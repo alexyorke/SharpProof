@@ -29,9 +29,9 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | 4 | 0 | 8 | 0 | partially-modeled |
 | M:System.Action`1.Invoke(`0) | call | 7 | 6 | 0 | 7 | 0 | unmodeled |
-| M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | 5 | 0 | 7 | 0 | unmodeled |
+| M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | 5 | 0 | 7 | 0 | partially-modeled |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | 7 | 0 | 7 | 0 | partially-modeled |
-| M:System.ArgumentException.#ctor(System.String) | call | 5 | 5 | 0 | 5 | 0 | unmodeled |
+| M:System.ArgumentException.#ctor(System.String) | call | 5 | 5 | 0 | 5 | 0 | partially-modeled |
 | M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | 3 | 0 | 5 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | 5 | 0 | 5 | 0 | partially-modeled |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | 3 | 0 | 5 | 0 | unmodeled |
@@ -71,7 +71,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.String.Replace(System.String,System.String) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
 | M:System.String.ToCharArray | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | P:System.Collections.Generic.Dictionary`2.Values | read | 2 | 2 | 0 | 2 | 0 | unmodeled |
-| M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
+| M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | 1 | 0 | 1 | 0 | partially-modeled |
 | M:System.ArgumentNullException.ThrowIfNull(System.Object,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
 | M:System.ArgumentOutOfRangeException.ThrowIfGreaterThan``1(``0,``0,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
 | M:System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero``1(``0,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |

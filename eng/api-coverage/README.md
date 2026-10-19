@@ -72,7 +72,16 @@ production frontend, and interprets their result and receiver-safety conditions 
 runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
 and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
 must be rejected. Integer and Count edges are described below. Every inventoried
-intrinsic requires a registered behavioral probe. Conversion probes cover the nine
+intrinsic requires a registered behavioral probe. The guarded exception-construction
+probe covers the exact KeyNotFoundException(string), ArgumentException(string), and
+ArgumentException(string,string) declarations with null/empty/nonempty messages,
+argument-order side effects and CLR/IR normal-path agreement. Choosing a normal
+resource path in this probe consumes approximation; it supplies no native replay authority.
+Separate worker tests preserve ambient callback effects, require nonnull-message
+preconditions where needed and check runtime culture/inner-exception boundaries.
+The constructor guards' 1,756 finite runtime cases are evidence, not a claim that
+all constructor behavior or every caller is covered. See [the open exception work](gaps.md#exception-message-construction-slice).
+Conversion probes cover the nine
 integer/Char domains and Boolean 0/1, signed Int64 result width, and the UInt64
 overflow boundary. Native tests retain argument and class-initialization effects
 while checking arithmetic proof/refutation. Separate CLR/IR oracles check actual

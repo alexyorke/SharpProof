@@ -9,17 +9,19 @@ namespace SharpProof.Worker.Test;
 public sealed class ExplicitFilterThrowControlTests
 {
     [TestCase("[DoesNotThrow]", "true", "throw null;", false)]
-    [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", true)]
+    [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", null)]
+    [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", true, true, true)]
     [TestCase("[EnforcePure]", "(State = 1) == 1 ? throw new System.ArgumentException() : false", "", false)]
     [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", false, false)]
     public async Task FilterWritesAndEscapingOriginalExceptionsRemainObservable(
-        string attribute, string filter, string handler, bool proven, bool catchOriginal = true)
+        string attribute, string filter, string handler, bool? proven, bool catchOriginal = true, bool explicitOriginal = false)
     {
         System.ArgumentNullException.ThrowIfNull(attribute);
         System.ArgumentNullException.ThrowIfNull(filter);
         System.ArgumentNullException.ThrowIfNull(handler);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
-            attribute + " public static void Target() { try { throw new System.DivideByZeroException(); } " +
+            attribute + " public static void Target() { try { throw " +
+            (explicitOriginal ? "new System.DivideByZeroException(\"original\")" : "new System.DivideByZeroException()") + "; } " +
             "catch (System.DivideByZeroException) when (" + filter + ") { " + handler + " } " +
             (catchOriginal ? "catch (System.DivideByZeroException) { }" : "catch (System.ArgumentException) { }") + " } }";
         using var image = new MemoryStream();
@@ -46,6 +48,6 @@ public sealed class ExplicitFilterThrowControlTests
         var result = attribute == "[EnforcePure]"
             ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)
             : await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(result.Outcome, proven is null ? Is.Null : proven.Value ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 }

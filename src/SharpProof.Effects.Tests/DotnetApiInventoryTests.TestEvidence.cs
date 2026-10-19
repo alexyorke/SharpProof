@@ -16,6 +16,14 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=guarded-exception-message-construction", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "null, empty and explicit messages; reverse named arguments; allocation retained; compiled CLR/IR normal-path agreement and deliberately wrong result; native callback effects, message preconditions and culture callback controls in ExceptionConstruction tests",
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, false),
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=typed-sz-array-clear-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,

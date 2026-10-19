@@ -49,6 +49,35 @@ internal static class IrOpaqueCallSite
 
     private const string DictionaryInitializationPrefix = "framework-scalar-dictionary-ready:";
 
+    private const string ExceptionInitializationPrefix = "framework-invariant-exception-ready:";
+
+    internal static bool IsExceptionInitializationKind(string kind)
+    {
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        return kind is "Argument" or "ArgumentNull" or "ArgumentNullName" or "ArgumentRange" or "ArgumentRangeName" or
+            "InvalidOperation" or "InvalidOperationNull" or "DivideByZero" or "IOException" or "ObjectDisposedName" or
+            "Aggregate" or "AggregateNull" or "KeyNotFoundNull";
+    }
+
+    internal static string ExceptionInitialization(string kind)
+    {
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        if (!IsExceptionInitializationKind(kind))
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        return ExceptionInitializationPrefix + kind;
+    }
+
+    internal static string? ExceptionInitializationKind(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        if (!description.StartsWith(ExceptionInitializationPrefix, StringComparison.Ordinal))
+        { return null; }
+        var kind = description.Substring(ExceptionInitializationPrefix.Length);
+        return IsExceptionInitializationKind(kind) ? kind : null;
+    }
+
     internal static string DictionaryInitialization(string primitive)
     {
         primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));

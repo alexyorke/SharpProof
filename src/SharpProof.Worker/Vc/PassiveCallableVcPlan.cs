@@ -332,7 +332,61 @@ internal sealed class PassiveCallableVcPlan
     {
         ArgumentNullException.ThrowIfNull(request);
         return ObserveIntegralConvertInitialization(Factory, request, WarmIntegralConvert) ??
-            ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+            ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ??
+            ObserveExceptionInitialization(Factory, request, WarmExceptionConstructor) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal static IrValue? ObserveExceptionInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
+            IrOpaqueCallSite.ExceptionInitializationKind(factory, request.Site) is not { } kind)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        try
+        {
+            if (!observe(kind))
+            { return null; }
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException or System.Resources.MissingManifestResourceException)
+        { return null; }
+        return factory.CreateBooleanValue(false);
+    }
+
+    internal static bool WarmExceptionConstructor(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        if (!IrOpaqueCallSite.IsExceptionInitializationKind(kind))
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        // Only the actual invariant, non-derived culture context is eligible.
+        // No locale switch, satellite loading, user culture or arbitrary format
+        // argument is executed to manufacture replay authority.
+        var ui = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        if (ui.GetType() != typeof(System.Globalization.CultureInfo) || culture.GetType() != typeof(System.Globalization.CultureInfo) ||
+            ui.Name.Length != 0 || culture.Name.Length != 0)
+        { return false; }
+#pragma warning disable CA2208 // Observe exact parameterless runtime APIs, rather than validating this helper's arguments.
+        Exception probe = kind switch
+        {
+            "Argument" => new ArgumentException(),
+            "ArgumentNull" => new ArgumentNullException(),
+            "ArgumentNullName" => new ArgumentNullException(nameof(kind)),
+            "ArgumentRange" => new ArgumentOutOfRangeException(),
+            "ArgumentRangeName" => new ArgumentOutOfRangeException(nameof(kind)),
+            "InvalidOperation" => new InvalidOperationException(),
+            "InvalidOperationNull" => new InvalidOperationException((string?)null),
+            "DivideByZero" => new DivideByZeroException(),
+            "IOException" => new IOException(),
+            "ObjectDisposedName" => new ObjectDisposedException(nameof(kind)),
+            "Aggregate" => new AggregateException(),
+            "AggregateNull" => new AggregateException((string?)null),
+            // The whitelist above leaves only KeyNotFoundNull here.
+            _ => new KeyNotFoundException((string?)null)
+        };
+#pragma warning restore CA2208
+        return probe.GetType().Assembly == typeof(Exception).Assembly;
     }
 
     internal static IrValue? ObserveIntegralConvertInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)

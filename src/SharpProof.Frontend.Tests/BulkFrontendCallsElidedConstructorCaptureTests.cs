@@ -122,7 +122,8 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             foreach (var flag in new[] { false, true })
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) });
+                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) },
+                    maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
                 Assert.That(replay.Status, Is.EqualTo(enabled ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                 if (enabled)
                 {
@@ -134,8 +135,7 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
                 }
                 else
                 { Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17))); }
-                Assert.That(replay.ConsumedApproximation, Is.False);
-                Assert.That(replay.ApproximationVariables, Is.Empty);
+                ExceptionConstructorNormalReplay.AssertApproximation(replay, enabled && flag);
             }
         }
         finally
