@@ -138,7 +138,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         {
             using var image = Emit(compilation);
             var runtime = loadContext.LoadFromStream(image).GetType("Target")!.GetMethod("Read")!;
-            foreach (var input in new object?[] { null, nonNull })
+            foreach (var input in ImmutableArray.Create<object?>(null, nonNull))
             {
                 Assert.That(runtime.Invoke(null, [input]), Is.SameAs(input));
                 var value = input == null ? factory.CreateNullValue(type) : typeName switch

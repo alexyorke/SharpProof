@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -57,7 +58,7 @@ internal static class SharpProofSymbolPackageValidator
                     "SharpProof.",
                     StringComparison.Ordinal))
             .OrderBy(static entry => entry.FullName, StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         if (assemblies.Length == 0)
         {
             throw new InvalidDataException(
@@ -66,14 +67,14 @@ internal static class SharpProofSymbolPackageValidator
 
         var expectedPdbNames = assemblies
             .Select(static entry => entry.FullName[..^4] + ".pdb")
-            .ToArray();
+            .ToImmutableArray();
         var actualPdbNames = symbols.Entries
             .Where(static entry => entry.FullName.EndsWith(
                 ".pdb",
                 StringComparison.OrdinalIgnoreCase))
             .Select(static entry => entry.FullName)
             .Order(StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         if (!actualPdbNames.SequenceEqual(expectedPdbNames, StringComparer.Ordinal))
         {
             throw new InvalidDataException(
@@ -120,7 +121,7 @@ internal static class SharpProofSymbolPackageValidator
             .Where(static entry => entry.FullName.EndsWith(
                 ".nuspec",
                 StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+            .ToImmutableArray();
         if (nuspecEntries.Length != 1)
         {
             throw new InvalidDataException(
@@ -194,7 +195,7 @@ internal static class SharpProofSymbolPackageValidator
         using var peReader = new PEReader(assemblyImage);
         var codeViewEntries = peReader.ReadDebugDirectory()
             .Where(static entry => entry.Type == DebugDirectoryEntryType.CodeView)
-            .ToArray();
+            .ToImmutableArray();
         if (codeViewEntries.Length != 1)
         {
             throw new InvalidDataException(
@@ -268,7 +269,7 @@ internal static class SharpProofSymbolPackageValidator
         var sourceLinks = reader.CustomDebugInformation
             .Select(reader.GetCustomDebugInformation)
             .Where(information => reader.GetGuid(information.Kind) == SourceLinkKind)
-            .ToArray();
+            .ToImmutableArray();
         if (sourceLinks.Length != 1)
         {
             throw new InvalidDataException(
@@ -286,7 +287,7 @@ internal static class SharpProofSymbolPackageValidator
             throw new InvalidDataException(
                 $"Portable PDB '{pdbEntry.FullName}' has malformed Source Link.");
         }
-        var mappings = documents.EnumerateObject().ToArray();
+        var mappings = documents.EnumerateObject().ToImmutableArray();
         if (mappings.Length == 0 || mappings.Any(mapping =>
                 !mapping.Name.Replace('\\', '/').EndsWith(
                     "/*",

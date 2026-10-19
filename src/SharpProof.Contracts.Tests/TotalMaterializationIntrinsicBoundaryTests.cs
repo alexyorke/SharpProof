@@ -57,11 +57,11 @@ public sealed class TotalMaterializationIntrinsicBoundaryTests
         var publicResult = new ContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(moduleResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(moduleResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(new[] { BoundContractKind.Requires }));
-        Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(new[] { BoundContractKind.Requires }));
+        Assert.That(moduleResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));
+        Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));
         var entry = context.Parameters.Single().Entry;
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { false, true })
+        foreach (var input in ImmutableArray.Create(false, true))
         {
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateBooleanValue(input));
             Assert.That(interpreter.Evaluate(moduleResult.Clauses[0].Value, values).Value!.Boolean, Is.EqualTo(input));

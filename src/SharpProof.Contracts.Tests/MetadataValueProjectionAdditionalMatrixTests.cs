@@ -359,7 +359,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
         var compilation = TestCompilation.Create(
                 "MetadataValueProjectionMatrixConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(compilation);
         using var consumerImage = new MemoryStream();
         var emittedConsumer = compilation.Emit(consumerImage);

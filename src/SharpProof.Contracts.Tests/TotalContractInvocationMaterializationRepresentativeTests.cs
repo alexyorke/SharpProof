@@ -78,7 +78,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var requires = TotalContractInvocationMaterialization.Bind(
             context, api, new ContractIntrinsicValidator(api), resolution, candidates, requiresOnly: true);
         Assert.That(requires.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(requires.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(new[] { BoundContractKind.Requires }));
+        Assert.That(requires.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));
     }
 
     [Test]
@@ -139,20 +139,20 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
     {
         System.ArgumentNullException.ThrowIfNull(factory);
         Assert.That(clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(
-            new[] { BoundContractKind.Requires, BoundContractKind.Assume, BoundContractKind.Ensures }));
+            ImmutableArray.Create(BoundContractKind.Requires, BoundContractKind.Assume, BoundContractKind.Ensures)));
         var result = context.Result ?? throw new AssertionException("Boolean target must own a result variable.");
         var parameter = context.Parameters.Single();
         var interpreter = new IrInterpreter(factory);
-        foreach (var entry in new[] { false, true })
+        foreach (var entry in ImmutableArray.Create(false, true))
         {
-            foreach (var current in new[] { false, true })
+            foreach (var current in ImmutableArray.Create(false, true))
             {
-                foreach (var previous in new[] { false, true })
+                foreach (var previous in ImmutableArray.Create(false, true))
                 {
-                    foreach (var returned in new[] { false, true })
+                    foreach (var returned in ImmutableArray.Create(false, true))
                     {
                         var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateBooleanValue(entry)).SetItem(parameter.Current, factory.CreateBooleanValue(current)).SetItem(parameter.PreState, factory.CreateBooleanValue(previous)).SetItem(result, factory.CreateBooleanValue(returned));
-                        var expected = new[] { entry, !current, returned == previous };
+                        var expected = ImmutableArray.Create(entry, !current, returned == previous);
                         for (var index = 0; index < clauses.Length; index++)
                         {
                             Assert.That(interpreter.Evaluate(clauses[index].Value, values).Value!.Boolean, Is.EqualTo(expected[index]));

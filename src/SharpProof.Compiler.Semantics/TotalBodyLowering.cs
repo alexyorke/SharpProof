@@ -53,7 +53,6 @@ internal static class TotalBodyLowering
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        context.AllowObjectWidening = prepareMetadata != null;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var contracts = new ExternalEffectResolver(compilation, apiSpecs);
         var invocationEmission = new InvocationEmissionPolicy(compilation);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
@@ -60,9 +61,9 @@ public sealed class TotalClosedAttributeBoundarySampleTests
         var runtime = System.Reflection.Assembly.Load(image.ToArray()).GetType("Target")!.GetMethod("Read")!;
         var values = typeName switch
         {
-            "sbyte" => new BigInteger[] { -128, -1, 0, 1, 127 },
-            "ushort" => new BigInteger[] { 0, 1, 128, 129, ushort.MaxValue },
-            _ => new BigInteger[] { 0, 1, 128, 129, ulong.MaxValue }
+            "sbyte" => ImmutableArray.Create<BigInteger>(-128, -1, 0, 1, 127),
+            "ushort" => ImmutableArray.Create<BigInteger>(0, 1, 128, 129, ushort.MaxValue),
+            _ => ImmutableArray.Create<BigInteger>(0, 1, 128, 129, ulong.MaxValue)
         };
         foreach (var value in values)
         {

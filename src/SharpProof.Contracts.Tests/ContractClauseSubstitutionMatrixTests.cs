@@ -35,7 +35,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
 
     public static IEnumerable<TestCaseData> IntegerCases()
     {
-        foreach (var expression in new[] { 0, 1, 2, 4, 5 })
+        foreach (var expression in ImmutableArray.Create(0, 1, 2, 4, 5))
         {
             for (var transformation = 0; transformation < 3; transformation++)
             {
@@ -128,7 +128,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
         var substitutions = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement);
         Assert.Throws<ArgumentException>(new Action(() =>
             IrSubstitution.Substitute(factory, contracts.Clauses[0].Condition, substitutions)));
-        var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToArray();
+        var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToImmutableArray();
         var rejected = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
         Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(rejected.Clauses, Is.Empty);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -24,7 +25,7 @@ public sealed class EntryPointBodyOwnershipRecoveryTests
             compilation = compilation.WithOptions(compilation.Options.WithMainTypeName("Other"));
         }
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (selectNamedMain)
         {
             Assert.That(errors, Has.Length.EqualTo(1));

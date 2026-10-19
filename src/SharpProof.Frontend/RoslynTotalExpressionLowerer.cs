@@ -28,6 +28,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
 
     // Shadow skeletons record call edges only; they never take opaque calls.
+    internal bool AllowObjectWidening { get; init; }
     internal bool AllowOpaqueCalls { get; init; }
     internal bool ShadowCallSkeleton { get; init; }
 
@@ -305,7 +306,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 ? new(_factory.Null(_context.Type(operation.Type)), block, FrontendSubsetClassification.Exact)
                 : AllocateValue(operation, block);
         }
-        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
+        if (depth < 256 && (AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
                 IsTryCast: false, OperatorMethod: null, Conversion.IsImplicit: true, Type.SpecialType: SpecialType.System_Object,
                 Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.Array
@@ -317,7 +318,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 ? new(_factory.Cast(_factory.ObjectType, operand.Value), operand.Continuation, operand.Classification)
                 : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
-        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && CSharpOperationSemantics.ReferenceUpcast(operation) is { } upcast)
+        if (depth < 256 && (AllowObjectWidening || AllowOpaqueCalls) && CSharpOperationSemantics.ReferenceUpcast(operation) is { } upcast)
         {
             var operand = LowerBodyValue(upcast.Operand, block, depth + 1);
             return operand.Classification.IsExact

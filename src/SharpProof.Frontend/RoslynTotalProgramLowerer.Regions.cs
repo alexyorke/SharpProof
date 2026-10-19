@@ -114,6 +114,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,
+            AllowObjectWidening = _calls?.MetadataRequiresEnabled == true,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ShadowCallSkeleton = _preserveSourceCall != null,
             OpaqueEffects = _calls?.OpaqueEffects,

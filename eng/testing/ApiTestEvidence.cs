@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -62,7 +63,7 @@ internal static class ApiTestEvidence
         global::System.ArgumentNullException.ThrowIfNull(root);
         global::System.ArgumentNullException.ThrowIfNull(name);
         global::System.ArgumentNullException.ThrowIfNull(evidence);
-        var rows = evidence.OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api), StringComparer.Ordinal).ThenBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Facet), StringComparer.Ordinal).ToArray();
+        var rows = evidence.OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api), StringComparer.Ordinal).ThenBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Facet), StringComparer.Ordinal).ToImmutableArray();
         var directory = Path.Combine(root, "artifacts", "api-coverage");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, name + ".json"), JsonSerializer.Serialize(rows, JsonOptions) + "\n");

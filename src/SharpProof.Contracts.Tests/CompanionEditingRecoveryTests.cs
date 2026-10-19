@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -41,7 +42,7 @@ public sealed class CompanionEditingRecoveryTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         if (declared)
         {
             Assert.That(errors, Is.Empty);

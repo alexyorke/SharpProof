@@ -3568,3 +3568,14 @@ constructor input. Preserve target-first/last ordering, ordinal set membership, 
 map duplicates, native reflection/byte inputs and mutable backend queue/counters. Narrow
 the private nullable membership helper and remove redundant immutable recapture. Validate
 all affected fixtures after implementation. Status: open before edits.
+IMM-M120/M121/M123/M124/M126/M127/M129 verified: full ordinary Release semantic gate
+passes 11,854 tests in 23 framework summaries and six isolated scheduler tasks, zero
+failures/skips/build warnings/errors, exact embedded PDB export for 225 outputs.
+The initial build caught CS0841 in the new M121 null guard; declaration and ThrowIfNull
+are now separate, and this complete rerun passes. Contracts preserves all runtime/native
+subjects and six immutable image publications; M129 uses session-derived init options
+for ordinary/region/nested lowering instead of a mutable context flag. This new clean
+full gate supersedes the earlier failed timeout gate as current validation; the earlier
+timeout's cause remains unproven. M131 next Worker vectors remain open and are excluded
+from this gate and new builder classification. Literal checkpoint: 3,318 tokens across
+768 changed C# files match master 16063804e; M131 literals require a later checkpoint.

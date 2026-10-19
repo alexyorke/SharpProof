@@ -104,7 +104,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var emit = library.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
         var compilation = TestCompilation.Create("MetadataValueProjectionConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(compilation);
         using var consumerImage = new MemoryStream();
         var consumerEmit = compilation.Emit(consumerImage);

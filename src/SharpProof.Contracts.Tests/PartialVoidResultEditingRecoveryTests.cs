@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -37,10 +38,10 @@ public sealed class PartialVoidResultEditingRecoveryTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         var root = tree.GetRoot();
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToArray();
+            .Where(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToImmutableArray();
         var definitionSyntax = methods.Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body == null));
         var implementationSyntax = methods.Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body != null));
         if (mismatched)
@@ -105,7 +106,7 @@ public sealed class PartialVoidResultEditingRecoveryTests
             Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
             var resultVariable = result.Contracts.Variables
                 .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result)).Variable;
-            foreach (var value in new[] { false, true })
+            foreach (var value in ImmutableArray.Create(false, true))
             {
                 var evaluation = new IrInterpreter(factory).Evaluate(result.Contracts.Clauses[0].Condition,
                     global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(resultVariable, factory.CreateBooleanValue(value)));

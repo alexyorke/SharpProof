@@ -183,7 +183,7 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var value = factory.Variable(variable);
         var valueRequests = 0;
-        var operationSites = new List<SyntaxNode?>();
+        var operationSiteBuilder = ImmutableArray.CreateBuilder<SyntaxNode?>();
         var result = ClosedContractAttributeBinding.BindValue(
             factory,
             api.Selections,
@@ -200,16 +200,17 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
             total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
-                operationSites.Add(syntax);
+                operationSiteBuilder.Add(syntax);
                 return factory.CreateOperation("held-marker-control");
             });
+        var operationSites = operationSiteBuilder.ToImmutable();
 
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses, Has.Length.EqualTo(1));
         Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[Positive] value"));
         Assert.That(result.Clauses[0].SourceSyntax, Is.Not.Null);
         Assert.That(valueRequests, Is.EqualTo(1));
-        Assert.That(operationSites, Has.Count.EqualTo(1));
+        Assert.That(operationSites, Has.Length.EqualTo(1));
         Assert.That(operationSites[0] is not null, Is.EqualTo(semantics == IrExecutionSemantics.Total));
 
         var interpreter = new IrInterpreter(factory);
@@ -328,7 +329,7 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
             emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
 
         var consumer = TestCompilation.Create("ClosedAttributeMetadataConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(consumer);
         var method = consumer.GetTypeByMetadataName("Library")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();

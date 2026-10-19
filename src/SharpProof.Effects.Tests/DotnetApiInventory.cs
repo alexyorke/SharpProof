@@ -170,7 +170,7 @@ internal static class DotnetApiInventory
         static ImmutableDictionary<string, string> Index(IEnumerable<string> lines)
         {
             global::System.ArgumentNullException.ThrowIfNull(lines);
-            var index = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+            var index = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
             foreach (var line in lines)
             {
                 global::System.ArgumentNullException.ThrowIfNull(line);
@@ -179,9 +179,9 @@ internal static class DotnetApiInventory
                 {
                     throw new ArgumentException("An item with the same key has already been added. Key: " + key);
                 }
-                index = index.Add(key, line);
+                index.Add(key, line);
             }
-            return index;
+            return index.ToImmutable();
         }
 
         var before = Index(baseline);

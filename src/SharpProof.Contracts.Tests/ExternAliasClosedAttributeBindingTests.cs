@@ -123,7 +123,7 @@ public sealed class ExternAliasClosedAttributeBindingTests
         var operation = factory.GetOperationInfo(clause.SourceOperation);
         Assert.That(operation.SourceSpan!.Start, Is.EqualTo(attributeSyntax.SpanStart));
         Assert.That(operation.SourceSpan.Length, Is.EqualTo(attributeSyntax.Span.Length));
-        Assert.That(IrTermAnalysis.CollectVariables(clause.Condition), Is.EquivalentTo(new[] { variable }));
+        Assert.That(IrTermAnalysis.CollectVariables(clause.Condition), Is.EquivalentTo(ImmutableArray.Create(variable)));
         var runtimeMethod = System.Reflection.Assembly.Load(image.ToArray())
             .GetType("Target")!.GetMethod("Read")!;
         var interpreter = new IrInterpreter(factory);

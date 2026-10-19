@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -36,7 +37,7 @@ public sealed class ContractEditingRecoveryTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         var model = compilation.GetSemanticModel(tree);
         var root = tree.GetRoot();
         var defaultSyntax = root.DescendantNodes().OfType<DefaultExpressionSyntax>().Single();

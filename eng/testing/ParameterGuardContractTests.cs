@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -9,7 +10,7 @@ public sealed class ParameterGuardContractTests
     [Test]
     public void LinkedGuardsPreserveValuesAndNamedExceptionContracts()
     {
-        var types = GuardTypes().ToArray();
+        var types = GuardTypes().ToImmutableArray();
         Assert.That(types, Is.Not.Empty, "The test's production dependency closure must include shared guards.");
         foreach (var type in types)
         {
@@ -26,7 +27,7 @@ public sealed class ParameterGuardContractTests
             Assert.That(Invoke(type, "ValidateInitialized", [value, false, "input", null]), Is.SameAs(value));
             Assert.That(Invoke(type, "ValidateInitialized", [null, false, "input", null]), Is.Null);
             AssertFailure(type, "ValidateInitialized", [value, true, "input", "detail"], typeof(ArgumentException), "input", "detail");
-            foreach (var invalidName in new string?[] { null, "" })
+            foreach (var invalidName in ImmutableArray.Create<string?>(null, ""))
             {
                 AssertFailure(type, "ValidateInitialized", [value, false, invalidName, null], typeof(ArgumentException), "parameterName");
                 AssertFailure(type, "ThrowIfMissing", [false, invalidName], typeof(ArgumentException), "parameterName");
@@ -39,11 +40,11 @@ public sealed class ParameterGuardContractTests
 
     private static IEnumerable<Type> GuardTypes()
     {
-        var pending = new Queue<AssemblyName>(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (pending.Count != 0)
+        var pending = ImmutableQueue.CreateRange(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
+        var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        while (!pending.IsEmpty)
         {
-            var name = pending.Dequeue();
+            pending = pending.Dequeue(out var name);
             if (name.Name?.StartsWith("SharpProof.", StringComparison.Ordinal) != true || !visited.Add(name.FullName))
             { continue; }
             var assembly = Assembly.Load(name);
@@ -52,7 +53,7 @@ public sealed class ParameterGuardContractTests
             if (assembly.GetType("SharpProof.Internal." + component.Replace(".", "", StringComparison.Ordinal) + ".ParameterGuard") is { } guard)
             { yield return guard; }
             foreach (var reference in assembly.GetReferencedAssemblies())
-            { pending.Enqueue(reference); }
+            { pending = pending.Enqueue(reference); }
         }
     }
 

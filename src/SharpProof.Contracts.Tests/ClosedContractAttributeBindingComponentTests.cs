@@ -26,7 +26,7 @@ public sealed class ClosedContractAttributeBindingComponentTests
             var variable = factory.CreateVariable("count", factory.IntegerType);
             var value = factory.Variable(variable);
             var valueRequests = 0;
-            var operationSites = new List<SyntaxNode?>();
+            var operationSiteBuilder = ImmutableArray.CreateBuilder<SyntaxNode?>();
             var result = ClosedContractAttributeBinding.BindValue(
                 factory,
                 api.Selections,
@@ -43,9 +43,10 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 total: semantics == IrExecutionSemantics.Total,
                 syntax =>
                 {
-                    operationSites.Add(syntax);
+                    operationSiteBuilder.Add(syntax);
                     return factory.CreateOperation("held-attribute");
                 });
+            var operationSites = operationSiteBuilder.ToImmutable();
 
             Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
             Assert.That(result.Clauses, Has.Length.EqualTo(2));
@@ -54,7 +55,7 @@ public sealed class ClosedContractAttributeBindingComponentTests
             Assert.That(result.Clauses.All(static clause => clause.Kind == BoundContractKind.Requires), Is.True);
             Assert.That(result.Clauses.All(static clause => clause.SourceSyntax is not null), Is.True);
             Assert.That(valueRequests, Is.EqualTo(2));
-            Assert.That(operationSites, Has.Count.EqualTo(2));
+            Assert.That(operationSites, Has.Length.EqualTo(2));
             Assert.That(operationSites.All(static syntax => syntax is not null), Is.EqualTo(semantics == IrExecutionSemantics.Total));
 
             var interpreter = new IrInterpreter(factory);

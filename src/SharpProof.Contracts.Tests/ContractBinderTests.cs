@@ -413,11 +413,9 @@ public sealed class ContractBinderTests
 
         using (Assert.EnterMultipleScope())
         {
-            foreach (var methodName in new[]
-                     {
-                         "InvalidEnsures",
+            foreach (var methodName in ImmutableArray.Create("InvalidEnsures",
                          "InvalidAssume"
-                     })
+))
             {
                 var full = subject.Bind("Target", methodName);
                 var requires = subject.BindRequires("Target", methodName);
@@ -1881,13 +1879,12 @@ public sealed class ContractBinderTests
             Path.Combine(root, "src/SharpProof.Contracts"),
             "*.cs",
             SearchOption.AllDirectories);
-        var forbidden = new[] {
-            "SyntaxFactory.",
+        var forbidden = ImmutableArray.Create("SyntaxFactory.",
             "ParseExpression(",
             "ParseStatement(",
             "GetSpeculative",
             "ToDisplayString("
-        };
+);
         foreach (var file in files)
         {
             var text = File.ReadAllText(file);

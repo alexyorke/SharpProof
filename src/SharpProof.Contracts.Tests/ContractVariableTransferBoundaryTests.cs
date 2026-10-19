@@ -53,16 +53,18 @@ public sealed class ContractVariableTransferBoundaryTests
         var factory = new IrFactory();
         var source = Bind(compilation, factory, "Frames", "Source");
         var destination = Bind(compilation, factory, "Frames", "Destination");
-        var callbackInputs = new List<IrVarId>();
-        var callbackOutputs = new List<IrVarId>();
+        var callbackInputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
+        var callbackOutputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
 
         var substitutions = CreateMap(
             factory,
             source,
             destination,
             ParameterBindings(source),
-            callbackInputs,
-            callbackOutputs);
+            callbackInputBuilder,
+            callbackOutputBuilder);
+        var callbackInputs = callbackInputBuilder.ToImmutable();
+        var callbackOutputs = callbackOutputBuilder.ToImmutable();
 
         Assert.That(substitutions, Is.Not.Null);
         var completeSubstitutions = substitutions!;
@@ -77,7 +79,7 @@ public sealed class ContractVariableTransferBoundaryTests
         var oldPairs = PreStatePairs(source);
         Assert.That(oldPairs, Has.Length.EqualTo(2));
         Assert.That(callbackInputs, Is.EqualTo(destinationParameters.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))));
-        Assert.That(callbackOutputs, Has.Count.EqualTo(2));
+        Assert.That(callbackOutputs, Has.Length.EqualTo(2));
         Assert.That(
             oldPairs.Select(pair => completeSubstitutions[pair.Value].Variable),
             Is.EqualTo(callbackOutputs));
@@ -119,8 +121,8 @@ public sealed class ContractVariableTransferBoundaryTests
         var factory = new IrFactory();
         var companionSource = Bind(compilation, factory, "ApiTargetContracts", "Read");
         var apiTarget = Bind(compilation, factory, "ApiTarget", "Read");
-        var callbackInputs = new List<IrVarId>();
-        var callbackOutputs = new List<IrVarId>();
+        var callbackInputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
+        var callbackOutputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
 
         Assert.That(apiTarget.Contracts.UsesCompanion, Is.True);
         Assert.That(
@@ -134,8 +136,10 @@ public sealed class ContractVariableTransferBoundaryTests
             companionSource,
             apiTarget,
             sourceParameters,
-            callbackInputs,
-            callbackOutputs);
+            callbackInputBuilder,
+            callbackOutputBuilder);
+        var callbackInputs = callbackInputBuilder.ToImmutable();
+        var callbackOutputs = callbackOutputBuilder.ToImmutable();
 
         Assert.That(substitutions, Is.Not.Null);
         var completeSubstitutions = substitutions!;
@@ -149,9 +153,9 @@ public sealed class ContractVariableTransferBoundaryTests
         Assert.That(
             completeSubstitutions[RequiredResultVariable(companionSource)].Variable,
             Is.EqualTo(RequiredResultVariable(apiTarget)));
-        Assert.That(callbackInputs, Has.Count.EqualTo(1));
+        Assert.That(callbackInputs, Has.Length.EqualTo(1));
         Assert.That(callbackInputs.Single(), Is.EqualTo(destinationParameter.Variable));
-        Assert.That(callbackOutputs, Has.Count.EqualTo(1));
+        Assert.That(callbackOutputs, Has.Length.EqualTo(1));
         Assert.That(
             completeSubstitutions[PreStatePairs(companionSource).Single().Value].Variable,
             Is.EqualTo(callbackOutputs.Single()));
@@ -167,8 +171,8 @@ public sealed class ContractVariableTransferBoundaryTests
         var sourceReceiver = RoleVariables(source, BoundContractVariableRole.Receiver).Single();
         var sourceParameter = Parameters(source).Single();
         var clauseVariables = IrTermAnalysis.CollectVariables(source.Contracts.Clauses.Single().Condition);
-        var callbackInputs = new List<IrVarId>();
-        var callbackOutputs = new List<IrVarId>();
+        var callbackInputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
+        var callbackOutputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
 
         Assert.That(clauseVariables, Does.Contain(sourceParameter.Variable));
         Assert.That(clauseVariables, Does.Not.Contain(sourceReceiver.Variable));
@@ -178,8 +182,10 @@ public sealed class ContractVariableTransferBoundaryTests
             source,
             destination,
             ParameterBindings(source),
-            callbackInputs,
-            callbackOutputs);
+            callbackInputBuilder,
+            callbackOutputBuilder);
+        var callbackInputs = callbackInputBuilder.ToImmutable();
+        var callbackOutputs = callbackOutputBuilder.ToImmutable();
 
         Assert.That(substitutions, Is.Null);
         Assert.That(callbackInputs, Is.Empty);
@@ -193,8 +199,8 @@ public sealed class ContractVariableTransferBoundaryTests
         var factory = new IrFactory();
         var source = Bind(compilation, factory, "ResultOnly", "Read");
         var destination = Bind(compilation, factory, "Frames", "Sink");
-        var callbackInputs = new List<IrVarId>();
-        var callbackOutputs = new List<IrVarId>();
+        var callbackInputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
+        var callbackOutputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
 
         Assert.That(ResultVariable(source).HasValue, Is.True);
         Assert.That(ResultVariable(destination).HasValue, Is.False);
@@ -203,8 +209,10 @@ public sealed class ContractVariableTransferBoundaryTests
             source,
             destination,
             ParameterBindings(source),
-            callbackInputs,
-            callbackOutputs);
+            callbackInputBuilder,
+            callbackOutputBuilder);
+        var callbackInputs = callbackInputBuilder.ToImmutable();
+        var callbackOutputs = callbackOutputBuilder.ToImmutable();
 
         Assert.That(substitutions, Is.Null);
         Assert.That(callbackInputs, Is.Empty);
@@ -226,8 +234,8 @@ public sealed class ContractVariableTransferBoundaryTests
             .Where(binding => binding.Variable != missingCurrent)
             .ToImmutableArray();
         Assert.That(incompleteBindings, Has.Length.EqualTo(1));
-        var callbackInputs = new List<IrVarId>();
-        var callbackOutputs = new List<IrVarId>();
+        var callbackInputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
+        var callbackOutputBuilder = ImmutableArray.CreateBuilder<IrVarId>();
 
         var substitutions = ContractVariableTransfer.CreateSubstitutions(
             factory,
@@ -240,11 +248,13 @@ public sealed class ContractVariableTransferBoundaryTests
                 .ToImmutableArray(),
             oldPairs,
             destination.Contracts.Variables,
-            current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (CreatePreState(factory, current, callbackInputs, callbackOutputs)));
+            current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (CreatePreState(factory, current, callbackInputBuilder, callbackOutputBuilder)));
+        var callbackInputs = callbackInputBuilder.ToImmutable();
+        var callbackOutputs = callbackOutputBuilder.ToImmutable();
 
         Assert.That(substitutions, Is.Null);
-        Assert.That(callbackInputs, Has.Count.EqualTo(1));
-        Assert.That(callbackOutputs, Has.Count.EqualTo(1));
+        Assert.That(callbackInputs, Has.Length.EqualTo(1));
+        Assert.That(callbackOutputs, Has.Length.EqualTo(1));
         var firstPairParameter = sourceBindings.Single(binding => binding.Variable == oldPairs[0].Key);
         var firstPairOrdinal = ((IParameterSymbol)firstPairParameter.Symbol).Ordinal;
         var expectedDestinationCurrent = Parameters(destination)
@@ -261,8 +271,8 @@ public sealed class ContractVariableTransferBoundaryTests
         BoundFrame source,
         BoundFrame destination,
         ImmutableArray<FrontendVariableBinding> sourceParameters,
-        List<IrVarId> callbackInputs,
-        List<IrVarId> callbackOutputs)
+        ImmutableArray<IrVarId>.Builder callbackInputs,
+        ImmutableArray<IrVarId>.Builder callbackOutputs)
     {
 
         System.ArgumentNullException.ThrowIfNull(callbackInputs);
@@ -297,8 +307,8 @@ public sealed class ContractVariableTransferBoundaryTests
     private static IrVarId CreatePreState(
         IrFactory factory,
         IrVarId current,
-        List<IrVarId> callbackInputs,
-        List<IrVarId> callbackOutputs)
+        ImmutableArray<IrVarId>.Builder callbackInputs,
+        ImmutableArray<IrVarId>.Builder callbackOutputs)
     {
         if (current.IsDefault)
         {
