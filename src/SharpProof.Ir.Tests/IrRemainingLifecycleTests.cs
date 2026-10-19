@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -158,7 +159,7 @@ public sealed class IrRemainingLifecycleTests
     public void FactoryInterningDistinguishesDifferentArgumentSequences()
     {
         var factory = new IrFactory();
-        var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToArray();
+        var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToImmutableArray();
         Assert.That(values[397].Id.Value - values[0].Id.Value, Is.EqualTo(397));
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Pair", factory.IntegerType, true,
             factory.IntegerType, factory.IntegerType);

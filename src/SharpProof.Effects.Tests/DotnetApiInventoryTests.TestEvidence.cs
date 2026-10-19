@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -9,11 +10,12 @@ public sealed partial class DotnetApiInventoryTests
 {
     private static readonly string IntrinsicEvidenceTest = typeof(DotnetApiInventoryTests).FullName + "." + nameof(PinnedFrameworkApiSurfaceAndSupportEvidenceMatchReviewedBaseline);
     private static readonly ImmutableArray<(string? Left, string? Right)> EqualityEdges = [("same", "same"), ("left", "right"), ("", ""), (null, null), (null, "value"), ("value", null), ("a\0b", "a\0b"), ("\u00e9", "e")];
-    private static void WriteIntrinsicTestEvidence(string root, CSharpCompilation compilation, DotnetApiInventory.Row[] inventory)
+    private static void WriteIntrinsicTestEvidence(string root, CSharpCompilation compilation, ImmutableArray<DotnetApiInventory.Row> inventory)
     {
         global::System.ArgumentNullException.ThrowIfNull(root);
         global::System.ArgumentNullException.ThrowIfNull(compilation);
-        global::System.ArgumentNullException.ThrowIfNull(inventory);
+        if (inventory.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(inventory)); }
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
             if (row.Evidence.Contains("intrinsic=object-reference-identity", StringComparison.Ordinal))
@@ -84,7 +86,7 @@ public sealed partial class DotnetApiInventoryTests
                 _ => (bool?)null
             };
             return instance.HasValue ? ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "equal, unequal, empty, null receiver/argument, embedded null, ordinal Unicode; compiled lowering and IR evaluation versus runtime", () => CheckEqualityIntrinsic(compilation, instance.Value, false), () => CheckEqualityIntrinsic(compilation, instance.Value, true)) : new ApiTestEvidence.Row(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "", "missing", "No behavioral probe registered for this intrinsic.");
-        }).ToArray();
+        }).ToImmutableArray();
         ApiTestEvidence.Write(root, "intrinsic-test-evidence", rows);
         Assert.That(rows, Is.Not.Empty);
         Assert.That(rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status != "passed")).Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api + ": " + row.Detail)), Is.Empty, "Every inventoried intrinsic needs passing behavioral evidence; see intrinsic-test-evidence.md.");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -114,7 +115,7 @@ public sealed partial class DotnetApiInventoryTests
 
         )
         {
-            var values = Enumerable.Range(0, size).ToArray();
+            var values = Enumerable.Range(0, size).ToImmutableArray();
             var observed = api switch
             {
                 "P:System.Collections.Generic.List`1.Count" => new List<int>(values).Count,

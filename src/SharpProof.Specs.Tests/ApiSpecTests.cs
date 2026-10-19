@@ -91,7 +91,7 @@ public sealed class ApiSpecTests
         var annotations = output.GetCustomAttributes(inherit: false)
             .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.GetType().FullName ==
                 "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(annotations, Has.Length.EqualTo(1));
         var annotation = annotations[0];
@@ -1050,7 +1050,7 @@ public sealed class ApiSpecTests
                 constructor.Parameters.Length == 1 &&
                 constructor.Parameters[0].Type.SpecialType ==
                     SpecialType.System_String))
-            .ToArray();
+            .ToImmutableArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 1 &&
@@ -1063,7 +1063,7 @@ public sealed class ApiSpecTests
                 constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName ==
                 "InvalidOperationException" &&
                 constructor.Parameters.Length == 1)))
-            .ToArray();
+            .ToImmutableArray();
         var invalidOperationParameterless =
             invalidOperation.InstanceConstructors.Single(
                 static constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.IsEmpty));

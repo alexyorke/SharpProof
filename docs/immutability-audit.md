@@ -2696,3 +2696,23 @@ immutable helper return; nullable witness query fallbacks become typed immutable
 Use checked source nodes/IDs and validate the full ordinary IR and Specs projects,
 including missing evidence controls and runtime collection probes.
 Status: open before edits.
+
+IMM-M072 verified: all 120 ordinary Effects tests pass, zero warnings/errors. Coordinator
+and read-only review confirmed immutable inventory/helper signatures, node snapshots and
+all 13 changed query calls. Master330's opaque List additions are present (41 lines added
+to the previous 87-line file); its mutable List source and reflection arguments remain.
+The earlier read-only statement that those additions were absent was incorrect.
+
+IMM-M073 verified: all 485 ordinary IR tests and all 150 ordinary Specs tests pass,
+zero failures/skips and zero warnings/errors. Evidence rows freeze through ToImmutable;
+no exact-capacity assumption was made. Typed empty fallbacks preserve missing facet/
+postcondition evidence. Actual native/concurrent/SUT arrays remain. Refreshed C# scanner
+covers 1,869 files and 3,004 candidates; newly reviewed evidence builder classified.
+Literal check against master 7e0e485a preserved 2,968 raw/interpolated tokens across
+659 changed C# files. Additional tokens reflect newly changed source files in the
+comparison universe. The comprehensive residual audit remains open.
+
+Master synchronization: fresh fetch found cd3363c63108d54c31e5958ca602d967519f9b36
+(PR329, sealed frontend classes and TotalParameterBinding composition). Commit the
+verified M072-M073 changes before merging. Preserve composition-based input projection
+and separate RegionIncompleteException catches alongside immutable snapshots.

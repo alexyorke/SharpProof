@@ -71,7 +71,7 @@ public sealed class EffectContractWireParityTests
             new CSharpParseOptions(LanguageVersion.Preview));
         var parseErrors = syntaxTree.GetDiagnostics()
             .Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
+            .ToImmutableArray();
         var executableSyntax = FindExecutableCatalogSyntax(syntaxTree.GetRoot());
 
         using (Assert.EnterMultipleScope())
@@ -105,12 +105,12 @@ public sealed class EffectContractWireParityTests
                     .Any(method => method.ExpressionBody is not null),
                 Is.True);
             Assert.That(
-                probeSyntax.OfType<IfStatementSyntax>().ToArray(),
+                probeSyntax.OfType<IfStatementSyntax>().ToImmutableArray(),
                 Has.Length.EqualTo(1));
         }
     }
 
-    private static SyntaxNode[] FindExecutableCatalogSyntax(SyntaxNode root)
+    private static ImmutableArray<SyntaxNode> FindExecutableCatalogSyntax(SyntaxNode root)
     {
         ArgumentNullException.ThrowIfNull(root);
         return root.DescendantNodesAndSelf()
@@ -127,7 +127,7 @@ public sealed class EffectContractWireParityTests
                 || node is AccessorDeclarationSyntax accessor &&
                     (accessor.Body is not null || accessor.ExpressionBody is not null)
                 || node is InvocationExpressionSyntax invocation && !IsCatalogDataFactory(invocation))
-            .ToArray();
+            .ToImmutableArray();
     }
 
     private static bool IsCatalogDataFactory(InvocationExpressionSyntax invocation)

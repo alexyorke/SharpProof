@@ -822,7 +822,7 @@ public sealed class IrKernelTests
             var terms = operators
                 .Select(value => factory.Binary(value, operands[0], operands[1]))
                 .Cast<IrBinaryTerm>()
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(terms, Is.Unique);
             Assert.That(
                 terms.Select(static term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Operator)),

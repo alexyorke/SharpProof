@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -24,7 +25,7 @@ public sealed class ResolvedApiSpecNullabilityContractTests
         var annotations = output.GetCustomAttributes(inherit: false)
             .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.GetType().FullName ==
                 "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(annotations, Has.Length.EqualTo(1));
         var annotation = annotations[0];
         var attributeType = annotation.GetType();

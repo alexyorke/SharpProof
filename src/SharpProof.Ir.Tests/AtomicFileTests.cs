@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -102,7 +103,7 @@ public sealed class AtomicFileTests : IDisposable
                 AtomicFile.TryDeleteStaged(temporary);
             }
         }, TestContext.CurrentContext.CancellationToken, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
-            TaskScheduler.Default))).ToArray();
+            TaskScheduler.Default))).ToImmutableArray();
 
         start.SignalAndWait();
         await Task.WhenAll(publications);

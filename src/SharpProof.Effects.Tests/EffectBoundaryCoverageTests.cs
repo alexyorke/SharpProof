@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -77,7 +78,7 @@ public sealed class EffectBoundaryCoverageTests
     public void InitializerProjectionRecognizesFieldsPropertiesAndAbsentInitializers()
     {
         var root = CSharpSyntaxTree.ParseText("class C { int f = 1; int g; int P { get; } = 2; }").GetRoot();
-        var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>().ToArray();
+        var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>().ToImmutableArray();
         Assert.That(EffectProjections.GetInitializerExpression(variables[0])!.ToString(), Is.EqualTo("1"));
         Assert.That(EffectProjections.GetInitializerExpression(variables[1]), Is.Null);
         Assert.That(EffectProjections.GetInitializerExpression(root.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single())!.ToString(), Is.EqualTo("2"));

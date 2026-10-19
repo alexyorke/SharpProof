@@ -31,17 +31,17 @@ internal static class DotnetApiInventory
         public ImmutableArray<string> Changed { get; init; } = Changed.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Changed)) : Changed;
     }
 
-    internal static Row[] Collect(CSharpCompilation compilation)
+    internal static ImmutableArray<Row> Collect(CSharpCompilation compilation)
     {
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         // Contract ghost APIs belong to SharpProof.Attributes, outside this pack.
-        var failures = resolved.Failures.Where(failure => failure is null ? throw new global::System.ArgumentNullException(nameof(failure)) : (!failure.WitnessIdentifier.StartsWith("contract.", StringComparison.Ordinal))).ToArray();
+        var failures = resolved.Failures.Where(failure => failure is null ? throw new global::System.ArgumentNullException(nameof(failure)) : (!failure.WitnessIdentifier.StartsWith("contract.", StringComparison.Ordinal))).ToImmutableArray();
         if (failures.Length != 0)
         {
             throw new InvalidOperationException("Framework catalog resolution failed: " + string.Join(", ", failures.Select(failure => failure is null ? throw new global::System.ArgumentNullException(nameof(failure)) : (failure.ToString()))));
         }
 
-        return compilation.References.Select(compilation.GetAssemblyOrModuleSymbol).OfType<IAssemblySymbol>().SelectMany(assembly => assembly is null ? throw new global::System.ArgumentNullException(nameof(assembly)) : (Members(assembly.GlobalNamespace))).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (Describe(symbol, resolved))).OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key), StringComparer.Ordinal).ToArray();
+        return compilation.References.Select(compilation.GetAssemblyOrModuleSymbol).OfType<IAssemblySymbol>().SelectMany(assembly => assembly is null ? throw new global::System.ArgumentNullException(nameof(assembly)) : (Members(assembly.GlobalNamespace))).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (Describe(symbol, resolved))).OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key), StringComparer.Ordinal).ToImmutableArray();
     }
 
     internal static IEnumerable<ISymbol> Members(INamespaceOrTypeSymbol owner)
@@ -191,9 +191,10 @@ internal static class DotnetApiInventory
         return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
     }
 
-    internal static string Markdown(Row[] rows, Delta delta)
+    internal static string Markdown(ImmutableArray<Row> rows, Delta delta)
     {
-        global::System.ArgumentNullException.ThrowIfNull(rows);
+        if (rows.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(rows)); }
         global::System.ArgumentNullException.ThrowIfNull(delta);
         var report = new StringBuilder("# .NET API coverage inventory\n\n").Append(CultureInfo.InvariantCulture, $"Microsoft.NETCore.App.Ref {PackVersion}, {Framework}. {rows.Length} declarations.\n\n").Append(CultureInfo.InvariantCulture, $"Partial evidence: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "partially-modeled"))}; unmodeled: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "unmodeled"))}; excluded containers: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "excluded-container"))}.\n\n").Append(CultureInfo.InvariantCulture, $"Added: {delta.Added.Length}; removed: {delta.Removed.Length}; evidence changed: {delta.Changed.Length}.\n\n").Append("Partial evidence is not a universal proof guarantee. Unmodeled means no evidence from the default catalog or the audited intrinsic predicates.\n\n").Append("| Assembly | Declarations | Partial evidence | Unmodeled | Excluded containers |\n| --- | ---: | ---: | ---: | ---: |\n");
         foreach (var group in rows.GroupBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Assembly)))

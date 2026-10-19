@@ -57,7 +57,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             var identifier = template.Target.WitnessIdentifier;
             var row = Witnesses[identifier];
             var expectedFacets = ExpectedFacets(template);
-            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToArray();
+            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToImmutableArray();
 
             using (Assert.EnterMultipleScope())
             {
@@ -1035,7 +1035,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         prepare();
         var target = receiver();
         var fields = InstanceFields(target.GetType());
-        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToArray();
+        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToImmutableArray();
         invoke();
         for (var index = 0; index < fields.Length; index++)
         {
@@ -1278,7 +1278,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
         var counts = edges.Select(static edge =>
                 edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (Count((IEnumerable)edge()!)))
-            .ToArray();
+            .ToImmutableArray();
         if (counts.All(static count => count == 0))
         {
             return SpecCardinality.Empty;

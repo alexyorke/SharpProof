@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
@@ -107,7 +108,7 @@ public sealed partial class DotnetApiInventoryTests
         var lowered = new RoslynProgramLowerer(factory).LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.Classification.IsExact, Is.True);
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrCallInstruction>(), Is.Empty);
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new global::System.ArgumentNullException(nameof(havoc)) : (factory.GetOperationInfo(havoc.Operation).Description is { } description && factory.GetString(description).EndsWith(":interface-array:bounds", StringComparison.Ordinal))), Is.True);
         Assert.That(instructions.OfType<IrWriteInstruction>().Any(write => write is null ? throw new global::System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Static)), Is.True);
