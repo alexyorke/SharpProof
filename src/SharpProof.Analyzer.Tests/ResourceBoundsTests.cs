@@ -6,7 +6,7 @@ using SharpProof.Analyzer;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class ResourceBoundsTests
+public sealed partial class ResourceBoundsTests
 {
     private static ResourceBoundsAnalysis.Result Analyze(string body, string parameters = "int n, int m, int[] values")
     {
@@ -55,22 +55,20 @@ public sealed class ResourceBoundsTests
         }
     }
 
-    [TestCase("while (n>0) {}", "UnsupportedOperation:Loop")]
+    [TestCase("while (n>0) {}", "UnsupportedLoop")]
     [TestCase("for (int i=0; i<=n; i++) {}", "UnsupportedLoop")]
-    [TestCase("for (int i=0; i<n; i+=2) {}", "UnsupportedLoop")]
+    [TestCase("for (int i=0; i<n; i+=2) {}", "LoopCounterMayOverflow")]
     [TestCase("for (int i=0; i<n; i++) { i=0; }", "UnstableInputOrCounter")]
     [TestCase("for (int i=0; i<n; i++) { n++; }", "UnstableInputOrCounter")]
     [TestCase("n=0; for (int i=0; i<n; i++) {}", "UnstableInputOrCounter")]
     [TestCase("for (int i=0; i<values.Length; i++) { values = new int[3]; }", "UnstableInputOrCounter")]
-    [TestCase("for (int i=0; i<n; i++) { for (int j=0; j<i; j++) {} }", "UnsupportedLoopBound")]
-    [TestCase("for (int i=0; i<n; i++) { var a = new int[i]; }", "UnsupportedAllocationSize")]
     [TestCase("var a = new int[n+1];", "UnsupportedAllocationSize")]
     [TestCase("var a = new object();", "UnsupportedLocal")]
     [TestCase("var a = new int[2,3];", "UnsupportedLocal")]
     [TestCase("var a = new int[] { 1,2 };", "UnsupportedOperation:ArrayCreation")]
     [TestCase("object a = n;", "UnsupportedLocal")]
-    [TestCase("System.Console.WriteLine(n);", "UnsupportedOperation:Invocation")]
-    [TestCase("M(n,m,values);", "UnsupportedOperation:Invocation")]
+    [TestCase("System.Console.WriteLine(n);", "OpaqueCall")]
+    [TestCase("M(n,m,values);", "RecursiveCostUnknown")]
     [TestCase("for (int i=0; i<n; i++) { break; }", "UnsupportedOperation:Branch")]
     [TestCase("for (int i=0; i<n; i++) { continue; }", "UnsupportedOperation:Branch")]
     [TestCase("try {} finally {}", "UnsupportedOperation:Try")]
@@ -175,7 +173,7 @@ public sealed class ResourceBoundsTests
             Assert.That(diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("cumulative elements"));
             Assert.That(diagnostics[1].Properties["ResourceStatus"], Is.EqualTo("Unknown"));
             Assert.That(diagnostics[1].Properties.ContainsKey("AllocatedElementsUpperBound"), Is.False);
-            Assert.That(diagnostics[1].Properties["UnknownReason"], Is.EqualTo("UnsupportedOperation:Loop"));
+            Assert.That(diagnostics[1].Properties["UnknownReason"], Is.EqualTo("UnsupportedLoop"));
         }
     }
 

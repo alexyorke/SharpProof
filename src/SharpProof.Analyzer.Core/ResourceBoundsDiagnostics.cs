@@ -39,14 +39,21 @@ internal static class ResourceBoundsDiagnostics
         var result = ResourceBoundsAnalysis.Analyze(method, body, context.CancellationToken);
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("ResourceStatus", result.Proven ? "Proven" : "Unknown")
-            .Add("ResourceCostModel", "loop-entries-and-primitive-array-elements-v1");
+            .Add("ResourceCostModel", "loop-entries-and-primitive-array-elements-v3");
         string message;
         if (result.Bounds is { } bounds)
         {
             properties = properties.Add("LoopIterationsUpperBound", bounds.LoopIterations.Text)
                 .Add("ArrayAllocationsUpperBound", bounds.Arrays.Text)
                 .Add("AllocatedElementsUpperBound", bounds.Elements.Text);
-            message = $"Proven upper bounds: loop iterations <= {bounds.LoopIterations.Text}; cumulative arrays <= {bounds.Arrays.Text}; cumulative elements <= {bounds.Elements.Text}";
+            properties = properties.Add("ResourceProofBasis", result.Assumptions.IsEmpty ? "Structural" : "ConditionalOnMetadataSpecifications");
+            if (!result.Assumptions.IsEmpty)
+            {
+                properties = properties.Add("ResourceAssumptions", string.Join("\n", result.Assumptions))
+                    .Add("ResourceMetadataCatalogSha256", ResourceMetadataCostCatalog.ContentSha256);
+            }
+            var qualification = result.Assumptions.IsEmpty ? "" : " under recorded metadata assumptions";
+            message = $"Proven upper bounds{qualification}: loop iterations <= {bounds.LoopIterations.Text}; cumulative arrays <= {bounds.Arrays.Text}; cumulative elements <= {bounds.Elements.Text}";
         }
         else
         {

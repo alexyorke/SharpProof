@@ -14,21 +14,23 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 ## A. Loop and expression bounds
 
 - [x] Canonical increasing unit-step loops, independent nesting, cumulative arrays.
-- [ ] Constant positive non-unit strides with explicit overflow checks.
-- [ ] Descending loops with checked progress and lower bounds.
-- [ ] Multiplicative/divisive progress and logarithmic iteration bounds.
-- [ ] Dependent nested loop bounds and conservative counter-size environments.
+- [x] Constant positive non-unit strides with explicit overflow checks.
+- [x] Descending loops with checked progress and lower bounds.
+- [x] Multiplicative/divisive progress and logarithmic iteration bounds.
+- [x] Dependent nested loop bounds and conservative counter-size environments.
 - [ ] Broader ranking-function synthesis with checked certificates.
-- [ ] Regression tests for boundary integers, nontermination, early exit,
+- [x] Regression tests for boundary integers, loops that do not terminate, early exit,
   mutation, exceptional exits, and independently counted iteration/allocation costs.
 
 ## B. Calls and recursive costs
 
-- [ ] Source-call summaries with argument substitution, dispatch admission,
+- [x] Source-call summaries with argument substitution, dispatch admission,
   receiver initialization rules, and shared analysis budgets.
-- [ ] Reviewed metadata cost summaries with assumption provenance.
-- [ ] Recursive progress proofs and recurrence bounds for admitted families.
-- [ ] Explicit Unknown for unproved progress, opaque targets and unsupported
+- [x] Reviewed metadata cost summaries with assumption provenance (Int32
+  Math.Min/Max, .NET 8.0.32, immutable source commit and catalog digest).
+- [x] Recursive progress proofs and recurrence bounds for admitted families
+  (positively guarded, decrement/division, static void tail recursion).
+- [x] Explicit Unknown for unproved progress, opaque targets and unsupported
   recurrences; verify actual caller/callee workflows.
 
 ## C. Quantitative memory and stack
@@ -67,13 +69,13 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [ ] End-to-end runtime/allocation benchmark workflow, with input scales,
   units, environmental identity and comparable baselines. Measurements must
   remain distinguishable from proofs and must not establish Big-O by themselves.
-- [ ] Cancellation, exceptional completion, shared-state and reentrancy controls.
+- [ ] Cancellation, exceptional completion, shared-state and repeated-entry controls.
 
 ## Delivery and verification
 
 - [x] Preserve the original dirty checkout using an isolated branch/worktree.
 - [x] First milestone: 1184 analyzer tests plus docs/layout/container gates passed.
-- [ ] Open and attach the draft merge request for this branch.
+- [x] Open and attach the draft merge request for this branch.
 - [ ] Keep this document current after each verified implementation phase.
 - [ ] Run focused checks before the relevant broader gate; record exact pushed
   commit and CI status after each delivery checkpoint.
@@ -84,6 +86,66 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 Branch: `codex/resource-bounds-milestone-one`; initial master: `cd3363c63`.
 Milestone-one implementation: `cd7901b72`; planning document: `488f4300e`.
-Next action: complete loop generalization and its independent execution tests,
-then implement source-call summary composition. Native-worker and general memory
-features are not implemented yet and must not be reported as complete.
+Draft MR: [#334](https://github.com/alexyorke/SharpProof/pull/334), initially
+published at `6118749b5`. CI was still running at the first inspection.
+
+Loop generalization and source-call size substitution passed all 83 focused
+resource tests with zero build warnings/errors. This includes independent small
+executions, checked/unchecked overflow controls, dependent allocations, symbol
+substitution, argument-evaluation allocation costs, type-initializer abstention,
+and a shared call-expansion budget. The initial loop-only run's invalid C# case
+was replaced with a valid Int64 overflow control before this passing run.
+
+Decreasing-while ranking rules and guarded tail-recursive allocation bounds passed
+101 focused tests, then the analyzer suite passed 1238 tests after consumer
+projection and final-expression-budget controls were added. Independent controls
+include negative/positive inputs, 138 combinations of loop sizes and strides,
+and 19 recursive executions.
+
+The metadata catalog and assumption projection then passed all 108 focused
+resource tests. Source evidence is now pinned to runtime commit
+`b9a49e4a6d3a444a3685e318c74a7892d01873f7` (.NET 8.0.32). The final full analyzer
+run for this checkpoint passed all 1243 tests with zero build warnings/errors,
+including 108 resource cases and the immutable source pin.
+
+CI for initial MR head `6118749b5` exposed two issues: spelling in new prose and
+the corpus host enabling SP0060 while normalizing every diagnostic to warnings.
+The host now preserves opt-in disabled defaults. The corrected full Gates suite
+passed all 471 tests, and the canonical lint/quality gate passed. No assertions
+were weakened and no existing corpus snapshots were rewritten to hide the extra
+diagnostic. Updated docs and evaluated layout also passed with the metadata
+files: 2616 source files, 59 evaluated projects, 151 pinned common files.
+
+Checkpoint commands use `eng/scripts/Invoke-SharpProof.ps1` with the canonical
+container environment recorded in the milestone-one document:
+
+| Arguments | Verified result |
+| --- | --- |
+| `test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~ResourceBoundsTests` | 108 passed |
+| `test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj` | 1243 passed |
+| `test -Target src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj` | 471 passed, including the CI regressions |
+| `lint` | All quality checks and negative fixtures passed |
+| `docs` | Drift, links and automation lifecycle checks passed |
+| `layout` | 2616 source files, 59 evaluated projects, 151 pinned common files |
+
+The full goal is not complete: the unchecked phase A certificate requirement and
+all phase C-F requirements still need implementation and verification. The MR
+remains draft. These passing checks establish this checkpoint, not completion of
+the roadmap.
+
+## Next implementation dependencies
+
+The native proof representation (phase D) must precede quantitative memory proof
+composition (phase C); both phases remain required. Introduce compiler-neutral
+resource expression and proof nodes with validated input identities, sizes,
+arithmetic, budgets and serialization. The current presentation strings must
+never become unchecked worker assumptions. Wire that representation into the
+existing portable analysis before the collector and independent worker checker.
+
+Memory evidence must distinguish cumulative allocation, logically reachable
+live space, retained output and stack frames. Byte bounds require an explicit
+versioned layout assumption; source-level reasoning alone must not claim an
+exact JIT stack layout or physical GC high-water mark. Native claim ownership,
+runtime compatibility, contract validation, protocol/cache identity and SARIF
+projection remain open. All asymptotic/aggregate and async/concurrent/measurement
+requirements in phases E-F also remain open.

@@ -39,16 +39,28 @@ early returns and exceptional exits, rather than guaranteeing normal completion.
 
 ## Supported proof rules
 
-- `for (int i = 0; i < bound; i++)` or `++i`, with no other writes or aliases to
-  the counter. The strict comparison ensures the increment cannot wrap, even at
-  `int.MaxValue`.
-- Bounds are int literals, unchanged int entry parameters, or the Length of an
-  unchanged primitive one-dimensional array parameter. Locals, arithmetic bounds,
-  dependent inner bounds, other strides/comparisons, while/do/foreach, break,
-  continue and goto are Unknown.
-- Sequential costs add. Independent nested costs multiply. A loop's contribution
+- Strict increasing counted loops with int/long counters, a nonnegative constant
+  start, and a positive constant `++`/`+=` step. Unchecked steps require a proof
+  that the final update cannot wrap; checked overflow ends that execution prefix.
+  For example, unchecked `int i += 2` against an arbitrary int parameter is
+  Unknown, whereas a long counter against that int bound is supported.
+- Strict descending loops against a nonnegative constant lower bound, with
+  `--`/`-=` progress. Division by a constant greater than one is supported for
+  loops ending at zero. Multiplication from one is supported for increasing
+  loops when the final update is checked or cannot wrap.
+- Bounds are integer literals, unchanged int/long entry parameters, the Length of an
+  unchanged primitive one-dimensional array parameter, or an enclosing counter's
+  proven nonnegative envelope. Dependent inner bounds and allocation sizes use
+  that envelope, which may be loose. Arbitrary arithmetic bounds and other local
+  values, do/foreach, break, continue and goto remain Unknown.
+- A local initialized from a supported size can serve as the rank for
+  `while (remaining > 0)`. A final `--`, `-= positiveConstant`, or `/= constant`
+  (divisor greater than one) must decrease that rank. The prefix rejects all
+  other counter writes, aliases and jumps. Earlier mutation invalidates the
+  initial-size fact. This rule does not infer ranks for arbitrary while loops.
+- Sequential costs add. Nested costs multiply. A loop's contribution
   includes its own body entries plus any nested loop entries. Branches take the
-  componentwise maximum, so different metrics need not attain their maxima on
+  maximum for each metric, so different metrics need not attain their maxima on
   the same path. Early return may make a bound loose.
 - Scalar locals and primitive array element operations, built-in arithmetic,
   comparisons, conditionals, and ordinary returns are supported. Counter and
@@ -57,9 +69,58 @@ early returns and exceptional exits, rather than guaranteeing normal completion.
 - Single-dimensional primitive array creation without an initializer charges one
   array and its size in elements at every execution. Sizes use the same forms as
   loop bounds. Arrays of arrays, objects, nullable/decimal/user-defined types,
-  initialized arrays, fields, arbitrary properties, calls (including recursion),
+  initialized arrays, fields, arbitrary properties, opaque or unsupported recursive calls,
   boxing, lambdas, async/iterator bodies, ref aliasing and exception regions are
   Unknown. Unknown operations are never recursively treated as free.
+
+`ceil(x / k)` rounds a nonnegative quotient upward. `digits(x, k)` is zero for
+zero, otherwise `1 + floor(log_k(x))`; it bounds division loops ending at zero.
+`ceil_log(x, k)` is zero for x <= 1, otherwise `ceil(log_k(x))`. Geometric steps
+require k > 1. These are mathematical bound expressions, not C# integer arithmetic.
+
+## Source-call composition
+
+Static source methods without generic type parameters can compose bounds.
+Arguments are evaluated and charged once, then their sizes are substituted by
+parameter symbol. A call in a loop inherits that loop's execution multiplicity.
+Named arguments and multilevel calls preserve binding. Unknown argument sizes
+remain Unknown if a callee needs them for a resource bound.
+
+Source calls share the root operation/depth budget. Unproved recursion returns
+`RecursiveCostUnknown`, unspecified metadata calls return `OpaqueCall`, and unsupported
+dispatch/signatures return `UnsupportedCall`. A possible static type initializer
+returns `CallTypeInitializationUnknown`; the callee body alone cannot establish
+its allocation or callback costs. These boundaries will be extended according to
+the [full implementation roadmap](resource-analysis-roadmap.md).
+
+Static void tail recursion is supported for a first `if (n <= 0) return` guard,
+a final self-call using `n - positiveConstant` or `n / divisorGreaterThanOne`,
+and unchanged forwarding of every other parameter. The positive rank decreases
+without overflow. Per-activation prefix costs use the entry-size envelope and
+scale by `ceil(max(0, n) / step)` or `digits(max(0, n), divisor)`. Multiple recursive
+sites, different guards, growing arguments, and other recurrence families remain
+Unknown. The zero-cost base case is checked; its work cannot be silently omitted
+if it contains allocations. These allocation bounds do not yet report recursive
+stack frames or count calls as loop body entries.
+
+## Reviewed metadata assumptions
+
+The version 1 resource catalog covers the Int32 overloads of `Math.Min` and
+`Math.Max` for approved .NET 8 metadata identities. These cost summaries are
+conditional on the reviewed .NET 8.0.32 implementation, pinned to
+[runtime commit b9a49e4](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Math.cs).
+They are independent of purity, exception, and termination specifications.
+The existing approved assembly/reference resolver must bind the exact method;
+source lookalikes receive ordinary body analysis. Possible type initializers and
+other runtime families remain Unknown.
+
+Each conditional proof includes the specification witness, source commit, and
+catalog digest. The digest binds the resource declarations, cost model, reviewed
+runtime, source identity, and approved API-specification content. Conditional
+diagnostics explicitly say "under recorded metadata assumptions". This is an
+assumption about the target implementation, not a claim that the analyzer has
+inspected the consumer's eventual deployment runtime. Native runtime compatibility
+checking remains part of the full roadmap.
 
 Results are conservative structural proofs over compiler-bound operations, not
 pattern guesses, benchmarks, Z3 worker results, or native-worker claim records.
@@ -76,9 +137,14 @@ peak live heap, retained output, and stack memory are outside the cost model.
 The result is an upper bound, not a tight Big-O classification or exact trip count.
 
 SP0060 properties expose `ResourceStatus` (`Proven` or `Unknown`) and
-`ResourceCostModel` (`loop-entries-and-primitive-array-elements-v1`). Proven
+`ResourceCostModel` (`loop-entries-and-primitive-array-elements-v3`). Proven
 results include `LoopIterationsUpperBound`, `ArrayAllocationsUpperBound`, and
 `AllocatedElementsUpperBound`. Unknown results include `UnknownReason`.
+`ResourceProofBasis` distinguishes `Structural` results from
+`ConditionalOnMetadataSpecifications`. Conditional results also include
+`ResourceAssumptions` (one provenance record per line) and
+`ResourceMetadataCatalogSha256`. Unknown results publish neither numeric bounds
+nor partial metadata proof assumptions.
 
 See [milestone progress](resource-bounds-progress.md) for verification evidence,
 implementation status, and subsequent work.

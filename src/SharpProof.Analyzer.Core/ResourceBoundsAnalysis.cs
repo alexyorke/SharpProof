@@ -4,16 +4,18 @@ namespace SharpProof.Analyzer;
 
 // This is a closed structural proof system. Never descend through an unknown
 // operation: doing so could omit a call, an allocation, or a nonterminating path.
-internal sealed class ResourceBoundsAnalysis
+internal sealed partial class ResourceBoundsAnalysis
 {
     internal sealed record Bound
     {
         internal string Text { get; }
         internal BigInteger? Constant { get; }
-        internal Bound(string text, BigInteger? constant = null)
+        internal BigInteger? Maximum { get; }
+        internal Bound(string text, BigInteger? constant = null, BigInteger? maximum = null)
         {
             Text = ArgumentNullGuard.NotNull(text, nameof(text));
             Constant = constant;
+            Maximum = constant ?? maximum;
         }
         internal static readonly Bound Zero = Number(0);
         internal static readonly Bound One = Number(1);
@@ -83,16 +85,25 @@ internal sealed class ResourceBoundsAnalysis
     internal sealed record Result(Cost? Bounds, string? UnknownReason)
     {
         internal bool Proven => Bounds is not null;
+        internal ImmutableArray<string> Assumptions { get; init; } = [];
     }
 
     private readonly CancellationToken _cancellation;
-    private readonly HashSet<ISymbol> _counters = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, Bound> _counters = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, Bound> _localProgress = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, Bound?> _scalarArguments = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, Bound?> _arrayArguments = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<ISymbol> _activeMethods = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<string> _assumptions = new(StringComparer.Ordinal);
+    private ResolvedApiSpecTable? _resourceSpecifications;
+    private readonly Compilation? _compilation;
     private string? _unknown;
     private int _remaining = 4096;
 
-    private ResourceBoundsAnalysis(CancellationToken cancellation)
+    private ResourceBoundsAnalysis(Compilation? compilation, CancellationToken cancellation)
     {
         _cancellation = cancellation;
+        _compilation = compilation;
     }
 
     internal static Result Analyze(IMethodSymbol method, IOperation? body, CancellationToken cancellation)
@@ -111,9 +122,15 @@ internal sealed class ResourceBoundsAnalysis
         {
             return new(null, "MissingBody");
         }
-        var analysis = new ResourceBoundsAnalysis(cancellation);
-        var cost = analysis.Visit(body, 0);
-        return analysis._unknown is { } reason ? new(null, reason) : new(cost, null);
+        var analysis = new ResourceBoundsAnalysis(body.SemanticModel?.Compilation, cancellation);
+        analysis._activeMethods.Add(method);
+        var cost = analysis.CallableBody(method, body, 0);
+        if (cost.LoopIterations.Text.Length + cost.Arrays.Text.Length + cost.Elements.Text.Length > 16384)
+        { analysis._unknown ??= "AnalysisBudgetExceeded"; }
+        return analysis._unknown is { } reason ? new(null, reason) : new(cost, null)
+        {
+            Assumptions = [.. analysis._assumptions.OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value, StringComparer.Ordinal)]
+        };
     }
 
     private static bool Primitive(ITypeSymbol? type)
@@ -159,6 +176,15 @@ internal sealed class ResourceBoundsAnalysis
                 result = Sequence(declaration.Declarators, depth);
                 break;
             case IVariableDeclaratorOperation variable:
+                _localProgress.Remove(variable.Symbol);
+                if (variable.Symbol.Type.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 &&
+                    variable.Initializer is { } progressInitializer)
+                {
+                    var constant = IntegerConstant(progressInitializer.Value);
+                    var progress = constant is { } integer ? Bound.Number(BigInteger.Max(0, integer)) : Size(progressInitializer.Value);
+                    if (progress is not null)
+                    { _localProgress[variable.Symbol] = progress; }
+                }
                 result = variable.Symbol.RefKind != RefKind.None || !SupportedType(variable.Symbol.Type)
                     ? Unknown("UnsupportedLocal")
                     : variable.Initializer is { } variableInitializer ? Visit(variableInitializer, depth + 1) : Cost.Zero;
@@ -174,6 +200,12 @@ internal sealed class ResourceBoundsAnalysis
                 break;
             case IForLoopOperation loop:
                 result = For(loop, depth);
+                break;
+            case IWhileLoopOperation loop:
+                result = While(loop, depth);
+                break;
+            case IInvocationOperation invocation:
+                result = Call(invocation, depth);
                 break;
             case IConditionalOperation conditional when !conditional.IsRef:
                 result = Visit(conditional.Condition, depth + 1).Add(
@@ -245,42 +277,14 @@ internal sealed class ResourceBoundsAnalysis
         return result;
     }
 
-    private Cost For(IForLoopOperation loop, int depth)
-    {
-        loop = ArgumentNullGuard.NotNull(loop, nameof(loop));
-        // i=0; i<b; i++ cannot wrap for any int b: the last increment is
-        // (b-1)->b. b is an unchanged entry parameter, immutable array length,
-        // or constant. No other counter writes or aliases are admitted.
-        if (loop.Before.Length != 1 || loop.Before[0] is not IVariableDeclarationGroupOperation group ||
-            group.Declarations.Length != 1 || group.Declarations[0].Declarators.Length != 1 ||
-            group.Declarations[0].Declarators[0] is not { } declaration ||
-            declaration.Symbol.Type.SpecialType != SpecialType.System_Int32 ||
-            declaration.Symbol.RefKind != RefKind.None ||
-            declaration.Initializer?.Value.ConstantValue is not { HasValue: true, Value: int start } || start != 0 ||
-            loop.Condition is not IBinaryOperation { OperatorKind: BinaryOperatorKind.LessThan, OperatorMethod: null } condition ||
-            condition.LeftOperand is not ILocalReferenceOperation counter ||
-            !SymbolEqualityComparer.Default.Equals(counter.Local, declaration.Symbol) ||
-            loop.AtLoopBottom.Length != 1 ||
-            loop.AtLoopBottom[0] is not IExpressionStatementOperation { Operation: IIncrementOrDecrementOperation increment } ||
-            increment.Kind != OperationKind.Increment || increment.OperatorMethod is not null ||
-            increment.Target is not ILocalReferenceOperation target ||
-            !SymbolEqualityComparer.Default.Equals(target.Local, declaration.Symbol))
-        { return Unknown("UnsupportedLoop"); }
-        var bound = Size(condition.RightOperand);
-        if (bound is null)
-        { return Unknown("UnsupportedLoopBound"); }
-        _counters.Add(declaration.Symbol);
-        var body = Visit(loop.Body, depth + 1);
-        _counters.Remove(declaration.Symbol);
-        return new Cost(Bound.One, Bound.Zero, Bound.Zero).Add(body).Scale(bound);
-    }
-
     private bool Writable(IOperation target)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
+        if (target is ILocalReferenceOperation written)
+        { _localProgress.Remove(written.Local); }
         return target switch
         {
-            ILocalReferenceOperation local => local.Local.RefKind == RefKind.None && !_counters.Contains(local.Local),
+            ILocalReferenceOperation local => local.Local.RefKind == RefKind.None && !_counters.ContainsKey(local.Local),
             IArrayElementReferenceOperation element => Primitive(element.Type),
             _ => false
         };
@@ -293,21 +297,28 @@ internal sealed class ResourceBoundsAnalysis
             property.Instance?.Type is IArrayTypeSymbol { Rank: 1, IsSZArray: true };
     }
 
-    private static Bound? Size(IOperation operation)
+    private Bound? Size(IOperation operation)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             ILiteralOperation { ConstantValue: { HasValue: true, Value: int value } } => Bound.Number(Math.Max(0, value)),
+            ILiteralOperation { ConstantValue: { HasValue: true, Value: long value } } => Bound.Number(Math.Max(0, value)),
             IUnaryOperation
             {
                 OperatorKind: UnaryOperatorKind.Minus, OperatorMethod: null,
                 Operand: ILiteralOperation, ConstantValue: { HasValue: true, Value: int value }
             } => Bound.Number(Math.Max(0, value)),
+            IParameterReferenceOperation parameter when _scalarArguments.TryGetValue(parameter.Parameter, out var argument) => argument,
             IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int32 =>
-                new("max(0, " + parameter.Parameter.Name + ")"),
-            IPropertyReferenceOperation property when IsArrayLength(property) && property.Instance is IParameterReferenceOperation array =>
-                new(array.Parameter.Name + ".Length"),
+                new("max(0, " + parameter.Parameter.Name + ")", maximum: int.MaxValue),
+            IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int64 =>
+                new("max(0, " + parameter.Parameter.Name + ")", maximum: long.MaxValue),
+            IPropertyReferenceOperation property when IsArrayLength(property) => ArraySize(property.Instance!),
+            ILocalReferenceOperation local when _counters.TryGetValue(local.Local, out var bound) => bound,
+            IConversionOperation conversion when conversion.Conversion.IsNumeric && !conversion.Conversion.IsUserDefined &&
+                conversion.Type?.SpecialType == SpecialType.System_Int64 &&
+                conversion.Operand.Type?.SpecialType == SpecialType.System_Int32 => Size(conversion.Operand),
             _ => null
         };
     }

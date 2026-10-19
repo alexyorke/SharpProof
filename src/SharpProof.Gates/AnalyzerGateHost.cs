@@ -108,9 +108,9 @@ internal static class AnalyzerGateHost
     internal static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
     /// <summary>
-    /// Every diagnostic the corpus gate normalizes to a warning before
-    /// snapshotting. Derived from the analyzer's own supported set so a new
-    /// descriptor cannot be silently omitted from the gate.
+    /// Every supported diagnostic, including opt-in rules. Default-enabled
+    /// rules are normalized to warnings; opt-in rules retain their disabled
+    /// defaults so ordinary contract evidence does not activate new analyses.
     /// </summary>
     internal static readonly ImmutableArray<string> DiagnosticIds =
         [.. GeneratedDiagnosticDescriptors.SupportedDiagnostics
@@ -119,9 +119,10 @@ internal static class AnalyzerGateHost
             .OrderBy(static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
 
     private static readonly ImmutableDictionary<string, ReportDiagnostic>
-        DiagnosticOptions = DiagnosticIds.ToImmutableDictionary(
-            static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
-            static _ => ReportDiagnostic.Warn,
+        DiagnosticOptions = GeneratedDiagnosticDescriptors.SupportedDiagnostics.ToImmutableDictionary(
+            static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id,
+            static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) :
+                descriptor.IsEnabledByDefault ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress,
             StringComparer.Ordinal);
     private static readonly AnalyzerOptions EmptyAnalyzerOptions =
         new(
