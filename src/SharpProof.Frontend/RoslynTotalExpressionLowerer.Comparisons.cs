@@ -7,7 +7,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
         { return null; }
-        var values = new GuardedExpression[2];
+        var values = ImmutableArray.CreateBuilder<GuardedExpression>(2);
+        values.Count = 2;
         foreach (var argument in invocation.Arguments)
         { values[argument.Parameter!.Ordinal] = LowerClause(argument.Value, state, depth + 1); }
         var classification = First([values[0].Classification, values[1].Classification]);
@@ -21,7 +22,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
         { return null; }
-        var values = new IrTerm[2];
+        var values = ImmutableArray.CreateBuilder<IrTerm>(2);
+        values.Count = 2;
         // Roslyn preserves source argument order; ordinals retain named bindings.
         foreach (var argument in invocation.Arguments)
         {
@@ -70,7 +72,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (!receiver.Classification.IsExact)
         { return Approximate(invocation, receiver.Continuation, receiver.Classification.Abstention); }
         block = receiver.Continuation;
-        var values = new IrTerm[primitive ? 1 : 2];
+        var values = ImmutableArray.CreateBuilder<IrTerm>(primitive ? 1 : 2);
+        values.Count = primitive ? 1 : 2;
         foreach (var argument in invocation.Arguments)
         {
             var lowered = LowerBodyValue(argument.Value, block, depth + 1);

@@ -75,7 +75,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                     (ISymbol)parameter.Parameter,
                 ILocalReferenceOperation { Local.RefKind: RefKind.None } local => local.Local,
                 _ => null
-            })).Distinct(SymbolEqualityComparer.Default).ToArray();
+            })).Distinct(SymbolEqualityComparer.Default).ToImmutableArray();
             if (symbols.Length == 1 && symbols[0] is { } symbol)
             { _context.RecordStorageCapture(captures.Key, symbol); }
         }

@@ -440,10 +440,10 @@ internal static partial class SemanticClaimIdentity
 
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
-        var chain = new Stack<IMethodSymbol>();
+        var chain = ImmutableArray.CreateBuilder<IMethodSymbol>();
         while (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
         {
-            chain.Push(method);
+            chain.Add(method);
             if (method.ContainingSymbol is not IMethodSymbol parent)
             {
                 break;
@@ -459,7 +459,7 @@ internal static partial class SemanticClaimIdentity
         {
             writer.Add(CreateContainerId(method.ContainingSymbol));
         }
-        foreach (var nested in chain)
+        foreach (var nested in chain.ToImmutable().Reverse())
         {
             var declaration = nested.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ??
                 throw new InvalidOperationException("A nested method target has no source declaration.");
@@ -515,16 +515,17 @@ internal static partial class SemanticClaimIdentity
             if (sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
                 context.Model.GetOperation(query) is not { } queryOperation)
             { continue; }
-            var syntaxPath = new Stack<int>();
+            var syntaxPath = ImmutableArray.CreateBuilder<int>();
             for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
             {
-                syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
+                syntaxPath.Add(current.Parent!.ChildNodes().TakeWhile(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
             }
-            var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
-            pending.Push((queryOperation, []));
+            var pending = ImmutableArray.CreateBuilder<(IOperation Operation, ImmutableArray<int> Path)>();
+            pending.Add((queryOperation, []));
             while (pending.Count != 0)
             {
-                var (operation, operationPath) = pending.Pop();
+                var (operation, operationPath) = pending[pending.Count - 1];
+                pending.RemoveAt(pending.Count - 1);
                 if (operation is IAnonymousFunctionOperation anonymous &&
                     SymbolEqualityComparer.Default.Equals(anonymous.Symbol.OriginalDefinition, method.OriginalDefinition))
                 {
@@ -532,16 +533,16 @@ internal static partial class SemanticClaimIdentity
                     // query tree; neither range-variable spelling nor a guessed
                     // declaration is used to identify the generated method.
                     writer.Add("query-generated-method").Add(syntaxPath.Count);
-                    foreach (var ordinal in syntaxPath)
+                    foreach (var ordinal in syntaxPath.ToImmutable().Reverse())
                     { writer.Add(ordinal); }
                     writer.Add(operationPath.Length);
                     foreach (var ordinal in operationPath)
                     { writer.Add(ordinal); }
                     return true;
                 }
-                var children = operation.ChildOperations.ToArray();
+                var children = operation.ChildOperations.ToImmutableArray();
                 for (var ordinal = children.Length - 1; ordinal >= 0; ordinal--)
-                { pending.Push((children[ordinal], operationPath.Add(ordinal))); }
+                { pending.Add((children[ordinal], operationPath.Add(ordinal))); }
             }
         }
         return false;
@@ -691,7 +692,7 @@ internal static partial class SemanticClaimIdentity
     {
         symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
-        var types = new Stack<INamedTypeSymbol>();
+        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (var type = symbol is INamedTypeSymbol named
                 ? named
                 : symbol.ContainingType;
@@ -700,14 +701,15 @@ internal static partial class SemanticClaimIdentity
         {
             if (type.IsFileLocal || type.IsExtension)
             {
-                types.Push(type);
+                types.Add(type);
             }
         }
 
         writer.Add("special-containing-types").Add(types.Count);
         while (types.Count > 0)
         {
-            var type = types.Pop();
+            var type = types[types.Count - 1];
+            types.RemoveAt(types.Count - 1);
             writer.Add(type.MetadataName).Add(type.IsFileLocal).Add(type.IsExtension);
             if (type.IsExtension && type.ExtensionParameter?.Type is { } receiver)
             {

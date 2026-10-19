@@ -2587,3 +2587,32 @@ map to ImmutableDictionary; all callers already pass immutable values. Keep orig
 null/missing-edge exceptions, SymbolEqualityComparer and lexical handler order. Validate
 full ordinary Frontend and Worker comparison/reference-identity cases.
 Status: open before edits.
+
+IMM-M066 verified: 97 Worker manifest/path/evidence tests and 32 Analyzer semantic/
+structural/reference ownership/budget tests pass with zero warnings/errors. Compiler
+nullable flow required a local successful TryGetValue binding before assigning parentId;
+this preserves the old successful lookup behavior. Read-only review found no traversal,
+identity-byte, comparer or strict-duplicate regressions.
+
+IMM-M067 verified: 23 existing SARIF/launcher integration cases pass in a private
+canonical workspace, comparing every successful serialization byte-for-byte against the
+pre-edit implementation. Explicit guarded constructors/get-only record properties meet
+the repository guard analyzer. Preserve exact schema/property order, source roots,
+fingerprints, notification fallback and result ordering. Formatter applied required
+layout before successful checks. Reconciled current Worker production inventory rows:
+29 existing scoped builder rows and seven native/state/SUT boundaries; no Open rows
+remain in that syntax inventory scope. This is not a claim of repository completion.
+
+IMM-M068 verified: all 2,051 ordinary Frontend tests and 1,021 Worker native-call,
+reference-identity and comparison tests pass with zero warnings/errors. The initial
+text transform missed the cast enum entry (OperationKind)52; corrected it and expanded
+coordinator equality checking to all 126 ordered decision entries, including that cast.
+The original 125-entry symbolic-only check was incomplete and is superseded. The
+read-only review's other four migration sites preserve their original behavior.
+
+M065-M068 refreshed coverage: 1,869 non-vendored C# files, 3,041 syntax candidates,
+2,438 Open; 84 PowerShell scripts, zero parser errors, 1,094 candidates, 872 Open.
+Open includes unchecked/stale/valid construction candidates as well as remaining actual
+violations. Classified 29 new C# builder rows and 28 canonical PowerShell builder rows.
+Literal check against master 7e0e485a preserved 2,959 raw/interpolated tokens across
+651 changed C# files. Comprehensive classification and final exact-commit gates remain.
