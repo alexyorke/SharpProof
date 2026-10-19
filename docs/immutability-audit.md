@@ -2777,3 +2777,16 @@ counting enumerable keeps its enumeration counter and AsEnumerable adapter; null
 facet filtering and reached.IndexOf retain original semantics. Validate all ordinary IR
 and Specs tests, keeping traversal's explicit mutable Stack overload probe intact.
 Status: open before edits.
+
+IMM-M077: Coordinator traced FrontendFuzzing's seven readonly method/type/batch-slice
+snapshots, name lookup, ordered method vector and environment/identity maps. Use immutable
+arrays and scoped builders, freezing before ordered lookup/callback/publication. Preserve
+TryAdd's duplicate-shape failure (not a thrown duplicate), strict environment/memo Add
+semantics, default variable/type comparers and ReferenceEqualityComparer for IrValue/
+CLR-array keys. Nested memo entries must publish only after recursive sequence creation,
+as before; retain native long[] operands and exact sequence origin references.
+FrontendSemanticEdgeCase.Arguments needs a separate design: a deliberate test exposes
+different indexer/enumerator views, so do not collapse that public input boundary to a
+single vector in this batch. Record it as pending, not excluded or complete. Validate
+full ordinary Fuzz tests, including identity mismatch/topology and emission controls.
+Status: open before edits.
