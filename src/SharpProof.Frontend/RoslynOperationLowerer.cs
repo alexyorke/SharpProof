@@ -18,7 +18,7 @@ public sealed class RoslynOperationLowerer
     public RoslynOperationLowerer(
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure = null)
-        : this(factory, isKnownPure, allowCompilerConstants: false)
+        : this(factory, isKnownPure, allowCompilerConstants: false, static type => type, static _ => default)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
@@ -26,12 +26,16 @@ public sealed class RoslynOperationLowerer
     private RoslynOperationLowerer(
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure,
-        bool allowCompilerConstants)
+        bool allowCompilerConstants,
+        Func<ITypeSymbol?, ITypeSymbol?> typeSpecializer,
+        Func<IOperation, (bool Handled, IrTerm? Term)> customLowering)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _types = new RoslynTypeMapper(_factory);
+        _types.TypeSpecializer = ArgumentNullGuard.NotNull(typeSpecializer, nameof(typeSpecializer));
         _isKnownPure = isKnownPure ?? (static _ => false);
         _allowCompilerConstants = allowCompilerConstants;
+        _customLowering = ArgumentNullGuard.NotNull(customLowering, nameof(customLowering));
         _visitor = new LoweringVisitor(this);
     }
 
@@ -43,19 +47,31 @@ public sealed class RoslynOperationLowerer
         return new RoslynOperationLowerer(
             factory,
             isKnownPure,
-            allowCompilerConstants: true);
+            allowCompilerConstants: true, static type => type, static _ => default);
+    }
+
+    internal static RoslynOperationLowerer CreateConfigured(
+        IrFactory factory,
+        Func<ITypeSymbol?, ITypeSymbol?> typeSpecializer,
+        Func<IOperation, (bool Handled, IrTerm? Term)> customLowering,
+        Func<IMethodSymbol, bool>? isKnownPure = null,
+        bool allowCompilerConstants = false)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        typeSpecializer = RepositoryParameterGuard.NotNull(typeSpecializer, nameof(typeSpecializer));
+        customLowering = RepositoryParameterGuard.NotNull(customLowering, nameof(customLowering));
+        return new RoslynOperationLowerer(
+            factory, isKnownPure, allowCompilerConstants, typeSpecializer, customLowering);
     }
 
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer
     {
         get => _types.TypeSpecializer;
-        set => _types.TypeSpecializer = ArgumentNullGuard.NotNull(value, nameof(value));
     }
-    private Func<IOperation, (bool Handled, IrTerm? Term)> _customLowering = static _ => default;
+    private readonly Func<IOperation, (bool Handled, IrTerm? Term)> _customLowering;
     internal Func<IOperation, (bool Handled, IrTerm? Term)> CustomLowering
     {
         get => _customLowering;
-        set => _customLowering = ArgumentNullGuard.NotNull(value, nameof(value));
     }
 
     public FrontendLoweringResult Lower(IOperation operation)

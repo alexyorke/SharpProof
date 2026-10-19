@@ -24,11 +24,8 @@ internal sealed class ContractExpressionBinder
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ArgumentNullGuard.NotNull(api, nameof(api));
         _source = ArgumentNullGuard.NotNull(source, nameof(source));
-        _lowerer = new RoslynOperationLowerer(factory)
-        {
-            TypeSpecializer = specializeType ?? (static type => type),
-            CustomLowering = BindIntrinsic
-        };
+        _lowerer = RoslynOperationLowerer.CreateConfigured(
+            factory, specializeType ?? (static type => type), BindIntrinsic);
     }
 
     internal ImmutableArray<FrontendVariableBinding> VariableBindings

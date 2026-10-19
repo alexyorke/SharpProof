@@ -3136,3 +3136,9 @@ after validation. Replay inputs retain indexer overwrite semantics when entry/cu
 IDs coincide, then freeze before execution. Validate catalog/import and real native
 static-write witness workflows. Resource-owning allocation caches remain separate.
 Status: open before edits.
+
+IMM-M092 and IMM-M094 verified: all 2,054 Frontend and 640 Contracts tests pass, zero
+failures/skips/warnings/errors. Main traced constructor short-circuit payload reasons,
+known-pure/default/replay callback paths and all configuring callers; independent
+read-only review found no concrete defect. Explicit configured-factory guards satisfy
+the repository defensive analyzer. Public lowering APIs and runtime mapper state remain.

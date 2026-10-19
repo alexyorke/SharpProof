@@ -669,15 +669,13 @@ public sealed class FrontendLoweringTests
             .ToImmutableArray();
         var visitBuilder = ImmutableDictionary.CreateBuilder<IOperation, int>(
             ReferenceEqualityComparer.Instance);
-        var lowerer = new RoslynOperationLowerer(compiled.Factory)
-        {
-            CustomLowering = operation =>
+        var lowerer = RoslynOperationLowerer.CreateConfigured(
+            compiled.Factory, static type => type, operation =>
             {
                 ArgumentNullException.ThrowIfNull(operation);
                 visitBuilder[operation] = visitBuilder.TryGetValue(operation, out var count) ? count + 1 : 1;
                 return default;
-            }
-        };
+            });
 
         var result = lowerer.Lower(compiled.TargetExpression);
         var visits = visitBuilder.ToImmutable();

@@ -35,13 +35,15 @@ internal sealed class ContractApiIdentityResolver
             ContractApiMetadata.ConditionalAttribute);
         var candidate = compilation.GetTypeByMetadataName(
             ContractApiMetadata.Contract);
+        string? unreadableReason = null;
         var shape = IsTrustedReferenceType(
                 candidate,
                 ContractApiMetadata.Contract) &&
             HasTrustedAttributesPayload(
-                candidate!.ContainingAssembly)
+                candidate!.ContainingAssembly, out unreadableReason)
                 ? new ContractApiShapeValidator(_conditionalAttribute, _metadataNames).TryResolve(candidate!)
                 : null;
+        UnreadableContractApiReason = unreadableReason;
         Contract = shape is not null
                 ? candidate
                 : null;
@@ -194,18 +196,12 @@ internal sealed class ContractApiIdentityResolver
     internal string? UnreadableContractApiReason
     {
         get;
-        private set;
     }
 
-    private bool HasTrustedAttributesPayload(IAssemblySymbol assembly)
+    private bool HasTrustedAttributesPayload(IAssemblySymbol assembly, out string? unreadableReason)
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
-        var trusted = PayloadPolicy.HasTrustedPayload(_compilation, assembly, out var unreadableReason);
-        if (unreadableReason != null)
-        {
-            UnreadableContractApiReason = unreadableReason;
-        }
-        return trusted;
+        return PayloadPolicy.HasTrustedPayload(_compilation, assembly, out unreadableReason);
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)

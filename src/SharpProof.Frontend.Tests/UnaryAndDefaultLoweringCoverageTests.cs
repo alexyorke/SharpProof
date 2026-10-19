@@ -257,9 +257,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             compilation.GetSemanticModel(tree),
             expression);
         var factory = new IrFactory();
-        var lowerer = concreteReplay
-            ? RoslynOperationLowerer.CreateForConcreteReplay(factory)
-            : new RoslynOperationLowerer(factory);
+        RoslynOperationLowerer lowerer;
         if (specializedType.HasValue)
         {
             var replacement = compilation.GetSpecialType(
@@ -274,7 +272,14 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
                     _ => type
                 };
             }
-            lowerer.TypeSpecializer = Specialize;
+            lowerer = RoslynOperationLowerer.CreateConfigured(
+                factory, Specialize, static _ => default, allowCompilerConstants: concreteReplay);
+        }
+        else
+        {
+            lowerer = concreteReplay
+                ? RoslynOperationLowerer.CreateForConcreteReplay(factory)
+                : new RoslynOperationLowerer(factory);
         }
         var result = lowerer.Lower(operation);
         assert?.Invoke(factory, result);
