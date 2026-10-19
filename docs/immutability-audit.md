@@ -3237,3 +3237,12 @@ and process environment adapters separate. Compare extracted baseline/current bu
 filter/descriptor and prepare blocks without launching builds/tests, then real semantic
 workflow after existing project jobs finish. No concurrent project test runs.
 Status: open before edits.
+
+IMM-M104: Main checked seven TotalCallableVerifierTests callback dictionaries. Use fresh
+ordinal immutable map builders within the existing per-run/test scopes, retain indexer
+replacement semantics and freeze after awaited verification or Assert.ThrowsAsync returns.
+Cancellation snapshots must include all evidence published before cancellation, with
+callback assignment preceding cancellation. Entry callback/backend ownership and resource
+counters are mutable subjects and remain unchanged. Validate repeated verification,
+shared budget, entry publication, legacy lowering, refutation and cancellation cases.
+Status: open before edits.
