@@ -147,18 +147,22 @@ public static partial class Inference
                 var projected = ConversionCore(projection.Shape);
                 if (projected.Name == destination.Name && projected.Arguments.Length == destination.Arguments.Length)
                 {
-                    for (var i = 0; i < projected.Arguments.Length; i++)
+                    if (projected.NestedTypeName is not null)
+                    { BindSubtype(projection.Type.ContainingType, targetNamed.ContainingType, projected.Arguments[0], destination.Arguments[0], true); }
+                    var projectedArguments = CSharpTypes.OwnArguments(projected);
+                    var destinationArguments = CSharpTypes.OwnArguments(destination);
+                    for (var i = 0; i < projectedArguments.Length; i++)
                     {
                         var before = projection.Type.TypeArguments[i];
                         var after = targetNamed.TypeArguments[i];
                         if (SymbolEqualityComparer.Default.Equals(before, after))
-                        { UnifyDeconstructionReceiver(destination.Arguments[i], projected.Arguments[i]); }
+                        { UnifyDeconstructionReceiver(destinationArguments[i], projectedArguments[i]); }
                         else if (targetNamed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
-                        { BindSubtype(before, after, projected.Arguments[i], destination.Arguments[i], true); }
+                        { BindSubtype(before, after, projectedArguments[i], destinationArguments[i], true); }
                         else if (targetNamed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.In)
-                        { BindSubtype(after, before, destination.Arguments[i], projected.Arguments[i], true); }
+                        { BindSubtype(after, before, destinationArguments[i], projectedArguments[i], true); }
                         else
-                        { PinConversion(before, after, projected.Arguments[i], destination.Arguments[i]); }
+                        { PinConversion(before, after, projectedArguments[i], destinationArguments[i]); }
                     }
                     return;
                 }
@@ -176,13 +180,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(value)); }
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             var actualMapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            if (source.TypeArguments.Length != value.Arguments.Length)
+            if (!CSharpTypes.MapNamedArguments(source, value, mapping) || !CSharpTypes.MapNamedArguments(source, CSharpTypes.Rigid(source), actualMapping))
             { return null; }
-            for (var i = 0; i < source.TypeArguments.Length; i++)
-            {
-                mapping.Add(source.OriginalDefinition.TypeParameters[i], value.Arguments[i]);
-                actualMapping.Add(source.OriginalDefinition.TypeParameters[i], CSharpTypes.Rigid(source.TypeArguments[i]));
-            }
             var originals = new List<INamedTypeSymbol>();
             var actuals = new List<INamedTypeSymbol>();
             for (var type = source.OriginalDefinition; type is not null; type = type.BaseType)
@@ -216,7 +215,7 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(right)); }
             left = ConversionCore(left);
             right = ConversionCore(right);
-            if (left.Name != right.Name || left.Arguments.Length != right.Arguments.Length)
+            if (left.Name != right.Name || left.NestedTypeName != right.NestedTypeName || left.Arguments.Length != right.Arguments.Length)
             { return false; }
             for (var i = 0; i < left.Arguments.Length; i++)
             { if (!SameConversionShape(left.Arguments[i], right.Arguments[i])) { return false; } }

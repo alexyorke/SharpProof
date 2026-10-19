@@ -1,0 +1,24 @@
+#nullable enable
+using System;
+
+class TypeShapeSampleOuter<T>
+{
+    public class Item<U>
+    {
+        public T First = default!;
+        public U Second = default!;
+        public T ReadFirst() => First;
+    }
+}
+ref struct TypeShapeSampleToken { public int Value; }
+static class TypeShapeSamples
+{
+    public static TypeShapeSampleOuter<int>.Item<string> NestedIdentity(TypeShapeSampleOuter<int>.Item<string> value) => value;
+    public static int NestedRead(TypeShapeSampleOuter<int>.Item<string> value) => value.ReadFirst();
+    public static int Read(ReadOnlySpan<int> values, int index) => values[index];
+    public static void Fill(Span<int> values, int replacement) { foreach (ref var item in values) item = replacement; }
+    public static Span<int> Tail(Span<int> values, int start) => values[start..];
+    public static ref int Borrow(Span<int> values, int index) => ref values[index];
+    public static int[] CopyTail(int[] values, int start) => values[start..];
+    public static TypeShapeSampleToken TokenIdentity(TypeShapeSampleToken value) => value;
+}

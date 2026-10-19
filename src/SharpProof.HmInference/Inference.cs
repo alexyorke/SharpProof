@@ -67,7 +67,8 @@ public static partial class Inference
                     throw new global::System.ArgumentNullException(nameof(p));
                 }
 
-                return CSharpTypes.Erase(p.Type);
+                return CSharpTypes.Erase(p.Type, method.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp13 }
+                    && model.Compilation.SupportsRuntimeCapability(RuntimeCapability.ByRefLikeGenerics));
             }).ToArray();
             for (var i = 0; i < parameters.Length; i++)
             {
@@ -206,7 +207,9 @@ public static partial class Inference
             }).ToArray();
             var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
                 (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0);
-            var candidate = method.WithReturnType((returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName)).WithTriviaFrom(method.ReturnType)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
+            TypeSyntax returnSyntax = returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName);
+            returnSyntax = method.ReturnType is RefTypeSyntax refReturn ? refReturn.WithType(returnSyntax.WithTriviaFrom(refReturn.Type)) : returnSyntax.WithTriviaFrom(method.ReturnType);
+            var candidate = method.WithReturnType(returnSyntax).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
                 if (p is null)
                 {
@@ -333,6 +336,8 @@ public static partial class Inference
                         != (after.ReducedFrom ?? after).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
                     { return new(symbol.Name, "Rejected", "Generalization changes a selected method group overload."); }
                 }
+                if (!PreservesMemberBindings(beforeRoot, afterRoot, beforeModel, afterModel))
+                { return new(symbol.Name, "Rejected", "Generalization changes a selected field, property or indexer."); }
                 if (!PreservesPatternBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes an implicit pattern member."); }
                 if (!PreservesDeconstructionBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
@@ -404,7 +409,8 @@ public static partial class Inference
                     return attribute.NormalizeWhitespace().ToFullString();
                 })) + " ") + (p.Modifiers.Count == 0 ? "" : string.Join(" ", p.Modifiers.Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.Text)) + " ") + parameterNames[i] + " " + p.Identifier.Text + (p.Default is null ? "" : " = " + p.Default.Value.NormalizeWhitespace().ToFullString());
             });
-            var signature = $"{returnName} {method.Identifier.Text}<{string.Join(", ", typeParameterNames)}>({string.Join(", ", renderedParameters)})";
+            var signatureReturn = method.ReturnType is RefTypeSyntax refResult ? "ref " + (refResult.ReadOnlyKeyword == default ? "" : "readonly ") + returnName : returnName;
+            var signature = $"{signatureReturn} {method.Identifier.Text}<{string.Join(", ", typeParameterNames)}>({string.Join(", ", renderedParameters)})";
             if (candidate.ConstraintClauses.Count != 0)
             {
                 signature += " " + string.Join(" ", candidate.ConstraintClauses.Select(clause =>
@@ -725,6 +731,17 @@ public static partial class Inference
             { return MethodGroup(expression, group, target); }
             switch (expression)
             {
+                case RefExpressionSyntax reference:
+                    return Expression(reference.Expression);
+                case RangeExpressionSyntax range:
+                    if (range.LeftOperand is not null)
+                    { Anchor(range.LeftOperand); }
+                    if (range.RightOperand is not null)
+                    { Anchor(range.RightOperand); }
+                    return CSharpTypes.Rigid(model.GetTypeInfo(range, cancellationToken).Type!);
+                case PrefixUnaryExpressionSyntax fromEnd when fromEnd.IsKind(SyntaxKind.IndexExpression):
+                    Anchor(fromEnd.Operand);
+                    return CSharpTypes.Rigid(model.GetTypeInfo(fromEnd, cancellationToken).Type!);
                 case AwaitExpressionSyntax awaited:
                     return Awaited(awaited);
                 case IsPatternExpressionSyntax pattern:
@@ -914,13 +931,10 @@ public static partial class Inference
                 case ElementAccessExpressionSyntax element:
                     if (model.GetOperation(element, cancellationToken) is IPropertyReferenceOperation indexer)
                     {
-                        Anchor(element.Expression);
-                        foreach (var argument in element.ArgumentList.Arguments)
-                        {
-                            Anchor(argument.Expression);
-                        }
-                        return CSharpTypes.Rigid(indexer.Property.Type);
+                        return IndexedProperty(element, indexer);
                     }
+                    if (model.GetOperation(element, cancellationToken) is IImplicitIndexerReferenceOperation implicitIndex)
+                    { return IndexedImplicitly(element, implicitIndex); }
                     var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array indexing is supported.");
                     var elementType = HmType.Variable();
                     HmType.Unify(Expression(element.Expression), new("[" + new string(',', array.Rank - 1) + "]", elementType));
@@ -929,9 +943,16 @@ public static partial class Inference
                         throw new InferenceException("Array index count mismatch.");
                     }
 
+                    if (array.Rank == 1 && element.ArgumentList.Arguments.Count == 1
+                        && (model.GetTypeInfo(element.ArgumentList.Arguments[0].Expression, cancellationToken).ConvertedType ?? model.GetTypeInfo(element.ArgumentList.Arguments[0].Expression, cancellationToken).Type) is INamedTypeSymbol specialIndex
+                        && specialIndex.ContainingType is null && specialIndex.ContainingNamespace.ToDisplayString() == "System" && specialIndex.Name is "Index" or "Range")
+                    {
+                        Anchor(element.ArgumentList.Arguments[0].Expression);
+                        return specialIndex.Name == "Range" ? new HmType("[]", elementType) : elementType;
+                    }
                     foreach (var index in element.ArgumentList.Arguments)
                     {
-                        HmType.Unify(Expression(index.Expression), new("int"));
+                        Anchor(index.Expression);
                     }
 
                     return elementType;
@@ -1308,7 +1329,7 @@ public static partial class Inference
 
             if (selected is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false })
             {
-                Anchor(member.Expression);
+                return PatternSymbolType(selected, Expression(member.Expression), receiverType ?? throw new InferenceException("Unresolved member receiver."));
             }
 
             return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);

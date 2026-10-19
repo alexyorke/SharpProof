@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace SharpProof.HmInference;
 
-internal static class CSharpTypes
+internal static partial class CSharpTypes
 {
     internal const string NullableParameter = "@nullable-parameter";
     internal const string NullableReference = "@nullable-reference";
@@ -17,14 +17,14 @@ internal static class CSharpTypes
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
     }
 
-    public static HmType Erase(ITypeSymbol type)
+    public static HmType Erase(ITypeSymbol type, bool allowRefLike = true)
     {
         if (type is null)
         {
             throw new global::System.ArgumentNullException(nameof(type));
         }
 
-        return Convert(type, true, null);
+        return Convert(type, true, null, allowRefLike);
     }
 
     public static HmType Rigid(ITypeSymbol type, Dictionary<ITypeParameterSymbol, HmType>? variables = null)
@@ -37,11 +37,11 @@ internal static class CSharpTypes
         return Convert(type, false, variables);
     }
 
-    private static HmType Convert(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables)
+    private static HmType Convert(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables, bool allowRefLike = true)
     {
         if (type is null)
         { throw new ArgumentNullException(nameof(type)); }
-        var shape = ConvertCore(type, erase, variables);
+        var shape = ConvertCore(type, erase, variables, allowRefLike);
         // Erased variables range over both domains. Concrete constructors retain
         // their domain so an instantiated unconstrained T? never renders int?.
         if (!shape.Root.IsVariable)
@@ -49,11 +49,11 @@ internal static class CSharpTypes
         return shape;
     }
 
-    private static HmType ConvertCore(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables)
+    private static HmType ConvertCore(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables, bool allowRefLike)
     {
         if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
         {
-            return new(NullableReference, Convert(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated), erase, variables));
+            return new(NullableReference, Convert(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated), erase, variables, allowRefLike));
         }
         if (type is ITypeParameterSymbol { NullableAnnotation: NullableAnnotation.Annotated } nullableParameter)
         {
@@ -72,7 +72,7 @@ internal static class CSharpTypes
 
         if (type is IArrayTypeSymbol array)
         {
-            return new("[" + new string(',', array.Rank - 1) + "]", Convert(array.ElementType, erase, variables));
+            return new("[" + new string(',', array.Rank - 1) + "]", Convert(array.ElementType, erase, variables, allowRefLike));
         }
 
         if (type is INamedTypeSymbol named)
@@ -86,11 +86,11 @@ internal static class CSharpTypes
                         throw new global::System.ArgumentNullException(nameof(e));
                     }
 
-                    return Convert(e.Type, erase, variables);
+                    return Convert(e.Type, erase, variables, allowRefLike);
                 }).ToArray());
             }
 
-            if (named.Name == "Func" && named.ContainingNamespace.ToDisplayString() == "System")
+            if (named.Name == "Func" && named.ContainingType is null && named.ContainingNamespace.ToDisplayString() == "System")
             {
                 return new("Func", named.TypeArguments.Select(t =>
                 {
@@ -99,11 +99,11 @@ internal static class CSharpTypes
                         throw new global::System.ArgumentNullException(nameof(t));
                     }
 
-                    return Convert(t, erase, variables);
+                    return Convert(t, erase, variables, allowRefLike);
                 }).ToArray());
             }
 
-            if (named.IsAnonymousType || named.IsUnboundGenericType || named.IsRefLikeType)
+            if (named.IsAnonymousType || named.IsUnboundGenericType)
             {
                 throw new InferenceException($"Unsupported type: {type.ToDisplayString()}.");
             }
@@ -112,7 +112,7 @@ internal static class CSharpTypes
             {
                 if (named.ContainingType is not null)
                 {
-                    throw new InferenceException("Nested generic types are unsupported.");
+                    return NestedShape(named, erase, variables, allowRefLike);
                 }
 
                 var prefix = named.ContainingNamespace.IsGlobalNamespace ? "global::" : "global::" + named.ContainingNamespace.ToDisplayString() + ".";
@@ -123,7 +123,7 @@ internal static class CSharpTypes
                         throw new global::System.ArgumentNullException(nameof(t));
                     }
 
-                    return Convert(t, erase, variables);
+                    return Convert(t, erase, variables, allowRefLike);
                 }).ToArray());
             }
 
@@ -132,6 +132,8 @@ internal static class CSharpTypes
                 return new("void");
             }
 
+            if (named.IsRefLikeType && erase)
+            { return allowRefLike ? new HmType("?") { NeedsRefLikePermission = true } : new HmType(Display(type)); }
             return erase ? HmType.Variable() : new(Display(type));
         }
 
@@ -198,6 +200,14 @@ internal static class CSharpTypes
         if (inferred.Name.StartsWith("[", StringComparison.Ordinal) && declared is IArrayTypeSymbol array)
         {
             return Render(inferred.Arguments[0], array.ElementType, variables, nullableAnnotations) + inferred.Name;
+        }
+
+        if (inferred.NestedTypeName is not null && declared is INamedTypeSymbol { ContainingType: not null } nested)
+        {
+            var own = OwnArguments(inferred);
+            var result = Render(inferred.Arguments[0], nested.ContainingType, variables, nullableAnnotations) + "." + inferred.NestedTypeName;
+            return own.Length == 0 ? result : result + "<" + string.Join(", ", own.Select((argument, i) =>
+            { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } if (i < 0) { throw new ArgumentOutOfRangeException(nameof(i)); } return Render(argument, nested.TypeArguments[i], variables, nullableAnnotations); })) + ">";
         }
 
         if (inferred.Arguments.Length > 0 && declared is INamedTypeSymbol named && named.TypeArguments.Length == inferred.Arguments.Length)

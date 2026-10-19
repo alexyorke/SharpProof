@@ -87,7 +87,8 @@ method/local-function declarations supply schemes instantiated per call.
 | Feature | Behavior |
 | --- | --- |
 | Primitive and nominal parameter types | Generalize unconstrained leaves |
-| Func, tuples, named tuples, generic containers | Preserve shape and tuple names |
+| Func, tuples, named tuples, generic/nested containers | Preserve owner/inner arguments, nullable annotations and tuple names |
+| Ref-like types, Span and ReadOnlySpan | Infer element types, indexing/slicing, ref stores/returns and ref iteration; synthesize allows ref struct when supported |
 | Nullable reference/value types | Preserve annotations; synthesize required class/struct constraints |
 | Task/ValueTask async methods and await | Infer result type through awaits; retain async modifiers and selected awaiter definitions |
 | Null/default, coalescing, suppression and conditional access | Support typed contexts; conservatively retain types for conversions and conditional receivers |
@@ -96,7 +97,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Explicit array construction | Preserve declared element types |
 | Synchronous lambdas | Infer inputs/results; retain explicit annotations |
 | Locals and nested blocks | Share types by symbol; retain explicit/constant local types, uninitialized declarations and conversions |
-| Mutable locals/parameters, tuple/field/property/array/indexer stores | Keep monotypes; retain receiver types and assignment conversions |
+| Mutable locals/parameters, tuple/field/property/array/indexer stores | Keep monotypes; preserve member selection and assignment conversions |
 | Compound assignments and increments | Retain original built-in operand types; skip custom operators |
 | Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
 | Break/continue and traditional switch | Track each exit separately; consume it at the correct loop/switch |
@@ -183,7 +184,7 @@ completeness, reachability and definite assignment after rewriting. Labels, name
 goto and goto case/default are supported, including pending finally/disposal.
 Unreachable syntax still contributes typing constraints. Boolean conditions retain
 the source type of user-defined conversions and true operators.
-Ref foreach and general type-parameter enumerator patterns remain unsupported.
+General type-parameter enumerator patterns remain unsupported.
 Ref delegates,
 attributed/modified lambdas and expression trees remain unsupported.
 Switch statements support pattern variables and guards.
@@ -221,6 +222,24 @@ Null-coalescing assignments share their input/result types for identity and
 nullable-lifting conversions; widening and boxing endpoints stay concrete.
 Candidates introducing new compiler warnings (including nullable warnings) are
 rejected; existing warnings do not become evidence of correctness.
+
+Nested generic types retain enclosing and inner type arguments separately. Instance
+calls, nested delegates, deconstruction, awaiters and constraints substitute both
+levels, including nested types without their own arguments and deeper nesting.
+Rendering preserves nullable annotations and named tuple arguments at each level.
+Ref-like signature types include Span/ReadOnlySpan and their nested enumerators.
+Generic field/property/indexer reads and stores propagate their declared type
+arguments; selected members are rechecked across supplied files. Index-from-end
+and range access retain index conversion domains. Ref/ref-readonly returns and
+iteration retain their modifiers and aliasing. Ref-like leaves can become type
+parameters with `allows ref struct` on C# 13 and supporting runtimes; older
+language versions or target runtimes keep those leaves concrete while allowing
+unrelated parameters to generalize. Compiler
+checks still enforce ref safety and generic type-argument restrictions. Runtime
+IDE-fix tests cover span mutation, ref aliases, shared slices versus copied array
+ranges, nested object identity and completed/suspended nested awaits with new
+type arguments. Direct pointer/function-pointer types and stack allocation remain
+open.
 
 Pattern variables participate in inference through `is` expressions, switch labels,
 guards and switch-expression arms. Var captures share the input monotype; property

@@ -121,7 +121,7 @@ public static class HmCore
                 return copy;
             }
 
-            copy = input.IsVariable ? HmType.Variable() : new HmType(input.Name, input.Arguments.Select(Copy).ToArray());
+            copy = input.WithArguments(input.Arguments.Select(Copy).ToArray());
             copies.Add(input, copy);
             return copy;
         }

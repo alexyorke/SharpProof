@@ -13,9 +13,21 @@ public sealed class HmType(string name, params HmType[] arguments)
         "string" or "object" or "Func" or CSharpTypes.NullableReference => false,
         _ => null
     };
+    internal string? NestedTypeName { get; set; }
+    internal bool NeedsRefLikePermission { get; set; }
     public HmType? Link { get; private set; }
     public bool IsVariable => Name == "?";
     public HmType Root => Link is null ? this : Link = Link.Root;
+
+    // Rebuild a constructor node without copying its substitution link.
+    public HmType WithArguments(params HmType[] arguments)
+    {
+        if (arguments is null)
+        { throw new ArgumentNullException(nameof(arguments)); }
+        if (arguments.Length != Arguments.Length)
+        { throw new ArgumentException("Constructor arity must be preserved.", nameof(arguments)); }
+        return new(Name, arguments) { IsValueType = IsValueType, NestedTypeName = NestedTypeName, NeedsRefLikePermission = NeedsRefLikePermission };
+    }
 
     public static HmType Variable()
     {
@@ -73,6 +85,7 @@ public sealed class HmType(string name, params HmType[] arguments)
                 throw new InferenceException("Infinite type (occurs check).");
             }
 
+            right.NeedsRefLikePermission |= left.NeedsRefLikePermission;
             left.Link = right;
             return;
         }
@@ -95,7 +108,7 @@ public sealed class HmType(string name, params HmType[] arguments)
                 right.Name == CSharpTypes.NullableParameter ? right.Arguments[0] : right);
             return;
         }
-        if (left.Name != right.Name || left.Arguments.Length != right.Arguments.Length)
+        if (left.Name != right.Name || left.NestedTypeName != right.NestedTypeName || left.Arguments.Length != right.Arguments.Length)
         {
             throw new InferenceException($"Conflicting types: {left.Name} and {right.Name}.");
         }
@@ -181,6 +194,14 @@ public sealed class HmType(string name, params HmType[] arguments)
             }
 
             return name;
+        }
+
+        if (type.NestedTypeName is not null)
+        {
+            var enclosing = type.Arguments[0].Format(variables, nullableAnnotations) + "." + type.NestedTypeName;
+            var own = CSharpTypes.OwnArguments(type);
+            return own.Length == 0 ? enclosing : enclosing + "<" + string.Join(", ", own.Select(argument =>
+            { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } return argument.Format(variables, nullableAnnotations); })) + ">";
         }
 
         if (type.Name == CSharpTypes.NullableParameter)
@@ -294,7 +315,7 @@ public sealed record HmScheme(HmType Type, IReadOnlyCollection<HmType> Quantifie
             }
 
             return t;
-        }, _ => HmType.Variable());
+        }, type => { if (type is null) { throw new ArgumentNullException(nameof(type)); } return type.WithArguments(); });
         return Copy(Type);
         HmType Copy(HmType type)
         {
@@ -309,7 +330,7 @@ public sealed record HmScheme(HmType Type, IReadOnlyCollection<HmType> Quantifie
                 return type;
             }
 
-            return new(type.Name, type.Arguments.Select(Copy).ToArray());
+            return type.WithArguments(type.Arguments.Select(Copy).ToArray());
         }
     }
 }

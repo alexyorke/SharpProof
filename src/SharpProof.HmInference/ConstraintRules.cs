@@ -82,15 +82,21 @@ public static partial class Inference
                 ImportConstructedConstraints(array.ElementType, inferred.Arguments[0]);
                 return;
             }
-            if (declared is not INamedTypeSymbol named || inferred.Arguments.Length != named.TypeArguments.Length || named.TypeArguments.Length == 0)
+            if (declared is not INamedTypeSymbol named)
             { return; }
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            for (var i = 0; i < named.TypeArguments.Length; i++)
-            { mapping.Add(named.OriginalDefinition.TypeParameters[i], inferred.Arguments[i]); }
-            for (var i = 0; i < named.TypeArguments.Length; i++)
+            if (!CSharpTypes.MapNamedArguments(named, inferred, mapping))
+            { return; }
+            for (var owner = named; owner is not null; owner = owner.ContainingType)
             {
-                ImportConstraints(named.OriginalDefinition.TypeParameters[i], inferred.Arguments[i], mapping, named.TypeArguments[i]);
-                ImportConstructedConstraints(named.TypeArguments[i], inferred.Arguments[i]);
+                for (var i = 0; i < owner.TypeArguments.Length; i++)
+                {
+                    var parameter = owner.OriginalDefinition.TypeParameters[i];
+                    if (!mapping.TryGetValue(parameter, out var argument))
+                    { continue; }
+                    ImportConstraints(parameter, argument, mapping, owner.TypeArguments[i]);
+                    ImportConstructedConstraints(owner.TypeArguments[i], argument);
+                }
             }
         }
 
@@ -158,6 +164,8 @@ public static partial class Inference
                 parts.AddRange(types);
                 if (keywords.Contains("new()") && !value)
                 { parts.Add("new()"); }
+                if (variable.Key.Root.NeedsRefLikePermission)
+                { parts.Add("allows ref struct"); }
                 if (parts.Count == 0)
                 { continue; }
                 var shape = (MethodDeclarationSyntax)SyntaxFactory.ParseMemberDeclaration($"void C<{variable.Value}>() where {variable.Value} : {string.Join(", ", parts)} {{}}")!;

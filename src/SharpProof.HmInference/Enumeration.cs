@@ -138,10 +138,11 @@ public static partial class Inference
                 if (loop is ForEachStatementSyntax simple)
                 {
                     var iteration = element;
-                    if (!simple.Type.IsVar)
+                    var iterationSyntax = simple.Type is RefTypeSyntax referenceType ? referenceType.Type : simple.Type;
+                    if (!iterationSyntax.IsVar)
                     {
                         HmType.Unify(element, CSharpTypes.Rigid(info.ElementType!));
-                        iteration = CSharpTypes.Rigid(model.GetTypeInfo(simple.Type, cancellationToken).Type!);
+                        iteration = CSharpTypes.Rigid(model.GetTypeInfo(iterationSyntax, cancellationToken).Type!);
                     }
                     environment.Add(model.GetDeclaredSymbol(simple, cancellationToken)!, iteration);
                 }

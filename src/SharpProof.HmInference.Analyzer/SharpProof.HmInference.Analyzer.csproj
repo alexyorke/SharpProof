@@ -11,6 +11,8 @@
     <Compile Include="../SharpProof.HmInference/Inference.cs" Link="Inference.cs" />
     <Compile Include="../SharpProof.HmInference/NullableAsync.cs" Link="NullableAsync.cs" />
     <Compile Include="../SharpProof.HmInference/AsyncBuilders.cs" Link="AsyncBuilders.cs" />
+    <Compile Include="../SharpProof.HmInference/NamedTypeShapes.cs" Link="NamedTypeShapes.cs" />
+    <Compile Include="../SharpProof.HmInference/MemberBindings.cs" Link="MemberBindings.cs" />
     <Compile Include="../SharpProof.HmInference/EnumerationProtocols.cs" Link="EnumerationProtocols.cs" />
     <Compile Include="../SharpProof.HmInference/Patterns.cs" Link="Patterns.cs" />
     <Compile Include="../SharpProof.HmInference/ArgumentConversions.cs" Link="ArgumentConversions.cs" />

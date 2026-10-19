@@ -22,11 +22,9 @@ public static partial class Inference
             { shape = shape.Arguments[0].Root; }
             if (shape.IsVariable)
             { HmType.Unify(shape, CSharpTypes.Rigid(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated))); shape = shape.Root; }
-            if (shape.Arguments.Length != declared.TypeArguments.Length)
-            { throw new InferenceException("Delegate type argument mismatch."); }
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            for (var i = 0; i < declared.TypeArguments.Length; i++)
-            { mapping.Add(declared.OriginalDefinition.TypeParameters[i], shape.Arguments[i]); }
+            if (!CSharpTypes.MapNamedArguments(declared, shape, mapping))
+            { throw new InferenceException("Delegate type argument mismatch."); }
             var inputs = new List<HmType>();
             foreach (var parameter in invoke.Parameters)
             {
@@ -61,8 +59,7 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(method)); }
             var owner = method.ContainingType;
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            for (var i = 0; i < owner.TypeArguments.Length; i++)
-            { mapping.Add(owner.OriginalDefinition.TypeParameters[i], CSharpTypes.Rigid(owner.TypeArguments[i])); }
+            AddNamedArguments(owner, mapping);
             if (receiver is null)
             { return mapping; }
             if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol { IsGenericType: true } declared)
@@ -70,11 +67,9 @@ public static partial class Inference
             var shape = Expression(receiver).Root;
             if (shape.Name == CSharpTypes.NullableReference)
             { shape = shape.Arguments[0].Root; }
-            if (shape.Arguments.Length != declared.TypeArguments.Length)
-            { Anchor(receiver); return mapping; }
             var receiverVariables = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            for (var i = 0; i < declared.TypeArguments.Length; i++)
-            { receiverVariables.Add(declared.OriginalDefinition.TypeParameters[i], shape.Arguments[i]); }
+            if (!CSharpTypes.MapNamedArguments(declared, shape, receiverVariables))
+            { Anchor(receiver); return mapping; }
             INamedTypeSymbol? ancestor = declared.OriginalDefinition;
             while (ancestor is not null && !SymbolEqualityComparer.Default.Equals(ancestor.OriginalDefinition, owner.OriginalDefinition))
             { ancestor = ancestor.BaseType; }
@@ -88,8 +83,8 @@ public static partial class Inference
             }
             if (ancestor is null)
             { Anchor(receiver); return mapping; }
-            for (var i = 0; i < owner.TypeArguments.Length; i++)
-            { mapping[owner.OriginalDefinition.TypeParameters[i]] = CSharpTypes.Rigid(ancestor.TypeArguments[i], receiverVariables); }
+            if (!CSharpTypes.MapNamedArguments(ancestor, CSharpTypes.Rigid(ancestor, receiverVariables), mapping))
+            { Anchor(receiver); }
             return mapping;
         }
         private HmType MethodGroup(ExpressionSyntax expression, IMethodSymbol method, INamedTypeSymbol target)

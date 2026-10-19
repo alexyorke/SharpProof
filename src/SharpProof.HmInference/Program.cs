@@ -173,7 +173,7 @@ internal static class Program
             ("TupleFirst", "static int M((int,bool) pair) => pair.Item1;", "Suggestion", "T1 M<T1, T2>((T1, T2) pair)"),
             ("NamedTuple", "static int M((int value,bool flag) pair) => pair.value;", "Suggestion", "T1 M<T1, T2>((T1 value, T2 flag) pair)"),
             ("GenericContainer", "static System.Collections.Generic.List<int> M(System.Collections.Generic.List<int> xs) => xs;", "Suggestion", "global::System.Collections.Generic.List<T1> M<T1>(global::System.Collections.Generic.List<T1> xs)"),
-            ("GenericProperty", "static int M(System.Collections.Generic.List<int> xs) => xs.Count;", "Concrete", null),
+            ("GenericProperty", "static int M(System.Collections.Generic.List<int> xs) => xs.Count;", "Suggestion", "int M<T1>(global::System.Collections.Generic.List<T1> xs)"),
             ("NominalIdentity", "static System.DateTime M(System.DateTime value) => value;", "Suggestion", "T1 M<T1>(T1 value)"),
             ("IfElse", "static int M(bool b,int x,int y) { if (b) return x; else return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
             ("GuardReturn", "static int M(bool b,int x,int y) { if (b) return x; return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
@@ -321,6 +321,7 @@ internal static class Program
 
         passed++;
         Program.Log.Info("PASS PolymorphicRuntime");
+        passed += await TypeShapeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ProtocolEnumerationChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PatternChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CallChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

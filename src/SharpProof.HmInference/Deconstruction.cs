@@ -19,16 +19,13 @@ public static partial class Inference
             if (original is not INamedTypeSymbol source)
             { return null; }
             value = value.Root;
-            if (value.Name == CSharpTypes.NullableReference)
+            while (value.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
             { value = value.Arguments[0].Root; }
-            var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            if (source.TypeArguments.Length > 0 && source.TypeArguments.Length == value.Arguments.Length)
-            {
-                for (var i = 0; i < source.TypeArguments.Length; i++)
-                { mapping.Add(source.OriginalDefinition.TypeParameters[i], value.Arguments[i]); }
-            }
-            else
+            if (value.IsVariable && !source.IsGenericType)
             { HmType.Unify(value, CSharpTypes.Rigid(source.WithNullableAnnotation(NullableAnnotation.NotAnnotated))); }
+            var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
+            if (!CSharpTypes.MapNamedArguments(source, value, mapping))
+            { HmType.Unify(value, CSharpTypes.Rigid(source.WithNullableAnnotation(NullableAnnotation.NotAnnotated))); CSharpTypes.MapNamedArguments(source, value, mapping); }
             INamedTypeSymbol? ancestor = source.OriginalDefinition;
             while (ancestor is not null && !SymbolEqualityComparer.Default.Equals(ancestor.OriginalDefinition, target.OriginalDefinition))
             { ancestor = ancestor.BaseType; }
@@ -90,13 +87,12 @@ public static partial class Inference
                     if (projected is null)
                     {
                         HmType.Unify(value, CSharpTypes.Rigid(original));
-                        for (var i = 0; i < selected.ContainingType.TypeArguments.Length; i++)
-                        { mapping.Add(selected.ContainingType.OriginalDefinition.TypeParameters[i], CSharpTypes.Rigid(selected.ContainingType.TypeArguments[i])); }
+                        AddNamedArguments(selected.ContainingType, mapping);
                     }
                     else
                     {
-                        for (var i = 0; i < selected.ContainingType.TypeArguments.Length; i++)
-                        { mapping.Add(selected.ContainingType.OriginalDefinition.TypeParameters[i], projected.Root.Arguments[i]); }
+                        if (!CSharpTypes.MapNamedArguments(selected.ContainingType, projected, mapping))
+                        { throw new InferenceException("Invalid deconstructor owner shape."); }
                     }
                 }
                 foreach (var parameter in definition.TypeParameters)

@@ -80,7 +80,7 @@ internal static class NullableAsyncChecks
             ("AsyncExtensionAwaiter", "static async Task<int> M(ExtensionAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::ExtensionAwaitBox<T1> task)"),
             ("AsyncConstrainedExtensionAwaiter", "static async Task<int> M(StructAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::StructAwaitBox<T1> task) where T1 : struct"),
             ("AsyncExtensionOverloadRetained", "static async Task<int> M(OverloadAwaitBox<int> task)=>await task;", "Concrete", null),
-            ("AsyncNestedAwaiterRetained", "static async Task<int> M(NestedAwaitBox<int> task,bool ignored)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::NestedAwaitBox<int> task, T1 ignored)"),
+            ("AsyncNestedAwaiterInferred", "static async Task<int> M(NestedAwaitBox<int> task,bool ignored)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1, T2>(global::NestedAwaitBox<T1> task, T2 ignored)"),
             ("AsyncOwnAwaiter", "static async Task<int> M(OwnAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::OwnAwaitBox<T1> task)"),
             ("AsyncAwaiterShadowingRejected", "static async Task<int> M(ExplicitAwaitSource task)=>await task;", "Rejected", null),
             ("ImportedNullableValue", "static int M(int x)=>NullableImports.Echo(x);", "Suggestion", "T1? M<T1>(T1 x)"),

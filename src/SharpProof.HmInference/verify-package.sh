@@ -22,7 +22,7 @@ consumer=$(mktemp -d /tmp/hm-package-consumer.XXXXXX)
 cp global.json "$consumer/global.json"
 cat > "$consumer/Consumer.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net8.0</TargetFramework><RestoreSources>$packages</RestoreSources><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>13.0</LangVersion><RestoreSources>$packages</RestoreSources><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
   <ItemGroup><PackageReference Include="SharpProof.HmInference" Version="$version" PrivateAssets="all" /></ItemGroup>
 </Project>
 EOF
@@ -34,6 +34,8 @@ using System.Collections.Generic;
 delegate void PackageSink<T>(T value);
 sealed class PackageBox<T> { public T Get()=>default!; }
 sealed class PackagePatternBox<T> { public T Value=>default!; }
+ref struct PackageTargetToken {}
+sealed class PackageShapeOuter<T> { public sealed class Item<U> { public T Read()=>default!; } }
 sealed class PackageExtensionSource<T> { public T[] Values=[]; }
 sealed class PackageImplicitSource<T> { public PackageImplicitEnumerator<T> GetAsyncEnumerator()=>new(); }
 sealed class PackageImplicitEnumerator<T> { public T Current=>default!; public PackageImplicitMove<T> MoveNextAsync()=>new(); }
@@ -93,6 +95,12 @@ static class Sample {
     public static int PatternSwitch(object value)=>value switch {string text=>text.Length,int number=>number,_=>-1};
     public static int ExtensionEnumeration(PackageExtensionSource<int> source,int seed){foreach(var value in source)seed=value;return seed;}
     public static async Task<int> ImplicitAwaitEnumeration(PackageImplicitSource<int> source,int seed){await foreach(var value in source)seed=value;return seed;}
+    public static PackageShapeOuter<int>.Item<string> NestedShape(PackageShapeOuter<int>.Item<string> value)=>value;
+    public static int SpanShape(ReadOnlySpan<int> values,int index)=>values[index];
+    public static Span<int> SpanTailShape(Span<int> values,int start)=>values[start..];
+    public static ref int RefShape(Span<int> values,int index)=>ref values[index];
+    public static void RefForeachShape(Span<int> values,int replacement){foreach(ref var item in values)item=replacement;}
+    public static PackageTargetToken RefLikeTarget(PackageTargetToken value,bool ignored)=>value;
     public static int Identity(int value) => value;
     public static int? NullableIdentity(int? value) => value;
     public static string? NullableReferenceIdentity(string? value) => value;
@@ -110,10 +118,10 @@ EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 if grep -Eq 'CS8032|AD0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
-for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'global::PackageTask<T1> CustomBuilderIdentity<T1>' 'T1? ImportedNullable<T1>' 'T1 ImportedNullableLegacy<T1>' 'ImportedNullableAsync<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class' 'BoxArgument<T1>' 'BoxAwaitedArgument<T1>' 'WidenAwaitedArgument<T1>' 'ArrayArgument<T1>' 'where T1 : notnull' 'PatternList<T1>' 'PatternProperty<T1>' 'PatternNullable<T1>' 'PatternSwitch<T1>' 'ExtensionEnumeration<T1>' 'ImplicitAwaitEnumeration<T1>'; do
+for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'global::PackageTask<T1> CustomBuilderIdentity<T1>' 'T1? ImportedNullable<T1>' 'T1 ImportedNullableLegacy<T1>' 'ImportedNullableAsync<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class' 'BoxArgument<T1>' 'BoxAwaitedArgument<T1>' 'WidenAwaitedArgument<T1>' 'ArrayArgument<T1>' 'where T1 : notnull' 'PatternList<T1>' 'PatternProperty<T1>' 'PatternNullable<T1>' 'PatternSwitch<T1>' 'ExtensionEnumeration<T1>' 'ImplicitAwaitEnumeration<T1>' 'NestedShape<T1, T2>' 'SpanShape<T1>' 'SpanTailShape<T1>' 'RefShape<T1>' 'RefForeachShape<T1>' 'global::PackageTargetToken RefLikeTarget<T1>(global::PackageTargetToken value, T1 ignored)'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' | tee "$evidence/package-checks.txt"

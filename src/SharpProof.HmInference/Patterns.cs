@@ -127,8 +127,8 @@ public static partial class Inference
             if (projected is null)
             { UnifyDeconstructionReceiver(CSharpTypes.Rigid(original), input); AddNamedArguments(owner, mapping); return mapping; }
             projected = ConversionCore(projected);
-            for (var i = 0; i < owner.TypeArguments.Length; i++)
-            { mapping[owner.OriginalDefinition.TypeParameters[i]] = projected.Arguments[i]; }
+            if (!CSharpTypes.MapNamedArguments(owner, projected, mapping))
+            { throw new InferenceException("Invalid pattern owner shape."); }
             return mapping;
         }
 

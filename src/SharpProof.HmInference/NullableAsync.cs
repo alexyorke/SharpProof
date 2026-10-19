@@ -39,7 +39,7 @@ public static partial class Inference
             if (asyncReturn.Arity == 1)
             {
                 var template = declared.Name == CSharpTypes.NullableReference ? declared.Arguments[0] : declared;
-                var constructed = new HmType(template.Name, value) { IsValueType = template.IsValueType };
+                var constructed = CSharpTypes.ReplaceOwnArguments(template, value);
                 result = declared.Name == CSharpTypes.NullableReference ? new(CSharpTypes.NullableReference, constructed) : constructed;
             }
             BindBuilderReturn(result, value);
@@ -137,7 +137,7 @@ public static partial class Inference
                 throw new InferenceException("Dynamic or unresolved await is unsupported.");
             }
             var operandType = model.GetTypeInfo(expression.Expression, cancellationToken).Type;
-            if (operandType is INamedTypeSymbol named && named.Arity == 1 &&
+            if (operandType is INamedTypeSymbol named && named.ContainingType is null && named.Arity == 1 &&
                 ((named.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks" && named.Name is "Task" or "ValueTask")
                 || (named.ContainingNamespace.ToDisplayString() == "System.Runtime.CompilerServices" && named.Name is "ConfiguredTaskAwaitable" or "ConfiguredValueTaskAwaitable")))
             {
@@ -218,8 +218,8 @@ public static partial class Inference
                 var projected = ProjectDeconstructionReceiver(receiverType, receiver, full.ContainingType);
                 if (projected is null)
                 { HmType.Unify(receiver, CSharpTypes.Rigid(receiverType)); return CSharpTypes.Rigid(selected.ReturnType); }
-                for (var i = 0; i < definition.ContainingType.TypeParameters.Length; i++)
-                { mapping.Add(definition.ContainingType.TypeParameters[i], projected.Root.Arguments[i]); }
+                if (!CSharpTypes.MapNamedArguments(full.ContainingType, projected, mapping))
+                { throw new InferenceException("Invalid awaiter owner shape."); }
             }
             return CSharpTypes.Rigid(definition.ReturnType, mapping);
         }
