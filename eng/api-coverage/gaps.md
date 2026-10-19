@@ -430,7 +430,10 @@ Boolean/reference values, opaque decimal/NaN/enum/Guid/nullable/struct payloads,
 copy independence, aliases, mutation, evaluation order and bounds. The selected
 normal growth and fault paths consume approximation and confer no replay authority.
 Native positive/wrong-claim, effect and unknown-writer/interface controls accompany
-these runtime comparisons.
+these runtime comparisons. Open generic entry roots observed through aliased
+`List<T>`/`List<U>` or `List<object>` views currently report
+Unknown/UnsupportedExpression. Their CLR mutation contradictions and native
+boundary controls do not establish modeled cross-generic alias semantics.
 
 Three declarations gain partial intrinsic evidence: List.Insert, IList.Insert
 and List.GetRange. The four ranked Insert sites and two GetRange sites gain

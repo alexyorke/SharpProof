@@ -96,6 +96,38 @@ public sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 1); var data = new Strange(); System.Collections.Generic.IList<int> alias = data; alias.Insert(0, 17); return data.Count;", WorkerClaimOutcome.Unknown,
             members: "public sealed class Strange : System.Collections.Generic.List<int>, System.Collections.Generic.IList<int> { void System.Collections.Generic.IList<int>.Insert(int index, int item) { } }");
     }
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task ListRangesKeepUnsupportedOpenGenericAliasExpressionsConservative(bool inserts, bool objectView)
+    {
+        var mutation = inserts ? "first.Insert(0, replacement);" : "first[0] = replacement;";
+        var source = "using SharpProof.Attributes; public static class C { public static bool Target" + (objectView ? "<T>" : "<T,U>") + "(System.Collections.Generic.List<T> first, System.Collections.Generic.List<" + (objectView ? "object" : "U") + "> second, T replacement) where T : class " + (objectView ? "" : "where U : class ") + "{ Contract.Requires(first != null && second != null && object.ReferenceEquals(first, second) && second.Count == 1); Contract.Ensures(Contract.Result<bool>()); var before = second[0]; " + mutation + " return object.ReferenceEquals(second[0], before); } }";
+        using var project = WorkerTests.TestProject.Create(source);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(response.Errors, Is.Empty);
+        // These roots stop at an unsupported expression; they do not prove generic alias semantics.
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+            Assert.That(response.CallableResults.Single().Reason, Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+        }
+        Assert.That(response.ClaimResults.Single().Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
+        var before = new object();
+        var replacement = new object();
+        var data = new List<object> { before };
+        var alias = data;
+        if (inserts)
+        { data.Insert(0, replacement); }
+        else
+        { data[0] = replacement; }
+        Assert.That(ReferenceEquals(alias[0], before), Is.False);
+    }
     [TestCase(false)]
     [TestCase(true)]
     public async Task ListRangesDoNotSeparateOpenGenericInstantiationsThatCanAlias(bool objectView)
