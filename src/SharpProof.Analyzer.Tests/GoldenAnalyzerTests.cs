@@ -45,7 +45,7 @@ public sealed class GoldenAnalyzerTests
             var lowering = new SharpProof.Frontend.RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True);
             Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
-            var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.PreState }))
+            var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
                 .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
                 .Append(context.Result!.Value).Distinct().ToImmutableArray();
             var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(

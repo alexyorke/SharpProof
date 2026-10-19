@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -32,7 +33,7 @@ public sealed class CompilerMetadataApiBoundaryTests
             var available = AnalyzerTestHost.CreateCompilation(source, [])
                 .WithAssemblyName("PlainMetadataApiAvailableCaller")
                 .WithReferences(TestMetadataReferences.WithSharpProof.Append(reference));
-            var callers = new[] { unavailable, available };
+            var callers = ImmutableArray.Create(unavailable, available);
             foreach (var caller in callers)
             {
                 Assert.That(caller.GetDiagnostics().Where(static diagnostic =>

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -78,14 +79,14 @@ public sealed class RuntimeRequiresOracleTests
                     [item.Value, item.Minimum, item.Maximum])!))
                 .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallLine))
                 .Order()
-                .ToArray();
+                .ToImmutableArray();
             var diagnosticLines = diagnostics
                 .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0027"))
                 .Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.GetLineSpan()
                         .StartLinePosition.Line))
                 .Order()
-                .ToArray();
+                .ToImmutableArray();
 
             Assert.That(runtimeRefutationLines, Is.Not.Empty);
             Assert.That(

@@ -3708,3 +3708,9 @@ lookup maps, scoped region/line-set builders and immutable DFS stacks. Preserve
 NUnit/reflection adapters, intentional JSON mutation delegates, stream buffers,
 wrong-case inputs and LIFO/source order. Validate affected fixtures after independent
 review. Status: planned before edits. Analyzer collector follow-up remains separate.
+
+IMM-M140 verified: all 1,134 ordinary Release Analyzer tests pass, zero failures/
+skips/build warnings/errors; 64 exact embedded PDB outputs. Main and independent
+review confirm all 86 vector/snapshot changes, three strict maps, ordinal hierarchy
+sorting, graph reference identity and native/SUT preservation. Canonical whitespace
+check required zero changes. Seventeen collector rows remain a separate follow-up.

@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -71,14 +73,9 @@ public sealed class CompilerMetadataResolutionTests
         image.Position = 0;
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
-        var definitions = reader.MethodDefinitions.ToDictionary(
-            handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetString(reader.GetMethodDefinition(handle).Name))),
-            handle => handle);
+        var definitions = ImmutableDictionaryCapture.Create(reader.MethodDefinitions, handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetString(reader.GetMethodDefinition(handle).Name))), handle => handle);
 
-        foreach (var (name, hasManagedBody) in new[]
-                 {
-                     ("Managed", true), ("Abstract", false), ("Native", false)
-                 })
+        foreach (var (name, hasManagedBody) in ImmutableArray.Create(("Managed", true), ("Abstract", false), ("Native", false)))
         {
             var token = MetadataTokens.GetToken(definitions[name]);
             Assert.That(CompilerMetadataResolution.TryGetMethodDefinition(

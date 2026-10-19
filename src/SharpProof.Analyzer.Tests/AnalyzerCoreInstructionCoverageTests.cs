@@ -102,7 +102,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         Assert.That(result.RequireOutput(0).Nullness[output], Is.EqualTo(NullnessValue.MaybeNull));
         Assert.That(result.RequireOutput(0).Cardinality[output].Length.Contains(0), Is.True);
         Assert.That(result.RequireOutput(0).Cardinality[output].Length.Contains(5), Is.True);
-        foreach (var condition in new[] { false, true })
+        foreach (var condition in ImmutableArray.Create(false, true))
         {
             var concrete = new IrProgramInterpreter(factory).Execute(program,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(condition))).ReturnValue!;
@@ -169,7 +169,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(1).Values[flag].SingletonValue, Is.Zero);
         Assert.That(result.RequireOutput(2).Values[flag].SingletonValue, Is.EqualTo(1));
-        foreach (var input in new[] { false, true })
+        foreach (var input in ImmutableArray.Create(false, true))
         {
             var concrete = new IrProgramInterpreter(factory).Execute(program,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(input)));

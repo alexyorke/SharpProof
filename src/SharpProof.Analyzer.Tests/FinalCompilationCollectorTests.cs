@@ -560,7 +560,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(implementation, Is.Not.Null);
         Assert.That(implementation!.GetReturnTypeAttributes().Select(static attribute =>
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath)),
-            Is.EqualTo(new[] { definitionPath, implementationPath }));
+            Is.EqualTo(ImmutableArray.Create(definitionPath, implementationPath)));
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", image, assembly =>
         {
@@ -578,7 +578,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence)),
                 Is.All.EqualTo(WorkerClaimEvidence.ReturnAttribute));
             Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)),
-                Is.EqualTo(new[] { definitionPath, implementationPath }.Order(StringComparer.Ordinal)));
+                Is.EqualTo(ImmutableArray.Create(definitionPath, implementationPath).Order(StringComparer.Ordinal)));
             Assert.That(prepared.FailureReason, Is.EqualTo(matchingPathOrder
                 ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
         }
@@ -1113,12 +1113,12 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(baseline.CompilerDiagnostics, Is.Empty);
             Assert.That(warningLevel.CompilerDiagnostics, Is.Empty);
             Assert.That(
-                new[] { generalError, specificError, providerError },
+                ImmutableArray.Create(generalError, specificError, providerError),
                 Has.All.Matches<CompilerManifestArtifact>(artifact =>
                     artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (artifact.CompilerDiagnostics.Any(diagnostic =>
                         diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS0168")))));
             Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
-            Assert.That(new[] { generalError, specificError, providerError }.Select(Digest),
+            Assert.That(ImmutableArray.Create(generalError, specificError, providerError).Select(Digest),
                 Has.All.EqualTo(Digest(generalError)));
             Assert.That(Digest(generalError), Is.Not.EqualTo(Digest(baseline)));
             Assert.That(
@@ -1195,7 +1195,7 @@ public sealed class FinalCompilationCollectorTests
                     Column = mapped.StartLinePosition.Character + 1
                 };
             })
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(expected, Is.Not.Empty);
 
         var artifact = await EmitArtifact(
@@ -1212,7 +1212,7 @@ public sealed class FinalCompilationCollectorTests
                 diagnostic.Location.Path,
                 diagnostic.Location.Line,
                 diagnostic.Location.Column
-            })).ToArray();
+            })).ToImmutableArray();
 
         Assert.That(actual, Is.EquivalentTo(expected));
     }
@@ -1299,7 +1299,7 @@ public sealed class FinalCompilationCollectorTests
     public async Task EmptyOrUnsetSpecificationPacksRemainNoPacksDefault()
     {
         using var workspace = new CollectorWorkspace();
-        string?[] values = [null, string.Empty, "   "];
+        ImmutableArray<string?> values = [null, string.Empty, "   "];
 
         for (var index = 0; index < values.Length; index++)
         {
@@ -1456,19 +1456,19 @@ public sealed class FinalCompilationCollectorTests
                 Is.EqualTo(["Linked.dll", "A.netmodule", "B.netmodule"]));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(NormalizePath)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Mvid)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(ReadMvid)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Sha256)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(ReadSha256)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new FileInfo(path).Length))));
         }
     }
@@ -1521,7 +1521,7 @@ public sealed class FinalCompilationCollectorTests
         var secondPath = Path.Combine(workspace.Path, "SecondLimit.dll");
         await File.WriteAllBytesAsync(firstPath, firstImage);
         await File.WriteAllBytesAsync(secondPath, secondImage);
-        MetadataReference[] references =
+        ImmutableArray<MetadataReference> references =
         [
             MetadataReference.CreateFromImage(
                 firstImage,
@@ -1548,11 +1548,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 captured.SelectMany(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules))
                     .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                Is.EqualTo(new[]
-                {
-                    firstImage.LongLength,
-                    secondImage.LongLength
-                }));
+                Is.EqualTo(ImmutableArray.Create(firstImage.LongLength, secondImage.LongLength)));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerCompilationCapture.CaptureReferences(
                     references,
@@ -1876,7 +1872,7 @@ public sealed class FinalCompilationCollectorTests
                 0, image.Length - originalBytes.Length + 1)
             .Where(offset => image.AsSpan(offset, originalBytes.Length)
                 .SequenceEqual(originalBytes))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(offsets, Has.Length.EqualTo(1));
         var patched = (byte[])image.Clone();
         replacementBytes.CopyTo(patched, offsets[0]);

@@ -31,10 +31,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
             WorkerFeatureSet.All).Build();
         var target = result.Targets.Single(pair => pair.Key.Name == "ThrowFormat").Value;
         var claim = target.EffectClaims.Single();
-        var expectedExceptions = new[] {
-            "System.FormatException",
-            "System.InvalidOperationException"
-        };
+        var expectedExceptions = ImmutableArray.Create("System.FormatException", "System.InvalidOperationException");
         var actualExceptionNames = claim.Evidence.Constraint.AllowedExceptionTypes
             .Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value[(value.LastIndexOf("::", StringComparison.Ordinal) + 2)..]))
             .ToImmutableArray();

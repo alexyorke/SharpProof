@@ -85,7 +85,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         {
             using var stream = new MemoryStream(image);
             var assembly = runtime.LoadFromStream(stream);
-            foreach (var typeName in new[] { "ResultSubject", "OldSubject" })
+            foreach (var typeName in ImmutableArray.Create("ResultSubject", "OldSubject"))
             {
                 var subject = assembly.GetType(typeName)!;
                 var thrown = Assert.Throws<TargetInvocationException>(

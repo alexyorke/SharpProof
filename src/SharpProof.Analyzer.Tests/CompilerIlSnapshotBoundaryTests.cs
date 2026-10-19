@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -35,7 +36,7 @@ public sealed class CompilerIlSnapshotBoundaryTests
             var current = AnalyzerTestHost.CreateCompilation(
                 "public static class Caller { public static int Root() => Second.Value(9); }", [],
                 additionalReferences: [firstReference, secondReference]).WithAssemblyName("SnapshotCurrentCaller");
-            foreach (var compilation in new[] { first, second, earlier, current })
+            foreach (var compilation in ImmutableArray.Create(first, second, earlier, current))
             {
                 Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
@@ -51,7 +52,7 @@ public sealed class CompilerIlSnapshotBoundaryTests
                 using var secondStream = new MemoryStream(secondImage, writable: false);
                 loadContext.LoadFromStream(firstStream);
                 loadContext.LoadFromStream(secondStream);
-                foreach (var (compilation, expected) in new[] { (earlier, 7), (current, 9) })
+                foreach (var (compilation, expected) in ImmutableArray.Create((earlier, 7), (current, 9)))
                 {
                     using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
                     var assembly = loadContext.LoadFromStream(image);

@@ -52,9 +52,9 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
                     Is.EqualTo(ExpectedModuleNames));
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                    Is.EqualTo(new[] { manifestImage.LongLength, firstImage.LongLength, secondImage.LongLength }));
+                    Is.EqualTo(ImmutableArray.Create(manifestImage.LongLength, firstImage.LongLength, secondImage.LongLength)));
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
-                    Is.EqualTo(new[] { manifestPath, firstPath, secondPath }.Select(Path.GetFullPath)));
+                    Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath).Select(Path.GetFullPath)));
             }
         }
         finally

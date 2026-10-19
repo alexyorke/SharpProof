@@ -25,7 +25,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         Assert.That(result.Gaps, Is.Empty);
         var interval = result.Outputs[0].Values[x];
         Assert.That(interval.Contains(0), Is.False);
-        foreach (var input in new[] { false, true })
+        foreach (var input in ImmutableArray.Create(false, true))
         { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(input))); Assert.That(interval.Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
@@ -66,7 +66,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         var program = b.Build();
         var result = new CoreIrAdvisoryInterpreter(program, [x]).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(x, IntervalValue.Range(254, 255)));
         Assert.That(result.Gaps, Is.Empty);
-        foreach (var input in new[] { 254, 255 })
+        foreach (var input in ImmutableArray.Create(254, 255))
         { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, f.CreateIntegerValue(type, input))); Assert.That(result.Outputs[0].Values[x].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     private static (IrProgram Program, IrVarId X) Loop()
@@ -145,7 +145,7 @@ public sealed class CoreIrAdvisoryProductTests
         Assert.That(result.Outputs[0].Nullness[s], Is.EqualTo(NullnessValue.MaybeNull));
         Assert.That(result.Outputs[0].Cardinality[s].Length.Contains(0), Is.True);
         Assert.That(result.Outputs[0].Cardinality[s].Length.Contains(2), Is.True);
-        foreach (var condition in new[] { false, true })
+        foreach (var condition in ImmutableArray.Create(false, true))
         { var actual = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(condition))); Assert.That(result.Outputs[0].Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
         var empty = new IrProgramBuilder(f);
         var first = empty.CreateBlock();
@@ -178,7 +178,7 @@ public sealed class CoreIrAdvisoryProductTests
         Assert.That(result.Inputs[1].Cardinality[s].Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
         Assert.That(result.Inputs[2].Nullness[s], Is.EqualTo(NullnessValue.MaybeNull));
         Assert.That(result.Inputs[2].Cardinality[s].Kind, Is.EqualTo(SequenceCardinalityKind.Empty));
-        var values = new[] { f.CreateNullValue(type), f.CreateEmptyArrayValue(type), f.CreateSequenceValue(type, new[] { f.CreateIntegerValue(1), f.CreateIntegerValue(2) }) };
+        var values = ImmutableArray.Create(f.CreateNullValue(type), f.CreateEmptyArrayValue(type), f.CreateSequenceValue(type, ImmutableArray.Create(f.CreateIntegerValue(1), f.CreateIntegerValue(2))));
         foreach (var value in values)
         { var actual = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(s, value)); var output = result.Outputs[value.Kind == IrValueKind.Sequence && value.Elements.Length > 0 ? 1 : 2]; Assert.That(output.Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
     }
@@ -354,7 +354,7 @@ public sealed class CoreIrAdvisoryResourceTests
         Assert.That(merged.Nullness[value], Is.EqualTo(NullnessValue.MaybeNull));
         Assert.That(merged.Cardinality[value].Length.Contains(0), Is.True);
         Assert.That(merged.Cardinality[value].Length.Contains(2), Is.True);
-        foreach (var condition in new[] { false, true })
+        foreach (var condition in ImmutableArray.Create(false, true))
         { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(condition))); Assert.That(merged.Values[n].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
@@ -478,7 +478,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         var lowering = new SharpProof.Frontend.RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
-        var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.PreState }))
+        var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
             .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
             .Append(context.Result!.Value).Distinct().ToImmutableArray();
         var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(
@@ -497,7 +497,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         {
             stream.Position = 0;
             var target = loadContext.LoadFromStream(stream).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var input in new[] { -2, -1, 0, 1, 2 })
+            foreach (var input in ImmutableArray.Create(-2, -1, 0, 1, 2))
             {
                 var concrete = new IrProgramInterpreter(context.Factory).Execute(lowering.Program,
                     global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[0].Entry, context.Factory.CreateIntegerValue(input)));

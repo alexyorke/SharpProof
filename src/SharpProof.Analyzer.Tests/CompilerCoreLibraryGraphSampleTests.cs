@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -21,8 +22,8 @@ public sealed class CompilerCoreLibraryGraphSampleTests
                 filePath: "Leaf" + index.ToString(CultureInfo.InvariantCulture) + ".cs")
                 .WithAssemblyName("CoreGraphLeaf_" + leafCount.ToString(CultureInfo.InvariantCulture) +
                     "_" + index.ToString(CultureInfo.InvariantCulture))
-                .WithReferences(TestMetadataReferences.CoreLibraryOnly)).ToArray();
-        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToArray();
+                .WithReferences(TestMetadataReferences.CoreLibraryOnly)).ToImmutableArray();
+        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToImmutableArray();
         var expression = string.Join(" + ", Enumerable.Range(0, leafCount).Select(index =>
             "Leaf" + index.ToString(CultureInfo.InvariantCulture) + ".Value(value)"));
         var caller = AnalyzerTestHost.CreateCompilation(
@@ -30,7 +31,7 @@ public sealed class CompilerCoreLibraryGraphSampleTests
             [], additionalReferences: references, filePath: "Caller.cs")
             .WithAssemblyName("CoreGraphCaller_" + leafCount.ToString(CultureInfo.InvariantCulture))
             .WithReferences(TestMetadataReferences.CoreLibraryOnly.Concat(references));
-        var compilations = leaves.Append(caller).ToArray();
+        var compilations = leaves.Append(caller).ToImmutableArray();
         foreach (var compilation in compilations)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>

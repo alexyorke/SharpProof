@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -32,7 +33,7 @@ public sealed class CompilerReferencedTreeOwnershipWorkflowTests
             }
             """, [], additionalReferences: [firstReference, secondReference])
             .WithAssemblyName("OwnedCaller_" + suffix);
-        foreach (var compilation in new[] { first, second, caller })
+        foreach (var compilation in ImmutableArray.Create(first, second, caller))
         {
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);

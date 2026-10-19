@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -30,7 +31,7 @@ public sealed class CompilerReferencedBodyOwnershipTests
             .WithAssemblyName("BodyOwnershipReferencedCaller");
         var owned = AnalyzerTestHost.CreateCompilation("using SharpProof.Attributes;\n" + dependencySource + "\n" + companionSource,
             [], filePath: "OwnedCompanion.cs").WithAssemblyName("BodyOwnershipOwnedCaller");
-        foreach (var compilation in new[] { dependency, referenced, owned })
+        foreach (var compilation in ImmutableArray.Create(dependency, referenced, owned))
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
@@ -41,7 +42,7 @@ public sealed class CompilerReferencedBodyOwnershipTests
         {
             using var dependencyStream = new MemoryStream(dependencyImage, writable: false);
             loadContext.LoadFromStream(dependencyStream);
-            foreach (var compilation in new[] { referenced, owned })
+            foreach (var compilation in ImmutableArray.Create(referenced, owned))
             {
                 using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
                 var assembly = loadContext.LoadFromStream(image);
@@ -54,7 +55,7 @@ public sealed class CompilerReferencedBodyOwnershipTests
             loadContext.Unload();
         }
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
-        foreach (var compilation in new[] { referenced, owned })
+        foreach (var compilation in ImmutableArray.Create(referenced, owned))
         {
             var discovery = new ClaimManifestBuilder(compilation).Build();
             Assert.That(discovery.Targets, Has.Count.EqualTo(1));

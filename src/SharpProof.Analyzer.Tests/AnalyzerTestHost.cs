@@ -41,7 +41,7 @@ internal static class AnalyzerTestHost
     {
         System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
         System.ArgumentNullException.ThrowIfNull(diagnostics);
-        var actual = diagnostics.ToArray();
+        var actual = diagnostics.ToImmutableArray();
         Assert.That(
             actual.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(expected),

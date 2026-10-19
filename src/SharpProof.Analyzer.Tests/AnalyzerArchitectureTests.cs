@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
@@ -121,10 +122,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes()
     {
-        var assemblies = new[] {
-            typeof(SharpProofAnalyzer).Assembly,
-            typeof(SharpProof.Effects.EffectSummaryProjector).Assembly
-        };
+        var assemblies = ImmutableArray.Create(typeof(SharpProofAnalyzer).Assembly, typeof(SharpProof.Effects.EffectSummaryProjector).Assembly);
 
         foreach (var assembly in assemblies)
         {
@@ -211,14 +209,11 @@ public sealed class AnalyzerArchitectureTests
                 analyzerDirectory,
                 "AnalyzerReleases.Unshipped.md"),
             "New Rules");
-        var descriptors = new SharpProofAnalyzer()
+        var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
             .SupportedDiagnostics
             .Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (!descriptor.Id.StartsWith(
                 "SPCF",
-                StringComparison.Ordinal)))
-            .ToDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
-                StringComparer.Ordinal);
+                StringComparison.Ordinal))), static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
@@ -251,26 +246,9 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void CompilationEndOnlyDescriptorsCarryCompilationEndTag()
     {
-        var descriptors = new SharpProofAnalyzer()
-            .SupportedDiagnostics
-            .ToDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
-                StringComparer.Ordinal);
-        var expected = new[]
-        {
-            "SP0025",
-            "SP0050",
-            "SPCF0001",
-            "SPCF0002",
-            "SPCF0003",
-            "SPCF0004",
-            "SPCF0005",
-            "SPCF0006",
-            "SPCF0007",
-            "SPCF0008",
-            "SPCF0009",
-            "SPCF0010"
-        };
+        var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
+            .SupportedDiagnostics, static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+        var expected = ImmutableArray.Create("SP0025", "SP0050", "SPCF0001", "SPCF0002", "SPCF0003", "SPCF0004", "SPCF0005", "SPCF0006", "SPCF0007", "SPCF0008", "SPCF0009", "SPCF0010");
 
         foreach (var id in expected)
         {

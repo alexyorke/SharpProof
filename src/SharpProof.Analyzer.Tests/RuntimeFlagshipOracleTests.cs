@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
@@ -70,7 +71,7 @@ public sealed class RuntimeFlagshipOracleTests
     [Test]
     public async Task AnalyzerVerdictsMatchConcreteFlagshipEffects()
     {
-        string[] enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
+        ImmutableArray<string> enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
         var compilation = AnalyzerTestHost.CreateCompilation(
             Source,
             enabledIds);
@@ -193,11 +194,11 @@ public sealed class RuntimeFlagshipOracleTests
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)))))
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         var orderedExpected = expected
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(actual, Is.EqualTo(orderedExpected));
     }
 

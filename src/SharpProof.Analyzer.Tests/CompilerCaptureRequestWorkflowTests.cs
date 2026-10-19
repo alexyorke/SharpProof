@@ -156,7 +156,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
         try
         {
             var identities = new List<string>();
-            foreach (var (name, captured) in new[] { ("left", "left"), ("renamed", "renamed"), ("left", "right") })
+            foreach (var (name, captured) in ImmutableArray.Create(("left", "left"), ("renamed", "renamed"), ("left", "right")))
             {
                 var path = Path.Combine(directory, "manifest-" + identities.Count + ".json");
                 var request = path + ".request";

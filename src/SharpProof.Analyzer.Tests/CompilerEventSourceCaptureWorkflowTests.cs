@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -71,7 +72,7 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
             Assert.That(effect.ClaimId, Is.EqualTo(claim.ClaimId));
             Assert.That(effect.ContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
             Assert.That(total.IsBodyAbstraction, Is.False);
-            Assert.That(total.ValidEffectClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(total.ValidEffectClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
             Assert.That(constraint.ClaimId, Is.EqualTo(claim.ClaimId));
             Assert.That(constraint.AllowedKinds, Is.Empty);
             Assert.That(sourceRoot.CallableId, Is.EqualTo(callable.CallableId));

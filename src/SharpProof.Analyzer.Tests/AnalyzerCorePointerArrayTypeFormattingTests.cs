@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -66,8 +67,8 @@ public sealed class AnalyzerCorePointerArrayTypeFormattingTests
         var objectDisplay = objectType.ContainingAssembly.Identity + "::" + DocumentationCommentId.CreateReferenceId(objectType);
         Assert.That(SymbolEqualityComparer.Default.Equals(failure.BaseType, baseException), Is.True);
         Assert.That(CompilerExceptionTypeIdentity.Encode(baseException), Is.EqualTo(baseDisplay));
-        string[] expectedHierarchy = [expected, baseDisplay, objectDisplay];
-        Array.Sort(expectedHierarchy, StringComparer.Ordinal);
+        var expectedHierarchy = ImmutableArray.Create(expected, baseDisplay, objectDisplay)
+            .Order(StringComparer.Ordinal).ToImmutableArray();
         Assert.That(CompilerExceptionTypeIdentity.EncodeHierarchy(failure), Is.EqualTo(expectedHierarchy));
     }
 }

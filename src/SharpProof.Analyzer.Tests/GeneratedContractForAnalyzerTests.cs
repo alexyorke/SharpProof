@@ -363,7 +363,7 @@ public sealed class GeneratedContractForAnalyzerTests
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
             .Concat(additionalDiagnosticIds ?? [])
-            .ToArray();
+            .ToImmutableArray();
         var compilation = AnalyzerTestHost.CreateCompilation(
             inputSource,
             diagnosticIds);
@@ -404,7 +404,7 @@ public sealed class GeneratedContractForAnalyzerTests
         System.ArgumentNullException.ThrowIfNull(generatedSource);
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
-            .ToArray();
+            .ToImmutableArray();
         var compilation = AnalyzerTestHost.CreateCompilation(
             inputFiles[0].Source,
             diagnosticIds,
@@ -440,7 +440,7 @@ public sealed class GeneratedContractForAnalyzerTests
             Target,
             Enumerable.Range(1, 8)
                 .Select(static index => $"SPCF{index:D4}")
-                .ToArray());
+                .ToImmutableArray());
         ISourceGenerator companion = new GeneratedCompanionSourceGenerator(
             generatedSource,
             "PeerContracts.cs").AsSourceGenerator();
@@ -448,8 +448,8 @@ public sealed class GeneratedContractForAnalyzerTests
             "namespace Peer { internal sealed class Marker { } }",
             "PeerMarker.cs").AsSourceGenerator();
         var generators = reverse
-            ? new[] { decoy, companion }
-            : new[] { companion, decoy };
+            ? ImmutableArray.Create(decoy, companion)
+            : ImmutableArray.Create(companion, decoy);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators,
             parseOptions: (CSharpParseOptions)compilation.SyntaxTrees[0].Options);
