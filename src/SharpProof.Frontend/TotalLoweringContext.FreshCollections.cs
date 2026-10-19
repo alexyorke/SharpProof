@@ -88,11 +88,7 @@ public sealed partial class TotalLoweringContext
             var pair = new KeyValuePair<ISymbol, ImmutableArray<IOperation>.Builder>(key, definitions[key]);
             if (pair.Key is ILocalSymbol { RefKind: RefKind.None } && !excluded.Contains(pair.Key) && All(pair.Value, 0))
             {
-                tracked = tracked.Add(pair.Key);
-                if (lists)
-                { _exactLists = tracked; }
-                else
-                { _defaultDictionaries = tracked; }
+                tracked.Add(pair.Key);
             }
         }
         foreach (var key in captureOrder)
@@ -100,11 +96,7 @@ public sealed partial class TotalLoweringContext
             var pair = new KeyValuePair<CaptureId, ImmutableArray<IOperation>.Builder>(key, captures[key]);
             if (!excludedCaptures.Contains(pair.Key) && All(pair.Value, 0))
             {
-                trackedCaptures = trackedCaptures.Add(pair.Key);
-                if (lists)
-                { _exactListCaptures = trackedCaptures; }
-                else
-                { _defaultDictionaryCaptures = trackedCaptures; }
+                trackedCaptures.Add(pair.Key);
             }
         }
 

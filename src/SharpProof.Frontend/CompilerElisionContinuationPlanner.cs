@@ -11,12 +11,12 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     private readonly TotalLoweringContext _context = context ?? throw new System.ArgumentNullException(nameof(context));
     private readonly CSharpInvocationEmissionPolicy? _emission = emission;
     private readonly Compilation? _emissionCompilation = emissionCompilation;
-    private ImmutableDictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = ImmutableDictionary<BasicBlock, BasicBlock>.Empty;
-    private ImmutableDictionary<BasicBlock, BasicBlock> _compilerElidedPlans = ImmutableDictionary<BasicBlock, BasicBlock>.Empty;
-    private ImmutableHashSet<BasicBlock> _compilerRestoredBlocks = ImmutableHashSet<BasicBlock>.Empty;
-    private ImmutableHashSet<BasicBlock> _regionSpecificationConditionals = ImmutableHashSet<BasicBlock>.Empty;
+    private readonly ImmutableDictionary<BasicBlock, BasicBlock>.Builder _compilerElidedContinuations = ImmutableDictionary.CreateBuilder<BasicBlock, BasicBlock>();
+    private readonly ImmutableDictionary<BasicBlock, BasicBlock>.Builder _compilerElidedPlans = ImmutableDictionary.CreateBuilder<BasicBlock, BasicBlock>();
+    private readonly ImmutableHashSet<BasicBlock>.Builder _compilerRestoredBlocks = ImmutableHashSet.CreateBuilder<BasicBlock>();
+    private readonly ImmutableHashSet<BasicBlock>.Builder _regionSpecificationConditionals = ImmutableHashSet.CreateBuilder<BasicBlock>();
     private ImmutableQueue<BasicBlock> _compilerRestorePending = ImmutableQueue<BasicBlock>.Empty;
-    private ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>? _compilerOwnerBlocks;
+    private ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>.Builder? _compilerOwnerBlocks;
 
     internal TotalLoweringContext.ExactSpecificationContinuation RegionSpecificationContinuation(BasicBlock source)
     {
@@ -41,16 +41,16 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         if (_compilerElidedPlans.ContainsKey(source) || source.BranchValue is not { } value)
         { return; }
         if (_context.IsSpecificationOperation(value) && source.ConditionKind != ControlFlowConditionKind.None)
-        { _regionSpecificationConditionals = _regionSpecificationConditionals.Add(source); return; }
+        { _regionSpecificationConditionals.Add(source); return; }
         if (!IsElidedSpecificationPart(value) || source.FallThroughSuccessor?.Destination == null)
         { return; }
         if (_compilerElidedContinuations.TryGetValue(source, out var cached))
         {
-            _compilerElidedPlans = _compilerElidedPlans.AddUnique(source, cached);
+            _compilerElidedPlans.AddUnique(source, cached);
             return;
         }
         var continuation = RequireCompilerContinuation(source);
-        _compilerElidedPlans = _compilerElidedPlans.AddUnique(source, continuation);
+        _compilerElidedPlans.AddUnique(source, continuation);
     }
 
     // Validate a proposed compiler continuation and own its rejection action.
@@ -118,7 +118,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     {
         if (_compilerOwnerBlocks != null)
         { return; }
-        _compilerOwnerBlocks = ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>.Empty;
+        _compilerOwnerBlocks = ImmutableDictionary.CreateBuilder<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>();
         foreach (var block in _regionGraph.Blocks)
         {
             SpendRegion();
@@ -131,7 +131,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
                 { continue; }
                 var syntax = invocation.Syntax;
                 var key = (syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length);
-                _compilerOwnerBlocks = _compilerOwnerBlocks.SetItem(key, _compilerOwnerBlocks.ContainsKey(key) ? (null, 0) : (block, ordinal));
+                _compilerOwnerBlocks[key] = _compilerOwnerBlocks.ContainsKey(key) ? (null, 0) : (block, ordinal);
             }
         }
     }
@@ -150,9 +150,8 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     private void RestoreCompilerBlock(BasicBlock block)
     {
         block = RepositoryParameterGuard.NotNull(block, nameof(block));
-        if (block.IsReachable || _compilerRestoredBlocks.Contains(block))
+        if (block.IsReachable || !_compilerRestoredBlocks.Add(block))
         { return; }
-        _compilerRestoredBlocks = _compilerRestoredBlocks.Add(block);
         _compilerRestorePending = _compilerRestorePending.Enqueue(block);
     }
 
@@ -321,13 +320,13 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         continuation = stops.Single();
         if (compilerMode)
         {
-            _compilerElidedContinuations = _compilerElidedContinuations.SetItem(source, continuation);
+            _compilerElidedContinuations[source] = continuation;
             foreach (var current in visitedOrder)
             {
                 // A terminal arm alone cannot establish a continuation. Do
                 // not let a later scan mistake it for a converging path.
                 if (!stops.Contains(current) && current.FallThroughSuccessor?.Semantics != ControlFlowBranchSemantics.Throw)
-                { _compilerElidedContinuations = _compilerElidedContinuations.SetItem(current, continuation); }
+                { _compilerElidedContinuations[current] = continuation; }
             }
         }
         return true;

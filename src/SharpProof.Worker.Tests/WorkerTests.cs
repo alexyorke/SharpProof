@@ -4832,7 +4832,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 3;
         var factoryCalls = 0;
-        var created = new List<ThrowingDisposeBackend>();
+        var createdBuilder = ImmutableArray.CreateBuilder<ThrowingDisposeBackend>();
         using var worker = new SharpProofWorker(() =>
         {
             factoryCalls++;
@@ -4843,7 +4843,7 @@ public sealed partial class WorkerTests
 
             var backend = new ThrowingDisposeBackend(
                 BackendCheckResult.Unsatisfiable([]));
-            created.Add(backend);
+            createdBuilder.Add(backend);
             return backend;
         });
 
@@ -4852,7 +4852,8 @@ public sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factoryCalls, Is.EqualTo(3));
-            Assert.That(created, Has.Count.EqualTo(2));
+            var created = createdBuilder.ToImmutable();
+            Assert.That(created, Has.Length.EqualTo(2));
             Assert.That(
                 created.Select(static backend => backend is null ? throw new System.ArgumentNullException(nameof(backend)) : (backend.DisposeCalls)),
                 Is.All.EqualTo(1));

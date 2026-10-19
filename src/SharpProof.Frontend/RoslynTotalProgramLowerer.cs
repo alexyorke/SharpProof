@@ -49,7 +49,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { _calls?.Leave(_context.Target); }
     }
 
-    private void LowerCore(ControlFlowGraph graph)
+    private void LowerCore(ControlFlowGraph graph, Func<IrBlockId, SourceCallFrame>? createFrame = null)
     {
         _cancellationToken.ThrowIfCancellationRequested();
         if (CSharpOperationSemantics.HasSynchronizedEntry(_context.Target))
@@ -85,10 +85,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var structural = _context.Factory.CreateOperation("candidate:cfg");
         var entry = _builder.CreateBlock("entry");
-        if (_frame == null)
+        if (createFrame == null)
         { _builder.SetEntry(entry); }
         else
-        { _frame.Entry = entry; }
+        { _frame = createFrame(entry); }
         if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
             (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
                 block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow))))

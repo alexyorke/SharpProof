@@ -149,7 +149,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(plan.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
-        var resourceReads = new List<long>();
+        var resourceReads = ImmutableArray.CreateBuilder<long>();
         long ReadActualResources()
         {
             var consumed = session.ConsumedResourceCount;
@@ -166,7 +166,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         var beforeCall = solver.ConsumedResourceCount;
         resourceReads.Clear();
         var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var callResourceReads = resourceReads.ToImmutableArray();
+        var callResourceReads = resourceReads.ToImmutable();
         WriteObservation(label, "call-precondition", source, result, beforeCall, solver.ConsumedResourceCount);
         if (requireProof || result.Outcome is ProvenOutcome)
         {
@@ -174,7 +174,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedJustifications = plan.CallPreconditionQueries(0)
-                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToHashSet();
+                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToImmutableHashSet();
             Assert.That(((ProvenOutcome)result.Outcome!).Core.All(ownedJustifications.Contains), Is.True);
         }
         else

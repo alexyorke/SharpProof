@@ -3341,3 +3341,15 @@ Narrow IsKnownList to private builder parameters; no collection escapes. Keep es
 queues/LIFO traversals, order sidecars, domain exclusions and work counters unchanged.
 Validate list/dictionary domain, source capture and receiver ownership through Frontend.
 Status: open before edits.
+
+Checkpoint before master #331 reconciliation: M102-M105 Release gate completed 23
+framework summaries and six tasks: 11,773 passed, one vc-shadow-core MethodTimeout
+failure, zero skips; builds zero warnings/errors. All 2,054 Frontend tests passed.
+M103 additionally passes 43 baseline/current controls and script format. M109 passes
+32 exact baseline/current argv/error/native probes; formatted script review is clean.
+M106/M108/M110/M111 follow-up build found CA1868 redundant set membership guards
+and SPINT001 lambda entry guard; main corrected those before rerun. M112 is reviewed
+construction work pending full Frontend validation. Current Worker follow-up is still
+running on its isolated pre-merge snapshot. These pending batches are checkpointed for
+safe conflict resolution, not declared fully validated. Master advanced to 16063804e
+(#331 dictionary source-helper state); merge review takes priority before more changes.

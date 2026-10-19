@@ -19,13 +19,15 @@ internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArr
 internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<TotalLoweringContext, bool>? prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
     Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
-    Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
+    Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
+    bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
+    bool approximateElementReads = false, bool pinElementReads = false)
 {
     private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private ImmutableHashSet<IMethodSymbol> _active = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
-    private ImmutableHashSet<string> _activeIl = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
-    private ImmutableDictionary<IMethodSymbol, bool> _iterators = ImmutableDictionary.Create<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
-    private ImmutableDictionary<INamedTypeSymbol, bool> _typeInitialization = ImmutableDictionary.Create<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<IMethodSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<string>.Builder _activeIl = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<IMethodSymbol, bool>.Builder _iterators = ImmutableDictionary.CreateBuilder<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<INamedTypeSymbol, bool>.Builder _typeInitialization = ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool SourceInitializationEffectsComplete { get; private set; } = true;
     internal bool ConstructionLimitExceeded { get; private set; }
@@ -33,22 +35,25 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal static TotalSourceCallSession CreatePrepared(Compilation compilation,
         Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
-        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
+        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
+    bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
+    bool approximateElementReads = false, bool pinElementReads = false)
     {
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
-        return new(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata);
+        return new(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata,
+            opaqueCalls, opaqueEffects, approximateElementReads, pinElementReads);
     }
 
     internal bool MetadataRequiresEnabled => prepareMetadata != null;
     // Claim lowering admits unmodeled metadata calls as opaque calls. Shadow
     // and metadata-Requires lowering keep rejecting them.
-    internal bool OpaqueCalls { get; set; }
-    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
-    internal bool ApproximateElementReads { get; set; }
+    internal bool OpaqueCalls { get; } = opaqueCalls;
+    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; } = opaqueEffects;
+    internal bool ApproximateElementReads { get; } = approximateElementReads;
     // Element reads are assigned where they occur, so later stores cannot
     // change them.
-    internal bool PinElementReads { get; set; }
+    internal bool PinElementReads { get; } = pinElementReads;
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { body = RepositoryParameterGuard.NotNull(body, nameof(body)); frame = RepositoryParameterGuard.NotNull(frame, nameof(frame)); return prepareMetadata?.Invoke(frame, body) ?? true; }
 
@@ -85,10 +90,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool Enter(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        if (!Spend() || _active.Count >= 256 || _active.Contains(method))
+        if (!Spend() || _active.Count >= 256)
         { return false; }
-        _active = _active.Add(method);
-        return true;
+        return _active.Add(method);
     }
 
     internal bool IsActive(IMethodSymbol method)
@@ -100,7 +104,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal void Leave(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        _active = _active.Remove(method);
+        _active.Remove(method);
     }
 
     internal TotalIlBody? PrepareIl(IMethodSymbol method)
@@ -117,14 +121,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!Spend() || _active.Count + _activeIl.Count >= 256)
         { return false; }
         var key = IlKey(method);
-        if (_activeIl.Contains(key))
-        { return false; }
-        _activeIl = _activeIl.Add(key);
-        return true;
+        return _activeIl.Add(key);
     }
 
     internal void LeaveIl(IMethodSymbol method)
-    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); _activeIl = _activeIl.Remove(IlKey(method)); }
+    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); _activeIl.Remove(IlKey(method)); }
 
     internal static bool IsEmptyParamsArray(IArgumentOperation argument)
     {
@@ -286,9 +287,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { return false; }
                 iterator |= node is YieldStatementSyntax;
                 if (iterator && !contractOnly)
-                { _iterators = _iterators.SetItem(method.OriginalDefinition, true); return false; }
+                { _iterators[method.OriginalDefinition] = true; return false; }
             }
-            _iterators = _iterators.SetItem(method.OriginalDefinition, iterator);
+            _iterators[method.OriginalDefinition] = iterator;
         }
         if (contractOnly && !IsActive(method) && !iterator &&
             !(method.MethodKind == MethodKind.Constructor && !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)))
@@ -477,7 +478,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return Spend() && eligible; }
         if (!TryCheckTypeInitialization(type, out eligible))
         { return false; }
-        _typeInitialization = _typeInitialization.SetItem(type, eligible);
+        _typeInitialization[type] = eligible;
         return eligible;
     }
 

@@ -399,18 +399,18 @@ try {
         }
     }
 
-    $builds = [Collections.Generic.List[object]]::new()
+    $buildBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if (-not $NoBuild -and -not $ReuseTestHarness) {
-        $testHarnessBuildArguments = @(
-            'build', $testProject, '-c', $Configuration,
-            '--no-restore')
+        $testHarnessBuildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $testHarnessBuildArgumentBuilder.AddRange([string[]]@(
+                'build', $testProject, '-c', $Configuration,
+                '--no-restore'))
         if ($Fast) {
-            $testHarnessBuildArguments +=
-            '-p:RunAnalyzersDuringBuild=false'
+            $testHarnessBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $builds.Add([pscustomobject]@{
+        $buildBuilder.Add([pscustomobject]@{
                 Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
-                Arguments = $testHarnessBuildArguments
+                Arguments = $testHarnessBuildArgumentBuilder.ToImmutable()
             })
     }
     # The Release test-harness project references Verifier with no output
@@ -419,24 +419,25 @@ try {
     # the harness is not built in the package's Release configuration.
     if ([string]::IsNullOrWhiteSpace($PackageSource) -and -not $NoBuild -and
         $Configuration -cne 'Release') {
-        $packageProductBuildArguments = @(
-            'build',
-            'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
-            '-c', 'Release', '--no-restore',
-            '-p:GeneratePackageOnBuild=false')
+        $packageProductBuildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $packageProductBuildArgumentBuilder.AddRange([string[]]@(
+                'build',
+                'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
+                '-c', 'Release', '--no-restore',
+                '-p:GeneratePackageOnBuild=false'))
         if ($Fast) {
-            $packageProductBuildArguments +=
-            '-p:RunAnalyzersDuringBuild=false'
+            $packageProductBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $builds.Add([pscustomobject]@{
+        $buildBuilder.Add([pscustomobject]@{
                 Name      = 'package-products-release'
-                Arguments = $packageProductBuildArguments
+                Arguments = $packageProductBuildArgumentBuilder.ToImmutable()
             })
     }
-    if ($builds.Count -gt 0) {
+    $builds = $buildBuilder.ToImmutable()
+    if ($builds.Length -gt 0) {
         Invoke-SharpProofTimedPhase -Name 'build-prerequisites' `
             -Timings $phaseTimings -RecordOnFailure -Action {
-            if ($Configuration -ceq 'Release' -and $builds.Count -eq 2) {
+            if ($Configuration -ceq 'Release' -and $builds.Length -eq 2) {
                 # The test harness builds the complete Release dependency
                 # closure. Wait for it before building the empty Verifier
                 # root, whose package payload consumes those outputs.
@@ -842,36 +843,39 @@ try {
         if ($directVstest) {
             $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
         }
-        $arguments = if ($directVstest) {
-            @('vstest', $testAssembly)
+        $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        if ($directVstest) {
+            $argumentBuilder.AddRange([string[]]@('vstest', $testAssembly))
         }
         else {
-            @(
-                'test', $testProject, '-c', $Configuration,
-                '--no-build', '--no-restore')
+            $argumentBuilder.AddRange([string[]]@(
+                    'test', $testProject, '-c', $Configuration,
+                    '--no-build', '--no-restore'))
         }
         if (-not $directVstest -and
             -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-            $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            $argumentBuilder.Add('-p:OutDir=' + $isolatedOutput + '/')
         }
         if ($directVstest) {
-            $arguments += '/TestCaseFilter:' + $shard.Filter
-            $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFilePrefix=$($shard.Name)"
-            $arguments += '/ResultsDirectory:' + (
-                Join-Path $results $shard.Name)
+            $argumentBuilder.Add('/TestCaseFilter:' + $shard.Filter)
+            $argumentBuilder.Add('/logger:console;verbosity=minimal')
+            $argumentBuilder.Add("/logger:trx;LogFilePrefix=$($shard.Name)")
+            $argumentBuilder.Add('/ResultsDirectory:' + (
+                    Join-Path $results $shard.Name))
         }
         else {
-            $arguments += @(
-                '--filter', $shard.Filter,
-                '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFilePrefix=$($shard.Name)",
-                '--results-directory', (Join-Path $results $shard.Name))
+            $argumentBuilder.AddRange([string[]]@(
+                    '--filter', $shard.Filter,
+                    '--logger', 'console;verbosity=minimal',
+                    '--logger', "trx;LogFilePrefix=$($shard.Name)",
+                    '--results-directory', (Join-Path $results $shard.Name)))
         }
-        $arguments = Add-SharpProofCoverageArguments `
-            -Arguments $arguments `
+        $coverageArguments = Add-SharpProofCoverageArguments `
+            -Arguments ([string[]]@($argumentBuilder.ToImmutable())) `
             -Enabled $coverageEnabled `
             -Settings $resolvedCoverageSettings
+        $arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string](
+            [string[]]@($coverageArguments))
         return [pscustomobject]@{
             Arguments   = $arguments
             Environment = $environment

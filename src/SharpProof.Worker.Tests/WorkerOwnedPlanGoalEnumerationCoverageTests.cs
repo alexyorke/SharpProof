@@ -49,7 +49,7 @@ public sealed partial class WorkerTests
         Assert.That(plan.EnsuresCount, Is.EqualTo(actualGoals.Length));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var solver = new PassiveCallableSolver(plan);
-        var checkedIds = new List<string>();
+        var checkedIdBuilder = ImmutableArray.CreateBuilder<string>();
         for (var ordinal = 0; ordinal < plan.EnsuresCount; ordinal++)
         {
             var checkedGoal = await solver.VerifyEnsuresAsync(ordinal, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -60,8 +60,9 @@ public sealed partial class WorkerTests
             { Assert.That(checkedGoal.EntryModel, Is.Not.Empty); }
             else
             { Assert.That(checkedGoal.Core, Is.Not.Empty); }
-            checkedIds.Add(actualGoals[ordinal].ClaimId!);
+            checkedIdBuilder.Add(actualGoals[ordinal].ClaimId!);
         }
+        var checkedIds = checkedIdBuilder.ToImmutable();
         Assert.That(checkedIds, Is.EquivalentTo(preparation.Entry.ClaimIds));
         Assert.That(checkedIds.Distinct().Count(), Is.EqualTo(plan.EnsuresCount));
 

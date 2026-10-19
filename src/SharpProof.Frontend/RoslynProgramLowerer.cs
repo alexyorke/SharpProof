@@ -108,11 +108,8 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         // Roslyn retains the original semantic-model operation, including nested CFGs.
         var compilation = graph.OriginalOperation.SemanticModel!.Compilation;
         var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,
-            cancellationToken, resolveScalarModel, prepareMetadata);
-        calls.OpaqueCalls = opaqueCalls;
-        calls.OpaqueEffects = opaqueEffects;
-        calls.ApproximateElementReads = approximateElementReads;
-        calls.PinElementReads = pinElementReads;
+            cancellationToken, resolveScalarModel, prepareMetadata, opaqueCalls: opaqueCalls,
+            opaqueEffects: opaqueEffects, approximateElementReads: approximateElementReads, pinElementReads: pinElementReads);
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls).Lower(graph);
     }
 }

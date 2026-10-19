@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Specs;
@@ -33,10 +34,7 @@ public sealed class WorkerApiSpecInstantiationTests
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Result!.Value] = result
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.Add(template.Result!.Value, result));
 
         Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         var comparison = instantiated.Postconditions.Single() as IrBinaryTerm;

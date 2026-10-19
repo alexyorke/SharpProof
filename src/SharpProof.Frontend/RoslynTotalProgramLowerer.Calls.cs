@@ -2,12 +2,12 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalProgramLowerer
 {
-    private sealed class SourceCallFrame(Action<IrBlockId, OperationId, IrTerm?> returned,
+    private sealed class SourceCallFrame(IrBlockId entry, Action<IrBlockId, OperationId, IrTerm?> returned,
         Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> search)
     {
         private readonly Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> _guarded_search = search ?? throw new System.ArgumentNullException(nameof(search));
         private readonly Action<IrBlockId, OperationId, IrTerm?> _guarded_returned = returned ?? throw new System.ArgumentNullException(nameof(returned));
-        internal IrBlockId Entry { get; set; }
+        internal IrBlockId Entry { get; } = entry.IsDefault ? throw new ArgumentOutOfRangeException(nameof(entry)) : entry;
         internal void Return(IrBlockId block, OperationId site, IrTerm? value)
         { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); _guarded_returned(block, site, value); }
         internal IrBlockId Search(IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
@@ -252,7 +252,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             {
                 _builder = _builder
             };
-            composed._frame = new((source, operation, value) =>
+            composed.LowerSharedFrame(graph!, entry => new SourceCallFrame(entry.IsDefault ? throw new ArgumentOutOfRangeException(nameof(entry)) : entry, (source, operation, value) =>
                 {
                     RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
                     RepositoryParameterGuard.ThrowIfInvalid(source.IsDefault, nameof(source));
@@ -265,13 +265,12 @@ internal sealed partial class RoslynTotalProgramLowerer
                     unwind = RepositoryParameterGuard.NotNull(unwind, nameof(unwind));
                     ImportExplicitThrowTypes(composed);
                     return ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind);
-                });
-            composed.LowerSharedFrame(graph!);
+                }));
             foreach (var obligation in composed._callPreconditions)
             { _callPreconditions = _callPreconditions.AddUnique(obligation.Key, obligation.Value); }
             foreach (var parameter in callee.Parameters)
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
-            _builder.Goto(block, site, composed._frame.Entry);
+            _builder.Goto(block, site, composed._frame!.Entry);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
         var expanded = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry);
@@ -405,14 +404,15 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
-    private void LowerSharedFrame(ControlFlowGraph graph)
+    private void LowerSharedFrame(ControlFlowGraph graph, Func<IrBlockId, SourceCallFrame> createFrame)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        createFrame = RepositoryParameterGuard.NotNull(createFrame, nameof(createFrame));
         if (_calls == null || !_calls.Enter(_context.Target))
         { throw new RegionIncompleteException(); }
         try
         {
-            LowerCore(graph);
+            LowerCore(graph, createFrame);
             if (_abstentions.Count != 0)
             { throw new RegionIncompleteException(); }
         }

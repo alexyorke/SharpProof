@@ -7,12 +7,12 @@ public sealed class RoslynOperationLowerer
     private readonly RoslynTypeMapper _types;
     private readonly Func<IMethodSymbol, bool> _isKnownPure;
     private readonly bool _allowCompilerConstants;
-    private ImmutableDictionary<ISymbol, IrVarId> _variables = ImmutableDictionary<ISymbol, IrVarId>.Empty.WithComparers(SymbolEqualityComparer.Default);
-    private ImmutableDictionary<ITypeSymbol, IrVarId> _instances = ImmutableDictionary<ITypeSymbol, IrVarId>.Empty.WithComparers(SymbolEqualityComparer.Default);
-    private ImmutableDictionary<CaptureId, IrVarId> _captures = ImmutableDictionary<CaptureId, IrVarId>.Empty;
-    private ImmutableList<IrVarId> _captureOrder = ImmutableList<IrVarId>.Empty;
+    private readonly ImmutableDictionary<ISymbol, IrVarId>.Builder _variables = ImmutableDictionary.CreateBuilder<ISymbol, IrVarId>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<ITypeSymbol, IrVarId>.Builder _instances = ImmutableDictionary.CreateBuilder<ITypeSymbol, IrVarId>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<CaptureId, IrVarId>.Builder _captures = ImmutableDictionary.CreateBuilder<CaptureId, IrVarId>();
+    private readonly ImmutableArray<IrVarId>.Builder _captureOrder = ImmutableArray.CreateBuilder<IrVarId>();
     private readonly LoweringVisitor _visitor;
-    private ImmutableDictionary<IOperation, LoweredExpression>? _currentLoweringResults;
+    private ImmutableDictionary<IOperation, LoweredExpression>.Builder? _currentLoweringResults;
     private RoslynOperationPurityClassifier? _currentPurityClassifier;
 
     public RoslynOperationLowerer(
@@ -96,7 +96,7 @@ public sealed class RoslynOperationLowerer
 
         var previousResults = _currentLoweringResults;
         var previousPurityClassifier = _currentPurityClassifier;
-        _currentLoweringResults = ImmutableDictionary<IOperation, LoweredExpression>.Empty.WithComparers(ReferenceComparer<IOperation>.Instance);
+        _currentLoweringResults = ImmutableDictionary.CreateBuilder<IOperation, LoweredExpression>(ReferenceComparer<IOperation>.Instance);
         _currentPurityClassifier = new(_isKnownPure, MaximumLoweringDepth);
         try
         {
@@ -127,7 +127,7 @@ public sealed class RoslynOperationLowerer
 
     internal ImmutableArray<IrVarId> CreateCaptureBindings()
     {
-        return [.. _captureOrder];
+        return _captureOrder.ToImmutable();
     }
 
     private LoweredExpression LowerCore(IOperation operation)
@@ -140,7 +140,7 @@ public sealed class RoslynOperationLowerer
         }
 
         var lowered = _visitor.Visit(operation, default);
-        _currentLoweringResults = _currentLoweringResults!.AddUnique(operation, lowered);
+        _currentLoweringResults!.AddUnique(operation, lowered);
         return lowered;
     }
 
@@ -164,7 +164,7 @@ public sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 symbol.Kind + ":" + symbol.MetadataName,
                 GetTypeId(type));
-            _variables = _variables.AddUnique(symbol, variable);
+            _variables.AddUnique(symbol, variable);
         }
         return _factory.Variable(variable);
     }
@@ -179,8 +179,8 @@ public sealed class RoslynOperationLowerer
                 "capture:" +
                 _captureOrder.Count.ToString(CultureInfo.InvariantCulture),
                 GetTypeId(type));
-            _captures = _captures.AddUnique(id, variable);
-            _captureOrder = _captureOrder.Add(variable);
+            _captures.AddUnique(id, variable);
+            _captureOrder.Add(variable);
         }
         return _factory.Variable(variable);
     }
@@ -267,7 +267,7 @@ public sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 "instance:" + type.MetadataName,
                 GetTypeId(specializedType));
-            _instances = _instances.AddUnique(type, variable);
+            _instances.AddUnique(type, variable);
         }
         return _factory.Variable(variable);
     }

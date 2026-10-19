@@ -156,14 +156,15 @@ if (-not $NoBuild) {
             -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
             -TimeoutSeconds $TimeoutSeconds `
             -Quiet:$Quiet
-        $buildArguments = @(
-            'build', $semanticBuildFilter,
-            '-c', $Configuration, '--no-restore')
+        $buildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArgumentBuilder.AddRange([string[]]@(
+                'build', $semanticBuildFilter,
+                '-c', $Configuration, '--no-restore'))
         if ($Fast) {
-            $buildArguments += '-p:RunAnalyzersDuringBuild=false'
+            $buildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
         Invoke-SharpProofRequiredDotnet `
-            -Arguments $buildArguments `
+            -Arguments ([string[]]@($buildArgumentBuilder.ToImmutable())) `
             -TimeoutSeconds $TimeoutSeconds `
             -Quiet:$Quiet
     }
@@ -293,7 +294,7 @@ $checksumMethod = $workerClassPrefix +
 'FixedChecksumNormalWorkerEntryTests.FrozenChecksumUsesActualDefaultNativeWorker'
 $checksumTaskFilter = "($workerRemainderTaskFilter)&(FullyQualifiedName=$checksumMethod)"
 if ($coverageEnabled) {
-    $workerRemainderTaskFilter += "&(FullyQualifiedName!=$checksumMethod)"
+    $workerRemainderTaskFilter = [string]::Concat($workerRemainderTaskFilter, "&(FullyQualifiedName!=$checksumMethod)")
 }
 $workerRemainderHeavyTaskFilter =
 "($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
@@ -347,52 +348,54 @@ if (-not $ArchitectureOnly) {
                 DefaultEstimatedMilliseconds = 500000L
             })
     }
-    $workerTaskDescriptors = @(
-        [pscustomobject]@{
-            Name                         = 'worker-claim-manifest'
-            Filter                       = $claimTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 30000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-compiler-manifest'
-            Filter                       = $manifestTaskFilter
-            Slots                        = [Math]::Min($parallelism, 4)
-            DefaultEstimatedMilliseconds = 50000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-core'
-            Filter                       = $workerCoreTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 50000L
-        })
+    $workerDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $workerDescriptorBuilder.AddRange([object[]]@(
+            [pscustomobject]@{
+                Name                         = 'worker-claim-manifest'
+                Filter                       = $claimTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 30000L
+            },
+            [pscustomobject]@{
+                Name                         = 'worker-compiler-manifest'
+                Filter                       = $manifestTaskFilter
+                Slots                        = [Math]::Min($parallelism, 4)
+                DefaultEstimatedMilliseconds = 50000L
+            },
+            [pscustomobject]@{
+                Name                         = 'worker-core'
+                Filter                       = $workerCoreTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 50000L
+            }))
     if ($coverageEnabled) {
         # The fixed-deadline native check retains its existing process hint,
         # while reserving the scheduler so competing test processes cannot overlap.
-        $workerTaskDescriptors += [pscustomobject]@{
-            Name                         = 'worker-fixed-checksum'
-            Filter                       = $checksumTaskFilter
-            Slots                        = $parallelism
-            ProcessSlots                 = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 10000L
-        }
+        $workerDescriptorBuilder.Add([pscustomobject]@{
+                Name                         = 'worker-fixed-checksum'
+                Filter                       = $checksumTaskFilter
+                Slots                        = $parallelism
+                ProcessSlots                 = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 10000L
+            })
     }
     # The remainder is the longest Worker task in every mode (about five
     # minutes uninstrumented on a four-CPU runner), so it always runs as two
     # complementary halves that the scheduler can overlap.
-    $workerTaskDescriptors += @(
-        [pscustomobject]@{
-            Name                         = 'worker-remainder-heavy'
-            Filter                       = $workerRemainderHeavyTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 160000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-remainder-other'
-            Filter                       = $workerRemainderOtherTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 160000L
-        })
+    $workerDescriptorBuilder.AddRange([object[]]@(
+            [pscustomobject]@{
+                Name                         = 'worker-remainder-heavy'
+                Filter                       = $workerRemainderHeavyTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 160000L
+            },
+            [pscustomobject]@{
+                Name                         = 'worker-remainder-other'
+                Filter                       = $workerRemainderOtherTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 160000L
+            }))
+    $workerTaskDescriptors = $workerDescriptorBuilder.ToImmutable()
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
         $taskBuilder.Add([pscustomobject]@{
                 Name                         = $descriptor.Name
@@ -509,20 +512,22 @@ try {
                 @((Get-Content -LiteralPath $task.Target -Raw | ConvertFrom-Json).solution.projects)
             }
             else { @($task.Target) }
-            $discoveryArguments = @('vstest')
-            $discoveryAssemblies = @()
+            $discoveryArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $discoveryArgumentBuilder.AddRange([string[]]@('vstest'))
+            $discoveryAssemblyBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
             foreach ($project in $discoveryProjects) {
                 $projectPath = [IO.Path]::GetFullPath(([string]$project).Replace('\', '/'), $repositoryRoot)
-                $discoveryAssemblies += Get-SharpProofTestAssemblyPath `
-                    -ProjectPath $projectPath -Configuration $Configuration
+                $discoveryAssemblyBuilder.Add((Get-SharpProofTestAssemblyPath `
+                            -ProjectPath $projectPath -Configuration $Configuration))
             }
-            $discoveryArguments += $discoveryAssemblies
-            $discoveryArguments += @(
-                '/ListFullyQualifiedTests',
-                ('/Settings:' + $discoverySettings),
-                ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
-                ('/TestCaseFilter:' + $task.Filter))
-            Invoke-SharpProofRequiredDotnet -Arguments $discoveryArguments `
+            $discoveryAssemblies = $discoveryAssemblyBuilder.ToImmutable()
+            $discoveryArgumentBuilder.AddRange($discoveryAssemblies)
+            $discoveryArgumentBuilder.AddRange([string[]]@(
+                    '/ListFullyQualifiedTests',
+                    ('/Settings:' + $discoverySettings),
+                    ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
+                    ('/TestCaseFilter:' + $task.Filter)))
+            Invoke-SharpProofRequiredDotnet -Arguments ([string[]]@($discoveryArgumentBuilder.ToImmutable())) `
                 -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
             $dumpRoot = Join-Path $taskRoot 'discovery'
             [IO.Directory]::CreateDirectory($dumpRoot) | Out-Null
@@ -552,35 +557,39 @@ try {
             $assembly = Get-SharpProofTestAssemblyPath `
                 -ProjectPath $task.Target `
                 -Configuration $Configuration
-            $arguments = @('vstest', $assembly)
-            $arguments += '/TestCaseFilter:' + $task.Filter
-            $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFilePrefix=$($task.Name)"
-            $arguments += '/ResultsDirectory:' + (
-                Join-Path $resultsRoot $task.Name)
+            $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $argumentBuilder.AddRange([string[]]@('vstest', $assembly))
+            $argumentBuilder.Add('/TestCaseFilter:' + $task.Filter)
+            $argumentBuilder.Add('/logger:console;verbosity=minimal')
+            $argumentBuilder.Add("/logger:trx;LogFilePrefix=$($task.Name)")
+            $argumentBuilder.Add('/ResultsDirectory:' + (
+                    Join-Path $resultsRoot $task.Name))
             if ($task.PSObject.Properties.Name -contains 'RunSettings') {
-                $arguments += '/Settings:' + $task.RunSettings
+                $argumentBuilder.Add('/Settings:' + $task.RunSettings)
             }
+            $arguments = $argumentBuilder.ToImmutable()
         }
         else {
-            $arguments = @(
-                'test', $task.Target, '-c', $Configuration,
-                '--no-build', '--no-restore')
+            $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $argumentBuilder.AddRange([string[]]@(
+                    'test', $task.Target, '-c', $Configuration,
+                    '--no-build', '--no-restore'))
             if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+                $argumentBuilder.Add('-p:OutDir=' + $isolatedOutput + '/')
             }
-            $arguments += @(
-                '--filter', $task.Filter,
-                '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFilePrefix=$($task.Name)",
-                '--results-directory', (Join-Path $resultsRoot $task.Name))
+            $argumentBuilder.AddRange([string[]]@(
+                    '--filter', $task.Filter,
+                    '--logger', 'console;verbosity=minimal',
+                    '--logger', "trx;LogFilePrefix=$($task.Name)",
+                    '--results-directory', (Join-Path $resultsRoot $task.Name)))
             if ($task.ProjectParallelism -gt 0) {
-                $arguments += "/m:$($task.ProjectParallelism)"
+                $argumentBuilder.Add("/m:$($task.ProjectParallelism)")
             }
-            $arguments = Add-SharpProofCoverageArguments `
-                -Arguments $arguments `
+            $coverageArguments = Add-SharpProofCoverageArguments `
+                -Arguments ([string[]]@($argumentBuilder.ToImmutable())) `
                 -Enabled ($coverageEnabled -and $task.Name -cne 'architecture') `
                 -Settings $resolvedCoverageSettings
+            $arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($coverageArguments))
         }
         return [pscustomobject]@{
             Arguments   = $arguments
