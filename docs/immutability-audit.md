@@ -3751,3 +3751,14 @@ production Construct adapters, and one hidden params materialization. Pinned Ros
 versus immutable overloads for annotation/arity/constructed-symbol behavior before
 changing the callers, then preserve exact argument order and nullable annotations.
 The earlier claim that no immutable overload exists was incorrect. Status: planned.
+
+IMM-M143 proof: all 30 pinned-Roslyn native/immutable overload controls pass, including top-level nullable annotations, nested and method symbols, wrong arity and constructed-type exception text/type. Main also found the fixture's hidden single-argument params allocation, making eight construction scopes to update. All symbol arguments originate from non-null compiler symbols or checked specialization results.
+
+IMM-M144: Freeze nine inline ordered wire-record scopes across Doctor and fuzz
+campaign/seed evidence. Use OrderedDictionary.AsReadOnly only around unique inline
+backing maps with no mutable alias; retain order and direct dictionary property access,
+remove the pscustomobject cast that would recreate writable note properties, and publish
+existing immutable check/run vectors directly. This wrapper is shallow: parsed external
+Doctor configuration remains a separately open nested-value scope. Validate real write
+rejection, baseline JSON/property/filter/measure behavior, Doctor and seed regressions.
+Status: planned before edits.
