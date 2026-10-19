@@ -2315,3 +2315,13 @@ its return type ImmutableArray<string>. Keep byte[] input/PE buffers, BitConvert
 metadata readers unchanged. Generic candidate method lookup vector can be immutable.
 Existing Has.Length checks and JSON trace serialization accept immutable vectors.
 Status: open before edits.
+
+IMM-M051: Coordinator read Test-SharpProofPublicApiGovernance.ps1 and the read-only
+agent review. Receipt accumulation can use an ImmutableArray<object> builder, frozen
+once before ordered controls.json serialization. The outer API rollback vector can use
+an ImmutableArray<byte[]> builder frozen before the private deletion control; preserve
+each native byte[] and indexed restoration order. Keep project XML, both API files and
+nullable source restoration in their existing finally blocks. Required process arguments,
+file bytes and text operations remain adapters. Validate the actual four controls in
+the canonical container: baseline, RS0016 missing files, RS0041 nullable metadata, restored.
+Status: open before edits.
