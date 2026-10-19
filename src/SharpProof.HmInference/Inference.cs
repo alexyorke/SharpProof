@@ -215,7 +215,6 @@ public static class Inference
                 return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site.");
             }
 
-            var originalCalls = method.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
             var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
             {
                 if (m is null)
@@ -225,38 +224,75 @@ public static class Inference
 
                 return m.SpanStart == method.SpanStart;
             });
-            var changedCalls = changedMethod.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
             var changedModel = changedCompilation.GetSemanticModel(changed);
-            for (var i = 0; i < originalCalls.Length; i++)
+            // Validate statically resolved calls in every supplied file. Merely
+            // compiling callers does not preserve conversions or overload selection
+            // when this method becomes generic or its result narrows.
+            foreach (var sourceTree in model.Compilation.SyntaxTrees)
             {
-                var before = model.GetSymbolInfo(originalCalls[i], cancellationToken).Symbol as IMethodSymbol;
-                var after = changedModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
-                if (SymbolEqualityComparer.Default.Equals(before, symbol) && after?.DeclaringSyntaxReferences.Any(r =>
+                cancellationToken.ThrowIfCancellationRequested();
+                var beforeModel = model.Compilation.GetSemanticModel(sourceTree);
+                var afterTree = sourceTree == tree ? changed : sourceTree;
+                var afterModel = changedCompilation.GetSemanticModel(afterTree);
+                var beforeRoot = sourceTree.GetRoot(cancellationToken);
+                var afterRoot = afterTree.GetRoot(cancellationToken);
+                var originalCalls = beforeRoot.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+                var changedCalls = afterRoot.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+                for (var i = 0; i < originalCalls.Length; i++)
                 {
-                    if (r is null)
+                    var before = beforeModel.GetSymbolInfo(originalCalls[i], cancellationToken).Symbol as IMethodSymbol;
+                    var after = afterModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
+                    var definition = (before?.ReducedFrom ?? before)?.OriginalDefinition;
+                    if (SymbolEqualityComparer.Default.Equals(definition, symbol.OriginalDefinition) && after?.DeclaringSyntaxReferences.Any(reference =>
                     {
-                        throw new global::System.ArgumentNullException(nameof(r));
+                        if (reference is null)
+                        { throw new ArgumentNullException(nameof(reference)); }
+                        return reference.SyntaxTree == changed && reference.Span.Start == changedMethod.SpanStart;
+                    }) == true)
+                    {
+                        var insideMethod = sourceTree == tree && method.Span.Contains(originalCalls[i].Span);
+                        if (!insideMethod && !SameCallSignature(before!, after))
+                        {
+                            return new(symbol.Name, "Rejected", "Generalization changes a supplied call's instantiated signature.");
+                        }
+                        continue;
                     }
-
-                    return r.SyntaxTree == changed && r.Span.Start == changedMethod.SpanStart;
-                }) == true)
-                {
-                    continue;
+                    if (definition?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                        != (after?.ReducedFrom ?? after)?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                    {
+                        return new(symbol.Name, "Rejected", "Generalization changes a selected method overload.");
+                    }
                 }
-
-                if (before?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != after?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                var originalCreations = beforeRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
+                var changedCreations = afterRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
+                for (var i = 0; i < originalCreations.Length; i++)
                 {
-                    return new(symbol.Name, "Rejected", "Generalization changes a selected method overload.");
+                    if (beforeModel.GetSymbolInfo(originalCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                        != afterModel.GetSymbolInfo(changedCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                    {
+                        return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
+                    }
                 }
             }
 
-            var originalCreations = method.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
-            var changedCreations = changedMethod.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
-            for (var i = 0; i < originalCreations.Length; i++)
+            var originalIndexers = method.DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+            var changedIndexers = changedMethod.DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+            for (var i = 0; i < originalIndexers.Length; i++)
             {
-                if (model.GetSymbolInfo(originalCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != changedModel.GetSymbolInfo(changedCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                if (model.GetSymbolInfo(originalIndexers[i], cancellationToken).Symbol?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                    != changedModel.GetSymbolInfo(changedIndexers[i], cancellationToken).Symbol?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
                 {
-                    return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
+                    return new(symbol.Name, "Rejected", "Generalization changes a selected indexer.");
+                }
+            }
+            var originalInitializers = CollectionElements(method);
+            var changedInitializers = CollectionElements(changedMethod);
+            for (var i = 0; i < originalInitializers.Length; i++)
+            {
+                if (model.GetCollectionInitializerSymbolInfo(originalInitializers[i], cancellationToken).Symbol?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                    != changedModel.GetCollectionInitializerSymbolInfo(changedInitializers[i], cancellationToken).Symbol?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                {
+                    return new(symbol.Name, "Rejected", "Generalization changes a collection initializer Add method.");
                 }
             }
 
@@ -742,7 +778,7 @@ public static class Inference
                     return MethodCall(invocation);
                 case BaseObjectCreationExpressionSyntax creation:
                     var constructed = model.GetOperation(creation, cancellationToken) as IObjectCreationOperation ?? throw new InferenceException("Unsupported object construction.");
-                    if (creation.Initializer is not null || constructed.Constructor is null || constructed.Constructor.Parameters.Any(p =>
+                    if (constructed.Constructor is null || constructed.Constructor.Parameters.Any(p =>
                     {
                         if (p is null)
                         {
@@ -752,7 +788,7 @@ public static class Inference
                         return p.RefKind != RefKind.None;
                     }))
                     {
-                        throw new InferenceException("Object initializers and ref constructors are unsupported.");
+                        throw new InferenceException("Ref constructors are unsupported.");
                     }
 
                     BindArguments(constructed.Arguments, constructed.Constructor.Parameters.Select(p =>
@@ -764,6 +800,10 @@ public static class Inference
 
                         return CSharpTypes.Rigid(p.Type);
                     }).ToArray());
+                    if (creation.Initializer is not null)
+                    {
+                        AnchorObjectInitializer(creation.Initializer);
+                    }
                     return CSharpTypes.Rigid(constructed.Type!);
                 case InterpolatedStringExpressionSyntax interpolated:
                     // Keep original hole types to preserve overloads and formatting;
@@ -795,6 +835,15 @@ public static class Inference
                     Anchor(unary.Operand);
                     return CSharpTypes.Rigid(model.GetTypeInfo(unary, cancellationToken).Type!);
                 case ElementAccessExpressionSyntax element:
+                    if (model.GetOperation(element, cancellationToken) is IPropertyReferenceOperation indexer)
+                    {
+                        Anchor(element.Expression);
+                        foreach (var argument in element.ArgumentList.Arguments)
+                        {
+                            Anchor(argument.Expression);
+                        }
+                        return CSharpTypes.Rigid(indexer.Property.Type);
+                    }
                     var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array indexing is supported.");
                     var elementType = HmType.Variable();
                     HmType.Unify(Expression(element.Expression), new("[" + new string(',', array.Rank - 1) + "]", elementType));
@@ -847,11 +896,93 @@ public static class Inference
             HmType.Unify(Expression(expression), CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped expression.")));
         }
 
+        private static bool SameCallSignature(IMethodSymbol before, IMethodSymbol after)
+        {
+            if (before is null)
+            { throw new ArgumentNullException(nameof(before)); }
+            if (after is null)
+            { throw new ArgumentNullException(nameof(after)); }
+            if (before.Parameters.Length != after.Parameters.Length || before.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) != after.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            {
+                return false;
+            }
+            for (var i = 0; i < before.Parameters.Length; i++)
+            {
+                if (before.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) != after.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static ExpressionSyntax[] CollectionElements(MethodDeclarationSyntax method)
+        {
+            if (method is null)
+            {
+                throw new ArgumentNullException(nameof(method));
+            }
+            var elements = new List<ExpressionSyntax>();
+            foreach (var initializer in method.DescendantNodes().OfType<InitializerExpressionSyntax>())
+            {
+                if (initializer.IsKind(SyntaxKind.CollectionInitializerExpression))
+                {
+                    elements.AddRange(initializer.Expressions);
+                }
+            }
+            return elements.ToArray();
+        }
+
+        // Construction fixes the receiver type. Pin initializer source types too,
+        // preserving overload selection and boxing/widening conversions while
+        // allowing unrelated method parameters to generalize.
+        private void AnchorObjectInitializer(InitializerExpressionSyntax initializer)
+        {
+            if (initializer is null)
+            {
+                throw new ArgumentNullException(nameof(initializer));
+            }
+            foreach (var entry in initializer.Expressions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry is InitializerExpressionSyntax nested)
+                {
+                    AnchorObjectInitializer(nested);
+                }
+                else if (entry is AssignmentExpressionSyntax assignment)
+                {
+                    if (assignment.Left is ImplicitElementAccessSyntax index)
+                    {
+                        foreach (var argument in index.ArgumentList.Arguments)
+                        {
+                            Anchor(argument.Expression);
+                        }
+                    }
+                    else if (model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not IFieldSymbol and not IPropertySymbol)
+                    {
+                        throw new InferenceException("Unsupported object initializer member.");
+                    }
+                    if (assignment.Right is InitializerExpressionSyntax memberInitializer)
+                    {
+                        AnchorObjectInitializer(memberInitializer);
+                    }
+                    else
+                    {
+                        Anchor(assignment.Right);
+                    }
+                }
+                else
+                {
+                    Anchor(entry);
+                }
+            }
+        }
+
         private HmType AssignmentTarget(ExpressionSyntax target)
         {
-            if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax)
+            if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax and not MemberAccessExpressionSyntax)
             {
-                throw new InferenceException("Only local, parameter and array-element assignment targets are supported.");
+                throw new InferenceException("Unsupported assignment target.");
             }
 
             return Expression(target);

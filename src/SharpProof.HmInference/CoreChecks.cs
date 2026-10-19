@@ -34,7 +34,37 @@ internal static class CoreChecks
     {
         var identity = L("x", V("x"));
         var map = L("f", L("xs", new HmIf(A(V("empty"), V("xs")), V("nil"), A(V("cons"), A(V("f"), A(V("head"), V("xs"))), A(V("map"), V("f"), A(V("tail"), V("xs")))))));
-        (string Name, HmExpression Expression, string? Expected)[] cases = [("CoreIdentity", identity, "forall T1. (T1 -> T1)"), ("CoreConstant", L("x", L("y", V("x"))), "forall T1 T2. (T1 -> (T2 -> T1))"), ("CoreApplication", L("f", L("x", A(V("f"), V("x")))), "forall T1 T2. ((T1 -> T2) -> (T1 -> T2))"), ("CoreComposition", L("f", L("g", L("x", A(V("f"), A(V("g"), V("x")))))), "forall T1 T2 T3. ((T1 -> T2) -> ((T3 -> T1) -> (T3 -> T2)))"), ("CoreLetPolymorphism", new HmLet("id", identity, new HmTuple(A(V("id"), Int), A(V("id"), Bool))), "(int, bool)"), ("CorePolymorphicAlias", new HmLet("id", identity, new HmLet("alias", V("id"), new HmTuple(A(V("alias"), Int), A(V("id"), String)))), "(int, string)"), ("CoreSelfApplicationViaLet", new HmLet("id", identity, A(V("id"), V("id"))), "forall T1. (T1 -> T1)"), ("CoreLambdaIsMonomorphic", L("f", new HmTuple(A(V("f"), Int), A(V("f"), Bool))), null), ("CoreNoCapturedGeneralization", L("x", new HmLet("y", V("x"), new HmTuple(A(V("y"), Int), A(V("y"), Bool)))), null), ("CoreCapturedResult", L("x", new HmLet("f", L("y", V("x")), new HmTuple(A(V("f"), Int), A(V("f"), Bool)))), "forall T1. (T1 -> (T1, T1))"), ("CoreSubstitutedEnvironment", L("f", new HmLet("x", A(V("f"), Int), new HmTuple(A(V("x"), Int), A(V("x"), Bool)))), null), ("CoreShadowing", L("x", new HmLet("x", identity, new HmTuple(A(V("x"), Int), A(V("x"), Bool)))), "forall T1. (T1 -> (int, bool))"), ("CoreOccursCheck", L("x", A(V("x"), V("x"))), null), ("CoreUnbound", V("missing"), null), ("CoreBadApplication", A(Int, Bool), null), ("CoreConditional", L("b", L("x", L("y", new HmIf(V("b"), V("x"), V("y"))))), "forall T1. (bool -> (T1 -> (T1 -> T1)))"), ("CoreConditionalConflict", new HmIf(Bool, Int, String), null), ("CoreNonBooleanCondition", new HmIf(Int, Int, Int), null), ("CoreEmptyList", new HmList(), "forall T1. List<T1>"), ("CoreHomogeneousList", new HmList(Int, Int), "List<int>"), ("CoreHeterogeneousList", new HmList(Int, Bool), null), ("CoreUnit", new HmLiteral(HmLiteralKind.Unit), "unit"), ("CoreRecursiveIdentity", new HmLetRec([new("id", identity)], new HmTuple(A(V("id"), Int), A(V("id"), Bool))), "(int, bool)"), ("CoreRecursiveMap", new HmLetRec([new("map", map)], V("map")), "forall T1 T2. ((T1 -> T2) -> (List<T1> -> List<T2>))"), ("CoreMutualRecursion", new HmLetRec([new("f", L("x", A(V("g"), V("x")))), new("g", L("x", new HmIf(Bool, V("x"), A(V("f"), V("x")))))], V("f")), "forall T1. (T1 -> T1)"), ("CoreNoPolymorphicRecursion", new HmLetRec([new("f", L("x", new HmIf(Bool, V("x"), A(V("f"), new HmList(V("x"))))))], V("f")), null), ("CoreRecursiveCapture", L("x", new HmLetRec([new("f", L("y", V("x")))], new HmTuple(A(V("f"), Bool), A(V("f"), Int)))), "forall T1. (T1 -> (T1, T1))"), ("CoreDuplicateRecursiveBinding", new HmLetRec([new("f", identity), new("f", identity)], V("f")), null)];
+        (string Name, HmExpression Expression, string? Expected)[] cases =
+        [
+            ("CoreIdentity", identity, "forall T1. (T1 -> T1)"),
+            ("CoreConstant", L("x", L("y", V("x"))), "forall T1 T2. (T1 -> (T2 -> T1))"),
+            ("CoreApplication", L("f", L("x", A(V("f"), V("x")))), "forall T1 T2. ((T1 -> T2) -> (T1 -> T2))"),
+            ("CoreComposition", L("f", L("g", L("x", A(V("f"), A(V("g"), V("x")))))), "forall T1 T2 T3. ((T1 -> T2) -> ((T3 -> T1) -> (T3 -> T2)))"),
+            ("CoreLetPolymorphism", new HmLet("id", identity, new HmTuple(A(V("id"), Int), A(V("id"), Bool))), "(int, bool)"),
+            ("CorePolymorphicAlias", new HmLet("id", identity, new HmLet("alias", V("id"), new HmTuple(A(V("alias"), Int), A(V("id"), String)))), "(int, string)"),
+            ("CoreSelfApplicationViaLet", new HmLet("id", identity, A(V("id"), V("id"))), "forall T1. (T1 -> T1)"),
+            ("CoreLambdaIsMonomorphic", L("f", new HmTuple(A(V("f"), Int), A(V("f"), Bool))), null),
+            ("CoreNoCapturedGeneralization", L("x", new HmLet("y", V("x"), new HmTuple(A(V("y"), Int), A(V("y"), Bool)))), null),
+            ("CoreCapturedResult", L("x", new HmLet("f", L("y", V("x")), new HmTuple(A(V("f"), Int), A(V("f"), Bool)))), "forall T1. (T1 -> (T1, T1))"),
+            ("CoreSubstitutedEnvironment", L("f", new HmLet("x", A(V("f"), Int), new HmTuple(A(V("x"), Int), A(V("x"), Bool)))), null),
+            ("CoreShadowing", L("x", new HmLet("x", identity, new HmTuple(A(V("x"), Int), A(V("x"), Bool)))), "forall T1. (T1 -> (int, bool))"),
+            ("CoreOccursCheck", L("x", A(V("x"), V("x"))), null),
+            ("CoreUnbound", V("missing"), null),
+            ("CoreBadApplication", A(Int, Bool), null),
+            ("CoreConditional", L("b", L("x", L("y", new HmIf(V("b"), V("x"), V("y"))))), "forall T1. (bool -> (T1 -> (T1 -> T1)))"),
+            ("CoreConditionalConflict", new HmIf(Bool, Int, String), null),
+            ("CoreNonBooleanCondition", new HmIf(Int, Int, Int), null),
+            ("CoreEmptyList", new HmList(), "forall T1. List<T1>"),
+            ("CoreHomogeneousList", new HmList(Int, Int), "List<int>"),
+            ("CoreHeterogeneousList", new HmList(Int, Bool), null),
+            ("CoreUnit", new HmLiteral(HmLiteralKind.Unit), "unit"),
+            ("CoreRecursiveIdentity", new HmLetRec([new("id", identity)], new HmTuple(A(V("id"), Int), A(V("id"), Bool))), "(int, bool)"),
+            ("CoreRecursiveMap", new HmLetRec([new("map", map)], V("map")), "forall T1 T2. ((T1 -> T2) -> (List<T1> -> List<T2>))"),
+            ("CoreMutualRecursion", new HmLetRec([new("f", L("x", A(V("g"), V("x")))), new("g", L("x", new HmIf(Bool, V("x"), A(V("f"), V("x")))))], V("f")), "forall T1. (T1 -> T1)"),
+            ("CoreNoPolymorphicRecursion", new HmLetRec([new("f", L("x", new HmIf(Bool, V("x"), A(V("f"), new HmList(V("x"))))))], V("f")), null),
+            ("CoreRecursiveCapture", L("x", new HmLetRec([new("f", L("y", V("x")))], new HmTuple(A(V("f"), Bool), A(V("f"), Int)))), "forall T1. (T1 -> (T1, T1))"),
+            ("CoreDuplicateRecursiveBinding", new HmLetRec([new("f", identity), new("f", identity)], V("f")), null)
+        ];
         var passed = 0;
         foreach (var test in cases)
         {

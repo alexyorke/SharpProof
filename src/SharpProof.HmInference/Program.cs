@@ -139,7 +139,71 @@ internal static class Program
 
     private static async Task<int> SelfTest(CancellationToken cancellationToken)
     {
-        (string Name, string Source, string Status, string? Signature)[] cases = [("Identity", "static int M(int x) => x;", "Suggestion", "T1 M<T1>(T1 x)"), ("Constant", "static int M(bool unused) => 42;", "Suggestion", "int M<T1>(T1 unused)"), ("Concrete", "static int M(int x) => x + 1;", "Concrete", null), ("Choose", "static int M(bool b, int x, int y) => b ? x : y;", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"), ("Tuple", "static (int, bool) M(int x, bool y) => (x, y);", "Suggestion", "(T1, T2) M<T1, T2>(T1 x, T2 y)"), ("Apply", "static int M(System.Func<int,int> f, int x) => f(x);", "Suggestion", "T2 M<T1, T2>(global::System.Func<T1, T2> f, T1 x)"), ("Compose", "static int M(System.Func<int,int> f, System.Func<int,int> g, int x) => f(g(x));", "Suggestion", "T2 M<T1, T2, T3>(global::System.Func<T1, T2> f, global::System.Func<T3, T1> g, T3 x)"), ("Lambda", "static System.Func<int,int> M(int x) => y => x;", "Suggestion", "global::System.Func<int, T1> M<T1>(T1 x)"), ("Closure", "static System.Func<int,int> M(int x) => y => x + y;", "Concrete", null), ("Local", "static int M(int x) { var y = x; return y; }", "Suggestion", "T1 M<T1>(T1 x)"), ("TypedLocal", "static int M(int x) { int y = x; return y; }", "Rejected", null), ("MonomorphicLocal", "static (int,bool) M(int x, bool b) { System.Func<object,object> id = y => y; return ((int)id(x), (bool)id(b)); }", "Concrete", null), ("SharedLocalType", "static int M(int x) { System.Func<int,int> id = y => y; var value = id(1); return id(x); }", "Concrete", null), ("Member", "static int M(string x) => x.Length;", "Concrete", null), ("Call", "static int M(int x) => System.Math.Abs(x);", "Concrete", null), ("Mutation", "static int M(int x) { x++; return x; }", "Concrete", null), ("Ref", "static int M(ref int x) => x;", "Suggestion", "T1 M<T1>(ref T1 x)"), ("Instance", "int M(int x) => x;", "Suggestion", "T1 M<T1>(T1 x)"), ("AlreadyGeneric", "static T M<T>(T x) => x;", "Concrete", null), ("StringAddition", "static string M(string x) => x + x;", "Concrete", null), ("OverloadCallsite", "static int M(int x) => x; static int Use() => M(1);", "Suggestion", "T1 M<T1>(T1 x)"), ("MethodGroup", "static int M(int x, int y) => x; static System.Func<int,int,int> Use() => M;", "Suggestion", "T1 M<T1, T2>(T1 x, T2 y)"), ("NullCallsite", "static object M(object x) => x; static object Use() => M(null);", "Rejected", null), ("ArrayIdentity", "static int[] M(int[] xs) => xs;", "Suggestion", "T1[] M<T1>(T1[] xs)"), ("ArrayIndex", "static int M(int[] xs, int i) => xs[i];", "Suggestion", "T1 M<T1>(T1[] xs, int i)"), ("ArrayLength", "static int M(int[] xs) => xs.Length;", "Suggestion", "int M<T1>(T1[] xs)"), ("ArrayRank", "static int M(int[,] xs) => xs.Rank;", "Suggestion", "int M<T1>(T1[,] xs)"), ("MatrixIndex", "static int M(int[,] xs, int i, int j) => xs[i,j];", "Suggestion", "T1 M<T1>(T1[,] xs, int i, int j)"), ("JaggedArray", "static int M(int[][] xs, int i, int j) => xs[i][j];", "Suggestion", "T1 M<T1>(T1[][] xs, int i, int j)"), ("TupleFirst", "static int M((int,bool) pair) => pair.Item1;", "Suggestion", "T1 M<T1, T2>((T1, T2) pair)"), ("NamedTuple", "static int M((int value,bool flag) pair) => pair.value;", "Suggestion", "T1 M<T1, T2>((T1 value, T2 flag) pair)"), ("GenericContainer", "static System.Collections.Generic.List<int> M(System.Collections.Generic.List<int> xs) => xs;", "Suggestion", "global::System.Collections.Generic.List<T1> M<T1>(global::System.Collections.Generic.List<T1> xs)"), ("GenericProperty", "static int M(System.Collections.Generic.List<int> xs) => xs.Count;", "Concrete", null), ("NominalIdentity", "static System.DateTime M(System.DateTime value) => value;", "Suggestion", "T1 M<T1>(T1 value)"), ("IfElse", "static int M(bool b,int x,int y) { if (b) return x; else return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"), ("GuardReturn", "static int M(bool b,int x,int y) { if (b) return x; return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"), ("ScopedBranches", "static int M(bool b,int x,int y) { if (b) { var z=x; return z; } else { var z=y; return z; } }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"), ("RecursiveChoose", "static int M(bool b,int x) => b ? x : M(true,x);", "Suggestion", "T1 M<T1>(bool b, T1 x)"), ("GenericCall", "static int M(int x) => Id(x); static T Id<T>(T x) => x;", "Suggestion", "T1 M<T1>(T1 x)"), ("GenericCallsFresh", "static (int,string) M(int x,string y) => (Id(x),Id(y)); static T Id<T>(T x) => x;", "Suggestion", "(T1, T2) M<T1, T2>(T1 x, T2 y)"), ("GenericConstraint", "static object M(object x) => Id(x); static T Id<T>(T x) where T:class => x;", "Rejected", null), ("ExplicitTypeArgument", "static int M(int x) => Id<int>(x); static T Id<T>(T x) => x;", "Rejected", null), ("NumericPromotion", "static long M(int x,long y) => x+y;", "Concrete", null), ("Comparison", "static bool M(double x,double y) => x < y;", "Concrete", null), ("BooleanLogic", "static bool M(bool x,bool y) => x && !y;", "Concrete", null), ("Bitwise", "static int M(int x,int y) => x << y;", "Concrete", null), ("Decimal", "static decimal M(decimal x) => x + 1.5m;", "Concrete", null), ("Negate", "static int M(int x) => -x;", "Concrete", null), ("Checked", "static int M(int x) => checked(x+1);", "Concrete", null), ("TypedLambda", "static int M(int x) { System.Func<int,int> f = (int y) => y; return f(x); }", "Concrete", null), ("Switch", "static int M(int tag,int x,int y) => tag switch { 0=>x, _=>y };", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"), ("Cast", "static long M(int x) => (long)x;", "Concrete", null), ("Default", "static int M(bool ignored) => default(int);", "Suggestion", "int M<T1>(T1 ignored)"), ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Concrete", null), ("Nullable", "static string? M(string? x) => x;", "Skipped", null), ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Concrete", null), ("ImplicitArray", "static int[] M(int x,int y) => new[] { x,y };", "Suggestion", "T1[] M<T1>(T1 x, T1 y)"), ("ExplicitArray", "static int[] M(int x) => new int[] { x };", "Concrete", null), ("AllocateArray", "static int[] M(int n) => new int[n];", "Concrete", null), ("GenericLocal", "static int M(int x) { T Id<T>(T value) => value; return Id(x); }", "Suggestion", "T1 M<T1>(T1 x)"), ("CapturedLocal", "static int M(int x) { int Read() => x; return Read(); }", "Rejected", null), ("TypedArrayLocal", "static int M(int[] xs,int i) { int[] copy=xs; return copy[i]; }", "Rejected", null)];
+        (string Name, string Source, string Status, string? Signature)[] cases =
+        [
+            ("Identity", "static int M(int x) => x;", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("Constant", "static int M(bool unused) => 42;", "Suggestion", "int M<T1>(T1 unused)"),
+            ("Concrete", "static int M(int x) => x + 1;", "Concrete", null),
+            ("Choose", "static int M(bool b, int x, int y) => b ? x : y;", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
+            ("Tuple", "static (int, bool) M(int x, bool y) => (x, y);", "Suggestion", "(T1, T2) M<T1, T2>(T1 x, T2 y)"),
+            ("Apply", "static int M(System.Func<int,int> f, int x) => f(x);", "Suggestion", "T2 M<T1, T2>(global::System.Func<T1, T2> f, T1 x)"),
+            ("Compose", "static int M(System.Func<int,int> f, System.Func<int,int> g, int x) => f(g(x));", "Suggestion", "T2 M<T1, T2, T3>(global::System.Func<T1, T2> f, global::System.Func<T3, T1> g, T3 x)"),
+            ("Lambda", "static System.Func<int,int> M(int x) => y => x;", "Suggestion", "global::System.Func<int, T1> M<T1>(T1 x)"),
+            ("Closure", "static System.Func<int,int> M(int x) => y => x + y;", "Concrete", null),
+            ("Local", "static int M(int x) { var y = x; return y; }", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("TypedLocal", "static int M(int x) { int y = x; return y; }", "Rejected", null),
+            ("MonomorphicLocal", "static (int,bool) M(int x, bool b) { System.Func<object,object> id = y => y; return ((int)id(x), (bool)id(b)); }", "Concrete", null),
+            ("SharedLocalType", "static int M(int x) { System.Func<int,int> id = y => y; var value = id(1); return id(x); }", "Concrete", null),
+            ("Member", "static int M(string x) => x.Length;", "Concrete", null),
+            ("Call", "static int M(int x) => System.Math.Abs(x);", "Concrete", null),
+            ("Mutation", "static int M(int x) { x++; return x; }", "Concrete", null),
+            ("Ref", "static int M(ref int x) => x;", "Suggestion", "T1 M<T1>(ref T1 x)"),
+            ("Instance", "int M(int x) => x;", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("AlreadyGeneric", "static T M<T>(T x) => x;", "Concrete", null),
+            ("StringAddition", "static string M(string x) => x + x;", "Concrete", null),
+            ("OverloadCallsite", "static int M(int x) => x; static int Use() => M(1);", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("MethodGroup", "static int M(int x, int y) => x; static System.Func<int,int,int> Use() => M;", "Suggestion", "T1 M<T1, T2>(T1 x, T2 y)"),
+            ("NullCallsite", "static object M(object x) => x; static object Use() => M(null);", "Rejected", null),
+            ("ArrayIdentity", "static int[] M(int[] xs) => xs;", "Suggestion", "T1[] M<T1>(T1[] xs)"),
+            ("ArrayIndex", "static int M(int[] xs, int i) => xs[i];", "Suggestion", "T1 M<T1>(T1[] xs, int i)"),
+            ("ArrayLength", "static int M(int[] xs) => xs.Length;", "Suggestion", "int M<T1>(T1[] xs)"),
+            ("ArrayRank", "static int M(int[,] xs) => xs.Rank;", "Suggestion", "int M<T1>(T1[,] xs)"),
+            ("MatrixIndex", "static int M(int[,] xs, int i, int j) => xs[i,j];", "Suggestion", "T1 M<T1>(T1[,] xs, int i, int j)"),
+            ("JaggedArray", "static int M(int[][] xs, int i, int j) => xs[i][j];", "Suggestion", "T1 M<T1>(T1[][] xs, int i, int j)"),
+            ("TupleFirst", "static int M((int,bool) pair) => pair.Item1;", "Suggestion", "T1 M<T1, T2>((T1, T2) pair)"),
+            ("NamedTuple", "static int M((int value,bool flag) pair) => pair.value;", "Suggestion", "T1 M<T1, T2>((T1 value, T2 flag) pair)"),
+            ("GenericContainer", "static System.Collections.Generic.List<int> M(System.Collections.Generic.List<int> xs) => xs;", "Suggestion", "global::System.Collections.Generic.List<T1> M<T1>(global::System.Collections.Generic.List<T1> xs)"),
+            ("GenericProperty", "static int M(System.Collections.Generic.List<int> xs) => xs.Count;", "Concrete", null),
+            ("NominalIdentity", "static System.DateTime M(System.DateTime value) => value;", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("IfElse", "static int M(bool b,int x,int y) { if (b) return x; else return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
+            ("GuardReturn", "static int M(bool b,int x,int y) { if (b) return x; return y; }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
+            ("ScopedBranches", "static int M(bool b,int x,int y) { if (b) { var z=x; return z; } else { var z=y; return z; } }", "Suggestion", "T1 M<T1>(bool b, T1 x, T1 y)"),
+            ("RecursiveChoose", "static int M(bool b,int x) => b ? x : M(true,x);", "Suggestion", "T1 M<T1>(bool b, T1 x)"),
+            ("GenericCall", "static int M(int x) => Id(x); static T Id<T>(T x) => x;", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("GenericCallsFresh", "static (int,string) M(int x,string y) => (Id(x),Id(y)); static T Id<T>(T x) => x;", "Suggestion", "(T1, T2) M<T1, T2>(T1 x, T2 y)"),
+            ("GenericConstraint", "static object M(object x) => Id(x); static T Id<T>(T x) where T:class => x;", "Rejected", null),
+            ("ExplicitTypeArgument", "static int M(int x) => Id<int>(x); static T Id<T>(T x) => x;", "Rejected", null),
+            ("NumericPromotion", "static long M(int x,long y) => x+y;", "Concrete", null),
+            ("Comparison", "static bool M(double x,double y) => x < y;", "Concrete", null),
+            ("BooleanLogic", "static bool M(bool x,bool y) => x && !y;", "Concrete", null),
+            ("Bitwise", "static int M(int x,int y) => x << y;", "Concrete", null),
+            ("Decimal", "static decimal M(decimal x) => x + 1.5m;", "Concrete", null),
+            ("Negate", "static int M(int x) => -x;", "Concrete", null),
+            ("Checked", "static int M(int x) => checked(x+1);", "Concrete", null),
+            ("TypedLambda", "static int M(int x) { System.Func<int,int> f = (int y) => y; return f(x); }", "Concrete", null),
+            ("Switch", "static int M(int tag,int x,int y) => tag switch { 0=>x, _=>y };", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"),
+            ("Cast", "static long M(int x) => (long)x;", "Concrete", null),
+            ("Default", "static int M(bool ignored) => default(int);", "Suggestion", "int M<T1>(T1 ignored)"),
+            ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Concrete", null),
+            ("Nullable", "static string? M(string? x) => x;", "Skipped", null),
+            ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Concrete", null),
+            ("ImplicitArray", "static int[] M(int x,int y) => new[] { x,y };", "Suggestion", "T1[] M<T1>(T1 x, T1 y)"),
+            ("ExplicitArray", "static int[] M(int x) => new int[] { x };", "Concrete", null),
+            ("AllocateArray", "static int[] M(int n) => new int[n];", "Concrete", null),
+            ("GenericLocal", "static int M(int x) { T Id<T>(T value) => value; return Id(x); }", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("CapturedLocal", "static int M(int x) { int Read() => x; return Read(); }", "Rejected", null),
+            ("TypedArrayLocal", "static int M(int[] xs,int i) { int[] copy=xs; return copy[i]; }", "Rejected", null)
+        ];
         var passed = 0;
         var failures = new List<string>();
         foreach (var test in cases)
@@ -261,6 +325,8 @@ internal static class Program
         passed += await (SyntaxChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (FlowChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (ExitChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
+        passed += BindingChecks.Run(cancellationToken);
+        passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (DeclarationChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += CoreChecks.Run(cancellationToken: cancellationToken);

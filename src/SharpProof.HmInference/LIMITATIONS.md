@@ -21,13 +21,13 @@ The README describes today's supported subset; it is not the completion spec.
 | Try/catch/finally, using/lock and goto | Open |
 | Declaration/type/property/list patterns | Open |
 | Custom enumerables and Deconstruct | Open |
-| Field/property stores and object/collection initializers | Open |
+| Field/property/indexer stores and object/collection initializers | Verified: conservative receiver/value types, overload/conversion tests and runtime probe; anonymous objects and record with expressions remain open |
 | Void/custom delegates and method groups | Open |
 | User operators/conversions and non-array params collections | Open |
 | Nested generic, pointer/function-pointer and ref-like types | Open |
 | Mutually recursive C# groups | Open |
 | Solution-scale cost | Open: no representative end-to-end performance baseline |
-| API/behavior compatibility | Compiler checks cover supplied source; reflection, binary and absent external consumers require an explicit compatibility policy |
+| API/behavior compatibility | Supplied static calls retain instantiated signatures; separate-file runtime regressions cover conversions/boxing/overloads. Dynamic, reflection, binary and absent external consumers still need a compatibility policy |
 
 The pure HM core's rank-1 restriction and C# local monomorphism are properties of
 their respective type systems, not omissions that can be removed by making locals

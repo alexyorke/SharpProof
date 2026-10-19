@@ -7,7 +7,8 @@ production analyzer and main solution.
 
 ## Run
 
-From the repository root, in the canonical Linux amd64 tooling container:
+From the repository root, use the host wrapper to run verification in the
+canonical Linux amd64 tooling container:
 
 ```powershell
 ./eng/scripts/Invoke-SharpProof.ps1 dev src/SharpProof.HmInference/verify.sh
@@ -92,14 +93,14 @@ method/local-function declarations supply schemes instantiated per call.
 | Explicit array construction | Preserve declared element types |
 | Synchronous lambdas | Infer inputs/results; retain explicit annotations |
 | Immutable locals and nested blocks | Share types by symbol and respect scope |
-| Mutable locals/parameters and array-element stores | Keep one monotype per symbol; preserve assignment conversions |
+| Mutable locals/parameters, tuple/field/property/array/indexer stores | Keep monotypes; retain receiver types and assignment conversions |
 | Compound assignments and increments | Retain original built-in operand types; skip custom operators |
 | Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
 | Break/continue and traditional switch | Track each exit separately; consume it at the correct loop/switch |
 | Tuple array foreach deconstruction | Bind nested tuple elements, discards and explicit types |
 | Checked/unchecked blocks and throws | Preserve overflow contexts and treat throws as nonreturning exits |
 | Tuple deconstruction declarations | Infer nested tuple bindings and discards; retain explicit element types |
-| Explicit/target-typed object construction | Bind constructor arguments and preserve the selected constructor |
+| Explicit/target-typed construction and initializers | Preserve constructor/indexer/Add selection; pin initializer source types and support nested members |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
 | Conditionals, return branches and guard returns | Unify results |
 | Constant/discard switch expressions | Preserve governing type; unify result arms |
@@ -117,10 +118,13 @@ return information. For example, `Func<int,int> Capture(int x) => y => x` can
 suggest `Func<int,T> Capture<T>(T x)` without an uninferable extra parameter.
 
 Every candidate is substituted into the original compilation and checked for
-compiler errors, including supplied callers and generic constraints. Selected
-method definitions inside the body are compared before/after to reject overload
-rebinding. Selected constructors are checked too. Roslyn validates C# constraints;
-the engine does not invent them. Escaped source identifiers are retained in signatures.
+compiler errors, including supplied callers and generic constraints. Statically
+resolved method and constructor definitions are compared across all supplied
+files. Calls outside the analyzed method must also retain their instantiated
+parameter and return types. This conservatively rejects changes to argument
+conversions, result boxing and caller overload selection. Indexer and collection
+Add definitions inside the method are checked too. Roslyn validates constraints;
+the engine does not invent them. Escaped identifiers are retained in signatures.
 
 Instance methods, existing generic methods and containing generic types are
 supported. Existing type parameters are rigid; their constraints are retained.
@@ -132,18 +136,19 @@ The adapter skips async, nullable annotations, custom operators, expanded
 non-array params collections, null/coalescing, unsupported patterns and other
 unimplemented syntax. It does not infer mutually recursive C# method groups or
 synthesize generic constraints. See [the completion ledger](LIMITATIONS.md).
+
 Tuple deconstruction supports declarations, reassignment and mixed targets for
 local/parameter identifiers and discards. Custom Deconstruct methods (including
-nested ones) remain unsupported. Object
-initializers, ref constructors, FormattableString and custom interpolation handlers
+nested ones) remain unsupported. Ref constructors, anonymous objects, record with
+expressions, FormattableString and custom interpolation handlers
 are also unsupported. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.
 
 Loop analysis accumulates constraints over monomorphic bindings; it does not
 generalize at iteration boundaries or prove termination. Loops conservatively
 fall through, so methods whose only return is inside an infinite loop are skipped.
-Goto, foreach over custom enumerables, property/field stores and void delegate
-calls remain unsupported. Switch statements support constant labels and guards,
+Goto, foreach over custom enumerables and void delegate calls remain unsupported.
+Switch statements support constant labels and guards,
 not declaration/type patterns. Try/catch/finally and rethrow are unsupported.
 Ordinary void
 method calls can appear as expression statements. The standalone HM core remains

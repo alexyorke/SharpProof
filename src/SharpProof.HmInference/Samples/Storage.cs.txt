@@ -1,0 +1,20 @@
+using System.Collections.Generic;
+
+public static class StorageSamples
+{
+    public static (int, string) ReplaceNumber((int, string) pair, int value)
+    {
+        pair.Item1 = value;
+        return pair;
+    }
+
+    public static int Read(List<int> values, int index, bool ignored) => values[index];
+    public static List<int> Create(int value, bool ignored) => new() { value };
+    public static Dictionary<int, string> Entries(int key, string value, bool ignored) => new() { [key] = value };
+    public static Box Wrap(int value, bool ignored) => new() { Value = value };
+
+    public sealed class Box
+    {
+        public int Value { get; set; }
+    }
+}
