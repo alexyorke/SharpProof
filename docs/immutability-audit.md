@@ -2716,3 +2716,15 @@ Master synchronization: fresh fetch found cd3363c63108d54c31e5958ca602d967519f9b
 (PR329, sealed frontend classes and TotalParameterBinding composition). Commit the
 verified M072-M073 changes before merging. Preserve composition-based input projection
 and separate RegionIncompleteException catches alongside immutable snapshots.
+
+IMM-M074: Coordinator rechecked the remaining Effects test construction sites. Convert
+19 fixed array/typed collection domains, including only the outer array-of-array test
+case vector; nested int[] operands, their clones and mutable IList probes stay native.
+Convert evidence accumulation to an immutable array builder, two interpreter input maps
+to strict immutable construction, and enum-value lookup to a strict Ordinal immutable map.
+Preserve original Dictionary indexer overwrite semantics with builder indexers, and
+ToDictionary duplicate rejection with ImmutableDictionaryCapture. Adapt EffectSummary's
+params consumer to JoinFrom(Bottom, immutable effects). Preserve all source literals,
+case order/identity and deliberately mutable collection/culture callback subjects.
+Validate all 120 ordinary Effects cases, including compiler/CLR identity controls.
+Status: open before edits.
