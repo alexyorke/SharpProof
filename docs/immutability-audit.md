@@ -3552,3 +3552,19 @@ avoiding earlier null normalization. All seven scripts parse clean, independent 
 confirms order/comparer/XML identity/Windows variants and duplicate heading anchors.
 Canonical formatting checks 87 PowerShell and 19 shell files. Existing scalar counters
 and native/SUT mutations remain separate reviewed state; other map construction is open.
+IMM-M130: Working-tree inventory refresh covers 1,878 non-vendored C# files and 84
+PowerShell scripts with zero parse errors: 2,486 C# candidates and 1,090 PS candidates.
+Main reconciled 111 already-tested C# builder rows, eight traced native/SUT Contracts
+adapters and 83 PS scalar/builder rows. Pending C# source owners remain open. Current
+Open counts: 1,571 C# / 728 PS. Numeric member/indexed aggregate owners remain open;
+scalar arithmetic classification does not exempt their mutable containers. M128 final
+canonical gates pass zero format changes, 713 documentation links and container contract.
+M124 embedded-symbol regressions pass exact pairing/checksum/malformed/missing controls.
+
+IMM-M131: Review 41 additional Worker fixed-vector/map/membership/private-input rows
+across A-G and Q-Z. Thirty-nine syntax sites use immutable snapshots/strict projections;
+two coupled changes use ordered callable builders and an immutable ScriptedBackend
+constructor input. Preserve target-first/last ordering, ordinal set membership, strict
+map duplicates, native reflection/byte inputs and mutable backend queue/counters. Narrow
+the private nullable membership helper and remove redundant immutable recapture. Validate
+all affected fixtures after implementation. Status: open before edits.
