@@ -16,6 +16,13 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=checked-integral-to-int64", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "signed/unsigned 8/16/32/64-bit limits, UTF-16 code units and Boolean 0/1; checked UInt64 overflow even in unchecked context; exact signed Int64 width; actual matching runtime overload and readiness observations; native arithmetic proof/refutation with uncertain initialization effects and unsupported logical clauses",
+                    () => CheckIntegralToInt64Intrinsic(compilation, row.Id, false), () => CheckIntegralToInt64Intrinsic(compilation, row.Id, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=object-reference-identity", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
@@ -53,6 +60,11 @@ public sealed partial class DotnetApiInventoryTests
                         constructorOrigin && (CheckDictionaryStateIntrinsic(compilation, true, sourceParameters: true) ||
                             CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true, sourceParameters: true)) ||
                         opaqueStorage && (CheckOpaqueDictionaryStorageIntrinsic(compilation, true) || CheckOpaqueDictionaryStorageIntrinsic(compilation, true, direct: true)));
+            }
+
+            if (row.Evidence.Contains("intrinsic=concrete-queue-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));
             }
 
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))

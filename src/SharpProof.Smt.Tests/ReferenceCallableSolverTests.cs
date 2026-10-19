@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Reflection;
+using Microsoft.Z3;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using Goal = SharpProof.Verify.Goal;
 
@@ -254,16 +256,22 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
 
-    [TestCase(0)]
-    [TestCase(64)]
-    [TestCase(65)]
-    [TestCase(257)]
-    [TestCase(int.MaxValue)]
-    public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum)
+    [TestCase(0, "list")]
+    [TestCase(64, "list")]
+    [TestCase(65, "list")]
+    [TestCase(257, "list")]
+    [TestCase(int.MaxValue, "list")]
+    [TestCase(0, "queue")]
+    [TestCase(64, "queue")]
+    [TestCase(65, "queue")]
+    [TestCase(257, "queue")]
+    [TestCase(int.MaxValue, "queue")]
+    public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum, string collection = "list")
     {
+        ArgumentNullException.ThrowIfNull(collection);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var input = factory.CreateVariable("list", factory.ObjectType);
-        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:list:count", factory.IntegerType, false);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         var count = factory.Binary(IrBinaryOperator.BitwiseAnd,
             factory.PureOpaque(field, factory.Variable(input)), factory.Integer(int.MaxValue));
         var assumptions = ImmutableArray.Create(NotNull(factory, input),
@@ -291,6 +299,163 @@ public sealed class ReferenceCallableSolverTests
         var largeProof = Query(factory, assumptions,
             factory.Binary(IrBinaryOperator.GreaterThanOrEqual, count, factory.Integer(minimum)), [input]);
         Assert.That(await new ProofKernel(session).VerifyAsync(largeProof, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task NominalWitnessPreferenceCannotProveAClaimOrOverrideRequiredAliases(bool fields)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var firstType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "First");
+        var secondType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Second");
+        var firstVariable = factory.CreateVariable("first", fields ? factory.ObjectType : firstType);
+        var secondVariable = factory.CreateVariable("second", secondType);
+        IrTerm first = factory.Variable(firstVariable);
+        IrTerm second = factory.Variable(secondVariable);
+        ImmutableArray<IrVarId> variables = [firstVariable, secondVariable];
+        if (fields)
+        {
+            var firstField = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:first", firstType, false);
+            var secondField = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:second", secondType, false);
+            first = factory.PureOpaque(firstField, factory.Variable(firstVariable));
+            second = factory.PureOpaque(secondField, factory.Variable(firstVariable));
+            variables = [firstVariable];
+        }
+        var assumptions = ImmutableArray.Create(Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, first, factory.Null(firstType))),
+            Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, second, factory.Null(secondType))));
+        if (fields)
+        { assumptions = assumptions.Add(NotNull(factory, firstVariable)); }
+        var alias = Equal(factory, factory.Cast(factory.ObjectType, first), factory.Cast(factory.ObjectType, second));
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var requiredAlias = Query(factory, assumptions.Add(Assume(factory, alias)), factory.Boolean(false), variables);
+        // The nominal retry is UNSAT here. The original uncertified SAT
+        // alias remains rejected; this retry never turns UNSAT into a proof.
+        Assert.That(await new ProofKernel(session).VerifyAsync(requiredAlias, TestContext.CurrentContext.CancellationToken), Is.TypeOf<UnknownOutcome>());
+        // Rechecking the same rejected preference must preserve abstention;
+        // cached selectors cannot turn that required alias into a proof.
+        Assert.That(await new ProofKernel(session).VerifyAsync(requiredAlias, TestContext.CurrentContext.CancellationToken), Is.TypeOf<UnknownOutcome>());
+        var wrongIdentity = Query(factory, assumptions, alias, variables);
+        Assert.That(await new ProofKernel(session).VerifyAsync(wrongIdentity, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+        var notDisjoint = Query(factory, assumptions, factory.Unary(IrUnaryOperator.Not, alias), variables);
+        Assert.That(await new ProofKernel(session).VerifyAsync(notDisjoint, TestContext.CurrentContext.CancellationToken), Is.TypeOf<UnknownOutcome>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task NominalWitnessPreferenceRemainsConservativeBeyondItsTypeGroupLimit(bool fields)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var receiver = factory.CreateVariable("receiver", factory.ObjectType);
+        var variables = ImmutableArray.CreateBuilder<IrVarId>();
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
+        if (fields)
+        { variables.Add(receiver); assumptions.Add(NotNull(factory, receiver)); }
+        for (var index = 0; index < 68; index++)
+        {
+            var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "View" + index);
+            IrTerm value;
+            if (fields)
+            {
+                var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:view" + index, type, false);
+                value = factory.PureOpaque(field, factory.Variable(receiver));
+            }
+            else
+            {
+                var variable = factory.CreateVariable("view" + index, type);
+                variables.Add(variable);
+                value = factory.Variable(variable);
+            }
+            assumptions.Add(Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(type))));
+        }
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, assumptions.ToImmutable(), factory.Boolean(false), variables.ToImmutable());
+        // A capped candidate search can abstain, but cannot prove this false
+        // claim about a feasible entry with 68 independent non-null views.
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.Not.TypeOf<ProvenOutcome>());
+        var invariant = Query(factory, query.Assumptions, query.Assumptions[0].Predicate, query.ModelVariables);
+        Assert.That(await new ProofKernel(session).VerifyAsync(invariant, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
+    public async Task ObservedFieldWitnessesAreNotCrowdedOutByRepeatedVariableTypes()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var repeated = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Repeated");
+        var variables = ImmutableArray.CreateBuilder<IrVarId>();
+        for (var index = 0; index < 80; index++)
+        { variables.Add(factory.CreateVariable("earlier" + index, repeated)); }
+        var receiver = factory.CreateVariable("receiver", factory.ObjectType);
+        variables.Add(receiver);
+        var firstType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "First");
+        var secondType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Second");
+        var firstField = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:first", firstType, false);
+        var secondField = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:second", secondType, false);
+        var first = factory.PureOpaque(firstField, factory.Variable(receiver));
+        var second = factory.PureOpaque(secondField, factory.Variable(receiver));
+        var assumptions = ImmutableArray.Create(NotNull(factory, receiver),
+            Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, first, factory.Null(firstType))),
+            Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, second, factory.Null(secondType))));
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, assumptions, factory.Boolean(false), variables.ToImmutable());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+    }
+
+    [Test]
+    public async Task EveryRepeatedNominalViewRetainsItsPreferredMembership()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var repeated = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Repeated");
+        var rare = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Rare");
+        var variables = ImmutableArray.CreateBuilder<IrVarId>();
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
+        for (var index = 0; index < 96; index++)
+        {
+            var variable = factory.CreateVariable("view" + index, index == 95 ? rare : repeated);
+            variables.Add(variable);
+            assumptions.Add(NotNull(factory, variable));
+        }
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, assumptions.ToImmutable(), factory.Boolean(false), variables.ToImmutable());
+        var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        AssertAssumptions(factory, query, result.Model!.Assignments);
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+    }
+    [Test]
+    public void BuiltinOnlyInputsDoNotCreateNominalMembershipConstraints()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variables = ImmutableArray.Create(factory.CreateVariable("integer", factory.IntegerType),
+            factory.CreateVariable("text", factory.StringType), factory.CreateVariable("object", factory.ObjectType),
+            factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType)));
+        var query = Query(factory, [], factory.Boolean(false), variables);
+        using var context = new Context();
+        using var owner = new Z3ExpressionOwner();
+        var encoder = new BvEncoder(context, factory, owner);
+        try
+        {
+            Assert.That(encoder.NominalReferenceBound(query,
+                new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken)), Is.Null);
+        }
+        finally
+        { encoder.DisposeReferences(); }
+    }
+    [Test]
+    public async Task BuiltinOnlyOptionalPreferenceKeepsTheOriginalSessionDomain()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var array = factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType));
+        var variables = ImmutableArray.Create(factory.CreateVariable("text", factory.StringType),
+            factory.CreateVariable("object", factory.ObjectType), array);
+        var assumptions = ImmutableArray.Create(NotNull(factory, array),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(array)), factory.Integer(2))));
+        var query = Query(factory, assumptions, factory.Boolean(false), variables);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var preference = typeof(CallableSolverSession).GetMethod("NominalReferenceWitnesses", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.That(preference.Invoke(session, [query, new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken)]), Is.Null);
+        var kernel = new ProofKernel(session);
+        Assert.That(await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+        var invariant = Query(factory, assumptions, assumptions[1].Predicate, variables);
+        Assert.That(await kernel.VerifyAsync(invariant, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
     private static Assumption NotNull(IrFactory factory, IrVarId variable)
     {

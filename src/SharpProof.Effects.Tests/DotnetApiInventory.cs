@@ -122,6 +122,9 @@ internal static class DotnetApiInventory
             { evidence.Add("intrinsic=concrete-list-state"); }
         }
 
+        if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
+        { evidence.Add("intrinsic=concrete-queue-state"); }
+
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
             evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");
@@ -135,6 +138,9 @@ internal static class DotnetApiInventory
 
         if (symbol is IMethodSymbol method)
         {
+            if (CSharpOperationSemantics.IsIntegralConvertToInt64(method))
+            { evidence.Add("intrinsic=checked-integral-to-int64"); }
+
             if (CSharpOperationSemantics.IsObjectReferenceEquals(method))
             { evidence.Add("intrinsic=object-reference-identity"); }
 

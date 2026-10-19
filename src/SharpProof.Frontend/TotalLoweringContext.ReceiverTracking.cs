@@ -371,7 +371,45 @@ internal sealed partial class TotalLoweringContext
             Type(named.TypeArguments[0]) == Type(array.ElementType);
     }
 
+    internal ITypeSymbol? SpecializeSourceType(ITypeSymbol? type)
+    {
+        var remaining = 4096;
+        return Substitute(type, 0);
+
+        ITypeSymbol? Substitute(ITypeSymbol? value, int depth)
+        {
+            if (value == null)
+            { return null; }
+            if (depth > 64 || --remaining < 0)
+            { throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType); }
+            var direct = SpecializeReceiverElementCore(value);
+            if (!SymbolEqualityComparer.Default.Equals(value, direct))
+            { return Substitute(direct, depth + 1); }
+            if (value is IArrayTypeSymbol array && Substitute(array.ElementType, depth + 1) is { } element &&
+                !SymbolEqualityComparer.Default.Equals(element, array.ElementType))
+            { return array.IsSZArray || array.Rank != 1 ? (Compilation ?? _sourceTypeCompilation)?.CreateArrayTypeSymbol(element, array.Rank, array.NullableAnnotation) ?? throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType) : throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType); }
+            if (value is INamedTypeSymbol named)
+            {
+                var definition = named.ConstructedFrom;
+                if (named.ContainingType is { } owner && Substitute(owner, depth + 1) is INamedTypeSymbol actualOwner &&
+                    !SymbolEqualityComparer.Default.Equals(owner, actualOwner))
+                {
+                    definition = actualOwner.GetTypeMembers(named.Name, named.Arity).Single(candidate =>
+                        candidate is null ? throw new ArgumentNullException(nameof(candidate)) : SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, named.OriginalDefinition));
+                }
+                var arguments = named.TypeArguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : Substitute(argument, depth + 1)!).ToArray();
+                if (!SymbolEqualityComparer.Default.Equals(definition, named.ConstructedFrom) ||
+                    arguments.Where((argument, index) => argument is null ? throw new ArgumentNullException(nameof(argument)) : !SymbolEqualityComparer.Default.Equals(argument, named.TypeArguments[index])).Any())
+                { return arguments.Length == 0 ? definition : definition.Construct(arguments); }
+            }
+            return value;
+        }
+    }
+
     private ITypeSymbol? SpecializeReceiverElement(ITypeSymbol? type)
+    { return SpecializeSourceType(type); }
+
+    private ITypeSymbol? SpecializeReceiverElementCore(ITypeSymbol? type)
     {
         if (type == null)
         { return null; }
@@ -419,6 +457,37 @@ internal sealed partial class TotalLoweringContext
         _types.TypeSpecializer = SpecializeReceiverElement;
         if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
             Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
+        { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+    }
+
+    internal void SpecializeSourceReferenceType(ITypeSymbol declared, ITypeSymbol actual)
+    {
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        _receiverElements[declared] = actual;
+        _types.TypeSpecializer = SpecializeReceiverElement;
+        var type = Type(actual);
+        Parameters = [.. Parameters.Select(binding => binding is null ? throw new ArgumentNullException(nameof(binding)) :
+            SymbolEqualityComparer.Default.Equals(binding.Parameter.Type, declared) && Factory.GetVariableInfo(binding.Entry).Type != type
+                ? new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
+                    Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type)) : binding)];
+        if (SymbolEqualityComparer.Default.Equals(Target.ReturnType, declared) && Result is { } result && Factory.GetVariableInfo(result).Type != type)
+        { Result = Factory.CreateVariable("result", type); }
+    }
+
+    internal void RefreshSourceBindingTypes()
+    {
+        Parameters = [.. Parameters.Select(binding =>
+        {
+            binding = RepositoryParameterGuard.NotNull(binding, nameof(binding));
+            // Concrete array provenance already refines an interface parameter.
+            // Preserve it when refreshing compound types dependent on an owner.
+            var type = Type(_arrayReceivers.TryGetValue(binding.Parameter, out var array) ? array : binding.Parameter.Type);
+            return Factory.GetVariableInfo(binding.Entry).Type == type ? binding :
+                new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
+                    Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type));
+        })];
+        if (Result is { } result && Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
         { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
     }
 

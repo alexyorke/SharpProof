@@ -74,6 +74,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && operation is IPropertyReferenceOperation queueProperty &&
+            QueueClause(queueProperty, state, depth) is { } queueClause)
+        { return queueClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation listProperty &&
             ListClause(listProperty, state, depth) is { } listClause)
         { return listClause; }
@@ -254,6 +257,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && QueueBody(operation, block, depth) is { } queue)
+        { return Capture(operation, queue); }
         if (depth < 256 && ListBody(operation, block, depth) is { } list)
         { return Capture(operation, list); }
         if (depth < 256 && DictionaryBody(operation, block, depth) is { } dictionary)
@@ -391,6 +396,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IInvocationOperation comparison &&
             IntegerComparisonBody(comparison, block, depth) is { } compared)
         { return compared; }
+        if (depth < 256 && operation is IInvocationOperation conversionCall &&
+            IntegralConvertBody(conversionCall, block, depth) is { } convertedCall)
+        { return convertedCall; }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
