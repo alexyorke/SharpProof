@@ -119,6 +119,17 @@ public sealed partial class WorkerTests
         var result = second.ClaimResults.Single();
         var metadata = result.ResourceBound!.MetadataAssumptions.Single();
         Assert.That(metadata.WitnessIdentifier, Is.EqualTo("bcl.math.max.int32-int32"));
+        var metadataRows = result.ResourceBound.MetadataAssumptions;
+        result.ResourceBound.MetadataAssumptions = null!;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        result.ResourceBound.MetadataAssumptions = Enumerable.Repeat(metadata, 17).ToArray();
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        result.ResourceBound.MetadataAssumptions = metadataRows;
+        var originalWitness = metadata.WitnessIdentifier;
+        metadata.WitnessIdentifier = null!;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        metadata.WitnessIdentifier = originalWitness;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
         Assert.That(metadata.RuntimeModel, Is.EqualTo("net8.0.32"));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
@@ -147,5 +158,39 @@ public sealed partial class WorkerTests
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
         result.ResourceBound.MetadataAssumptions = [];
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+    }
+    [Test]
+    public async Task UnknownResourceContractsRejectPartialAndUndefinedEvidence()
+    {
+        using var project = TestProject.Create("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, "n", 1)]
+                public static void Target(int n) { for(int i=0;i<n;i+=2) {} }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(response, WorkerClaimOutcome.Unknown);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        var claim = response.ClaimResults.Single();
+        Assert.That(claim.ResourceBound, Is.Not.Null);
+        var evidence = claim.ResourceBound!;
+        Assert.That(evidence.UnknownReason, Is.Not.Empty);
+        evidence.ObservedLowerBound = "1";
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        evidence.ObservedLowerBound = null;
+        evidence.InferredUpperBound = "n";
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        evidence.InferredUpperBound = null;
+        var reason = evidence.UnknownReason;
+        evidence.UnknownReason = "bad\nreason";
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        evidence.UnknownReason = reason;
+        claim.Outcome = (WorkerClaimOutcome)999;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        claim.Outcome = WorkerClaimOutcome.Unknown;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 }

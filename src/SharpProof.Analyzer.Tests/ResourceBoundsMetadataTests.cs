@@ -21,6 +21,18 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Assumptions[0], Does.Contain("net8.0.32"));
     }
 
+    [TestCase("int value=n.GetHashCode();", "OpaqueCall")]
+    [TestCase("int value=System.Math.Max(n++,0);", "UnstableInputOrCounter")]
+    public void UnsupportedMetadataReceiversAndArgumentsHaveNoPartialCosts(string body, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(reason);
+        var result = Analyze(body);
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.UnknownReason, Is.EqualTo(reason));
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.Assumptions, Is.Empty);
+    }
     [Test]
     public void SourceLookalikeDoesNotReceiveMetadataCosts()
     {

@@ -503,3 +503,16 @@ extension were not part of that measurement. The next ranking work is checked
 composition of multiple counter phases; unsupported coupled updates will remain
 Unknown. Remaining metadata/protocol coverage gaps are also being mapped to
 boundary controls rather than excluded from qualification.
+
+Published while-ranking checkpoint: `2848a1d8c237f9f62325bcb0b299746d04a14ce5`.
+Its exact-head documentation maintenance and toolchain image security checks
+passed; package/consumer, coverage and canonical PR gates were queued at inspection.
+
+The next coverage follow-up passed two source and five native/protocol boundary
+tests, with zero warnings/errors. Controls cover instance metadata receivers,
+mutating metadata arguments, invalid dependency projection, null or oversized
+metadata arrays, null witness identity, and real Unknown responses corrupted with
+partial numeric or undefined-outcome evidence. Every mutation is rejected and the
+restored response validates. No coverage percentage is inferred until the next
+complete measurement; the 100% baseline and remaining roadmap requirements stay
+unchanged.

@@ -373,6 +373,21 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == metadata.AssumptionId).Used, Is.True);
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void MetadataProjectionRequiresADecidedResourceClaim(int corruption)
+    {
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]", ""));
+        var binding = new NativeResourceMetadataBinding(preparation);
+        var result = new WorkerClaimResult
+        {
+            Outcome = corruption == 0 ? WorkerClaimOutcome.Proven : corruption == 1 ? WorkerClaimOutcome.Unknown : (WorkerClaimOutcome)999,
+            ResourceBound = corruption == 0 ? null : new WorkerResourceBoundEvidence()
+        };
+        Action project = () => binding.Project(result);
+        Assert.Throws<ArgumentException>(project);
+    }
     [Test]
     public async Task RefutedResourceClaimsRetainReviewedMetadataDependencies()
     {
