@@ -50,6 +50,11 @@ Do not broaden checks after a passing gate without a specific unresolved concern
 
 ## Remaining after milestone one
 
+The user subsequently requested the entire remaining roadmap. Its active scope,
+phase status, and completion criteria are now tracked in the
+[full implementation roadmap](resource-analysis-roadmap.md). The milestone-one
+checkpoint below is historical evidence, not completion of that expanded goal.
+
 - Non-unit strides, descending/logarithmic loops, dependent nested bounds, and
   ranking-function synthesis beyond the checked canonical rule.
 - Source/metadata call cost summaries and recursion/recurrence solving.
