@@ -3066,3 +3066,13 @@ resolution, guard order, exact diagnostic text and cache publication. Atomic con
 ImmutableInterlocked caches remain immutable roots. Validate resolver/rebuild/malformed,
 owned metadata lifetime and authentic implicit-reference policy tests.
 Status: open before edits.
+
+IMM-M093: Main traced Gates diagnostic projection, corpus transaction staging/recovery,
+and allocation IL reachability. Use scoped immutable array/hash/dictionary builders for
+private sequential accumulation; freeze destinations before staging and transaction
+entries before marker publication. Keep a frozen completed entry vector for rollback;
+partial staging cleanup freezes the builder without moving its storage. Preserve
+ordinal duplicate checks, cancellation order, durable marker behavior, publication
+indices, native file/IL buffers and LIFO traversal. Diagnostic text/order/limits remain
+unchanged. Validate transaction failure/recovery and ordinary allocation oracle gates.
+Status: open before edits.
