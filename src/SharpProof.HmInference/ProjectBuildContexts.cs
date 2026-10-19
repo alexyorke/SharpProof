@@ -87,6 +87,24 @@ internal sealed class ProjectBuildContexts
         }
     }
 
+    internal static IEnumerable<ProjectGraphNode> ToolReferences(ProjectGraphNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        foreach (var dependency in node.ProjectReferences)
+        {
+            var items = ReferenceItems(node, dependency);
+            if (!items.Any(item =>
+            {
+                ArgumentNullException.ThrowIfNull(item);
+                return !item.GetMetadataValue("BuildReference").Equals("false", StringComparison.OrdinalIgnoreCase)
+                    && (item.GetMetadataValue("ReferenceOutputAssembly").Equals("false", StringComparison.OrdinalIgnoreCase)
+                        || item.GetMetadataValue("OutputItemType").Equals("Analyzer", StringComparison.OrdinalIgnoreCase));
+            }))
+            { continue; }
+            foreach (var target in ExpandRoot(dependency))
+            { yield return target; }
+        }
+    }
     internal static Dictionary<string, string> GetProperties(ProjectGraphNode node)
     {
         ArgumentNullException.ThrowIfNull(node);

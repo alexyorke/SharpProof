@@ -37,6 +37,7 @@ The built CLI accepts:
 | `--solution <solution.sln/slnx/slnf>` | Load the selected solution graph |
 | `--framework <tfm> --configuration <name> --property <Name=Value>` | Set MSBuild properties for project/solution loading |
 | `--no-restore` | Use existing project assets without restoring dependencies |
+| `--no-build` | Use supplied generator/analyzer binaries without building tool projects |
 | `--samples` | Analyze bundled C# programs |
 | `--hm-samples` | Display core HM types and expected type errors |
 | `--self-test` | Run C#, HM, runtime and differential checks |
@@ -47,8 +48,11 @@ reference assemblies. Project/solution mode uses the installed MSBuild SDK selec
 for the target directory and keeps project reference assemblies, language/nullable
 settings, preprocessor symbols, linked/excluded files, source generators and analyzer
 configuration. Dependencies are restored by default; `--no-restore` assumes current
-restore assets. Build source-generator/analyzer project dependencies when their
-binaries are required. The native MSBuild graph supplies project contexts; source
+restore assets. Declared generator/analyzer project references are built in their
+SDK-selected framework and configuration before analysis. Builds are cached per
+project context, and failures stop inference even when older binaries exist.
+`--no-build` trusts supplied tool binaries. Raw analyzer-file references still require
+the specified binary. The native MSBuild graph supplies project contexts; source
 references are compiled to fresh in-memory metadata, including Visual Basic
 references. Requested multi-target roots include every framework by default.
 Dependencies use the SDK-selected compatible target, excluding unused frameworks.

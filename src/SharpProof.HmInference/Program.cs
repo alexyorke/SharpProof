@@ -54,7 +54,7 @@ internal static class Program
 
         if (args.Length == 0 || args is ["--help"])
         {
-            Program.Log.Info("HM inference: <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore\nProject dependencies are restored by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
+            Program.Log.Info("HM inference: <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore --no-build\nDependencies are restored and declared tool projects are built by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
             return 0;
         }
 

@@ -21,10 +21,18 @@ internal static class ProjectLoading
         { Program.Log.Error("File not found: " + path); return 2; }
         var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var restore = true;
+        var buildTools = true;
         for (var index = offset + 1; index < args.Length; index++)
         {
             if (index < 0)
             { throw new InvalidOperationException("Invalid option index."); }
+            if (args[index] == "--no-build")
+            {
+                if (!buildTools)
+                { Program.Log.Error("Duplicate project option."); return 2; }
+                buildTools = false;
+                continue;
+            }
             if (args[index] == "--no-restore")
             {
                 if (!restore)
@@ -68,7 +76,7 @@ internal static class ProjectLoading
             }
             if (restore && !await ProjectRestoration.RunAsync(path, properties, cancellationToken).ConfigureAwait(false))
             { return 1; }
-            return await Load(path, properties, cancellationToken).ConfigureAwait(false);
+            return await Load(path, properties, buildTools, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException or NotSupportedException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or AggregateException
             || exception.GetType().FullName is "Microsoft.Build.Exceptions.InvalidProjectFileException" or "Microsoft.Build.Exceptions.CircularDependencyException")
@@ -77,12 +85,12 @@ internal static class ProjectLoading
 
     // Keep SDK assembly resolution behind MSBuildLocator registration.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static async Task<int> Load(string path, Dictionary<string, string> properties, CancellationToken cancellationToken)
+    private static async Task<int> Load(string path, Dictionary<string, string> properties, bool buildTools, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(properties);
         var contexts = new ProjectBuildContexts(path, properties);
-        var session = new ProjectLoadSession();
+        var session = new ProjectLoadSession(buildTools);
         foreach (var root in contexts.Roots)
         {
             if (!await session.LoadAsync(root, cancellationToken).ConfigureAwait(false))

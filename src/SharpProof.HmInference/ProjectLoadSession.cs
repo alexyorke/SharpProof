@@ -7,6 +7,8 @@ namespace SharpProof.HmInference;
 
 internal sealed class ProjectLoadSession
 {
+    private readonly ProjectToolBuilder? toolBuilder;
+    internal ProjectLoadSession(bool buildTools) { toolBuilder = buildTools ? new ProjectToolBuilder() : null; }
     private readonly Dictionary<ProjectGraphNode, (Compilation Compilation, string? OutputPath, string? RefPath)> loaded = [];
     private readonly Dictionary<ProjectGraphNode, (PortableExecutableReference Reference, string? OutputPath, string? RefPath)> images = [];
     private readonly List<(string Name, string? Path, CSharpCompilation Compilation, Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions Options)> prepared = [];
@@ -18,6 +20,8 @@ internal sealed class ProjectLoadSession
         cancellationToken.ThrowIfCancellationRequested();
         if (loaded.ContainsKey(node))
         { return true; }
+        if (toolBuilder is not null && !await toolBuilder.EnsureAsync(node, cancellationToken).ConfigureAwait(false))
+        { return false; }
         var globals = ProjectBuildContexts.GetProperties(node);
         using var workspace = MSBuildWorkspace.Create(globals);
         workspace.LoadMetadataForReferencedProjects = false;
