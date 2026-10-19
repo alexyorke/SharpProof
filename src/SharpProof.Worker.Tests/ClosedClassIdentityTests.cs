@@ -58,6 +58,31 @@ public sealed class ClosedClassIdentityTests
             "Contract.Requires(a == null && b == null); Contract.Ensures(Contract.Result<bool>()); return object.ReferenceEquals(a, b); } }"), Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
+    [TestCase(false, WorkerClaimOutcome.Refuted)]
+    [TestCase(true, WorkerClaimOutcome.Unknown)]
+    public async Task UnrelatedFieldViewsNeedAConcreteEntryWitness(bool requireAlias, WorkerClaimOutcome expected)
+    {
+        Assert.That(await Verify("using SharpProof.Attributes; public class A { } public class B { } " +
+            "public class Holder { public A First; public B Second; public int Value; } public static class C { " +
+            "public static int Target(Holder holder) { Contract.Requires(holder != null && holder.First != null && holder.Second != null && holder.Value == 0); " +
+            (requireAlias ? "Contract.Requires(object.ReferenceEquals(holder.First, holder.Second)); " : "") +
+            "Contract.Ensures(Contract.Result<int>() == 0); holder.Value = 1; return holder.Value; } }"), Is.EqualTo(expected));
+    }
+
+    [TestCase("public class A { } public class B : A { }", "A", "B")]
+    [TestCase("public interface A { } public interface B { } public class Both : A, B { }", "A", "B")]
+    [TestCase("public interface A { } public class B : A { }", "A", "B")]
+    public async Task NominalWitnessSearchRetainsCertifiedAliasOverlaps(string declarations, string first, string second)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        Assert.That(await Verify("using SharpProof.Attributes; " + declarations + " public class Other { } public class Holder { public " + first +
+            " First; public " + second + " Second; public Other Unrelated; public int Value; } public static class C { " +
+            "public static int Target(Holder holder) { Contract.Requires(holder != null && holder.First != null && holder.Second != null && holder.Unrelated != null && holder.Value == 0); " +
+            "Contract.Requires(object.ReferenceEquals(holder.First, holder.Second)); Contract.Ensures(Contract.Result<int>() == 0); holder.Value = 1; return holder.Value; } }"),
+            Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
     private static async Task<WorkerClaimOutcome> Verify(string source)
     {
         ArgumentNullException.ThrowIfNull(source);

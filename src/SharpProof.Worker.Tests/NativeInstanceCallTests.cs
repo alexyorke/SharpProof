@@ -134,6 +134,41 @@ public sealed class NativeInstanceCallTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
     }
 
+    [Test]
+    public void LegacyGenericClassificationDoesNotSuppressConstructorArrayTransport()
+    {
+        var preparation = Prepare("public class ArrayNode<T> { public ArrayNode<T>[] Forwards { get; private set; } " +
+            "public ArrayNode(int length) { Forwards = new ArrayNode<T>[length]; } } " +
+            "public static class C { [EnforcePure] public static int Target<T>() { Contract.Ensures(Contract.Result<int>() == 2); var node = new ArrayNode<T>(2); return node.Forwards.Length; } }");
+        Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        Assert.That(preparation.Total, Is.Not.Null);
+    }
+
+    [Test]
+    public void GenericConstructorSetterKeepsConstructedArrayIdentityInTransport()
+    {
+        var preparation = Prepare("public class ArrayNode<T> { public ArrayNode<T>[] Forwards { get; private set; } " +
+            "public ArrayNode(int length) { Forwards = new ArrayNode<T>[length]; } } " +
+            "public static class C { [EnforcePure] public static int Target<T>(T item) where T : class { Contract.Ensures(Contract.Result<int>() == 2); var node = new ArrayNode<T>(2); return node.Forwards.Length; } }");
+        Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        Assert.That(preparation.Total, Is.Not.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task FieldMutationWitnessMustRetainEveryEntryRequirement(bool requireAlias)
+    {
+        var preparation = Prepare("public class A { } public class B { } public class Holder { public A First; public B Second; public int Value; } " +
+            "public static class C { [EnforcePure] public static void Target(Holder holder) { " +
+            "Contract.Requires(holder != null && holder.First != null && holder.Second != null && holder.Value == 0); " +
+            (requireAlias ? "Contract.Requires(object.ReferenceEquals(holder.First, holder.Second)); " : "") + "holder.Value = 1; } }");
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        if (requireAlias)
+        { Assert.That(result.Outcome, Is.TypeOf<UnknownOutcome>()); }
+        else
+        { Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString()); }
+    }
+
     private static CompilerCallablePreparation Prepare(string types, bool effects = true)
     {
         System.ArgumentNullException.ThrowIfNull(types);

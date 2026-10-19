@@ -50,6 +50,13 @@ nominal views. Impossible closed class field aliases cannot authorize a refutati
 Base/derived, supported interface aliases and both-null values retain their tested
 behavior. Missing legacy metadata and uncertified open generic views can still
 yield Unknown, including legitimate aliases when generic arguments coincide.
+Candidate search prefers separate non-null identities for uncertified typed views
+only after decoding rejects an otherwise satisfiable model, over at most 64 nominal
+reference types and every requested view of those types. This type-group limit
+is separate from the unchanged small string/array/count witness size. Required
+uncertified aliases can still yield Unknown; this preference adds no proof premise.
+Unobserved entry fields remain unavailable to replay. Source helper substitution
+preserves constructed owners, tuple and array types, and concrete array provenance.
 This boundary does not add complete field disjointness proofs or arbitrary CLR
 subtype materialization. Portable metadata is part of the canonical artifact and
 its request-bound digest; malformed ancestry and interface metadata fail closed.
