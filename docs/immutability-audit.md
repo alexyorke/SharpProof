@@ -2863,3 +2863,14 @@ fallbacks and post-construction indexing before tests. Native PE/reflection/para
 intentionally mutable runtime aliases are excluded from this batch. Main validates all
 reported sites, formats changed files and runs the ordinary Worker project tests.
 Status: open before edits.
+
+IMM-M081: Compiler producer still copies claim evidence into a temporary CLR array,
+scalar-domain collection materializes ToArray, and wire-enum completeness creates a
+read-only bool array. Use a capacity-scoped immutable builder and frozen evidence,
+ToImmutableArray, and eager ImmutableArray.Create(...).All respectively. Preserve
+all seven completeness calls in left-to-right order; do not short-circuit them.
+EvidenceSha256 remains an explicit in-place Seal lifecycle contract: guard tests read
+the same instance's digest and synchronization preparation aliases the sealed claim.
+Changing it to init/with would alter the subject under test. Reviewed stale owned
+builder inventory rows and native PE/hash/params adapters can be classified separately.
+Status: open before edits.
