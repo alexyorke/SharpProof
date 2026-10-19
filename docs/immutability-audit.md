@@ -2382,3 +2382,14 @@ Nested object?[] inputs and int[] reference subjects remain exact runtime/reflec
 arguments with alias identity preserved. Do not alter generated source strings. Validate
 existing metadata/total fuzz and emission lifecycle tests in the canonical container.
 Status: open before edits.
+
+IMM-M057: Coordinator read IrFieldSites.cs and its interpreter/SMT field consumers.
+IrObjectState retains its public in-place WithField receiver identity; private/internal
+storage can use get-only immutable-dictionary builders without changing that contract.
+Execution-owned IrHeap maps/sets can use readonly builders, retaining IrValueIdentity,
+ObjectKey and FieldKey comparers, nested int/tuple-key default equality, strict insertion
+and existing index-overwrite behavior. Preserve clear-on-invalidate, fresh/default field
+precedence, exact IrValue/object references and ConsumedApproximation timing. Internal
+mutable execution flags remain live evaluation outcome state. Review consumers for
+ordering/concrete Dictionary assumptions and validate heap/array/keyed/snapshot tests.
+Status: open before edits.
