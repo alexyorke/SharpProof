@@ -69,7 +69,7 @@ public sealed partial class ResourceBoundsTests
     [TestCase("var a = new int[n+1];", "UnsupportedAllocationSize")]
     [TestCase("var a = new int[2,3];", "UnsupportedOperation:ArrayCreation")]
     [TestCase("var a = new int[] { 1,2 };", "UnsupportedOperation:ArrayCreation")]
-    [TestCase("object a = n;", "UnsupportedOperation:Conversion")]
+    [TestCase("object a = 1.0m;", "UnsupportedOperation:Conversion")]
     [TestCase("System.Console.WriteLine(n);", "OpaqueCall")]
     [TestCase("M(n,m,values);", "RecursiveCostUnknown")]
     [TestCase("for (int i=0; i<n; i++) { break; }", "UnsupportedOperation:Branch")]

@@ -903,3 +903,37 @@ coverage shards. Aggregate qualification failed at 3099/3180 changed trusted lin
 (97.45%), leaving 81 gaps against the unchanged 100% baseline. That measurement
 excludes this managed-object layer; fresh exact-head CI and final qualification
 remain required. No phase C/E/F requirement is removed by this checkpoint.
+
+## Scalar boxing source integration
+
+Scalar boxing to object now reuses the total backend's typed conversion predicate.
+Operand effects precede a managed Box storage fact, so source-call arrays, loop
+counts and exceptions retain their ordering. Boolean and physical 8/16/32/64-bit
+integer storage (including char) use the reviewed 24-byte box model. Existing
+array count/element metrics remain zero for the box itself. Floating, decimal,
+nullable, interface and user-defined conversions remain explicit Unknown cases.
+Protocol 22/cache 24 invalidate older capability results; artifact 37 and program
+model 4 already represent managed box facts and are unchanged.
+
+Initial native validation passed 275 contract/protocol tests. Seven actual package
+cases then passed across arrays, managed objects and scalar boxes, including
+strict/advisory proof/refutation, AnyCPU Unknown and semantic artifact/cache reuse.
+Final native operand-ordering and broader checks are recorded after completion.
+
+String construction must preserve the runtime's cached zero-length path and
+negative-length exceptions, rather than treating every constructor call as a
+fresh instance. The next source/native implementation will follow the pinned
+[String constructor implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/String.cs).
+Exact initializer replay, remaining string/delegate/closure extraction, alias/
+escape/liveness, peak/retained output, stack, phase E/F and final unchanged 100%
+qualification remain required. No existing roadmap item is removed here.
+
+Final scalar-boxing validation passed 449 focused native/resource/protocol/cache/
+golden tests, all 1405 analyzer tests and 7 actual package cases. Operand-call
+arrays precede the box in concrete prefixes; a throwing operand cannot create a
+box event. All quality/compatibility categories passed with zero build warnings
+or errors. Documentation drift and 723 local links passed. Layout evaluated
+2665 source files, 59 projects and 151 pinned common files. Exact-head CI for the
+published managed-object checkpoint was still running at this local delivery
+check; neither it nor the newer boxing layer is represented by an older coverage
+percentage. The unchanged 100% qualification remains required.

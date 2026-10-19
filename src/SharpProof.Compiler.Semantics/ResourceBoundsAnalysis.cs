@@ -276,6 +276,10 @@ internal sealed partial class ResourceBoundsAnalysis
             case IUnaryOperation unary when unary.OperatorMethod is null && Primitive(unary.Type):
                 result = Visit(unary.Operand, depth + 1);
                 break;
+            case IConversionOperation boxing when CSharpOperationSemantics.IsScalarBoxing(boxing):
+                result = Visit(boxing.Operand, depth + 1).Add(new(Bound.Zero, Bound.Zero, Bound.Zero,
+                    ResourceProgram.Managed(ResourceAllocationShape.Box(Storage(boxing.Operand.Type!)))));
+                break;
             case IConversionOperation conversion when !conversion.Conversion.IsUserDefined &&
                 (conversion.Conversion.IsIdentity || conversion.Conversion.IsNumeric || conversion.Conversion.IsReference || conversion.Operand.ConstantValue is { HasValue: true, Value: null }) &&
                 conversion.Type is { } converted && SupportedType(converted):

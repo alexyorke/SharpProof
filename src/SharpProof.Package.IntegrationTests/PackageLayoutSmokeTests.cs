@@ -3687,16 +3687,18 @@ public sealed class PackageLayoutSmokeTests
         }
         Assert.That(resourceResults, Is.EqualTo(3));
     }
-    [TestCase(false, false)]
-    [TestCase(true, false)]
-    [TestCase(false, true)]
-    [TestCase(true, true)]
-    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, bool managed)
+    [TestCase(false, 0)]
+    [TestCase(true, 0)]
+    [TestCase(false, 1)]
+    [TestCase(true, 1)]
+    [TestCase(false, 2)]
+    [TestCase(true, 2)]
+    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
     {
-        var upper = managed ? 64 : 120;
-        var boundLimit = violates ? managed ? 50 : 80 : upper;
-        var body = managed ? "var item=new Cell();" : "for(int i=0;i<3;i++) { var a=new int[3]; }";
-        var declarations = managed ? "public class Cell { public Cell() { var data=new int[3]; } }" : string.Empty;
+        var upper = allocationKind switch { 1 => 64, 2 => 72, _ => 120 };
+        var boundLimit = violates ? allocationKind switch { 1 => 50, 2 => 48, _ => 80 } : upper;
+        var body = allocationKind switch { 1 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
+        var declarations = allocationKind == 1 ? "public class Cell { public Cell() { var data=new int[3]; } }" : string.Empty;
         var expected = violates ? "Refuted" : "Proven";
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();

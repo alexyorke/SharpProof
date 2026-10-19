@@ -307,7 +307,7 @@ invent byte events. These are exact costs in the declared source storage model,
 not measured JIT/GC/process allocation traces. Refutations retain the owned
 layout dependency and expose the observed prefix and evaluated entry bound.
 Other allocation categories still need compiler extraction and effect accounting.
-Protocol 21, cache schema 23 and compiler artifact schema 37 invalidate earlier
+Protocol 22, cache schema 24 and compiler artifact schema 37 invalidate earlier
 serialized evidence. Resource program/evidence model 4 and expression model 1
 are checked together; the existing three count metrics retain their meanings.
 
@@ -334,5 +334,16 @@ numeric violation needing events after that approximation stays Unknown. Exact
 initializer execution remains required work. Inheritance, custom layout, static
 type initialization, recursive construction, COM activation, cleanup callbacks and events,
 unsupported value fields and unmodeled constructor chains also remain Unknown.
-String/delegate/closure/boxing source extraction, liveness/escape, peak and
+String/delegate/closure source extraction, liveness/escape, peak and
 retained space and stack models remain in the full roadmap.
+
+### Scalar boxing
+
+Boolean and typed 8/16/32/64-bit integer conversions to object, including char,
+now charge their operand effects and a typed box. Under the reviewed x64 model,
+these primitive boxes occupy 24 bytes. Repeated boxes compose with source loops
+and array events; they do not become array allocations or allocated elements.
+Both constant upper bounds and concrete byte-prefix refutations retain the owned
+layout dependency. An operand exception occurs before boxing and cannot supply
+a box event. Floating, decimal, nullable, interface and user-defined conversions
+remain Unknown until their storage and conversion rules are admitted.
