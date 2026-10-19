@@ -2984,3 +2984,16 @@ changes. Three proof/core roots are reused directly, native emitted-image bytes 
 unchanged, and JSON evidence still publishes arrays/nulls in the same ordered shapes.
 The 143-test count difference from M080's full Worker run reflects the explicit
 LongFuzz filter, not a claim that the broader universe was retested here.
+
+IMM-M088: Main traced the remaining 30 compiler root rebindings in three files:
+initialization closure/recursive admission state, Portable IR decoder type/term cycle
+state and ordered program construction, and callable-codec uniqueness/count/dataflow
+state. No persistent root escapes or rollback snapshot is observed. Use owned readonly
+builders for private caches, cycle-state vectors and uniqueness sets; preserve exact
+1-to-2 transition order, AddUnique, active-set finally removal, symbol comparers and
+count/dataflow join expressions. Build block/instruction/parameter/clause vectors in
+builders and freeze where existing helpers/results receive immutable collections.
+Keep actual FIFO/LIFO worklists as immutable queues/stacks. Validate malformed/cyclic
+portable graphs, callable metadata admission, exception initialization and existing
+compiler round-trip/cache tests before committing this batch.
+Status: open before edits.
