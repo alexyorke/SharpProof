@@ -117,25 +117,36 @@ function Get-ExpectedAuditSources {
             'NuGet configuration requires an explicit <auditSources> ' +
             'section; package-source fallback is not accepted.')
     }
-    $elements = @($section.ChildNodes | Where-Object {
-            $_.NodeType -eq [Xml.XmlNodeType]::Element
-        })
-    $clearElements = @($elements | Where-Object {
-            $_.Name -ceq 'clear'
-        })
-    if ($clearElements.Count -ne 1 -or
-        $elements.Count -eq 0 -or
+    $elementBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    [int]$clearElementCount = 0
+    [int]$sourceNodeCount = 0
+    [bool]$hasUnexpectedElement = $false
+    foreach ($childNode in $section.ChildNodes) {
+        if ($childNode.NodeType -ne [Xml.XmlNodeType]::Element) {
+            continue
+        }
+        $elementBuilder.Add($childNode)
+        if ($childNode.Name -ceq 'clear') {
+            $clearElementCount++
+        }
+        elseif ($childNode.Name -ceq 'add') {
+            $sourceNodeCount++
+        }
+        else {
+            $hasUnexpectedElement = $true
+        }
+    }
+    $elements = $elementBuilder.ToImmutable()
+    if ($clearElementCount -ne 1 -or
+        $elements.Length -eq 0 -or
         $elements[0].Name -cne 'clear' -or
-        @($elements | Where-Object {
-                $_.Name -cne 'clear' -and $_.Name -cne 'add'
-            }).Count -ne 0) {
+        $hasUnexpectedElement) {
         throw (
             'NuGet audit sources must be hermetic: <auditSources> ' +
             'requires exactly one leading <clear /> followed only by ' +
             '<add /> elements.')
     }
-    $sourceNodes = @($elements | Where-Object { $_.Name -ceq 'add' })
-    if ($sourceNodes.Count -eq 0) {
+    if ($sourceNodeCount -eq 0) {
         throw 'NuGet configuration has no approved audit source.'
     }
     $sources = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -143,7 +154,10 @@ function Get-ExpectedAuditSources {
         [StringComparer]::Ordinal)
     $keys = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
-    foreach ($sourceNode in $sourceNodes) {
+    foreach ($sourceNode in $elements) {
+        if ($sourceNode.Name -cne 'add') {
+            continue
+        }
         $keyAttribute = $sourceNode.Attributes['key']
         $attribute = $sourceNode.Attributes['value']
         if ($null -eq $keyAttribute -or
@@ -399,19 +413,23 @@ if ($null -ne $problemProperty) {
     if ($problemProperty.Value -isnot [Array]) {
         throw "Dependency audit report property 'problems' is not an array."
     }
-    $problems = @($problemProperty.Value)
-    if ($problems.Count -gt 0) {
-        $problemSummary = @(
-            foreach ($problem in $problems) {
-                $level = [string](Get-ExactProperty `
-                        -Value $problem `
-                        -Name 'level')
-                $text = [string](Get-ExactProperty `
-                        -Value $problem `
-                        -Name 'text')
-                "$level`: $text"
-            }
-        ) -join '; '
+    $problemBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($problem in $problemProperty.Value) {
+        $problemBuilder.Add($problem)
+    }
+    $problems = $problemBuilder.ToImmutable()
+    if ($problems.Length -gt 0) {
+        $problemSummaryBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        foreach ($problem in $problems) {
+            $level = [string](Get-ExactProperty `
+                    -Value $problem `
+                    -Name 'level')
+            $text = [string](Get-ExactProperty `
+                    -Value $problem `
+                    -Name 'text')
+            $problemSummaryBuilder.Add("$level`: $text")
+        }
+        $problemSummary = $problemSummaryBuilder.ToImmutable() -join '; '
         throw "Dependency audit report contains problems: $problemSummary"
     }
 }
@@ -545,16 +563,22 @@ foreach ($solutionProject in $solutionProjects) {
 $observedProjects = $observedProjectBuilder.ToImmutable()
 $expectedProjectSet = $expectedProjectBuilder.ToImmutable()
 if (-not $observedProjects.SetEquals($expectedProjectSet)) {
-    $missing = @(
-        $expectedProjectSet |
-            Where-Object { -not $observedProjects.Contains($_) } |
-            Sort-Object
-    )
-    $invented = @(
-        $observedProjects |
-            Where-Object { -not $expectedProjectSet.Contains($_) } |
-            Sort-Object
-    )
+    $missingBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $expectedProjectSet |
+        Where-Object { -not $observedProjects.Contains($_) } |
+        Sort-Object |
+        ForEach-Object {
+            $missingBuilder.Add([string]$_)
+        }
+    $missing = $missingBuilder.ToImmutable()
+    $inventedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $observedProjects |
+        Where-Object { -not $expectedProjectSet.Contains($_) } |
+        Sort-Object |
+        ForEach-Object {
+            $inventedBuilder.Add([string]$_)
+        }
+    $invented = $inventedBuilder.ToImmutable()
     throw (
         'Dependency audit project coverage is incomplete or invented. ' +
         "Missing: $($missing -join ', '); invented: " +
