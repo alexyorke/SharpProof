@@ -3686,3 +3686,12 @@ with an init-only expression-lowerer option. Compute the existing predicate once
 LowerCore, pass through ordinary/region initialization, and retain default false for
 pure contract clauses. Verify lowering/write-site behavior with Frontend and Contracts
 ordinary suites. Status: planned before edits.
+
+IMM-M140: Migrate 85 reviewed Analyzer-test vector/snapshot rows (56 fixed vectors,
+29 materializations), excluding the 17 collector owners for a separate batch. Use
+immutable arrays and strict ImmutableDictionaryCapture for all three ToDictionary
+sites. Replace the pointer-array hierarchy's Array.Sort with an ordinally ordered
+immutable snapshot. Preserve native byte images, reflection args, diagnostics/source
+text and private mutable test subjects. Validate all ordinary Analyzer tests.
+Status: planned before edits; coordinator corrected review's generic ToImmutableDictionary
+suggestion to preserve strict duplicate behavior.
