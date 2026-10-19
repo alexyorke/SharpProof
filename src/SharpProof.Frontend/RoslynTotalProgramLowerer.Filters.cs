@@ -13,7 +13,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         internal ImmutableArray<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)>.Builder Transfers { get; } = ImmutableArray.CreateBuilder<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)>();
     }
 
-    private ImmutableDictionary<ControlFlowRegion, RegionFilter> _regionFilters = ImmutableDictionary<ControlFlowRegion, RegionFilter>.Empty;
+    private readonly ImmutableDictionary<ControlFlowRegion, RegionFilter>.Builder _regionFilters = ImmutableDictionary.CreateBuilder<ControlFlowRegion, RegionFilter>();
 
     private RegionFilter? EnclosingRegionFilter(ControlFlowRegion source)
     {
@@ -41,7 +41,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             return;
         }
         var resolver = new RegionFilterEdgeResolver(this, filter.Region, filter.Catch,
-            filter.Accepted, filter.Rejected, _blocks);
+            filter.Accepted, filter.Rejected, _blocks.ToImmutable());
         var fall = resolver.Resolve(source.FallThroughSuccessor);
         if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition)
         {

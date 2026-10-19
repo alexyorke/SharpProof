@@ -24,18 +24,18 @@ internal sealed partial class RoslynTotalProgramLowerer
         internal ImmutableArray<(IrBlockId Entry, IrBlockId Target, OperationId Site, RegionExceptionToken? Exception)>.Builder Transfers { get; } = ImmutableArray.CreateBuilder<(IrBlockId Entry, IrBlockId Target, OperationId Site, RegionExceptionToken? Exception)>();
         internal ImmutableDictionary<(IrBlockId Target, OperationId Site, IrExceptionKind? Kind, bool Return), IrBlockId>.Builder Entries { get; } = ImmutableDictionary.CreateBuilder<(IrBlockId Target, OperationId Site, IrExceptionKind? Kind, bool Return), IrBlockId>();
     }
-    private ImmutableDictionary<ControlFlowRegion, ImmutableArray<IrExceptionKind>> _regionCatchKinds = ImmutableDictionary<ControlFlowRegion, ImmutableArray<IrExceptionKind>>.Empty;
-    private ImmutableDictionary<ControlFlowRegion, IrVarId> _regionCaught = ImmutableDictionary<ControlFlowRegion, IrVarId>.Empty;
-    private ImmutableDictionary<(ControlFlowRegion Catch, int Token), IrBlockId> _regionCatchEntries = ImmutableDictionary<(ControlFlowRegion Catch, int Token), IrBlockId>.Empty;
-    private ImmutableDictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken> _regionTokens = ImmutableDictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken>.Empty;
-    private ImmutableDictionary<OperationId, (INamedTypeSymbol Type, bool Exact)> _explicitThrowTypes = ImmutableDictionary<OperationId, (INamedTypeSymbol Type, bool Exact)>.Empty;
+    private readonly ImmutableDictionary<ControlFlowRegion, ImmutableArray<IrExceptionKind>>.Builder _regionCatchKinds = ImmutableDictionary.CreateBuilder<ControlFlowRegion, ImmutableArray<IrExceptionKind>>();
+    private readonly ImmutableDictionary<ControlFlowRegion, IrVarId>.Builder _regionCaught = ImmutableDictionary.CreateBuilder<ControlFlowRegion, IrVarId>();
+    private readonly ImmutableDictionary<(ControlFlowRegion Catch, int Token), IrBlockId>.Builder _regionCatchEntries = ImmutableDictionary.CreateBuilder<(ControlFlowRegion Catch, int Token), IrBlockId>();
+    private readonly ImmutableDictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken>.Builder _regionTokens = ImmutableDictionary.CreateBuilder<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken>();
+    private readonly ImmutableDictionary<OperationId, (INamedTypeSymbol Type, bool Exact)>.Builder _explicitThrowTypes = ImmutableDictionary.CreateBuilder<OperationId, (INamedTypeSymbol Type, bool Exact)>();
     private readonly ImmutableArray<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)>.Builder _regionRethrows = ImmutableArray.CreateBuilder<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)>();
     private readonly ImmutableArray<ILocalSymbol>.Builder _regionLocals = ImmutableArray.CreateBuilder<ILocalSymbol>();
     private readonly ImmutableArray<RegionFinally>.Builder _regionFinallyOrder = ImmutableArray.CreateBuilder<RegionFinally>();
     private readonly ImmutableArray<RegionFilter>.Builder _regionFilterOrder = ImmutableArray.CreateBuilder<RegionFilter>();
     private ControlFlowGraph _regionGraph = null!;
     private BasicBlock _regionSource = null!;
-    private ImmutableDictionary<ControlFlowRegion, RegionFinally> _regionFinallys = ImmutableDictionary<ControlFlowRegion, RegionFinally>.Empty;
+    private readonly ImmutableDictionary<ControlFlowRegion, RegionFinally>.Builder _regionFinallys = ImmutableDictionary.CreateBuilder<ControlFlowRegion, RegionFinally>();
     private IrBlockId _regionExceptionalExit;
 
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
@@ -70,13 +70,13 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation ||
                     !CSharpOperationSemantics.TryCatchKinds(compilation, region.ExceptionType, out var kinds))
                 { throw new RegionIncompleteException(); }
-                _regionCatchKinds = _regionCatchKinds.AddUnique(region, kinds);
-                _regionCaught = _regionCaught.AddUnique(region, _context.Temporary(RegionInteger));
+                _regionCatchKinds.AddUnique(region, kinds);
+                _regionCaught.AddUnique(region, _context.Temporary(RegionInteger));
             }
             if (region.Kind == ControlFlowRegionKind.Finally)
             {
                 var state = new RegionFinally(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch"));
-                _regionFinallys = _regionFinallys.AddUnique(region, state);
+                _regionFinallys.AddUnique(region, state);
                 _regionFinallyOrder.Add(state);
             }
             if (region.Kind == ControlFlowRegionKind.Filter)
@@ -85,7 +85,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 var caught = parent.NestedRegions.SingleOrDefault(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Catch)) ?? throw new RegionIncompleteException();
                 var filter = new RegionFilter(region, caught, _context.Temporary(RegionInteger),
                     RegionBlock("filter:accepted"), RegionBlock("filter:rejected"));
-                _regionFilters = _regionFilters.AddUnique(region, filter);
+                _regionFilters.AddUnique(region, filter);
                 _regionFilterOrder.Add(filter);
             }
             foreach (var child in region.NestedRegions.Reverse())
@@ -100,7 +100,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in graph.Blocks)
         {
-            _blocks = _blocks.AddUnique(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            _blocks.AddUnique(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
             if (block.IsReachable && !filterRegions.Contains(block.EnclosingRegion))
             { _compilerElision.PlanCompilerElidedTerminator(block); }
         }
@@ -436,7 +436,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         var value = Value(thrown, block);
         block = value.Continuation;
         var site = _context.ThrowSite(thrown, type, exact);
-        _explicitThrowTypes = _explicitThrowTypes.SetItem(site, (type, exact));
+        _explicitThrowTypes[site] = (type, exact);
         if (!exact)
         {
             var isNull = _context.Factory.Binary(IrBinaryOperator.Equal, value.Value, _context.Factory.Null(value.Value.Type));
@@ -485,7 +485,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         entry = RegionBlock("catch:entry");
         _builder.Assign(entry, token.Site, _regionCaught[caught], _context.Factory.Integer(RegionInteger, token.Ordinal));
         _builder.Goto(entry, token.Site, _blocks[_regionGraph.Blocks[caught.FirstBlockOrdinal]]);
-        _regionCatchEntries = _regionCatchEntries.AddUnique(key, entry);
+        _regionCatchEntries.AddUnique(key, entry);
         return entry;
     }
 
@@ -597,7 +597,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (!_regionTokens.TryGetValue(key, out var token))
         {
             token = new(kind, site, _regionTokens.Count);
-            _regionTokens = _regionTokens.AddUnique(key, token);
+            _regionTokens.AddUnique(key, token);
         }
         return token;
     }

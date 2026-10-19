@@ -11,14 +11,14 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private readonly bool _captureShadowCallAncestry = captureShadowCallAncestry ?? context.CaptureShadowCallAncestry;
     private IrProgramBuilder _builder = new(context.Factory);
     private readonly ImmutableArray<FrontendProgramAbstention>.Builder _abstentions = ImmutableArray.CreateBuilder<FrontendProgramAbstention>();
-    private ImmutableDictionary<BasicBlock, IrBlockId> _blocks = ImmutableDictionary<BasicBlock, IrBlockId>.Empty;
+    private readonly ImmutableDictionary<BasicBlock, IrBlockId>.Builder _blocks = ImmutableDictionary.CreateBuilder<BasicBlock, IrBlockId>();
     private RoslynTotalExpressionLowerer _expressions = null!;
     private readonly CancellationToken _cancellationToken = cancellationToken;
     private readonly TotalSourceCallSession? _calls = calls;
     private readonly bool _externalFilterSearch = externalFilterSearch;
     private readonly Func<IMethodSymbol, bool>? _preserveSourceCall = preserveSourceCall;
-    private ImmutableDictionary<IrCallInstruction, IMethodSymbol> _preservedSourceCalls = ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
-    private ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> _callPreconditions = ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Empty;
+    private readonly ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Builder _preservedSourceCalls = ImmutableDictionary.CreateBuilder<IrCallInstruction, IMethodSymbol>();
+    private readonly ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Builder _callPreconditions = ImmutableDictionary.CreateBuilder<IrAssignInstruction, TotalCallPrecondition>();
     private SourceCallFrame? _frame;
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
@@ -108,7 +108,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in selected)
         {
-            _blocks = _blocks.AddUnique(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            _blocks.AddUnique(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
         }
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _ordinaryExceptionalExit = exceptionalExit;
@@ -461,8 +461,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         {
             SourceInitializationEffectsComplete = _calls?.SourceInitializationEffectsComplete ?? true,
             IsShadowCallSkeleton = _preserveSourceCall != null,
-            PreservedSourceCalls = _preservedSourceCalls,
-            CallPreconditions = _callPreconditions
+            PreservedSourceCalls = _preservedSourceCalls.ToImmutable(),
+            CallPreconditions = _callPreconditions.ToImmutable()
         };
     }
 

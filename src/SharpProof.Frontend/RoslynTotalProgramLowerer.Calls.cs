@@ -76,7 +76,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             "shadow-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
             method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (_context.Type(parameter.Type))).ToImmutableArray());
         var call = _builder.CallSnapshot(block, _context.Site(invocation), target, member, null, arguments.ToImmutable());
-        _preservedSourceCalls = _preservedSourceCalls.AddUnique(call, method.OriginalDefinition);
+        _preservedSourceCalls.AddUnique(call, method.OriginalDefinition);
         return new(value, block, FrontendSubsetClassification.Exact);
     }
 
@@ -267,7 +267,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     return ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind);
                 }));
             foreach (var obligation in composed._callPreconditions)
-            { _callPreconditions = _callPreconditions.AddUnique(obligation.Key, obligation.Value); }
+            { _callPreconditions.AddUnique(obligation.Key, obligation.Value); }
             foreach (var parameter in callee.Parameters)
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
             _builder.Goto(block, site, composed._frame!.Entry);
@@ -324,7 +324,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case IrAssignInstruction assign:
                         var copied = _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         if (lowering.CallPreconditions.TryGetValue(assign, out var obligation))
-                        { _callPreconditions = _callPreconditions.AddUnique(copied, obligation); }
+                        { _callPreconditions.AddUnique(copied, obligation); }
                         break;
                     case IrBranchInstruction branch:
                         _builder.Branch(destination, branch.Operation, branch.Condition, Target(branch.WhenTrue), Target(branch.WhenFalse));
@@ -400,7 +400,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // imported assumption. The callee still executes normally.
             var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
                 _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
-            _callPreconditions = _callPreconditions.AddUnique(marker, new(identity, ordinal, clause.ClauseSite, value, safe, ancestry: ancestry));
+            _callPreconditions.AddUnique(marker, new(identity, ordinal, clause.ClauseSite, value, safe, ancestry: ancestry));
         }
     }
 
@@ -429,7 +429,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Source frames use declaration symbols. An unresolved generic
             // throw type cannot exclude a caller's constructed catch type.
             if (CompilerIdentityBridge.IsClosedReferenceType(entry.Value.Type, _cancellationToken))
-            { _explicitThrowTypes = _explicitThrowTypes.SetItem(entry.Key, entry.Value); }
+            { _explicitThrowTypes[entry.Key] = entry.Value; }
         }
     }
 

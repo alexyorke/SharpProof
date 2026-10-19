@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
-    private ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId> _listFields = ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId>.Empty;
+    private readonly ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId>.Builder _listFields = ImmutableDictionary.CreateBuilder<(string Name, IrTypeId Value), IrMemberId>();
 
     private IrMemberId ListField(string name, IrTypeId value)
     {
@@ -14,7 +14,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var identity = _factory.InternExternalIdentity(("list", name, value), EqualityComparer<(string, string, IrTypeId)>.Default);
         field = _factory.GetOrCreateMemberSnapshot(identity, _factory.ObjectType, IrFieldSites.Prefix + "list:" + name, value,
             false, name == "count" ? [] : [_factory.IntegerType]);
-        _listFields = _listFields.AddUnique(storage, field);
+        _listFields.AddUnique(storage, field);
         return field;
     }
 

@@ -3415,3 +3415,20 @@ substitution indexer overwrite semantics with scoped builders. No new public hel
 Retain native reflection/byte buffers and mutable test subjects. Run Contracts/Fuzz
 ordinary suites plus layout after project metadata changes and literal text verification.
 Status: open before edits.
+
+IMM-M113 post-merge Worker controls verified: 1,167 passed, zero failures/skips and zero
+build warnings/errors, including dictionary source helpers, old-heap state, provenance,
+NativeSpecifiedCall and golden fixtures. Automatic Effects/Gates/expression-dispatch
+merge review is clean. GitHub reports MR #323 MERGEABLE at pushed merge 66ed463ae.
+
+IMM-M109 verified through canonical Release package workflow: 383 passed, zero failures,
+one expected VerificationFailsExplicitlyOnUnsupportedHosts skip across 39 isolated
+shards. Build zero warnings/errors; all 32 baseline/current controls and script format
+already passed. This is distinct from M101's direct ordinary package suite count.
+
+IMM-M114/M116 verified: all 2,064 Frontend tests pass after receiver and final private
+map builder conversions, zero failures/skips/warnings/errors. Independent review confirms
+no same-builder enumeration mutation across parent/child imports, call-map snapshots,
+filter-resolver boundary and stable token ordinals. Remaining direct Frontend roots are
+intentional immutable FIFO/LIFO traversal and atomic shared caches. M115/M117 Fuzz and
+Contracts implementation remains under validation, including friend-access metadata.

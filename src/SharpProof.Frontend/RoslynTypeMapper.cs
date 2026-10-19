@@ -6,7 +6,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer = static type => type;
-    private ImmutableDictionary<ITypeSymbol, bool> _closedSealedTypes = ImmutableDictionary.Create<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<ITypeSymbol, bool>.Builder _closedSealedTypes = ImmutableDictionary.CreateBuilder<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
@@ -60,7 +60,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             {
                 using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
                 certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type, cancellation.Token);
-                _closedSealedTypes = _closedSealedTypes.AddUnique(type, certified);
+                _closedSealedTypes.AddUnique(type, certified);
             }
             if (certified)
             { _factory.RegisterClosedSealedReferenceType(mapped); }

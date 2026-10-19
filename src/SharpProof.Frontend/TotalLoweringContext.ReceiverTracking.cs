@@ -2,13 +2,13 @@ namespace SharpProof.Frontend;
 
 public sealed partial class TotalLoweringContext
 {
-    private ImmutableHashSet<ISymbol> _entryNullableDefaultComparers = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
-    private ImmutableHashSet<ISymbol> _nullableDefaultComparers = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
-    private ImmutableHashSet<CaptureId> _nullableDefaultComparerCaptures = ImmutableHashSet<CaptureId>.Empty;
+    private readonly ImmutableHashSet<ISymbol>.Builder _entryNullableDefaultComparers = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<ISymbol>.Builder _nullableDefaultComparers = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _nullableDefaultComparerCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
 
-    private ImmutableDictionary<ISymbol, IArrayTypeSymbol> _arrayReceivers = ImmutableDictionary.Create<ISymbol, IArrayTypeSymbol>(SymbolEqualityComparer.Default);
-    private ImmutableDictionary<CaptureId, IArrayTypeSymbol> _arrayCaptures = ImmutableDictionary<CaptureId, IArrayTypeSymbol>.Empty;
-    private ImmutableDictionary<ITypeSymbol, ITypeSymbol> _receiverElements = ImmutableDictionary.Create<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<ISymbol, IArrayTypeSymbol>.Builder _arrayReceivers = ImmutableDictionary.CreateBuilder<ISymbol, IArrayTypeSymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<CaptureId, IArrayTypeSymbol>.Builder _arrayCaptures = ImmutableDictionary.CreateBuilder<CaptureId, IArrayTypeSymbol>();
+    private readonly ImmutableDictionary<ITypeSymbol, ITypeSymbol>.Builder _receiverElements = ImmutableDictionary.CreateBuilder<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
 
     private readonly ImmutableArray<ISymbol>.Builder _entryNullableDefaultComparerOrder = ImmutableArray.CreateBuilder<ISymbol>();
     private readonly ImmutableArray<ITypeSymbol>.Builder _receiverElementOrder = ImmutableArray.CreateBuilder<ITypeSymbol>();
@@ -72,13 +72,13 @@ public sealed partial class TotalLoweringContext
             var pair = new KeyValuePair<ISymbol, ImmutableArray<IOperation>.Builder>(definitionKey, definitions[definitionKey]);
             if (pair.Key is ILocalSymbol { RefKind: RefKind.None } local && IsArrayInterface(local.Type) &&
                 !excluded.Contains(local) && ResolveDefinitions(pair.Value, 0) is { } array)
-            { _arrayReceivers = _arrayReceivers.SetItem(local, array); }
+            { _arrayReceivers[local] = array; }
         }
         foreach (var captureKey in captureOrder)
         {
             var pair = new KeyValuePair<CaptureId, ImmutableArray<IOperation>.Builder>(captureKey, captures[captureKey]);
             if (ResolveDefinitions(pair.Value, 0) is { } array)
-            { _arrayCaptures = _arrayCaptures.SetItem(pair.Key, array); }
+            { _arrayCaptures[pair.Key] = array; }
         }
 
         void Exclude(IOperation operation)
@@ -129,8 +129,8 @@ public sealed partial class TotalLoweringContext
         }
     }
 
-    private ImmutableHashSet<ISymbol> _defaultComparers = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
-    private ImmutableHashSet<CaptureId> _defaultComparerCaptures = ImmutableHashSet<CaptureId>.Empty;
+    private readonly ImmutableHashSet<ISymbol>.Builder _defaultComparers = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _defaultComparerCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
 
     // Default comparer identity is immutable. All definitions must prove it;
     // unknown implementations, escaping storage and cycles fail closed.
@@ -192,13 +192,13 @@ public sealed partial class TotalLoweringContext
             var pair = new KeyValuePair<ISymbol, ImmutableArray<IOperation>.Builder>(definitionKey, definitions[definitionKey]);
             if (pair.Key is ILocalSymbol { RefKind: RefKind.None } local &&
                 !excluded.Contains(local) && ResolveDefinitions(pair.Value, 0))
-            { _defaultComparers = _defaultComparers.Add(local); }
+            { _defaultComparers.Add(local); }
         }
         foreach (var captureKey in captureOrder)
         {
             var pair = new KeyValuePair<CaptureId, ImmutableArray<IOperation>.Builder>(captureKey, captures[captureKey]);
             if (ResolveDefinitions(pair.Value, 0))
-            { _defaultComparerCaptures = _defaultComparerCaptures.Add(pair.Key); }
+            { _defaultComparerCaptures.Add(pair.Key); }
         }
 
         // A known null/default entry and every write must preserve the same
@@ -208,20 +208,20 @@ public sealed partial class TotalLoweringContext
         foreach (var parameter in _entryNullableDefaultComparerOrder)
         {
             if (ResolveNullableSymbol(parameter, 0))
-            { _nullableDefaultComparers = _nullableDefaultComparers.Add(parameter); }
+            { _nullableDefaultComparers.Add(parameter); }
         }
         foreach (var definitionKey in definitionOrder)
         {
             var pair = new KeyValuePair<ISymbol, ImmutableArray<IOperation>.Builder>(definitionKey, definitions[definitionKey]);
             if (pair.Key is ILocalSymbol { RefKind: RefKind.None } local && IsIntegerComparerType(local.Type) &&
                 ResolveNullableSymbol(local, 0))
-            { _nullableDefaultComparers = _nullableDefaultComparers.Add(local); }
+            { _nullableDefaultComparers.Add(local); }
         }
         foreach (var captureKey in captureOrder)
         {
             var pair = new KeyValuePair<CaptureId, ImmutableArray<IOperation>.Builder>(captureKey, captures[captureKey]);
             if (ResolveNullableDefinitions(pair.Value, 0))
-            { _nullableDefaultComparerCaptures = _nullableDefaultComparerCaptures.Add(pair.Key); }
+            { _nullableDefaultComparerCaptures.Add(pair.Key); }
         }
 
         bool ResolveNullableSymbol(ISymbol symbol, int depth)
@@ -344,9 +344,8 @@ public sealed partial class TotalLoweringContext
     internal void SpecializeNullableDefaultComparerParameter(IParameterSymbol parameter)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
-        if (!_entryNullableDefaultComparers.Contains(parameter))
+        if (_entryNullableDefaultComparers.Add(parameter))
         {
-            _entryNullableDefaultComparers = _entryNullableDefaultComparers.Add(parameter);
             _entryNullableDefaultComparerOrder.Add(parameter);
         }
     }
@@ -361,7 +360,7 @@ public sealed partial class TotalLoweringContext
     internal void SpecializeDefaultComparerParameter(IParameterSymbol parameter)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
-        _defaultComparers = _defaultComparers.Add(parameter);
+        _defaultComparers.Add(parameter);
     }
     internal IArrayTypeSymbol? ConcreteArray(IOperation operation, int depth = 0)
     {
@@ -435,7 +434,7 @@ public sealed partial class TotalLoweringContext
         scalar = RepositoryParameterGuard.NotNull(scalar, nameof(scalar));
         if (!_receiverElements.ContainsKey(parameter))
         { _receiverElementOrder.Add(parameter); }
-        _receiverElements = _receiverElements.SetItem(parameter, scalar);
+        _receiverElements[parameter] = scalar;
         _types.TypeSpecializer = SpecializeReceiverElement;
         if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
             Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
@@ -456,7 +455,7 @@ public sealed partial class TotalLoweringContext
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         array = RepositoryParameterGuard.NotNull(array, nameof(array));
-        _arrayReceivers = _arrayReceivers.SetItem(parameter, array);
+        _arrayReceivers[parameter] = array;
         var declaredElement = parameter.Type is IArrayTypeSymbol declaredArray ? declaredArray.ElementType :
             ((INamedTypeSymbol)parameter.Type).TypeArguments[0];
         if (declaredElement is ITypeParameterSymbol element)
