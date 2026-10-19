@@ -2371,3 +2371,14 @@ validation/cancellation order. Keep body/callee/parameter/manifest alignment che
 all InvalidDataException/JsonException failure gates. DFS uses an immutable stack with
 unchanged push/pop order; membership sets and call vectors can be immutable. No file,
 wire, decoder or graph semantics change. Status: open before edits.
+
+IMM-M056: Coordinator read MetadataProgramDifferentialOracle.RunAsync and
+TotalProgramDifferentialOracle.RunAsync plus replay IReadOnlyList batch boundaries.
+Use exact-capacity positional immutable builders for generated source/input vectors,
+initialized Count for default false/null slots; freeze before indexed batch projection.
+Body category counters use a seven-slot int builder; preserve all random calls, masks,
+ordinal branching and array-read counters. Generated batch vectors become immutable.
+Nested object?[] inputs and int[] reference subjects remain exact runtime/reflection
+arguments with alias identity preserved. Do not alter generated source strings. Validate
+existing metadata/total fuzz and emission lifecycle tests in the canonical container.
+Status: open before edits.
