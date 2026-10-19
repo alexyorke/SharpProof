@@ -88,6 +88,9 @@ method/local-function declarations supply schemes instantiated per call.
 | Explicit array construction | Preserve declared element types |
 | Synchronous lambdas | Infer inputs/results; retain explicit annotations |
 | Immutable locals and nested blocks | Share types by symbol and respect scope |
+| Mutable locals/parameters and array-element stores | Keep one monotype per symbol; preserve assignment conversions |
+| Compound assignments and increments | Retain original built-in operand types; skip custom operators |
+| Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
 | Tuple deconstruction declarations | Infer nested tuple bindings and discards; retain explicit element types |
 | Explicit/target-typed object construction | Bind constructor arguments and preserve the selected constructor |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
@@ -112,18 +115,27 @@ method definitions inside the body are compared before/after to reject overload
 rebinding. Selected constructors are checked too. Roslyn validates C# constraints;
 the engine does not invent them. Escaped source identifiers are retained in signatures.
 
-The adapter explicitly skips mutation, loops, async, ref/out, nullable
+The adapter explicitly skips async, ref/out, nullable
 annotations, user-defined operators, expanded non-array params collections, null and
 coalescing, existing generic root methods, instance root methods, attributes,
 unsupported patterns and other unimplemented syntax. It does not infer mutually
 recursive C# method groups or synthesize generic constraints. Imported signatures
 and retained annotations can make inference conservative.
 
-Tuple deconstruction supports declarations, not reassignment or mixed targets;
-custom Deconstruct methods (including nested ones) remain unsupported. Object
+Tuple deconstruction supports declarations, reassignment and mixed targets for
+local/parameter identifiers and discards. Custom Deconstruct methods (including
+nested ones) remain unsupported. Object
 initializers, ref constructors, FormattableString and custom interpolation handlers
 are also unsupported. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.
+
+Loop analysis accumulates constraints over monomorphic bindings; it does not
+generalize at iteration boundaries or prove termination. Loops conservatively
+fall through, so methods whose only return is inside an infinite loop are skipped.
+Break/continue/goto, foreach over custom enumerables, foreach deconstruction,
+property/field stores and void delegate calls remain unsupported. Ordinary void
+method calls can appear as expression statements. The standalone HM core remains
+pure; these imperative extensions belong to the C# adapter only.
 
 Candidates are checked independently. Applying multiple suggestions requires
 another compile. Public APIs, binary consumers, reflection and external callers

@@ -1,0 +1,33 @@
+static class FlowSamples
+{
+    public static int ChooseByAssignment(bool condition, int left, int right)
+    {
+        if (condition) left = right;
+        return left;
+    }
+    public static int Repeat(int count, int seed, int value)
+    {
+        for (var i = 0; i < count; i++) seed = value;
+        return seed;
+    }
+    public static int LastOrSeed(int[] values, int seed)
+    {
+        foreach (var value in values) seed = value;
+        return seed;
+    }
+    public static int[] Store(int[] values, int index, int value)
+    {
+        values[index] = value;
+        return values;
+    }
+    public static int DeconstructAgain((int, bool) pair, int value, bool flag)
+    {
+        (value, flag) = pair;
+        return value;
+    }
+    public static long Widen(long destination, int source, bool ignored)
+    {
+        destination = source;
+        return destination;
+    }
+}

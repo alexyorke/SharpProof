@@ -106,35 +106,41 @@ public static class Inference
 
         private HmType Block(BlockSyntax block)
         {
+            var flow = Scoped(() => Statements(block.Statements.ToArray()));
+            if (flow.FallsThrough || flow.ReturnType is null)
+                throw new InferenceException("Body has no structurally complete value return.");
+            return flow.ReturnType;
+        }
+
+        private readonly record struct Flow(HmType? ReturnType = null, bool FallsThrough = true);
+
+        private Flow Scoped(Func<Flow> analyze)
+        {
             var locals = environment.Keys.ToHashSet(SymbolEqualityComparer.Default);
-            try { return Statements(block.Statements.ToArray()); }
+            try { return analyze(); }
             finally
             {
                 foreach (var local in environment.Keys.Where(k => !locals.Contains(k)).ToArray()) environment.Remove(local);
             }
         }
 
-        private HmType Statements(StatementSyntax[] statements)
+        private Flow Statements(StatementSyntax[] statements)
         {
+            HmType? returns = null;
+            var fallsThrough = true;
             for (var index = 0; index < statements.Length; index++)
             {
+                if (!fallsThrough) throw new InferenceException("Unreachable statements are unsupported.");
                 var statement = statements[index];
                 cancellationToken.ThrowIfCancellationRequested();
+                var flow = new Flow(null, true);
                 switch (statement)
                 {
-                    case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0:
-                        foreach (var variable in local.Declaration.Variables)
-                        {
-                            if (variable.Initializer is null) throw new InferenceException("Uninitialized local.");
-                            environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, Expression(variable.Initializer.Value));
-                        }
+                    case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0 && local.UsingKeyword == default:
+                        Declare(local.Declaration);
                         break;
-                    case ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment }
-                        when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
-                             assignment.Left.DescendantNodesAndSelf().OfType<DeclarationExpressionSyntax>().Any():
-                        if (model.GetTypeInfo(assignment.Right, cancellationToken).Type is not INamedTypeSymbol { IsTupleType: true })
-                            throw new InferenceException("Only tuple-based deconstruction declarations are supported.");
-                        BindDeconstruction(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type!);
+                    case ExpressionStatementSyntax expression:
+                        Expression(expression.Expression);
                         break;
                     case LocalFunctionStatementSyntax:
                         // C# already supplies an explicit (possibly generic) scheme.
@@ -142,25 +148,80 @@ public static class Inference
                         // after any change to the containing method signature.
                         break;
                     case ReturnStatementSyntax { Expression: not null } returned:
-                        if (index != statements.Length - 1) throw new InferenceException("Statements after return are unsupported.");
-                        return Expression(returned.Expression);
+                        flow = new(Expression(returned.Expression), false);
+                        break;
                     case IfStatementSyntax conditional:
                         HmType.Unify(Expression(conditional.Condition), new("bool"));
                         var yes = Branch(conditional.Statement);
                         var no = conditional.Else is not null ? Branch(conditional.Else.Statement)
-                            : Statements(statements[(index + 1)..]);
-                        if (conditional.Else is not null && index != statements.Length - 1)
-                            throw new InferenceException("Statements after exhaustive branching are unsupported.");
-                        HmType.Unify(yes, no);
-                        return yes;
-                    case BlockSyntax nested when index == statements.Length - 1: return Block(nested);
+                            : new Flow(null, true);
+                        flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough);
+                        break;
+                    case BlockSyntax nested: flow = Scoped(() => Statements(nested.Statements.ToArray())); break;
+                    case WhileStatementSyntax loop:
+                        HmType.Unify(Expression(loop.Condition), new("bool"));
+                        flow = Branch(loop.Statement) with { FallsThrough = true };
+                        break;
+                    case DoStatementSyntax loop:
+                        flow = Branch(loop.Statement) with { FallsThrough = true };
+                        HmType.Unify(Expression(loop.Condition), new("bool"));
+                        break;
+                    case ForStatementSyntax loop:
+                        flow = Scoped(() =>
+                        {
+                            if (loop.Declaration is not null) Declare(loop.Declaration);
+                            foreach (var initializer in loop.Initializers) Expression(initializer);
+                            if (loop.Condition is not null) HmType.Unify(Expression(loop.Condition), new("bool"));
+                            var body = Branch(loop.Statement);
+                            foreach (var increment in loop.Incrementors) Expression(increment);
+                            return body with { FallsThrough = true };
+                        });
+                        break;
+                    case ForEachStatementSyntax loop when loop.AwaitKeyword == default:
+                        flow = Scoped(() =>
+                        {
+                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol
+                                ?? throw new InferenceException("Only array foreach is supported.");
+                            var element = HmType.Variable();
+                            HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
+                            var iteration = element;
+                            if (!loop.Type.IsVar)
+                            {
+                                // Preserve explicit foreach conversions, e.g. int[] to long.
+                                HmType.Unify(element, CSharpTypes.Rigid(source.ElementType));
+                                iteration = CSharpTypes.Rigid(model.GetTypeInfo(loop.Type, cancellationToken).Type!);
+                            }
+                            environment.Add(model.GetDeclaredSymbol(loop, cancellationToken)!, iteration);
+                            return Branch(loop.Statement) with { FallsThrough = true };
+                        });
+                        break;
+                    case EmptyStatementSyntax: break;
                     default: throw new InferenceException($"Unsupported statement: {statement.Kind()}.");
                 }
+                returns = MergeReturns(returns, flow.ReturnType);
+                fallsThrough = flow.FallsThrough;
             }
-            throw new InferenceException("Missing return expression.");
+            return new(returns, fallsThrough);
         }
 
-        private HmType Branch(StatementSyntax statement) => statement is BlockSyntax block ? Block(block) : Statements([statement]);
+        private static HmType? MergeReturns(HmType? first, HmType? second)
+        {
+            if (first is null) return second;
+            if (second is not null) HmType.Unify(first, second);
+            return first;
+        }
+
+        private void Declare(VariableDeclarationSyntax declaration)
+        {
+            foreach (var variable in declaration.Variables)
+            {
+                if (variable.Initializer is null) throw new InferenceException("Uninitialized local.");
+                environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, Expression(variable.Initializer.Value));
+            }
+        }
+
+        private Flow Branch(StatementSyntax statement) => Scoped(() => statement is BlockSyntax block
+            ? Statements(block.Statements.ToArray()) : Statements([statement]));
 
         private HmType Expression(ExpressionSyntax expression)
         {
@@ -168,6 +229,31 @@ public static class Inference
             switch (expression)
             {
                 case ParenthesizedExpressionSyntax parentheses: return Expression(parentheses.Expression);
+                case AssignmentExpressionSyntax assignment:
+                    if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                    {
+                        if (assignment.Left is TupleExpressionSyntax or DeclarationExpressionSyntax)
+                        {
+                            var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type;
+                            if (original is not INamedTypeSymbol { IsTupleType: true })
+                                throw new InferenceException("Only tuple-based deconstruction is supported.");
+                            var assignedTuple = Expression(assignment.Right);
+                            BindDeconstruction(assignment.Left, assignedTuple, original);
+                            return assignedTuple;
+                        }
+                        return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
+                    }
+                    if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) ||
+                        model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
+                        throw new InferenceException("User-defined and coalescing assignments are unsupported.");
+                    AssignmentTarget(assignment.Left);
+                    Anchor(assignment.Left);
+                    Anchor(assignment.Right);
+                    return CSharpTypes.Rigid(model.GetTypeInfo(assignment, cancellationToken).Type!);
+                case PrefixUnaryExpressionSyntax increment when increment.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression:
+                    return Increment(increment, increment.Operand);
+                case PostfixUnaryExpressionSyntax increment when increment.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression:
+                    return Increment(increment, increment.Operand);
                 case IdentifierNameSyntax identifier:
                     var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
                     if (symbol is not null && environment.TryGetValue(symbol, out var type)) return type;
@@ -268,6 +354,37 @@ public static class Inference
             CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type
                 ?? throw new InferenceException("Untyped expression.")));
 
+        private HmType AssignmentTarget(ExpressionSyntax target)
+        {
+            if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax)
+                throw new InferenceException("Only local, parameter and array-element assignment targets are supported.");
+            return Expression(target);
+        }
+
+        private HmType AssignValue(ExpressionSyntax targetSyntax, HmType value, ITypeSymbol? sourceType)
+        {
+            var target = AssignmentTarget(targetSyntax);
+            var targetType = model.GetTypeInfo(targetSyntax, cancellationToken).Type!;
+            if (sourceType is not null && !SymbolEqualityComparer.Default.Equals(targetType, sourceType))
+            {
+                // Assignment conversions are not HM equality. Keep both original
+                // endpoints so widening/boxing still happens at the assignment.
+                HmType.Unify(target, CSharpTypes.Rigid(targetType));
+                HmType.Unify(value, CSharpTypes.Rigid(sourceType));
+            }
+            else HmType.Unify(target, value);
+            return target;
+        }
+
+        private HmType Increment(ExpressionSyntax expression, ExpressionSyntax operand)
+        {
+            if (model.GetOperation(expression, cancellationToken) is not IIncrementOrDecrementOperation { OperatorMethod: null })
+                throw new InferenceException("User-defined increments are unsupported.");
+            AssignmentTarget(operand);
+            Anchor(operand);
+            return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type!);
+        }
+
         private void BindDeconstruction(ExpressionSyntax target, HmType value, ITypeSymbol original)
         {
             switch (target)
@@ -283,6 +400,10 @@ public static class Inference
                     var elements = tuple.Arguments.Select(_ => HmType.Variable()).ToArray();
                     HmType.Unify(value, new("Tuple", elements));
                     for (var i = 0; i < elements.Length; i++) BindDeconstruction(tuple.Arguments[i].Expression, elements[i], source.TupleElements[i].Type);
+                    break;
+                case IdentifierNameSyntax identifier:
+                    if (model.GetOperation(identifier, cancellationToken) is not IDiscardOperation)
+                        AssignValue(identifier, value, original);
                     break;
                 default: throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");
             }
@@ -368,10 +489,11 @@ public static class Inference
             var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation
                 ?? throw new InferenceException("Unresolved or dynamic invocation.");
             var called = operation.TargetMethod;
-            if (called.Parameters.Any(p => p.RefKind != RefKind.None) || called.ReturnsVoid)
-                throw new InferenceException("Ref and void calls are unsupported.");
+            if (called.Parameters.Any(p => p.RefKind != RefKind.None))
+                throw new InferenceException("Ref calls are unsupported.");
             if (called.MethodKind == MethodKind.DelegateInvoke)
             {
+                if (called.ReturnsVoid) throw new InferenceException("Void delegate calls are unsupported.");
                 var inputs = called.Parameters.Select(_ => HmType.Variable()).ToArray();
                 var output = HmType.Variable();
                 HmType.Unify(Expression(invocation.Expression), HmType.Function(inputs, output));

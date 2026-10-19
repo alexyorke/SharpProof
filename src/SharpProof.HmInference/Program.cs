@@ -66,7 +66,7 @@ internal static class Program
             ("SharedLocalType", "static int M(int x) { System.Func<int,int> id = y => y; var value = id(1); return id(x); }", "Concrete", null),
             ("Member", "static int M(string x) => x.Length;", "Concrete", null),
             ("Call", "static int M(int x) => System.Math.Abs(x);", "Concrete", null),
-            ("Mutation", "static int M(int x) { x++; return x; }", "Skipped", null),
+            ("Mutation", "static int M(int x) { x++; return x; }", "Concrete", null),
             ("Ref", "static int M(ref int x) => x;", "Skipped", null),
             ("Instance", "int M(int x) => x;", "Skipped", null),
             ("AlreadyGeneric", "static T M<T>(T x) => x;", "Skipped", null),
@@ -106,7 +106,7 @@ internal static class Program
             ("Default", "static int M(bool ignored) => default(int);", "Suggestion", "int M<T1>(T1 ignored)"),
             ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Concrete", null),
             ("Nullable", "static string? M(string? x) => x;", "Skipped", null),
-            ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Skipped", null),
+            ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Concrete", null),
             ("ImplicitArray", "static int[] M(int x,int y) => new[] { x,y };", "Suggestion", "T1[] M<T1>(T1 x, T1 y)"),
             ("ExplicitArray", "static int[] M(int x) => new int[] { x };", "Concrete", null),
             ("AllocateArray", "static int[] M(int n) => new int[n];", "Concrete", null),
@@ -176,6 +176,7 @@ internal static class Program
         Console.WriteLine("PASS PolymorphicRuntime");
         passed += await CallChecks.Run();
         passed += await SyntaxChecks.Run();
+        passed += await FlowChecks.Run();
         passed += CoreChecks.Run();
         if (failures.Count != 0) throw new InvalidOperationException(string.Join("\n", failures));
         Console.WriteLine($"{passed} checks passed.");

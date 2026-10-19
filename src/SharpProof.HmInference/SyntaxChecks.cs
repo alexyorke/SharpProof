@@ -18,7 +18,7 @@ internal static class SyntaxChecks
             ("DeconstructVarElements", "static int M((int,bool) pair) { (var x,var y)=pair; return x; }", "Suggestion", "T1 M<T1, T2>((T1, T2) pair)"),
             ("DeconstructTypedUse", "static int M((int,bool) pair) { var (x,y)=pair; return x+1; }", "Suggestion", "int M<T1>((int, T1) pair)"),
             ("DeconstructBranchScope", "static int M(bool b,(int,bool) pair) { if(b) { var (x,y)=pair; return x; } else { var (x,y)=pair; return x; } }", "Suggestion", "T1 M<T1, T2>(bool b, (T1, T2) pair)"),
-            ("MixedDeconstruction", "static int M((int,bool) pair,int x) { (x,var y)=pair; return x; }", "Skipped", null),
+            ("MixedDeconstruction", "static int M((int,bool) pair,int x) { (x,var y)=pair; return x; }", "Suggestion", "T1 M<T1, T2>((T1, T2) pair, T1 x)"),
             ("CustomDeconstruct", "static int M(System.Collections.Generic.KeyValuePair<int,bool> pair) { var (x,y)=pair; return x; }", "Skipped", null),
             ("NestedCustomDeconstruct", "static int M((int,System.Collections.Generic.KeyValuePair<int,bool>) pair) { var (x,(y,z))=pair; return y; }", "Skipped", null),
             ("Construct", "static System.Text.StringBuilder M(int size) => new System.Text.StringBuilder(size);", "Concrete", null),
