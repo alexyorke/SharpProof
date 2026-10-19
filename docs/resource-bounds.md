@@ -347,3 +347,18 @@ Both constant upper bounds and concrete byte-prefix refutations retain the owned
 layout dependency. An operand exception occurs before boxing and cannot supply
 a box event. Floating, decimal, nullable, interface and user-defined conversions
 remain Unknown until their storage and conversion rules are admitted.
+
+### Repeated-character strings
+
+`new string('x', count)` admits a constant character outside the surrogate range
+and a supported scalar count. The pinned runtime layout bounds positive fresh
+storage by `align8(22 + 2 * count)`. Zero returns the cached empty string with zero
+fresh bytes; negative counts throw before string allocation. Array allocation and
+element counts stay zero for the string itself. Argument effects remain separate.
+
+Concrete replay preserves content and length. Symbolic checking preserves length
+and non-null facts while allowing conservative content; fresh storage never means
+unequal string values. Dynamic characters, surrogate characters, other overloads
+and opaque factories remain Unknown. These are source storage bounds under the
+explicit runtime assumption, not physical JIT/GC measurements or runtime helper
+loop counts. Peak live memory and the remaining roadmap are still pending.

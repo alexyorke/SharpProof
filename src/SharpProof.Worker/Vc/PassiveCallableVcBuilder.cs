@@ -308,6 +308,7 @@ internal sealed class PassiveCallableVcBuilder
                 switch (instruction)
                 {
                     case IrAllocationInstruction allocation:
+                        var stringAllocation = _factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.String;
                         IrTerm? arrayLength = null;
                         if (allocation.Length is { } dimension)
                         {
@@ -315,11 +316,13 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             var validLength = _factory.Binary(IrBinaryOperator.GreaterThanOrEqual, arrayLength, _factory.Integer(0));
                             var invalidLength = And(reach, Not(validLength));
-                            _exceptions.Add((invalidLength, _factory.Integer((int)IrExceptionKind.Overflow)));
+                            _exceptions.Add((invalidLength, _factory.Integer((int)(stringAllocation ? IrExceptionKind.ArgumentOutOfRange : IrExceptionKind.Overflow))));
                             _potentialExceptionAllocations.Add(invalidLength);
                             reach = And(reach, validLength);
                         }
-                        _allocations.Add((reach, allocation.Operation));
+                        var allocationReach = stringAllocation && arrayLength != null
+                            ? And(reach, _factory.Binary(IrBinaryOperator.GreaterThan, arrayLength, _factory.Integer(0))) : reach;
+                        _allocations.Add((allocationReach, allocation.Operation));
                         if (allocation.Target is { } allocatedTarget)
                         {
                             if (_inputBindings.TryGetValue(allocatedTarget, out var allocatedInput) && allocatedInput == allocatedTarget)
@@ -351,7 +354,7 @@ internal sealed class PassiveCallableVcBuilder
                             }
                             // The sequence encoder observes only scalar elements.
                             // Reference contents remain an overapproximation.
-                            for (var index = 0; index < allocation.InitialValues.Length &&
+                            for (var index = 0; !stringAllocation && index < allocation.InitialValues.Length &&
                                 _factory.GetTypeInfo(allocation.InitialValues[index].Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; index++)
                             {
                                 Spend();
@@ -367,8 +370,8 @@ internal sealed class PassiveCallableVcBuilder
                             { _freshReferences.Add((reach, allocated, allocation.Operation)); }
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
-                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type == allocated.Type || referenceObject &&
-                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)).Distinct())
+                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (!stringAllocation && (value.Type == allocated.Type || referenceObject &&
+                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))).Distinct())
                             {
                                 Spend();
                                 var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;

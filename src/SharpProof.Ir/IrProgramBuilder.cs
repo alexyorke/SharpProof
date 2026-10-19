@@ -356,16 +356,21 @@ public sealed class IrProgramBuilder(IrFactory factory)
         _factory.GetOperationInfo(allocation.Operation);
         if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
         { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
+        var stringAllocation = _factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.String && allocation.Length != null;
+        if (stringAllocation && (allocation.InitialValues.Length != 1 || allocation.InitialValues[0] is not IrIntegerTerm character ||
+            _factory.GetTypeInfo(ValidateTerm(character, "initialValues")) is not { Kind: IrTypeKind.Integer, Width: 16, Signed: false } ||
+            character.Value < 0 || character.Value > char.MaxValue || char.IsSurrogate((char)(int)character.Value)))
+        { throw InvalidArgument("A repeated string requires one constant character outside the surrogate range.", "initialValues"); }
         if (allocation.Target is { } allocatedTarget &&
             (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
-                !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
+                !((_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence || stringAllocation) && allocation.Length != null) ||
                 _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
         { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
         if (allocation.Length is { } length &&
-            (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
+            ((_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence && !stringAllocation) || allocation.Target == null ||
                 ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
-        { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
-        if (!allocation.InitialValues.IsEmpty)
+        { throw InvalidArgument("An array or repeated string allocation requires Total matching storage and an Int32 length.", "length"); }
+        if (!stringAllocation && !allocation.InitialValues.IsEmpty)
         {
             if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
             { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }

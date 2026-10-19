@@ -258,6 +258,25 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return Capture(operation, list); }
         if (depth < 256 && DictionaryBody(operation, block, depth) is { } dictionary)
         { return Capture(operation, dictionary); }
+        if (depth < 256 && operation is IObjectCreationOperation stringCreation &&
+            CSharpOperationSemantics.IsRepeatedCharacterStringCreation(stringCreation))
+        {
+            var arguments = new IrTerm[2];
+            foreach (var argument in stringCreation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+            {
+                var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+                if (!lowered.Classification.IsExact)
+                { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+                var pinned = Pin(argument.Value, lowered);
+                arguments[argument.Parameter!.Ordinal] = pinned.Value;
+                block = pinned.Continuation;
+            }
+            var target = _context.Temporary(_factory.StringType);
+            var character = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
+            var fill = _factory.Integer(_context.Type(character.Type), (char)character.ConstantValue.Value!);
+            _builder!.Allocate(block, _context.Site(operation), _factory.StringType, target, arguments[1], [fill]);
+            return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
             SourceConstruction?.Invoke(sourceCreation, block, depth) is { } constructed)
         { return constructed; }

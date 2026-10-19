@@ -120,6 +120,16 @@ internal static class NativeResourceViolationReplay
                 }
                 if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
                 { Observe(instruction.Operation, constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements, approximation); }
+            }, (instruction, characters, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || approximation || site is not null)
+                { return; }
+                var shape = ResourceAllocationShape.String(ResourceExpression.Literal(characters));
+                var bound = ResourceRuntimeLayout.Bound(shape, layout!, cancellation);
+                if (bound.Bounds is not { IsExact: true, Lower.Constant: { } bytes })
+                { unsupportedByteStorage = true; return; }
+                Observe(instruction.Operation, bytes, false);
             }, (instruction, approximation) =>
             {
                 ArgumentNullException.ThrowIfNull(instruction);

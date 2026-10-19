@@ -937,3 +937,42 @@ or errors. Documentation drift and 723 local links passed. Layout evaluated
 published managed-object checkpoint was still running at this local delivery
 check; neither it nor the newer boxing layer is represented by an older coverage
 percentage. The unchanged 100% qualification remains required.
+
+## Repeated-character string integration
+
+The next phase C slice admits the metadata `string(char, int)` constructor with a
+constant character outside the surrogate range. The count may be a supported
+constant or scalar size expression. Argument effects retain source evaluation
+order; successful positive counts produce a typed String storage fact. Zero
+returns the cached empty value without an allocation event. Negative counts throw
+ArgumentOutOfRange before a string instance is created.
+
+The symbolic backend keeps content conservative, retains non-null/length facts,
+and never infers unequal string values from fresh storage. Concrete replay fills
+the requested character and reports positive successful allocation prefixes under
+the owned layout model. Runtime helper work remains outside source loop counts.
+Dynamic characters, surrogate characters, other string overloads and opaque
+string factories remain Unknown. The well-formed UTF-16 value domain is unchanged.
+
+Protocol 23, cache 25 and artifact 38 invalidate old capability results. The
+existing resource program model 4 already represents the typed String shape.
+Final validation is recorded below. Remaining phase C/E/F requirements, including exact
+initializer replay, delegates/closures, alias/lifetime analysis, peak/retained
+space, stack models, asymptotic/amortized/average-case analysis and concurrency,
+remain open. Final exact-head CI and unchanged 100% qualification remain required.
+String validation passed all 1408 analyzer tests, 562 IR tests (including the
+independent pinned-runtime allocation controls), and 9 actual package cases.
+The 659-case focused worker run passed 657 cases; the only failures were two
+artifact-schema golden numbers, corrected from 37 to 38 and independently rerun.
+All 81 golden cases passed after the schema correction. Layout passed with 2665
+source files, 59 evaluated projects and 151 pinned common files.
+Quality/compatibility categories passed apart from documentation spelling/newline
+issues; targeted spelling and Markdown checks passed after correction. Final
+source whitespace verification passed. Documentation drift and 723 local links
+passed.
+
+Published boxing checkpoint f59fb2fda passed every non-coverage workflow and all
+four coverage shards. Aggregate qualification failed at 3219/3308 changed trusted
+lines (97.31%), leaving 89 gaps against the unchanged 100% floor. This measurement
+excludes the string layer. Fresh exact-head CI and final qualification remain
+required; no roadmap item is removed by this checkpoint.

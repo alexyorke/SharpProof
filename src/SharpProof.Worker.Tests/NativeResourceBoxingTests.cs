@@ -5,6 +5,75 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeResourceContractTests
 {
+    [TestCase(1, 24)]
+    [TestCase(2, 32)]
+    [TestCase(5, 32)]
+    [TestCase(6, 40)]
+    public async Task RepeatedCharacterStringsHaveLayoutBoundBytes(int count, int bytes)
+    {
+        foreach (var bound in new[] { bytes - 1, bytes })
+        {
+            var target = Read(CreateArtifact(Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {bound})]",
+                $"var value=new string('x', {count});"), reviewedRuntime: true, x64: true));
+            var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+            Assert.That(result.Outcome, Is.EqualTo(bound == bytes ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.MetadataAssumptions, Has.Length.EqualTo(1));
+            Assert.That(bound == bytes ? result.ResourceBound.InferredUpperBound : result.ResourceBound.ObservedLowerBound,
+                Is.EqualTo(bytes.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+    }
+
+    [Test]
+    public async Task EmptyStringConstructionDoesNotAllocate()
+    {
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", "var value=new string('x', 0);"), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
+    }
+
+    [Test]
+    public async Task SymbolicStringCountHasAConcreteViolatingPrefix()
+    {
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 23)]", "var value=new string('x', n);"), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(System.Numerics.BigInteger.Parse(result.ResourceBound!.ObservedLowerBound!, System.Globalization.CultureInfo.InvariantCulture), Is.GreaterThan(23));
+    }
+
+    [TestCase("var value=new string((char)n, 3);")]
+    [TestCase("var value=new string('\\uD800', 3);")]
+    [TestCase("var value=new string(new char[3]);")]
+    public async Task UnsupportedStringConstructionReturnsUnknown(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", body), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+    }
+    [TestCase("var first=new string('x', 1); var second=new string('x', 1); if(first==second) { var data=new int[3]; }", 88)]
+    [TestCase("var value=new string(count:new int[3].Length, c:'x');", 72)]
+    public async Task StringReplayPreservesValueEqualityAndArgumentEffects(string body, int bytes)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var source = Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {bytes - 1})]", body);
+
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(bytes.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [Test]
+    public async Task NegativeStringCountCannotSupplyAnAllocationWitness()
+    {
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", "var value=new string('x', -1);"), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+    }
     [TestCase("object value=n;")]
     [TestCase("object value=(long)n;")]
     [TestCase("object value=(byte)n;")]

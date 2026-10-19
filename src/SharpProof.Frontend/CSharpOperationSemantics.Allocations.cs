@@ -2,6 +2,20 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsRepeatedCharacterStringCreation(IObjectCreationOperation creation)
+    {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
+        return creation is
+        {
+            Type.SpecialType: SpecialType.System_String, Initializer: null,
+            Constructor: { DeclaringSyntaxReferences.IsEmpty: true, Parameters.Length: 2 }, Arguments.Length: 2
+        } &&
+            creation.Constructor.Parameters[0] is { Type.SpecialType: SpecialType.System_Char, RefKind: RefKind.None } &&
+            creation.Constructor.Parameters[1] is { Type.SpecialType: SpecialType.System_Int32, RefKind: RefKind.None } &&
+            creation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == 0)
+                .Value.ConstantValue is { HasValue: true, Value: char character } && !char.IsSurrogate(character);
+    }
+
     internal static bool IsSupportedArrayCreation(IArrayCreationOperation creation)
     {
         creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));

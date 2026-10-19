@@ -451,13 +451,25 @@ public sealed partial class IrAllocationInstruction
             { return IrProgramInterpreter.FromEvaluation(size, this, state.Values, state.Steps); }
             // Compare as BigInteger: a narrowing cast would wrap or throw on huge lengths.
             var requestedLength = size.Value!.IntegerNumericValue;
+            var isString = state.Interpreter._factory.GetTypeInfo(this.AllocatedType).Kind == IrTypeKind.String;
             if (requestedLength < 0)
-            { return IrProgramInterpreter.FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), this, state.Values, state.Steps); }
+            { return IrProgramInterpreter.FromEvaluation(IrEvaluationResult.FromException(isString ? IrExceptionKind.ArgumentOutOfRange : IrExceptionKind.Overflow, "An allocation length was negative."), this, state.Values, state.Steps); }
             // This bounds concrete replay work, never the symbolic input domain.
             if (requestedLength > state.MaximumSteps - state.Steps)
             { return IrProgramInterpreter.Result(IrProgramExecutionStatus.StepLimit, null, state.Values, state.Steps); }
             var count = (int)requestedLength;
             state.Steps += count;
+            if (isString)
+            {
+                var fill = (IrIntegerTerm)this.InitialValues[0];
+                state.Values[this.Target!.Value] = state.Interpreter._factory.CreateStringValue(new string((char)(int)fill.Value, count));
+                if (count == 0)
+                { return null; }
+                state.ReplayOptions?.StringAllocationPrefixObserver?.Invoke(this, count, state.Values.ConsumedApproximation);
+                state.ReplayOptions?.AllocationObserver?.Invoke(this);
+                state.ReplayOptions?.AllocationPrefixObserver?.Invoke(this, state.Values.ConsumedApproximation);
+                return null;
+            }
             var element = state.Interpreter._factory.GetTypeInfo(this.AllocatedType).ElementType
                 ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
             var info = state.Interpreter._factory.GetTypeInfo(element);

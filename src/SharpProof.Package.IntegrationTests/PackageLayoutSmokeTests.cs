@@ -3693,11 +3693,13 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(true, 1)]
     [TestCase(false, 2)]
     [TestCase(true, 2)]
+    [TestCase(false, 3)]
+    [TestCase(true, 3)]
     public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
     {
-        var upper = allocationKind switch { 1 => 64, 2 => 72, _ => 120 };
-        var boundLimit = violates ? allocationKind switch { 1 => 50, 2 => 48, _ => 80 } : upper;
-        var body = allocationKind switch { 1 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
+        var upper = allocationKind switch { 1 => 64, 2 => 72, 3 => 32, _ => 120 };
+        var boundLimit = violates ? allocationKind switch { 1 => 50, 2 => 48, 3 => 31, _ => 80 } : upper;
+        var body = allocationKind switch { 1 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
         var declarations = allocationKind == 1 ? "public class Cell { public Cell() { var data=new int[3]; } }" : string.Empty;
         var expected = violates ? "Refuted" : "Proven";
         var feed = await PackagedProductFeed.GetAsync();

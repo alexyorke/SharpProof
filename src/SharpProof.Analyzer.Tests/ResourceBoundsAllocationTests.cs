@@ -39,6 +39,17 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds, Is.Null);
         Assert.That(result.UnknownReason, Is.EqualTo(reason));
     }
+    [TestCase("var value=new string('x', 0);")]
+    [TestCase("var value=new string('x', 3);")]
+    [TestCase("var value=new string('x', n);")]
+    public void RepeatedStringsPreserveArrayCountUnits(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var result = Analyze(body);
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("0"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("0"));
+    }
     [TestCase("object value=n;")]
     [TestCase("object value=(long)n;")]
     [TestCase("object value=true;")]

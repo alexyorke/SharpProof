@@ -7,6 +7,61 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrTotalExecutionTests
 {
+    [TestCase(0, 100, IrProgramExecutionStatus.Returned, 0)]
+    [TestCase(3, 100, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(-1, 100, IrProgramExecutionStatus.Exception, 0)]
+    [TestCase(100, 4, IrProgramExecutionStatus.StepLimit, 0)]
+    public void RepeatedStringReplayObservesOnlySuccessfulFreshStorage(int count, int steps, IrProgramExecutionStatus expected, int allocations)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("text", factory.StringType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, target, factory.Integer(count),
+            [factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x')]);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var observed = new List<int>();
+        var general = 0;
+        var options = new IrProgramReplayOptions(_ => null)
+        {
+            StringAllocationPrefixObserver = (instruction, characters, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                Assert.That(approximation, Is.False);
+                observed.Add(characters);
+            },
+            AllocationObserver = instruction =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                general++;
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, steps, options);
+        Assert.That(result.Status, Is.EqualTo(expected));
+        Assert.That(observed, Has.Count.EqualTo(allocations));
+        Assert.That(general, Is.EqualTo(allocations));
+        if (count < 0)
+        { Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.ArgumentOutOfRange)); }
+        if (expected == IrProgramExecutionStatus.Returned)
+        { Assert.That(result.ReturnValue!.Payload, Is.EqualTo(new string('x', count))); }
+    }
+
+    [TestCase(0)]
+    [TestCase(2)]
+    [TestCase(3)]
+    public void RepeatedStringAllocationRejectsInvalidFillPayload(int kind)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("text", factory.StringType);
+        var character = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), kind == 3 ? 0xD800 : 'x');
+        ImmutableArray<IrTerm> fill = kind == 0 ? [] : kind == 2 ? [character, character] : [character];
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            builder.Allocate(entry, factory.CreateOperation(), factory.StringType, target, factory.Integer(3), fill);
+        }));
+    }
     [Test]
     public void AssignmentObservationsRetainApproximationStateAtEachCheckpoint()
     {

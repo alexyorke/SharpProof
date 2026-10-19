@@ -5,6 +5,18 @@ internal sealed partial class ResourceBoundsAnalysis
     private Cost ObjectCreation(IObjectCreationOperation creation, int depth)
     {
         creation = ArgumentNullGuard.NotNull(creation, nameof(creation));
+        if (CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
+        {
+            var stringArguments = Sequence(creation.Arguments.Select(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Value), depth + 1);
+            var count = creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 1).Value;
+            var size = Size(count);
+            if (size is null)
+            { return Unknown("UnsupportedStringAllocationSize"); }
+            var allocation = count.ConstantValue is { HasValue: true, Value: int constant } && constant <= 0
+                ? ResourceProgram.Zero
+                : ResourceProgram.Choice(ResourceProgram.Zero, ResourceProgram.Managed(ResourceAllocationShape.String(size.Expression)));
+            return stringArguments.Add(new(Bound.Zero, Bound.Zero, Bound.Zero, allocation));
+        }
         if (CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Object([]))); }
         if (_compilation is null || creation.Type is not INamedTypeSymbol { TypeKind: TypeKind.Class } type ||
