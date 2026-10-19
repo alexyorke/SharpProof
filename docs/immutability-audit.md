@@ -2825,3 +2825,9 @@ array edits; reject changed nodes, unsupported constructors/comments and unexpec
 before writes. No persistent root is reassigned during fixed expression construction.
 Validate ordinary IR and Specs projects and preserve all invalid binding/value probes.
 Status: open before edits.
+
+IMM-M078 verified: all 485 ordinary IR and 150 ordinary Specs tests pass, with
+zero failures/skips and zero compiler warnings/errors. The 25 fixed maps/list preserve
+key/value evaluation order, indexer overwrite behavior and reference-valued operands.
+Postcondition assertions use immutable Length. All embedded program literals remain
+unchanged. Remaining dynamic substitution and binding accumulators stay in scope.

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -107,12 +108,7 @@ public sealed class Wave9CompoundNullContextControlsTests
         var rightType = sequence
             ? factory.GetOrCreateSequenceType(factory.StringType)
             : factory.GetOrCreateReferenceType(factory.CreateIdentity(), "OtherWidget");
-        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>
-        {
-            [template.Parameters[0]] = factory.Variable(factory.CreateVariable("flag", factory.BooleanType)),
-            [template.Parameters[1]] = factory.Variable(factory.CreateVariable("left", leftType)),
-            [template.Parameters[2]] = factory.Variable(factory.CreateVariable("right", rightType))
-        });
+        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], factory.Variable(factory.CreateVariable("flag", factory.BooleanType))).SetItem(template.Parameters[1], factory.Variable(factory.CreateVariable("left", leftType))).SetItem(template.Parameters[2], factory.Variable(factory.CreateVariable("right", rightType))));
         Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Failed));
         Assert.That(result.Failure?.Kind, Is.EqualTo(conditional
             ? SpecInstantiationFailureKind.InvalidExpression
@@ -147,11 +143,7 @@ public sealed class Wave9CompoundNullContextControlsTests
         System.ArgumentNullException.ThrowIfNull(flag);
         System.ArgumentNullException.ThrowIfNull(template);
         System.ArgumentNullException.ThrowIfNull(value);
-        return ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>
-        {
-            [template.Parameters[0]] = flag,
-            [template.Parameters[1]] = value
-        });
+        return ApiSpecInstantiator.InstantiatePostconditions(template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], flag).SetItem(template.Parameters[1], value));
     }
 
     private static ApiSpecDeclaration Declaration(

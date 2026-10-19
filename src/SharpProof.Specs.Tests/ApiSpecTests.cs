@@ -484,11 +484,7 @@ public sealed class ApiSpecTests
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters.Single()] = factory.Variable(parameter),
-                [template.Result!.Value] = factory.Variable(result)
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters.Single(), factory.Variable(parameter)).SetItem(template.Result!.Value, factory.Variable(result)));
 
         Assert.That(
             instantiated.Status,
@@ -1207,11 +1203,7 @@ public sealed class ApiSpecTests
         return ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Receiver!.Value] = factory.Variable(receiver),
-                [template.Result!.Value] = factory.Variable(result)
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Receiver!.Value, factory.Variable(receiver)).SetItem(template.Result!.Value, factory.Variable(result)));
     }
 
     private static ApiSpecDeclaration Declaration(

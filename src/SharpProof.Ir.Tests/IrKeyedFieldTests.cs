@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -17,7 +18,7 @@ public sealed class IrKeyedFieldTests
         var key = factory.CreateIntegerValue(keyType, bits);
         var state = new IrObjectState().WithKeyedField(field, key, factory.CreateIntegerValue(23));
         var value = factory.CreateReferenceValue(factory.ObjectType, state);
-        var variables = new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [owner] = value, [old] = value };
+        var variables = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(owner, value).SetItem(old, value);
         var interpreter = new IrInterpreter(factory);
         var read = factory.PureOpaque(field, factory.Variable(owner), factory.Integer(keyType, bits));
         Assert.That(interpreter.Evaluate(read, variables).Value!.Integer, Is.EqualTo(23));
@@ -44,7 +45,7 @@ public sealed class IrKeyedFieldTests
         Assert.Throws<ArgumentException>((Action)(() => state.WithKeyedField(field, factory.CreateBooleanValue(false), factory.CreateIntegerValue(1))));
         state.WithKeyedField(field, factory.CreateIntegerValue(0), factory.CreateBooleanValue(true));
         var read = factory.PureOpaque(field, factory.Variable(owner), factory.Integer(0));
-        var variables = new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [owner] = factory.CreateReferenceValue(factory.ObjectType, state) };
+        var variables = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(owner, factory.CreateReferenceValue(factory.ObjectType, state));
         Assert.That(new IrInterpreter(factory).Evaluate(read, variables).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
     }
 
@@ -127,7 +128,7 @@ public sealed class IrKeyedFieldTests
         var heap = new IrHeap();
         var value = factory.CreateReferenceValue(factory.ObjectType, new object());
         heap.RegisterFreshObject(value);
-        var result = new IrInterpreter(factory).Evaluate(read, new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [owner] = value }, null, heap, default);
+        var result = new IrInterpreter(factory).Evaluate(read, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(owner, value), null, heap, default);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
     }
 }

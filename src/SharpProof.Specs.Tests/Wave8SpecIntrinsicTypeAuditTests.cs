@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -37,7 +38,7 @@ public sealed class Wave8SpecIntrinsicTypeAuditTests
         System.ArgumentNullException.ThrowIfNull(shape);
         var template = ApiSpecTable.Create([Declaration(Condition(shape, relabeled: false), normalCompletion)]).Templates.Single();
         var factory = new IrFactory();
-        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>());
+        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty);
         Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         var condition = normalCompletion ? result.NormalCompletionCondition : result.Postconditions.Single();
         Assert.That(condition, Is.Not.Null);

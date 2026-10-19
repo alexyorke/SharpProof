@@ -490,11 +490,7 @@ public sealed class IrKernelTests
         var substituted = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [receiver] = factory.Null(receiverType),
-                [argument] = factory.Integer(4)
-            });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(receiver, factory.Null(receiverType)).SetItem(argument, factory.Integer(4)));
 
         Assert.That(substituted, Is.TypeOf<IrOpaqueTerm>());
         var opaque = (IrOpaqueTerm)substituted;
@@ -520,15 +516,11 @@ public sealed class IrKernelTests
         var unchanged = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>());
+            ImmutableDictionary<IrVarId, IrTerm>.Empty);
         var substituted = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [first] = factory.Variable(second),
-                [second] = factory.Integer(1)
-            });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Variable(second)).SetItem(second, factory.Integer(1)));
 
         Assert.That(unchanged, Is.SameAs(root));
         Assert.That(
@@ -569,11 +561,8 @@ public sealed class IrKernelTests
         var foreignRoot = foreignFactory.Integer(9);
         var changingRoots = new ChangingIrTermList(root, foreignRoot);
         IReadOnlyDictionary<IrVarId, IrTerm> replacements = hasReplacement
-            ? new Dictionary<IrVarId, IrTerm>
-            {
-                [variable] = factory.Integer(7)
-            }
-            : new Dictionary<IrVarId, IrTerm>();
+            ? ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(variable, factory.Integer(7))
+            : ImmutableDictionary<IrVarId, IrTerm>.Empty;
 
         var result = IrSubstitution.SubstituteMany(
             factory,

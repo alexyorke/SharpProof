@@ -42,87 +42,61 @@ public sealed class ApiSpecInstantiationCoverageTests
             SpecVariableRole.Result,
             -1,
             IrTypeKind.Boolean);
-        var postconditions = new List<SpecTermDeclaration> {
-            result,
-            new SpecBooleanDeclaration(true),
-            new SpecUnaryDeclaration(
+        var postconditions = ImmutableArray.Create<SpecTermDeclaration>(result, new SpecBooleanDeclaration(true), new SpecUnaryDeclaration(
                 IrUnaryOperator.Not,
                 new SpecBooleanDeclaration(false),
-                IrTypeKind.Boolean),
-            Equal(
+                IrTypeKind.Boolean), Equal(
                 new SpecUnaryDeclaration(
                     IrUnaryOperator.Negate,
                     new SpecIntegerDeclaration(7),
                     IrTypeKind.Integer),
-                new SpecIntegerDeclaration(-7)),
-            Equal(Binary(
+                new SpecIntegerDeclaration(-7)), Equal(Binary(
                 IrBinaryOperator.Add,
                 Integer(2),
                 Integer(3),
-                IrTypeKind.Integer), Integer(5)),
-            Equal(Binary(
+                IrTypeKind.Integer), Integer(5)), Equal(Binary(
                 IrBinaryOperator.Subtract,
                 Integer(7),
                 Integer(2),
-                IrTypeKind.Integer), Integer(5)),
-            Equal(Binary(
+                IrTypeKind.Integer), Integer(5)), Equal(Binary(
                 IrBinaryOperator.Multiply,
                 Integer(4),
                 Integer(3),
-                IrTypeKind.Integer), Integer(12)),
-            Equal(Binary(
+                IrTypeKind.Integer), Integer(12)), Equal(Binary(
                 IrBinaryOperator.Divide,
                 Integer(12),
                 Integer(4),
-                IrTypeKind.Integer), Integer(3)),
-            Equal(Binary(
+                IrTypeKind.Integer), Integer(3)), Equal(Binary(
                 IrBinaryOperator.Remainder,
                 Integer(14),
                 Integer(4),
-                IrTypeKind.Integer), Integer(2)),
-            Binary(
+                IrTypeKind.Integer), Integer(2)), Binary(
                 IrBinaryOperator.AndAlso,
                 new SpecBooleanDeclaration(true),
                 boolean,
-                IrTypeKind.Boolean),
-            Binary(
+                IrTypeKind.Boolean), Binary(
                 IrBinaryOperator.OrElse,
                 new SpecBooleanDeclaration(false),
                 boolean,
-                IrTypeKind.Boolean),
-            Equal(integer, integer),
-            Binary(
+                IrTypeKind.Boolean), Equal(integer, integer), Binary(
                 IrBinaryOperator.NotEqual,
                 Integer(1),
                 Integer(2),
-                IrTypeKind.Boolean),
-            Compare(IrBinaryOperator.LessThan, 1, 2),
-            Compare(IrBinaryOperator.LessThanOrEqual, 2, 2),
-            Compare(IrBinaryOperator.GreaterThan, 2, 1),
-            Compare(IrBinaryOperator.GreaterThanOrEqual, 2, 2),
-            Equal(Binary(
+                IrTypeKind.Boolean), Compare(IrBinaryOperator.LessThan, 1, 2), Compare(IrBinaryOperator.LessThanOrEqual, 2, 2), Compare(IrBinaryOperator.GreaterThan, 2, 1), Compare(IrBinaryOperator.GreaterThanOrEqual, 2, 2), Equal(Binary(
                 IrBinaryOperator.StringConcat,
                 new SpecStringDeclaration("sharp"),
                 new SpecStringDeclaration("proof"),
-                IrTypeKind.String), new SpecStringDeclaration("sharpproof")),
-            new SpecConditionalDeclaration(
+                IrTypeKind.String), new SpecStringDeclaration("sharpproof")), new SpecConditionalDeclaration(
                 boolean,
                 new SpecBooleanDeclaration(true),
                 new SpecBooleanDeclaration(false),
-                IrTypeKind.Boolean),
-            Equal(
+                IrTypeKind.Boolean), Equal(
                 new SpecLengthDeclaration(receiver),
-                new SpecIntegerDeclaration(3)),
-            Equal(
+                new SpecIntegerDeclaration(3)), Equal(
                 new SpecNullDeclaration(IrTypeKind.String),
-                new SpecNullDeclaration(IrTypeKind.String)),
-            Equal(
+                new SpecNullDeclaration(IrTypeKind.String)), Equal(
                 new SpecNullDeclaration(IrTypeKind.Reference),
-                new SpecNullDeclaration(IrTypeKind.Reference)),
-            Equal(text, text),
-            Equal(reference, reference),
-            Equal(sequence, sequence)
-        };
+                new SpecNullDeclaration(IrTypeKind.Reference)), Equal(text, text), Equal(reference, reference), Equal(sequence, sequence));
         var template = CreateTemplate(
             isStatic: false,
             receiverType: IrTypeKind.String,
@@ -138,22 +112,13 @@ public sealed class ApiSpecInstantiationCoverageTests
         var factory = new IrFactory();
         var sequenceType =
             factory.GetOrCreateSequenceType(factory.IntegerType);
-        var substitutions = new Dictionary<SpecVarId, IrTerm>
-        {
-            [template.Receiver!.Value] = factory.String("abc"),
-            [template.Parameters[0]] = factory.Boolean(true),
-            [template.Parameters[1]] = factory.Integer(42),
-            [template.Parameters[2]] = factory.String("value"),
-            [template.Parameters[3]] = factory.Variable(
+        var substitutions = ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Receiver!.Value, factory.String("abc")).SetItem(template.Parameters[0], factory.Boolean(true)).SetItem(template.Parameters[1], factory.Integer(42)).SetItem(template.Parameters[2], factory.String("value")).SetItem(template.Parameters[3], factory.Variable(
                 factory.CreateVariable(
                     "reference",
-                    factory.ObjectType)),
-            [template.Parameters[4]] = factory.Variable(
+                    factory.ObjectType))).SetItem(template.Parameters[4], factory.Variable(
                 factory.CreateVariable(
                     "sequence",
-                    sequenceType)),
-            [template.Result!.Value] = factory.Boolean(true)
-        };
+                    sequenceType))).SetItem(template.Result!.Value, factory.Boolean(true));
 
         var instantiated =
             ApiSpecInstantiator.InstantiatePostconditions(
@@ -169,7 +134,7 @@ public sealed class ApiSpecInstantiationCoverageTests
             Assert.That(instantiated.Failure, Is.Null);
             Assert.That(
                 instantiated.Postconditions,
-                Has.Length.EqualTo(postconditions.Count));
+                Has.Length.EqualTo(postconditions.Length));
             Assert.That(
                 instantiated.Postconditions.Select(
                     term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetTypeInfo(term.Type).Kind)),
@@ -227,10 +192,7 @@ public sealed class ApiSpecInstantiationCoverageTests
                     ApiSpecInstantiator.InstantiatePostconditions(
                         template,
                         factory,
-                        new Dictionary<SpecVarId, IrTerm>
-                        {
-                            [testCase.Variable] = testCase.Value
-                        });
+                        ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(testCase.Variable, testCase.Value));
                 AssertFailure(instantiated, testCase.Failure);
             }
         }
@@ -323,10 +285,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         var missing = ApiSpecInstantiator.InstantiatePostconditions(
             template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty);
         var supplied = ApiSpecInstantiator.InstantiatePostconditions(
-            template, factory, new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters.Single()] = factory.Boolean(true)
-            });
+            template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters.Single(), factory.Boolean(true)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -450,7 +409,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm> { [id] = replacement });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(id, replacement));
 
         Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
@@ -484,23 +443,15 @@ public sealed class ApiSpecInstantiationCoverageTests
         var compatible = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("left", compatibleType)),
-                [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("right", compatibleType))
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], factory.Variable(
+                    factory.CreateVariable("left", compatibleType))).SetItem(template.Parameters[1], factory.Variable(
+                    factory.CreateVariable("right", compatibleType))));
         var incompatible = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("leftOther", compatibleType)),
-                [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("rightOther", incompatibleType))
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], factory.Variable(
+                    factory.CreateVariable("leftOther", compatibleType))).SetItem(template.Parameters[1], factory.Variable(
+                    factory.CreateVariable("rightOther", incompatibleType))));
 
         Assert.That(compatible.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         AssertFailure(incompatible, SpecInstantiationFailureKind.TypeMismatch);
@@ -538,11 +489,8 @@ public sealed class ApiSpecInstantiationCoverageTests
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters.Single()] = factory.Variable(
-                    factory.CreateVariable("value", exactType))
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters.Single(), factory.Variable(
+                    factory.CreateVariable("value", exactType))));
 
         Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
