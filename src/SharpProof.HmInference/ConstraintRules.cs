@@ -102,6 +102,8 @@ public static partial class Inference
             // domains before rendering constraints that mention other variables.
             foreach (var requirement in inferredConstraints)
             {
+                if (requirement.Type?.Root.Name == "object")
+                { continue; }
                 var constrained = requirement.Variable.Root;
                 while (constrained.Name == CSharpTypes.NullableParameter)
                 { constrained = constrained.Arguments[0].Root; }
@@ -109,7 +111,7 @@ public static partial class Inference
                 { continue; }
                 if (requirement.Keyword is "struct" or "unmanaged")
                 { constrained.IsValueType = true; }
-                else if (requirement.Keyword is "class" or "class?" || requirement.BaseClass)
+                else if (constrained.IsValueType != true && (requirement.Keyword is "class" or "class?" || requirement.BaseClass))
                 { constrained.IsValueType = false; }
             }
             var clauses = new List<TypeParameterConstraintClauseSyntax>();
@@ -120,6 +122,8 @@ public static partial class Inference
                 var hasBaseClass = false;
                 foreach (var requirement in inferredConstraints)
                 {
+                    if (requirement.Type?.Root.Name == "object")
+                    { continue; }
                     var constrained = requirement.Variable.Root;
                     while (constrained.Name == CSharpTypes.NullableParameter)
                     { constrained = constrained.Arguments[0].Root; }

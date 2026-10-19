@@ -1,0 +1,24 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+static class ArgumentConversionSamples
+{
+    public static object Box(int value) => BoxValue(value);
+    public static object? BoxNullable(int? value) => BoxOptional(value);
+    public static async Task<object?> BoxAwaited(Task<int?> value) => BoxOptional(await value);
+    public static async Task<long?> WidenAwaited(Task<int?> value, bool ignored) => Widen(await value);
+    public static int ArrayElement(int[] values) => First(values);
+    public static int ListElement(List<int> values) => First(values);
+    public static object CovariantElement(IEnumerable<string> values) => FirstObject(values);
+
+    private static object BoxValue(object value) => value;
+    private static object? BoxOptional(object? value) => value;
+    private static long? Widen(long? value) => value;
+    private static T First<T>(IEnumerable<T> values)
+    {
+        using var enumerator = values.GetEnumerator();
+        return enumerator.MoveNext() ? enumerator.Current : default!;
+    }
+    private static object FirstObject(IEnumerable<object> values) => First(values);
+}

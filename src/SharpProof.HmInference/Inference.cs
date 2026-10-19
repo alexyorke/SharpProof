@@ -117,6 +117,7 @@ public static partial class Inference
                 return p.FreeVariables();
             }));
             PreserveResultOnly(result, CSharpTypes.Rigid(symbol.ReturnType), inferable);
+            CompleteArgumentConversions(inferable);
             var variables = new Dictionary<HmType, string>();
             var reserved = new HashSet<string>(method.DescendantTokens().Where((SyntaxToken /* SPINT001: all values valid - IsKind accepts every SyntaxToken including default. */ token) => token.IsKind(SyntaxKind.IdentifierToken)).Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.ValueText));
             for (var owner = symbol.ContainingType; owner is not null; owner = owner.ContainingType)
@@ -966,7 +967,9 @@ public static partial class Inference
 
         private void Anchor(ExpressionSyntax expression)
         {
-            HmType.Unify(Expression(expression), CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? model.GetTypeInfo(expression, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped expression.")));
+            // Local declaration annotations and flow-state annotations can differ.
+            // Retain the declared wrapper while fixing the same runtime receiver type.
+            UnifyDeconstructionReceiver(CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? model.GetTypeInfo(expression, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped expression.")), Expression(expression));
         }
 
         private static bool SameCallSignature(IMethodSymbol before, IMethodSymbol after)

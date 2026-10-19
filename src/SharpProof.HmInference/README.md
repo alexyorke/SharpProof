@@ -213,6 +213,21 @@ nullable-lifting conversions; widening and boxing endpoints stay concrete.
 Candidates introducing new compiler warnings (including nullable warnings) are
 rejected; existing warnings do not become evidence of correctness.
 
+Resource-local receiver checks tolerate differences between declared nullable
+annotations and the non-null flow state at a member access, retaining the
+declared wrapper and concrete disposal type.
+
+Call arguments distinguish conversions from HM equality. Derived-to-base and
+interface conversions carry inferred type arguments through generic bases,
+implemented interfaces and arrays. Representable subtype relationships become
+C# constraints. Covariant array/interface/delegate conversions retain reference
+constraints, and boxing into non-nullable `object` requires `notnull`. Nullable
+boxing preserves `T?` with a value constraint. Numeric, lifted numeric and
+user-defined conversions keep their original endpoints. Tuple element and
+expanded array-params arguments follow the same rules, including awaited nullable
+values. IDE-fix runtime checks compare results, evaluation order, operator effects,
+boxing and reference identity with the original code.
+
 Async methods returning `Task<T>` or `ValueTask<T>` infer the body result and then
 wrap it in the original task type. Non-generic Task/ValueTask bodies may fall
 through or use `return;`. Standard generic awaits preserve their result variable;

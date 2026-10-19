@@ -152,7 +152,7 @@ internal static class Program
             ("Closure", "static System.Func<int,int> M(int x) => y => x + y;", "Concrete", null),
             ("Local", "static int M(int x) { var y = x; return y; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("TypedLocal", "static int M(int x) { int y = x; return y; }", "Concrete", null),
-            ("MonomorphicLocal", "static (int,bool) M(int x, bool b) { System.Func<object,object> id = y => y; return ((int)id(x), (bool)id(b)); }", "Concrete", null),
+            ("MonomorphicLocal", "static (int,bool) M(int x, bool b) { System.Func<object,object> id = y => y; return ((int)id(x), (bool)id(b)); }", "Suggestion", "(int, bool) M<T1, T2>(T1 x, T2 b)"),
             ("SharedLocalType", "static int M(int x) { System.Func<int,int> id = y => y; var value = id(1); return id(x); }", "Concrete", null),
             ("Member", "static int M(string x) => x.Length;", "Concrete", null),
             ("Call", "static int M(int x) => System.Math.Abs(x);", "Concrete", null),
@@ -327,6 +327,7 @@ internal static class Program
         passed += await (ExitChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await NullableAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await CustomBuilderChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await ConversionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ConstraintFlowChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DelegateAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DelegateRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);

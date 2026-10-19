@@ -230,6 +230,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expected)); }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
+            if (TryBindArgumentConversion(value, expected, inferred))
+            { return; }
             if (expected.Name == CSharpTypes.NullableParameter)
             {
                 // A T? formal accepts an unannotated actual without making that
