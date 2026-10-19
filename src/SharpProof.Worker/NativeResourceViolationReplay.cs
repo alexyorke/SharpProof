@@ -137,6 +137,14 @@ internal static class NativeResourceViolationReplay
                 { return; }
                 if (instruction.Target is null || factory.GetTypeInfo(instruction.AllocatedType).Kind != IrTypeKind.Reference)
                 { unsupportedByteStorage = true; return; }
+                if (factory.TryGetClosureFrameType(instruction.AllocatedType, out var fields))
+                {
+                    var frame = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(fields), layout!, cancellation);
+                    if (frame.Bounds?.Lower.Constant is not { } frameBytes)
+                    { unsupportedByteStorage = true; return; }
+                    Observe(instruction.Operation, frameBytes, false);
+                    return;
+                }
                 // Certified delegates have a reviewed fixed footprint. Other
                 // fresh references contribute only the minimum instance cost.
                 Observe(instruction.Operation, factory.IsDelegateReferenceType(instruction.AllocatedType) ? ResourceRuntimeLayout.DelegateBytes : ResourceRuntimeLayout.MinimumObject, false);

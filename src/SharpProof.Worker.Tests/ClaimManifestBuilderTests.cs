@@ -1537,10 +1537,22 @@ public sealed class ClaimManifestBuilderTests
             StringComparer.Ordinal);
 
         AssertUnsupportedEffectTargets(
-            targets,
+            targets.Where(static pair => pair.Key != "DelegateCall").ToDictionary(
+                static pair => pair.Key,
+                static pair => pair.Value,
+                StringComparer.Ordinal),
             "Async",
-            "DelegateCall",
             "Generic");
+
+        var delegateTarget = targets["DelegateCall"];
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(delegateTarget.IsVerifierSupported, Is.True);
+            Assert.That(delegateTarget.EffectClaims.Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(delegateTarget.EffectClaims.Single().Evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+        }
     }
 
     [Test]

@@ -12,6 +12,55 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void ClosureFrameStorageSurvivesPortableRoundTrip()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        var target = factory.CreateVariable("frame", type);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Allocate(entry, factory.CreateOperation(), type, target);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(encoded.Graph, WorkerProtocolJson.Options);
+        var graph = JsonSerializer.Deserialize<PortableIrGraph>(bytes, WorkerProtocolJson.Options)!;
+        var decoded = PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = new IrProgramInterpreter(decoded.Factory).Execute(decoded.Program!);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(decoded.Factory.TryGetClosureFrameType(result.ReturnValue!.Type, out var fields), Is.True);
+        Assert.That(fields, Is.EqualTo(new[] { ResourceStorageKind.Word32, ResourceStorageKind.Reference }));
+        var second = PortableIrGraphCodec.Encode(decoded.Factory, decoded.Program, [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(JsonSerializer.SerializeToUtf8Bytes(second.Graph, WorkerProtocolJson.Options), Is.EqualTo(bytes));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ClosureFrameStorageRejectsNonCanonicalRows(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        var target = factory.CreateVariable("frame", type);
+        var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(target)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+        var row = kind == 6 ? graph.Types[0] : graph.Types.Single(static row => row is null ? throw new ArgumentNullException(nameof(row)) : row.Name == "Frame");
+        row.ClosureFrameFields = kind == 1 ? [] : kind == 2 ? [ResourceStorageKind.Unspecified] : [ResourceStorageKind.Word32];
+        if (kind == 3)
+        { row.DelegateReference = true; }
+        if (kind == 4)
+        { row.ClosedSealedReference = true; }
+        if (kind == 5)
+        { row.ClosedClassBase = -1; }
+        Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        }));
+    }
+    [Test]
     public void DelegateCertificatesRoundTripWithFreshAllocationTypes()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);

@@ -3699,21 +3699,24 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(true, 4)]
     [TestCase(false, 5)]
     [TestCase(true, 5)]
+    [TestCase(false, 6)]
+    [TestCase(true, 6)]
     public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
     {
-        var upper = allocationKind switch { 1 or 4 or 5 => 64, 2 => 72, 3 => 32, _ => 120 };
-        var boundLimit = violates ? allocationKind switch { 1 or 4 => 50, 5 => 63, 2 => 48, 3 => 31, _ => 80 } : upper;
-        var body = allocationKind switch { 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
+        var upper = allocationKind switch { 1 or 4 or 5 => 64, 6 => 88, 2 => 72, 3 => 32, _ => 120 };
+        var boundLimit = violates ? allocationKind switch { 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
+        var body = allocationKind switch { 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", 6 => "return () => n;", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
         var declarations = allocationKind switch { 1 => "public class Cell { public Cell() { var data=new int[3]; } }", 4 => "public class Cell { public int[] data=new int[3]; }", 5 => "public static class Callbacks { public static void Run() {} }", _ => string.Empty };
         var expected = violates ? "Refuted" : "Proven";
-        var returnType = allocationKind == 5 ? "System.Action" : "void";
+        var parameters = allocationKind == 6 ? "int n" : string.Empty;
+        var returnType = allocationKind switch { 5 => "System.Action", 6 => "System.Func<int>", _ => "void" };
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
             using SharpProof.Attributes;
             public static class Subject {
                 [ResourceUpperBound(ResourceMetric.AllocatedBytes, {{boundLimit}})]
-                public static {{returnType}} Target() { {{body}} }
+                public static {{returnType}} Target({{parameters}}) { {{body}} }
             }
             {{declarations}}
             """, "all");

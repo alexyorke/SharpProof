@@ -127,6 +127,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             PinElementReads = _calls?.PinElementReads == true,
             ExceptionTarget = _frame == null ? null : (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (_frame.Search(kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target)))
         };
+        var closure = RootParameterClosurePlan.TryCreate(_context.Target, _context.Compilation, _cancellationToken);
+        if (closure != null)
+        {
+            _expressions.RootClosure = closure;
+            var frameType = _context.Factory.GetOrCreateReferenceType(_context.Factory.CreateIdentity(), "root-parameter-closure-frame");
+            _context.Factory.RegisterClosureFrameType(frameType, closure.Fields);
+            var frame = _context.Temporary(frameType);
+            _builder.Allocate(entry, structural, frameType, frame);
+        }
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
         { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }
         foreach (var source in selected)

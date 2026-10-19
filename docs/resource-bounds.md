@@ -382,3 +382,23 @@ accepted while unsupported bodies remain Unknown. Implicit conversions, lambdas,
 capture frames, metadata/extern targets, target type initialization and unmodeled
 dispatch remain Unknown. Closure allocation scope, sharing and lifetimes remain
 required work in the full roadmap.
+
+### Root parameter closures
+
+A synchronous static method whose sole return creates a delegate capturing entry
+parameters can account for its root frame separately from the delegate. Integer,
+Boolean, char and reference captures use typed storage slots. A single Int32
+capture has a 24-byte frame plus the 64-byte delegate under the reviewed model.
+Frame field packing uses conservative upper and packed lower bounds.
+
+The frame event occurs at entry; the delegate event occurs at the return. The
+lambda body is not executed during construction. Compiler data-flow facts exclude
+compile-time `nameof` references. Immutable frame certificates retain storage
+through portable IR and reject conflicting class/interface/delegate metadata.
+
+Local captures, nested functions, broader control flow, shared frames, caches,
+async lambdas and unsupported value fields remain Unknown. In particular, an
+unsupported loop may allocate an entry frame before zero iterations and may add a
+delegate-cache field. Its cost must not be treated as zero merely because the
+lambda expression is never reached. Broader capture placement and liveness remain
+part of the full roadmap.

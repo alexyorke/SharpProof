@@ -757,7 +757,7 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && !row.DelegateReference && row.ImplementedInterfaces == null &&
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields == null && row.ImplementedInterfaces == null &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
@@ -789,6 +789,11 @@ internal static partial class PortableIrGraphCodec
             Require(!row.DelegateReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
                 !row.InterfaceReference && row.ClosedClassBase == null,
                 "Only Total nominal delegates may carry delegate certificates.");
+            Require(row.ClosureFrameFields == null || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+                !row.InterfaceReference && !row.DelegateReference && !row.ClosedSealedReference && row.ClosedClassBase == null &&
+                row.ImplementedInterfaces == null && row.ClosureFrameFields.Length is > 0 and <= ResourceAllocationShape.MaximumFields &&
+                row.ClosureFrameFields.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
+                "Only Total nominal closure frames may carry valid storage fields.");
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
@@ -803,6 +808,8 @@ internal static partial class PortableIrGraphCodec
             var info = _factory.GetTypeInfo(_types[index]);
             if (row.ClosedSealedReference)
             { _factory.RegisterClosedSealedReferenceType(_types[index]); }
+            if (row.ClosureFrameFields != null)
+            { _factory.RegisterClosureFrameType(_types[index], [.. row.ClosureFrameFields]); }
             if (row.DelegateReference)
             { _factory.RegisterDelegateReferenceType(_types[index]); }
             if (row.InterfaceReference)

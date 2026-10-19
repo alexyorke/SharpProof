@@ -103,6 +103,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private CSharpInvocationEmissionPolicy? _resourceEmission;
     private readonly Compilation? _compilation;
     private string? _unknown;
+    private readonly Dictionary<IMethodSymbol, RootParameterClosurePlan> _rootClosures = new(SymbolEqualityComparer.Default);
     private int _remaining = 4096;
 
     private ResourceBoundsAnalysis(Compilation? compilation, CancellationToken cancellation)

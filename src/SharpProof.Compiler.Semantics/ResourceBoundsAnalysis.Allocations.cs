@@ -5,6 +5,8 @@ internal sealed partial class ResourceBoundsAnalysis
     private Cost DelegateCreation(IDelegateCreationOperation creation, int depth)
     {
         creation = ArgumentNullGuard.NotNull(creation, nameof(creation));
+        if (_rootClosures.Values.Any(closure => closure is null ? throw new ArgumentNullException(nameof(closure)) : closure.Matches(creation)))
+        { return new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate())); }
         if (!CSharpOperationSemantics.IsExplicitDelegateCreation(creation))
         { return Unknown("UnsupportedDelegateAllocation"); }
         var target = (IMethodReferenceOperation)creation.Target;

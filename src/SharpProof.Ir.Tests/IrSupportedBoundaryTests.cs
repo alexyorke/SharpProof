@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -5,6 +6,49 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrSupportedBoundaryTests
 {
+    [Test]
+    public void ClosureFramesKeepImmutableScopedStorageCertificates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        Assert.That(factory.TryGetClosureFrameType(type, out _), Is.False);
+        factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        Assert.That(factory.TryGetClosureFrameType(type, out var fields), Is.True);
+        Assert.That(fields, Is.EqualTo(new[] { ResourceStorageKind.Word32, ResourceStorageKind.Reference }));
+        Assert.That(factory.CreateReferenceValue(type, new object()).Type, Is.EqualTo(type));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word64]); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterDelegateReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedSealedReferenceType(type); }));
+        var other = new IrFactory(IrExecutionSemantics.Total);
+        Assert.Throws<ArgumentException>((Action)(() => { other.RegisterClosureFrameType(type, [ResourceStorageKind.Word32]); }));
+        Assert.Throws<ArgumentException>((Action)(() => { other.TryGetClosureFrameType(type, out _); }));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ClosureFramesRejectUnsupportedOrContradictoryStorage(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        if (kind == 4)
+        { factory.RegisterDelegateReferenceType(type); }
+        if (kind == 5)
+        { factory.RegisterClosedSealedReferenceType(type); }
+        if (kind == 6)
+        { factory.RegisterClosedClassReferenceType(type, null); }
+        var fields = kind == 1 ? ImmutableArray<ResourceStorageKind>.Empty :
+            kind == 2 ? ImmutableArray.Create(ResourceStorageKind.Unspecified) : ImmutableArray.Create(ResourceStorageKind.Word32);
+        Assert.Throws(kind == 2 ? Is.TypeOf<ArgumentOutOfRangeException>() : Is.TypeOf<ArgumentException>(),
+            (Action)(() => { factory.RegisterClosureFrameType(kind == 3 ? factory.ObjectType : type, fields); }));
+    }
     [Test]
     public void DelegateCertificatesAreScopedAndExcludeClassAndInterfaceCertificates()
     {

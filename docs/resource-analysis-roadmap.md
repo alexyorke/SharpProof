@@ -1078,3 +1078,39 @@ constructor/callee-precondition controls passed, confirming false callee require
 are not imported as assumptions. The same three expectations blocked the published semantic-worker coverage shard,
 so no fresh aggregate percentage is available for that merge. Coverage
 qualification and exact-head CI remain required against the unchanged 100% baseline.
+
+## Root parameter closure frames
+
+A shared bounded capture plan now admits synchronous static methods whose sole
+return constructs one delegate closing over entry parameters. The plan uses
+compiler data-flow capture facts, not textual variable matches; `nameof` does not
+invent captures. Nested functions, local capture scopes, broader control flow,
+async lambdas and unsupported value storage retain Unknown boundaries.
+
+The native program allocates a typed frame at entry and the delegate at the return
+expression. Immutable frame storage certificates survive portable transport and
+are incompatible with ordinary class/interface/delegate certificates. Source
+bounds charge the same frame separately from delegate creation. A packed lower
+bound and conservative field-layout upper bound remain distinct. No lambda body
+is executed while computing construction costs.
+
+Independent Debug/Release emission controls confirm frame construction precedes
+user branches, zero-trip loops and exceptional exits. The zero-loop example also
+contains a delegate-cache field, making its entry frame 32 bytes. It remains
+Unknown because a general capture/sharing model is still required; moving all
+closure cost to the lambda expression would miss that allocation. The admitted
+single-return family has no such cache field.
+
+Protocol 26, cache 28 and artifact 41 invalidate previous capability evidence.
+Resource program/evidence model 4, expression model 1 and the runtime layout model
+are unchanged. Validation passed 934 focused worker cases plus three packing-bound
+controls, all 1415 analyzer tests, all 2112 frontend tests, all 593 IR tests and
+15 package cases. The 95 capture/transport controls include independent Debug
+and Release compiler observations. Full quality and compatibility checks passed;
+layout evaluated 2708 source files, 59 projects and 151 pinned common files.
+Documentation generation and 723 local links passed. Published delegate CI also
+exposed a stale signature expectation: admitting a delegate parameter does not
+supply a complete effect summary, which remains Unknown. The regression now
+checks that distinction explicitly; all 88 manifest cases passed. Broader closure scopes,
+sharing, lifetime/peak/retained memory, stack and phase E/F remain required, along
+with unchanged 100% coverage qualification and exact-head CI.

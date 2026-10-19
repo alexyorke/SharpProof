@@ -30,6 +30,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
     internal bool ShadowCallSkeleton { get; set; }
+    internal RootParameterClosurePlan? RootClosure { get; set; }
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
@@ -306,6 +307,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             }
             return AllocateValue(operation, block);
         }
+        if (depth < 256 && operation is IDelegateCreationOperation capturedDelegate && RootClosure?.Matches(capturedDelegate) == true)
+        { return AllocateValue(operation, block); }
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
             CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
         {

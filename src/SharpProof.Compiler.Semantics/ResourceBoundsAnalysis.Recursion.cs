@@ -17,6 +17,17 @@ internal sealed partial class ResourceBoundsAnalysis
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         body = ArgumentNullGuard.NotNull(body, nameof(body));
         _cancellation.ThrowIfCancellationRequested();
+        var closure = RootParameterClosurePlan.TryCreate(method, _compilation, _cancellation);
+        if (closure != null)
+        {
+            _rootClosures.Add(method, closure);
+            try
+            {
+                var frame = new Cost(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Object(closure.Fields)));
+                return frame.Add(Visit(body, depth));
+            }
+            finally { _rootClosures.Remove(method); }
+        }
         // Only the positively guarded tail-recursive family gets this rule.
         // Other control shapes pass through the closed visitor, where an
         // unproved recursive cycle remains Unknown.

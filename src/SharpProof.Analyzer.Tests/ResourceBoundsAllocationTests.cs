@@ -72,6 +72,18 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("1"));
         Assert.That(result.Bounds.Elements.Text, Is.EqualTo("3"));
     }
+    [TestCase("return () => n;")]
+    [TestCase("return new System.Func<int>(() => n);")]
+    [TestCase("return () => values.Length + n;")]
+    public void RootClosureConstructionDoesNotExecuteItsBodyOrBecomeAnArray(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var result = AnalyzeSource("public static class Subject { public static System.Func<int> Root(int n, int[] values) { " + body + " } }");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.LoopIterations.Text, Is.EqualTo("0"));
+        Assert.That(result.Bounds.Arrays.Text, Is.EqualTo("0"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("0"));
+    }
     [TestCase("object value=n;")]
     [TestCase("object value=(long)n;")]
     [TestCase("object value=true;")]

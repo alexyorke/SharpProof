@@ -187,6 +187,8 @@ public sealed class ResourceRuntimeLayoutTests
         Assert.That(Measure(CreateInstanceDelegate), Is.EqualTo(88));
         Assert.That(Measure(CreateDiscardedDelegate), Is.Zero);
         CheckMeasured(ResourceAllocationShape.Closure([ResourceStorageKind.Word32]), CreateClosure);
+        Assert.That(Measure(static () => RootParameterClosure(42)), Is.EqualTo(88));
+        Assert.That(Measure(static () => RootMixedClosure(42, SharedReference)), Is.EqualTo(96));
         Assert.That(Measure(static () => new InitializedFieldCell()), Is.EqualTo(64));
         Assert.That(Measure(static () => new InitializedPropertyCell()), Is.EqualTo(64));
         Assert.That(Measure(static () => new InitializedFieldCell { Data = new int[4] }), Is.EqualTo(104));
@@ -251,6 +253,16 @@ public sealed class ResourceRuntimeLayoutTests
         return closure;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int> RootParameterClosure(int value)
+    { return () => value; }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int> RootMixedClosure(int value, object reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return () => value + reference.GetHashCode();
+    }
     private sealed class InitializedFieldCell
     {
         internal int[] Data = new int[3];

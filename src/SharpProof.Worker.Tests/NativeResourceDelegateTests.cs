@@ -40,7 +40,6 @@ public sealed partial class NativeResourceContractTests
 
     [TestCase("return Callbacks.Run;")]
     [TestCase("return () => {};")]
-    [TestCase("return () => { int value=n; };")]
     [TestCase("return new System.Action(() => {});")]
     public async Task UnmodeledDelegateConversionsRemainUnknown(string body)
     {
