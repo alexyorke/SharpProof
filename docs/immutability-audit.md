@@ -3289,4 +3289,12 @@ get-only properties. Preserve null callback fallback and deferred callback invoc
 factory parameter guard timing and fresh per-pass session policy. Update the production
 factory call and test constructors; validate full Frontend plus Worker source-call paths.
 TotalLoweringContext phase/model state requires separate analysis, not blind init setters.
+Status: open before edits.IMM-M109: Package runner argv construction has eight collection appends and three
+scalar timing additions. Use scoped string builders for both prerequisite builds and
+per-shard direct/project arguments, immutable build descriptors after construction,
+and an immediate immutable snapshot of coverage-helper native output. Preserve build
+order, fast flag, isolated OutDir position, exclusive/direct selection, coverage suffix,
+DOTNET_HOST_PATH and native adapters. Keep timing/scheduler/environment mutations.
+Compare extracted baseline/current blocks for direct, exclusive, coverage, empty/null
+and Debug/Release/Fast combinations before the real package workflow.
 Status: open before edits.
