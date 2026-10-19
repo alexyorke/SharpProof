@@ -202,6 +202,7 @@
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.InterfaceArrays.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Dictionaries.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Lists.cs",
+          "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Queues.cs",
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
           "src/SharpProof.Frontend/FrontendLoweringRejectionException.cs",
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.Calls.cs",
