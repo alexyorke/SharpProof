@@ -317,10 +317,6 @@ public sealed partial class TotalLoweringContext
         return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart, Span(syntax));
     }
 
-    // A constructor whose body uses `this` only to read and write its fields
-    // initializes an object no caller can observe yet.
-    internal bool FreshReceiver { get; set; }
-
     // The compilation of the body being lowered; control flow graph
     // operations carry no semantic model.
     internal Compilation? Compilation { get; set; }

@@ -63,7 +63,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _context.TrackDefaultComparers(graph);
         _context.TrackDefaultDictionaries(graph);
         _context.TrackFreshLists(graph);
-        _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
+        var freshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
                     CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent)));
@@ -92,7 +92,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
             (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
                 block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow))))
-        { _regionStructural = structural; LowerRegions(graph, entry, structural); return; }
+        { _regionStructural = structural; LowerRegions(graph, entry, structural, freshReceiver); return; }
         if (!_context.HasScalarSignature || !_context.OwnsBody(graph.OriginalOperation) ||
             HasUnsupportedRegion(graph.Root) || !TrySelect(graph.Blocks[0], out var selected))
         {
@@ -120,6 +120,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,
+            FreshReceiver = freshReceiver,
             AllowObjectWidening = _calls?.MetadataRequiresEnabled == true,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ShadowCallSkeleton = _preserveSourceCall != null,

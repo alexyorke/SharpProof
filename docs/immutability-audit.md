@@ -3695,3 +3695,10 @@ immutable snapshot. Preserve native byte images, reflection args, diagnostics/so
 text and private mutable test subjects. Validate all ordinary Analyzer tests.
 Status: planned before edits; coordinator corrected review's generic ToImmutableDictionary
 suggestion to preserve strict duplicate behavior.
+
+IMM-M140 scope correction: main found an additional conditional long[] samples vector in CoreIrScalarIntervalTransferTests omitted by the syntax inventory. Its consumers only enumerate/index the samples; convert the declaration to ImmutableArray<long> (86 total snapshot/vector sites).
+
+IMM-M139 verified: all 2,064 ordinary Release Frontend and 640 Contracts tests pass,
+zero failures/skips/build warnings/errors; 9 and 16 exact embedded PDB outputs.
+Canonical formatting requires zero changes. Independent review confirms ordinary/
+region/nested lowering propagation, pure-clause separation and no stale context use.

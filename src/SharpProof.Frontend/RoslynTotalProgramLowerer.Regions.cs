@@ -38,7 +38,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private readonly ImmutableDictionary<ControlFlowRegion, RegionFinally>.Builder _regionFinallys = ImmutableDictionary.CreateBuilder<ControlFlowRegion, RegionFinally>();
     private IrBlockId _regionExceptionalExit;
 
-    private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
+    private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural, bool freshReceiver)
     {
         RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
@@ -114,6 +114,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,
+            FreshReceiver = freshReceiver,
             AllowObjectWidening = _calls?.MetadataRequiresEnabled == true,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ShadowCallSkeleton = _preserveSourceCall != null,

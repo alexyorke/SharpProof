@@ -27,6 +27,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
 
+    // A constructor whose body only reads and writes its own fields initializes
+    // an object no caller can observe yet.
+    internal bool FreshReceiver { get; init; }
+
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowObjectWidening { get; init; }
     internal bool AllowOpaqueCalls { get; init; }
@@ -1277,7 +1281,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return _context.FreshReceiver && IsImplicitThis(instance) ||
+        return FreshReceiver && IsImplicitThis(instance) ||
             instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
             ? _context.FreshWriteSite(operation) : _context.Site(operation);
     }
