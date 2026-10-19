@@ -6,6 +6,13 @@ public sealed class HmType(string name, params HmType[] arguments)
 {
     public string Name { get; } = name ?? throw new ArgumentNullException(nameof(name));
     public ImmutableArray<HmType> Arguments { get; } = (arguments ?? throw new ArgumentNullException(nameof(arguments))).ToImmutableArray();
+    internal bool? IsValueType { get; set; } = name switch
+    {
+        "bool" or "byte" or "sbyte" or "char" or "short" or "ushort" or "int" or "uint" or "long" or "ulong"
+            or "nint" or "nuint" or "float" or "double" or "decimal" or "Tuple" or CSharpTypes.NullableValue => true,
+        "string" or "object" or "Func" or CSharpTypes.NullableReference => false,
+        _ => null
+    };
     public HmType? Link { get; private set; }
     public bool IsVariable => Name == "?";
     public HmType Root => Link is null ? this : Link = Link.Root;
@@ -44,11 +51,21 @@ public sealed class HmType(string name, params HmType[] arguments)
 
         left = left.Root;
         right = right.Root;
+        while (left.Name == CSharpTypes.NullableParameter && left.Arguments[0].Root.Name == CSharpTypes.NullableParameter)
+        { left = left.Arguments[0].Root; }
+        while (right.Name == CSharpTypes.NullableParameter && right.Arguments[0].Root.Name == CSharpTypes.NullableParameter)
+        { right = right.Arguments[0].Root; }
         if (ReferenceEquals(left, right))
         {
             return;
         }
 
+        // Unconstrained C# T? is an annotation of T, not Nullable<T>.
+        // Retain annotations on variables, erase them for concrete equality,
+        // and make repeated annotation idempotent without creating a cycle.
+        if (left.Name == CSharpTypes.NullableParameter && ReferenceEquals(left.Arguments[0].Root, right)
+            || right.Name == CSharpTypes.NullableParameter && ReferenceEquals(right.Arguments[0].Root, left))
+        { return; }
         if (left.IsVariable)
         {
             if (Occurs(left, right))
@@ -66,11 +83,25 @@ public sealed class HmType(string name, params HmType[] arguments)
             return;
         }
 
+        if (left.Name == CSharpTypes.NullableParameter && right.Name == CSharpTypes.NullableReference
+            && left.Arguments[0].Root.Name != CSharpTypes.NullableReference)
+        { Unify(left.Arguments[0], right.Arguments[0]); return; }
+        if (right.Name == CSharpTypes.NullableParameter && left.Name == CSharpTypes.NullableReference
+            && right.Arguments[0].Root.Name != CSharpTypes.NullableReference)
+        { Unify(left.Arguments[0], right.Arguments[0]); return; }
+        if (left.Name == CSharpTypes.NullableParameter || right.Name == CSharpTypes.NullableParameter)
+        {
+            Unify(left.Name == CSharpTypes.NullableParameter ? left.Arguments[0] : left,
+                right.Name == CSharpTypes.NullableParameter ? right.Arguments[0] : right);
+            return;
+        }
         if (left.Name != right.Name || left.Arguments.Length != right.Arguments.Length)
         {
             throw new InferenceException($"Conflicting types: {left.Name} and {right.Name}.");
         }
 
+        left.IsValueType ??= right.IsValueType;
+        right.IsValueType ??= left.IsValueType;
         for (var i = 0; i < left.Arguments.Length; i++)
         {
             Unify(left.Arguments[i], right.Arguments[i]);
@@ -130,6 +161,13 @@ public sealed class HmType(string name, params HmType[] arguments)
     public string Format(Dictionary<HmType, string> variables)
     {
         if (variables is null)
+        { throw new global::System.ArgumentNullException(nameof(variables)); }
+        return Format(variables, true);
+    }
+
+    internal string Format(Dictionary<HmType, string> variables, bool nullableAnnotations)
+    {
+        if (variables is null)
         {
             throw new global::System.ArgumentNullException(nameof(variables));
         }
@@ -145,33 +183,41 @@ public sealed class HmType(string name, params HmType[] arguments)
             return name;
         }
 
+        if (type.Name == CSharpTypes.NullableParameter)
+        {
+            var inner = type.Arguments[0].Root;
+            var rendered = inner.Format(variables, nullableAnnotations);
+            return !nullableAnnotations || inner.IsValueType == true || inner.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference or CSharpTypes.NullableValue ? rendered : rendered + "?";
+        }
         if (type.Name == CSharpTypes.NullableReference)
         {
-            return type.Arguments[0].Format(variables) + "?";
+            var inner = type.Arguments[0].Root;
+            var rendered = inner.Format(variables, nullableAnnotations);
+            return !nullableAnnotations || inner.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter ? rendered : rendered + "?";
         }
         if (type.Name == "Tuple")
         {
-            return $"({string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables); }))})";
+            return $"({string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables, nullableAnnotations); }))})";
         }
 
         if (type.Name == "Func")
         {
-            return $"global::System.Func<{string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables); }))}>";
+            return $"global::System.Func<{string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables, nullableAnnotations); }))}>";
         }
 
         if (type.Name == "->")
         {
-            return $"({type.Arguments[0].Format(variables)} -> {type.Arguments[1].Format(variables)})";
+            return $"({type.Arguments[0].Format(variables, nullableAnnotations)} -> {type.Arguments[1].Format(variables, nullableAnnotations)})";
         }
 
         if (type.Name.StartsWith("[", StringComparison.Ordinal))
         {
-            return type.Arguments[0].Format(variables) + type.Name;
+            return type.Arguments[0].Format(variables, nullableAnnotations) + type.Name;
         }
 
         if (type.Arguments.Length != 0)
         {
-            return $"{type.Name}<{string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables); }))}>";
+            return $"{type.Name}<{string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables, nullableAnnotations); }))}>";
         }
 
         return type.Name;

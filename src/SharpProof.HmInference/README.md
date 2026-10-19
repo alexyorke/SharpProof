@@ -154,8 +154,7 @@ Generic instance calls preserve receiver substitutions and explicit type argumen
 The adapter skips custom async return builders, custom operators, expanded non-array params
 collections, unsupported patterns and other unimplemented syntax. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
-of generic constraints. Imported unconstrained nullable `T?`
-schemes are still unsupported. See [the completion ledger](LIMITATIONS.md).
+of generic constraints. See [the completion ledger](LIMITATIONS.md).
 
 Tuple and custom deconstruction support declarations, reassignment, mixed targets,
 discards, member/indexer stores and nested instance/extension Deconstruct methods.
@@ -193,6 +192,15 @@ an all-throw body retains declared result information when producing a C# signat
 The suite exercises nested exit ownership, tuple iteration, thrown exceptions and
 checked overflow versus unchecked wrapping at runtime.
 
+Imported unconstrained `T?` signatures retain their C# annotation semantics through
+calls, tuples, arrays, containers and await results. They do not require a reference
+or value constraint: an annotated `T` instantiated with `int` is still `int`, while
+instantiation with `string` can produce a nullable reference. Explicit and constrained
+instantiations normalize accordingly, including repeated annotations. Passing an
+annotated result to a `notnull` requirement can force the original non-nullable
+value domain; the compiler checks the resulting constraints and warnings.
+Generated signatures and constraints follow the method's nullable annotation
+context, including files with annotations disabled.
 Nullable wrappers remain distinct from their underlying types. For example,
 `int? Identity(int? x) => x` can become `T? Identity<T>(T? x) where T : struct`;
 nullable reference identities use `where T : class`. Existing constraints and

@@ -122,7 +122,7 @@ public static partial class Inference
                     types[i] = selected.Parameters[i + offset].Type;
                 }
                 foreach (var parameter in definition.TypeParameters)
-                { ImportConstraints(parameter, mapping[parameter], mapping); }
+                { ImportConstraints(parameter, mapping[parameter], mapping, selected.TypeArguments[parameter.Ordinal]); }
             }
             var steps = info.Nested.IsDefaultOrEmpty ? new DeconstructionInfo[count] : info.Nested.ToArray();
             if (steps.Length != count)

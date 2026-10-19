@@ -155,21 +155,6 @@ public static partial class Inference
             }
 
             NameVariables(result);
-            var parameterNames = parameters.Select((t, i) =>
-            {
-                if (t is null)
-                {
-                    throw new global::System.ArgumentNullException(nameof(t));
-                }
-
-                if (i < 0)
-                {
-                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
-                }
-
-                return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables);
-            }).ToArray();
-            var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables);
             if (variables.Count == 0)
             {
                 return new(symbol.Name, "Concrete", "Body requires concrete types; no generic suggestion.");
@@ -196,7 +181,26 @@ public static partial class Inference
             }
 
             ImportConstructedConstraints(symbol.ReturnType, result);
-            var nullableConstraints = NullableConstraints(parameters, result, variables);
+            var constraintPosition = method.ConstraintClauses.Count == 0 ? method.ParameterList.Span.End : method.ConstraintClauses[method.ConstraintClauses.Count - 1].Span.End;
+            var nullableAnnotations = (model.GetNullableContext(constraintPosition) & NullableContext.AnnotationsEnabled) != 0;
+            var nullableConstraints = NullableConstraints(parameters, result, variables, nullableAnnotations);
+            var parameterNames = parameters.Select((t, i) =>
+            {
+                if (t is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(t));
+                }
+
+                if (i < 0)
+                {
+                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
+                }
+
+                return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables,
+                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0);
+            }).ToArray();
+            var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
+                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0);
             var candidate = method.WithReturnType((returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName)).WithTriviaFrom(method.ReturnType)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
                 if (p is null)
@@ -719,7 +723,7 @@ public static partial class Inference
                     return ConditionalAccess(conditionalAccess);
                 case PostfixUnaryExpressionSyntax suppressed when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression):
                     var nullableOperand = Expression(suppressed.Operand).Root;
-                    return nullableOperand.Name == CSharpTypes.NullableReference ? nullableOperand.Arguments[0] : nullableOperand;
+                    return nullableOperand.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter ? nullableOperand.Arguments[0] : nullableOperand;
                 case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.NullLiteralExpression) || literal.IsKind(SyntaxKind.DefaultLiteralExpression):
                     return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped null/default literal."));
                 case ParenthesizedExpressionSyntax parentheses:
@@ -1356,7 +1360,7 @@ public static partial class Inference
                 return CSharpTypes.Rigid(p.Type, variables);
             }).ToArray());
             foreach (var parameter in definition.TypeParameters)
-            { ImportConstraints(parameter, variables[parameter], variables); }
+            { ImportConstraints(parameter, variables[parameter], variables, called.TypeArguments[parameter.Ordinal]); }
             return CSharpTypes.Rigid(definition.ReturnType, variables);
         }
 

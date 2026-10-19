@@ -131,7 +131,7 @@ public static partial class Inference
             { HmType.Unify(signature.Inputs[i], CSharpTypes.Rigid(definition.Parameters[i].Type, mapping)); }
             HmType.Unify(signature.Output, CSharpTypes.Rigid(definition.ReturnType, mapping));
             foreach (var parameter in definition.TypeParameters)
-            { ImportConstraints(parameter, mapping[parameter], mapping); }
+            { ImportConstraints(parameter, mapping[parameter], mapping, method.TypeArguments[parameter.Ordinal]); }
             ImportConstructedConstraints(target, nominal);
             return nominal;
         }

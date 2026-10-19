@@ -39,7 +39,8 @@ internal static class NullableAsyncChecks
             ("NullableCoalesceAssignmentResult", "static string M(string? x,string y)=>x??=y;", "Suggestion", "T1 M<T1>(T1? x, T1 y) where T1 : class"),
             ("NullableCoalesceAssignmentValue", "static int M(int? x,int y)=>x??=y;", "Suggestion", "T1 M<T1>(T1? x, T1 y) where T1 : struct"),
             ("NullableCoalesceAssignmentBoth", "static int? M(int? x,int? y)=>x??=y;", "Suggestion", "T1? M<T1>(T1? x, T1? y) where T1 : struct"),
-            ("NullableCoalesceAssignmentConversion", "static long M(long? x,int y,bool ignored)=>x??=y;", "Suggestion", "long M<T1>(long? x, int y, T1 ignored)"),            ("NullableWideningCoalesce", "static long M(int? x,long y,bool ignored)=>x??y;", "Suggestion", "long M<T1>(int? x, long y, T1 ignored)"),
+            ("NullableCoalesceAssignmentConversion", "static long M(long? x,int y,bool ignored)=>x??=y;", "Suggestion", "long M<T1>(long? x, int y, T1 ignored)"),
+            ("NullableWideningCoalesce", "static long M(int? x,long y,bool ignored)=>x??y;", "Suggestion", "long M<T1>(int? x, long y, T1 ignored)"),
             ("NullableExistingGeneric", "static T? M<T>(T? x)=>x;", "Concrete", null),
             ("NullableExistingConstraints", "static T? M<T>(T? x,int? ignored) where T:class =>x;", "Suggestion", "T? M<T, T1>(T? x, T1? ignored) where T : class where T1 : struct"),
             ("AsyncTaskResult", "static async Task<int> M(Task<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task<T1> task)"),
@@ -71,14 +72,56 @@ internal static class NullableAsyncChecks
             ("NullableConditionalNestedArray", "static int[]? M(int[][]? x,int i)=>x?[i];", "Suggestion", "T1[]? M<T1>(T1[][]? x, int i)"),
             ("NullableConditionalMultidimensional", "static int? M(int[,]? x,int i)=>x?[i,i];", "Suggestion", "T1? M<T1>(T1[,]? x, int i) where T1 : struct"),
             ("NullableConditionalCoalesce", "static int M(int[]? x,int i,int fallback)=>x?[i]??fallback;", "Suggestion", "T1 M<T1>(T1[]? x, int i, T1 fallback) where T1 : struct"),
-            ("NullableConditionalReferenceCoalesce", "static string M(string[]? x,int i,string fallback)=>x?[i]??fallback;", "Suggestion", "T1 M<T1>(T1[]? x, int i, T1 fallback) where T1 : class"),            ("AsyncGenericCustomAwaiter", "static async Task<int> M(AwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::AwaitBox<T1> task)"),
+            ("NullableConditionalReferenceCoalesce", "static string M(string[]? x,int i,string fallback)=>x?[i]??fallback;", "Suggestion", "T1 M<T1>(T1[]? x, int i, T1 fallback) where T1 : class"),
+            ("AsyncGenericCustomAwaiter", "static async Task<int> M(AwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::AwaitBox<T1> task)"),
             ("AsyncInheritedCustomAwaiter", "static async Task<int> M(DerivedAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::DerivedAwaitBox<T1> task)"),
             ("AsyncNullableCustomAwaiter", "static async Task<int?> M(AwaitBox<int?> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::AwaitBox<T1?> task) where T1 : struct"),
             ("AsyncReferenceCustomAwaiter", "static async Task<string?> M(AwaitBox<string?> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::AwaitBox<T1?> task) where T1 : class"),
             ("AsyncExtensionAwaiter", "static async Task<int> M(ExtensionAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::ExtensionAwaitBox<T1> task)"),
             ("AsyncConstrainedExtensionAwaiter", "static async Task<int> M(StructAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::StructAwaitBox<T1> task) where T1 : struct"),
-            ("AsyncExtensionOverloadRetained", "static async Task<int> M(OverloadAwaitBox<int> task)=>await task;", "Concrete", null),            ("AsyncNestedAwaiterRetained", "static async Task<int> M(NestedAwaitBox<int> task,bool ignored)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::NestedAwaitBox<int> task, T1 ignored)"),            ("AsyncOwnAwaiter", "static async Task<int> M(OwnAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::OwnAwaitBox<T1> task)"),
-            ("AsyncAwaiterShadowingRejected", "static async Task<int> M(ExplicitAwaitSource task)=>await task;", "Rejected", null),            ("AsyncTypedLocal", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Concrete", null),
+            ("AsyncExtensionOverloadRetained", "static async Task<int> M(OverloadAwaitBox<int> task)=>await task;", "Concrete", null),
+            ("AsyncNestedAwaiterRetained", "static async Task<int> M(NestedAwaitBox<int> task,bool ignored)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::NestedAwaitBox<int> task, T1 ignored)"),
+            ("AsyncOwnAwaiter", "static async Task<int> M(OwnAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::OwnAwaitBox<T1> task)"),
+            ("AsyncAwaiterShadowingRejected", "static async Task<int> M(ExplicitAwaitSource task)=>await task;", "Rejected", null),
+            ("ImportedNullableValue", "static int M(int x)=>NullableImports.Echo(x);", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("ImportedNullableReference", "static string? M(string x)=>NullableImports.Echo(x);", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("ImportedNullableAnnotatedReference", "static string? M(string? x)=>NullableImports.Echo(x);", "Suggestion", "T1? M<T1>(T1? x) where T1 : class"),
+            ("ImportedNullableValueWrapper", "static int? M(int? x)=>NullableImports.Echo(x);", "Suggestion", "T1? M<T1>(T1? x) where T1 : struct"),
+            ("ImportedNullableSuppression", "static string M(string x)=>NullableImports.Maybe(x)!;", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("ImportedNullableMaybeValue", "static int M(int x)=>NullableImports.Maybe(x);", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("ImportedNullableMaybeReference", "static string? M(string x)=>NullableImports.Maybe(x);", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("ImportedNullableExistingParameter", "static T? M<T>(T? x,int ignored)=>NullableImports.Echo(x);", "Suggestion", "T? M<T, T1>(T? x, T1 ignored)"),
+            ("ImportedNullableExistingReturn", "static T? M<T>(T x,int ignored)=>NullableImports.Maybe(x);", "Suggestion", "T? M<T, T1>(T x, T1 ignored)"),
+            ("ImportedNullableArithmetic", "static int M(int x,bool ignored)=>NullableImports.Echo(x)+1;", "Suggestion", "int M<T1>(int x, T1 ignored)"),
+            ("ImportedNullableMember", "static int M(string x,int ignored)=>NullableImports.Maybe(x).Length;", "Suggestion", "int M<T1>(string x, T1 ignored)"),
+            ("ImportedNullableReferenceFallback", "static string M(string x,string fallback)=>NullableImports.Maybe(x)??fallback;", "Suggestion", "T1 M<T1>(T1 x, T1 fallback)"),
+            ("ImportedNullableValueFallback", "static int M(int? x,int fallback)=>NullableImports.Echo(x)??fallback;", "Suggestion", "T1 M<T1>(T1? x, T1 fallback) where T1 : struct"),
+            ("ImportedNullableTuple", "static (int first,int second) M(int x)=>NullableImports.Pair(x);", "Suggestion", "(T1? first, T1 second) M<T1>(T1 x)"),
+            ("ImportedNullableArray", "static int[] M(int x)=>NullableImports.Array(x);", "Suggestion", "T1?[] M<T1>(T1 x)"),
+            ("ImportedNullableContainer", "static System.Collections.Generic.List<int> M(int x)=>NullableImports.Items(x);", "Suggestion", "global::System.Collections.Generic.List<T1?> M<T1>(T1 x)"),
+            ("ImportedNullableAsyncValue", "static async Task<int> M(int x)=>await NullableImports.Async(x);", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(T1 x)"),
+            ("ImportedNullableAsyncReference", "static async Task<string?> M(string x)=>await NullableImports.Async(x);", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(T1 x)"),
+            ("ImportedNullableExplicitValue", "static int M(int x,bool ignored)=>NullableImports.Echo<int>(x);", "Suggestion", "int M<T1>(int x, T1 ignored)"),
+            ("ImportedNullableExplicitReference", "static string? M(string x,bool ignored)=>NullableImports.Echo<string>(x);", "Suggestion", "string? M<T1>(string x, T1 ignored)"),
+            ("ImportedNullableNotNull", "static int M(int x)=>NullableImports.NotNull(x);", "Suggestion", "T1? M<T1>(T1 x) where T1 : notnull"),
+            ("ImportedNullableCustomAwait", "static async Task<int> M(OptionalAwaitBox<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::OptionalAwaitBox<T1> task)"),
+            ("ImportedNullableRepeated", "static int M(int x)=>NullableImports.Echo(NullableImports.Echo(x));", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("ImportedNullableSameBranch", "static int M(int x,bool flag)=>flag?NullableImports.Echo(x):x;", "Suggestion", "T1? M<T1>(T1 x, bool flag)"),
+            ("ImportedNullableValueConstructor", "static System.Collections.Generic.KeyValuePair<int,bool> M(System.Collections.Generic.KeyValuePair<int,bool> x)=>NullableImports.Echo(x);", "Suggestion", "global::System.Collections.Generic.KeyValuePair<T1, T2> M<T1, T2>(global::System.Collections.Generic.KeyValuePair<T1, T2> x)"),
+            ("ImportedNullableExplicitStruct", "static System.DateTime M(System.DateTime x,bool ignored)=>NullableImports.Echo<System.DateTime>(x);", "Suggestion", "global::System.DateTime M<T1>(global::System.DateTime x, T1 ignored)"),
+            ("ImportedNullableExistingStruct", "static T? M<T>(T? x,int ignored) where T:struct=>NullableImports.Echo(x);", "Suggestion", "T? M<T, T1>(T? x, T1 ignored) where T : struct"),
+            ("ImportedNullableExistingReference", "static T? M<T>(T? x,int ignored) where T:class=>NullableImports.Echo(x);", "Suggestion", "T? M<T, T1>(T? x, T1 ignored) where T : class"),
+            ("ImportedNullableThenStruct", "static int? M(int x)=>NullableImports.Lift(NullableImports.Maybe(x));", "Suggestion", "T1? M<T1>(T1 x) where T1 : struct"),
+            ("ImportedNullableThenNotNull", "static int M(int x)=>NullableImports.Required(NullableImports.Maybe(x));", "Suggestion", "T1 M<T1>(T1 x) where T1 : struct"),
+            ("ImportedNullableExplicitNull", "static string? M(bool ignored)=>NullableImports.Echo<string>(null);", "Suggestion", "string? M<T1>(T1 ignored)"),
+            ("ImportedNullableExplicitAnnotated", "static string? M(string x,bool ignored)=>NullableImports.Echo<string?>(x);", "Suggestion", "string? M<T1>(string x, T1 ignored)"),
+            ("ImportedNullableCapturedLambda", "static System.Func<int,int> M(int x)=>ignored=>NullableImports.Maybe(x);", "Suggestion", "global::System.Func<int, T1?> M<T1>(T1 x)"),
+            ("ImportedNullableRepeatedBranch", "static int M(int x,bool flag)=>flag?NullableImports.Echo(NullableImports.Echo(x)):x;", "Suggestion", "T1? M<T1>(T1 x, bool flag)"),
+            ("ImportedNullableDisabledContext", "\n#nullable disable\nstatic int M(int x)=>NullableImports.Echo(x);\n", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("ImportedNullableWarningsOnly", "\n#nullable enable warnings\n#nullable disable annotations\nstatic int M(int x)=>NullableImports.Maybe(x);\n", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("ImportedNullableDisabledConstraint", "\n#nullable disable\nstatic int M(int x,IntOptional source)=>NullableImports.Typed(x,source);\n", "Suggestion", "T1 M<T1, T2>(T1 x, T2 source) where T2 : global::IOptional<T1>"),
+            ("ImportedNullableMixedContext", "static int M(int x,\n#nullable disable\nint y,\n#nullable enable\nbool flag)=>flag?NullableImports.Maybe(x):y;", "Suggestion", "T1? M<T1>(T1 x, T1 y, bool flag)"),
+            ("AsyncTypedLocal", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Concrete", null),
             ("AsyncGenericRoot", "static async Task<T> M<T>(Task<T> task)=>await task;", "Concrete", null),
             ("AsyncVoidRoot", "static async void M(int x) { await Task.Yield(); }", "Suggestion", "void M<T1>(T1 x)"),
             ("AsyncForeach", "static async Task<int> M(System.Collections.Generic.IAsyncEnumerable<int> xs,int seed) { await foreach(var x in xs) seed=x; return seed; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<T1> xs, T1 seed)"),
@@ -94,7 +137,7 @@ internal static class NullableAsyncChecks
         var failures = new List<string>();
         foreach (var test in tests)
         {
-            var compilation = Program.Compile([CSharpSyntaxTree.ParseText("#nullable enable\nusing System.Threading.Tasks; class Cases { " + test.Source + " }" + AwaitFixtures, cancellationToken: cancellationToken)]);
+            var compilation = Program.Compile([CSharpSyntaxTree.ParseText("#nullable enable\nusing System.Threading.Tasks; class Cases { " + test.Source + " }\n#nullable enable\n" + SupportFixtures, cancellationToken: cancellationToken)]);
             var errors = compilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity == DiagnosticSeverity.Error; }).ToArray();
             if (errors.Length != 0)
             { throw new InvalidOperationException($"Invalid nullable/async fixture {test.Name}: {errors[0]}"); }
@@ -122,7 +165,22 @@ internal static class NullableAsyncChecks
         return tests.Length + 1 + await CodeFixRuntime(cancellationToken).ConfigureAwait(false);
     }
 
-    private const string AwaitFixtures = """
+    private const string SupportFixtures = """
+        interface IOptional<T> {}
+        class IntOptional:IOptional<int> {}
+        static class NullableImports {
+            public static T? Typed<T,U>(T x,U source) where U:IOptional<T?> => x;
+            public static T? Lift<T>(T x) where T:struct=>x;
+            public static T Required<T>(T x) where T:notnull=>x;
+            public static T? Echo<T>(T? x)=>x;
+            public static T? Maybe<T>(T x)=>x;
+            public static T? NotNull<T>(T x) where T:notnull=>x;
+            public static (T? first,T second) Pair<T>(T x)=>(x,x);
+            public static T?[] Array<T>(T x)=>new T?[]{x};
+            public static System.Collections.Generic.List<T?> Items<T>(T x)=>new(){x};
+            public static System.Threading.Tasks.Task<T?> Async<T>(T x)=>System.Threading.Tasks.Task.FromResult<T?>(x);
+        }
+        class OptionalAwaitBox<T> { public OwnAwaiter<T?> GetAwaiter()=>new(); }
         class AwaitBox<T> {
             public System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter()=>System.Threading.Tasks.Task.FromResult(default(T)!).GetAwaiter();
         }
@@ -137,7 +195,8 @@ internal static class NullableAsyncChecks
                 public T GetResult()=>default!;
                 public void OnCompleted(System.Action action)=>action();
             }
-        }        class OwnAwaitBox<T> { public OwnAwaiter<T> GetAwaiter()=>new(); }
+        }
+        class OwnAwaitBox<T> { public OwnAwaiter<T> GetAwaiter()=>new(); }
         struct OwnAwaiter<T>:System.Runtime.CompilerServices.INotifyCompletion {
             public bool IsCompleted=>true;
             public T GetResult()=>default!;
@@ -146,7 +205,8 @@ internal static class NullableAsyncChecks
         interface IAwaitSource { System.Runtime.CompilerServices.TaskAwaiter<int> GetAwaiter(); }
         class ExplicitAwaitSource:IAwaitSource {
             System.Runtime.CompilerServices.TaskAwaiter<int> IAwaitSource.GetAwaiter()=>System.Threading.Tasks.Task.FromResult(1).GetAwaiter();
-        }        static class AwaitExtensions {
+        }
+        static class AwaitExtensions {
             public static System.Runtime.CompilerServices.TaskAwaiter<int> GetAwaiter<T>(this T task) where T:IAwaitSource=>task.GetAwaiter();
             public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this ExtensionAwaitBox<T> task)=>System.Threading.Tasks.Task.FromResult(default(T)!).GetAwaiter();
             public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this StructAwaitBox<T> task) where T:struct=>System.Threading.Tasks.Task.FromResult(default(T)).GetAwaiter();
@@ -180,7 +240,12 @@ internal static class NullableAsyncChecks
             public static class RuntimeAwaitExtensions {
                 public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this RuntimeExtensionBox<T> box)=>box.Task.GetAwaiter();
             }
-            public static class NullableAsyncProbe {
+            public static class RuntimeNullableImports {
+                public static T? Echo<T>(T? x)=>x;
+                public static T? Missing<T>(T x)=>default;
+                public static T?[] Array<T>(T x)=>new T?[]{x};
+                public static Task<T?> Async<T>(Task<T?> task)=>task;
+            }            public static class NullableAsyncProbe {
                 public static int Finalizers;
                 public static int Guarded(int x,bool fail) {
                     try { if(fail) throw new System.InvalidOperationException(); return x; }
@@ -194,6 +259,10 @@ internal static class NullableAsyncChecks
                 public static int? Value(int? x) => x;
                 public static string? Reference(string? x) => x;
                 public static int Fallback(int? x,int fallback) => x??fallback;
+                public static int MaybeEcho(int x)=>RuntimeNullableImports.Echo(x);
+                public static int MaybeMissing(int x)=>RuntimeNullableImports.Missing(x);
+                public static int[] MaybeArray(int x)=>RuntimeNullableImports.Array(x);
+                public static async Task<int> MaybeTask(Task<int> task)=>await RuntimeNullableImports.Async(task);
                 public static int SetValue(int? x,int fallback)=>x??=fallback;
                 public static string SetReference(string? x,string fallback)=>x??=fallback;
                 public static string SetReferenceFactory(string? x,System.Func<string> fallback)=>x??=fallback();
@@ -210,7 +279,7 @@ internal static class NullableAsyncChecks
             """);
         var provider = new HmSignatureCodeFixProvider();
         var applied = 0;
-        for (var round = 0; round < 24; round++)
+        for (var round = 0; round < 32; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false)).GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
@@ -223,8 +292,8 @@ internal static class NullableAsyncChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             applied++;
         }
-        if (applied != 19)
-        { throw new InvalidOperationException($"Expected nineteen nullable/async/lifetime code fixes; applied {applied}."); }
+        if (applied != 23)
+        { throw new InvalidOperationException($"Expected twenty-three nullable/async/lifetime code fixes; applied {applied}."); }
         var finalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var problems = finalCompilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
         if (problems.Length != 0)
@@ -331,6 +400,37 @@ internal static class NullableAsyncChecks
             }
             catch (OperationCanceledException) { }
         }
+        foreach (var name in new[] { "MaybeEcho", "MaybeMissing", "MaybeArray", "MaybeTask" })
+        {
+            var parameter = probe.GetMethod(name)!.GetGenericArguments().Single();
+            if (parameter.GetGenericParameterConstraints().Length != 0
+                || (parameter.GenericParameterAttributes & System.Reflection.GenericParameterAttributes.SpecialConstraintMask) != 0)
+            { throw new InvalidOperationException("Unconstrained nullable inference invented a domain constraint."); }
+        }
+        var maybeEcho = probe.GetMethod("MaybeEcho")!;
+        var maybeMissing = probe.GetMethod("MaybeMissing")!;
+        if (!Equals(maybeEcho.MakeGenericMethod(typeof(Guid)).Invoke(null, new object?[] { guid }), guid)
+            || !Equals(maybeEcho.MakeGenericMethod(typeof(Guid?)).Invoke(null, new object?[] { guid }), guid)
+            || maybeEcho.MakeGenericMethod(typeof(Guid?)).Invoke(null, new object?[] { null }) is not null
+            || !Equals(maybeEcho.MakeGenericMethod(typeof(string)).Invoke(null, new object?[] { "nullable" }), "nullable")
+            || maybeEcho.MakeGenericMethod(typeof(string)).Invoke(null, new object?[] { null }) is not null
+            || !Equals(maybeMissing.MakeGenericMethod(typeof(Guid)).Invoke(null, new object?[] { guid }), Guid.Empty)
+            || maybeMissing.MakeGenericMethod(typeof(Guid?)).Invoke(null, new object?[] { guid }) is not null
+            || maybeMissing.MakeGenericMethod(typeof(string)).Invoke(null, new object?[] { "nullable" }) is not null)
+        { throw new InvalidOperationException("Unconstrained T? was confused with Nullable<T> or lost its reference annotation."); }
+        var maybeArray = (Guid[])probe.GetMethod("MaybeArray")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object?[] { guid })!;
+        var maybeReferenceArray = (string?[])probe.GetMethod("MaybeArray")!.MakeGenericMethod(typeof(string)).Invoke(null, new object?[] { null })!;
+        if (maybeArray.Length != 1 || maybeArray[0] != guid || maybeReferenceArray.Length != 1 || maybeReferenceArray[0] is not null)
+        { throw new InvalidOperationException("Unconstrained nullable element annotations changed array element types."); }
+        var maybeTask = probe.GetMethod("MaybeTask")!.MakeGenericMethod(typeof(Guid));
+        var pendingMaybe = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var maybeResult = (Task<Guid>)maybeTask.Invoke(null, new object[] { pendingMaybe.Task })!;
+        if (maybeResult.IsCompleted)
+        { throw new InvalidOperationException("Annotated generic await completed before its operand."); }
+        pendingMaybe.SetResult(guid);
+        if (await maybeResult.WaitAsync(cancellationToken).ConfigureAwait(false) != guid
+            || await ((Task<string?>)probe.GetMethod("MaybeTask")!.MakeGenericMethod(typeof(string)).Invoke(null, new object[] { Task.FromResult<string?>(null) })!).ConfigureAwait(false) is not null)
+        { throw new InvalidOperationException("Annotated generic await changed its result type or value."); }
         Program.Log.Info("PASS NullableAsyncCodeFixRuntime");
         var taskSource = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pendingTask = (Task<string>)echo.Invoke(null, new object[] { taskSource.Task })!;

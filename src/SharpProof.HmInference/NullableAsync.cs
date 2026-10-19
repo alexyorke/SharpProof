@@ -99,13 +99,15 @@ public static partial class Inference
             if (SymbolEqualityComparer.Default.Equals(info.Type, converted) || sameTuple || model.ClassifyConversion(expression, converted).IsIdentity)
             {
                 var inferred = Expression(expression).Root;
-                if (info.Type.IsReferenceType && converted.NullableAnnotation == NullableAnnotation.Annotated && inferred.Name != CSharpTypes.NullableReference)
+                if (info.Type.IsReferenceType && converted.NullableAnnotation == NullableAnnotation.Annotated && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
                 {
                     return new(CSharpTypes.NullableReference, inferred);
                 }
-                if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated && inferred.Name == CSharpTypes.NullableReference)
+                if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated && inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
                 {
-                    return inferred.Arguments[0];
+                    while (inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+                    { inferred = inferred.Arguments[0].Root; }
+                    return inferred;
                 }
                 return inferred;
             }
@@ -203,7 +205,7 @@ public static partial class Inference
                 { HmType.Unify(receiver, CSharpTypes.Rigid(receiverType)); projected = CSharpTypes.Rigid(full.Parameters[0].Type); }
                 UnifyDeconstructionReceiver(expected, projected);
                 foreach (var parameter in definition.TypeParameters)
-                { ImportConstraints(parameter, mapping[parameter], mapping); }
+                { ImportConstraints(parameter, mapping[parameter], mapping, full.TypeArguments[parameter.Ordinal]); }
             }
             else
             {
@@ -223,9 +225,15 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expected)); }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
-            if (expected.Name == CSharpTypes.NullableReference && inferred.Name != CSharpTypes.NullableReference)
+            if (expected.Name == CSharpTypes.NullableParameter)
             {
-                HmType.Unify(inferred, expected.Arguments[0]);
+                // A T? formal accepts an unannotated actual without making that
+                // actual nullable. The result scheme still retains its annotation.
+                UnifyDeconstructionReceiver(expected.Arguments[0], inferred);
+            }
+            else if (expected.Name == CSharpTypes.NullableReference && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
+            {
+                UnifyDeconstructionReceiver(expected.Arguments[0], inferred);
             }
             else if (!expected.IsVariable && inferred.Name == CSharpTypes.NullableReference && expected.Name != CSharpTypes.NullableReference)
             {
@@ -252,7 +260,9 @@ public static partial class Inference
                 throw new InferenceException("Unresolved coalescing expression.");
             }
             var left = Expression(expression.Left).Root;
-            if (!operation.ValueConversion.IsIdentity || left.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue))
+            while (left.Name == CSharpTypes.NullableParameter && left.Arguments[0].Root.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter)
+            { left = left.Arguments[0].Root; }
+            if (!operation.ValueConversion.IsIdentity || left.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter))
             {
                 Anchor(expression.Left);
                 Anchor(expression.Right);
@@ -273,6 +283,8 @@ public static partial class Inference
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
             var target = AssignmentTarget(expression.Left).Root;
+            while (target.Name == CSharpTypes.NullableParameter && target.Arguments[0].Root.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter)
+            { target = target.Arguments[0].Root; }
             var targetType = model.GetTypeInfo(expression.Left, cancellationToken).Type!;
             var sourceType = model.GetTypeInfo(expression.Right, cancellationToken).Type;
             var resultType = model.GetTypeInfo(expression, cancellationToken).Type!;
@@ -334,7 +346,7 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped conditional access."));
         }
 
-        private List<TypeParameterConstraintClauseSyntax> NullableConstraints(HmType[] parameters, HmType result, Dictionary<HmType, string> variables)
+        private List<TypeParameterConstraintClauseSyntax> NullableConstraints(HmType[] parameters, HmType result, Dictionary<HmType, string> variables, bool nullableAnnotations)
         {
             if (parameters is null)
             { throw new ArgumentNullException(nameof(parameters)); }
@@ -350,9 +362,13 @@ public static partial class Inference
                 type = type.Root;
                 if (!visited.Add(type))
                 { return; }
-                if (type.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue && type.Arguments[0].Root.IsVariable)
+                if (type.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue)
                 {
-                    RequireKeyword(type.Arguments[0], type.Name == CSharpTypes.NullableReference ? "class" : "struct");
+                    var element = type.Arguments[0].Root;
+                    while (element.Name == CSharpTypes.NullableParameter)
+                    { element = element.Arguments[0].Root; }
+                    if (element.IsVariable)
+                    { RequireKeyword(element, type.Name == CSharpTypes.NullableReference ? "class" : "struct"); }
                 }
                 foreach (var argument in type.Arguments)
                 { Visit(argument); }
@@ -360,7 +376,7 @@ public static partial class Inference
             foreach (var parameter in parameters)
             { Visit(parameter); }
             Visit(result);
-            return BuildConstraints(variables);
+            return BuildConstraints(variables, nullableAnnotations);
         }
 
         private string CompilerWarningKey(Diagnostic warning, Compilation compilation)

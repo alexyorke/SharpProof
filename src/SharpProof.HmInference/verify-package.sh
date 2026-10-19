@@ -46,6 +46,12 @@ static class Sample {
     public static Func<Task<int>> Capture(int value) => async () => { await Task.Yield(); return value; };
     public static Func<int> Group(PackageBox<int> box) => box.Get;
     public static void Apply(PackageSink<int> sink,int value) => sink(value);
+    public static T? Maybe<T>(T value)=>value;
+    public static int ImportedNullable(int value)=>Maybe(value);
+#nullable disable
+    public static int ImportedNullableLegacy(int value)=>Maybe(value);
+#nullable enable
+    public static async Task<int> ImportedNullableAsync(int value)=>await Task.FromResult(Maybe(value));
     public static int Identity(int value) => value;
     public static int? NullableIdentity(int? value) => value;
     public static string? NullableReferenceIdentity(string? value) => value;
@@ -63,10 +69,10 @@ EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 if grep -Eq 'CS8032|AD0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
-for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class'; do
+for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'T1? ImportedNullable<T1>' 'T1 ImportedNullableLegacy<T1>' 'ImportedNullableAsync<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' | tee "$evidence/package-checks.txt"

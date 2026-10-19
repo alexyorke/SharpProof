@@ -5,6 +5,7 @@ namespace SharpProof.HmInference;
 
 internal static class CSharpTypes
 {
+    internal const string NullableParameter = "@nullable-parameter";
     internal const string NullableReference = "@nullable-reference";
     internal const string NullableValue = "global::System.Nullable";
 
@@ -38,17 +39,26 @@ internal static class CSharpTypes
 
     private static HmType Convert(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables)
     {
+        if (type is null)
+        { throw new ArgumentNullException(nameof(type)); }
+        var shape = ConvertCore(type, erase, variables);
+        // Erased variables range over both domains. Concrete constructors retain
+        // their domain so an instantiated unconstrained T? never renders int?.
+        if (!shape.Root.IsVariable)
+        { shape.IsValueType ??= type.IsValueType ? true : type.IsReferenceType ? false : null; }
+        return shape;
+    }
+
+    private static HmType ConvertCore(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables)
+    {
         if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
         {
             return new(NullableReference, Convert(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated), erase, variables));
         }
         if (type is ITypeParameterSymbol { NullableAnnotation: NullableAnnotation.Annotated } nullableParameter)
         {
-            if (variables is not null && variables.ContainsKey(nullableParameter))
-            {
-                throw new InferenceException("Imported unconstrained nullable type parameters are unsupported.");
-            }
-            return new(Display(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)));
+            return new(NullableParameter, variables is not null && variables.TryGetValue(nullableParameter, out var mapped)
+                ? mapped : new HmType(Display(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated))));
         }
         if (type is ITypeParameterSymbol parameter && variables is not null && variables.TryGetValue(parameter, out var variable))
         {
@@ -138,7 +148,7 @@ internal static class CSharpTypes
         return SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ? "@" + name : name;
     }
 
-    public static string Render(HmType inferred, ITypeSymbol declared, Dictionary<HmType, string> variables)
+    public static string Render(HmType inferred, ITypeSymbol declared, Dictionary<HmType, string> variables, bool nullableAnnotations = true)
     {
         if (variables is null)
         {
@@ -146,16 +156,26 @@ internal static class CSharpTypes
         }
 
         inferred = inferred.Root;
+        var annotate = nullableAnnotations || declared.NullableAnnotation == NullableAnnotation.Annotated
+            && (declared.IsReferenceType || declared is ITypeParameterSymbol);
         if (declared is ITypeParameterSymbol { NullableAnnotation: NullableAnnotation.Annotated }
             && inferred.Name == Display(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated)))
-        { return Display(declared); }
+        { return Display(annotate ? declared : declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated)); }
+        if (inferred.Name == NullableParameter)
+        {
+            var inner = inferred.Arguments[0].Root;
+            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations);
+            return !annotate || inner.IsValueType == true || inner.Name is NullableParameter or NullableReference or NullableValue ? rendered : rendered + "?";
+        }
         if (inferred.Name == NullableReference)
         {
-            return Render(inferred.Arguments[0], declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables) + "?";
+            var inner = inferred.Arguments[0].Root;
+            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations);
+            return !annotate || inner.Name is NullableReference or NullableParameter ? rendered : rendered + "?";
         }
         if (inferred.Name == NullableValue && declared is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
         {
-            return Render(inferred.Arguments[0], nullable.TypeArguments[0], variables) + "?";
+            return Render(inferred.Arguments[0], nullable.TypeArguments[0], variables, nullableAnnotations) + "?";
         }
         if (inferred.Name == "Tuple" && declared is INamedTypeSymbol { IsTupleType: true } tuple && tuple.TupleElements.Length == inferred.Arguments.Length)
         {
@@ -171,13 +191,13 @@ internal static class CSharpTypes
                     throw new global::System.ArgumentOutOfRangeException(nameof(i));
                 }
 
-                return Render(inferred.Arguments[i], field.Type, variables) + (field.IsImplicitlyDeclared ? "" : " " + Identifier(field.Name));
+                return Render(inferred.Arguments[i], field.Type, variables, nullableAnnotations) + (field.IsImplicitlyDeclared ? "" : " " + Identifier(field.Name));
             })) + ")";
         }
 
         if (inferred.Name.StartsWith("[", StringComparison.Ordinal) && declared is IArrayTypeSymbol array)
         {
-            return Render(inferred.Arguments[0], array.ElementType, variables) + inferred.Name;
+            return Render(inferred.Arguments[0], array.ElementType, variables, nullableAnnotations) + inferred.Name;
         }
 
         if (inferred.Arguments.Length > 0 && declared is INamedTypeSymbol named && named.TypeArguments.Length == inferred.Arguments.Length)
@@ -195,10 +215,10 @@ internal static class CSharpTypes
                     throw new global::System.ArgumentOutOfRangeException(nameof(i));
                 }
 
-                return Render(t, named.TypeArguments[i], variables);
+                return Render(t, named.TypeArguments[i], variables, nullableAnnotations);
             })) + ">";
         }
 
-        return inferred.Format(variables);
+        return inferred.Format(variables, nullableAnnotations);
     }
 }

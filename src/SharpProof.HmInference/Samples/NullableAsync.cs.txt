@@ -3,6 +3,11 @@ using System.Threading.Tasks;
 
 public static class NullableAsyncSamples
 {
+    public static int ImportedNullable(int value) => ImportedMaybe(value);
+    public static int[] ImportedNullableArray(int value) => ImportedArray(value);
+    public static async Task<int> ImportedNullableAsync(int value) => await Task.FromResult(ImportedMaybe(value));
+    public static T? ImportedMaybe<T>(T value) => value;
+    public static T?[] ImportedArray<T>(T value) => new T?[] { value };
     public static int? ValueIdentity(int? value) => value;
     public static string? ReferenceIdentity(string? value) => value;
     public static int Fallback(int? value, int fallback) => value ?? fallback;

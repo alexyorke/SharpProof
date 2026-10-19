@@ -28,7 +28,7 @@ public static partial class Inference
             inferredConstraints.Add((variable, null, CSharpTypes.Rigid(type, mapping), type.TypeKind == TypeKind.Class));
         }
 
-        private void ImportConstraints(ITypeParameterSymbol parameter, HmType variable, Dictionary<ITypeParameterSymbol, HmType> mapping)
+        private void ImportConstraints(ITypeParameterSymbol parameter, HmType variable, Dictionary<ITypeParameterSymbol, HmType> mapping, ITypeSymbol? actual = null)
         {
             if (parameter is null)
             { throw new ArgumentNullException(nameof(parameter)); }
@@ -45,7 +45,20 @@ public static partial class Inference
                 RequireKeyword(variable, parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated ? "class?" : "class");
             }
             if (parameter.HasNotNullConstraint)
-            { RequireKeyword(variable, "notnull"); }
+            {
+                RequireKeyword(variable, "notnull");
+                if (variable.Root.Name == CSharpTypes.NullableParameter && actual is { IsValueType: true }
+                    && actual is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+                {
+                    // An annotated type argument satisfies notnull without a new
+                    // warning only in the non-nullable value domain. Preserve that
+                    // domain when the original constructed call proves it applies.
+                    var underlying = variable.Root;
+                    while (underlying.Name == CSharpTypes.NullableParameter)
+                    { underlying = underlying.Arguments[0].Root; }
+                    RequireKeyword(underlying, "struct");
+                }
+            }
             foreach (var type in parameter.ConstraintTypes)
             { RequireType(variable, type, mapping); }
             if (parameter.HasConstructorConstraint)
@@ -59,7 +72,7 @@ public static partial class Inference
             if (inferred is null)
             { throw new ArgumentNullException(nameof(inferred)); }
             inferred = inferred.Root;
-            if (inferred.Name == CSharpTypes.NullableReference)
+            if (inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
             {
                 ImportConstructedConstraints(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), inferred.Arguments[0]);
                 return;
@@ -76,15 +89,29 @@ public static partial class Inference
             { mapping.Add(named.OriginalDefinition.TypeParameters[i], inferred.Arguments[i]); }
             for (var i = 0; i < named.TypeArguments.Length; i++)
             {
-                ImportConstraints(named.OriginalDefinition.TypeParameters[i], inferred.Arguments[i], mapping);
+                ImportConstraints(named.OriginalDefinition.TypeParameters[i], inferred.Arguments[i], mapping, named.TypeArguments[i]);
                 ImportConstructedConstraints(named.TypeArguments[i], inferred.Arguments[i]);
             }
         }
 
-        private List<TypeParameterConstraintClauseSyntax> BuildConstraints(Dictionary<HmType, string> variables)
+        private List<TypeParameterConstraintClauseSyntax> BuildConstraints(Dictionary<HmType, string> variables, bool nullableAnnotations)
         {
             if (variables is null)
             { throw new ArgumentNullException(nameof(variables)); }
+            // Constraints establish annotation domains only after solving. Apply all
+            // domains before rendering constraints that mention other variables.
+            foreach (var requirement in inferredConstraints)
+            {
+                var constrained = requirement.Variable.Root;
+                while (constrained.Name == CSharpTypes.NullableParameter)
+                { constrained = constrained.Arguments[0].Root; }
+                if (!constrained.IsVariable)
+                { continue; }
+                if (requirement.Keyword is "struct" or "unmanaged")
+                { constrained.IsValueType = true; }
+                else if (requirement.Keyword is "class" or "class?" || requirement.BaseClass)
+                { constrained.IsValueType = false; }
+            }
             var clauses = new List<TypeParameterConstraintClauseSyntax>();
             foreach (var variable in variables)
             {
@@ -93,7 +120,10 @@ public static partial class Inference
                 var hasBaseClass = false;
                 foreach (var requirement in inferredConstraints)
                 {
-                    if (!ReferenceEquals(requirement.Variable.Root, variable.Key.Root))
+                    var constrained = requirement.Variable.Root;
+                    while (constrained.Name == CSharpTypes.NullableParameter)
+                    { constrained = constrained.Arguments[0].Root; }
+                    if (!ReferenceEquals(constrained, variable.Key.Root))
                     { continue; }
                     if (requirement.Keyword is not null)
                     { keywords.Add(requirement.Keyword); }
@@ -104,7 +134,7 @@ public static partial class Inference
                             if (!variables.ContainsKey(free))
                             { throw new InferenceException("A constraint-only type variable cannot be inferred from method arguments."); }
                         }
-                        var type = requirement.Type.Format(variables);
+                        var type = requirement.Type.Format(variables, nullableAnnotations);
                         if (!types.Contains(type))
                         { if (requirement.BaseClass) { types.Insert(0, type); } else { types.Add(type); } }
                         hasBaseClass |= requirement.BaseClass;
