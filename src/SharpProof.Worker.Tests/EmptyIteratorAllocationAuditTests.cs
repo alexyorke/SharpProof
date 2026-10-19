@@ -83,16 +83,16 @@ public sealed class EmptyIteratorAllocationAuditTests
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
             Language = parseOptions.LanguageVersion.ToString(),
-            Symbols = parseOptions.PreprocessorSymbolNames.ToArray(),
+            Symbols = parseOptions.PreprocessorSymbolNames.ToImmutableArray(),
             Optimization = compilation.Options.OptimizationLevel.ToString(),
-            Diagnostics = diagnostics.Select(DiagnosticObservation).ToArray(),
-            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
+            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             emission.Success
         });
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
         Assert.That(diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var warnings = diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToArray();
+        var warnings = diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
         if (caseIndex == 3)
         { Assert.That(warnings.All(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8321")), Is.True); }
         else
@@ -176,7 +176,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             PeSha256 = Hash(bytes),
             CallableId = callableId,
             OutputExists = outputExists,
-            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToArray()
+            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray()
         });
         Assert.That(collectorDiagnostics, Is.Empty);
         Assert.That(outputExists, Is.True, "A fresh public artifact must retain the selected allocation claim.");
@@ -195,7 +195,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAllocationInstruction>().ToArray() ?? [];
+            .OfType<IrAllocationInstruction>().ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
             subject.Name,
@@ -215,7 +215,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             native.QueryCompleted,
             native.HasFeasibleEntryWitness,
             NativeAllocationWitness = native.AllocationWitness?.ToString(),
-            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToArray(),
+            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
             Allocations = allocations.Select(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (new
             {
                 Operation = allocation.Operation.ToString(),
@@ -223,7 +223,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 Target = allocation.Target?.ToString(),
                 Length = allocation.Length?.ToString(),
                 MatchesWitness = allocation.Operation == native.AllocationWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
@@ -234,7 +234,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
             {
                 item.ClaimId,
@@ -243,7 +243,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome?.ToString() ?? "SemanticNotProven"
         });
         using (Assert.EnterMultipleScope())
@@ -353,10 +353,10 @@ public sealed class EmptyIteratorAllocationAuditTests
                 return new AttributeObservation(MetadataTokens.GetRowNumber(handle), constructor.DeclaringType!.FullName!,
                     constructor.DeclaringType.Assembly.FullName!, MetadataTokens.GetToken(attribute.Constructor),
                     Convert.ToHexStringLower(metadata.GetBlobBytes(attribute.Value)));
-            }).ToArray();
+            }).ToImmutableArray();
             return new(method.Module.ModuleVersionId, metadata.GetGuid(metadata.GetModuleDefinition().Mvid), method.MetadataToken,
                 measured.DelegateMethodToken, measured.DelegateMvid, measured.DelegateHasNoTarget,
-                type.TypeInitializer != null, attributes.ToImmutableArray(), iteratorType?.FullName, iteratorType?.MetadataToken,
+                type.TypeInitializer != null, attributes, iteratorType?.FullName, iteratorType?.MetadataToken,
                 iteratorType?.Module.ModuleVersionId, iteratorType?.DeclaringType == type,
                 iteratorType?.IsInstanceOfType(measured.First), measured.First == null, measured.Second == null,
                 ReferenceEquals(measured.First, measured.Second), measured.First?.GetType().FullName, enumerationHasElement,
@@ -433,7 +433,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 else
                 { Assert.That(round.SubjectBytes, Is.Zero); }
             }
-            var allocations = observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToArray();
+            var allocations = observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToImmutableArray();
             if (caseIndex == 0)
             {
                 Assert.That(observation.Attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName)), Is.EqualTo(1));

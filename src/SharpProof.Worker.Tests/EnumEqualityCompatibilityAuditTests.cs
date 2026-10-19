@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -40,7 +41,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".observed.cs"), source);
         var compilation = TestCompilation.Create("EnumEqualityCompatibility_" + caseName, ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
-        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToArray();
+        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
         Assert.That(warnings, Is.Empty, string.Join("\n", warnings.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

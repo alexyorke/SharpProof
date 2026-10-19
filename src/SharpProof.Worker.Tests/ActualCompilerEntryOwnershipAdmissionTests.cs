@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -26,7 +27,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var targets = project.Snapshot.Callables.ToArray();
+        var targets = project.Snapshot.Callables;
         Assert.That(targets, Has.Length.EqualTo(2));
         Assert.That(targets[0].Entry.CallableId, Is.Not.EqualTo(targets[1].Entry.CallableId));
         foreach (var target in targets)

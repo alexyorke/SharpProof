@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -68,7 +69,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
             Assert.That(owner.StaticConstructors, Is.Empty);
             Assert.That(owner.GetMembers().OfType<IFieldSymbol>().Count(), Is.EqualTo(count));
             Assert.That(owner.GetMembers(), Has.Length.EqualTo(count + 1));
-            Assert.That(Array.IndexOf(owner.GetMembers().ToArray(), method), Is.EqualTo(shape == "fields-before" ? count : 0));
+            Assert.That(owner.GetMembers().IndexOf(method), Is.EqualTo(shape == "fields-before" ? count : 0));
             Assert.That(owner.GetMembers().OfType<IFieldSymbol>().All(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.IsStatic && !field.IsConst && field.DeclaringSyntaxReferences.Length == 1)), Is.True);
         }
         else if (shape == "module")
@@ -102,7 +103,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
                 Assert.That(owner.GetMembers()[1], Is.EqualTo(method));
                 Assert.That(owner.GetMembers()[2], Is.EqualTo(constructor));
                 Assert.That(constructorSyntax.Body!.Statements, Has.Count.EqualTo(count + 1));
-                var statements = constructorSyntax.Body.Statements.OfType<ExpressionStatementSyntax>().ToArray();
+                var statements = constructorSyntax.Body.Statements.OfType<ExpressionStatementSyntax>().ToImmutableArray();
                 Assert.That(statements, Has.Length.EqualTo(shape == "type-work" ? count + 1 : count));
                 foreach (var statement in statements)
                 {

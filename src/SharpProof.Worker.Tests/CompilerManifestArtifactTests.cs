@@ -242,7 +242,7 @@ public sealed class CompilerManifestArtifactTests
         var callable = artifact.Manifest.Callables.Single();
         var claims = artifact.Manifest.Claims
             .Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.CallableId == callable.CallableId)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(claims, Is.Not.Empty);
         artifact = artifact with
         {
@@ -297,7 +297,7 @@ public sealed class CompilerManifestArtifactTests
                 WorkerClaimReason.Unspecified or
                 WorkerClaimReason.None) &&
                 !allowed.Contains(reason))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(rejected, Does.Contain(WorkerClaimReason.MethodTimeout));
         var artifact = CreateUnsupportedLoopArtifact();
 
@@ -730,7 +730,7 @@ public sealed class CompilerManifestArtifactTests
         var allowed = evidence.Constraint.AllowedExceptionTypes;
         Assert.That(allowed, Has.Length.EqualTo(2));
         Assert.That(allowed, Is.EqualTo(
-            allowed.OrderBy(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type), StringComparer.Ordinal).ToArray()));
+            allowed.OrderBy(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type), StringComparer.Ordinal).ToImmutableArray()));
         Assert.DoesNotThrow((Action)(() =>
             CompilerEffectClaimArtifactCodec.Validate(evidence)));
 

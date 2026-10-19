@@ -95,7 +95,7 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
             Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EquivalentTo(RefusalDiagnosticIds));
             var companionDiagnostics = diagnostics.Where(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree))).ToArray();
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree))).ToImmutableArray();
             Assert.That(companionDiagnostics, Has.Length.EqualTo(2));
             foreach (var diagnostic in companionDiagnostics)
             {

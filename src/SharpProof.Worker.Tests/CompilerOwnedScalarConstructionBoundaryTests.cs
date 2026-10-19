@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -44,7 +45,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(method.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
         Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
-        var statements = declaration.Body!.Statements.OfType<ExpressionStatementSyntax>().ToArray();
+        var statements = declaration.Body!.Statements.OfType<ExpressionStatementSyntax>().ToImmutableArray();
         Assert.That(statements, Has.Length.EqualTo(statementCount));
         foreach (var statement in statements)
         {

@@ -192,7 +192,7 @@ public sealed class CallerBoxingInterfaceAuditTests
             var nullableControlMethod = type.GetMethod("ControlNullable")!;
             var methods = new[] { doubleMethod, nullableMethod, doubleControlMethod, nullableControlMethod, boundaryMethod };
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
-                JsonSerializer.Serialize(methods.Select(DescribeIl).ToArray(), WorkerProtocolJson.SharedOptions));
+                JsonSerializer.Serialize(methods.Select(DescribeIl).ToImmutableArray(), WorkerProtocolJson.SharedOptions));
             foreach (var method in methods)
             { AssertNoInliningOnly(method); }
             Assert.That(boundaryMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody),
@@ -261,7 +261,7 @@ public sealed class CallerBoxingInterfaceAuditTests
             var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == declaration.ClaimId));
             var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == declaration.CallableId));
             var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaration.CallableId));
-            var group = observations.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Method == methodName)).ToArray();
+            var group = observations.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Method == methodName)).ToImmutableArray();
             Assert.That(group, Has.Length.EqualTo(methodName == "TargetDouble" ? MeasurementRounds : 2 * MeasurementRounds));
             var positive = group.Any(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes > 0));
             var zero = group.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0));

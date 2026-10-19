@@ -271,7 +271,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             Scenario = scenario,
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(settings.Source)),
             ProducerSourceSha256 = Hash(Encoding.UTF8.GetBytes(settings.Producer)),
-            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToArray(),
+            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             ProducerPe = DescribePe(producerBytes),
@@ -522,12 +522,12 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, priorBytes ?? callerBytes);
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
-            var creations = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToArray();
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
+            var creations = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToImmutableArray();
             var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
             var inputs = settings.Retained ? RetainedInputs : OmittedInputs;
-            var observations = inputs.Select(input => Invoke(target, input)).ToArray();
+            var observations = inputs.Select(input => Invoke(target, input)).ToImmutableArray();
             await Save(directory, "emission-and-clr.json", new
             {
                 Producer = new { Name = producer.GetName().Name, Mvid = producer.ManifestModule.ModuleVersionId },
@@ -541,13 +541,13 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                     Assembly = attribute.AttributeType.Assembly.GetName().Name,
                     Mvid = attribute.AttributeType.Module.ModuleVersionId,
                     ConstructorToken = attribute.Constructor.MetadataToken,
-                    ParameterTypes = attribute.Constructor.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                    ParameterTypes = attribute.Constructor.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                     Arguments = attribute.ConstructorArguments.Select(argument => ((argument.ArgumentType is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (new
                     {
                         Type = argument.ArgumentType.FullName,
                         argument.Value
-                    }))).ToArray()
-                })).ToArray(),
+                    }))).ToImmutableArray()
+                })).ToImmutableArray(),
                 DelegateMethodToken = target.Method.MetadataToken,
                 DelegateMvid = target.Method.Module.ModuleVersionId,
                 DelegateTargetIsNull = target.Target == null,

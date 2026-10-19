@@ -51,7 +51,7 @@ public sealed class CompilerIlStreamFillTests
 
         CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(destination, Is.EqualTo(source.Skip(1).Take(length).ToArray()));
+        Assert.That(destination, Is.EqualTo(source.Skip(1).Take(length).ToImmutableArray()));
         Assert.That(stream.Position, Is.EqualTo(length + 1));
         Assert.That(stream.ReadByte(), Is.EqualTo((int)source[length + 1]));
     }
@@ -67,7 +67,7 @@ public sealed class CompilerIlStreamFillTests
         Assert.Throws<EndOfStreamException>((Action)(() =>
             CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken)));
 
-        Assert.That(destination.Take(available).ToArray(), Is.EqualTo(source));
+        Assert.That(destination.Take(available).ToImmutableArray(), Is.EqualTo(source));
         Assert.That(destination[available], Is.EqualTo((byte)0xcc));
         Assert.That(stream.Position, Is.EqualTo(available));
         Assert.That(stream.CanRead, Is.True);
@@ -123,7 +123,7 @@ public sealed class CompilerIlStreamFillTests
         Assert.That(stream.Reads, Has.Count.EqualTo(1));
         Assert.That(stream.Reads[0], Is.EqualTo((Offset: 0, Count: 81920)));
         Assert.That(inner.Position, Is.EqualTo(50000));
-        Assert.That(destination.Take(50000).ToArray(), Is.EqualTo(source.Take(50000).ToArray()));
+        Assert.That(destination.Take(50000).ToImmutableArray(), Is.EqualTo(source.Take(50000).ToImmutableArray()));
         Assert.That(destination.Skip(50000).All(value => value == 0xcc), Is.True);
     }
 

@@ -158,7 +158,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 q,
                 outcome = outcome.GetType().Name,
                 reason = outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : "None",
-                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToArray() : [],
+                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToImmutableArray() : [],
                 delta,
                 consumed = session.ConsumedResourceCount
             }));
@@ -193,7 +193,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             {
                 prime,
                 isPrime = IsPrime(prime)
-            }).ToArray(),
+            }).ToImmutableArray(),
             maximumProduct = maximumProduct.ToString(System.Globalization.CultureInfo.InvariantCulture),
             startedQueries,
             observedBatchDelta,

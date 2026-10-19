@@ -53,7 +53,7 @@ public sealed class CompilerTotalCallableArtifactTests
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(static preparation =>
             preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Total is { CallPreconditions.Length: 1 })).Total!;
-        var instructions = total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -558,9 +558,9 @@ public sealed class CompilerTotalCallableArtifactTests
         var encoded = CompilerTotalCallableArtifactCodec.Encode(modified)!;
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)) with { Total = encoded }) }; }
         var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))
-            .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToArray();
+            .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToImmutableArray();
         var operations = encoded.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Operation))
-            .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToArray();
+            .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToImmutableArray();
         Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations, TestContext.CurrentContext.CancellationToken)));
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -1029,7 +1029,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var documents = artifact.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!)).ToArray();
+        var documents = artifact.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!)).ToImmutableArray();
         Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Document)), Is.EquivalentTo(artifact.Compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))));
         Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Start)).Distinct().Count(), Is.EqualTo(1));
         Assert.That(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)), Is.All.EqualTo("mapped.cs"));

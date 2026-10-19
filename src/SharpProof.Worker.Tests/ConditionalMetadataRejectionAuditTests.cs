@@ -140,8 +140,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 Type = attribute.AttributeClass!.ToDisplayString(),
                 Assembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
                 Constructor = attribute.AttributeConstructor!.ToDisplayString(),
-                Values = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))).ToArray()
-            })).ToArray(),
+                Values = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))).ToImmutableArray()
+            })).ToImmutableArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             MetadataRuntime = typeof(MetadataReader).Assembly.FullName,
@@ -150,7 +150,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(sourceLog.IsConditional, Is.True);
         Assert.That(sourceLog.DeclaringSyntaxReferences.Length, Is.EqualTo(1));
         Assert.That(sourceAttributes.Length, Is.EqualTo(2));
-        var official = sourceAttributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType))).ToArray();
+        var official = sourceAttributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType))).ToImmutableArray();
         Assert.That(official.Length, Is.EqualTo(settings.Mutation == null ? 1 : 2));
         Assert.That(official.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : ((string)attribute.ConstructorArguments.Single().Value!)),
             Does.Contain("OFFICIAL_ABSENT"));
@@ -434,7 +434,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
             allowedOffsets = [blobOffset + 3];
             mutated[blobOffset + 3] = 0x7f;
         }
-        var changedOffsets = Enumerable.Range(0, original.Length).Where(offset => original[offset] != mutated[offset]).ToArray();
+        var changedOffsets = Enumerable.Range(0, original.Length).Where(offset => original[offset] != mutated[offset]).ToImmutableArray();
         var before = DescribeImage(original, logToken);
         var after = DescribeImage(mutated, logToken);
         await File.WriteAllBytesAsync(Path.Combine(directory, "mutated-producer.dll"), mutated);
@@ -505,7 +505,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         {
             Version = version,
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(CallerSource)),
-            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToArray(),
+            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             MetadataRuntime = typeof(MetadataReader).Assembly.FullName,
@@ -579,10 +579,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, producerBytes);
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
             var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
-            var observations = (retained ? RetainedInputs : OmittedInputs).Select(input => Invoke(target, input)).ToArray();
+            var observations = (retained ? RetainedInputs : OmittedInputs).Select(input => Invoke(target, input)).ToImmutableArray();
             await Save(directory, "emission-and-clr.json", new
             {
                 Producer = new

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
@@ -100,7 +101,7 @@ public sealed class DeclarationCoverageAccountingTests
                 var path = Path.Combine(temporary, index + ".cs");
                 File.WriteAllText(path, "public abstract class Subject\n{\n" + item.Declaration + "\n}\n");
                 return new { path = item.Name, sourcePath = path, languageVersion = "preview", preprocessorSymbols = Array.Empty<string>() };
-            }).ToArray();
+            }).ToImmutableArray();
             var request = Path.Combine(temporary, "request.json");
             await File.WriteAllTextAsync(request, JsonSerializer.Serialize(documents));
             const string script = """

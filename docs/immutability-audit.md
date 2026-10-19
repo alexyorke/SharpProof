@@ -3076,3 +3076,9 @@ ordinal duplicate checks, cancellation order, durable marker behavior, publicati
 indices, native file/IL buffers and LIFO traversal. Diagnostic text/order/limits remain
 unchanged. Validate transaction failure/recovery and ordinary allocation oracle gates.
 Status: open before edits.
+
+IMM-M090 verified: all 5,484 ordinary Worker tests excluding LongFuzz pass, zero
+failures/skips/warnings/errors. Main checked all 142 selected projections and coupled
+compiler overload, metadata reversal, direct immutable roots and member-index lookup.
+The first build identified one redundant immutable attribute copy; direct publication
+fixed it before this passing complete run. Native mutable SUT buffers remain intact.

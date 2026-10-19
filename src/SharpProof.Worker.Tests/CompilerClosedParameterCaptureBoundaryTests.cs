@@ -114,19 +114,16 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         using var pe = new PEReader(new MemoryStream(image, writable: false));
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "Two");
-        var rows = Definition(reader, method).GetParameters().ToArray();
+        var rows = Definition(reader, method).GetParameters().ToImmutableArray();
         foreach (var row in rows)
         {
             var attribute = reader.GetCustomAttribute(reader.GetParameter(row).GetCustomAttributes().Single());
             Assert.That(attribute.Constructor.Kind, Is.EqualTo(HandleKind.MemberReference));
         }
-        if (reverseRows)
-        {
-            Array.Reverse(rows);
-        }
+        var orderedRows = reverseRows ? rows.AsEnumerable().Reverse().ToImmutableArray() : rows;
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            rows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
+            orderedRows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
         Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ParameterOrdinal)), Is.EqualTo(ExpectedParameterOrdinals));
         Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Kind)), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
@@ -145,7 +142,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.Zero);
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            Enumerable.Repeat(row, count).ToArray(), TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
+            Enumerable.Repeat(row, count).ToImmutableArray(), TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
         Assert.That(attributes, Is.Empty);
     }
 
@@ -160,7 +157,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         var (_, zero) = Import(image, "Zero");
         var returnRow = Definition(reader, zero).GetParameters().Single();
         var parameterRow = Definition(reader, method).GetParameters().Single();
-        var rows = Enumerable.Repeat(returnRow, returns).Append(parameterRow).ToArray();
+        var rows = Enumerable.Repeat(returnRow, returns).Append(parameterRow).ToImmutableArray();
         Assert.That(reader.GetParameter(returnRow).SequenceNumber, Is.Zero);
         Assert.That(reader.GetParameter(parameterRow).GetCustomAttributes().Count, Is.EqualTo(1));
 

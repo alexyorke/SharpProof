@@ -950,14 +950,14 @@ public sealed class ClaimManifestBuilderTests
             .SelectMany(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Assumptions))
             .Where(static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(assumptions, Has.Length.EqualTo(2));
         Assert.That(
             assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)),
             Is.All.Matches("^spa1:[0-9a-f]{64}$"));
         Assert.That(
-            assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct().ToArray(),
+            assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct().ToImmutableArray(),
             Has.Length.EqualTo(2));
     }
 
@@ -1040,13 +1040,13 @@ public sealed class ClaimManifestBuilderTests
                 StringComparison.Ordinal)));
         var firstIds = first.Manifest.Claims
             .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
-            .ToArray();
+            .ToImmutableArray();
         var renamedIds = renamed.Manifest.Claims
             .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
-            .ToArray();
+            .ToImmutableArray();
         var changedIds = changed.Manifest.Claims
             .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1513,14 +1513,14 @@ public sealed class ClaimManifestBuilderTests
                 Is.False);
             Assert.That(
                 result.Manifest.Callables.Select(static callable =>
-                    callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).Distinct(StringComparer.Ordinal).ToArray(),
+                    callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).Distinct(StringComparer.Ordinal).ToImmutableArray(),
                 Has.Length.EqualTo(8));
             Assert.That(
                 result.Manifest.Claims.Select(static claim =>
-                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct(StringComparer.Ordinal).ToArray(),
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct(StringComparer.Ordinal).ToImmutableArray(),
                 Has.Length.EqualTo(8));
             Assert.That(
-                targets.SelectMany(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims)).ToArray(),
+                targets.SelectMany(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims)).ToImmutableArray(),
                 Has.Length.EqualTo(8));
         }
     }
@@ -2234,7 +2234,7 @@ public sealed class ClaimManifestBuilderTests
                 claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal)),
                 Is.EqualTo([0, 1, 2]));
             Assert.That(
-                claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().ToArray(),
+                claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().ToImmutableArray(),
                 Has.Length.EqualTo(3));
             Assert.That(
                 second.Manifest.Claims.Select(static claim =>
@@ -2337,7 +2337,7 @@ public sealed class ClaimManifestBuilderTests
         var result = Build(("Subject.cs", source));
 
         var claims = result.Manifest.Claims.Where(static claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
         Assert.That(claims, Has.Length.EqualTo(1));
         Assert.That(claims[0].ClaimId, Is.Not.Empty);
     }

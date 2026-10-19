@@ -173,13 +173,13 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Cases = cases,
             AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0)),
             AllFourObservedZero = cases.All(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes == 0)),

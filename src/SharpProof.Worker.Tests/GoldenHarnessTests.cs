@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Worker.Test;
@@ -86,7 +87,7 @@ public sealed class GoldenHarnessTests
     {
         using var copy = CreateRepository();
         File.WriteAllText(Path.Combine(Path.GetDirectoryName(Expected(copy))!, "orphan.expected"), "old\n");
-        Assert.Throws<InvalidDataException>((Action)(() => GoldenTest.Cases("worker", copy.FullName).ToArray()));
+        Assert.Throws<InvalidDataException>((Action)(() => GoldenTest.Cases("worker", copy.FullName).ToImmutableArray()));
     }
 
     [Test]

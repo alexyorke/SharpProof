@@ -235,7 +235,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var assignment = (ISimpleAssignmentOperation)invocation.Arguments.Single().Value;
         var parameter = (IParameterReferenceOperation)assignment.Target;
         var requires = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" })).ToArray();
+            .Where(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" })).ToImmutableArray();
         var selected = discovery.Targets.Values.Single();
         var attributeObservations = attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
         {
@@ -246,7 +246,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Argument = (string)attribute.ConstructorArguments.Single().Value!,
             IsPrivate = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, privateType),
             IsOfficial = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType)
-        })).ToArray();
+        })).ToImmutableArray();
         await Save(directory, "source-and-compiler.json", new
         {
             Scenario = scenario,
@@ -593,7 +593,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 Argument = (string)attribute.ConstructorArguments.Single().Value!,
                 IsPrivate = attribute.AttributeType.Assembly == producerAssembly,
                 IsOfficial = attribute.AttributeType == typeof(System.Diagnostics.ConditionalAttribute)
-            })).ToArray();
+            })).ToImmutableArray();
             await Save(directory, "decoded-il.json", new
             {
                 Target = targetIl,
@@ -623,8 +623,8 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Assert.That(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic |
                 BindingFlags.Static | BindingFlags.Instance), Is.Empty);
             Assert.That(logIl.Instructions.Single().OpCode, Is.EqualTo("ret"));
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
             var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
             Assert.That(calls.Length, Is.EqualTo(retained ? 1 : 0), "Requires is absent from the emitted caller.");
             Assert.That(stores.Length, Is.EqualTo(retained ? 1 : 0));
@@ -654,7 +654,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             {
                 Assert.That(attribute.Argument, Is.EqualTo(settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT"));
             }
-            var observations = inputs.Select(input => Invoke(target, input)).ToArray();
+            var observations = inputs.Select(input => Invoke(target, input)).ToImmutableArray();
             await Save(directory, "clr-observations.json", new
             {
                 Inputs = inputs,

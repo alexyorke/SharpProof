@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -52,7 +53,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
             """)], allowUnsafe: true);
         TestCompilation.AssertNoErrors(compilation);
         var methods = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target")
-            .OfType<IMethodSymbol>().ToArray();
+            .OfType<IMethodSymbol>().ToImmutableArray();
         foreach (var method in methods)
         {
             TestContext.Out.WriteLine($"wrapper={wrapper}; generic={generic}; parameter={method.Parameters[0].Type}; referenceId={DocumentationCommentId.CreateReferenceId(method.Parameters[0].Type)}; callableId={SemanticClaimIdentity.CreateCallableId(method)}");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -37,11 +38,11 @@ public sealed class CompilerRecursiveMayEffectUnionCoverageTests
         Assert.That(graph.Bodies.All(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && body.CallsComplete &&
             body.EffectsCompleteAtEntry && body.IsCallSkeleton && body.SourceCalls.Length == 1 &&
             body.Callees.Length == 1 && body.Callees[0] != body.BodyId && ids.Contains(body.Callees[0]))), Is.True);
-        var locals = graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken))).ToArray();
+        var locals = graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken))).ToImmutableArray();
         Assert.That(locals.All(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Program != null)), Is.True);
-        var allocations = locals.Where(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Instructions.OfType<IrAllocationInstruction>().Any())).ToArray();
+        var allocations = locals.Where(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Instructions.OfType<IrAllocationInstruction>().Any())).ToImmutableArray();
         var writes = locals.Where(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Instructions.OfType<IrWriteInstruction>()
-            .Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (IrWriteSites.IsObservable(local.Factory, write))))).ToArray();
+            .Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (IrWriteSites.IsObservable(local.Factory, write))))).ToImmutableArray();
         Assert.That(allocations, Has.Length.EqualTo(1));
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(allocations[0], Is.Not.SameAs(writes[0]));

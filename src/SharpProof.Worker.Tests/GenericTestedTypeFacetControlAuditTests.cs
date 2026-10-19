@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -114,7 +115,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
             };
-        }).ToArray();
+        }).ToImmutableArray();
         await Save(evidenceDirectory, "facet-native.json", new
         {
             SourceSha256 = sourceHash,
@@ -127,7 +128,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = observedClaims,
             Cases = cases,
             FrozenExpectation = "Both EnforcePure and DoesNotThrow remain Proven independently of potential allocation."

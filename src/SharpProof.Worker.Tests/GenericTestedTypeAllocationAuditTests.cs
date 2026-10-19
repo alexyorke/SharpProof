@@ -128,7 +128,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToImmutableArray(),
             Cases = cases,
             Control = control,
             AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.AllocatedBytes > 0)),

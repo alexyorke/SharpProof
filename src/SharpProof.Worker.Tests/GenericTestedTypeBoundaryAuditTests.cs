@@ -143,7 +143,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Cases = cases,
             NativeExpectation = preserveProof ? "Proven preservation control" : "Exploratory nullable outcome; no fixed outcome",
             SubjectBytes = "Exploratory actual counts, with no zero or positive allocation prerequisite",

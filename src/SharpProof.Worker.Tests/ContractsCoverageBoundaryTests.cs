@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,7 +47,7 @@ public sealed class ContractsCoverageBoundaryTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
-            .ToArray();
+            .ToImmutableArray();
         var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
@@ -99,7 +100,7 @@ public sealed class ContractsCoverageBoundaryTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
-            .ToArray();
+            .ToImmutableArray();
         var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";

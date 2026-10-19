@@ -47,7 +47,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         var model = compilation.GetSemanticModel(tree);
         var expectedType = valueType == "double" ? SpecialType.System_Double : SpecialType.System_Single;
         var calls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" })).ToArray();
+            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" })).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(4));
         foreach (var syntax in calls)
         {
@@ -64,7 +64,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         var comparisons = root.DescendantNodes().OfType<BinaryExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetOperation(syntax))).OfType<IBinaryOperation>()
             .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.LeftOperand.Type?.SpecialType == expectedType &&
-                operation.RightOperand.Type?.SpecialType == expectedType)).ToArray();
+                operation.RightOperand.Type?.SpecialType == expectedType)).ToImmutableArray();
         Assert.That(comparisons.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind)),
             Is.EquivalentTo(FloatingComparisonKinds));
         Assert.That(comparisons.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorMethod == null && !operation.IsLifted)), Is.True);

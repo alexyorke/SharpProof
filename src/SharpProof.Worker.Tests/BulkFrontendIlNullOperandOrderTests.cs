@@ -98,7 +98,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(body.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(body.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(body.Module, Is.EqualTo(captured.Name));
-            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToArray(),
+            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToImmutableArray(),
                 Is.EqualTo(nullOnLeft ? ExpectedLeft : ExpectedRight));
             Assert.That(body.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Ldarg")).Operand, Is.Zero);
             bool PrepareSourceCallee(TotalLoweringContext frame)

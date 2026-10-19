@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -147,7 +148,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             using var pe = new PEReader(new MemoryStream(image, writable: false));
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
-            var rows = definition.GetParameters().Select(handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetParameter(handle)))).ToArray();
+            var rows = definition.GetParameters().Select(handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetParameter(handle)))).ToImmutableArray();
             var attributeRows = rows.Sum(row => ((row.Equals(default(Parameter))) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetCustomAttributes().Count)));
             using (Assert.EnterMultipleScope())
             {
@@ -190,7 +191,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
         Directory.CreateDirectory(directory);
         try
         {
-            var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToArray();
+            var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToImmutableArray();
             var source = string.Concat(names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ($"public class {name} {{\n"))) +
                 "public static int Identity([SharpProof.Attributes.Positive] int value) { return value; }\n" +
                 new string('}', owners);

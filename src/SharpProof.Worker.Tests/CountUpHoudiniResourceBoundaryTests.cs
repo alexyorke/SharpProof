@@ -341,7 +341,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Assert.That(recorder.Values.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (!query.Frames.Any(frame =>
             frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == combinedRecheckLine)))), Is.True);
         var denied = budgetReads.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery &&
-            budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit)).ToArray();
+            budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit)).ToImmutableArray();
         Assert.That(denied, Is.Not.Empty, "Actual reader evidence of reservation denial is required.");
         var firstDenied = denied[0];
         Assert.That(firstDenied.InCombinedRecheck, Is.True);

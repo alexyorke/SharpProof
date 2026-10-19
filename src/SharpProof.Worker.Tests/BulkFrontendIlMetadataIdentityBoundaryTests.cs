@@ -136,7 +136,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(decodedBody.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(decodedBody.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(decodedBody.Module, Is.EqualTo(captured.Name));
-            Assert.That(decodedBody.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToArray(), Is.EqualTo(ExpectedCodes));
+            Assert.That(decodedBody.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToImmutableArray(), Is.EqualTo(ExpectedCodes));
             Assert.That(decodedBody.Instructions[0].Operand, Is.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes, Has.Length.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes.Single().Kind, Is.EqualTo("Positive"));

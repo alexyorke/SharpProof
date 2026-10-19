@@ -73,14 +73,14 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var expression = method.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!;
         var operation = model.GetOperation(expression);
         var graph = ControlFlowGraph.Create(method, model, TestContext.CurrentContext.CancellationToken)!;
-        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToArray();
+        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToImmutableArray();
         var expectedPattern = form == "discard-declaration" ? OperationKind.DeclarationPattern : OperationKind.TypePattern;
         await Save(evidenceDirectory, form + "-shape.json", new
         {
             SourceSha256 = sourceHash,
             ExpectedPattern = expectedPattern.ToString(),
             Operation = Shape(operation),
-            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToArray(),
+            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToImmutableArray(),
             Roslyn = typeof(IOperation).Assembly.GetName().Version!.ToString(),
             Role = "Compiler/CFG setup qualification; shape mismatch is not a product allocation red."
         });
@@ -177,13 +177,13 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Target = measured,
             Control = control,
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven. Zero measured allocation rejects this hypothesis for the tested form/runtime."

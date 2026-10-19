@@ -89,10 +89,10 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
             Language = parseOptions.LanguageVersion.ToString(),
-            Symbols = parseOptions.PreprocessorSymbolNames.ToArray(),
+            Symbols = parseOptions.PreprocessorSymbolNames.ToImmutableArray(),
             Optimization = compilation.Options.OptimizationLevel.ToString(),
-            Diagnostics = compilerDiagnostics.Select(DiagnosticObservation).ToArray(),
-            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = compilerDiagnostics.Select(DiagnosticObservation).ToImmutableArray(),
+            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             emission.Success
         });
         Assert.That(string.Equals(sourceHash, subject.SourceHash, StringComparison.OrdinalIgnoreCase), Is.True);
@@ -107,8 +107,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = model.GetOperation(syntax)!;
-        var operations = Walk(operation).ToArray();
-        var parameters = operations.OfType<IParameterReferenceOperation>().ToArray();
+        var operations = Walk(operation).ToImmutableArray();
+        var parameters = operations.OfType<IParameterReferenceOperation>().ToImmutableArray();
         var canonicalAttribute = compilation.GetTypeByMetadataName("SharpProof.Attributes.EnforcePureAttribute")!;
         var attribute = target.GetAttributes().Single();
         var attributeSyntax = (AttributeSyntax)(await attribute.ApplicationSyntaxReference!.GetSyntaxAsync());
@@ -134,9 +134,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 OwnerKind = ((IMethodSymbol)reference.Parameter.ContainingSymbol).MethodKind.ToString(),
                 OwnedByTarget = SymbolEqualityComparer.Default.Equals(reference.Parameter.ContainingSymbol, target),
                 Span = new { reference.Syntax.Span.Start, reference.Syntax.Span.Length }
-            })).ToArray(),
+            })).ToImmutableArray(),
             StorageOperations = operations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item is ISimpleAssignmentOperation or ICompoundAssignmentOperation or
-                IIncrementOrDecrementOperation)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind.ToString())).ToArray()
+                IIncrementOrDecrementOperation)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind.ToString())).ToImmutableArray()
         });
         using (Assert.EnterMultipleScope())
         {
@@ -206,9 +206,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             CallableId = callableId,
             FreshRequestedPath = manifestPath,
             OutputExists = outputExists,
-            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             InfrastructureFailures = collectorDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0049"))
-                .Select(DiagnosticObservation).ToArray(),
+                .Select(DiagnosticObservation).ToImmutableArray(),
             DownstreamStarted = outputExists
         });
         if (!outputExists)
@@ -235,7 +235,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var nativeWrites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToArray() ?? [];
+            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
             subject.Name,
@@ -264,8 +264,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Receiver = write.Target?.ToString(),
                 Field = write.Field?.ToString(),
                 Value = write.Value?.ToString()
-            })).ToArray(),
-            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToArray(),
+            })).ToImmutableArray(),
+            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
@@ -276,7 +276,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
             {
                 item.ClaimId,
@@ -285,7 +285,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome.ToString()
         });
         using (Assert.EnterMultipleScope())

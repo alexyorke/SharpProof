@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -128,7 +129,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
         var trustedAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         Assert.That(trustedAssemblies, Is.Not.Null.And.Not.Empty);
         var references = trustedAssemblies!.Split(Path.PathSeparator)
-            .Distinct(StringComparer.Ordinal).ToArray();
+            .Distinct(StringComparer.Ordinal).ToImmutableArray();
         Assert.That(references.All(Path.IsPathFullyQualified), Is.True);
         Assert.That(references.All(File.Exists), Is.True);
         var arguments = new List<string>

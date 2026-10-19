@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -82,7 +83,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot();
         Assert.That(syntax.DescendantNodesAndSelf().Count(), Is.LessThan(65536));
-        var declarations = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(helperCount + 1));
         var model = compilation.GetSemanticModel(tree);
         foreach (var declaration in declarations)
