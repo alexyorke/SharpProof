@@ -117,7 +117,9 @@ internal static class ResourceMemoryProgram
                     if (objectAllocation.Target is not { } objectTarget || !objectAllocation.InitialValues.IsEmpty)
                     { return Unknown("MemoryAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
-                    if (objectAllocation.AllocatedType == factory.ObjectType)
+                    if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
+                    { objectShape = ResourceAllocationShape.Delegate(); }
+                    else if (objectAllocation.AllocatedType == factory.ObjectType)
                     { objectShape = ResourceAllocationShape.Object([]); }
                     else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
                     { objectShape = ResourceAllocationShape.Object(fields); }

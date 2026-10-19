@@ -7,6 +7,57 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(false, 0)]
+    [TestCase(false, 1)]
+    [TestCase(true, 0)]
+    [TestCase(true, 1)]
+    [TestCase(true, 2)]
+    public void StaticDelegateLifetimesRequireBothCompilerBindingAndTypeEvidence(bool certified, int marker)
+    {
+        if (marker < 0 || marker > 2)
+        { throw new ArgumentOutOfRangeException(nameof(marker)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Callback");
+        if (certified)
+        { factory.RegisterDelegateReferenceType(type); }
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("callback", type);
+        var site = marker == 0 ? factory.CreateOperation() : factory.CreateOperation(
+            marker == 1 ? IrStaticDelegateAllocationSite.Description : IrStaticDelegateAllocationSite.Description + "Suffix");
+        builder.Allocate(entry, site, type, target);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var program = builder.Build();
+        var check = ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken);
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 100, options, TestContext.CurrentContext.CancellationToken);
+        var observed = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
+        if (certified && marker == 1)
+        {
+            Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(64, 64, 0, 0, 64, 64)), check.UnknownReason);
+            Assert.That(observed.Bounds, Is.EqualTo(check.Bounds), observed.UnknownReason);
+        }
+        else
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryObjectStorageUnavailable"));
+            Assert.That(observed.Bounds, Is.Null);
+            Assert.That(observed.UnknownReason, Is.EqualTo("MemoryReplayObjectStorageUnavailable"));
+        }
+    }
+
+    [Test]
+    public void StaticDelegateAdmissionRequiresItsFactoryAndInstruction()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var allocation = builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType);
+        Assert.Throws<ArgumentNullException>((Action)(() => IrStaticDelegateAllocationSite.Matches(null!, allocation)));
+        Assert.Throws<ArgumentNullException>((Action)(() => IrStaticDelegateAllocationSite.Matches(factory, null!)));
+    }
+
     [TestCase(false, 40)]
     [TestCase(true, 32)]
     public void UnsignedGuardConstantsDoNotPassThroughASignedIntermediary(bool maximum, int retained)

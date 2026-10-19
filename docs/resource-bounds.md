@@ -523,3 +523,18 @@ determine subsequent extents; unconstrained constructor inputs remain Unknown.
 CLR zero stores carry the compiler's fresh-write marker because they precede any
 source operation that can publish the object. This preserves ordinary purity
 analysis while retaining the stores for memory analysis and replay.
+
+### Static delegates and scalar boxes
+
+Finite lifetime proofs and completed refutations admit explicitly constructed
+static delegates when the compiler records an owned source binding, admitted
+type initialization and the nominal delegate type. The exact allocation marker
+establishes that no receiver is captured; a delegate type alone is insufficient.
+Their 64-byte storage under the declared layout participates in aliasing,
+reference guards, auxiliary memory and retained output. Scalar boxes use fresh
+24-byte object storage for the admitted Boolean/integer payloads.
+
+Instance delegates, closure captures, cached conversions, metadata method targets
+and unsupported initialization remain Unknown without partial lifetime metrics.
+Delegate invocation costs and effects require their own admission and are not
+implied by allocation or lifetime evidence.

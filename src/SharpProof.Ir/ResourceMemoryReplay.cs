@@ -128,7 +128,9 @@ internal sealed class ResourceMemoryReplay
                         objectAllocation.AllocatedType != value.Type || Find(value, identities) != 0 || !objectAllocation.InitialValues.IsEmpty)
                     { return Unknown("MemoryReplayAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
-                    if (objectAllocation.AllocatedType == factory.ObjectType)
+                    if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
+                    { objectShape = ResourceAllocationShape.Delegate(); }
+                    else if (objectAllocation.AllocatedType == factory.ObjectType)
                     { objectShape = ResourceAllocationShape.Object([]); }
                     else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
                     { objectShape = ResourceAllocationShape.Object(fields); }

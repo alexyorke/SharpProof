@@ -488,6 +488,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             model.GetOperation(declaration, cancellationToken) is not { } callee || Captures(callee, target, cancellationToken, visited);
     }
 
+    internal bool CanBindStaticDelegate(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return method.IsStatic && !method.IsExtern && method.DeclaringSyntaxReferences.Length == 1 &&
+            _compilation.ContainsSyntaxTree(method.DeclaringSyntaxReferences[0].SyntaxTree) &&
+            HasNoTypeInitialization(method.ContainingType);
+    }
+
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)
     {
         if (_typeInitialization.TryGetValue(type, out var eligible))

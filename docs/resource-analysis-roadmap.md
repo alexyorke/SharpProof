@@ -1574,3 +1574,51 @@ The full final worker suite passed all 6595 cases with no failures. This include
 the native lifetime, purity, synchronization, replay, artifact, protocol and
 consumer-result regressions. Fresh exact-head CI remains required after publishing
 this checkpoint; the unchanged coverage floor and remaining C/E/F work stay open.
+
+## Static delegate and scalar box lifetimes
+
+Finite lifetime extraction and completed replay now recognize explicit static
+delegate allocations through an exact compiler-owned operation marker plus the
+existing nominal delegate type certificate. The compiler marker requires an
+explicit static method binding, owned source declaration and admitted type
+initialization. A delegate type alone, a marker without that type certificate,
+or a similar-looking marker cannot establish capture-free storage.
+
+The declared layout supplies the delegate's 64-byte storage; no producer byte
+estimate enters the lifetime trace. Existing aliases, reference guards, last-use
+roots and returned-graph exclusion compose with these fresh identities. Scalar
+boxes already use the supported fresh-object path; new native controls verify
+their 24-byte storage and distinct identities for Boolean and integer payloads.
+
+Initial verification passed six IR admission/replay cases and eight native
+lifetime cases. Additional controls preserve Unknown for captured instance
+delegates, cached conversions, closures, metadata bindings and target type
+initialization. Full affected checks and packaged proof/refutation controls are
+in progress. Instance-target and closure capture edges, broader repeated and
+exceptional lifetimes, stack bounds and remaining E/F requirements remain open.
+Wire versions and model identities are unchanged: the operation descriptor and
+delegate certificate use existing owned IR transport; companion-module identities
+invalidate earlier implementations.
+
+The full IR suite passed 688 tests and the full frontend suite passed 2122.
+All 583 affected native/resource, delegate/closure, allocation, protocol,
+artifact/golden and cache-identity controls passed. Independent pinned-runtime
+allocation controls passed after adding Boolean and 64-bit box payloads alongside
+the existing integer-box and static-delegate measurements. Layout passed for
+2725 source files, 59 projects and all 151 pinned common files; documentation
+generation and 724 local links passed. Quality categories passed apart from one
+guide spelling correction; the focused spelling gate then passed with zero
+findings. Complete canonical formatting passed as well.
+
+All 11 final native controls passed, including a generic static delegate whose
+target throws if invoked. This confirms that construction does not execute the
+target body. Six actual packaged static-delegate/box proof and refutation cases
+passed with strict/advisory diagnostics and serialized evidence, bringing the
+cumulative validated lifetime package controls to 48.
+
+Next, model instance delegate targets as mandatory owned reference edges and
+connect returned closure delegates to their entry frames and captured values.
+Missing, borrowed or unproved capture edges must prevent numerical lifetime
+claims. Preserve field-graph sharing/cycles and independently observe these edges
+during completed replay before admitting broader capture families. Stack bounds,
+remaining C/E/F requirements and unchanged coverage qualification stay open.

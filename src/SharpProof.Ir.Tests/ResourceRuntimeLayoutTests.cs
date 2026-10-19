@@ -180,6 +180,8 @@ public sealed class ResourceRuntimeLayoutTests
         CheckMeasured(ResourceAllocationShape.String(ResourceExpression.Literal(6)), static () => new string('x', 6));
         CheckMeasured(ResourceAllocationShape.Object([]), static () => new object());
         CheckMeasured(ResourceAllocationShape.Box(ResourceStorageKind.Word32), static () => 42);
+        CheckMeasured(ResourceAllocationShape.Box(ResourceStorageKind.Byte), static () => true);
+        CheckMeasured(ResourceAllocationShape.Box(ResourceStorageKind.Word64), static () => long.MaxValue);
         CheckMeasured(ResourceAllocationShape.Object([ResourceStorageKind.Word32, ResourceStorageKind.Word32]), static () => new SmallFields(42, 43));
         CheckMeasured(ResourceAllocationShape.Object([ResourceStorageKind.Reference, ResourceStorageKind.Word64, ResourceStorageKind.Byte]),
             static () => new MixedFields(SharedReference, 42, 1));

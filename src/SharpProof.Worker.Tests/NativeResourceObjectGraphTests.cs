@@ -6,6 +6,51 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeResourceContractTests
 {
+    [TestCase("return new System.Action(Work);", 0, 64)]
+    [TestCase("return new System.Func<int>(Read);", 0, 64)]
+    [TestCase("object first=new System.Action(Work); object second=new System.Action(Work); if(first==second) return null; return second;", 64, 64)]
+    [TestCase("return (object)true;", 0, 24)]
+    [TestCase("return (object)long.MaxValue;", 0, 24)]
+    [TestCase("object first=1; object second=true; if(first==second) return null; return second;", 24, 24)]
+    public async Task StaticDelegateAndScalarBoxLifetimesPreserveFreshIdentity(string body, int auxiliary, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 5, 6 })
+        {
+            var upper = metric == 5 ? auxiliary : retained;
+            foreach (var violates in new[] { false, true })
+            {
+                if (violates && upper == 0)
+                { continue; }
+                var source = "using SharpProof.Attributes; public static class C { public static void Work() {} public static int Read() { throw new System.InvalidOperationException(); } " +
+                    $"[ResourceUpperBound((ResourceMetric){metric},{(violates ? upper - 1 : upper)})] public static object Target() {{ {body} }} }}";
+                var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+                var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+                Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+                Assert.That(violates ? result.ResourceBound!.ObservedLowerBound : result.ResourceBound!.InferredUpperBound,
+                    Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
+    [TestCase("var receiver=new Callback(); return new System.Action(receiver.Work);")]
+    [TestCase("return Work;")]
+    [TestCase("return () => value;")]
+    [TestCase("return new System.Action(System.GC.Collect);")]
+    [TestCase("return new System.Action(Initialized.Work);")]
+    public async Task DelegateLifetimesWithoutCaptureAndCacheEvidenceHaveNoPartialMetrics(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using SharpProof.Attributes; public class Callback { public void Work() {} } public static class Initialized { static Initialized() {} public static void Work() {} } public static class C { public static void Work() {} " +
+            $"[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static System.Delegate Target(int value) {{ {body} }} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
     [TestCase("public class Node { public int Count; }", "var root=new Node(); return new int[root.Count];", 24, 24)]
     [TestCase("public class Node { public int Count; public Node() { Count=2; } }", "var root=new Node(); return new int[root.Count];", 24, 32)]
     [TestCase("public class Node { public int Count; public Node() { if(Count==0) Count=2; } }", "var root=new Node(); return new int[root.Count];", 24, 32)]

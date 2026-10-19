@@ -36,6 +36,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // or calls opaque code; otherwise a read is a pure function of the array.
     internal bool ApproximateElementReads { get; set; }
     internal bool PinElementReads { get; set; }
+    internal Func<IMethodSymbol, bool>? StaticDelegateBinding { get; set; }
 
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
@@ -676,7 +677,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var type = _context.Type(operation.Type);
         var target = _context.Temporary(type);
-        _builder!.Allocate(block, _context.Site(operation), type, target);
+        var site = operation is IDelegateCreationOperation
+        {
+            Target: IMethodReferenceOperation { Instance: null, Method.IsStatic: true }
+        } creation && CSharpOperationSemantics.IsExplicitDelegateCreation(creation) &&
+            StaticDelegateBinding?.Invoke(((IMethodReferenceOperation)creation.Target).Method) == true
+            ? _context.StaticDelegateAllocationSite(operation) : _context.Site(operation);
+        _builder!.Allocate(block, site, type, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
     }
 
