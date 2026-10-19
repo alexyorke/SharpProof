@@ -1,0 +1,60 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NUnit.Framework;
+using SharpProof.Ir;
+
+namespace SharpProof.Frontend.Test;
+
+[TestFixture]
+public sealed class SourceTypeSubstitutionTests
+{
+    [TestCase("[]")]
+    [TestCase("[,]")]
+    public void ConstructedNestedOwnersAndTupleArraysUseTheSameRuntimeType(string suffix)
+    {
+        System.ArgumentNullException.ThrowIfNull(suffix);
+        var tree = CSharpSyntaxTree.ParseText("public class Box<T> { public class Inner<U> { public void Target() { } " +
+            "public System.Collections.Generic.List<(T, U)>" + suffix + " Open; } } public class Expected { " +
+            "public System.Collections.Generic.List<(int, string)>" + suffix + " Value; public Box<int>.Inner<string> Owner; }");
+        var compilation = CSharpCompilation.Create("SourceSubstitution", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) :
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var model = compilation.GetSemanticModel(tree);
+        var target = (IMethodSymbol)model.GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var owner = target.ContainingType;
+        context.SpecializeTypeParameter(owner.ContainingType.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));
+        context.SpecializeTypeParameter(owner.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_String));
+        var expected = compilation.GetTypeByMetadataName("Expected")!;
+        var field = (IFieldSymbol)owner.GetMembers("Open").Single();
+        Assert.That(CompilerIdentityBridge.SameRuntimeType(context.SpecializeSourceType(field.Type)!, ((IFieldSymbol)expected.GetMembers("Value").Single()).Type), Is.True);
+        Assert.That(CompilerIdentityBridge.SameRuntimeType(context.SpecializeSourceType(owner)!, ((IFieldSymbol)expected.GetMembers("Owner").Single()).Type), Is.True);
+    }
+
+    [Test]
+    public void CompoundArraySubstitutionRequiresItsAuthenticatedCompilation()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public class Box { public static void Target<T>(T[] values) { } }");
+        var compilation = CSharpCompilation.Create("MissingSubstitutionCompilation", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        context.SpecializeTypeParameter(target.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));
+        Assert.Throws<FrontendLoweringRejectionException>((System.Action)(() => context.SpecializeSourceType(target.Parameters[0].Type)));
+    }
+
+    [Test]
+    public void CyclicSubstitutionAbstainsWithinItsConstructionBound()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public class Box<T> { public void Target() { } }");
+        var compilation = CSharpCompilation.Create("CyclicSubstitution", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var target = (IMethodSymbol)model.GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        context.SpecializeTypeParameter(target.ContainingType.TypeParameters[0], target.ContainingType);
+        Assert.Throws<FrontendLoweringRejectionException>((System.Action)(() => context.SpecializeSourceType(target.ContainingType)));
+    }
+}
