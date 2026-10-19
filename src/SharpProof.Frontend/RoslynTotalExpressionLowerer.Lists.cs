@@ -112,6 +112,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return new(count, block, FrontendSubsetClassification.Exact); }
         var valueType = _context.Type(method.ContainingType.TypeArguments[0]);
         var contents = ListField("value", valueType);
+        if (name is "Insert" or "GetRange")
+        { return ListRangeBody(operation, method, owner, values, name, contents, countField, count, block); }
         if (name == "Add")
         {
             var previous = Pin(operation, new(count, block, FrontendSubsetClassification.Exact));
@@ -135,6 +137,123 @@ internal sealed partial class RoslynTotalExpressionLowerer
             return new(values[1], block, FrontendSubsetClassification.Exact);
         }
         return new(_factory.PureOpaque(contents, owner, index), block, FrontendSubsetClassification.Exact);
+    }
+
+    private TotalBodyValue ListRangeBody(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
+        string name, IrMemberId contents, IrMemberId countField, IrTerm count, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        count = RepositoryParameterGuard.NotNull(count, nameof(count));
+        RepositoryParameterGuard.ThrowIfInvalid(contents.IsDefault, nameof(contents));
+        RepositoryParameterGuard.ThrowIfInvalid(countField.IsDefault, nameof(countField));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var site = _context.Site(operation);
+        var previous = Pin(operation, new(count, block, FrontendSubsetClassification.Exact));
+        count = previous.Value;
+        block = previous.Continuation;
+        var index = values[0];
+        block = ListRangeBounds(operation, method, owner, values,
+            _factory.Binary(IrBinaryOperator.LessThan, index, _factory.Integer(0)), IrExceptionKind.ArgumentOutOfRange, block);
+        if (name == "Insert")
+        {
+            block = ListRangeBounds(operation, method, owner, values,
+                _factory.Binary(IrBinaryOperator.GreaterThan, index, count), IrExceptionKind.ArgumentOutOfRange, block);
+            block = ListRuntimeEffects(operation, method, [owner, .. values],
+                _factory.Binary(IrBinaryOperator.Equal, count, _factory.Integer(int.MaxValue)), block);
+            var done = ListCopySlots(operation, owner, owner, contents, index, count, reverse: true, block);
+            _builder!.FieldStore(done, site, IrWriteRegion.Field, owner, contents, values[1], index);
+            _builder.FieldStore(done, site, IrWriteRegion.Field, owner, countField,
+                _factory.Binary(IrBinaryOperator.Add, count, _factory.Integer(1)));
+            return new(_factory.Boolean(false), done, FrontendSubsetClassification.Exact);
+        }
+        var length = values[1];
+        block = ListRangeBounds(operation, method, owner, values,
+            _factory.Binary(IrBinaryOperator.LessThan, length, _factory.Integer(0)), IrExceptionKind.ArgumentOutOfRange, block);
+        // Subtraction follows the runtime check and avoids index + length overflow.
+        block = ListRangeBounds(operation, method, owner, values,
+            _factory.Binary(IrBinaryOperator.LessThan, _factory.Binary(IrBinaryOperator.Subtract, count, index), length),
+            IrExceptionKind.Argument, block);
+        block = ListRuntimeEffects(operation, method, [owner, .. values], _factory.Boolean(false), block, initialization: true);
+        var allocated = AllocateValue(operation, block);
+        var destination = AsObject(allocated.Value);
+        block = allocated.Continuation;
+        var copied = ListCopySlots(operation, owner, destination, contents, index, length, reverse: false, block);
+        _builder!.FieldStore(copied, site, IrWriteRegion.Field, destination, countField, length);
+        return new(allocated.Value, copied, FrontendSubsetClassification.Exact);
+    }
+
+    private IrBlockId ListCopySlots(IOperation operation, IrTerm source, IrTerm destination, IrMemberId contents,
+        IrTerm index, IrTerm extent, bool reverse, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        destination = RepositoryParameterGuard.NotNull(destination, nameof(destination));
+        index = RepositoryParameterGuard.NotNull(index, nameof(index));
+        extent = RepositoryParameterGuard.NotNull(extent, nameof(extent));
+        RepositoryParameterGuard.ThrowIfInvalid(contents.IsDefault, nameof(contents));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var site = _context.Site(operation);
+        var cursor = _context.Temporary(_factory.IntegerType);
+        _builder!.Assign(block, site, cursor, reverse ? extent : _factory.Integer(0));
+        var done = _builder.CreateBlock("list:copy-done");
+        var position = _factory.Variable(cursor);
+        var condition = _factory.Binary(reverse ? IrBinaryOperator.GreaterThan : IrBinaryOperator.LessThan,
+            position, reverse ? index : extent);
+        var previous = _factory.Binary(IrBinaryOperator.Subtract, position, _factory.Integer(1));
+        var from = reverse ? previous : _factory.Binary(IrBinaryOperator.Add, index, position);
+        var next = reverse ? previous : _factory.Binary(IrBinaryOperator.Add, position, _factory.Integer(1));
+        // Peel a short prefix so small concrete copies need no heap invariant.
+        // The residual loop retains every remaining element: this is an exact
+        // control-flow optimization, not a maximum supported collection length.
+        for (var peeled = 0; peeled < 4; peeled++)
+        {
+            var copy = _builder.CreateBlock("list:copy-prefix");
+            var continuation = _builder.CreateBlock("list:copy-prefix-next");
+            _builder.Branch(block, site, condition, copy, done);
+            _builder.FieldStore(copy, site, IrWriteRegion.Field, destination, contents,
+                _factory.PureOpaque(contents, source, from), position);
+            _builder.Assign(copy, site, cursor, next);
+            _builder.Goto(copy, site, continuation);
+            block = continuation;
+        }
+        var test = _builder.CreateBlock("list:copy-test");
+        var remaining = _builder.CreateBlock("list:copy-remaining");
+        _builder.Goto(block, site, test);
+        _builder.Branch(test, site, condition, remaining, done);
+        _builder.FieldStore(remaining, site, IrWriteRegion.Field, destination, contents,
+            _factory.PureOpaque(contents, source, from), position);
+        _builder.Assign(remaining, site, cursor, next);
+        _builder.Goto(remaining, site, test);
+        return done;
+    }
+    private IrBlockId ListRangeBounds(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
+        IrTerm outside, IrExceptionKind fault, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
+        outside = RepositoryParameterGuard.NotNull(outside, nameof(outside));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var site = _context.Site(operation);
+        var invalid = _builder!.CreateBlock("list:range-invalid");
+        var valid = _builder.CreateBlock("list:range-valid");
+        _builder.Branch(block, site, outside, invalid, valid);
+        // Framework resource lookup can invoke CultureInfo callbacks, mutate
+        // reachable state, allocate, or throw before the intended argument fault.
+        ImmutableArray<IrTerm> arguments = [owner, .. values];
+        var member = OpaqueCallMember(method, arguments, method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType), out var display);
+        _builder.CallSnapshot(invalid, _context.OpaqueCallSite(operation, IrOpaqueCallSite.WithCapabilities(IrOpaqueCallEffects.All | IrOpaqueCallEffects.ReadsAmbient, int.MaxValue), display + ":bounds"), null, member, null, arguments);
+        var throws = _context.Temporary(_factory.BooleanType);
+        _builder.Havoc(invalid, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+        invalid = ApplyRule(operation, new TotalScalarRule(_factory.Boolean(true),
+            [new(IrExceptionKind.Unknown, _factory.Variable(throws))], FrontendSubsetClassification.Exact), invalid).Continuation;
+        _builder.Throw(invalid, site, fault, ExceptionTarget?.Invoke(fault, site) ?? _exceptionalExit);
+        return valid;
     }
 
     private IrBlockId ListRuntimeEffects(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrTerm full, IrBlockId block, bool initialization = false)

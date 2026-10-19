@@ -1337,11 +1337,11 @@ System.Collections	M:System.Collections.Generic.List`1.FindLastIndex(System.Int3
 System.Collections	M:System.Collections.Generic.List`1.FindLastIndex(System.Predicate{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.ForEach(System.Action{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.GetEnumerator	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0,System.Int32)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0,System.Int32,System.Int32)	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.List`1.Insert(System.Int32,`0)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.List`1.Insert(System.Int32,`0)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state
 System.Collections	M:System.Collections.Generic.List`1.InsertRange(System.Int32,System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.LastIndexOf(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.LastIndexOf(`0,System.Int32)	Method	unmodeled	-
@@ -1525,9 +1525,9 @@ System.Collections	M:System.Collections.Generic.SortedSet`1.SetEquals(System.Col
 System.Collections	M:System.Collections.Generic.SortedSet`1.SymmetricExceptWith(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.SortedSet`1.TryGetValue(`0,`0@)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.SortedSet`1.UnionWith(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Stack`1.#ctor	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Stack`1.#ctor	Method	partially-modeled	intrinsic=concrete-stack-state
 System.Collections	M:System.Collections.Generic.Stack`1.#ctor(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Stack`1.#ctor(System.Int32)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Stack`1.#ctor(System.Int32)	Method	partially-modeled	intrinsic=concrete-stack-state
 System.Collections	M:System.Collections.Generic.Stack`1.Clear	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.Contains(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.CopyTo(`0[],System.Int32)	Method	unmodeled	-
@@ -1537,8 +1537,8 @@ System.Collections	M:System.Collections.Generic.Stack`1.Enumerator.Dispose	Metho
 System.Collections	M:System.Collections.Generic.Stack`1.Enumerator.MoveNext	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.GetEnumerator	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.Peek	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Stack`1.Pop	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Stack`1.Push(`0)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Stack`1.Pop	Method	partially-modeled	intrinsic=concrete-stack-state
+System.Collections	M:System.Collections.Generic.Stack`1.Push(`0)	Method	partially-modeled	intrinsic=concrete-stack-state
 System.Collections	M:System.Collections.Generic.Stack`1.ToArray	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.TrimExcess	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Stack`1.TrimExcess(System.Int32)	Method	unmodeled	-
@@ -1626,7 +1626,7 @@ System.Collections	P:System.Collections.Generic.SortedSet`1.Enumerator.Current	P
 System.Collections	P:System.Collections.Generic.SortedSet`1.Max	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.SortedSet`1.Min	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Stack`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Stack`1.Count	Property	partially-modeled	catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
+System.Collections	P:System.Collections.Generic.Stack`1.Count	Property	partially-modeled	catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=concrete-stack-state
 System.Collections	P:System.Collections.Generic.Stack`1.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.StructuralComparisons.StructuralComparer	Property	unmodeled	-
 System.Collections	P:System.Collections.StructuralComparisons.StructuralEqualityComparer	Property	unmodeled	-
@@ -25737,7 +25737,7 @@ System.Runtime	M:System.Collections.Generic.IEnumerable`1.GetEnumerator	Method	u
 System.Runtime	M:System.Collections.Generic.IEqualityComparer`1.Equals(`0,`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IEqualityComparer`1.GetHashCode(`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IList`1.IndexOf(`0)	Method	unmodeled	-
-System.Runtime	M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)	Method	unmodeled	-
+System.Runtime	M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state
 System.Runtime	M:System.Collections.Generic.IList`1.RemoveAt(System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IReadOnlyDictionary`2.ContainsKey(`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IReadOnlyDictionary`2.TryGetValue(`0,`1@)	Method	unmodeled	-
