@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -15,6 +17,49 @@ public sealed class CorpusSnapshotWorkflowTests
         var exception = Assert.Throws<ArgumentException>((Action)(() =>
             CorpusSnapshotFormat.Render(default(ImmutableArray<string>))));
         Assert.That(exception!.ParamName, Is.EqualTo("lines"));
+    }
+
+    [Test]
+    public async Task GateCountsAndRejectsAnUnreviewedSilentUnknown()
+    {
+        using var temporary = new TempDirectory("SharpProof-silent-unknown-");
+        var corpusDirectory = CopyCorpus(temporary.FullName);
+        var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
+        var method = manifest["methods"]!.AsArray().Single(static item =>
+            item is null ? throw new ArgumentNullException(nameof(item)) : item["id"]!.GetValue<string>() == "OSS0139")!;
+        var file = manifest["files"]!.AsArray().Single(item =>
+            item is null ? throw new ArgumentNullException(nameof(item)) : item["path"]!.GetValue<string>() == method["path"]!.GetValue<string>())!;
+        var source = file["content"]!.GetValue<string>();
+        var syntax = await CSharpSyntaxTree.ParseText(source).GetRootAsync(TestContext.CurrentContext.CancellationToken);
+        var declaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(static item =>
+            item is null ? throw new ArgumentNullException(nameof(item)) : item.Identifier.ValueText == "UniversalHash" && item.ParameterList.Parameters[0].Type!.ToString() == "int");
+        // In this private fixture, an explicit message removes the resource
+        // advisory while unsupported static initialization still prevents a
+        // native purity proof. The reviewed corpus itself remains untouched.
+        var replacement = declaration.ToFullString().Replace("new ArgumentOutOfRangeException(",
+            "new ArgumentOutOfRangeException(\"whichHashFunction\", ", StringComparison.Ordinal);
+        Assert.That(replacement, Is.Not.EqualTo(declaration.ToFullString()));
+        var changed = source.Replace(declaration.ToFullString(), replacement, StringComparison.Ordinal);
+        var changedSyntax = await CSharpSyntaxTree.ParseText(changed).GetRootAsync(TestContext.CurrentContext.CancellationToken);
+        var changedDeclaration = changedSyntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(item =>
+            item is null ? throw new ArgumentNullException(nameof(item)) : item.SpanStart == declaration.SpanStart);
+        file["content"] = changed;
+        file["contentSha256"] = OpenSourceCorpusCatalog.ComputeNormalizedSha256(changed);
+        method["declarationSha256"] = OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(changedDeclaration));
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString());
+
+        var result = await CorpusGate.RunAsync(temporary.FullName, TestContext.CurrentContext.CancellationToken);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Passed, Is.False);
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(218));
+            Assert.That(result.SupportedUnknownCount, Is.Zero);
+            Assert.That(result.UnknownReasons.Single(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
+            Assert.That(result.Failures, Does.Contain("Corpus produced a new unreviewed Unknown reason 'silent-unclassified' (1 cases)."));
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for OSS0139.baseline:"));
+        }
     }
 
     [Test]

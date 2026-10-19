@@ -135,7 +135,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     var type = factory.GetVariableInfo(valueParameter).Type;
                     var value = input == null ? factory.CreateNullValue(type) : factory.CreateStringValue(input);
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueParameter, value).SetItem(flagParameter, factory.CreateBooleanValue(flag)));
+                        global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueParameter, value).SetItem(flagParameter, factory.CreateBooleanValue(flag)), maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
                     Assert.That(replay.Status, Is.EqualTo(enabled
                         ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                     if (enabled)
@@ -147,8 +147,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     }
                     else
                     { Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17))); }
-                    Assert.That(replay.ConsumedApproximation, Is.False);
-                    Assert.That(replay.ApproximationVariables, Is.Empty);
+                    ExceptionConstructorNormalReplay.AssertApproximation(replay, enabled);
                 }
             }
         }

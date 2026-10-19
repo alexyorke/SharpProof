@@ -79,7 +79,7 @@ public sealed class ConditionalElisionReceiverContinuationTests
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding, value));
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding, value), maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(subject.Factory));
             if (!elided && input == null)
             {
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
@@ -90,8 +90,7 @@ public sealed class ConditionalElisionReceiverContinuationTests
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
             }
-            Assert.That(replay.ConsumedApproximation, Is.False);
-            Assert.That(replay.ApproximationVariables, Is.Empty);
+            ExceptionConstructorNormalReplay.AssertApproximation(replay, !elided && input == null);
         }
     }
 }

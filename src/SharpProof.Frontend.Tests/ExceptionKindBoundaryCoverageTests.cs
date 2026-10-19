@@ -13,6 +13,71 @@ public sealed class ExceptionKindBoundaryCoverageTests
 {
     private static readonly ImmutableArray<IrExceptionKind> OverflowKinds = [IrExceptionKind.Overflow];
 
+    [TestCase("new System.Exception((string)null)", -1)]
+    [TestCase("new System.ArgumentException((string)null)", -1)]
+    [TestCase("new System.InvalidOperationException(\"message\")", 0)]
+    [TestCase("new System.Collections.Generic.KeyNotFoundException(\"message\")", 0)]
+    [TestCase("new System.ArgumentNullException(\"parameter\", \"message\")", 1)]
+    [TestCase("new System.ArgumentNullException()", null)]
+    [TestCase("new System.Security.Cryptography.CryptographicException(\"format\", \"insert\")", null)]
+    public void ConstructorResourceGuardsDistinguishMessageRoles(string expression, int? expected)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        using var subject = TypedProgramSubject.Create("object Target() => " + expression + ";");
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        var creation = (IObjectCreationOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
+        Assert.That(CSharpOperationSemantics.ExceptionConstructorMessageGuard(creation.Constructor!), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ConstructorResourceGuardsRejectSourceLookalikesAndOrdinaryMethods()
+    {
+        var tree = CSharpSyntaxTree.ParseText("namespace System { public class ArgumentException : Exception { public ArgumentException(string message) {} } } public static class Subject { public static object Target() => new System.ArgumentException(\"message\"); }");
+        var compilation = CSharpCompilation.Create("SourceExceptionLookalike", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        var creation = (IObjectCreationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
+        Assert.That(CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(creation.Constructor!), Is.False);
+        Assert.That(CSharpOperationSemantics.IsExceptionResourceLockDeclaration(creation.Constructor!), Is.False);
+        Assert.That(CSharpOperationSemantics.ExceptionConstructorMessageGuard(creation.Constructor!), Is.Null);
+        Assert.That(CSharpOperationSemantics.ExceptionInitializationKind(creation.Constructor!), Is.Null);
+        var ordinary = compilation.GetSpecialType(SpecialType.System_String).GetMembers("ToString").OfType<IMethodSymbol>().First();
+        Assert.That(CSharpOperationSemantics.ExceptionConstructorMessageGuard(ordinary), Is.Null);
+        Assert.That(CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(ordinary), Is.False);
+        Assert.That(CSharpOperationSemantics.IsExceptionResourceLockDeclaration(ordinary), Is.False);
+        Assert.That(CSharpOperationSemantics.ExceptionInitializationKind(ordinary), Is.Null);
+        Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.ExceptionConstructorMessageGuard(null!)));
+        Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(null!)));
+        Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.IsExceptionResourceLockDeclaration(null!)));
+        Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.ExceptionInitializationKind(null!)));
+    }
+
+    [TestCase("new System.ArgumentException()", "Argument")]
+    [TestCase("new System.ArgumentNullException()", "ArgumentNull")]
+    [TestCase("new System.ArgumentNullException(\"parameter\")", "ArgumentNullName")]
+    [TestCase("new System.ArgumentOutOfRangeException()", "ArgumentRange")]
+    [TestCase("new System.ArgumentOutOfRangeException(\"parameter\")", "ArgumentRangeName")]
+    [TestCase("new System.InvalidOperationException()", "InvalidOperation")]
+    [TestCase("new System.InvalidOperationException((string)null)", "InvalidOperationNull")]
+    [TestCase("new System.DivideByZeroException()", "DivideByZero")]
+    [TestCase("new System.IO.IOException()", "IOException")]
+    [TestCase("new System.ObjectDisposedException(\"object\")", "ObjectDisposedName")]
+    [TestCase("new System.AggregateException()", "Aggregate")]
+    [TestCase("new System.AggregateException((string)null)", "AggregateNull")]
+    [TestCase("new System.Collections.Generic.KeyNotFoundException((string)null)", "KeyNotFoundNull")]
+    [TestCase("new System.Diagnostics.UnreachableException((string)null)", null)]
+    public void ExceptionReplayDescriptionsHaveFixedConstructorIdentities(string expression, string? expected)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        using var subject = TypedProgramSubject.Create("object Target() => " + expression + ";");
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        var creation = (IObjectCreationOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
+        Assert.That(CSharpOperationSemantics.ExceptionInitializationKind(creation.Constructor!), Is.EqualTo(expected));
+    }
+
     [Test]
     public void ActualMissingFrameworkCompilationCannotClassifyBareCatchKinds()
     {

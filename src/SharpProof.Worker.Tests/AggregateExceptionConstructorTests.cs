@@ -35,18 +35,18 @@ public sealed class AggregateExceptionConstructorTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
-    [TestCase("new System.AggregateException()")]
-    [TestCase("new System.AggregateException(\"outer\")")]
-    [TestCase("new System.AggregateException(\"outer\", new System.Exception())")]
-    [TestCase("new System.AggregateException(innerException: new System.Exception(), message: \"outer\")")]
-    public async Task KnownSafeAggregateConstructionRetainsExactExceptionProof(string expression)
+    [TestCase("new System.AggregateException()", false)]
+    [TestCase("new System.AggregateException(\"outer\")", true)]
+    [TestCase("new System.AggregateException(\"outer\", new System.Exception())", true)]
+    [TestCase("new System.AggregateException(innerException: new System.Exception(), message: \"outer\")", true)]
+    public async Task AggregateConstructionSeparatesResourceAndExplicitMessageProofs(string expression, bool proven)
     {
         System.ArgumentNullException.ThrowIfNull(expression);
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw " + expression + "; } }";
         AssertRuntimeException<AggregateException>(source);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.Null, result.Reason.ToString());
     }
 
     [Test]

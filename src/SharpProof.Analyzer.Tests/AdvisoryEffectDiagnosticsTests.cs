@@ -54,14 +54,17 @@ public sealed class AdvisoryEffectDiagnosticsTests
 
     [TestCase("System.Exception", "System.InvalidOperationException", false)]
     [TestCase("System.ArgumentException", "System.InvalidOperationException", true)]
-    [TestCase("System.InvalidOperationException", "System.InvalidOperationException", false)]
-    public async Task ExplicitThrowsRespectAllowedExceptionTypes(string allowed, string thrown, bool warns)
+    // The default constructor can throw from user culture callbacks before
+    // the explicit throw, so the narrow exception policy needs a warning.
+    [TestCase("System.InvalidOperationException", "System.InvalidOperationException", true)]
+    [TestCase("System.InvalidOperationException", "System.InvalidOperationException", false, true)]
+    public async Task ExplicitThrowsRespectAllowedExceptionTypes(string allowed, string thrown, bool warns, bool explicitMessage = false)
     {
         System.ArgumentNullException.ThrowIfNull(allowed);
         System.ArgumentNullException.ThrowIfNull(thrown);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            Source($"[AllowedExceptions(typeof({allowed}))]", $"throw new {thrown}();"), "effects",
+            Source($"[AllowedExceptions(typeof({allowed}))]", $"throw new {thrown}(" + (explicitMessage ? "\"message\"" : "") + ");"), "effects",
             ["SP0046"], new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {

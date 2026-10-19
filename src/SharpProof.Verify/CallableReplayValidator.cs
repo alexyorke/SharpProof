@@ -65,7 +65,8 @@ internal static class CallableReplayValidator
                 }))
             {
                 SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(),
-                ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider
+                ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider,
+                ConcreteLockCompletionProvider = context.ReplayOptions?.ConcreteLockCompletionProvider
             };
             var execution = new IrProgramInterpreter(factory).Execute(
                 program, initial, context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);

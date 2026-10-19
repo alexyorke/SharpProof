@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,598 declarations have no catalog/audited-intrinsic evidence, and 75 have partial
+55,585 declarations have no catalog/audited-intrinsic evidence, and 88 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,598 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,585 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -78,9 +78,79 @@ access kind and value domains satisfy the production guard.
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Typed SZ-array Clear now models valid scalar ranges and reference null stores, with valid-call effects for opaque values. Remaining: general Array/multidimensional/nonzero-lower-bound Clear, opaque default atoms and reference-content proofs, Copy/Resize, allocation/ref replacement and precise failure/callback semantics. Safe direct covariant Clear upcasts are covered; general covariant array assignments and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
 | N: Numeric / conversion | Convert.ToInt64 body arithmetic is partial; initialization/clauses, other conversions, floating operations and formatting remain open | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
-| E: Exceptions | Selected constructors are partial; other constructors and exact native opaque-call exception sets remain open | Preserve constructor arguments, allocation/cache effects, null/bounds behavior and exact exception identity. Portable named exception evidence must be carried into native IR before claiming AllowedExceptions proofs. |
+| E: Exceptions | KeyNotFoundException(string), ArgumentException(string) and ArgumentException(string,string) have guarded construction evidence; default/null resource messages retain callback effects | Preserve constructor arguments and their evaluation order, allocation/cache effects, null/bounds behavior and exact exception identity. Resource lookup may execute user culture callbacks; unconditional no-throw/purity/termination claims are invalid there. Other constructors, message/inner-exception properties and exact native opaque-call exception sets remain open. |
 | F: Delegates / enumeration / LINQ / parallelism | Invoke, iterator members, LINQ and Parallel.For remain open | Model callback effects, captured mutable state, deferred execution, iteration faults, allocation and parallel behavior; preserve conservative fallback until covered. |
 | O: Ambient state and other APIs | Date/time, randomness, IO, volatile reads, diagnostics, reflection and object behavior need individual contracts | Define nondeterminism, ambient capabilities, observable reads/writes, exceptions and allocation per overload. Do not force deterministic scalar semantics. |
+
+## Exception message-construction slice
+
+Three formerly unmodeled declaration rows now have partial construction evidence:
+`KeyNotFoundException(string)` (seven ranked sites), `ArgumentException(string)`
+(five), and `ArgumentException(string,string)` (one). Arguments are evaluated and
+captured in source order, including reversed named arguments, before allocation
+and constructor effects. This does not prove the callers containing those sites or model
+exception property values.
+
+Resource-message construction can call user-defined `CultureInfo.Name` overrides.
+Those callbacks can mutate state, throw a different exception or fail to terminate.
+The frontend therefore preserves full runtime effects on resource paths, including
+null messages where the actual constructor substitutes a resource. Explicit
+non-null messages have a guarded callback-free path for the audited signatures;
+the two new ArgumentException overloads also accept null messages without resource
+lookup. Fresh exception allocation remains visible in every case.
+
+The previous unconditional effect/no-throw/termination catalog guarantees for the
+two InvalidOperationException constructors were unsound and are withdrawn in
+catalog version 9. Their conservative MayAllocate fact remains. Original tests
+whose narrow catch/throw policy omitted resource callbacks remain as Unknown
+controls, alongside explicit-message successful variants and concrete refutations.
+No required coverage threshold, witness budget or corpus ratchet is reduced.
+Compiler-known string messages omit the unreachable resource branch, preserving
+advisory precision. Native queries can also use a non-null message precondition;
+advisory summaries without that evidence remain conservative.
+
+The production guard lists 55 callback-free signatures and 159 signatures requiring
+a non-null message. A runtime regression oracle checks all 312 public, concrete,
+string/Exception-only constructor signatures without generic parameters in the pinned core runtime:
+1,756 cases vary every string position over null/empty/nonempty values and observe
+both culture hooks and inner-exception overrides, with throwing and returning
+callbacks. These finite observations are evidence for the guards, not exhaustive
+behavioral coverage. Unlisted signatures, including arbitrary format constructors,
+retain full effects. These guard corrections do not credit every audited signature
+as a newly inventoried API.
+
+For concrete refutations only, replay may observe 13 fixed framework constructors
+under the actual base invariant culture. Custom and non-invariant cultures, forged
+sites, failed observations and unsupported constructors supply no such authority.
+Universal proof queries retain both normal and callback paths. No arbitrary user
+callback is run to manufacture a counterexample.
+
+The audited .NET 10.0.13 Linux amd64 CoreLib resource helper takes its shared lock
+before culture callbacks. A module-identity guard, the actual resource-key mode and
+the actual lock identity certify an additional synchronization prefix for those
+13 constructors. Unsupported modules retain conservative replay. CLR oracle tests
+check the helper IL hashes and observe that all 13 constructors hold that same
+lock during culture callbacks. The production probe uses the existing base
+invariant culture; the callback instrumentation exists only in the independent
+tests. Uncertain earlier operations cannot gain authority from this certificate.
+These 13 synchronization declarations add ten further partial rows beyond the
+three message-construction rows. The source framework identity must be version
+10; the runtime certificate is restricted to the audited module and resource mode.
+Runtime-certified synchronization witnesses are deliberately excluded from the
+response cache because its key does not bind that runtime context. Ordinary
+source-lock counterexamples remain cacheable.
+
+Two original corpus claims, OSS0059 and OSS0144, now have concrete synchronization
+refutations in their queue-empty branches. Their sources and support classification
+are unchanged. OSS0139 retains its unsupported source-type initialization boundary;
+its existing Unknown now has an explicit SP0002 diagnostic. The one silent-Unknown
+reason allowance moves to that diagnostic bucket, preserving the total Unknown
+ceiling and both supported-case floors. No additional Unknown case is allowed.
+
+Remaining: arbitrary exception/custom constructors, nullable message paths without
+adequate preconditions, property/inner-exception semantics, precise resource and
+initialization faults, callback termination, and typed exception identity for
+unknown opaque calls. Keep these in work item E.
 
 ## Stack shared-state slice
 
@@ -878,7 +948,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | unmodeled-dispatch | D |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | unmodeled-dispatch | D |
 | P:System.String.Length | read | 22 | partially-modeled | T |
-| M:System.Exception.#ctor(System.String) | call | 18 | partially-modeled | T |
+| M:System.Exception.#ctor(System.String) | call | 18 | partially-modeled | E |
 | P:System.Collections.Generic.List`1.Count | read | 18 | partially-modeled | L |
 | P:System.String.Chars(System.Int32) | read | 18 | partially-modeled | T |
 | P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | partially-modeled | L |
@@ -893,23 +963,23 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | unmodeled | C |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | partially-modeled | D |
 | M:System.Action`1.Invoke(`0) | call | 7 | unmodeled | F |
-| M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | unmodeled | T |
+| M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | partially-modeled | E |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | partially-modeled | T |
-| M:System.ArgumentException.#ctor(System.String) | call | 5 | unmodeled | T |
+| M:System.ArgumentException.#ctor(System.String) | call | 5 | partially-modeled | E |
 | M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | partially-modeled | D |
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | partially-modeled | S |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | unmodeled | F |
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | unmodeled | N |
 | P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | unmodeled | O |
 | P:System.Collections.Generic.Queue`1.Count | read | 5 | partially-modeled | S |
-| M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | unmodeled | T |
+| M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | partially-modeled | E |
 | M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | call | 4 | partially-modeled | L |
 | M:System.Console.WriteLine(System.String) | call | 4 | unmodeled | T |
-| M:System.InvalidOperationException.#ctor(System.String) | call | 4 | partially-modeled | T |
+| M:System.InvalidOperationException.#ctor(System.String) | call | 4 | partially-modeled | E |
 | M:System.Math.Abs(System.Int32) | call | 4 | partially-modeled | N |
 | M:System.Math.Max(System.Int32,System.Int32) | call | 4 | partially-modeled | N |
-| M:System.ArgumentNullException.#ctor | call | 3 | unmodeled | E |
-| M:System.ArgumentNullException.#ctor(System.String) | call | 3 | unmodeled | T |
+| M:System.ArgumentNullException.#ctor | call | 3 | partially-modeled | E |
+| M:System.ArgumentNullException.#ctor(System.String) | call | 3 | partially-modeled | E |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | partially-modeled | R |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | partially-modeled | S |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | partially-modeled | N |
@@ -926,7 +996,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | partially-modeled | S |
 | M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | partially-modeled | S |
 | M:System.Console.Write(System.String) | call | 2 | unmodeled | T |
-| M:System.IndexOutOfRangeException.#ctor(System.String) | call | 2 | unmodeled | T |
+| M:System.IndexOutOfRangeException.#ctor(System.String) | call | 2 | unmodeled | E |
 | M:System.Math.Min(System.Int64,System.Int64) | call | 2 | unmodeled | N |
 | M:System.Predicate`1.Invoke(`0) | call | 2 | unmodeled | F |
 | M:System.String.#ctor(System.Char,System.Int32) | call | 2 | unmodeled | T |
@@ -935,7 +1005,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.String.Replace(System.String,System.String) | call | 2 | unmodeled | T |
 | M:System.String.ToCharArray | call | 2 | unmodeled | T |
 | P:System.Collections.Generic.Dictionary`2.Values | read | 2 | unmodeled | D |
-| M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | unmodeled | T |
+| M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | partially-modeled | E |
 | M:System.ArgumentNullException.ThrowIfNull(System.Object,System.String) | call | 1 | unmodeled | T |
 | M:System.ArgumentOutOfRangeException.ThrowIfGreaterThan``1(``0,``0,System.String) | call | 1 | unmodeled | T |
 | M:System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero``1(``0,System.String) | call | 1 | unmodeled | T |
@@ -964,13 +1034,13 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Convert.ToInt32(System.String) | call | 1 | unmodeled | T |
 | M:System.Convert.ToString(System.Char) | call | 1 | unmodeled | N |
 | M:System.Diagnostics.Debug.Assert(System.Boolean,System.String) | call | 1 | unmodeled | T |
-| M:System.Exception.#ctor(System.String,System.Exception) | call | 1 | unmodeled | T |
+| M:System.Exception.#ctor(System.String,System.Exception) | call | 1 | unmodeled | E |
 | M:System.Func`1.Invoke | call | 1 | unmodeled | F |
 | M:System.IndexOutOfRangeException.#ctor | call | 1 | unmodeled | E |
 | M:System.Int32.ToString | call | 1 | unmodeled | N |
 | M:System.Linq.Enumerable.Select``2(System.Collections.Generic.IEnumerable{``0},System.Func{``0,``1}) | call | 1 | unmodeled | F |
-| M:System.NotSupportedException.#ctor(System.String) | call | 1 | unmodeled | T |
-| M:System.NullReferenceException.#ctor(System.String) | call | 1 | unmodeled | T |
+| M:System.NotSupportedException.#ctor(System.String) | call | 1 | unmodeled | E |
+| M:System.NullReferenceException.#ctor(System.String) | call | 1 | unmodeled | E |
 | M:System.Random.NextDouble | call | 1 | unmodeled | O |
 | M:System.String.#ctor(System.Char[]) | call | 1 | unmodeled | T |
 | M:System.String.Insert(System.Int32,System.String) | call | 1 | unmodeled | T |
@@ -990,10 +1060,19 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 75 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 88 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
+| M:System.AggregateException.#ctor | intrinsic=guarded-exception-resource-synchronization |
+| M:System.AggregateException.#ctor(System.String) | intrinsic=guarded-exception-resource-synchronization |
+| M:System.ArgumentException.#ctor | intrinsic=guarded-exception-resource-synchronization |
+| M:System.ArgumentException.#ctor(System.String) | intrinsic=guarded-exception-message-construction |
+| M:System.ArgumentException.#ctor(System.String,System.String) | intrinsic=guarded-exception-message-construction |
+| M:System.ArgumentNullException.#ctor | intrinsic=guarded-exception-resource-synchronization |
+| M:System.ArgumentNullException.#ctor(System.String) | intrinsic=guarded-exception-resource-synchronization |
+| M:System.ArgumentOutOfRangeException.#ctor | intrinsic=guarded-exception-resource-synchronization |
+| M:System.ArgumentOutOfRangeException.#ctor(System.String) | intrinsic=guarded-exception-resource-synchronization |
 | M:System.Array.Clear(System.Array) | intrinsic=typed-sz-array-clear-state |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | intrinsic=typed-sz-array-clear-state |
 | M:System.Array.Empty``1 | catalog=bcl.array.empty;effects=Unknown;allocation=Unknown;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=Empty;termination=Unknown;postconditions=0 |
@@ -1011,6 +1090,7 @@ These 75 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | intrinsic=default-primitive-hash-set-state |
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | M:System.Collections.Generic.IList`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
+| M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | intrinsic=guarded-exception-message-construction;intrinsic=guarded-exception-resource-synchronization |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=concrete-list-state |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
@@ -1033,13 +1113,15 @@ These 75 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Convert.ToInt64(System.UInt16) | intrinsic=checked-integral-to-int64 |
 | M:System.Convert.ToInt64(System.UInt32) | intrinsic=checked-integral-to-int64 |
 | M:System.Convert.ToInt64(System.UInt64) | intrinsic=checked-integral-to-int64 |
+| M:System.DivideByZeroException.#ctor | intrinsic=guarded-exception-resource-synchronization |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.IO.IOException.#ctor | intrinsic=guarded-exception-resource-synchronization |
 | M:System.Int16.CompareTo(System.Int16) | intrinsic=integer-comparison |
 | M:System.Int32.CompareTo(System.Int32) | intrinsic=integer-comparison |
 | M:System.Int64.CompareTo(System.Int64) | intrinsic=integer-comparison |
-| M:System.InvalidOperationException.#ctor | catalog=bcl.invalid-operation-exception.ctor;effects=WritesReceiverState, ReadsAmbientState, Synchronization;allocation=MayAllocate;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
-| M:System.InvalidOperationException.#ctor(System.String) | catalog=bcl.invalid-operation-exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.InvalidOperationException.#ctor | catalog=bcl.invalid-operation-exception.ctor;effects=Unknown;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=guarded-exception-resource-synchronization |
+| M:System.InvalidOperationException.#ctor(System.String) | catalog=bcl.invalid-operation-exception.ctor.string;effects=Unknown;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=guarded-exception-resource-synchronization |
 | M:System.Linq.Enumerable.Empty``1 | catalog=bcl.enumerable.empty;effects=Unknown;allocation=Unknown;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=Empty;termination=Unknown;postconditions=0 |
 | M:System.Math.Abs(System.Int32) | catalog=bcl.math.abs.int32;effects=None;allocation=None;throws=MayThrow;exceptions=System.OverflowException;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=1 |
 | M:System.Math.Max(System.Int32,System.Int32) | catalog=bcl.math.max.int32-int32;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
@@ -1048,6 +1130,7 @@ These 75 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Nullable`1.GetValueOrDefault(`0) | catalog=bcl.nullable.get-value-or-default.value;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Object.#ctor | catalog=bcl.object.ctor;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Object.ReferenceEquals(System.Object,System.Object) | intrinsic=object-reference-identity |
+| M:System.ObjectDisposedException.#ctor(System.String) | intrinsic=guarded-exception-resource-synchronization |
 | M:System.SByte.CompareTo(System.SByte) | intrinsic=integer-comparison |
 | M:System.String.Concat(System.String,System.String) | catalog=bcl.string.concat.string-string;effects=None;allocation=MayAllocate;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.String.Equals(System.String) | intrinsic=string-instance-equality |

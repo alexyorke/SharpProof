@@ -159,9 +159,9 @@ public sealed class SwitchExpressionTerminalElisionTests
                 var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
                         binding.Parameter.Ordinal == 0 ? input.Value : input.Other)));
-                var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, environment);
-                Assert.That(replay.ConsumedApproximation, Is.False);
-                Assert.That(replay.ApproximationVariables, Is.Empty);
+                var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, environment,
+                    maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
+                ExceptionConstructorNormalReplay.AssertApproximation(replay, enabled);
                 if (enabled)
                 {
                     Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));

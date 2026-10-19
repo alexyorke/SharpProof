@@ -1318,7 +1318,7 @@
       "declarationSha256": "120be84f96cfe1020d349327224d389a55216b2ca80471fe670b36340f811608",
       "methodName": "PeekAtHighestPriority",
       "mode": "effects",
-      "expectedVerdict": "Proven",
+      "expectedVerdict": "Refuted",
       "support": "Supported"
     },
     {
@@ -2278,7 +2278,7 @@
       "declarationSha256": "77a82eff93da43f16a31fbdc0aa03b37d669415c280bc58dd8e08ba0a891ef27",
       "methodName": "UniversalHash",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -2338,7 +2338,7 @@
       "declarationSha256": "eb58281c7d80513688d258e261290006ced7b7100f5fdf699dfe322ef8f8cfe6",
       "methodName": "PeekAtMinPriority",
       "mode": "effects",
-      "expectedVerdict": "Proven",
+      "expectedVerdict": "Refuted",
       "support": "Supported"
     },
     {

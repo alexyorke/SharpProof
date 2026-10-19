@@ -17,11 +17,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         CreateParameterlessConstructorInvoker<Exception>();
     private static readonly Action<Exception, string?> CallExceptionStringConstructor =
         CreateStringConstructorInvoker<Exception>();
-    private static readonly Action<InvalidOperationException> CallInvalidOperationExceptionConstructor =
-        CreateParameterlessConstructorInvoker<InvalidOperationException>();
-    private static readonly Action<InvalidOperationException, string?>
-        CallInvalidOperationExceptionStringConstructor =
-            CreateStringConstructorInvoker<InvalidOperationException>();
     private static readonly Action<object> CallObjectConstructor =
         CreateParameterlessConstructorInvoker<object>();
     private static readonly object ListItem = new();
@@ -35,8 +30,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static Exception s_exceptionConstructorReceiver =
         CreateUninitializedException<Exception>();
-    private static InvalidOperationException s_invalidOperationExceptionConstructorReceiver =
-        CreateUninitializedException<InvalidOperationException>();
     private static object s_objectConstructorReceiver = new();
     private static GhostProbe s_ghostProbe = new();
     private static string? s_stringSink;
@@ -441,36 +434,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
     {
-        var row = CreateBclConstructorWitness(
-            "an already allocated InvalidOperationException receiver, excluding newobj",
-            ObserveInvalidOperationExceptionConstructorEffect,
-            SpecEffect.None,
-            PrepareInvalidOperationExceptionConstructorReceiver,
-            [InvokePreparedInvalidOperationExceptionConstructor]);
-        return row with
-        {
-            Facets = [
-                ConservativeMayAllocate(
-                    "an already allocated InvalidOperationException receiver, excluding newobj"),
-                .. row.Facets.Where(static witness =>
-                    witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet != FacetKind.Allocation))
-            ]
-        };
+        return Row(allocation: ConservativeMayAllocate(
+            "resource-message construction can allocate through ambient culture callbacks; excluding newobj"));
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorStringWitness()
     {
-        return CreateBclConstructorWitness(
-            "an already allocated InvalidOperationException receiver and null/non-null messages, excluding newobj",
-            ObserveInvalidOperationExceptionStringConstructorEffect,
-            SpecEffect.None,
-            PrepareInvalidOperationExceptionConstructorReceiver,
-            [
-                InvokePreparedInvalidOperationExceptionStringConstructor,
-                InvokePreparedInvalidOperationExceptionNullStringConstructor
-            ]);
+        return Row(allocation: ConservativeMayAllocate(
+            "null-message resource lookup can allocate through ambient culture callbacks; excluding newobj"));
     }
-
     private static RowWitness CreateBclObjectCtorWitness()
     {
         var edges = ImmutableArray.Create(
@@ -984,30 +956,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
             PrepareExceptionConstructorReceiver,
             static () => s_exceptionConstructorReceiver,
             [InvokePreparedExceptionStringConstructor, InvokePreparedExceptionNullStringConstructor]);
-    }
-
-    private static SpecEffect ObserveInvalidOperationExceptionConstructorEffect()
-    {
-        var writes = ObserveConstructorWrites(
-            PrepareInvalidOperationExceptionConstructorReceiver,
-            static () => s_invalidOperationExceptionConstructorReceiver,
-            [InvokePreparedInvalidOperationExceptionConstructor]);
-        return writes == SpecEffect.WritesReceiverState
-            ? SpecEffect.WritesReceiverState |
-              SpecEffect.ReadsAmbientState |
-              SpecEffect.Synchronization
-            : writes;
-    }
-
-    private static SpecEffect ObserveInvalidOperationExceptionStringConstructorEffect()
-    {
-        return ObserveConstructorWrites(
-            PrepareInvalidOperationExceptionConstructorReceiver,
-            static () => s_invalidOperationExceptionConstructorReceiver,
-            [
-                InvokePreparedInvalidOperationExceptionStringConstructor,
-                InvokePreparedInvalidOperationExceptionNullStringConstructor
-            ]);
     }
 
     private static SpecEffect ObserveConstructorWrites<TException>(
@@ -1563,35 +1511,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static void InvokePreparedExceptionNullStringConstructor()
     {
         CallExceptionStringConstructor(s_exceptionConstructorReceiver, null);
-    }
-
-    private static void PrepareInvalidOperationExceptionConstructorReceiver()
-    {
-        s_invalidOperationExceptionConstructorReceiver =
-            CreateUninitializedException<InvalidOperationException>();
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InvokePreparedInvalidOperationExceptionConstructor()
-    {
-        CallInvalidOperationExceptionConstructor(
-            s_invalidOperationExceptionConstructorReceiver);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InvokePreparedInvalidOperationExceptionStringConstructor()
-    {
-        CallInvalidOperationExceptionStringConstructor(
-            s_invalidOperationExceptionConstructorReceiver,
-            "after");
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InvokePreparedInvalidOperationExceptionNullStringConstructor()
-    {
-        CallInvalidOperationExceptionStringConstructor(
-            s_invalidOperationExceptionConstructorReceiver,
-            null);
     }
 
     private static void PrepareObjectConstructorReceiver()

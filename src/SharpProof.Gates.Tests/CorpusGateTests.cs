@@ -886,15 +886,20 @@ public sealed class CorpusGateTests
                 result.IntentionallyUnsupportedCaseCount,
                 Is.EqualTo(218));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(217));
-            Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
+            Assert.That(result.UnknownCount, Is.EqualTo(218));
+            Assert.That(result.SilentUnknownCount, Is.Zero);
             Assert.That(result.TotalUnknownCount, Is.EqualTo(218));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
 , static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Reason), static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Count)),
                 Is.EquivalentTo(
-                    ImmutableDictionaryCapture.Create(ImmutableArray.Create(new KeyValuePair<string, int>("SP0002", 120), new KeyValuePair<string, int>("SP0016", 18), new KeyValuePair<string, int>("SP0045", 9), new KeyValuePair<string, int>("SP0046", 9), new KeyValuePair<string, int>("SP0047", 61), new KeyValuePair<string, int>("silent-unclassified", 1
-)), static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
+                    ImmutableDictionaryCapture.Create(ImmutableArray.Create(
+                        new KeyValuePair<string, int>("SP0002", 121),
+                        new KeyValuePair<string, int>("SP0016", 18),
+                        new KeyValuePair<string, int>("SP0045", 9),
+                        new KeyValuePair<string, int>("SP0046", 9),
+                        new KeyValuePair<string, int>("SP0047", 61)),
+                        static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
             Assert.That(
                 result.UnknownRate,
                 Is.EqualTo(result.UnknownCount / (double)result.CaseCount));
@@ -1014,7 +1019,7 @@ public sealed class CorpusGateTests
         var diagnosticParts = refutedParts[3].Split('@');
         var message = Encoding.UTF8.GetString(
             Convert.FromBase64String(diagnosticParts[3]));
-        var silentUnknown = lines.Single(static line =>
+        var unsupportedInitialization = lines.Single(static line =>
             line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal)))
             .Split('|');
         var openSource = lines.Single(static line =>
@@ -1036,9 +1041,9 @@ public sealed class CorpusGateTests
                 message,
                 Is.EqualTo(
                     "Call to 'Positive' violates precondition 'value > 0'"));
-            Assert.That(silentUnknown[1], Is.EqualTo("SilentUnknown"));
-            Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
-            Assert.That(silentUnknown[3], Is.Empty);
+            Assert.That(unsupportedInitialization[1], Is.EqualTo("Unknown"));
+            Assert.That(unsupportedInitialization[2], Is.EqualTo("Unknown"));
+            Assert.That(unsupportedInitialization[3], Does.StartWith("SP0002@Warning@"));
             Assert.That(openSource, Has.Length.EqualTo(4));
             Assert.That(openSource[1], Is.EqualTo("Unknown"));
             Assert.That(openSource[2], Is.EqualTo("Abstained"));

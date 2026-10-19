@@ -15,11 +15,14 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinarySummaryThrowAfterWriteReportTests
 {
-    [Test]
-    public async Task ActualAllowedExceptionAfterWriteKeepsTheInterruptedReplayVisible()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ActualAllowedExceptionAfterWriteKeepsTheInterruptedReplayVisible(bool explicitMessage)
     {
         const string source = "public class SummaryInvocation { public static int Counter; [global::SharpProof.Attributes.EffectContract(global::SharpProof.Attributes.SharpProofEffect.Throws | global::SharpProof.Attributes.SharpProofEffect.Allocates, ThrownExceptions = new[] { typeof(System.InvalidOperationException) })] public static void Target() { Counter = 1; throw new System.InvalidOperationException(); } }";
-        var compilation = await PrepareAsync(source);
+        var compilation = await PrepareAsync(explicitMessage
+            ? source.Replace("new System.InvalidOperationException()", "new System.InvalidOperationException(\"message\")", StringComparison.Ordinal)
+            : source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
@@ -31,18 +34,18 @@ public sealed class OrdinarySummaryThrowAfterWriteReportTests
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
-        Assert.That(evidence.WriteWitness, Is.Not.Null);
+        Assert.That(evidence.WriteWitness != null, Is.EqualTo(explicitMessage));
         Assert.That(evidence.ExceptionWitness, Is.Null);
         Assert.That(evidence.AllocationWitness, Is.Null);
-        Assert.That(evidence.LockWitness, Is.Null);
+        Assert.That(evidence.LockWitness != null, Is.EqualTo(!explicitMessage));
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
             "summary-write-invocation", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("WriteInvocationThrew"));
-        Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(1));
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(explicitMessage ? "WriteInvocationThrew" : "LockOracleNotRun"));
+        Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(explicitMessage ? 1 : 0));
         Assert.That(report.RuntimeWitnesses, Is.Zero);
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);

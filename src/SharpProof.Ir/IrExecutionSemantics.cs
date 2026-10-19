@@ -117,6 +117,9 @@ public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocV
     internal ImmutableHashSet<IrVarId> SnapshotVariables { get; init; } = [];
     // Only a trusted replay host may replace an approximation with an observed framework value.
     internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; init; }
+    // null preserves ordinary lock-prefix stopping; only a trusted host can
+    // certify completion of a specific framework synchronization operation.
+    internal Func<IrLockInstruction, IrValue, bool?>? ConcreteLockCompletionProvider { get; init; }
 
     public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; init; }
     public Action<IrAllocationInstruction>? AllocationObserver { get; init; }
