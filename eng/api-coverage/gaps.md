@@ -691,6 +691,12 @@ Boolean keys use a one-to-one false/true representation; no heap-key validation 
 relaxed. Receiver and argument evaluation order, rebinding and independent sets are
 tested against compiled CLR executions and native proof controls.
 
+Frontend boundary tests also reject allocating clause receivers and over-deep
+body receivers or arguments without emitting collection stores. Real compiler
+operations check constructor-origin tracking across identity conversions and
+assignment values. Opaque Count fallback tests retain nonnegative masking only
+for List, Queue and Stack; HashSet retains its signed result.
+
 The complete API inventory gains six partial declarations. The source ranking
 credits nine default constructions and one primitive site each for Add, Contains
 and Remove: twelve newly partial static sites. Fifteen Contains, eleven Add and
