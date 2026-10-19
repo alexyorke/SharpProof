@@ -19,6 +19,7 @@ namespace SharpProof.Gates.Test;
 public sealed class ApiUsageRankingTests
 {
     private static readonly ImmutableArray<bool> FreshDictionaryCalls = [true, false, false];
+    private static readonly ImmutableArray<bool> FreshHashSetCalls = [true, true, true, false, false, false];
     private static readonly ImmutableArray<bool> FreshListCalls = [true, false];
     private static readonly ImmutableArray<bool> FreshListIndexers = [true, true, false, false, false];
     private static readonly ImmutableArray<bool> FreshDictionaryIndexers = [true, true, false, false];
@@ -211,6 +212,17 @@ public sealed class ApiUsageRankingTests
                     IObjectCreationOperation { Initializer: null, Constructor: { } constructor } => CSharpOperationSemantics.IsQueueStateMember(constructor) ? "partially-modeled" : "unmodeled-domain",
                     IInvocationOperation invocation => CSharpOperationSemantics.IsQueueStateMember(invocation.TargetMethod) ? "partially-modeled" : "unmodeled-domain",
                     IPropertyReferenceOperation => "partially-modeled",
+                    _ => "unmodeled-domain"
+                };
+            }
+            if (CSharpOperationSemantics.IsHashSetStateDeclaration(symbol))
+            {
+                status = model.GetOperation(syntax) switch
+                {
+                    IObjectCreationOperation creation => CSharpOperationSemantics.IsEmptyDefaultHashSetCreation(creation) ? "partially-modeled" : "unmodeled-domain",
+                    IPropertyReferenceOperation { Property.Name: "Count" } => "partially-modeled",
+                    IInvocationOperation invocation => knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" :
+                        CSharpOperationSemantics.IsHashSetStateMember(invocation.TargetMethod) ? "unmodeled-dispatch" : "unmodeled-domain",
                     _ => "unmodeled-domain"
                 };
             }
@@ -423,6 +435,31 @@ public sealed class ApiUsageRankingTests
     }
 
     [Test]
+    public void UsageScanCreditsOnlyProvenPrimitiveDefaultHashSetMembership()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class HashSetUsageProbe {
+                public static void Target(System.Collections.Generic.HashSet<int> incoming,
+                    System.Collections.Generic.IEqualityComparer<int> comparer) {
+                    var fresh = new System.Collections.Generic.HashSet<int>();
+                    fresh.Add(1); _ = fresh.Contains(1); fresh.Remove(1);
+                    _ = incoming.Contains(1);
+                    var custom = new System.Collections.Generic.HashSet<int>(comparer);
+                    _ = custom.Contains(1);
+                    var floating = new System.Collections.Generic.HashSet<double>();
+                    _ = floating.Contains(double.NaN);
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var tree = compilation.SyntaxTrees.Single();
+        var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        Assert.That(calls, Has.Length.EqualTo(6));
+        Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
+            Is.EqualTo(FreshHashSetCalls));
+    }
+
+    [Test]
     public void UsageScanCreditsOwnedListAliasesAndInitializersWithoutCreditingUnprovenDispatch()
     {
         var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
@@ -546,6 +583,7 @@ public sealed class ApiUsageRankingTests
             context.TrackArrayReceivers(graph);
             context.TrackDefaultComparers(graph);
             context.TrackDefaultDictionaries(graph);
+            context.TrackDefaultHashSets(graph);
             context.TrackFreshLists(graph);
             foreach (var creation in graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue))).SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IObjectCreationOperation>())
             {
@@ -555,6 +593,8 @@ public sealed class ApiUsageRankingTests
             foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue))).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
                 if (context.IsDefaultIntegerComparison(invocation) ||
+                    invocation.Instance != null && CSharpOperationSemantics.IsHashSetStateMember(invocation.TargetMethod) &&
+                    context.IsDefaultHashSetOrigin(invocation.Instance) ||
                     invocation.Instance != null && DictionaryMember(invocation.TargetMethod) &&
                     context.IsDefaultDictionaryOrigin(invocation.Instance) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) &&

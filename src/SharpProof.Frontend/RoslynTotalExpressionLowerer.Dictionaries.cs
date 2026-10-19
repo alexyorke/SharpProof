@@ -30,7 +30,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var keyType = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(0));
         var valueType = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(1));
         if (!CSharpOperationSemantics.IsDefaultDictionaryStateMember(method, keyType, valueType) ||
-            !_context.IsDefaultDictionaryOrigin(instance))
+            !_context.IsDefaultDictionaryOrigin(instance) && method.AssociatedSymbol is not IPropertySymbol { Name: "Count" })
         { return null; }
         var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
         if (name is not ("Count" or "Item" or "ContainsKey"))
@@ -42,8 +42,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var safe = And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type))));
         if (name == "Count")
         {
-            return new(_factory.Binary(IrBinaryOperator.BitwiseAnd,
-                _factory.PureOpaque(DictionaryField("count", _factory.IntegerType), owner), _factory.Integer(int.MaxValue)),
+            return new(_factory.PureOpaque(DictionaryField("count", _factory.IntegerType), owner),
                 safe, FrontendSubsetClassification.Exact);
         }
         var argument = (invocation?.Arguments ?? property!.Arguments)[0];
@@ -125,7 +124,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var knownKey = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(0));
         var knownValue = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(1));
         if (!CSharpOperationSemantics.IsDefaultDictionaryStateMember(method, knownKey, knownValue) ||
-            !_context.IsDefaultDictionaryOrigin(instance))
+            !_context.IsDefaultDictionaryOrigin(instance) && method.AssociatedSymbol is not IPropertySymbol { Name: "Count" })
         { return null; }
         var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
         var arguments = invocation?.Arguments ?? property!.Arguments;
@@ -159,7 +158,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var owner = AsObject(receiver.Value);
         var count = DictionaryField("count", _factory.IntegerType);
         if (name == "Count")
-        { return new(_factory.Binary(IrBinaryOperator.BitwiseAnd, _factory.PureOpaque(count, owner), _factory.Integer(int.MaxValue)), block, FrontendSubsetClassification.Exact); }
+        { return new(_factory.PureOpaque(count, owner), block, FrontendSubsetClassification.Exact); }
         if (_context.IsDefaultDictionary(instance))
         { return DefaultDictionaryState(operation, method, owner, values, name, assigned != null, block); }
 

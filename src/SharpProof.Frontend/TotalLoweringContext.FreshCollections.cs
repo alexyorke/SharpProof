@@ -2,12 +2,12 @@ namespace SharpProof.Frontend;
 
 public sealed partial class TotalLoweringContext
 {
-    private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false)
+    private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false, bool hashSetOrigins = false)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var identityOnly = lists || dictionaryOrigins;
-        var tracked = lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
-        var trackedCaptures = lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
+        var identityOnly = lists || dictionaryOrigins || hashSetOrigins;
+        var tracked = hashSetOrigins ? _defaultHashSetOrigins : lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
+        var trackedCaptures = hashSetOrigins ? _defaultHashSetOriginCaptures : lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToImmutableArray();
         var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);
@@ -143,7 +143,8 @@ public sealed partial class TotalLoweringContext
             }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
-            return lists ? CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation) : CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
+            return hashSetOrigins ? CSharpOperationSemantics.IsEmptyDefaultHashSetCreation(operation) :
+                lists ? CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation) : CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
         }
     }
 

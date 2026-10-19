@@ -91,6 +91,12 @@ public sealed partial class DotnetApiInventoryTests
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));
             }
+            if (row.Evidence.Contains("intrinsic=default-primitive-hash-set-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "default/capacity construction; primitive-key Add/Contains/Remove return values and aliased Count; CLR/IR oracle with deliberately wrong result; native boundary keys and immutable generic helper; initialization and unknown-writer fallback retained",
+                    () => CheckHashSetStateIntrinsic(compilation, false), () => CheckHashSetStateIntrinsic(compilation, true));
+            }
 
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
             {

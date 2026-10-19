@@ -300,6 +300,50 @@ public sealed class ReferenceCallableSolverTests
             factory.Binary(IrBinaryOperator.GreaterThanOrEqual, count, factory.Integer(minimum)), [input]);
         Assert.That(await new ProofKernel(session).VerifyAsync(largeProof, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(-1)]
+    [TestCase(64)]
+    [TestCase(-64)]
+    [TestCase(65)]
+    [TestCase(-65)]
+    [TestCase(257)]
+    [TestCase(-257)]
+    [TestCase(int.MaxValue)]
+    [TestCase(int.MinValue)]
+    [TestCase(-1, "dictionary")]
+    [TestCase(-64, "dictionary")]
+    [TestCase(-65, "dictionary")]
+    [TestCase(65, "dictionary")]
+    [TestCase(int.MaxValue, "dictionary")]
+    [TestCase(int.MinValue, "dictionary")]
+    public async Task CallbackCollectionWitnessCountsKeepTheirSignAndChargeTheirMagnitude(int value, string collection = "hash-set")
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var input = factory.CreateVariable("set", factory.ObjectType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
+        var count = factory.PureOpaque(field, factory.Variable(input));
+        var equal = factory.Binary(IrBinaryOperator.Equal, count, factory.Integer(value));
+        var assumptions = ImmutableArray.Create(NotNull(factory, input), Assume(factory, equal));
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, assumptions, factory.Boolean(false), [input]);
+        var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
+        if (value is int.MinValue or int.MaxValue)
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
+        }
+        else
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+            Assert.That(new IrInterpreter(factory).Evaluate(count, result.Model!.Assignments).Value!.Integer, Is.EqualTo(value));
+            Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+        }
+        Assert.That(await new ProofKernel(session).VerifyAsync(Query(factory, assumptions, equal, [input]),
+            TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task NominalWitnessPreferenceCannotProveAClaimOrOverrideRequiredAliases(bool fields)

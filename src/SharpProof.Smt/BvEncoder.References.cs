@@ -39,13 +39,16 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
-            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
+            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count" or IrFieldSites.Prefix + "hash-set:count" or IrFieldSites.Prefix + "dictionary:count")
             {
                 foreach (var observed in _fieldReads[field.Key].ToImmutable())
                 {
                     meter.Consume();
                     var count = owner.Own(context.MkApp(field.Value, observed.Owner));
-                    var size = owner.Own(context.MkBVAND((BitVecExpr)count, owner.Own(context.MkBV(int.MaxValue, 32))));
+                    var size = factory.GetString(member.Name) is IrFieldSites.Prefix + "hash-set:count" or IrFieldSites.Prefix + "dictionary:count"
+                        ? (BitVecExpr)owner.Own(context.MkITE(owner.Own(context.MkBVSLT((BitVecExpr)count, owner.Own(context.MkBV(0, 32)))),
+                            owner.Own(context.MkBVNeg((BitVecExpr)count)), count))
+                        : owner.Own(context.MkBVAND((BitVecExpr)count, owner.Own(context.MkBV(int.MaxValue, 32))));
                     bounds.Add(owner.Own(context.MkBVULE(size, owner.Own(context.MkBV(MaximumSmallReference, 32)))));
                 }
             }

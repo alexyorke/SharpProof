@@ -62,6 +62,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _context.TrackArrayReceivers(graph);
         _context.TrackDefaultComparers(graph);
         _context.TrackDefaultDictionaries(graph);
+        _context.TrackDefaultHashSets(graph);
         _context.TrackFreshLists(graph);
         var freshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
