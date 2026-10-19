@@ -403,7 +403,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                         _builder.Lock(destination, synchronization.Operation, synchronization.Receiver);
                         break;
                     case IrWriteInstruction { Target: { } stored, Field: null, Index: { } index, Value: { } value } write:
-                        _builder.ElementStore(destination, write.Operation, stored, index, value);
+                        _builder.ElementStore(destination, write.Operation, stored, index, value, write.Length);
                         break;
                     case IrWriteInstruction { Target: { } storedReceiver, Field: { } field, Value: { } value } write:
                         _builder.FieldStore(destination, write.Operation, write.Region, storedReceiver, field, value, write.Index);

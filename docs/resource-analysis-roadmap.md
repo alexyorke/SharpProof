@@ -1017,3 +1017,21 @@ four coverage shards. Aggregate qualification failed at 3292/3382 changed truste
 lines (97.34%), leaving 90 gaps against the unchanged 100% baseline. This result
 excludes initializer replay. Exact-head CI, coverage gap closure and all remaining
 phase C/E/F work remain required.
+
+## Master reconciliation
+
+The draft MR became conflicted after master advanced to `deaa0a57c`, so GitHub
+could not run pull-request CI for initializer checkpoint `17d028b08`. The branch
+now merges that master revision. Its only content conflict was source call
+preparation: source binding types must refresh before receiver creation, while
+constructed calls must still model their fresh receiver. The resolution preserves
+both rules and retains the upstream array range, collection, conversion and
+runtime type-identity implementations.
+
+Merged-state verification passed 882 worker resource/source-call and upstream
+feature cases, all 577 IR tests, all 2112 frontend tests and all 1409 analyzer
+tests. All 11 package cases and all quality/compatibility categories passed.
+Documentation generation and 723 local links passed. Layout passed with 2704
+source files, 59 evaluated projects and 151 pinned common files. Delegate/closure allocation work
+resumes after merge qualification; no remaining phase C/E/F requirement or the
+unchanged 100% coverage qualification is removed by this reconciliation.

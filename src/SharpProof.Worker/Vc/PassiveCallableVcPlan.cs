@@ -351,7 +351,50 @@ internal sealed class PassiveCallableVcPlan
     private IrValue? ReplayFrameworkValue(IrHavocRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+        return ObserveIntegralConvertInitialization(Factory, request, WarmIntegralConvert) ??
+            ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal static IrValue? ObserveIntegralConvertInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
+            IrOpaqueCallSite.IntegralConvertInitializationPrimitive(factory, request.Site) is not { } primitive)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        try
+        {
+            if (!observe(primitive))
+            { return null; }
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException)
+        { return null; }
+        return factory.CreateBooleanValue(false);
+    }
+
+    internal static bool WarmIntegralConvert(string primitive)
+    {
+        ArgumentNullException.ThrowIfNull(primitive);
+        if (primitive is not ("System_Boolean" or "System_SByte" or "System_Byte" or "System_Int16" or "System_UInt16" or
+            "System_Char" or "System_Int32" or "System_UInt32" or "System_Int64" or "System_UInt64"))
+        { throw new ArgumentOutOfRangeException(nameof(primitive)); }
+        // Fixed CoreLib overloads only. Initialization is actually completed
+        // before observing a legitimate already-initialized normal replay state.
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(Convert).TypeHandle);
+        return primitive switch
+        {
+            "System_Boolean" => Convert.ToInt64(false) == 0 && Convert.ToInt64(true) == 1,
+            "System_SByte" => Convert.ToInt64(sbyte.MinValue) == sbyte.MinValue && Convert.ToInt64(sbyte.MaxValue) == sbyte.MaxValue,
+            "System_Byte" => Convert.ToInt64(byte.MinValue) == byte.MinValue && Convert.ToInt64(byte.MaxValue) == byte.MaxValue,
+            "System_Int16" => Convert.ToInt64(short.MinValue) == short.MinValue && Convert.ToInt64(short.MaxValue) == short.MaxValue,
+            "System_UInt16" => Convert.ToInt64(ushort.MinValue) == ushort.MinValue && Convert.ToInt64(ushort.MaxValue) == ushort.MaxValue,
+            "System_Char" => Convert.ToInt64(char.MinValue) == char.MinValue && Convert.ToInt64(char.MaxValue) == char.MaxValue,
+            "System_Int32" => Convert.ToInt64(int.MinValue) == int.MinValue && Convert.ToInt64(int.MaxValue) == int.MaxValue,
+            "System_UInt32" => Convert.ToInt64(uint.MinValue) == uint.MinValue && Convert.ToInt64(uint.MaxValue) == uint.MaxValue,
+            "System_Int64" => Convert.ToInt64(long.MinValue) == long.MinValue && Convert.ToInt64(long.MaxValue) == long.MaxValue,
+            _ => Convert.ToInt64(0UL) == 0 && Convert.ToInt64((ulong)long.MaxValue) == long.MaxValue
+        };
     }
 
     internal static IrValue? ObserveDictionaryInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)

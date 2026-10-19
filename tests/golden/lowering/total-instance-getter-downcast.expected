@@ -15,16 +15,16 @@ block: b2 cfg:1
   i6 op3 Assign v5:bool[width=0,signed=False] = (v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null)) source=total-instance-getter-downcast.cs:tokens["node","==","null"]#1
   i7 op1 Branch v5 ? b4 : b3 source=total-instance-getter-downcast.cs:tokens["node","==","null"]#1
 block: b3 cfg:3
-  i8 op5 Assign v11:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v1 source=total-instance-getter-downcast.cs:tokens["node"]#3
-  i9 op4 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)v11) source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
-  i10 op4 Assign v10:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)null) source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
-  i11 op6 Branch (v11 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null)) ? b8 : b9 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
+  i8 op5 Assign v12:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v1 source=total-instance-getter-downcast.cs:tokens["node"]#3
+  i9 op4 Assign v8:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v12 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
+  i10 op4 Assign v11:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null) source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
+  i11 op6 Branch (v12 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null)) ? b8 : b9 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
 block: b4 cfg:2
-  i31 op15 Assign v16:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null) source=total-instance-getter-downcast.cs:tokens["null"]#2
+  i31 op15 Assign v17:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null) source=total-instance-getter-downcast.cs:tokens["null"]#2
   i32 op0 Goto b5 source=none
 block: b5 cfg:4
-  i33 op17 Assign v17:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v16 source=total-instance-getter-downcast.cs:tokens["node","==","null","?","null",":","node",".","Parent"]#1
-  i34 op16 Assign v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v17 source=total-instance-getter-downcast.cs:tokens["node","==","null","?","null",":","node",".","Parent"]#1
+  i33 op17 Assign v18:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v17 source=total-instance-getter-downcast.cs:tokens["node","==","null","?","null",":","node",".","Parent"]#1
+  i34 op16 Assign v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v18 source=total-instance-getter-downcast.cs:tokens["node","==","null","?","null",":","node",".","Parent"]#1
   i35 op16 Return v3 source=total-instance-getter-downcast.cs:tokens["node","==","null","?","null",":","node",".","Parent"]#1
 block: b6 cfg:5
   i36 op0 Return void source=none
@@ -33,21 +33,21 @@ block: b7 exceptional:exit
 block: b8 throw
   i12 op6 Throw NullReference -> b7 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
 block: b9 normal
-  i13 op7 Assign v12:bool[width=0,signed=False] = true source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
+  i13 op7 Assign v13:bool[width=0,signed=False] = true source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
   i14 op4 Goto b11 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
 block: b10 call:continued
-  i29 op14 Assign v16:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)v10) source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
+  i29 op14 Assign v17:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v11 source=total-instance-getter-downcast.cs:tokens["node",".","Parent"]#1
   i30 op0 Goto b5 source=none
 block: b11 call:body
-  i15 op8 Assign v8:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = v7 source=none
-  i16 op8 Assign v9:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = v7 source=none
+  i15 op8 Assign v9:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v8 source=none
+  i16 op8 Assign v10:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v8 source=none
   i17 op8 Goto b12 source=none
 block: b12 call:body
   i18 op8 Goto b13 source=none
 block: b13 call:body
-  i19 op10 Assign v13:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}[width=0,signed=False] = pure:m0((("object"#t3)v8)) source=total-instance-getter-downcast.cs:tokens["base",".","Parent"]#1
-  i20 op11 Havoc Variables/Approximation [v14:bool[width=0,signed=False]] source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
-  i21 op12 Branch ((v13 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)) && (!v14)) ? b16 : b17 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
+  i19 op10 Assign v14:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}[width=0,signed=False] = pure:m0((("object"#t3)v9)) source=total-instance-getter-downcast.cs:tokens["base",".","Parent"]#1
+  i20 op11 Havoc Variables/Approximation [v15:bool[width=0,signed=False]] source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
+  i21 op12 Branch ((v14 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)) && (!v15)) ? b16 : b17 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
 block: b14 call:body
   i22 op8 Goto b10 source=none
 block: b15 call:body
@@ -55,9 +55,9 @@ block: b15 call:body
 block: b16 call:body
   i24 op12 Throw InvalidCast -> b7 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
 block: b17 call:body
-  i25 op13 Assign v15:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)v13) source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
-  i26 op9 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = v15 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
-  i27 op9 Assign v10:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}[width=0,signed=False] = v6 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
+  i25 op13 Assign v16:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)v14) source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
+  i26 op9 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v16 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
+  i27 op9 Assign v11:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}[width=0,signed=False] = v7 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
   i28 op9 Goto b10 source=total-instance-getter-downcast.cs:tokens["(","RedNode","<","TKey",">",")","base",".","Parent"]#1
 term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v0
 term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v1
@@ -65,26 +65,23 @@ term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, Pub
 term: ir4 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null)
 term: ir5 Binary type=t0:bool width=0 signed=False value=(v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null))
 term: ir6 Variable type=t0:bool width=0 signed=False value=v5
-term: ir7 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=v10
-term: ir8 Cast type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)v10)
-term: ir9 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v11
-term: ir10 Cast type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)v11)
-term: ir11 Null type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)null)
-term: ir12 Boolean type=t0:bool width=0 signed=False value=true
-term: ir13 Binary type=t0:bool width=0 signed=False value=(v11 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null))
-term: ir15 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=v7
-term: ir16 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=v8
-term: ir17 Cast type=t3:object width=0 signed=False value=(("object"#t3)v8)
-term: ir18 Opaque type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=pure:m0((("object"#t3)v8))
-term: ir19 Variable type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=v13
-term: ir20 Variable type=t0:bool width=0 signed=False value=v14
-term: ir21 Null type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)
-term: ir22 Binary type=t0:bool width=0 signed=False value=(v13 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null))
-term: ir23 Unary type=t0:bool width=0 signed=False value=(!v14)
-term: ir24 Binary type=t0:bool width=0 signed=False value=((v13 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)) && (!v14))
-term: ir25 Cast type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0}"#t5)v13)
-term: ir26 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=v15
-term: ir27 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:RedNode`1:`0} width=0 signed=False value=v6
-term: ir28 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v16
-term: ir29 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v17
-term: ir30 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v3
+term: ir7 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v11
+term: ir8 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v12
+term: ir9 Boolean type=t0:bool width=0 signed=False value=true
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v12 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)null))
+term: ir12 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v8
+term: ir13 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v9
+term: ir14 Cast type=t3:object width=0 signed=False value=(("object"#t3)v9)
+term: ir15 Opaque type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=pure:m0((("object"#t3)v9))
+term: ir16 Variable type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=v14
+term: ir17 Variable type=t0:bool width=0 signed=False value=v15
+term: ir18 Null type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)
+term: ir19 Binary type=t0:bool width=0 signed=False value=(v14 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null))
+term: ir20 Unary type=t0:bool width=0 signed=False value=(!v15)
+term: ir21 Binary type=t0:bool width=0 signed=False value=((v14 != (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Node{T:RedNode`1:`0}"#t6)null)) && (!v15))
+term: ir22 Cast type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0}"#t4)v14)
+term: ir23 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v16
+term: ir24 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v7
+term: ir25 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v17
+term: ir26 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v18
+term: ir27 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::RedNode{T:Map`1:`0} width=0 signed=False value=v3

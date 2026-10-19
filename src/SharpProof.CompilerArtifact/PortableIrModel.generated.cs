@@ -42,6 +42,12 @@ internal sealed class PortableIrType(
     public bool Signed { get; set; } = signed;
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool ClosedSealedReference { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? ClosedClassBase { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool InterfaceReference { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int[]? ImplementedInterfaces { get; set; }
 }
 
 internal sealed class PortableIrVariable(
@@ -305,7 +311,12 @@ internal static partial class PortableIrGraphCodec
                 _factory.GetString(value.Name),
                 value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1,
                 value.Width, value.Signed)
-            { ClosedSealedReference = _factory.IsClosedSealedReferenceType(id) };
+            {
+                ClosedSealedReference = _factory.IsClosedSealedReferenceType(id),
+                ClosedClassBase = _factory.TryGetClosedClassReferenceBase(id, out var parent) ? parent.HasValue ? TypeIndex(parent.Value) : -1 : null,
+                InterfaceReference = _factory.IsInterfaceReferenceType(id),
+                ImplementedInterfaces = _factory.GetImplementedReferenceInterfaces(id) is { Length: > 0 } interfaces ? interfaces.Select(TypeIndex).OrderBy(index => index).ToArray() : null
+            };
         }
 
         private PortableIrVariable VariableRow(IrVarId id)
@@ -728,7 +739,7 @@ internal static class PortableIrGraphCodecProjections
                     var write = (IrWriteInstruction)instruction;
                     return context.Row(instruction, context.OperationIndex(instruction.Operation),
                         (int)write.Region, write.Field == null ? context.OptionalTermIndex(write.Target) : -1, write.Field == null ? context.OptionalTermIndex(write.Index) : -1,
-                        write.Value == null ? null : context.TermIndices([write.Value]),
+                        write.Value == null ? null : context.TermIndices(write.Length is { } length ? [write.Value, length] : [write.Value]),
                         write.Field is { } field ? context.Location(new IrMemberLocation(write.Value!.Type, field, write.Target, write.Index is { } key ? [key] : [])) : null);
                 },
                 static (row, context) =>
@@ -738,8 +749,8 @@ internal static class PortableIrGraphCodecProjections
                             ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0], field.Arguments.IsEmpty ? null : field.Arguments[0])
                             : throw context.Invalid()
                         : context.OptionalTerm(row.B) is { } stored
-                        ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index
-                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0])
+                        ? row.A == (int)IrWriteRegion.Element && row.Items.Length is 1 or 2 && context.OptionalTerm(row.C) is { } index
+                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0], row.Items.Length == 2 ? context.Terms(row.Items)[1] : null)
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
                 }),
