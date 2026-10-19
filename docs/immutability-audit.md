@@ -3442,3 +3442,14 @@ shadow callback maps after awaited producers, outer result/check arrays after so
 and ordered proof-loss strings after claim loops. Retain numeric outputs and lifecycle
 state. Validate scalar, source/IL exception, graph, label/core and source-universe controls.
 Status: open before edits.
+
+IMM-M119: Main reviewed nine A-G/new-master input and traversal rows. Freeze producer
+reason allow-list, ascending credit map and its nested vectors, dictionary interpreter
+input maps, and DictionaryFields lookup. Preserve IrObjectState/CLR dictionary mutable
+subjects, default/ordinal comparers, strict argument Add rejection and indexer overwrite.
+Credits use sorted immutable keys matching original ascending insertion/assertion order.
+DictionaryFields retains first-wins discovery and DFS order via the existing immutable
+IrTraversal.PushChildren overload; keep params roots as an input adapter. Other A-G
+callback/evidence collectors remain open; options/evidence JSON needs explicit property
+order preservation before conversion. Validate Worker dictionary/coverage/producer tests.
+Status: open before edits.
