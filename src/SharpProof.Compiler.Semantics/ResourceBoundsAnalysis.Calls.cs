@@ -1,4 +1,4 @@
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ResourceBoundsAnalysis
 {
@@ -8,7 +8,7 @@ internal sealed partial class ResourceBoundsAnalysis
         if (operation is IParameterReferenceOperation parameter && parameter.Parameter.Type is IArrayTypeSymbol)
         {
             return _arrayArguments.TryGetValue(parameter.Parameter, out var argument) ? argument :
-                new(parameter.Parameter.Name + ".Length", maximum: int.MaxValue);
+                Bound.Parameter(parameter.Parameter, ResourceInputKind.ArrayLength);
         }
         if (operation is IArrayCreationOperation { DimensionSizes.Length: 1, Initializer: null } array)
         { return Size(array.DimensionSizes[0]); }

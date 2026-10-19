@@ -138,8 +138,9 @@ The result is an upper bound, not a tight Big-O classification or exact trip cou
 
 SP0060 properties expose `ResourceStatus` (`Proven` or `Unknown`) and
 `ResourceCostModel` (`loop-entries-and-primitive-array-elements-v3`). Proven
-results include `LoopIterationsUpperBound`, `ArrayAllocationsUpperBound`, and
-`AllocatedElementsUpperBound`. Unknown results include `UnknownReason`.
+results include `LoopIterationsUpperBound`, `ArrayAllocationsUpperBound`,
+`AllocatedElementsUpperBound`, and `ResourceExpressionModel` (`1`). Unknown results
+include `UnknownReason`.
 `ResourceProofBasis` distinguishes `Structural` results from
 `ConditionalOnMetadataSpecifications`. Conditional results also include
 `ResourceAssumptions` (one provenance record per line) and

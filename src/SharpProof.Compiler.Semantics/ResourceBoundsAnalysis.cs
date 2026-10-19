@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 // This is a closed structural proof system. Never descend through an unknown
 // operation: doing so could omit a call, an allocation, or a nonterminating path.
@@ -8,45 +8,44 @@ internal sealed partial class ResourceBoundsAnalysis
 {
     internal sealed record Bound
     {
-        internal string Text { get; }
-        internal BigInteger? Constant { get; }
-        internal BigInteger? Maximum { get; }
-        internal Bound(string text, BigInteger? constant = null, BigInteger? maximum = null)
+        internal ResourceExpression Expression { get; }
+        internal string Text => Expression.ToDisplayString();
+        internal BigInteger? Constant => Expression.Constant;
+        internal BigInteger? Maximum => Expression.Maximum;
+        internal Bound(ResourceExpression expression)
         {
-            Text = ArgumentNullGuard.NotNull(text, nameof(text));
-            Constant = constant;
-            Maximum = constant ?? maximum;
+            Expression = ArgumentNullGuard.NotNull(expression, nameof(expression));
         }
         internal static readonly Bound Zero = Number(0);
         internal static readonly Bound One = Number(1);
         internal static Bound Number(BigInteger value)
         {
-            return new(value.ToString(CultureInfo.InvariantCulture), value);
+            return new(ResourceExpression.Literal(value));
+        }
+        internal static Bound Parameter(IParameterSymbol parameter, ResourceInputKind kind)
+        {
+            parameter = ArgumentNullGuard.NotNull(parameter, nameof(parameter));
+            var maximum = kind == ResourceInputKind.NonNegativeScalar && parameter.Type.SpecialType == SpecialType.System_Int64
+                ? new BigInteger(long.MaxValue) : new BigInteger(int.MaxValue);
+            return new(ResourceExpression.InputSize(new ResourceInput(parameter.Ordinal, kind, parameter.Name, maximum)));
         }
         internal static Bound Add(Bound left, Bound right)
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return left.Constant == 0 ? right : right.Constant == 0 ? left :
-                left.Constant is { } a && right.Constant is { } b ? Number(a + b) :
-                new($"({left.Text} + {right.Text})");
+            return new(ResourceExpression.Add(left.Expression, right.Expression));
         }
         internal static Bound Multiply(Bound left, Bound right)
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return left.Constant == 0 || right.Constant == 0 ? Zero :
-                left.Constant == 1 ? right : right.Constant == 1 ? left :
-                left.Constant is { } a && right.Constant is { } b ? Number(a * b) :
-                new($"({left.Text} * {right.Text})");
+            return new(ResourceExpression.Multiply(left.Expression, right.Expression));
         }
         internal static Bound Max(Bound left, Bound right)
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return left.Text == right.Text ? left :
-                left.Constant is { } a && right.Constant is { } b ? Number(BigInteger.Max(a, b)) :
-                new($"max({left.Text}, {right.Text})");
+            return new(ResourceExpression.Max(left.Expression, right.Expression));
         }
     }
 
@@ -114,7 +113,7 @@ internal sealed partial class ResourceBoundsAnalysis
             method.ReturnsByRef || method.ReturnsByRefReadonly ||
             (!SupportedType(method.ReturnType) && !method.ReturnsVoid) ||
             method.Parameters.Any(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                parameter.RefKind != RefKind.None || !SupportedType(parameter.Type)))
+                parameter.RefKind != RefKind.None || string.IsNullOrEmpty(parameter.Name) || !SupportedType(parameter.Type)))
         {
             return new(null, "UnsupportedCallable");
         }
@@ -124,13 +123,20 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         var analysis = new ResourceBoundsAnalysis(body.SemanticModel?.Compilation, cancellation);
         analysis._activeMethods.Add(method);
-        var cost = analysis.CallableBody(method, body, 0);
-        if (cost.LoopIterations.Text.Length + cost.Arrays.Text.Length + cost.Elements.Text.Length > 16384)
-        { analysis._unknown ??= "AnalysisBudgetExceeded"; }
-        return analysis._unknown is { } reason ? new(null, reason) : new(cost, null)
+        try
         {
-            Assumptions = [.. analysis._assumptions.OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value, StringComparer.Ordinal)]
-        };
+            var cost = analysis.CallableBody(method, body, 0);
+            if (cost.LoopIterations.Text.Length + cost.Arrays.Text.Length + cost.Elements.Text.Length > 16384)
+            { analysis._unknown ??= "AnalysisBudgetExceeded"; }
+            return analysis._unknown is { } reason ? new(null, reason) : new(cost, null)
+            {
+                Assumptions = [.. analysis._assumptions.OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value, StringComparer.Ordinal)]
+            };
+        }
+        catch (ResourceExpressionLimitException)
+        {
+            return new(null, "AnalysisBudgetExceeded");
+        }
     }
 
     private static bool Primitive(ITypeSymbol? type)
@@ -311,9 +317,9 @@ internal sealed partial class ResourceBoundsAnalysis
             } => Bound.Number(Math.Max(0, value)),
             IParameterReferenceOperation parameter when _scalarArguments.TryGetValue(parameter.Parameter, out var argument) => argument,
             IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int32 =>
-                new("max(0, " + parameter.Parameter.Name + ")", maximum: int.MaxValue),
+                Bound.Parameter(parameter.Parameter, ResourceInputKind.NonNegativeScalar),
             IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int64 =>
-                new("max(0, " + parameter.Parameter.Name + ")", maximum: long.MaxValue),
+                Bound.Parameter(parameter.Parameter, ResourceInputKind.NonNegativeScalar),
             IPropertyReferenceOperation property when IsArrayLength(property) => ArraySize(property.Instance!),
             ILocalReferenceOperation local when _counters.TryGetValue(local.Local, out var bound) => bound,
             IConversionOperation conversion when conversion.Conversion.IsNumeric && !conversion.Conversion.IsUserDefined &&

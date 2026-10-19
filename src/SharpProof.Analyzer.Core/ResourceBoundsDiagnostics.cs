@@ -46,6 +46,7 @@ internal static class ResourceBoundsDiagnostics
             properties = properties.Add("LoopIterationsUpperBound", bounds.LoopIterations.Text)
                 .Add("ArrayAllocationsUpperBound", bounds.Arrays.Text)
                 .Add("AllocatedElementsUpperBound", bounds.Elements.Text);
+            properties = properties.Add("ResourceExpressionModel", ResourceExpression.ModelVersion.ToString(CultureInfo.InvariantCulture));
             properties = properties.Add("ResourceProofBasis", result.Assumptions.IsEmpty ? "Structural" : "ConditionalOnMetadataSpecifications");
             if (!result.Assumptions.IsEmpty)
             {
@@ -62,4 +63,5 @@ internal static class ResourceBoundsDiagnostics
         }
         context.ReportDiagnostic(Diagnostic.Create(Rule, declaration.Identifier.GetLocation(), properties, method.Name, message));
     }
+
 }

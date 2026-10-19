@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ResourceBoundsAnalysis
 {
@@ -69,45 +69,19 @@ internal sealed partial class ResourceBoundsAnalysis
     private static Bound Difference(Bound upper, BigInteger lower)
     {
         upper = ArgumentNullGuard.NotNull(upper, nameof(upper));
-        if (upper.Constant is { } number)
-        { return Bound.Number(BigInteger.Max(0, number - lower)); }
-        return lower == 0 ? upper : new($"max(0, ({upper.Text} - {lower.ToString(CultureInfo.InvariantCulture)}))", maximum: upper.Maximum);
+        return new(ResourceExpression.Difference(upper.Expression, lower));
     }
 
     private static Bound DivideCeiling(Bound numerator, BigInteger denominator)
     {
         numerator = ArgumentNullGuard.NotNull(numerator, nameof(numerator));
-        if (denominator <= 0)
-        { throw new ArgumentOutOfRangeException(nameof(denominator)); }
-        if (denominator == 1)
-        { return numerator; }
-        if (numerator.Constant is { } number)
-        { return Bound.Number((number + denominator - 1) / denominator); }
-        return new($"ceil({numerator.Text} / {denominator.ToString(CultureInfo.InvariantCulture)})");
+        return new(ResourceExpression.DivideCeiling(numerator.Expression, denominator));
     }
 
-    private static Bound GeometricCount(Bound size, BigInteger factor, bool descending)
+    private Bound GeometricCount(Bound size, BigInteger factor, bool descending)
     {
         size = ArgumentNullGuard.NotNull(size, nameof(size));
-        if (factor <= 1)
-        { throw new ArgumentOutOfRangeException(nameof(factor)); }
-        if (size.Constant is { } number)
-        {
-            var count = 0;
-            if (descending)
-            {
-                while (number > 0)
-                { number /= factor; count++; }
-            }
-            else
-            {
-                var progress = BigInteger.One;
-                while (progress < number)
-                { progress *= factor; count++; }
-            }
-            return Bound.Number(count);
-        }
-        return new($"{(descending ? "digits" : "ceil_log")}({size.Text}, {factor.ToString(CultureInfo.InvariantCulture)})");
+        return new(ResourceExpression.Geometric(size.Expression, factor, descending, _cancellation));
     }
 
     private Cost For(IForLoopOperation loop, int depth)

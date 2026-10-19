@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ResourceBoundsAnalysis
 {

@@ -91,6 +91,7 @@ public sealed partial class ResourceBoundsTests
             diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture).StartsWith("Method 'Root':", StringComparison.Ordinal));
         Assert.That(root.Properties["ResourceStatus"], Is.EqualTo("Proven"));
         Assert.That(root.Properties["ResourceCostModel"], Is.EqualTo("loop-entries-and-primitive-array-elements-v3"));
+        Assert.That(root.Properties["ResourceExpressionModel"], Is.EqualTo("1"));
         Assert.That(root.Properties["ArrayAllocationsUpperBound"], Is.EqualTo("5"));
         Assert.That(root.Properties["AllocatedElementsUpperBound"], Is.EqualTo("15"));
     }

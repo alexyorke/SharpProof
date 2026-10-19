@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 // Explicit assumption boundary, independent of effect/termination facets.
 // These methods were reviewed in the pinned .NET 8 source. Other methods

@@ -149,3 +149,50 @@ exact JIT stack layout or physical GC high-water mark. Native claim ownership,
 runtime compatibility, contract validation, protocol/cache identity and SARIF
 projection remain open. All asymptotic/aggregate and async/concurrent/measurement
 requirements in phases E-F also remain open.
+
+## Native expression foundation (in progress)
+
+Resource arithmetic now has a compiler-neutral tree in `SharpProof.Ir`, using
+nonnegative mathematical integers rather than parsed display text. Input identity
+consists of parameter ordinal, scalar/array/string size kind and physical domain;
+renaming a display label does not change identity. Addition, multiplication,
+maximum, positive difference, ceiling division, integer digit/log counts and
+alignment have explicit semantics. Construction, evaluation and serialization
+have bounded depth, node count, numeric representation and text size. Cancellation
+propagates rather than becoming an Unknown proof or malformed-input verdict.
+
+The portable analysis uses these nodes internally, and proven SP0060 results
+publish expression model version 1. Its shared implementation now lives in
+`SharpProof.Compiler.Semantics`, accessible to both the analyzer and collector
+without adding a compiler-artifact dependency to the analyzer core. The resource
+cost model remains v3 because its measured units and admitted source behavior
+have not changed.
+
+The strict artifact codec rejects unknown or duplicate fields, wrong versions,
+invalid operators/arity/domains and payload budgets before constant folding.
+Its owned-callable entry point additionally checks the callable ID, concrete
+body, parameter map, input ordinal/type and exact physical domain. Display names
+provide no ownership evidence. The preparation must already belong to the
+validated manifest envelope; matching a caller-provided label cannot establish
+external source ownership.
+
+This is an arithmetic and input-binding foundation, not a native resource proof.
+It does not yet emit resource claims from the collector or verify their cost
+composition in the worker. The phase D proof representation checkbox remains
+open until those parts and adversarial consumer tests are implemented. Memory,
+asymptotic, amortized, distribution, async, concurrency and measurement phases
+remain required.
+
+The first expression checkpoint passed 15 focused IR tests and 126 focused
+analyzer/resource-codec tests, including the source-analysis-to-codec bridge.
+The same 126 tests passed again after the shared semantic layer move. With
+ownership and numeric-budget controls added, all 132 focused resource/codec/
+ownership tests, all 497 IR tests, and all 10 architecture tests passed with zero
+build warnings/errors. The full analyzer suite passed all 1267 tests with zero
+build warnings/errors. Evaluated layout passed with 2622 source files, 59 projects
+and 151 pinned common files; documentation drift/lifecycle checks also passed.
+All quality checks except markdown passed on the first run. After correcting one
+heading's blank-line spacing, the pinned markdown engine checked both changed
+documents with zero findings. Package compatibility and negative gate fixtures
+passed. The published predecessor `bf966074c` still had four CI checks pending
+at the latest inspection (25 successful, four skipped, no failures).
