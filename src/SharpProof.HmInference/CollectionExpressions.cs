@@ -62,7 +62,7 @@ public static partial class Inference
             throw new InferenceException("Unresolved collection element protocol.");
         }
 
-        private IMethodSymbol? CollectionAdd(ICollectionExpressionOperation operation, ExpressionSyntax value)
+        private IInvocationOperation? CollectionAddCall(ICollectionExpressionOperation operation, ExpressionSyntax value, int? bindingPosition = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
@@ -70,11 +70,19 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(value)); }
             if (operation.ConstructMethod is not { MethodKind: MethodKind.Constructor } || operation.Type is null)
             { return null; }
-            var invocation = SyntaxFactory.ParseExpression("default(" + CollectionTypeName(operation.Type, operation.Syntax.SpanStart) + ")!.Add(" + value.WithoutTrivia() + ")");
-            return model.GetSpeculativeSymbolInfo(operation.Syntax.SpanStart, invocation, SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
+            var position = bindingPosition ?? operation.Syntax.SpanStart;
+            var receiver = "__hmCollectionReceiver";
+            while (model.LookupSymbols(position, name: receiver).Length != 0 || value.DescendantTokens().Any(token => token.ValueText == receiver))
+            { receiver += "_"; }
+            var statement = SyntaxFactory.ParseStatement("{var " + receiver + "=default(" + CollectionTypeName(operation.Type, position) + ")!;" + receiver + ".Add(" + value.WithoutTrivia() + ");}");
+            if (!model.TryGetSpeculativeSemanticModel(position, statement, out var speculative))
+            { throw new InferenceException("Unresolved collection Add binding context."); }
+            var invocation = (InvocationExpressionSyntax)((ExpressionStatementSyntax)((BlockSyntax)statement).Statements[1]).Expression;
+            return speculative.GetOperation(invocation, cancellationToken) as IInvocationOperation
+                ?? throw new InferenceException("Unresolved collection Add invocation.");
         }
 
-        private void BindCollectionAdd(ICollectionExpressionOperation operation, ITypeSymbol source, HmType value, ExpressionSyntax syntax, HmType collection)
+        private void BindCollectionAdd(ICollectionExpressionOperation operation, ITypeSymbol source, HmType value, ExpressionSyntax syntax, HmType collection, int? bindingPosition = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
@@ -86,24 +94,47 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(syntax)); }
             if (collection is null)
             { throw new ArgumentNullException(nameof(collection)); }
-            var add = CollectionAdd(operation, syntax);
-            if (add is null)
+            var call = CollectionAddCall(operation, syntax, bindingPosition);
+            if (call is null)
             { return; }
-            if (add.Parameters.Length != 1)
-            { throw new InferenceException("Unsupported collection Add shape."); }
-            var mapping = PatternOwnerMapping(add.ContainingType, collection, operation.Type!);
-            foreach (var parameter in add.OriginalDefinition.TypeParameters)
+            var add = call.TargetMethod;
+            var definition = add.OriginalDefinition;
+            var mapping = add.IsStatic ? ReceiverMapping(add, null) : PatternOwnerMapping(add.ContainingType, collection, operation.Type!);
+            foreach (var parameter in definition.TypeParameters)
             { mapping[parameter] = HmType.Variable(); }
-            var expected = CSharpTypes.Rigid(add.OriginalDefinition.Parameters[0].Type, mapping);
-            BindConvertedArgument(source, add.Parameters[0].Type, value, expected);
-            foreach (var parameter in add.OriginalDefinition.TypeParameters)
+            var extension = add.IsStatic && add.IsExtensionMethod;
+            foreach (var argument in call.Arguments)
+            {
+                var parameter = argument.Parameter ?? throw new InferenceException("Unbound collection Add argument.");
+                if (argument.ArgumentKind == ArgumentKind.DefaultValue)
+                { continue; }
+                var expected = CSharpTypes.Rigid(definition.Parameters[parameter.Ordinal].Type, mapping);
+                if (extension && parameter.Ordinal == 0)
+                { BindConvertedArgument(operation.Type!, parameter.Type, collection, expected); continue; }
+                if (argument.ArgumentKind == ArgumentKind.ParamArray && argument.Value is IArrayCreationOperation { Initializer: not null } array && parameter.Type is IArrayTypeSymbol arrayType)
+                {
+                    var element = HmType.Variable();
+                    HmType.Unify(expected, new("[]", element));
+                    foreach (var item in array.Initializer.ElementValues)
+                    { BindConvertedArgument(source, arrayType.ElementType, value, element); }
+                }
+                else if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation packed)
+                {
+                    CollectionExpression(packed, expected, item =>
+                    { if (item is null) { throw new ArgumentNullException(nameof(item)); } return (source, value, syntax); }, bindingPosition ?? operation.Syntax.SpanStart);
+                }
+                else
+                { BindConvertedArgument(source, parameter.Type, value, expected); }
+            }
+            foreach (var parameter in definition.TypeParameters)
             { ImportConstraints(parameter, mapping[parameter], mapping, add.TypeArguments[parameter.Ordinal]); }
         }
 
-        private HmType CollectionExpression(ICollectionExpressionOperation operation, HmType? expected = null, Func<IOperation, (ITypeSymbol Type, HmType Shape, ExpressionSyntax Syntax)>? elementSource = null)
+        private HmType CollectionExpression(ICollectionExpressionOperation operation, HmType? expected = null, Func<IOperation, (ITypeSymbol Type, HmType Shape, ExpressionSyntax Syntax)>? elementSource = null, int? bindingPosition = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
+            var position = bindingPosition ?? operation.Syntax.SpanStart;
             var original = operation.Type ?? throw new InferenceException("Unresolved collection expression target.");
             var shape = CSharpTypes.Erase(original);
             if (ConversionCore(shape).IsVariable)
@@ -111,7 +142,7 @@ public static partial class Inference
             if (expected is not null)
             { UnifyDeconstructionReceiver(expected, shape); }
             ImportConstructedConstraints(original, shape);
-            var element = CollectionElement(original, shape, operation.Syntax.SpanStart);
+            var element = CollectionElement(original, shape, position);
             if (operation.ConstructMethod is { IsStatic: true } builder)
             {
                 var mapping = ReceiverMapping(builder, null);
@@ -134,7 +165,7 @@ public static partial class Inference
                     var values = CollectionElement(source, BoundExpression(spread.Operand), spread.Syntax.SpanStart);
                     BindConvertedArgument(values.Type, element.Type, values.Shape, element.Shape);
                     if (operation.ConstructMethod is { MethodKind: MethodKind.Constructor })
-                    { BindCollectionAdd(operation, values.Type, values.Shape, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(values.Type, spread.Syntax.SpanStart) + ")!"), shape); }
+                    { BindCollectionAdd(operation, values.Type, values.Shape, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(values.Type, spread.Syntax.SpanStart) + ")!"), shape, position); }
                 }
                 else
                 {
@@ -142,7 +173,7 @@ public static partial class Inference
                     {
                         var resolved = elementSource(item);
                         BindConvertedArgument(resolved.Type, element.Type, resolved.Shape, element.Shape);
-                        BindCollectionAdd(operation, resolved.Type, resolved.Shape, resolved.Syntax, shape);
+                        BindCollectionAdd(operation, resolved.Type, resolved.Shape, resolved.Syntax, shape, position);
                     }
                     else
                     {
@@ -151,7 +182,7 @@ public static partial class Inference
                         var source = (IsTargetedInterpolation(syntax) ? info.ConvertedType : info.Type) ?? item.Type ?? element.Type;
                         var value = BoundExpression(item);
                         BindConvertedArgument(source, element.Type, value, element.Shape);
-                        BindCollectionAdd(operation, source, value, syntax, shape);
+                        BindCollectionAdd(operation, source, value, syntax, shape, position);
                     }
                 }
             }
@@ -222,7 +253,27 @@ public static partial class Inference
             return value.Syntax as ExpressionSyntax ?? throw new InferenceException("Unresolved collection element syntax.");
         }
 
-        private string CollectionFacts(ICollectionExpressionOperation operation)
+        private string CollectionAddFacts(ICollectionExpressionOperation operation, ExpressionSyntax value, int? bindingPosition = null)
+        {
+            if (operation is null)
+            { throw new ArgumentNullException(nameof(operation)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            var call = CollectionAddCall(operation, value, bindingPosition);
+            var facts = new List<string?> { ProtocolMember(call?.TargetMethod) };
+            if (call is not null)
+            {
+                foreach (var argument in call.Arguments)
+                {
+                    facts.Add(argument.ArgumentKind.ToString());
+                    if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation packed)
+                    { facts.Add(CollectionFacts(packed, bindingPosition ?? operation.Syntax.SpanStart, value)); }
+                }
+            }
+            return string.Join("/", facts);
+        }
+
+        private string CollectionFacts(ICollectionExpressionOperation operation, int? bindingPosition = null, ExpressionSyntax? packedValue = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
@@ -246,10 +297,10 @@ public static partial class Inference
                     }
                     var type = spread.ElementType!;
                     facts.Add(operation.ConstructMethod is { MethodKind: MethodKind.Constructor }
-                        ? ProtocolMember(CollectionAdd(operation, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(type, spread.Syntax.SpanStart) + ")!"))) : null);
+                        ? CollectionAddFacts(operation, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(type, spread.Syntax.SpanStart) + ")!"), bindingPosition) : null);
                 }
                 else
-                { facts.Add(ProtocolMember(CollectionAdd(operation, CollectionValueSyntax(operation, item)))); }
+                { facts.Add(CollectionAddFacts(operation, packedValue ?? CollectionValueSyntax(operation, item), bindingPosition)); }
             }
             return string.Join("|", facts);
         }

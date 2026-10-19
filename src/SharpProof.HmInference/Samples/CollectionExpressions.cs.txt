@@ -10,5 +10,49 @@ public static class CollectionExpressionSamples
     public static int[] ArrayElements(int value) => [value];
     public static List<int> ListElements(int value) => [value, value];
     public static List<int> SpreadElements(int[] values, int last) => [.. values, last];
+    public static SampleOptionalAdd<int> OptionalAddElement(int value) => [value];
+    public static SampleArrayAdd<int> ArrayParamsAddElement(int value) => [value];
+    public static SampleSpanAdd<int> SpanParamsAddElement(int value) => [value];
+    public static SampleExtensionAdd<int> ExtensionAddElement(int value) => [value];
+    public static SampleRefExtensionAdd<int> RefExtensionAddElement(int value) => [value];
     public static IEnumerable<int> InterfaceElements(int value) => [value];
+}
+public class SampleOptionalAdd<T> : IEnumerable<T>
+{
+    public readonly List<T> Items = [];
+    public void Add(T value, int tag = 7) => Items.Add(value);
+    public IEnumerator<T> GetEnumerator() => Items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public class SampleArrayAdd<T> : IEnumerable<T>
+{
+    public readonly List<T> Items = [];
+    public void Add(params T[] values) => Items.AddRange(values);
+    public IEnumerator<T> GetEnumerator() => Items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public class SampleSpanAdd<T> : IEnumerable<T>
+{
+    public readonly List<T> Items = [];
+    public void Add(params ReadOnlySpan<T> values) { foreach (var value in values) Items.Add(value); }
+    public IEnumerator<T> GetEnumerator() => Items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public class SampleExtensionAdd<T> : IEnumerable<T>
+{
+    public readonly List<T> Items = [];
+    public IEnumerator<T> GetEnumerator() => Items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public struct SampleRefExtensionAdd<T> : IEnumerable<T>
+{
+    public readonly List<T> Items;
+    public SampleRefExtensionAdd() { Items = []; }
+    public IEnumerator<T> GetEnumerator() => Items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public static class SampleAddExtensions
+{
+    public static void Add<T>(this SampleExtensionAdd<T> target, T value, int tag = 9) => target.Items.Add(value);
+    public static void Add<T>(this ref SampleRefExtensionAdd<T> target, T value) => target.Items.Add(value);
 }

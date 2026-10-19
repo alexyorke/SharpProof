@@ -168,7 +168,10 @@ Generic instance calls preserve receiver substitutions and explicit type argumen
 
 The adapter skips unsupported patterns and other unimplemented
 syntax. Collection expressions and expanded non-array params are inferred through
-their element and construction protocols. It does not
+their element and construction protocols. Add calls preserve omitted defaults and
+normal/expanded array/span/builder params forms, including trailing packs and
+constrained/ref extension receivers. Selected methods and nested collection
+construction are rechecked across supplied files. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
 of generic constraints. See [the completion ledger](LIMITATIONS.md).
 
