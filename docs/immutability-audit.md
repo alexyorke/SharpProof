@@ -2466,3 +2466,18 @@ Make plan allocation status get-only; freeze its two local filtered vectors. Rep
 launcher allowed-name factory input with an immutable array. Preserve mutable solver
 resource lifecycle, cache read status and intentionally exercised CoreLib dictionary SUT.
 Status: open before edits; validate full ordinary Worker suite after the change.
+
+IMM-M062: Coordinator read third-party inventory validation, package discovery and the
+existing regression consumers. Discovery returns an OrdinalIgnoreCase immutable map of
+case-sensitive sorted immutable method vectors, preserving index overwrite and minimum-
+count failures; retain mutable minimum-count fixtures and native discovery input arrays.
+Third-party ZIP entry lookup and membership accumulators use scoped immutable builders,
+freezing after archive/component discovery. Preserve strict duplicate-entry rejection,
+null/schema validation, Ordinal key/path semantics, digests and disposal. Binary and
+first-seen declared-path sidecars preserve failure diagnostics and first missing-pin order.
+Read-only package/identity vectors can be immutable; parsed invalid/mutable JSON inputs,
+ZIP/stream objects and raw file bytes remain validation/native subjects. PowerShell has
+no general extension-method dispatch: replace Dictionary.TryAdd with explicit ContainsKey
+then Add on the builder, retaining the original error before publication. Validate real
+third-party regression controls and package-discovery class/case/minimum controls.
+Status: open before edits.
