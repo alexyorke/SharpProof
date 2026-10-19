@@ -121,12 +121,16 @@ public sealed class ResourceUpperBoundAttribute : Attribute
     }
 
     /// <summary>Gets the cumulative resource metric.</summary>
+    /// <value>The cumulative resource measured by this contract.</value>
     public ResourceMetric Metric { get; }
     /// <summary>Gets the nonnegative constant term.</summary>
+    /// <value>The nonnegative constant term in the mathematical bound.</value>
     public long Constant { get; }
     /// <summary>Gets the entry size name, or null for a constant bound.</summary>
+    /// <value>The scalar parameter name or array length, or null for a constant bound.</value>
     public string? SizeParameter { get; }
     /// <summary>Gets the nonnegative size coefficient.</summary>
+    /// <value>The positive size multiplier, or zero for a constant bound.</value>
     public long Coefficient { get; }
 }
 ```

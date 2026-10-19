@@ -79,9 +79,9 @@ public sealed class ContractApiCatalogParityTests
                 case ContractApiAttributeCategory.Effect:
                     Assert.That(
                         usage!.ValidOn,
-                        Is.EqualTo(AttributeTargets.Method |
-                            AttributeTargets.Constructor |
-                            AttributeTargets.Property));
+                        Is.EqualTo(descriptor.MetadataName == ContractApiCatalog.ResourceUpperBound
+                            ? AttributeTargets.Method
+                            : AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property));
                     Assert.That(
                         descriptor.Selection,
                         Is.EqualTo(ContractApiSelectionFeature.Effects));

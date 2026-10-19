@@ -254,4 +254,40 @@ internal sealed class ContractApiTests
         }
     }
 
+    [TestCase(ResourceMetric.LoopBodyEntries)]
+    [TestCase(ResourceMetric.ArrayAllocations)]
+    [TestCase(ResourceMetric.AllocatedElements)]
+    public void ResourceContractsPreserveDeclaredConstantAndLinearTerms(ResourceMetric metric)
+    {
+        var constant = new ResourceUpperBoundAttribute(metric, 3);
+        Assert.That(constant.Metric, Is.EqualTo(metric));
+        Assert.That(constant.Constant, Is.EqualTo(3));
+        Assert.That(constant.SizeParameter, Is.Null);
+        Assert.That(constant.Coefficient, Is.Zero);
+        var linear = new ResourceUpperBoundAttribute(metric, 2, "values.Length", 4);
+        Assert.That(linear.Metric, Is.EqualTo(metric));
+        Assert.That(linear.Constant, Is.EqualTo(2));
+        Assert.That(linear.SizeParameter, Is.EqualTo("values.Length"));
+        Assert.That(linear.Coefficient, Is.EqualTo(4));
+    }
+
+    [TestCase(0, 0, 0)]
+    [TestCase(99, 0, 0)]
+    [TestCase(1, -1, 0)]
+    [TestCase(1, 0, -1)]
+    public void ResourceContractsRejectUndefinedMetricsAndNegativeTerms(int metric, long constant, long coefficient)
+    {
+        Action construct = () => _ = new ResourceUpperBoundAttribute((ResourceMetric)metric, constant, coefficient: coefficient);
+        Assert.Throws<ArgumentOutOfRangeException>(construct);
+    }
+
+    [TestCase(null, 1)]
+    [TestCase("", 1)]
+    [TestCase(" ", 1)]
+    [TestCase("n", 0)]
+    public void ResourceContractsRequireASizeExactlyWhenTheCoefficientIsPositive(string? size, long coefficient)
+    {
+        Action construct = () => _ = new ResourceUpperBoundAttribute(ResourceMetric.ArrayAllocations, 0, size, coefficient);
+        Assert.Throws<ArgumentException>(construct);
+    }
 }

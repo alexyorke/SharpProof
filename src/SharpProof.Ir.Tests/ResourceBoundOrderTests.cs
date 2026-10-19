@@ -88,4 +88,33 @@ public sealed class ResourceBoundOrderTests
         Action compare = () => ResourceBoundOrder.Proves(Input(), Input(), new CancellationToken(true));
         Assert.Throws<OperationCanceledException>(compare);
     }
+    [Test]
+    public void RightHandAlternativesAndRightHandConstantFactorsAreSound()
+    {
+        var first = Input();
+        var second = Input(1);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(ResourceBoundOrder.Proves(first, ResourceExpression.Max(second, first), cancellation), Is.True);
+        Assert.That(ResourceBoundOrder.Proves(ResourceExpression.Multiply(first, ResourceExpression.Literal(2)), Linear(first, 3, 0), cancellation), Is.True);
+        var zeroDomain = ResourceExpression.InputSize(new ResourceInput(2, ResourceInputKind.NonNegativeScalar, "empty", 0));
+        Assert.That(ResourceBoundOrder.Proves(ResourceExpression.One, zeroDomain, cancellation), Is.False);
+    }
+
+    [Test]
+    public void ArithmeticCollectionHasASharedExpandedNodeBudget()
+    {
+        var expression = Input();
+        for (int level = 0; level < 11; level++)
+        { expression = ResourceExpression.Add(expression, expression); }
+        Assert.That(expression.NodeCount, Is.LessThanOrEqualTo(ResourceExpression.MaximumNodes));
+        Action compare = () => ResourceBoundOrder.Proves(expression, Input(1), TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<ResourceExpressionLimitException>(compare);
+    }
+
+    [Test]
+    public void UndefinedMetricsCannotDeclareAnArithmeticContract()
+    {
+        Action construct = () => _ = new ResourceBoundConstraint((ResourceCostMetric)999, ResourceExpression.Zero);
+        Assert.Throws<ArgumentOutOfRangeException>(construct);
+    }
 }

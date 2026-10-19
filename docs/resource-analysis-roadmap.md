@@ -288,3 +288,52 @@ CI for published predecessor `80a15d016` failed the required 100% coverage gate:
 targeted boundary coverage work is in progress. The coverage baseline is
 unchanged. Coverage qualification, native numeric refutations and every remaining
 unchecked roadmap requirement still block completion; the MR remains draft.
+
+## Boundary coverage and CI hardening (in progress)
+
+The next checkpoint adds explicit malformed arithmetic/program transport controls,
+aggregate encoding budgets, detached-record validation, rank-domain/overflow
+controls and native claim ownership/Unknown controls. Supported primitive
+expression forms and unsupported loop updates also have direct regressions.
+Encoding reuses the immutable trees' expanded-node/depth invariants while
+retaining aggregate payload limits. Decoding still enforces raw budgets before
+folding, and its admitted arithmetic operators are explicitly closed.
+
+The diagnostic resource coverage invocation initially ran static collectors in
+parallel and produced compiler-reference identity mismatches. Repeating the same
+filter with `SHARPPROOF_TEST_PROJECT_PARALLELISM=1` eliminated those failures:
+90 worker resource tests, 151 analyzer resource tests and the actual packaged
+resource consumer passed. This filtered run is diagnostic evidence only; it does
+not qualify the repository-wide coverage gate. The separate Attributes phase
+then exposed missing XML property-value documentation, now corrected; all 21
+Attributes tests passed. Coverage floors remain unchanged.
+
+Published head `e3abf12a4` also failed the packaging job's formatting prerequisite
+at `ProtocolModel.generated.cs:805`. The exact CI job log was inspected and the
+canonical formatter with `--include-generated` applied the missing line break.
+Final suite and gate results are recorded below. Coverage qualification is
+still in progress. No remaining roadmap phase is marked complete by these
+boundary fixes, and numeric violations still require exact owned replay.
+
+The full analyzer suite passed 1301 tests and the full IR suite passed 512 tests.
+After adding the exact payload-boundary control, all 170 focused analyzer
+resource tests passed. All 75 focused native resource tests and all 32 Attributes
+tests passed, including direct constant/linear construction and rejection paths.
+Encoding accepts an exactly one-MiB expression envelope and rejects one extra
+byte; the writer reserves the envelope's closing byte explicitly. Builds reported
+zero warnings/errors. All ten lint/quality/compatibility categories passed, final
+changed-source formatting (including generated source) passed, and layout passed
+with 2638 source files, 59 projects and 151 pinned common files.
+
+The next inspection of CI for `e3abf12a4` found two exact frontend catalog parity
+failures: the attribute roster omitted ResourceUpperBound, and the shared effect
+category test assumed every attribute also targeted constructors/properties.
+The expectations now include the new attribute and check its declared method-only
+target separately while retaining the existing targets for all other effects.
+The serialized diagnostic coverage run completed its tests and report export;
+its repository-wide floor check failed as expected for a resource-only filter.
+That report predates the final native/Attributes controls and is not final
+coverage qualification. Documentation drift and automation lifecycle checks passed.
+
+After the catalog expectation fixes, all 2052 frontend tests passed with zero
+build warnings/errors.

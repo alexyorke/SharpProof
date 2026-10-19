@@ -802,7 +802,8 @@ internal static class WorkerProtocolMetadata
     }
     internal static bool HasValidResourceConstraint(WorkerEffectContractKind kind, WorkerResourceConstraint? constraint)
     {
-        if (kind != WorkerEffectContractKind.ResourceUpperBound) { return constraint is null; }
+        if (kind != WorkerEffectContractKind.ResourceUpperBound)
+        { return constraint is null; }
         return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
             constraint.CostModel == WorkerResourceModels.CostModel && constraint.ExpressionModel == WorkerResourceModels.Expression &&
             constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };

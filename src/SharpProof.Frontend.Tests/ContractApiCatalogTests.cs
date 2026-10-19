@@ -23,6 +23,7 @@ public sealed class ContractApiCatalogTests
                 "SharpProof.Attributes.ContractForAttribute",
                 "SharpProof.Attributes.EnforcePureAttribute",
                 "SharpProof.Attributes.ZeroAllocationsAttribute",
+                "SharpProof.Attributes.ResourceUpperBoundAttribute",
                 "SharpProof.Attributes.AllowedCapabilitiesAttribute",
                 "SharpProof.Attributes.DoesNotThrowAttribute",
                 "SharpProof.Attributes.AllowedExceptionsAttribute",

@@ -38,6 +38,9 @@ public sealed partial class ResourceBoundsTests
     [TestCase("for (int i=0; i< -1; i++) {}", "0", "0", "0")]
     [TestCase("for (int i=0; i<2147483647; i++) {}", "2147483647", "0", "0")]
     [TestCase("for (int i=0; i<3; i++) { if (n>0) return; var a = new int[2]; }", "3", "3", "6")]
+    [TestCase("var a=new int[4]; int x=~n; x=(int)(long)n; x+=a[0]; a[0]=x;", "0", "1", "4")]
+    [TestCase("long size=(long)n; int x=0; x++; x--; if(n>0) ;", "0", "0", "0")]
+    [TestCase("for(long i=0;i<4L;i++) { var a=new int[i]; }", "4", "4", "16")]
     public void SupportedBodiesHaveProvenUpperBounds(string body, string loops, string arrays, string elements)
     {
         ArgumentNullException.ThrowIfNull(body);

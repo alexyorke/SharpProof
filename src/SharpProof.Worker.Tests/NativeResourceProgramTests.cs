@@ -245,4 +245,63 @@ public sealed class NativeResourceProgramTests
         Assert.Throws<ResourceExpressionLimitException>(tooMany);
         Assert.Throws<ResourceExpressionLimitException>(tooDeep);
     }
+    [TestCase(true)]
+    [TestCase(false)]
+    public void RankDomainsCannotWidenThePhysicalCounter(bool increasing)
+    {
+        var large = ResourceExpression.Literal(long.MaxValue);
+        var rank = new ResourceLoopRank(increasing ? ResourceLoopKind.IncreasingAdd : ResourceLoopKind.DecreasingSubtract,
+            increasing ? ResourceExpression.Zero : large, increasing ? large : ResourceExpression.Zero, 1, 32, true);
+        var result = Check(ResourceProgram.Repeat(rank, ResourceRepeatKind.Loop, ResourceProgram.Zero));
+        Assert.That(result.UnknownReason, Is.EqualTo("UnsupportedResourceRankDomain"));
+        Assert.That(result.Cost, Is.Null);
+    }
+
+    [Test]
+    public void DescendingUncheckedNarrowUpdatesCannotWrap()
+    {
+        var rank = new ResourceLoopRank(ResourceLoopKind.DecreasingSubtract, ResourceExpression.Literal(2), ResourceExpression.Zero,
+            long.MaxValue, 32, false);
+        Assert.That(Check(ResourceProgram.Repeat(rank, ResourceRepeatKind.Loop, ResourceProgram.Zero)).UnknownReason,
+            Is.EqualTo("ResourceCounterMayOverflow"));
+    }
+
+    [TestCase(0)]
+    [TestCase(99)]
+    public void RecurrenceKindsCannotBorrowAnUnrelatedProgressRule(int kind)
+    {
+        var repeat = kind == 0 ? ResourceProgram.Repeat(Rank(0, 0, 4, 1), ResourceRepeatKind.TailRecurrence, ResourceProgram.Zero) :
+            ResourceProgram.Repeat(Rank(2, 4, 0, 1), (ResourceRepeatKind)kind, ResourceProgram.Zero);
+        Assert.That(Check(repeat).UnknownReason, Is.EqualTo("UnsupportedResourceRecurrence"));
+    }
+
+    [Test]
+    public void CompositionBudgetStopsDeepSymbolicCostsBeforePublishingBounds()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateIntegerType(32, true);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        builder.Return(block, factory.CreateOperation("return"));
+        var owner = new CompilerTotalCallablePreparation("owned", builder.Build(),
+            [new(factory.CreateVariable("entry", type), factory.CreateVariable("current", type), factory.CreateVariable("old", type))], null, []);
+        var input = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var rank = new ResourceLoopRank(ResourceLoopKind.IncreasingAdd, ResourceExpression.Zero, input, 1, 32, false);
+        var program = ResourceProgram.Zero;
+        for (int index = 0; index < 70; index++)
+        { program = ResourceProgram.Repeat(rank, ResourceRepeatKind.Loop, program); }
+        var result = NativeResourceProgramVerifier.Verify(program, "owned", owner, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.EqualTo("ResourceProofBudgetExceeded"));
+        Assert.That(result.Cost, Is.Null);
+    }
+    [Test]
+    public void UnknownDetachedProgramKindsCannotProducePartialCosts()
+    {
+        var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
+        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty]);
+        var result = Check(program);
+        Assert.That(result.Verified, Is.False);
+        Assert.That(result.Cost, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("MalformedResourceProgram"));
+    }
 }

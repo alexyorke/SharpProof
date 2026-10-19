@@ -25,30 +25,27 @@ internal static class ResourceExpressionCodec
     {
         expression = ArgumentNullGuard.NotNull(expression, nameof(expression));
         cancellation.ThrowIfCancellationRequested();
+        // Immutable construction already bounds expanded node count and depth.
+        // The writer additionally bounds the aggregate encoded payload.
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
             writer.WriteNumber("version", ResourceExpression.ModelVersion);
             writer.WritePropertyName("expression");
-            var remaining = ResourceExpression.MaximumNodes;
-            WriteNode(writer, expression, 0, ref remaining, cancellation);
+            WriteNode(writer, expression, cancellation);
             writer.WriteEndObject();
             writer.Flush();
         }
-        if (stream.Length > MaximumPayloadBytes)
-        { throw new ResourceExpressionLimitException(); }
         return stream.ToArray();
     }
 
-    private static void WriteNode(Utf8JsonWriter writer, ResourceExpression expression, int depth,
-        ref int remaining, CancellationToken cancellation)
+    private static void WriteNode(Utf8JsonWriter writer, ResourceExpression expression, CancellationToken cancellation)
     {
         writer = ArgumentNullGuard.NotNull(writer, nameof(writer));
         expression = ArgumentNullGuard.NotNull(expression, nameof(expression));
         cancellation.ThrowIfCancellationRequested();
-        if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
-        { throw new ResourceExpressionLimitException(); }
+
         writer.WriteStartObject();
         writer.WriteNumber("kind", (int)expression.Kind);
         writer.WriteString("number", expression.Number.ToString(CultureInfo.InvariantCulture));
@@ -66,10 +63,11 @@ internal static class ResourceExpressionCodec
         { writer.WriteNullValue(); }
         writer.WriteStartArray("operands");
         foreach (var operand in expression.Operands)
-        { WriteNode(writer, operand, depth + 1, ref remaining, cancellation); }
+        { WriteNode(writer, operand, cancellation); }
         writer.WriteEndArray();
         writer.WriteEndObject();
-        if (writer.BytesCommitted + writer.BytesPending > MaximumPayloadBytes)
+        // Reserve the final byte for the enclosing envelope object.
+        if (writer.BytesCommitted + writer.BytesPending >= MaximumPayloadBytes)
         { throw new ResourceExpressionLimitException(); }
     }
 
@@ -102,7 +100,9 @@ internal static class ResourceExpressionCodec
         { throw new ResourceExpressionLimitException(); }
         Properties(node, "kind", "number", "input", "operands");
         var kind = (ResourceExpressionKind)Integer(node.GetProperty("kind"));
-        if (!Enum.IsDefined(typeof(ResourceExpressionKind), kind))
+        if (kind is not (ResourceExpressionKind.Constant or ResourceExpressionKind.Input or ResourceExpressionKind.Add or
+            ResourceExpressionKind.Multiply or ResourceExpressionKind.Maximum or ResourceExpressionKind.PositiveDifference or
+            ResourceExpressionKind.CeilingDivide or ResourceExpressionKind.Digits or ResourceExpressionKind.CeilingLog or ResourceExpressionKind.Align))
         { throw new InvalidDataException("Resource expression kind is undefined."); }
         var number = Natural(node.GetProperty("number"));
         var operands = node.GetProperty("operands");
@@ -135,8 +135,7 @@ internal static class ResourceExpressionCodec
             {
                 ResourceExpressionKind.Add => ResourceExpression.Add(left, right),
                 ResourceExpressionKind.Multiply => ResourceExpression.Multiply(left, right),
-                ResourceExpressionKind.Maximum => ResourceExpression.Max(left, right),
-                _ => throw new InvalidDataException("Unexpected binary resource expression.")
+                _ => ResourceExpression.Max(left, right)
             };
         }
         return kind switch
@@ -145,8 +144,7 @@ internal static class ResourceExpressionCodec
             ResourceExpressionKind.CeilingDivide => ResourceExpression.DivideCeiling(left, number),
             ResourceExpressionKind.Digits => ResourceExpression.Geometric(left, number, true, cancellation),
             ResourceExpressionKind.CeilingLog => ResourceExpression.Geometric(left, number, false, cancellation),
-            ResourceExpressionKind.Align => ResourceExpression.Aligned(left, number),
-            _ => throw new InvalidDataException("Unexpected unary resource expression.")
+            _ => ResourceExpression.Aligned(left, number)
         };
     }
 

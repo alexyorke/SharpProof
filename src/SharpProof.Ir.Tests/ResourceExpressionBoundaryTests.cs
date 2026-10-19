@@ -93,4 +93,13 @@ public sealed class ResourceExpressionBoundaryTests
         Assert.Throws<InvalidOperationException>(evaluate);
         Assert.Throws<InvalidOperationException>(display);
     }
+    [Test]
+    public void DetachedProgramRecordsMustHaveInitializedNonNullChildren()
+    {
+        var constructor = typeof(ResourceProgram).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
+        Action missing = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, default(ImmutableArray<ResourceProgram>)]);
+        Action nullChild = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, ImmutableArray<ResourceProgram>.Empty.Add(null!)]);
+        Assert.That(Assert.Throws<TargetInvocationException>(missing)!.InnerException, Is.TypeOf<ArgumentException>());
+        Assert.That(Assert.Throws<TargetInvocationException>(nullChild)!.InnerException, Is.TypeOf<ArgumentException>());
+    }
 }

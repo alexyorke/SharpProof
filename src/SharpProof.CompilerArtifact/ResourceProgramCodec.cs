@@ -16,6 +16,8 @@ internal static class ResourceProgramCodec
     {
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         cancellation.ThrowIfCancellationRequested();
+        // Immutable construction already bounds expanded node count and depth.
+        // The writer additionally bounds the aggregate encoded payload.
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
@@ -24,23 +26,19 @@ internal static class ResourceProgramCodec
             writer.WriteNumber("expressionModel", ResourceExpression.ModelVersion);
             writer.WriteString("costModel", CostModel);
             writer.WritePropertyName("program");
-            var remaining = ResourceExpression.MaximumNodes;
-            Write(writer, program, 0, ref remaining, cancellation);
+            Write(writer, program, cancellation);
             writer.WriteEndObject();
             writer.Flush();
         }
-        if (stream.Length > MaximumPayloadBytes)
-        { throw new ResourceExpressionLimitException(); }
         return stream.ToArray();
     }
 
-    private static void Write(Utf8JsonWriter writer, ResourceProgram program, int depth, ref int remaining, CancellationToken cancellation)
+    private static void Write(Utf8JsonWriter writer, ResourceProgram program, CancellationToken cancellation)
     {
         writer = ArgumentNullGuard.NotNull(writer, nameof(writer));
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         cancellation.ThrowIfCancellationRequested();
-        if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
-        { throw new ResourceExpressionLimitException(); }
+
         writer.WriteStartObject();
         writer.WriteNumber("kind", (int)program.Kind);
         writer.WritePropertyName("length");
@@ -65,10 +63,11 @@ internal static class ResourceProgramCodec
         writer.WriteNumber("repeatKind", (int)program.RepeatKind);
         writer.WriteStartArray("children");
         foreach (var child in program.Children)
-        { Write(writer, child, depth + 1, ref remaining, cancellation); }
+        { Write(writer, child, cancellation); }
         writer.WriteEndArray();
         writer.WriteEndObject();
-        if (writer.BytesCommitted + writer.BytesPending > MaximumPayloadBytes)
+        // Reserve the final byte for the enclosing envelope object.
+        if (writer.BytesCommitted + writer.BytesPending >= MaximumPayloadBytes)
         { throw new ResourceExpressionLimitException(); }
     }
 

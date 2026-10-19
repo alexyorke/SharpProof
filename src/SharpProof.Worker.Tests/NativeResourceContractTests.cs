@@ -171,4 +171,59 @@ public sealed class NativeResourceContractTests
         Action serialize = () => Read(artifact);
         Rejects(serialize);
     }
+    [TestCase("missing-entry", "ResourceEntryUnavailable")]
+    [TestCase("abstract-entry", "ResourceEntryUnavailable")]
+    [TestCase("incomplete-entry", "ResourceEntryUnavailable")]
+    [TestCase("invalid-claim", "UnsupportedResourceContract")]
+    [TestCase("missing-program", "ResourceProgramUnavailable")]
+    [TestCase("metadata", "ResourceMetadataAssumptionsNotBound")]
+    [TestCase("malformed-bound", "MalformedResourceEvidence")]
+    public void IncompleteNativeEvidenceAlwaysReturnsUnknownWithoutNumericBounds(string scenario, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(scenario);
+        ArgumentNullException.ThrowIfNull(expected);
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
+        var claim = preparation.EffectClaims.Single();
+        switch (scenario)
+        {
+            case "missing-entry":
+                preparation = preparation with { Total = null };
+                break;
+            case "abstract-entry":
+                preparation = preparation with { Total = preparation.Total! with { IsBodyAbstraction = true } };
+                break;
+            case "incomplete-entry":
+                preparation = preparation with { Total = preparation.Total! with { EffectsCompleteAtEntry = false } };
+                break;
+            case "invalid-claim":
+                preparation = preparation with { Total = preparation.Total! with { ValidEffectClaimIds = [] } };
+                break;
+            case "missing-program":
+                preparation = preparation with { ResourceProgram = null, ResourceUnknownReason = null };
+                break;
+            case "metadata":
+                preparation = preparation with { ResourceProgram = ResourceProgram.MetadataBoundary };
+                break;
+            default:
+                claim.Constraint.ResourceUpperBound!.UpperBound = System.Text.Encoding.UTF8.GetBytes("{}");
+                CompilerEffectClaimArtifactCodec.Seal(claim);
+                break;
+        }
+        var result = NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.UnknownReason, Is.EqualTo(expected));
+        Assert.That(result.EffectWitness, Is.Null);
+    }
+
+    [Test]
+    public void UnownedNativeResourceClaimsAreRejectedBeforeEvaluation()
+    {
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
+        var claim = preparation.EffectClaims.Single();
+        claim.ClaimId = "foreign";
+        CompilerEffectClaimArtifactCodec.Seal(claim);
+        Action verify = () => NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<ArgumentException>(verify);
+    }
 }
