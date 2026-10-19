@@ -146,24 +146,24 @@ function Assert-SharpProofFuzzRunnerResult {
         }
 
         $coverage = $root.GetProperty('FrontendCoverage')
-        $coverageProperties = @(
-            'TextParameters', 'StringLiterals', 'NullStrings',
-            'StringConcatenations', 'StringLengths', 'StringCasts',
-            'ArrayLengths', 'ArrayIndexes', 'DivideByZeroExceptions',
-            'OverflowExceptions', 'NullReferenceExceptions',
-            'IndexOutOfRangeExceptions', 'InvalidCastExceptions')
+        $coverageProperties = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                'TextParameters', 'StringLiterals', 'NullStrings',
+                'StringConcatenations', 'StringLengths', 'StringCasts',
+                'ArrayLengths', 'ArrayIndexes', 'DivideByZeroExceptions',
+                'OverflowExceptions', 'NullReferenceExceptions',
+                'IndexOutOfRangeExceptions', 'InvalidCastExceptions'))
         if ($coverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Frontend coverage must be a JSON object.'
         }
         Assert-SharpProofExactJsonProperties `
             -Actual @($coverage.EnumerateObject() | ForEach-Object { $_.Name }) `
             -RejectDuplicates `
-            -Expected $coverageProperties -Description 'Frontend coverage'
+            -Expected ([string[]]@($coverageProperties)) -Description 'Frontend coverage'
         [long]$exceptionTotal = 0
-        $coverageValues = [ordered]@{}
+        $coverageValuesBuilder = [ordered]@{}
         foreach ($name in $coverageProperties) {
             $count = Get-ExactJsonInt32 $coverage $name
-            $coverageValues[$name] = $count
+            $coverageValuesBuilder[$name] = $count
             if ($count -lt 0 -or ($cases -ge 1000 -and $count -eq 0)) {
                 throw "Frontend coverage '$name' is invalid for the executed case count."
             }
@@ -174,27 +174,29 @@ function Assert-SharpProofFuzzRunnerResult {
                 $exceptionTotal += [long]$count
             }
         }
+        $coverageValues = $coverageValuesBuilder.AsReadOnly()
         if ($exceptionTotal -gt $cases) {
             throw 'Frontend exception coverage exceeds the executed case count.'
         }
 
         $totalCoverage = $root.GetProperty('TotalProgramCoverage')
-        $totalProperties = @(
-            'Cases', 'Agreements', 'NativeProofs', 'NativeRefutations',
-            'WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
-            'BooleanBodies', 'LoopBodies', 'ReferenceBodies', 'ExceptionalExits', 'TypeMask', 'ArrayReadBodies')
+        $totalProperties = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                'Cases', 'Agreements', 'NativeProofs', 'NativeRefutations',
+                'WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
+                'BooleanBodies', 'LoopBodies', 'ReferenceBodies', 'ExceptionalExits', 'TypeMask', 'ArrayReadBodies'))
         if ($totalCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Total program coverage must be a JSON object.'
         }
         Assert-SharpProofExactJsonProperties `
             -Actual @($totalCoverage.EnumerateObject() | ForEach-Object { $_.Name }) `
-            -RejectDuplicates -Expected $totalProperties -Description 'Total program coverage'
-        $totalValues = [ordered]@{}
+            -RejectDuplicates -Expected ([string[]]@($totalProperties)) -Description 'Total program coverage'
+        $totalValuesBuilder = [ordered]@{}
         foreach ($name in $totalProperties) {
             $count = Get-ExactJsonInt32 $totalCoverage $name
             if ($count -lt 0) { throw "Total program coverage '$name' is negative." }
-            $totalValues[$name] = $count
+            $totalValuesBuilder[$name] = $count
         }
+        $totalValues = $totalValuesBuilder.AsReadOnly()
         [long]$bodyTotal = 0
         foreach ($name in @('WrappedBodies', 'CheckedBodies', 'FinallyBodies', 'SourceCalls',
                 'BooleanBodies', 'LoopBodies', 'ReferenceBodies')) {
@@ -214,17 +216,18 @@ function Assert-SharpProofFuzzRunnerResult {
         }
 
         $metadataCoverage = $root.GetProperty('MetadataProgramCoverage')
-        $metadataProperties = @('Cases', 'Agreements', 'NativeProofs', 'NativeRefutations', 'TypeMask', 'RecipeMask')
+        $metadataProperties = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('Cases', 'Agreements', 'NativeProofs', 'NativeRefutations', 'TypeMask', 'RecipeMask'))
         if ($metadataCoverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Metadata program coverage must be a JSON object.'
         }
         Assert-SharpProofExactJsonProperties `
             -Actual @($metadataCoverage.EnumerateObject() | ForEach-Object { $_.Name }) `
-            -Description 'Metadata program coverage' -RejectDuplicates -Expected $metadataProperties
-        $metadataValues = [ordered]@{}
+            -Description 'Metadata program coverage' -RejectDuplicates -Expected ([string[]]@($metadataProperties))
+        $metadataValuesBuilder = [ordered]@{}
         foreach ($name in $metadataProperties) {
-            $metadataValues[$name] = Get-ExactJsonInt32 $metadataCoverage $name
+            $metadataValuesBuilder[$name] = Get-ExactJsonInt32 $metadataCoverage $name
         }
+        $metadataValues = $metadataValuesBuilder.AsReadOnly()
         if ($metadataValues.Cases -ne $cases -or $metadataValues.Agreements -ne $cases -or
             $metadataValues.NativeProofs -ne $cases -or $metadataValues.NativeRefutations -ne $cases -or
             $metadataValues.TypeMask -lt 1 -or $metadataValues.TypeMask -gt 1023 -or
@@ -262,23 +265,23 @@ function Assert-SharpProofFuzzRunnerResult {
             -not $coverageSatisfied -or -not $passed) {
             throw 'The fuzz runner did not produce a passing result.'
         }
-        $result = [pscustomobject][ordered]@{
-            SchemaVersion           = $schema
-            Cases                   = $cases
-            Seed                    = $seed
-            MaximumParallelism      = $maximumParallelism
-            Agreements              = $agreements
-            Abstentions             = $abstentions
-            FrontendAgreements      = $frontendAgreements
-            SmtAgreements           = $smtAgreements
-            PartialSmtAgreements    = $partialSmtAgreements
-            FrontendCoverage        = [pscustomobject]$coverageValues
-            TotalProgramCoverage    = [pscustomobject]$totalValues
-            MetadataProgramCoverage = [pscustomobject]$metadataValues
-            CoverageSatisfied       = $coverageSatisfied
-            Failures                = [object[]]@()
-            Passed                  = $passed
-        }
+        $result = ([ordered]@{
+                SchemaVersion           = $schema
+                Cases                   = $cases
+                Seed                    = $seed
+                MaximumParallelism      = $maximumParallelism
+                Agreements              = $agreements
+                Abstentions             = $abstentions
+                FrontendAgreements      = $frontendAgreements
+                SmtAgreements           = $smtAgreements
+                PartialSmtAgreements    = $partialSmtAgreements
+                FrontendCoverage        = $coverageValues
+                TotalProgramCoverage    = $totalValues
+                MetadataProgramCoverage = $metadataValues
+                CoverageSatisfied       = $coverageSatisfied
+                Failures                = [Collections.Immutable.ImmutableArray[object]]::Empty
+                Passed                  = $passed
+            }).AsReadOnly()
     }
     catch {
         throw "Invalid fuzz runner result: $($_.Exception.Message)"

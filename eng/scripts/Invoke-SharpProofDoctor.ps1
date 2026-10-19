@@ -42,7 +42,11 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
     }
     else {
         $evaluation = $raw | ConvertFrom-Json
-        $configuration = $evaluation.Properties
+        $configurationBuilder = [ordered]@{}
+        foreach ($property in $evaluation.Properties.PSObject.Properties) {
+            $configurationBuilder[$property.Name] = $property.Value
+        }
+        $configuration = $configurationBuilder.AsReadOnly()
         $packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($evaluation.Items.PackageReference | Where-Object { $_.Identity -in $packageIds } | ForEach-Object {
                     $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
                     ([ordered]@{ id = $_.Identity; version = $version }).AsReadOnly()
@@ -168,6 +172,11 @@ else {
         Write-Output "[$($check.status)] $($check.name): $($check.message)"
         if ($check.action) { Write-Output "  Next: $($check.action)" }
     }
-    if ($configuration) { $configuration | Format-List | Out-String | Write-Output }
+    if ($configuration) {
+        # Format-List requires adapted object properties rather than dictionary entries.
+        $displayBuilder = [ordered]@{}
+        foreach ($name in $configuration.Keys) { $displayBuilder[$name] = $configuration[$name] }
+        [pscustomobject]$displayBuilder | Format-List | Out-String | Write-Output
+    }
 }
 if (@($checkSnapshot | Where-Object { $_.status -eq 'error' }).Count) { exit 1 }
