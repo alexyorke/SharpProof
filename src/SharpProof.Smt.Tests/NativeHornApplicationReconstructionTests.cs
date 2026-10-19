@@ -58,7 +58,7 @@ public sealed class NativeHornApplicationReconstructionTests
             "ugt" => context.MkBVUGT(minusOne, one),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
-        Expr[] expectedArguments = operation switch
+        ImmutableArray<Expr> expectedArguments = operation switch
         {
             "and" => [yes, no, yes],
             "or" => [no, yes, no],
@@ -115,7 +115,7 @@ public sealed class NativeHornApplicationReconstructionTests
             "nested" => context.MkMul(sum, three),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
-        Expr[] expectedArguments = operation switch
+        ImmutableArray<Expr> expectedArguments = operation switch
         {
             "add" or "multiply" => [two, three, five],
             "subtract" => [five, two],
@@ -209,9 +209,10 @@ public sealed class NativeHornApplicationReconstructionTests
     }
 
     private static void AssertApplication(Expr expression, Z3_decl_kind expectedKind, int expectedArity,
-        Expr[] expectedArguments)
+        ImmutableArray<Expr> expectedArguments)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedArguments, nameof(expectedArguments));
+        if (expectedArguments.IsDefault)
+        { throw new ArgumentNullException(nameof(expectedArguments)); }
         System.ArgumentNullException.ThrowIfNull(expression);
         using var declaration = expression.FuncDecl;
         var arguments = expression.Args;
