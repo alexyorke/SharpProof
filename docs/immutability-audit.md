@@ -3013,3 +3013,11 @@ publication; native NUL-delimited Git bytes remain unchanged. Replace declaratio
 compiler argv array concatenation with builder assembly. Validate old/new argv, Git
 inventory outputs, declaration classification and doctor evaluation in canonical Linux.
 Status: open before edits.
+
+IMM-M088 verified: all 492 targeted Worker portable-graph, callable-codec, initialization,
+exception-constraint, metadata-admission and specification-pack tests pass, zero failures/
+skips/warnings/errors. Main checked decoder publication/cycle order, canonical-role
+freeze, join expressions and recursive finally bookkeeping; read-only review found no
+concrete defect. Inventory now records 2,776 C# syntax candidates across 1,870 files;
+52 added owned-builder rows classified. Literal check preserves 3,035 raw/interpolated
+tokens across 699 changed C# files against current master. Other Open rows remain in scope.

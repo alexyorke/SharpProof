@@ -314,7 +314,7 @@ internal static class CompilerTotalCallableLowerer
         CSharpCompilation compilation, CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        var types = ImmutableDictionary.Create<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
+        var types = ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool? moduleSafe = null;
         return type =>
         {
@@ -325,7 +325,7 @@ internal static class CompilerTotalCallableLowerer
             if (!types.TryGetValue(type, out var typeSafe))
             {
                 typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
-                types = types.AddUnique(type, typeSafe);
+                types.AddUnique(type, typeSafe);
             }
             if (!typeSafe)
             { return false; }
@@ -411,8 +411,8 @@ internal static class CompilerTotalCallableLowerer
     // initializer code cannot supply a complete exception constraint row.
     private sealed class ExceptionEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
-        private ImmutableDictionary<INamedTypeSymbol, bool> _checked = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : ImmutableDictionary.Create<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default));
-        private ImmutableHashSet<INamedTypeSymbol> _active = ImmutableHashSet.Create<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly ImmutableDictionary<INamedTypeSymbol, bool>.Builder _checked = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default));
+        private readonly ImmutableHashSet<INamedTypeSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         private int _remaining = CompilerArtifactLimits.MaximumInstructions;
 
         internal bool NoFault(INamedTypeSymbol type)
@@ -432,7 +432,7 @@ internal static class CompilerTotalCallableLowerer
             { return known; }
             if (type.DeclaringSyntaxReferences.Length == 0 || _active.Contains(type))
             { return false; }
-            _active = _active.Add(type);
+            _active.Add(type);
             var safe = false;
             try
             {
@@ -480,8 +480,8 @@ internal static class CompilerTotalCallableLowerer
             }
             finally
             {
-                _active = _active.Remove(type);
-                _checked = _checked.SetItem(type, safe);
+                _active.Remove(type);
+                _checked[type] = safe;
             }
         }
 

@@ -704,16 +704,16 @@ internal static partial class PortableIrGraphCodec
         CancellationToken _cancellationToken)
     {
         private readonly IrFactory _factory = new((_graph ?? throw new System.ArgumentNullException(nameof(_graph))).Semantics);
-        private ImmutableHashSet<IrMemberId> _distinctMembers = [];
-        private ImmutableHashSet<IrId> _distinctTerms = [];
-        private ImmutableList<IrTypeId> _types = [];
-        private ImmutableList<IrIdentityId> _identities = [];
+        private readonly ImmutableHashSet<IrMemberId>.Builder _distinctMembers = ImmutableHashSet.CreateBuilder<IrMemberId>();
+        private readonly ImmutableHashSet<IrId>.Builder _distinctTerms = ImmutableHashSet.CreateBuilder<IrId>();
+        private readonly ImmutableList<IrTypeId>.Builder _types = ImmutableList.CreateBuilder<IrTypeId>();
+        private readonly ImmutableList<IrIdentityId>.Builder _identities = ImmutableList.CreateBuilder<IrIdentityId>();
         private ImmutableArray<IrVarId> _variables = [];
         private ImmutableArray<IrMemberId> _members = [];
         private ImmutableArray<OperationId> _operations = [];
-        private ImmutableList<IrTerm?> _terms = [];
-        private ImmutableList<byte> _typeState = [];
-        private ImmutableList<byte> _termState = [];
+        private readonly ImmutableList<IrTerm?>.Builder _terms = ImmutableList.CreateBuilder<IrTerm?>();
+        private readonly ImmutableList<byte>.Builder _typeState = ImmutableList.CreateBuilder<byte>();
+        private readonly ImmutableList<byte>.Builder _termState = ImmutableList.CreateBuilder<byte>();
 
         internal DecodedPortableIrGraph Decode()
         {
@@ -726,8 +726,10 @@ internal static partial class PortableIrGraphCodec
             _members = DecodeRows(_graph.Members, "member", DecodeMember);
             _operations = DecodeRows(_graph.Operations, "operation",
                 DecodeOperation);
-            _terms = Enumerable.Repeat<IrTerm?>(null, _graph.Terms.Length).ToImmutableList();
-            _termState = Enumerable.Repeat((byte)0, _terms.Count).ToImmutableList();
+            _terms.Clear();
+            _terms.AddRange(Enumerable.Repeat<IrTerm?>(null, _graph.Terms.Length));
+            _termState.Clear();
+            _termState.AddRange(Enumerable.Repeat((byte)0, _terms.Count));
             for (var index = 0; index < _terms.Count; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
@@ -757,8 +759,10 @@ internal static partial class PortableIrGraphCodec
         private void DecodeTypes()
         {
             Require(_graph.Types.Length >= 4, "Portable IR is missing built-in types.");
-            _types = Enumerable.Repeat(default(IrTypeId), _graph.Types.Length).ToImmutableList();
-            _typeState = Enumerable.Repeat((byte)0, _types.Count).ToImmutableList();
+            _types.Clear();
+            _types.AddRange(Enumerable.Repeat(default(IrTypeId), _graph.Types.Length));
+            _typeState.Clear();
+            _typeState.AddRange(Enumerable.Repeat((byte)0, _types.Count));
             var builtIns = ImmutableArray.Create(
                 (_factory.BooleanType, IrTypeKind.Boolean, "bool"),
                 (_factory.IntegerType, IrTypeKind.Integer, "int"),
@@ -773,8 +777,8 @@ internal static partial class PortableIrGraphCodec
                     row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
-                _types = _types.SetItem(index, id);
-                _typeState = _typeState.SetItem(index, 2);
+                _types[index] = id;
+                _typeState[index] = 2;
             }
             for (var index = builtIns.Length; index < _types.Count; index++)
             {
@@ -794,7 +798,7 @@ internal static partial class PortableIrGraphCodec
 
             Require(_typeState[index] != 1, "Portable IR type metadata contains a cycle.");
             Require(depth < MaximumGraphDepth, "Portable IR type depth exceeds the supported limit.");
-            _typeState = _typeState.SetItem(index, 1);
+            _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
             Require(!row.ClosedSealedReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference,
@@ -810,7 +814,7 @@ internal static partial class PortableIrGraphCodec
                     _factory.CreateIdentity(), DecodeType(row.Element, depth + 1), row.Name),
                 _ => throw Bad("Portable IR contains a non-canonical scalar type.")
             };
-            _types = _types.SetItem(index, decodedType);
+            _types[index] = decodedType;
             var info = _factory.GetTypeInfo(_types[index]);
             if (row.ClosedSealedReference)
             { _factory.RegisterClosedSealedReferenceType(_types[index]); }
@@ -820,20 +824,20 @@ internal static partial class PortableIrGraphCodec
                 (info.Kind != IrTypeKind.Integer || _factory.GetString(info.Name) == row.Name) &&
                 info.ElementType == (row.Element == -1 ? null : _types[row.Element]),
                 "Portable IR type metadata is inconsistent.");
-            _typeState = _typeState.SetItem(index, 2);
+            _typeState[index] = 2;
             return _types[index];
         }
 
         private void DecodeIdentities()
         {
-            _identities = [];
+            _identities.Clear();
             for (var index = 0; index < _graph.Identities.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 Require(
                     _graph.Identities[index] == index,
                     "Portable IR identities are not canonical.");
-                _identities = _identities.Add(_factory.CreateIdentity());
+                _identities.Add(_factory.CreateIdentity());
             }
         }
 
@@ -847,7 +851,7 @@ internal static partial class PortableIrGraphCodec
                 Type(row.DeclaringType), name,
                 Type(row.ReturnType), row.IsStatic, row.ParameterTypes.Select(Type).ToImmutableArray());
             Require(!_distinctMembers.Contains(member), "Portable IR member equality partitions collapse.");
-            _distinctMembers = _distinctMembers.Add(member);
+            _distinctMembers.Add(member);
             return member;
         }
 
@@ -862,7 +866,7 @@ internal static partial class PortableIrGraphCodec
 
             Require(_termState[index] != 1, "Portable IR terms contain a cycle.");
             Require(depth < MaximumGraphDepth, "Portable IR term depth exceeds the supported limit.");
-            _termState = _termState.SetItem(index, 1);
+            _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
             Require(!row.Items.IsDefault, "Portable IR term metadata is invalid.");
             RequireCanonicalTermSlots(row);
@@ -887,9 +891,9 @@ internal static partial class PortableIrGraphCodec
                 term.Type == Type(row.Type) &&
                 !_distinctTerms.Contains(term.Id),
                 "Portable IR term equality or type metadata is inconsistent.");
-            _distinctTerms = _distinctTerms.Add(term.Id);
-            _terms = _terms.SetItem(index, term);
-            _termState = _termState.SetItem(index, 2);
+            _distinctTerms.Add(term.Id);
+            _terms[index] = term;
+            _termState[index] = 2;
             return term;
         }
 
@@ -901,28 +905,29 @@ internal static partial class PortableIrGraphCodec
             }
 
             var builder = new IrProgramBuilder(_factory);
-            var blocks = ImmutableList<IrBlockId>.Empty;
+            var blockBuilder = ImmutableList.CreateBuilder<IrBlockId>();
             for (var index = 0; index < _graph.Blocks.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 var row = Required(_graph.Blocks[index], "block row");
                 Require(!row.Instructions.IsDefault, "Portable IR instruction arrays cannot be null.");
                 RequireCanonicalOptionalText(row.Name, "block name");
-                blocks = blocks.Add(builder.CreateBlock(row.Name));
+                blockBuilder.Add(builder.CreateBlock(row.Name));
             }
+            var blocks = blockBuilder.ToImmutable();
             builder.SetEntry(Block(_graph.Entry, blocks));
-            var instructions = ImmutableList<IrInstruction>.Empty;
+            var instructions = ImmutableArray.CreateBuilder<IrInstruction>();
             for (var index = 0; index < _graph.Blocks.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 foreach (var row in _graph.Blocks[index].Instructions)
                 {
                     _cancellationToken.ThrowIfCancellationRequested();
-                    instructions = instructions.Add(Instruction(builder, blocks[index], blocks, row));
+                    instructions.Add(Instruction(builder, blocks[index], blocks, row));
                 }
             }
 
-            return (builder.Build(), [.. instructions]);
+            return (builder.Build(), instructions.ToImmutable());
         }
 
         private IrInstruction Instruction(
