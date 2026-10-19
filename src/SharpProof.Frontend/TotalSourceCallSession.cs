@@ -186,7 +186,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         graph = null;
         if (!Spend(method.Parameters.Length + 1))
         { return false; }
-        // Reference element specialization belongs to the supported List helper
+        // Scalar, reference and opaque element specialization belongs to the List helper
         // boundary. Other generic source calls retain their existing scalar domain.
         var listElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
             parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type));

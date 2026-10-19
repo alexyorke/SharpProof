@@ -19,8 +19,7 @@ internal static partial class CSharpOperationSemantics
         return IsListStateDeclaration(method.AssociatedSymbol ?? method) && !method.IsStatic &&
             method.ContainingType is { TypeArguments.Length: 1 } type &&
             (method.MethodKind == MethodKind.Constructor || method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
-                IsScalar(knownElement ?? type.TypeArguments[0]) || IsReferenceDomain(knownElement ?? type.TypeArguments[0]) ||
-                (knownElement ?? type.TypeArguments[0]) is ITypeParameterSymbol { IsReferenceType: true });
+                IsValueDomain(knownElement ?? type.TypeArguments[0]));
     }
 
     internal static bool IsConcreteListStateMember(IMethodSymbol method, ITypeSymbol? knownElement = null)

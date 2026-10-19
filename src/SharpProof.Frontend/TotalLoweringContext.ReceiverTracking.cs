@@ -408,8 +408,7 @@ public sealed partial class TotalLoweringContext
         if (type == null)
         { return null; }
         var known = SpecializeReceiverElement(type);
-        return CSharpOperationSemantics.IsScalar(known) || CSharpOperationSemantics.IsReferenceDomain(known) ||
-            known is ITypeParameterSymbol { IsReferenceType: true } ? known : null;
+        return CSharpOperationSemantics.IsValueDomain(known) ? known : null;
     }
 
     internal void SpecializeTypeParameter(ITypeParameterSymbol parameter, ITypeSymbol scalar)
