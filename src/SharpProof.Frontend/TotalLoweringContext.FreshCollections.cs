@@ -2,11 +2,12 @@ namespace SharpProof.Frontend;
 
 public sealed partial class TotalLoweringContext
 {
-    private void TrackFreshCollections(ControlFlowGraph graph, bool lists)
+    private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var tracked = lists ? _exactLists : _defaultDictionaries;
-        var trackedCaptures = lists ? _exactListCaptures : _defaultDictionaryCaptures;
+        var identityOnly = lists || dictionaryOrigins;
+        var tracked = lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
+        var trackedCaptures = lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToArray();
         var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
@@ -30,16 +31,16 @@ public sealed partial class TotalLoweringContext
                 values.Add(capture.Value);
             }
             // Ownership rejects publication of comparer/deserialization state.
-            // A List's allocation identity survives by-value publication;
+            // Allocation lineage survives by-value publication;
             // opaque heap effects separately invalidate its content knowledge.
             if (operation is IArgumentOperation argument && !CSharpOperationSemantics.IsScalar(argument.Value.Type) &&
-                (!lists || argument.Parameter?.RefKind != RefKind.None))
+                (!identityOnly || argument.Parameter?.RefKind != RefKind.None))
             { Exclude(argument.Value); }
             if (operation is ISimpleAssignmentOperation { IsRef: true } referenceAssignment)
             { Exclude(referenceAssignment.Value); }
             if (operation is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None, Initializer: { } initializer })
             { Exclude(initializer.Value); }
-            if (!lists && operation is ISimpleAssignmentOperation publication && Symbol(publication.Target) == null &&
+            if (!identityOnly && operation is ISimpleAssignmentOperation publication && Symbol(publication.Target) == null &&
                 publication.Target is not IFlowCaptureReferenceOperation && !CSharpOperationSemantics.IsScalar(publication.Value.Type))
             { Exclude(publication.Value); }
             if (operation is IDeconstructionAssignmentOperation deconstruction)
@@ -116,13 +117,13 @@ public sealed partial class TotalLoweringContext
             if (depth > 64 || --remaining < 0)
             { return false; }
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
-                (conversion.Conversion.IsIdentity || lists && conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
+                (conversion.Conversion.IsIdentity || identityOnly && conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { return Resolve(conversion.Operand, depth + 1); }
-            if (lists && operation is ISimpleAssignmentOperation { IsRef: false } assignment)
+            if (identityOnly && operation is ISimpleAssignmentOperation { IsRef: false } assignment)
             { return Resolve(assignment.Value, depth + 1); }
             if (Symbol(operation) is { } symbol)
             {
-                return !excluded.Contains(symbol) && (lists && symbol is IParameterSymbol && tracked.Contains(symbol) ||
+                return !excluded.Contains(symbol) && (identityOnly && symbol is IParameterSymbol && tracked.Contains(symbol) ||
                     symbol is ILocalSymbol && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1));
             }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
