@@ -147,9 +147,17 @@ Supplied method groups are rechecked for selected overloads after rewriting.
 
 Sync and async iterator roots infer element types from yield return, retain
 non-generic yield conversions, and support yield break and finalizer flow.
-Foreach supports arrays, generic interfaces and custom instance patterns, including
-nested/inherited enumerators. Await foreach supports configured and cancelable
-sources. Protocol members and conversions are rechecked after rewriting.
+Foreach supports arrays, generic interfaces and custom instance/extension patterns,
+including base/interface receiver projection and imported extension constraints.
+Await foreach supports configured and cancelable sources. Implicit MoveNextAsync
+and DisposeAsync awaits infer through instance/inherited/extension GetAwaiter and
+GetResult members in the loop's scope. MoveNextAsync results and IsCompleted
+properties retain their required Boolean types. Specialized extension overloads
+keep the type arguments their signatures require. Protocol members, conversions
+and implicit await bindings are rechecked across all supplied files, including
+when an extension protocol method itself becomes generic. Runtime IDE-fix checks
+compare original/fixed traces through suspension, empty/full iteration, early
+breaks, body/move/disposal failures and cancellation.
 Generic instance calls preserve receiver substitutions and explicit type arguments.
 
 The adapter skips custom operators, expanded non-array params
@@ -175,8 +183,8 @@ completeness, reachability and definite assignment after rewriting. Labels, name
 goto and goto case/default are supported, including pending finally/disposal.
 Unreachable syntax still contributes typing constraints. Boolean conditions retain
 the source type of user-defined conversions and true operators.
-Ref foreach, generalized extension enumeration and type-parameter enumerator
-patterns remain unsupported. Ref delegates,
+Ref foreach and general type-parameter enumerator patterns remain unsupported.
+Ref delegates,
 attributed/modified lambdas and expression trees remain unsupported.
 Switch statements support pattern variables and guards.
 Try/catch/finally supports exception locals, filters,

@@ -155,6 +155,7 @@ public static partial class Inference
                 try
                 {
                     var awaiter = AwaitProtocolResult(operandType, operand, selected);
+                    HmType.Unify(PatternSymbolType(info.IsCompletedProperty, awaiter, selected.ReturnType), new HmType("bool"));
                     return AwaitProtocolResult(selected.ReturnType, awaiter, info.GetResultMethod);
                 }
                 catch (InferenceException)
@@ -183,7 +184,7 @@ public static partial class Inference
                     { throw new ArgumentNullException(nameof(reference)); }
                     return reference.SyntaxTree == changedTree && reference.Span.Start == changedMethod.SpanStart;
                 }))
-            { return SameCallSignature(before, after); }
+            { return SameCallSignature(before.ReducedFrom ?? before, after.ReducedFrom ?? after); }
             return ProtocolMember(before) == ProtocolMember(after);
         }
         private HmType AwaitProtocolResult(ITypeSymbol receiverType, HmType receiver, IMethodSymbol selected)

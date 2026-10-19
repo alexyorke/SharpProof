@@ -85,13 +85,13 @@ public static partial class Inference
                 HmType.Unify(Expression(loop.Expression), new("[" + new string(',', array.Rank - 1) + "]", element));
                 return element;
             }
-            if (info.GetEnumeratorMethod is null || info.GetEnumeratorMethod.IsStatic || info.GetEnumeratorMethod.ReturnType is not INamedTypeSymbol
+            if (info.GetEnumeratorMethod is null || info.GetEnumeratorMethod.ReturnType is not INamedTypeSymbol
                 || info.CurrentProperty is null)
             {
                 Anchor(loop.Expression);
                 return CSharpTypes.Rigid(info.ElementType);
             }
-            var mapping = ReceiverMapping(info.GetEnumeratorMethod, loop.Expression);
+            var mapping = EnumerationMapping(loop, info.GetEnumeratorMethod);
             var returned = info.GetEnumeratorMethod.OriginalDefinition.ReturnType as INamedTypeSymbol
                 ?? throw new InferenceException("Unresolved enumerator type.");
             AddNamedArguments(returned, mapping);
@@ -111,10 +111,12 @@ public static partial class Inference
             AddNamedArguments(ancestor, mapping);
             if (info.IsAsynchronous)
             {
-                // Implicit awaits have no AwaitExpressionSyntax. Retain awaitable types so
-                // extension GetAwaiter overloads cannot change when element types generalize.
-                PinProtocolAwaitable(info.MoveNextMethod, mapping);
-                PinProtocolAwaitable(info.DisposeMethod, mapping);
+                if (info.MoveNextMethod is not null)
+                { MapEnumerationOwner(returned, info.MoveNextMethod.ContainingType, mapping); }
+                BindImplicitAwait(loop, info.MoveNextMethod, mapping, true);
+                if (info.DisposeMethod is not null)
+                { MapEnumerationOwner(returned, info.DisposeMethod.ContainingType, mapping); }
+                BindImplicitAwait(loop, info.DisposeMethod, mapping, false);
             }
             var current = CSharpTypes.Rigid(info.CurrentProperty.OriginalDefinition.Type, mapping);
             if (!info.CurrentConversion.IsIdentity)
@@ -123,15 +125,6 @@ public static partial class Inference
                 return CSharpTypes.Rigid(info.ElementType);
             }
             return current;
-        }
-
-        private static void PinProtocolAwaitable(IMethodSymbol? method, Dictionary<ITypeParameterSymbol, HmType> mapping)
-        {
-            if (mapping is null)
-            { throw new ArgumentNullException(nameof(mapping)); }
-            if (method is null)
-            { return; }
-            HmType.Unify(CSharpTypes.Rigid(method.OriginalDefinition.ReturnType, mapping), CSharpTypes.Rigid(method.ReturnType));
         }
 
         private Flow ForEachFlow(CommonForEachStatementSyntax loop)
@@ -161,7 +154,7 @@ public static partial class Inference
             });
         }
 
-        private bool PreservesForEachBindings(MethodDeclarationSyntax before, MethodDeclarationSyntax after, SemanticModel changedModel)
+        private bool PreservesForEachBindings(SyntaxNode before, SyntaxNode after, SemanticModel beforeModel, SemanticModel changedModel, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)
         {
             if (before is null)
             { throw new ArgumentNullException(nameof(before)); }
@@ -169,21 +162,30 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(after)); }
             if (changedModel is null)
             { throw new ArgumentNullException(nameof(changedModel)); }
+            if (beforeModel is null)
+            { throw new ArgumentNullException(nameof(beforeModel)); }
+            if (changedMethod is null)
+            { throw new ArgumentNullException(nameof(changedMethod)); }
+            if (changedTree is null)
+            { throw new ArgumentNullException(nameof(changedTree)); }
             var originals = before.DescendantNodes().OfType<CommonForEachStatementSyntax>().ToArray();
             var candidates = after.DescendantNodes().OfType<CommonForEachStatementSyntax>().ToArray();
             if (originals.Length != candidates.Length)
             { return false; }
             for (var i = 0; i < originals.Length; i++)
             {
-                var left = model.GetForEachStatementInfo(originals[i]);
+                var left = beforeModel.GetForEachStatementInfo(originals[i]);
                 var right = changedModel.GetForEachStatementInfo(candidates[i]);
-                if (ProtocolMember(left.GetEnumeratorMethod) != ProtocolMember(right.GetEnumeratorMethod)
-                    || ProtocolMember(left.MoveNextMethod) != ProtocolMember(right.MoveNextMethod)
+                if (!SameAwaitMethod(left.GetEnumeratorMethod, right.GetEnumeratorMethod, changedMethod, changedTree)
+                    || !SameAwaitMethod(left.MoveNextMethod, right.MoveNextMethod, changedMethod, changedTree)
                     || ProtocolMember(left.CurrentProperty) != ProtocolMember(right.CurrentProperty)
-                    || ProtocolMember(left.DisposeMethod) != ProtocolMember(right.DisposeMethod)
+                    || !SameAwaitMethod(left.DisposeMethod, right.DisposeMethod, changedMethod, changedTree)
                     || left.IsAsynchronous != right.IsAsynchronous
                     || !SameProtocolConversion(left.ElementConversion, right.ElementConversion)
                     || !SameProtocolConversion(left.CurrentConversion, right.CurrentConversion))
+                { return false; }
+                if (left.IsAsynchronous && (!SameImplicitAwait(beforeModel, changedModel, originals[i], candidates[i], left.MoveNextMethod, right.MoveNextMethod, changedMethod, changedTree)
+                    || !SameImplicitAwait(beforeModel, changedModel, originals[i], candidates[i], left.DisposeMethod, right.DisposeMethod, changedMethod, changedTree)))
                 { return false; }
             }
             return true;

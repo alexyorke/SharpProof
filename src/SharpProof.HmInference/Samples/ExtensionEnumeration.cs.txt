@@ -1,0 +1,36 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+class ExtensionEnumerationSource<T> { public T[] Values = []; }
+class ExtensionAsyncSource<T> { public T Value = default!; }
+class ExtensionAsyncEnumerator<T>(ExtensionAsyncSource<T> source)
+{
+    public T Current => source.Value;
+    public ExtensionMove<T> MoveNextAsync() => new(Task.FromResult(false));
+    public ExtensionDispose<T> DisposeAsync() => new(Task.CompletedTask);
+}
+readonly struct ExtensionMove<T>(Task<bool> task) { public Task<bool> Task => task; }
+readonly struct ExtensionDispose<T>(Task task) { public Task Task => task; }
+static class SampleEnumerationExtensions
+{
+    public static IEnumerator<T> GetEnumerator<T>(this ExtensionEnumerationSource<T> source) => ((IEnumerable<T>)source.Values).GetEnumerator();
+    public static ExtensionAsyncEnumerator<T> GetAsyncEnumerator<T>(this ExtensionAsyncSource<T> source, CancellationToken token = default) => new(source);
+    public static TaskAwaiter<bool> GetAwaiter<T>(this ExtensionMove<T> move) => move.Task.GetAwaiter();
+    public static TaskAwaiter GetAwaiter<T>(this ExtensionDispose<T> dispose) => dispose.Task.GetAwaiter();
+}
+static class ExtensionEnumerationSamples
+{
+    public static int Last(ExtensionEnumerationSource<int> source, int seed)
+    {
+        foreach (var value in source) seed = value;
+        return seed;
+    }
+    public static async Task<int> LastAsync(ExtensionAsyncSource<int> source, int seed)
+    {
+        await foreach (var value in source) seed = value;
+        return seed;
+    }
+}

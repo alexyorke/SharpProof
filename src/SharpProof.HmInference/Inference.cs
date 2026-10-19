@@ -254,8 +254,6 @@ public static partial class Inference
                 return m.SpanStart == method.SpanStart;
             });
             var changedModel = changedCompilation.GetSemanticModel(changed);
-            if (!PreservesForEachBindings(method, changedMethod, changedModel))
-            { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol."); }
             // Validate statically resolved calls in every supplied file. Merely
             // compiling callers does not preserve conversions or overload selection
             // when this method becomes generic or its result narrows.
@@ -267,6 +265,8 @@ public static partial class Inference
                 var afterModel = changedCompilation.GetSemanticModel(afterTree);
                 var beforeRoot = sourceTree.GetRoot(cancellationToken);
                 var afterRoot = afterTree.GetRoot(cancellationToken);
+                if (!PreservesForEachBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol or implicit await."); }
                 var beforeAwaits = beforeRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
                 var afterAwaits = afterRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
                 for (var i = 0; i < beforeAwaits.Length; i++)
