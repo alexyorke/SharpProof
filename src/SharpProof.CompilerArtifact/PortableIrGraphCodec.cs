@@ -584,8 +584,7 @@ internal static partial class PortableIrGraphCodec
             block = RepositoryParameterGuard.NotNull(block, nameof(block));
             _cancellationToken.ThrowIfCancellationRequested();
             return new(
-                block.Name.HasValue ? _factory.GetString(block.Name.Value) : null,
-                instructions: null)
+                block.Name.HasValue ? _factory.GetString(block.Name.Value) : null)
             {
                 Instructions = block.Instructions.Select(InstructionRow).ToImmutableArray()
             };

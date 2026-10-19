@@ -111,7 +111,7 @@ internal sealed record PortableIrMember
     string? name = null,
     int returnType = -1,
     bool isStatic = false,
-    int[]? parameterTypes = null
+    ImmutableArray<int> parameterTypes /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
 ) : this()
     {
         Identity = identity;
@@ -119,7 +119,7 @@ internal sealed record PortableIrMember
         Name = name ?? string.Empty;
         ReturnType = returnType;
         IsStatic = isStatic;
-        ParameterTypes = parameterTypes?.ToImmutableArray() ?? [];
+        ParameterTypes = parameterTypes.IsDefault ? [] : parameterTypes;
     }
 
 }
@@ -182,7 +182,7 @@ internal sealed record PortableIrTerm
     int d = -1,
     long number = 0,
     string? text = null,
-    int[]? items = null
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
 ) : this()
     {
         Kind = kind;
@@ -193,7 +193,7 @@ internal sealed record PortableIrTerm
         D = d;
         Number = number;
         Text = text;
-        Items = items?.ToImmutableArray() ?? [];
+        Items = items.IsDefault ? [] : items;
     }
 
 }
@@ -215,14 +215,14 @@ internal sealed record PortableIrLocation
     int type = -1,
     int a = -1,
     int b = -1,
-    int[]? items = null
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
 ) : this()
     {
         Kind = kind;
         Type = type;
         A = a;
         B = b;
-        Items = items?.ToImmutableArray() ?? [];
+        Items = items.IsDefault ? [] : items;
     }
 
 }
@@ -249,7 +249,7 @@ internal sealed record PortableIrInstruction
     int a = -1,
     int b = -1,
     int c = -1,
-    int[]? items = null,
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default,
     PortableIrLocation? location = null
 ) : this()
     {
@@ -258,7 +258,7 @@ internal sealed record PortableIrInstruction
         A = a;
         B = b;
         C = c;
-        Items = items?.ToImmutableArray() ?? [];
+        Items = items.IsDefault ? [] : items;
         Location = location;
     }
 
@@ -275,11 +275,11 @@ internal sealed record PortableIrBlock
 
     public PortableIrBlock(
     string? name = null,
-    PortableIrInstruction[]? instructions = null
+    ImmutableArray<PortableIrInstruction> instructions /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
 ) : this()
     {
         Name = name;
-        Instructions = instructions?.ToImmutableArray() ?? [];
+        Instructions = instructions.IsDefault ? [] : instructions;
     }
 
 }
