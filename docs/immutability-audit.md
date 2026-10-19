@@ -2301,3 +2301,17 @@ TryAdd semantics and sort output by term ID; use a scoped builder and freeze bef
 printing. Callback observations freeze after replay. Preserve native interpreter argument
 arrays, emitted PE byte buffers and StringBuilder's text writer contract. No embedded
 source/literal text may change. Status: open before edits.
+
+IMM-M049 validation: all 219 scalar operator, frontend lowering and golden lowering
+cases pass in the canonical Linux container, with zero build warnings/errors. Reference
+operation maps retain ReferenceEqualityComparer.Instance; recursive memo snapshots sort
+by term ID, and replay observation vectors retain insertion order. Native byte and
+reflection argument arrays remain unchanged. Read-only review pending before commit.
+
+IMM-M050: Coordinator inspected both NativeIntegerConditionalEmissionApiTests and
+GenericNativeIntegerConditionalEmissionApiTests. TraceCalls returns a read-only sequence
+of decoded Trace calls; its List<string> can become a scoped ImmutableArray builder and
+its return type ImmutableArray<string>. Keep byte[] input/PE buffers, BitConverter and
+metadata readers unchanged. Generic candidate method lookup vector can be immutable.
+Existing Has.Length checks and JSON trace serialization accept immutable vectors.
+Status: open before edits.
