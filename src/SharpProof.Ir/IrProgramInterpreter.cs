@@ -137,11 +137,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 steps++;
 
                 state.Transfer = false;
+                state.CompletedValue = null;
                 var result = instruction.Execute(ref state);
                 if (replayOptions?.CompletedInstructionObserver is { } completed &&
                     (result == null || result.Status == IrProgramExecutionStatus.Returned))
                 {
-                    IrValue? produced = result?.ReturnValue;
+                    IrValue? produced = result?.ReturnValue ?? state.CompletedValue;
                     var target = instruction switch
                     {
                         IrAssignInstruction assigned => (IrVarId?)assigned.Target,
@@ -179,6 +180,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal int Steps;
         internal IrThrowInstruction? PendingException;
         internal bool Transfer;
+        internal IrValue? CompletedValue;
     }
 
     // Original cases 4
@@ -555,6 +557,7 @@ public sealed partial class IrWriteInstruction
             var element = state.Interpreter.Evaluate(storedElement, state.Values, state.CancellationToken);
             if (element.Status != IrEvaluationStatus.Value)
             { return IrProgramInterpreter.FromEvaluation(element, this, state.Values, state.Steps); }
+            state.CompletedValue = element.Value;
             // The lowering guards the store, so an invalid one is not C#.
             if (this.Field is { } keyedField && position != null && target.Value!.Kind == IrValueKind.Reference)
             { state.Values.Heap.StoreKeyedField(target.Value, keyedField, position.Value!, element.Value!); }

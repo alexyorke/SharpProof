@@ -63,15 +63,16 @@ internal sealed class ResourceMemoryReplay
             {
                 if (++reads > ResourceMemoryTrace.MaximumEvents)
                 { return Unknown("MemoryReplayBudgetExceeded"); }
-                if (term is IrVariableTerm variable)
-                { lastUse[variable.Variable] = index; }
-                else if (term is not (IrIntegerTerm or IrBooleanTerm or IrNullTerm))
+                if (!ReadVariables(term, lastUse, index, 0))
                 { return Unknown("MemoryReplayValueUnsupported"); }
             }
         }
         var factory = _program.Factory;
         var identities = new List<IrValue>();
         var slots = new Dictionary<IrVarId, int>();
+        var actualValues = new Dictionary<IrVarId, IrValue>();
+        var objects = new HashSet<int>();
+        var fieldSlots = new Dictionary<IrMemberId, int>();
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         var output = 0;
@@ -81,6 +82,26 @@ internal sealed class ResourceMemoryReplay
             var (instruction, value) = _observed[index];
             switch (instruction)
             {
+                case IrAllocationInstruction objectAllocation when objectAllocation.Length == null:
+                    if (objectAllocation.Target is not { } objectTarget || value is not { Kind: IrValueKind.Reference } ||
+                        objectAllocation.AllocatedType != value.Type || Find(value, identities) != 0 || !objectAllocation.InitialValues.IsEmpty)
+                    { return Unknown("MemoryReplayAllocationUnsupported"); }
+                    ResourceAllocationShape objectShape;
+                    if (objectAllocation.AllocatedType == factory.ObjectType)
+                    { objectShape = ResourceAllocationShape.Object([]); }
+                    else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
+                    { objectShape = ResourceAllocationShape.Object(fields); }
+                    else
+                    { return Unknown("MemoryReplayObjectStorageUnavailable"); }
+                    var objectFootprint = ResourceRuntimeLayout.Bound(objectShape, layout, cancellation);
+                    if (objectFootprint.Bounds is not { Lower.Constant: { } objectLower, Upper.Constant: { } objectUpper })
+                    { return Unknown(objectFootprint.UnknownReason ?? "MemoryReplayAllocationUnsupported"); }
+                    identities.Add(value);
+                    actualValues[objectTarget] = value;
+                    objects.Add(identities.Count);
+                    events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(objectTarget, slots), 0, objectLower, objectUpper));
+                    liveRoots.Add(objectTarget);
+                    break;
                 case IrAllocationInstruction allocation:
                     if (allocation.Target is not { } target || value is not { Kind: IrValueKind.Sequence } ||
                         allocation.AllocatedType != value.Type || !allocation.InitialValues.IsEmpty ||
@@ -101,13 +122,15 @@ internal sealed class ResourceMemoryReplay
                         ResourceExpression.Literal(value.Elements.Length)), layout, cancellation);
                     if (footprint.Bounds is not { Lower.Constant: { } lower, Upper.Constant: { } upper })
                     { return Unknown(footprint.UnknownReason ?? "MemoryReplayAllocationUnsupported"); }
-                    identities.Add(value.SequenceIdentity);
+                    identities.Add(value);
+                    actualValues[target] = value;
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(target, slots), 0, lower, upper));
                     liveRoots.Add(target);
                     break;
                 case IrAssignInstruction assigned:
                     if (value == null || value.Type != factory.GetVariableInfo(assigned.Target).Type)
                     { return Unknown("MemoryReplayValueUnsupported"); }
+                    actualValues[assigned.Target] = value;
                     if (value.Kind is IrValueKind.Sequence or IrValueKind.Reference or IrValueKind.String or IrValueKind.Null)
                     {
                         var identity = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
@@ -115,6 +138,24 @@ internal sealed class ResourceMemoryReplay
                         { return Unknown("MemoryReplayBorrowedReference"); }
                         events.Add(new(ResourceMemoryEventKind.BindRoot, 0, Slot(assigned.Target, slots), identity));
                         liveRoots.Add(assigned.Target);
+                    }
+                    break;
+                case IrWriteInstruction { IsFieldStore: true, IsStore: true, Index: null, Length: null } stored:
+                    if (stored.Target == null || stored.Field is not { } field || value == null ||
+                        ActualReference(stored.Target, factory, actualValues, 0) is not { } receiverValue)
+                    { return Unknown("MemoryReplayFieldStoreUnsupported"); }
+                    var receiver = Find(receiverValue, identities);
+                    var member = factory.GetMemberInfo(field);
+                    if (!objects.Contains(receiver) || member.IsStatic || !member.ParameterTypes.IsEmpty || value.Type != member.ReturnType)
+                    { return Unknown("MemoryReplayFieldStoreUnsupported"); }
+                    if (value.Kind is IrValueKind.Reference or IrValueKind.Sequence or IrValueKind.String or IrValueKind.Null)
+                    {
+                        var child = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
+                        if (value.Kind != IrValueKind.Null && child == 0)
+                        { return Unknown("MemoryReplayBorrowedReference"); }
+                        if (!fieldSlots.TryGetValue(field, out var fieldSlot))
+                        { fieldSlot = fieldSlots.Count; fieldSlots.Add(field, fieldSlot); }
+                        events.Add(new(ResourceMemoryEventKind.StoreReference, receiver, fieldSlot, child));
                     }
                     break;
                 case IrReturnInstruction:
@@ -145,15 +186,45 @@ internal sealed class ResourceMemoryReplay
         return Unknown("MemoryReplayIncomplete");
     }
 
+    private static IrValue? ActualReference(IrTerm term, IrFactory factory, Dictionary<IrVarId, IrValue> values, int depth)
+    {
+        term = ArgumentNullGuard.NotNull(term, nameof(term));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        values = ArgumentNullGuard.NotNull(values, nameof(values));
+        if (depth > 32)
+        { return null; }
+        if (term is IrVariableTerm variable)
+        { return values.TryGetValue(variable.Variable, out var value) ? value : null; }
+        if (term is IrCastTerm cast && (cast.Type == factory.ObjectType || cast.Type == cast.Operand.Type))
+        { return ActualReference(cast.Operand, factory, values, depth + 1); }
+        return null;
+    }
+
+    private static bool ReadVariables(IrTerm term, Dictionary<IrVarId, int> lastUse, int index, int depth)
+    {
+        term = ArgumentNullGuard.NotNull(term, nameof(term));
+        lastUse = ArgumentNullGuard.NotNull(lastUse, nameof(lastUse));
+        if (depth > 32)
+        { return false; }
+        if (term is IrVariableTerm variable)
+        { lastUse[variable.Variable] = index; return true; }
+        if (term is IrCastTerm cast)
+        { return ReadVariables(cast.Operand, lastUse, index, depth + 1); }
+        return term is IrIntegerTerm or IrBooleanTerm or IrNullTerm;
+    }
+
     private static int Find(IrValue value, List<IrValue> identities)
     {
         value = ArgumentNullGuard.NotNull(value, nameof(value));
         identities = ArgumentNullGuard.NotNull(identities, nameof(identities));
-        if (value.Kind != IrValueKind.Sequence)
+        var identity = value.Kind switch { IrValueKind.Sequence => value.SequenceIdentity, IrValueKind.Reference => value.Reference, _ => null };
+        if (identity == null)
         { return 0; }
         for (var index = 0; index < identities.Count; index++)
         {
-            if (ReferenceEquals(value.SequenceIdentity, identities[index]))
+            var candidate = identities[index];
+            var candidateIdentity = candidate.Kind == IrValueKind.Sequence ? candidate.SequenceIdentity : candidate.Reference;
+            if (ReferenceEquals(identity, candidateIdentity))
             { return index + 1; }
         }
         return 0;

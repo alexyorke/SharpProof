@@ -12,6 +12,56 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void CompleteObjectStorageSurvivesPortableRoundTrip()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "StoredObject");
+        factory.RegisterClosedClassReferenceType(type, null);
+        factory.RegisterObjectStorageType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        var target = factory.CreateVariable("object", type);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Allocate(entry, factory.CreateOperation(), type, target);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var graph = PortableIrGraphCodec.Encode(factory, builder.Build(), [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(graph, WorkerProtocolJson.Options);
+        var decoded = PortableIrGraphCodec.Decode(JsonSerializer.Deserialize<PortableIrGraph>(bytes, WorkerProtocolJson.Options)!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = new IrProgramInterpreter(decoded.Factory).Execute(decoded.Program!);
+        Assert.That(decoded.Factory.TryGetObjectStorageType(result.ReturnValue!.Type, out var fields), Is.True);
+        Assert.That(fields, Has.Length.EqualTo(2));
+        var second = PortableIrGraphCodec.Encode(decoded.Factory, decoded.Program, [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+        Assert.That(JsonSerializer.SerializeToUtf8Bytes(second, WorkerProtocolJson.Options), Is.EqualTo(bytes));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void CompleteObjectStorageRejectsMalformedRows(int kind)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "StoredObject");
+        factory.RegisterClosedClassReferenceType(type, null);
+        var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(factory.CreateVariable("object", type))], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+        var row = kind == 6 ? graph.Types[0] : graph.Types.Single(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Name == "StoredObject");
+        row.ObjectStorageFields = kind == 1 ? [ResourceStorageKind.Unspecified] : [];
+        if (kind == 0)
+        { graph.Semantics = IrExecutionSemantics.Legacy; }
+        if (kind == 2)
+        { row.ClosedClassBase = null; }
+        if (kind == 3)
+        { row.InterfaceReference = true; }
+        if (kind == 4)
+        { row.DelegateReference = true; }
+        if (kind == 5)
+        { row.ClosureFrameFields = [ResourceStorageKind.Word32]; }
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+    }
+
+    [Test]
     public void ClosureFrameStorageSurvivesPortableRoundTrip()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);

@@ -757,7 +757,7 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields == null && row.ImplementedInterfaces == null &&
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields == null && row.ObjectStorageFields == null && row.ImplementedInterfaces == null &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
@@ -794,6 +794,11 @@ internal static partial class PortableIrGraphCodec
                 row.ImplementedInterfaces == null && row.ClosureFrameFields.Length is > 0 and <= ResourceAllocationShape.MaximumFields &&
                 row.ClosureFrameFields.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
                 "Only Total nominal closure frames may carry valid storage fields.");
+            Require(row.ObjectStorageFields == null || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+                !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields == null &&
+                row.ClosedClassBase == -1 && row.ObjectStorageFields.Length <= ResourceAllocationShape.MaximumFields &&
+                row.ObjectStorageFields.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
+                "Only Total direct nominal classes may carry complete object storage.");
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
@@ -827,6 +832,8 @@ internal static partial class PortableIrGraphCodec
                     "A class certificate requires a certified base.");
                 _factory.RegisterClosedClassReferenceType(_types[index], parent);
             }
+            if (row.ObjectStorageFields != null)
+            { _factory.RegisterObjectStorageType(_types[index], [.. row.ObjectStorageFields]); }
             if (row.ImplementedInterfaces != null)
             {
                 Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && row.ImplementedInterfaces.Length is > 0 and <= 128,

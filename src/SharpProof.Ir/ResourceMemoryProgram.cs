@@ -16,6 +16,8 @@ internal static class ResourceMemoryProgram
         { return Unknown("MemoryProgramBudgetExceeded"); }
         var blocks = program.Blocks.ToDictionary(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Id);
         var constants = new Dictionary<IrVarId, IrTerm>();
+        var references = new Dictionary<IrVarId, int>();
+        var nextReference = 0;
         var visited = new HashSet<IrBlockId>();
         var instructions = new List<IrInstruction>();
         var current = program.Entry;
@@ -30,8 +32,10 @@ internal static class ResourceMemoryProgram
             {
                 cancellation.ThrowIfCancellationRequested();
                 if (instruction is not (IrAssignInstruction or IrAllocationInstruction or IrBranchInstruction or
-                    IrGotoInstruction or IrReturnInstruction or IrWriteInstruction { Region: IrWriteRegion.Local, IsStore: false }))
+                    IrGotoInstruction or IrReturnInstruction or IrWriteInstruction { Region: IrWriteRegion.Local, IsStore: false } or
+                    IrWriteInstruction { IsFieldStore: true, IsStore: true, Index: null, Length: null }))
                 { return Unknown("MemoryInstructionUnsupported"); }
+                UpdateReferences(instruction, program.Factory, references, ref nextReference);
                 UpdateConstants(instruction, constants);
             }
             instructions.AddRange(block.Instructions);
@@ -39,7 +43,7 @@ internal static class ResourceMemoryProgram
             { return Extract(program.Factory, instructions, layout, cancellation); }
             if (block.Instructions[block.Instructions.Length - 1] is IrGotoInstruction next)
             { current = next.Target; }
-            else if (block.Instructions[block.Instructions.Length - 1] is IrBranchInstruction branch && TryConstantCondition(branch.Condition, constants, out var taken))
+            else if (block.Instructions[block.Instructions.Length - 1] is IrBranchInstruction branch && TryConstantCondition(branch.Condition, constants, program.Factory, references, out var taken))
             { current = taken ? branch.WhenTrue : branch.WhenFalse; }
             else
             { return Unknown("MemoryControlFlowUnsupported"); }
@@ -65,9 +69,7 @@ internal static class ResourceMemoryProgram
                 cancellation.ThrowIfCancellationRequested();
                 if (++readCount > ResourceMemoryTrace.MaximumEvents)
                 { return Unknown("MemoryProgramBudgetExceeded"); }
-                if (term is IrVariableTerm variable)
-                { lastUse[variable.Variable] = index; }
-                else if (term is not (IrIntegerTerm or IrBooleanTerm or IrNullTerm))
+                if (!ReadVariables(term, lastUse, index, 0))
                 { return Unknown("MemoryScalarEffectUnsupported"); }
             }
         }
@@ -76,6 +78,8 @@ internal static class ResourceMemoryProgram
         var values = new Dictionary<IrVarId, int>();
         var trace = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         var nextObject = 0;
+        var objects = new HashSet<int>();
+        var fieldSlots = new Dictionary<IrMemberId, int>();
         for (var index = 0; index < instructions.Count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -83,6 +87,25 @@ internal static class ResourceMemoryProgram
             UpdateConstants(instruction, constants);
             switch (instruction)
             {
+                case IrAllocationInstruction objectAllocation when objectAllocation.Length == null:
+                    if (objectAllocation.Target is not { } objectTarget || !objectAllocation.InitialValues.IsEmpty)
+                    { return Unknown("MemoryAllocationUnsupported"); }
+                    ResourceAllocationShape objectShape;
+                    if (objectAllocation.AllocatedType == factory.ObjectType)
+                    { objectShape = ResourceAllocationShape.Object([]); }
+                    else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
+                    { objectShape = ResourceAllocationShape.Object(fields); }
+                    else
+                    { return Unknown("MemoryObjectStorageUnavailable"); }
+                    var objectFootprint = ResourceRuntimeLayout.Bound(objectShape, layout, cancellation);
+                    if (objectFootprint.Bounds is not { Lower.Constant: { } objectLower, Upper.Constant: { } objectUpper })
+                    { return Unknown(objectFootprint.UnknownReason ?? "MemoryAllocationUnsupported"); }
+                    if (!slots.TryGetValue(objectTarget, out var objectSlot))
+                    { objectSlot = slots.Count; slots.Add(objectTarget, objectSlot); }
+                    values[objectTarget] = ++nextObject;
+                    objects.Add(nextObject);
+                    trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, objectSlot, 0, objectLower, objectUpper));
+                    break;
                 case IrAllocationInstruction allocation:
                     if (allocation.Target is not { } target || ResolveConstant(allocation.Length, constants) is not IrIntegerTerm length || length.Value < 0 ||
                         !allocation.InitialValues.IsEmpty || factory.GetTypeInfo(allocation.AllocatedType).ElementType is not { } element)
@@ -109,7 +132,7 @@ internal static class ResourceMemoryProgram
                 case IrAssignInstruction assignment:
                     if (factory.GetTypeInfo(assignment.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
                     {
-                        if (!TryReference(assignment.Value, values, out var identity))
+                        if (!TryReference(assignment.Value, factory, values, out var identity))
                         { return Unknown("UnownedMemoryReference"); }
                         if (!slots.TryGetValue(assignment.Target, out slot))
                         { slot = slots.Count; slots.Add(assignment.Target, slot); }
@@ -119,6 +142,24 @@ internal static class ResourceMemoryProgram
                     else if (assignment.Value is not (IrIntegerTerm or IrBooleanTerm or IrVariableTerm))
                     { return Unknown("MemoryScalarEffectUnsupported"); }
                     break;
+                case IrWriteInstruction { IsFieldStore: true, IsStore: true, Index: null, Length: null } stored:
+                    if (stored.Target == null || stored.Value == null || stored.Field is not { } field ||
+                        !TryReference(stored.Target, factory, values, out var receiver) || receiver == 0 || !objects.Contains(receiver))
+                    { return Unknown("MemoryFieldStoreUnsupported"); }
+                    var member = factory.GetMemberInfo(field);
+                    if (member.IsStatic || !member.ParameterTypes.IsEmpty)
+                    { return Unknown("MemoryFieldStoreUnsupported"); }
+                    if (factory.GetTypeInfo(member.ReturnType).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
+                    {
+                        if (!TryReference(stored.Value, factory, values, out var child))
+                        { return Unknown("MemoryFieldStoreUnsupported"); }
+                        if (!fieldSlots.TryGetValue(field, out var fieldSlot))
+                        { fieldSlot = fieldSlots.Count; fieldSlots.Add(field, fieldSlot); }
+                        trace.Add(new(ResourceMemoryEventKind.StoreReference, receiver, fieldSlot, child));
+                    }
+                    else if (stored.Value is not (IrIntegerTerm or IrBooleanTerm or IrVariableTerm))
+                    { return Unknown("MemoryFieldStoreUnsupported"); }
+                    break;
                 case IrWriteInstruction { Region: IrWriteRegion.Local, IsStore: false }:
                 case IrBranchInstruction:
                 case IrGotoInstruction:
@@ -127,7 +168,7 @@ internal static class ResourceMemoryProgram
                     var output = 0;
                     if (returned.Value != null && factory.GetTypeInfo(returned.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
                     {
-                        if (!TryReference(returned.Value, values, out output))
+                        if (!TryReference(returned.Value, factory, values, out output))
                         { return Unknown("UnownedMemoryOutput"); }
                     }
                     else if (returned.Value is not (null or IrIntegerTerm or IrBooleanTerm or IrVariableTerm))
@@ -151,6 +192,34 @@ internal static class ResourceMemoryProgram
         return Unknown("MemoryControlFlowUnsupported");
     }
 
+    private static bool ReadVariables(IrTerm term, Dictionary<IrVarId, int> lastUse, int index, int depth)
+    {
+        term = ArgumentNullGuard.NotNull(term, nameof(term));
+        lastUse = ArgumentNullGuard.NotNull(lastUse, nameof(lastUse));
+        if (depth > 32)
+        { return false; }
+        if (term is IrVariableTerm variable)
+        { lastUse[variable.Variable] = index; return true; }
+        if (term is IrCastTerm cast)
+        { return ReadVariables(cast.Operand, lastUse, index, depth + 1); }
+        return term is IrIntegerTerm or IrBooleanTerm or IrNullTerm;
+    }
+
+    private static void UpdateReferences(IrInstruction instruction, IrFactory factory, Dictionary<IrVarId, int> references, ref int next)
+    {
+        instruction = ArgumentNullGuard.NotNull(instruction, nameof(instruction));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        references = ArgumentNullGuard.NotNull(references, nameof(references));
+        var identity = 0;
+        var known = instruction is IrAssignInstruction assignment && TryReference(assignment.Value, factory, references, out identity);
+        foreach (var variable in IrInstructionFacts.WrittenVariables(instruction))
+        { references.Remove(variable); }
+        if (known && instruction is IrAssignInstruction assigned)
+        { references[assigned.Target] = identity; }
+        if (instruction is IrAllocationInstruction { Target: { } target })
+        { references[target] = ++next; }
+    }
+
     private static IrTerm? ResolveConstant(IrTerm? term, Dictionary<IrVarId, IrTerm> constants)
     {
         constants = ArgumentNullGuard.NotNull(constants, nameof(constants));
@@ -168,14 +237,24 @@ internal static class ResourceMemoryProgram
         { constants[assigned.Target] = value; }
     }
 
-    private static bool TryConstantCondition(IrTerm condition, Dictionary<IrVarId, IrTerm> constants, out bool value)
+    private static bool TryConstantCondition(IrTerm condition, Dictionary<IrVarId, IrTerm> constants,
+        IrFactory factory, Dictionary<IrVarId, int> references, out bool value)
     {
         condition = ArgumentNullGuard.NotNull(condition, nameof(condition));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        references = ArgumentNullGuard.NotNull(references, nameof(references));
         constants = ArgumentNullGuard.NotNull(constants, nameof(constants));
         condition = ResolveConstant(condition, constants)!;
         value = false;
         if (condition is IrBooleanTerm literal)
         { value = literal.Value; return true; }
+        if (condition is IrBinaryTerm referenceComparison && referenceComparison.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual &&
+            TryReference(ResolveConstant(referenceComparison.Left, constants)!, factory, references, out var leftReference) &&
+            TryReference(ResolveConstant(referenceComparison.Right, constants)!, factory, references, out var rightReference))
+        {
+            value = referenceComparison.Operator == IrBinaryOperator.Equal ? leftReference == rightReference : leftReference != rightReference;
+            return true;
+        }
         if (condition is not IrBinaryTerm comparison ||
             ResolveConstant(comparison.Left, constants) is not IrIntegerTerm left ||
             ResolveConstant(comparison.Right, constants) is not IrIntegerTerm right)
@@ -205,11 +284,16 @@ internal static class ResourceMemoryProgram
         }
     }
 
-    private static bool TryReference(IrTerm term, Dictionary<IrVarId, int> values, out int identity)
+    private static bool TryReference(IrTerm term, IrFactory factory, Dictionary<IrVarId, int> values, out int identity, int depth = 0)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         values = ArgumentNullGuard.NotNull(values, nameof(values));
         identity = 0;
+        if (depth > 32)
+        { return false; }
+        if (term is IrCastTerm cast && (cast.Type == factory.ObjectType || cast.Type == cast.Operand.Type))
+        { return TryReference(cast.Operand, factory, values, out identity, depth + 1); }
         return term is IrNullTerm || term is IrVariableTerm variable && values.TryGetValue(variable.Variable, out identity);
     }
 

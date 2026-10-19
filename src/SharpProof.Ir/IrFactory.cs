@@ -14,6 +14,7 @@ public sealed class IrFactory
     private readonly HashSet<IrTypeId> _interfaceReferenceTypes = [];
     private readonly HashSet<IrTypeId> _delegateReferenceTypes = [];
     private readonly Dictionary<IrTypeId, ImmutableArray<ResourceStorageKind>> _closureFrameTypes = [];
+    private readonly Dictionary<IrTypeId, ImmutableArray<ResourceStorageKind>> _objectStorageTypes = [];
     private readonly Dictionary<IrTypeId, HashSet<IrTypeId>> _implementedReferenceInterfaces = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
@@ -212,6 +213,35 @@ public sealed class IrFactory
         {
             GetTypeInfoCore(type, nameof(type));
             return _closedSealedReferenceTypes.Contains(type);
+        }
+    }
+
+    internal void RegisterObjectStorageType(IrTypeId type, ImmutableArray<ResourceStorageKind> fields)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        RepositoryParameterGuard.RequireInitialized(fields.IsDefault, nameof(fields), "Array must be initialized.");
+        ResourceAllocationShape.Object(fields);
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference ||
+                !_closedClassReferenceBases.TryGetValue(type, out var parent) || parent.HasValue ||
+                _interfaceReferenceTypes.Contains(type) || _delegateReferenceTypes.Contains(type) ||
+                _closureFrameTypes.ContainsKey(type))
+            { throw new ArgumentException("Object storage requires a Total direct nominal class.", nameof(type)); }
+            if (_objectStorageTypes.TryGetValue(type, out var previous) && !previous.SequenceEqual(fields))
+            { throw new ArgumentException("An object type cannot change its complete field storage.", nameof(fields)); }
+            _objectStorageTypes[type] = fields;
+        }
+    }
+
+    internal bool TryGetObjectStorageType(IrTypeId type, out ImmutableArray<ResourceStorageKind> fields)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _objectStorageTypes.TryGetValue(type, out fields);
         }
     }
 

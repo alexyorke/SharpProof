@@ -1260,3 +1260,33 @@ All quality categories passed. The first external-link audit received a 504 for
 an unchanged GitHub URL; its targeted retry passed without source-link changes.
 Broader graph, call/repetition/exceptional lifetime composition, stack and phases
 E/F remain open, together with unchanged 100% coverage and exact-head CI.
+
+## Owned object field graphs
+
+Compiler-issued complete object-storage certificates now cover every instance
+field of admitted direct source classes, including unused and backing fields.
+Typed immutable storage survives portable IR and cannot be mixed with interface,
+delegate, closure, inherited, legacy or built-in certificates. Layout facts are
+compiler facts rather than inferences from whichever fields a body happens to read.
+
+Finite lifetime extraction and independent concrete replay now preserve owned
+field graphs. Shared children and cycles count once; overwriting a field edge can
+release a former child. Proven non-null facts and safe object casts preserve field
+store order. Packed lower and conservative upper object bounds remain separate.
+Borrowed child references and unsupported layouts produce Unknown without partial
+numbers or used layout dependencies. Field reads and broader lifetime composition
+remain required; this does not finish phase C or phases E/F.
+
+Protocol 29, cache 31 and compiler artifact 44 invalidate older object-layout
+capabilities. Manifest 6, resource program/evidence 4, expression 1, the allocation
+layout and lifetime model identities remain unchanged. Four initial IR graph
+controls and 16 focused native/portable cases passed. Final validation passed
+574 affected worker/protocol/portable cases, all 645 IR tests, all 2122 frontend
+tests, all 1416 analyzer tests and four actual packaged object-graph proof and
+refutation cases. Across the lifetime milestones, 26 distinct package cases have
+passed. Quality/compatibility, documentation generation and 723 local links passed;
+layout evaluated 2724 source files, 59 projects and 151 pinned common files.
+Broad regression checks caught an initially excessive certificate restriction on
+sealed classes. Sealed and direct-class facts now compose, and both original
+suites plus the explicit sealed-object control pass. Packing controls preserve
+Unknown between the packed lower and conservative upper bounds.

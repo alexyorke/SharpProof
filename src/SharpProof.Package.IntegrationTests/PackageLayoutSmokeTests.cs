@@ -3708,16 +3708,20 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(true, 7, TestName = "MainPackageLifetimeCompletedPeakViolation")]
     [TestCase(true, 8, TestName = "MainPackageLifetimeCompletedRetainedViolation")]
     [TestCase(true, 10, TestName = "MainPackageLifetimeFixedLocalRetainedViolation")]
+    [TestCase(false, 11, TestName = "MainPackageOwnedObjectGraphRetainedProof")]
+    [TestCase(true, 11, TestName = "MainPackageOwnedObjectGraphRetainedViolation")]
+    [TestCase(false, 12, TestName = "MainPackageOwnedObjectGraphAuxiliaryProof")]
+    [TestCase(true, 12, TestName = "MainPackageOwnedObjectGraphAuxiliaryViolation")]
     public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
     {
-        var upper = allocationKind switch { 9 => 0, 10 => 32, 7 => 32, 8 => 40, 1 or 4 or 5 => 64, 6 => 88, 2 => 72, 3 => 32, _ => 120 };
-        var boundLimit = violates ? allocationKind switch { 7 or 10 => 31, 8 => 39, 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
-        var body = allocationKind switch { 9 or 10 => "var size=1; return new int[size];", 7 or 8 => "var dead=new int[1]; return new int[3];", 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", 6 => "return () => n;", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
-        var declarations = allocationKind switch { 1 => "public class Cell { public Cell() { var data=new int[3]; } }", 4 => "public class Cell { public int[] data=new int[3]; }", 5 => "public static class Callbacks { public static void Run() {} }", _ => string.Empty };
+        var upper = allocationKind switch { 11 => 56, 12 => 32, 9 => 0, 10 => 32, 7 => 32, 8 => 40, 1 or 4 or 5 => 64, 6 => 88, 2 => 72, 3 => 32, _ => 120 };
+        var boundLimit = violates ? allocationKind switch { 11 => 55, 12 => 31, 7 or 10 => 31, 8 => 39, 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
+        var body = allocationKind switch { 11 => "var root=new Node(); root.Child=new int[1]; return root;", 12 => "var root=new Node(); root.Child=new int[1]; root.Child=new int[3]; return root;", 9 or 10 => "var size=1; return new int[size];", 7 or 8 => "var dead=new int[1]; return new int[3];", 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", 6 => "return () => n;", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
+        var declarations = allocationKind switch { 11 or 12 => "public class Node { public int[] Child; }", 1 => "public class Cell { public Cell() { var data=new int[3]; } }", 4 => "public class Cell { public int[] data=new int[3]; }", 5 => "public static class Callbacks { public static void Run() {} }", _ => string.Empty };
         var expected = violates ? "Refuted" : "Proven";
         var parameters = allocationKind == 6 ? "int n" : string.Empty;
-        var returnType = allocationKind switch { 7 or 8 or 9 or 10 => "int[]", 5 => "System.Action", 6 => "System.Func<int>", _ => "void" };
-        var metric = allocationKind switch { 7 or 9 => "PeakAuxiliaryBytes", 8 or 10 => "RetainedBytes", _ => "AllocatedBytes" };
+        var returnType = allocationKind switch { 11 or 12 => "Node", 7 or 8 or 9 or 10 => "int[]", 5 => "System.Action", 6 => "System.Func<int>", _ => "void" };
+        var metric = allocationKind switch { 7 or 9 or 12 => "PeakAuxiliaryBytes", 8 or 10 or 11 => "RetainedBytes", _ => "AllocatedBytes" };
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""

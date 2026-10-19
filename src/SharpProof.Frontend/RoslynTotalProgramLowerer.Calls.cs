@@ -120,6 +120,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrBlockId Allocate(IrBlockId current)
         {
             RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
+            var allocatedType = _context.Type(creation.Type);
+            if (CSharpOperationSemantics.CompleteObjectStorage(creation.Type, _cancellationToken) is { } storage &&
+                _context.Factory.TryGetClosedClassReferenceBase(allocatedType, out var parent) && !parent.HasValue)
+            { _context.Factory.RegisterObjectStorageType(allocatedType, storage); }
             var allocated = _expressions.AllocateValue(creation, current);
             created = allocated.Value;
             current = allocated.Continuation;

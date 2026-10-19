@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 28,
+    "protocolVersion": 29,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 43,
+    "compilerArtifactSchemaVersion": 44,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -771,6 +771,7 @@
           "src/SharpProof.Frontend/GlobalUsings.cs",
           "src/SharpProof.Frontend/RoslynTypeMapper.cs",
           "src/SharpProof.Frontend/RootParameterClosurePlan.cs",
+          "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
           "src/SharpProof.Ir/AnalysisDefaults.cs",
           "src/SharpProof.Ir/AtomicFile.cs",

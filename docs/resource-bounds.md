@@ -434,10 +434,12 @@ Lifetime layout ownership is independent of cumulative-program availability.
 A proven fixed local size can therefore support a native lifetime proof even when
 the count analyzer reports Unknown.
 
-The initial native family is finite primitive-array allocation with constant sizes,
-reference aliases, last-use root drops, literal copies through compiler temporaries
-and proven constant guards. Unproved branches, repeated regions, borrowed output,
-source-call lifetime effects, broader object/field graphs and unsupported storage
+The native finite family admits primitive arrays with constant sizes and certified
+direct source classes, reference aliases, typed field stores, last-use root drops,
+literal copies through compiler temporaries and proven constant guards. Shared
+children and cycles count once by identity; overwritten field edges can release
+former children. Unproved branches, repeated regions, borrowed references,
+field-value reads, source-call lifetime effects and unsupported storage
 return Unknown without partial numbers or used layout dependencies. Numerical
 refutations in the admitted finite family require a validated feasible entry and
 an independently observed completed execution. Replay reconstructs identities,
@@ -450,3 +452,18 @@ metrics use `coreclr-8.0.32-x64-source-storage-v1:finite-owned-strong-reachabili
 The distinct cost-model identity, owned layout provenance and typed-program digest
 remain attached to native proof evidence. Physical peak heap, retained borrowed
 inputs, recursive stack and broader lifetime composition remain separate work.
+
+### Complete object storage facts
+
+An admitted object layout includes every instance field, including fields that the
+analyzed body never accesses and compiler backing fields. The compiler supplies an
+immutable typed storage certificate; portable transport rejects mixed, inherited,
+legacy, built-in and malformed certificates. Field edges use scoped member identities.
+Object packing keeps a packed lower bound and a conservative slot upper bound;
+replay cannot turn the upper estimate into an exact numerical violation.
+
+The initial object family has a direct System.Object base, source declarations and
+supported integral/reference storage. Custom layout, static initialization, events,
+cleanup methods, unsupported value fields and broader ownership remain Unknown.
+The model still describes logical source-owned storage under the reviewed layout,
+with final returned graphs excluded from auxiliary bytes throughout execution.
