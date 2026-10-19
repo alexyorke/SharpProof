@@ -68,6 +68,27 @@ internal static class IrOpaqueCallSite
         return IsDefaultComparerPrimitive(primitive) ? primitive : null;
     }
 
+    private const string IntegralConvertInitializationPrefix = "framework-integral-convert-ready:";
+
+    internal static string IntegralConvertInitialization(string primitive)
+    {
+        primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
+        if (primitive != "System_Boolean" && !IsDefaultComparerPrimitive(primitive))
+        { throw new ArgumentOutOfRangeException(nameof(primitive)); }
+        return IntegralConvertInitializationPrefix + primitive;
+    }
+
+    internal static string? IntegralConvertInitializationPrimitive(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        if (!description.StartsWith(IntegralConvertInitializationPrefix, StringComparison.Ordinal))
+        { return null; }
+        var primitive = description.Substring(IntegralConvertInitializationPrefix.Length);
+        return primitive == "System_Boolean" || IsDefaultComparerPrimitive(primitive) ? primitive : null;
+    }
+
     private static bool IsDefaultComparerPrimitive(string primitive)
     {
         primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
