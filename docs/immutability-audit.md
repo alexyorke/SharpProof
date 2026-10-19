@@ -2348,3 +2348,15 @@ returns, freeze after four-entry validation, and retain original runtime model d
 Read-only one-entry/empty interpreter and proof maps become immutable values. Preserve
 runtime assembly resource objects, model elements, byte/reflection boundaries and the
 string decoder's text writer. Status: open before edits.
+
+IMM-M054: Coordinator read semantic scheduler construction/timing/finally paths in
+Invoke-SharpProofSemanticTests.ps1. Prior durations use an OrdinalIgnoreCase builder,
+retaining later timing-file overwrite semantics, frozen before task estimates. Tasks,
+timings and failures use scoped array builders; freeze selected tasks after estimates
+and before sorting/parallel scheduler consumption, timings inside finally for partial
+evidence, and failures before ordered count/join. Coverage-group filtering must retain
+append order and duplicate tasks without a mutable List rebind. PSCustomObject task
+records remain scheduler/serialization adapters, fully constructed before publication;
+native process arguments and environment maps retain their required APIs. Validate
+ordinary canonical Release semantic workflow, including scheduler and timing output.
+Status: open before edits.
