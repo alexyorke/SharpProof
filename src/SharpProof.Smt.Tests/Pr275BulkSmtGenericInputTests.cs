@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -12,12 +13,12 @@ public sealed class Pr275BulkSmtGenericInputTests
     public void DecodeCoreTreatsNullToStringAsMalformedChargesTheItemAndDisposesIt()
     {
         using var expression = new NullToStringDisposable();
-        NullToStringDisposable[] core = [expression];
+        ImmutableArray<NullToStringDisposable> core = [expression];
         var meter = new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken);
 
         var result = CallableSolverSession.DecodeCore(
             core,
-            new Dictionary<string, int>(),
+            ImmutableDictionary<string, int>.Empty,
             "g-current",
             meter);
 

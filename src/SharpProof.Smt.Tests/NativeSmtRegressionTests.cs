@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Z3Context = Microsoft.Z3.Context;
 using Z3Expr = Microsoft.Z3.Expr;
 using Z3Object = Microsoft.Z3.Z3Object;
@@ -552,7 +553,7 @@ public sealed class NativeSmtRegressionTests
                     "tracked-" + index,
                     factory.BooleanType)),
                 new LoweredJustification(operation)))
-            .ToArray();
+            .ToImmutableArray();
         var expensive = new VerificationQuery(
             factory,
             assumptions,
@@ -590,28 +591,24 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public void UnsatCoreWrappersAreDisposedOnSuccessAndMalformedResult()
     {
-        var successful = new[]
-        {
-            new DisposableLabel("first"),
-            new DisposableLabel("second")
-        };
+        using var firstLabel = new DisposableLabel("first");
+        using var secondLabel = new DisposableLabel("second");
+        var successful = ImmutableArray.Create(firstLabel, secondLabel);
+        var activeBuilder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+        activeBuilder["first"] = 2;
+        activeBuilder["second"] = 1;
+        var active = activeBuilder.ToImmutable();
         var success = CallableSolverSession.DecodeCore(
             successful,
-            new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["first"] = 2,
-                ["second"] = 1
-            },
+            active,
             "goal", new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken));
 
-        var malformed = new[]
-        {
-            new DisposableLabel("missing"),
-            new DisposableLabel("unvisited")
-        };
+        using var missingLabel = new DisposableLabel("missing");
+        using var unvisitedLabel = new DisposableLabel("unvisited");
+        var malformed = ImmutableArray.Create(missingLabel, unvisitedLabel);
         var failure = CallableSolverSession.DecodeCore(
             malformed,
-            new Dictionary<string, int>(StringComparer.Ordinal),
+            ImmutableDictionary.Create<string, int>(StringComparer.Ordinal),
             "goal", new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken));
 
         using (Assert.EnterMultipleScope())
@@ -619,7 +616,7 @@ public sealed class NativeSmtRegressionTests
             Assert.That(
                 success.Status,
                 Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-            Assert.That(success.UnsatCore, Is.EqualTo((int[])[1, 2]));
+            Assert.That(success.UnsatCore, Is.EqualTo(ImmutableArray.Create(1, 2)));
             Assert.That(successful.All(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsDisposed)), Is.True);
             Assert.That(failure.Status, Is.EqualTo(BackendCheckStatus.Unknown));
             Assert.That(
@@ -639,7 +636,7 @@ public sealed class NativeSmtRegressionTests
         using var context = new Z3Context();
         using var solver = context.MkSolver();
         using var owner = new Z3ExpressionOwner();
-        var expressions = new List<Z3Expr>();
+        var expressionsBuilder = ImmutableArray.CreateBuilder<Z3Expr>();
         for (var index = 0; index < 64; index++)
         {
             var left = owner.Own(context.MkIntConst("owner-left-" + index));
@@ -649,15 +646,16 @@ public sealed class NativeSmtRegressionTests
                 (Microsoft.Z3.ArithExpr)right));
             var constraint = owner.Own(
                 context.MkEq(sum, right));
-            expressions.Add(left);
-            expressions.Add(right);
-            expressions.Add(sum);
-            expressions.Add(constraint);
+            expressionsBuilder.Add(left);
+            expressionsBuilder.Add(right);
+            expressionsBuilder.Add(sum);
+            expressionsBuilder.Add(constraint);
             solver.Assert((Microsoft.Z3.BoolExpr)constraint);
         }
 
         Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
-        Assert.That(owner.OwnedCount, Is.EqualTo(expressions.Count));
+        var expressions = expressionsBuilder.ToImmutable();
+        Assert.That(owner.OwnedCount, Is.EqualTo(expressions.Length));
         Assert.That(expressions.All(IsLiveNativeObject), Is.True);
 
         owner.Dispose();

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
@@ -159,7 +160,7 @@ public sealed class ResourceAccountingRegressionTests
                     "tracked-" + index,
                     factory.BooleanType)),
                 new LoweredJustification(operation)))
-            .ToArray();
+            .ToImmutableArray();
 
         return new VerificationQuery(
             factory,
