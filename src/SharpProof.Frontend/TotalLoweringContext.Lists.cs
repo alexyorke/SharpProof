@@ -13,22 +13,21 @@ internal static partial class CSharpOperationSemantics
             "P:System.Collections.Generic.IList`1.Item(System.Int32)";
     }
 
-    internal static bool IsListStateMember(IMethodSymbol method)
+    internal static bool IsListStateMember(IMethodSymbol method, ITypeSymbol? knownElement = null)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return IsListStateDeclaration(method.AssociatedSymbol ?? method) && !method.IsStatic &&
             method.ContainingType is { TypeArguments.Length: 1 } type &&
             (method.MethodKind == MethodKind.Constructor || method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
-                IsScalar(type.TypeArguments[0]) || IsReferenceDomain(type.TypeArguments[0]) ||
-                type.TypeArguments[0] is ITypeParameterSymbol { IsReferenceType: true });
+                IsValueDomain(knownElement ?? type.TypeArguments[0]));
     }
 
-    internal static bool IsConcreteListStateMember(IMethodSymbol method)
+    internal static bool IsConcreteListStateMember(IMethodSymbol method, ITypeSymbol? knownElement = null)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         // A subclass can replace interface dispatch or hide a public member,
         // but a bound nonvirtual List member still uses the base List storage.
-        return IsListStateMember(method) && !method.IsVirtual && method.MethodKind != MethodKind.Constructor &&
+        return IsListStateMember(method, knownElement) && !method.IsVirtual && method.MethodKind != MethodKind.Constructor &&
             method.ContainingType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.List`1";
     }
 
@@ -42,28 +41,48 @@ internal static partial class CSharpOperationSemantics
 
 public sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _freshLists = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _freshListCaptures = [];
+    private readonly HashSet<ISymbol> _exactLists = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<CaptureId> _exactListCaptures = [];
 
     internal void TrackFreshLists(ControlFlowGraph graph)
-    { TrackFreshCollections(RepositoryParameterGuard.NotNull(graph, nameof(graph)), true); }
+    {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        TrackFreshCollections(graph, true);
+    }
 
-    internal bool IsFreshList(IOperation operation)
+    internal bool IsExactList(IOperation operation)
+    { return IsKnownList(RepositoryParameterGuard.NotNull(operation, nameof(operation)), _exactLists, _exactListCaptures); }
+
+    internal static bool IsListReceiverType(ITypeSymbol? type)
+    {
+        return IsArrayInterface(type) || type is INamedTypeSymbol named &&
+            named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.List`1" &&
+            named.GetMembers().Any(CSharpOperationSemantics.IsListStateDeclaration);
+    }
+
+    internal void SpecializeListParameter(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        _exactLists.Add(parameter);
+    }
+
+    private static bool IsKnownList(IOperation operation, HashSet<ISymbol> symbols, HashSet<CaptureId> captures)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        symbols = RepositoryParameterGuard.NotNull(symbols, nameof(symbols));
+        captures = RepositoryParameterGuard.NotNull(captures, nameof(captures));
         while (true)
         {
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { operation = conversion.Operand; }
-            else if (operation is ISimpleAssignmentOperation { IsRef: false } assignment &&
-                Symbol(assignment.Target) is ILocalSymbol { RefKind: RefKind.None })
+            else if (operation is ISimpleAssignmentOperation { IsRef: false } assignment)
             { operation = assignment.Value; }
             else
             { break; }
         }
         return CSharpOperationSemantics.IsEmptyListCreation(operation) ||
-            Symbol(operation) is { } symbol && _freshLists.Contains(symbol) ||
-            operation is IFlowCaptureReferenceOperation capture && _freshListCaptures.Contains(capture.Id);
+            Symbol(operation) is { } symbol && symbols.Contains(symbol) ||
+            operation is IFlowCaptureReferenceOperation capture && captures.Contains(capture.Id);
     }
 }

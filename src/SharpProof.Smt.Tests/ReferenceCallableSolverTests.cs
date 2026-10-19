@@ -254,6 +254,44 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
 
+    [TestCase(0)]
+    [TestCase(64)]
+    [TestCase(65)]
+    [TestCase(257)]
+    [TestCase(int.MaxValue)]
+    public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var input = factory.CreateVariable("list", factory.ObjectType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:list:count", factory.IntegerType, false);
+        var count = factory.Binary(IrBinaryOperator.BitwiseAnd,
+            factory.PureOpaque(field, factory.Variable(input)), factory.Integer(int.MaxValue));
+        var assumptions = ImmutableArray.Create(NotNull(factory, input),
+            Assume(factory, factory.Binary(IrBinaryOperator.GreaterThanOrEqual, count, factory.Integer(minimum))),
+            Assume(factory, factory.Binary(IrBinaryOperator.LessThanOrEqual, count, factory.Integer(minimum == int.MaxValue ? int.MaxValue : minimum + 32))));
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var predicate = factory.Binary(IrBinaryOperator.LessThan, count, factory.Integer(minimum));
+        var query = Query(factory, assumptions, predicate, [input]);
+        var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
+        if (minimum == int.MaxValue)
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
+        }
+        else
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+            var actual = new IrInterpreter(factory).Evaluate(count, result.Model!.Assignments).Value!.Integer;
+            Assert.That(actual, Is.GreaterThanOrEqualTo(minimum));
+            if (minimum <= 64)
+            { Assert.That(actual, Is.LessThanOrEqualTo(64)); }
+            Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+        }
+        // A preference selector cannot restrict a subsequent universal proof.
+        var largeProof = Query(factory, assumptions,
+            factory.Binary(IrBinaryOperator.GreaterThanOrEqual, count, factory.Integer(minimum)), [input]);
+        Assert.That(await new ProofKernel(session).VerifyAsync(largeProof, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+    }
     private static Assumption NotNull(IrFactory factory, IrVarId variable)
     {
         if (variable.IsDefault)
