@@ -22,8 +22,7 @@ public sealed class IrIdentifierTests
     [Test]
     public void DefaultIdentifiersPreserveKindSpecificFormatting()
     {
-        var identifiers = new[]
-        {
+        var identifiers = ImmutableArray.Create(
             (IsDefault: default(IrIdentityId).IsDefault,
                 Text: default(IrIdentityId).ToString()),
             (IsDefault: default(IrId).IsDefault,
@@ -42,7 +41,7 @@ public sealed class IrIdentifierTests
                 Text: default(IrBlockId).ToString()),
             (IsDefault: default(IrInstructionId).IsDefault,
                 Text: default(IrInstructionId).ToString())
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {
@@ -75,8 +74,7 @@ public sealed class IrIdentifierTests
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         var instruction = builder.Return(block, operation, term);
-        var identifiers = new[]
-        {
+        var identifiers = ImmutableArray.Create(
             (IsDefault: identity.IsDefault,
                 Text: identity.ToString(),
                 Value: identity.Value),
@@ -104,7 +102,7 @@ public sealed class IrIdentifierTests
             (IsDefault: instruction.Id.IsDefault,
                 Text: instruction.Id.ToString(),
                 Value: instruction.Id.Value)
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {

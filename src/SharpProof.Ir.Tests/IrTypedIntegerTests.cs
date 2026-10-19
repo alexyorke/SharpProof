@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using System.Globalization;
 using System.Numerics;
@@ -12,9 +13,9 @@ public sealed class IrTypedIntegerTests
     {
         var factory = new IrFactory();
         var types = new HashSet<IrTypeId> { factory.IntegerType };
-        foreach (var width in new[] { 8, 16, 32, 64 })
+        foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
-            foreach (var isSigned in new[] { false, true })
+            foreach (var isSigned in ImmutableArray.Create(false, true))
             {
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 Assert.That(factory.GetOrCreateIntegerType(width, isSigned), Is.EqualTo(type));

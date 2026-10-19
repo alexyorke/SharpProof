@@ -952,10 +952,10 @@ public static class FrontendDifferentialOracle
 
             var midpoint = generatedCases.Count / 2;
             var left = CompareBatch(
-                generatedCases.Take(midpoint).ToArray(),
+                generatedCases.Take(midpoint).ToImmutableArray(),
                 cancellationToken);
             var right = CompareBatch(
-                generatedCases.Skip(midpoint).ToArray(),
+                generatedCases.Skip(midpoint).ToImmutableArray(),
                 cancellationToken);
             return [.. left, .. right];
         }
@@ -1033,7 +1033,7 @@ public static class FrontendDifferentialOracle
             .OrderBy(
                 static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ParseMethodIndex(
                     method.Identifier.ValueText)))
-            .ToArray();
+            .ToImmutableArray();
         if (methodSyntaxes.Length != generatedCases.Count)
         {
             var failure = Mismatch(
@@ -1168,7 +1168,7 @@ public static class FrontendDifferentialOracle
             .OfType<ClassDeclarationSyntax>()
             .Where(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText ==
                 "SharpProofGeneratedFrontendEdges"))
-            .ToArray();
+            .ToImmutableArray();
         if (generatedTypes.Length != 1)
         {
             return IsolateSemanticEdgeFailure(
@@ -1195,7 +1195,7 @@ public static class FrontendDifferentialOracle
         }
         var methods = generatedType.Members
             .OfType<MethodDeclarationSyntax>()
-            .ToArray();
+            .ToImmutableArray();
         if (methods.Length != cases.Count ||
             generatedType.Members.Count != cases.Count)
         {
@@ -1204,7 +1204,7 @@ public static class FrontendDifferentialOracle
                 "Roslyn exposed an unexpected semantic-edge method shape.",
                 cancellationToken);
         }
-        var methodsByName = new Dictionary<string, MethodDeclarationSyntax>(
+        var methodsByName = ImmutableDictionary.CreateBuilder<string, MethodDeclarationSyntax>(
             StringComparer.Ordinal);
         foreach (var method in methods)
         {
@@ -1219,10 +1219,11 @@ public static class FrontendDifferentialOracle
             }
         }
 
-        var orderedMethods = new MethodDeclarationSyntax[cases.Count];
+        var namedMethods = methodsByName.ToImmutable();
+        var orderedMethods = ImmutableArray.CreateBuilder<MethodDeclarationSyntax>(cases.Count);
         for (var index = 0; index < cases.Count; index++)
         {
-            if (!methodsByName.TryGetValue(
+            if (!namedMethods.TryGetValue(
                     SemanticEdgeMethodName(index),
                     out var method))
             {
@@ -1232,9 +1233,9 @@ public static class FrontendDifferentialOracle
                     cancellationToken);
             }
 
-            orderedMethods[index] = method;
+            orderedMethods.Add(method);
         }
-        methods = orderedMethods;
+        methods = orderedMethods.ToImmutable();
 
         return WithLoadedGeneratedAssembly(
             image,
@@ -1302,17 +1303,17 @@ public static class FrontendDifferentialOracle
 
         var midpoint = cases.Count / 2;
         var left = CompareSemanticEdges(
-            cases.Take(midpoint).ToArray(),
+            cases.Take(midpoint).ToImmutableArray(),
             cancellationToken);
         var right = CompareSemanticEdges(
-            cases.Skip(midpoint).ToArray(),
+            cases.Skip(midpoint).ToImmutableArray(),
             cancellationToken);
         return [.. left, .. right];
     }
 
     internal static (
-        Dictionary<IrVarId, IrValue> Variables,
-        Dictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
+        ImmutableDictionary<IrVarId, IrValue> Variables,
+        ImmutableDictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
         IrFactory factory,
         IMethodSymbol method,
         FrontendLoweringResult lowering,
@@ -1322,8 +1323,8 @@ public static class FrontendDifferentialOracle
         generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
         lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        var environment = new Dictionary<IrVarId, IrValue>();
-        var sequenceOrigins = new Dictionary<IrValue, Array>(
+        var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        var sequenceOrigins = ImmutableDictionary.CreateBuilder<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
         foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
@@ -1349,9 +1350,9 @@ public static class FrontendDifferentialOracle
                 _ => throw new InvalidOperationException(
                     "The generated method has an unexpected parameter.")
             };
-            environment.Add(variable, value);
+            environment.AddUnique(variable, value);
         }
-        return (environment, sequenceOrigins);
+        return (environment.ToImmutable(), sequenceOrigins.ToImmutable());
 
         IrValue CreateSequenceValue(IrTypeId type, long[] values)
         {
@@ -1360,7 +1361,7 @@ public static class FrontendDifferentialOracle
             var value = factory.CreateSequenceValue(
                 type,
                 values.Select(factory.CreateIntegerValue));
-            sequenceOrigins.Add(value, values);
+            sequenceOrigins.AddUnique(value, values);
             return value;
         }
     }
@@ -1454,8 +1455,8 @@ public static class FrontendDifferentialOracle
     }
 
     private static (
-        Dictionary<IrVarId, IrValue> Variables,
-        Dictionary<IrValue, Array> SequenceOrigins)
+        ImmutableDictionary<IrVarId, IrValue> Variables,
+        ImmutableDictionary<IrValue, Array> SequenceOrigins)
         CreateSemanticEdgeEnvironment(
             IrFactory factory,
             IMethodSymbol method,
@@ -1466,15 +1467,15 @@ public static class FrontendDifferentialOracle
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        var environment = new Dictionary<IrVarId, IrValue>();
-        var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
+        var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        var sequenceValues = ImmutableDictionary.CreateBuilder<object, ImmutableDictionary<IrTypeId, IrValue>.Builder>(
             ReferenceEqualityComparer.Instance);
-        var sequenceOrigins = new Dictionary<IrValue, Array>(
+        var sequenceOrigins = ImmutableDictionary.CreateBuilder<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
         foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
             var type = factory.GetVariableInfo(variable).Type;
-            environment.Add(
+            environment.AddUnique(
                 variable,
                 CreateSemanticEdgeValue(
                     factory,
@@ -1483,7 +1484,7 @@ public static class FrontendDifferentialOracle
                     sequenceValues,
                     sequenceOrigins));
         }
-        return (environment, sequenceOrigins);
+        return (environment.ToImmutable(), sequenceOrigins.ToImmutable());
     }
 
     private static IEnumerable<(IrVarId Variable, int Ordinal)> ParameterBindings(
@@ -1508,8 +1509,8 @@ public static class FrontendDifferentialOracle
         IrFactory factory,
         IrTypeId type,
         object? value,
-        Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues,
-        Dictionary<IrValue, Array> sequenceOrigins)
+        ImmutableDictionary<object, ImmutableDictionary<IrTypeId, IrValue>.Builder>.Builder sequenceValues,
+        ImmutableDictionary<IrValue, Array>.Builder sequenceOrigins)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
@@ -1569,11 +1570,11 @@ public static class FrontendDifferentialOracle
                         sequenceOrigins)));
             if (!sequenceValues.TryGetValue(array, out typedValues))
             {
-                typedValues = [];
-                sequenceValues.Add(array, typedValues);
+                typedValues = ImmutableDictionary.CreateBuilder<IrTypeId, IrValue>();
+                sequenceValues.AddUnique(array, typedValues);
             }
-            typedValues.Add(type, created);
-            sequenceOrigins.Add(created, array);
+            typedValues.AddUnique(type, created);
+            sequenceOrigins.AddUnique(created, array);
             return created;
         }
     }
@@ -1767,7 +1768,7 @@ public static class FrontendDifferentialOracle
     private static FrontendDifferentialResult CompareOutcomes(
         IrEvaluationResult interpreted,
         RuntimeOutcome actual,
-        IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
+        ImmutableDictionary<IrValue, Array> sequenceOrigins)
     {
         sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         if (actual.Exception != null)
@@ -1809,7 +1810,7 @@ public static class FrontendDifferentialOracle
     private static bool SemanticValueEquals(
         object? actual,
         IrValue interpreted,
-        IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
+        ImmutableDictionary<IrValue, Array> sequenceOrigins)
     {
         interpreted = RepositoryParameterGuard.NotNull(interpreted, nameof(interpreted));
         sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));

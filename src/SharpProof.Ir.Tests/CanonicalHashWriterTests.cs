@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -32,7 +33,7 @@ public sealed class CanonicalHashWriterTests
         }
 
         Assert.That(
-            new[] {
+            ImmutableArray.Create(
                 Hash(null),
                 Hash(string.Empty),
                 Hash("1"),
@@ -42,7 +43,7 @@ public sealed class CanonicalHashWriterTests
                 Hash(true),
                 Hash(TestEnum.One),
                 Hash(new byte[] { 1 })
-            },
+            ),
             Is.Unique);
     }
 

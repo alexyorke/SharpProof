@@ -386,7 +386,7 @@ public sealed class ApiSpecTests
     [Test]
     public void DefaultBclCatalogApprovesOnlyObservedFrameworkIdentities()
     {
-        var expected = new[] {
+        var expected = ImmutableArray.Create(
             "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
             "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreRuntime",
             "System.Collections|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
@@ -408,7 +408,7 @@ public sealed class ApiSpecTests
             "mscorlib|b77a5c561934e089|NetStandardReferencePack",
             "netstandard|cc7b13ffcd2ddd51|MicrosoftNetCoreReferencePack",
             "netstandard|cc7b13ffcd2ddd51|NetStandardReferencePack"
-        };
+        );
 
         foreach (var template in ApiSpecTable.Default.Templates.Where(
                      static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Target.WitnessIdentifier.StartsWith(
@@ -656,7 +656,7 @@ public sealed class ApiSpecTests
                         "System.Diagnostics.ConditionalAttribute"))
                     .SelectMany(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ConstructorArguments))
                     .Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
-                Is.EquivalentTo(new object[] { Contract.ConditionalSymbol }));
+                Is.EquivalentTo(ImmutableArray.Create<object>(Contract.ConditionalSymbol)));
         }
     }
 
@@ -1176,13 +1176,13 @@ public sealed class ApiSpecTests
     [Test]
     public void SeedFacetsRetainDocumentedAndObservedEvidence()
     {
-        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (new[] {
+        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (ImmutableArray.Create(
             row.Facets.Effects.Evidence,
             row.Facets.Allocation.Evidence,
             row.Facets.Throws.Evidence,
             row.Facets.Nullness.Evidence,
             row.Facets.Cardinality.Evidence
-        })).Concat(ApiSpecTable.Default.Templates
+        ))).Concat(ApiSpecTable.Default.Templates
             .Where(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination != null))
             .Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination!.Evidence)))
         .Concat(ApiSpecTable.Default.Templates.SelectMany(
@@ -1547,11 +1547,10 @@ public sealed class ApiSpecTests
                 ".nuget",
                 "packages");
         }
-        var candidates = new[]
-            {
+        var candidates = ImmutableArray.Create(
                 packRoot,
                 Path.Combine(packageRoot, "microsoft.netcore.app.ref")
-            }
+            )
             .Where(Directory.Exists)
             .SelectMany(Directory.EnumerateDirectories)
             .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new

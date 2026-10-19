@@ -591,7 +591,7 @@ public sealed class IrKernelTests
 
         var stableResult = IrSubstitution.SubstituteMany(
             factory,
-            new[] { root },
+            ImmutableArray.Create(root),
             replacements);
         Assert.That(
             stableResult[0],
@@ -788,14 +788,14 @@ public sealed class IrKernelTests
     public void BinaryOperatorKeysAreDistinctWithinEachTypedDomain()
     {
         var factory = new IrFactory();
-        var integers = new[] {
+        var integers = ImmutableArray.Create<IrTerm>(
             factory.Variable(factory.CreateVariable("left", factory.IntegerType)),
             factory.Variable(factory.CreateVariable("right", factory.IntegerType))
-        };
-        var booleans = new[] {
+        );
+        var booleans = ImmutableArray.Create<IrTerm>(
             factory.Variable(factory.CreateVariable("first", factory.BooleanType)),
             factory.Variable(factory.CreateVariable("second", factory.BooleanType))
-        };
+        );
 
         AssertDistinct(
             [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
@@ -814,11 +814,13 @@ public sealed class IrKernelTests
             booleans);
 
         void AssertDistinct(
-            IrBinaryOperator[] operators,
-            IrTerm[] operands)
+            ImmutableArray<IrBinaryOperator> operators,
+            ImmutableArray<IrTerm> operands)
         {
-            System.ArgumentNullException.ThrowIfNull(operands, nameof(operands));
-            System.ArgumentNullException.ThrowIfNull(operators, nameof(operators));
+            if (operands.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(operands)); }
+            if (operators.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(operators)); }
             var terms = operators
                 .Select(value => factory.Binary(value, operands[0], operands[1]))
                 .Cast<IrBinaryTerm>()
@@ -1435,10 +1437,9 @@ public sealed class IrKernelTests
         public IEnumerator<IrTerm> GetEnumerator()
         {
             EnumerationCount++;
-            return new[]
-            {
+            return ImmutableArray.Create(
                 EnumerationCount == 1 ? _first : _later
-            }.AsEnumerable().GetEnumerator();
+            ).AsEnumerable().GetEnumerator();
         }
 
         System.Collections.IEnumerator

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -14,7 +15,7 @@ public sealed class IrOperandFailureTests
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), type, "Read", factory.IntegerType, false);
         var sequence = factory.Variable(factory.CreateVariable("sequence", factory.GetOrCreateSequenceType(factory.IntegerType)));
         var interpreter = new IrInterpreter(factory);
-        foreach (var root in new IrTerm[] { factory.PureOpaque(member, receiver), factory.SequenceAccess(sequence, factory.Integer(0)), factory.Cast(factory.ObjectType, receiver) })
+        foreach (var root in ImmutableArray.Create<IrTerm>(factory.PureOpaque(member, receiver), factory.SequenceAccess(sequence, factory.Integer(0)), factory.Cast(factory.ObjectType, receiver)))
         {
             var missing = interpreter.Evaluate(root);
             Assert.That(missing.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));

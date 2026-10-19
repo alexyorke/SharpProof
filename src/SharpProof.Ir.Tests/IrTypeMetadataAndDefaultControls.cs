@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -15,14 +16,13 @@ public sealed class IrTypeMetadataAndDefaultControls
         var reference = factory.GetOrCreateReferenceType(identity, "Widget");
         var sequence = factory.GetOrCreateSequenceType(factory.BooleanType);
         var unsigned = factory.GetOrCreateIntegerType(64, signed: false);
-        var expectations = new[]
-        {
+        var expectations = ImmutableArray.Create(
             (Type: factory.BooleanType, Kind: IrTypeKind.Boolean, Name: "bool", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: unsigned, Kind: IrTypeKind.Integer, Name: "ulong", Element: (IrTypeId?)null, Width: 64, Signed: false),
             (Type: factory.StringType, Kind: IrTypeKind.String, Name: "string", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: reference, Kind: IrTypeKind.Reference, Name: "Widget", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: sequence, Kind: IrTypeKind.Sequence, Name: "bool[]", Element: (IrTypeId?)factory.BooleanType, Width: 0, Signed: false)
-        };
+        );
         using (Assert.EnterMultipleScope())
         {
             foreach (var expected in expectations)

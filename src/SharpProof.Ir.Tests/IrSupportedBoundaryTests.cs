@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -21,7 +22,7 @@ public sealed class IrSupportedBoundaryTests
     {
         var span = new IrSourceSpan("source.cs", 4, 2);
         var hash = new string('a', 64);
-        foreach (var identity in new[] { new string('x', 4097), new string('\u0800', 1366), "\ud800" })
+        foreach (var identity in ImmutableArray.Create(new string('x', 4097), new string('\u0800', 1366), "\ud800"))
         {
             Assert.That(IrCallPreconditionMarker.TryCreateName(identity, 0, span, span, out var sourceName), Is.False);
             Assert.That(sourceName, Is.Empty);

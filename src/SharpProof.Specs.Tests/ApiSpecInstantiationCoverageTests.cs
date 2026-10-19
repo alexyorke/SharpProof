@@ -200,8 +200,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         var factory = new IrFactory();
         var foreignFactory = new IrFactory();
 
-        var cases = new[]
-        {
+        var cases = ImmutableArray.Create(
             (
                 Variable: template.Parameters.Single(),
                 Value: (IrTerm)null!,
@@ -218,7 +217,7 @@ public sealed class ApiSpecInstantiationCoverageTests
                 Variable: template.Parameters.Single(),
                 Value: (IrTerm)factory.Boolean(false),
                 Failure: SpecInstantiationFailureKind.TypeMismatch)
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {
@@ -255,7 +254,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         var factory = new IrFactory();
         var validated = factory.Integer(0);
         var foreignFactory = new IrFactory();
-        IrTerm?[] lookupValues = [
+        ImmutableArray<IrTerm?> lookupValues = [
             foreignFactory.Integer(0),
             factory.Boolean(false),
             null

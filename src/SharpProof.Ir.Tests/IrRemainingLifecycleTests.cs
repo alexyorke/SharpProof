@@ -166,7 +166,7 @@ public sealed class IrRemainingLifecycleTests
         var first = factory.PureOpaque(member, null, values[0], values[397]);
         var second = factory.PureOpaque(member, null, values[1], values[0]);
         Assert.That(second, Is.Not.SameAs(first));
-        Assert.That(second.Arguments, Is.EqualTo(new[] { values[1], values[0] }));
+        Assert.That(second.Arguments, Is.EqualTo(ImmutableArray.Create(values[1], values[0])));
         Assert.That(factory.PureOpaque(member, null, values[0], values[397]), Is.SameAs(first));
     }
 
@@ -180,7 +180,7 @@ public sealed class IrRemainingLifecycleTests
         var parameterized = factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true, factory.BooleanType);
         Assert.That(parameterized, Is.Not.EqualTo(empty));
         Assert.That(factory.GetMemberInfo(empty).ParameterTypes, Is.Empty);
-        Assert.That(factory.GetMemberInfo(parameterized).ParameterTypes, Is.EqualTo(new[] { factory.BooleanType }));
+        Assert.That(factory.GetMemberInfo(parameterized).ParameterTypes, Is.EqualTo(ImmutableArray.Create(factory.BooleanType)));
         Assert.That(factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true), Is.EqualTo(empty));
     }
 }

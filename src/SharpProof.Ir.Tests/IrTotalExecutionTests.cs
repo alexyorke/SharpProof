@@ -135,7 +135,7 @@ public sealed class IrTotalExecutionTests
     {
         var first = new string('x', 3);
         var second = alias ? first : new string('x', 3);
-        foreach (var semantics in new[] { IrExecutionSemantics.Legacy, IrExecutionSemantics.Total })
+        foreach (var semantics in ImmutableArray.Create(IrExecutionSemantics.Legacy, IrExecutionSemantics.Total))
         {
             var factory = new IrFactory(semantics);
             var x = factory.CreateVariable("x", factory.StringType);
@@ -230,7 +230,7 @@ public sealed class IrTotalExecutionTests
         var program = builder.Build();
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out var failure);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(order, Is.EqualTo(new[] { entry, cleanup, exit }));
+        Assert.That(order, Is.EqualTo(ImmutableArray.Create(entry, cleanup, exit)));
         var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(entry).Terminator);
         Assert.That(successors!.Value.First, Is.EqualTo(cleanup));
         Assert.That(successors.Value.Second, Is.Null);
@@ -544,13 +544,12 @@ public sealed class IrTotalExecutionTests
         var values = ImmutableDictionary<IrVarId, IrValue>.Empty
             .Add(sequence, factory.CreateSequenceValue(sequenceType, []))
             .Add(boxed, factory.CreateReferenceValue(factory.ObjectType, 1));
-        var terms = new[]
-        {
+        var terms = ImmutableArray.Create(
             factory.SequenceAccess(factory.Null(sequenceType), factory.Integer(0)),
             factory.SequenceAccess(factory.Variable(sequence), factory.Integer(-1)),
             factory.Cast(elementType, factory.Null(factory.ObjectType)),
             factory.Cast(elementType, factory.Variable(boxed))
-        };
+        );
         foreach (var term in terms)
         {
             var result = new IrInterpreter(factory).Evaluate(term, values);

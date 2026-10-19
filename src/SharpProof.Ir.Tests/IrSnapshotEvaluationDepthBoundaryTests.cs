@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -34,7 +35,7 @@ public sealed class IrSnapshotEvaluationDepthBoundaryTests
             return factory.Conditional(warmOwner, read, factory.Integer(-1));
         }
         var interpreter = new IrInterpreter(factory);
-        var snapshots = new[] { old };
+        var snapshots = ImmutableArray.Create(old);
         var nearby = interpreter.Evaluate(CreateRead(252), variables, null, heap, default, snapshots);
         var boundaryTerm = CreateRead(253);
         var currentOnly = interpreter.Evaluate(boundaryTerm, variables, null, heap, default);

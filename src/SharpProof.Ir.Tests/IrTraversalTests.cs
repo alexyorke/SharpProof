@@ -36,7 +36,7 @@ public sealed class IrTraversalTests
             receiverTerm,
             integerTerm);
         var shapes =
-            new (IrTermKind Kind, IrTerm Term, IrTerm[] Children)[] {
+            ImmutableArray.Create<(IrTermKind Kind, IrTerm Term, ImmutableArray<IrTerm> Children)>(
                 (IrTermKind.Boolean, factory.Boolean(true), []),
                 (IrTermKind.Integer, factory.Integer(1), []),
                 (IrTermKind.String, factory.String("text"), []),
@@ -68,7 +68,7 @@ public sealed class IrTraversalTests
                 (IrTermKind.SequenceAccess,
                     factory.SequenceAccess(sequenceTerm, integerTerm),
                     [sequenceTerm, integerTerm])
-            };
+            );
 
         Assert.That(
             shapes.Select(static shape => shape.Kind),
@@ -116,10 +116,10 @@ public sealed class IrTraversalTests
 
         Assert.That(
             variables,
-            Is.EquivalentTo(new[] { condition, first, second }));
+            Is.EquivalentTo(ImmutableArray.Create(condition, first, second)));
 
         Assert.That(
             IrTraversal.CollectVariables(root),
-            Is.EquivalentTo(new[] { condition, first, second }));
+            Is.EquivalentTo(ImmutableArray.Create(condition, first, second)));
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -205,14 +206,14 @@ public sealed class IrProgramTests
             factory.Variable(result));
 
         var instructions = builder.Build().Blocks.Single().Instructions;
-        IrInstructionKind[] expectedKinds = [
+        ImmutableArray<IrInstructionKind> expectedKinds = [
             IrInstructionKind.Store,
             IrInstructionKind.Load,
             IrInstructionKind.Call,
             IrInstructionKind.Havoc,
             IrInstructionKind.Return
         ];
-        int[] expectedIds = [0, 1, 2, 3, 4];
+        ImmutableArray<int> expectedIds = [0, 1, 2, 3, 4];
 
         Assert.That(
             instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)),

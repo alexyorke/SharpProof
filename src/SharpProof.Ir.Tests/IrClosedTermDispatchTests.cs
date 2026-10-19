@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -16,8 +17,7 @@ public sealed class IrClosedTermDispatchTests
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence = factory.Variable(factory.CreateVariable("sequence", sequenceType));
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), ownerType, "Read", factory.IntegerType, false, factory.IntegerType);
-        var shapes = new (IrTerm Term, string Text)[]
-        {
+        var shapes = ImmutableArray.Create<(IrTerm Term, string Text)>(
             (factory.Boolean(true), "true"),
             (factory.Integer(2), "2"),
             (factory.String("x"), "\"x\""),
@@ -31,7 +31,7 @@ public sealed class IrClosedTermDispatchTests
             (factory.Cast(factory.ObjectType, owner), "((" + TypeName(factory, factory.ObjectType) + ")v2)"),
             (factory.Length(sequence), "len(v3)"),
             (factory.SequenceAccess(sequence, integer), "v3[v1]")
-        };
+        );
         Assert.That(shapes.Select(shape => shape.Term.Kind), Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
         var printer = new IrPrinter(factory);
         foreach (var shape in shapes)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -20,7 +21,7 @@ public sealed class IrResourceBoundTests
 
         var complete = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out failure);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(complete, Is.EqualTo(new[] { entry }));
+        Assert.That(complete, Is.EqualTo(ImmutableArray.Create(entry)));
     }
 
     [TestCase(true, 3L)]

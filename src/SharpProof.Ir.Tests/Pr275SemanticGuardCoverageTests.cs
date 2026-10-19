@@ -24,7 +24,7 @@ public sealed class Pr275SemanticGuardCoverageTests
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Boolean, Is.EqualTo(expected));
         Assert.That(IrTermAnalysis.CollectVariables(term),
-            Is.EquivalentTo(new[] { condition, consequence }));
+            Is.EquivalentTo(ImmutableArray.Create(condition, consequence)));
     }
 
     [TestCase("factory")]

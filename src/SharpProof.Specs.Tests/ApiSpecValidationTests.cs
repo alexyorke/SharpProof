@@ -346,8 +346,7 @@ public sealed class ApiSpecValidationTests
     public void StaticallyReachablePartialBranchesRemainNonTotal()
     {
         var partial = PartialDivision();
-        var reached = new SpecTermDeclaration[]
-        {
+        var reached = ImmutableArray.Create<SpecTermDeclaration>(
             new SpecBinaryDeclaration(
                 IrBinaryOperator.AndAlso,
                 new SpecBooleanDeclaration(true),
@@ -363,7 +362,7 @@ public sealed class ApiSpecValidationTests
                 partial,
                 new SpecBooleanDeclaration(true),
                 IrTypeKind.Boolean)
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {
@@ -371,7 +370,7 @@ public sealed class ApiSpecValidationTests
             {
                 var declaration = Declaration(
                     "reachable-partial-" + condition.GetType().Name +
-                    Array.IndexOf(reached, condition),
+                    reached.IndexOf(condition),
                     resultType: null,
                     SpecNullness.NotApplicable,
                     SpecCardinality.NotApplicable,

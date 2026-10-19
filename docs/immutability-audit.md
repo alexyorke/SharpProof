@@ -2790,3 +2790,26 @@ different indexer/enumerator views, so do not collapse that public input boundar
 single vector in this batch. Record it as pending, not excluded or complete. Validate
 full ordinary Fuzz tests, including identity mismatch/topology and emission controls.
 Status: open before edits.
+
+IMM-M076 verified: all 485 ordinary IR and 150 ordinary Specs tests pass, zero failures/
+skips and zero warnings/errors. Main reviewed all 53 checked-node excerpts before writes;
+read-only review confirmed the coupled operator/operand signatures, tuple child typing,
+counting enumerator, facet null filtering and IndexOf equality/first-match behavior.
+Six native byte inputs, explicit params arrays and mutable traversal Stack remain SUT/API
+contracts. Fixed vectors preserve order and all raw/embedded program contents.
+
+IMM-M077 verified: all 302 ordinary Fuzz tests pass with zero warnings/errors. Read-only
+review confirmed strict AddUnique semantics, TryAdd false-on-duplicate failures, ordered
+method lookup and recursive memo insertion timing. All sequence origin keys retain
+ReferenceEqualityComparer and exact original CLR array objects.
+Coordinator resolved the deferred Arguments decision by tracing its actual tests:
+SameContentSequenceIdentityMismatchIsDetected supplies different indexed/enumerated views;
+FuzzDomainBehaviorTests supplies an invalid with-clone null before validation. The oracle
+intentionally indexes only lowered bindings and separately enumerates for reflection.
+Eager capture could add unused indexed accesses or move caller exceptions. Retain only
+this explicit input adapter contract, not a blanket exemption for readonly interfaces.
+
+Refreshed inventory: 1,870 C# files, 2,919 syntax candidates; eight new scoped builder
+rows classified and the two argument-view input boundary rows retained. Literal check
+against cd3363c63 preserves 2,968 raw/interpolated tokens across 666 changed C# files.
+All remaining open rows and unchecked semantic shapes remain in scope.

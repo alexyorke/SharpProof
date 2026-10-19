@@ -649,9 +649,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
 
         return new RowWitness(
-            [.. new IFacetWitness?[] {
+            [.. ImmutableArray.Create<IFacetWitness?>(
                 effects, allocation, throws, nullness, cardinality, termination
-            }.OfType<IFacetWitness>()],
+            ).OfType<IFacetWitness>()],
             postconditions.IsDefault ? [] : postconditions);
     }
 
