@@ -260,8 +260,10 @@ mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
 closure escape and unsupported type domains keep fallback. Publication preserves
 allocation lineage, while a constructor-written heap predicate guards the current
 default comparer. Unknown writers invalidate that predicate and the contents.
-Source contracts can read Count, ContainsKey and present values, including Old;
-call preconditions are obligations and cannot restore comparer assumptions.
+Specialized source preconditions can read Count, ContainsKey and present values;
+they are obligations and cannot restore comparer assumptions. Caller proofs use
+shared body state. Helper postconditions and Old heap expressions are not verified
+at specialized call sites; standalone incoming dictionaries remain unsupported.
 
 Initialization retains conservative allocation, static cache/capability and fault
 paths. Native replay observes fixed real CoreLib primitive dictionary operations

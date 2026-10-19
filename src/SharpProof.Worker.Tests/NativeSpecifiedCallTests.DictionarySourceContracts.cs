@@ -7,7 +7,7 @@ public sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("int", "17", "31", "Contract.Result<int>() == Contract.Old(data[key])", "ReadAndSet(data, 1, 31) * 100 + data[1]", 1731)]
     [TestCase("object", "first", "second", "object.ReferenceEquals(Contract.Result<T>(), Contract.Old(data[key]))", "object.ReferenceEquals(ReadAndSet(data, 1, second), first) && object.ReferenceEquals(data[1], second) ? 1 : 0", 1)]
-    public async Task DictionarySourceContractsReadCallerEntryState(string valueType, string first, string second,
+    public async Task DictionarySourcePreconditionsPreserveCallerStateAcrossMutation(string valueType, string first, string second,
         string postcondition, string result, int expected)
     {
         ArgumentNullException.ThrowIfNull(valueType);

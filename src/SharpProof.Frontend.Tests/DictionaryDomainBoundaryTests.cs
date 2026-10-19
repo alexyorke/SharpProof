@@ -10,6 +10,19 @@ namespace SharpProof.Frontend.Test;
 
 public sealed class DictionaryDomainBoundaryTests
 {
+    [TestCase("((System.Collections.Generic.Dictionary<int, int>)data).Count", true)]
+    [TestCase("((System.Collections.Generic.Dictionary<int, int>)(object)data).Count", false)]
+    public void DictionaryConstructorOriginCrossesIdentityCastsButRequiresEvidenceForReferenceCasts(string expression, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var (model, syntax, graph, context) = Prepare("",
+            "var data = new System.Collections.Generic.Dictionary<int, int>(); return " + expression + ";");
+        context.TrackDefaultDictionaries(graph);
+        var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(
+            syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsDefaultDictionaryOrigin(property.Instance!), Is.EqualTo(expected));
+    }
+
     [TestCase("receiver", 255)]
     [TestCase("argument", 254)]
     [TestCase("value", 254)]

@@ -351,7 +351,8 @@ a subclass that reimplements interfaces, so it supplies no interface dispatch pr
 Allocation identity is separate from content knowledge. Unknown writers invalidate
 contents even after by-value publication. Rebinding, ref escape, closure capture,
 mixed definitions and unknown interface implementations retain conservative fallback.
-Helper contracts use caller entry state and Old values; a standalone arbitrary
+Helper preconditions use caller state; helper Ensures/Old expressions are not
+verified at specialized source call sites. A standalone arbitrary
 interface claim remains Unknown even when a proven call context can model its body.
 
 Native tests include scalar limits, Boolean/reference/null identity, shared mutation,
@@ -427,8 +428,10 @@ by-value publication and immutable source-helper parameters. Generic helpers
 specialize key/value storage from the caller's known domains and share Count,
 membership and values. Primitive-integer-key operations copy opaque values as
 atoms without interpreting their operators, fields, equality or conversions.
-Helper contracts can read Count, ContainsKey and present values, including caller
-entry state through Old.
+Specialized source preconditions can read Count, ContainsKey and present values.
+Caller proofs use shared body state. Helper postconditions and Old heap
+expressions are not verified at specialized call sites; standalone incoming
+dictionaries remain unsupported. Their postcondition verification remains open.
 
 Allocation lineage does not prove the current comparer. A constructor-written
 heap predicate guards the primitive model after publication. Unknown writers
@@ -437,17 +440,23 @@ parameters, custom/explicit-comparer construction, ref escape, captured mutable
 parameters and mixed unproven receivers acquire no constructor-origin fact.
 Source preconditions remain obligations and cannot restore comparer knowledge.
 
-The canonical focused worker run passes 62 cases, including 22 CLR/IR comparisons,
-source contracts, key/receiver evaluation order and comparer mutation controls.
+All 196 Dictionary worker tests pass, including 25 CLR/IR comparisons, source
+preconditions, key/receiver evaluation order and comparer mutation controls.
+Opaque insertion proves Count one and refutes Count zero without invoking value
+comparison/equality/hash callbacks. Failed initialization observations still
+cannot certify replay. Separate snapshot tests validate Old lowering with an
+explicitly supplied origin; these are not specialized postcondition proofs.
+False helper Ensures controls prove the actual return and refute the claimed
+wrong return, confirming those helper postconditions are not imported assumptions.
 Nine reproduced regressions also verify that generic construction specialized to
 primitive integer keys preserves caller memory. Non-primitive-key initialization
 retains arbitrary existing-state effects.
 The inventory's 29 tests pass with executed positive/wrong-claim probes for shared
 helper state and opaque atom storage. Exactly five existing partial declaration
 rows gain evidence; the reference manifest and declaration totals are unchanged.
-All 2,057 frontend tests and nine ranking tests also pass. The broader Gates run
-passes its 471 other tests; its ranking-document mismatch is fixed and that gate
-passes on rerun. Coverage and exact-commit CI remain gates.
+All 40 Dictionary frontend domain tests and nine ranking tests also pass. The
+pre-integration core run passes 2,057 frontend and 472 Gates tests. Integrated-head
+coverage and exact-commit CI remain gates.
 
 The original corpus still has 85 unmodeled Dictionary content sites: 23 use
 primitive keys but obtain receivers from static caches (9), virtual Trie Children

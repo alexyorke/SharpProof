@@ -23,6 +23,7 @@ public sealed partial class NativeSpecifiedCallTests
     }
 
     [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(); data.Add(1, 17); return Read<int, int>(data, 1);", "static V Read<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key) => data[key];", 17)]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(); data.Add(1, 17); return Read<int, int>((System.Collections.Generic.Dictionary<int, int>)data, 1);", "static V Read<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key) => data[key];", 17)]
     [TestCase("var data = new System.Collections.Generic.Dictionary<long, int>(); data.Add(long.MaxValue, 17); return Read<long, int>(data, long.MaxValue);", "static V Read<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key) => data[key];", 17)]
     [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(); return Put<int, int>(data, 1, 17);", "static int Put<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key, V value) { data.Add(key, value); return data.Count; }", 1)]
     [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(); data.Add(1, 17); Replace<int, int>(data, 1, 23); return data[1] + data.Count;", "static void Replace<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key, V value) { data[key] = value; }", 24)]
