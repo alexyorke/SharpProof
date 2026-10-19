@@ -16,6 +16,13 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=typed-sz-array-clear-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "all valid ranges of a four-cell incoming array, aliases and unchanged cells; whole-array overload; CLR/IR equality and wrong-result control; native symbolic-range and effect controls in ArrayClear tests",
+                    () => CheckArrayClearIntrinsic(compilation, row.Id, false), () => CheckArrayClearIntrinsic(compilation, row.Id, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=checked-integral-to-int64", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
@@ -62,6 +69,22 @@ public sealed partial class DotnetApiInventoryTests
                         opaqueStorage && (CheckOpaqueDictionaryStorageIntrinsic(compilation, true) || CheckOpaqueDictionaryStorageIntrinsic(compilation, true, direct: true)));
             }
 
+            if (row.Evidence.Contains("intrinsic=list-insertion-range-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled concrete and exact interface List Insert/GetRange normal state versus CLR; reverse shift, independent range storage, exact declared interface reference identity and API-specific opaque generic atoms versus decimal CLR bits; growth/bounds uncertainty retained; native proof and wrong-claim controls in NativeSpecifiedCallTests.ListRangesPreserveSharedContentsAndDistinctCopies",
+                    () => CheckListRangeIntrinsic(compilation, row.Id, false) && CheckListRangeIntrinsic(compilation, row.Id, false, referenceValues: true) &&
+                        CheckOpaqueListStorageIntrinsic(compilation, false, rangeMethod: row.Id),
+                    () => CheckListRangeIntrinsic(compilation, row.Id, true) || CheckListRangeIntrinsic(compilation, row.Id, true, referenceValues: true) ||
+                        CheckOpaqueListStorageIntrinsic(compilation, true, rangeMethod: row.Id));
+            }
+            if (row.Evidence.Contains("intrinsic=concrete-stack-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled CLR/IR default/capacity construction, incoming and aliased LIFO Count/Push/Pop; generic opaque decimal payload identity and source helper; normal growth choices retain approximation",
+                    () => CheckStackStateIntrinsic(compilation, false) && CheckStackStateIntrinsic(compilation, false, incoming: true) && CheckStackStateIntrinsic(compilation, false, opaque: true),
+                    () => CheckStackStateIntrinsic(compilation, true) || CheckStackStateIntrinsic(compilation, true, incoming: true) || CheckStackStateIntrinsic(compilation, true, opaque: true));
+            }
             if (row.Evidence.Contains("intrinsic=concrete-queue-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));

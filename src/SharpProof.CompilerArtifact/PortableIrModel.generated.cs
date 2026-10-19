@@ -739,7 +739,7 @@ internal static class PortableIrGraphCodecProjections
                     var write = (IrWriteInstruction)instruction;
                     return context.Row(instruction, context.OperationIndex(instruction.Operation),
                         (int)write.Region, write.Field == null ? context.OptionalTermIndex(write.Target) : -1, write.Field == null ? context.OptionalTermIndex(write.Index) : -1,
-                        write.Value == null ? null : context.TermIndices([write.Value]),
+                        write.Value == null ? null : context.TermIndices(write.Length is { } length ? [write.Value, length] : [write.Value]),
                         write.Field is { } field ? context.Location(new IrMemberLocation(write.Value!.Type, field, write.Target, write.Index is { } key ? [key] : [])) : null);
                 },
                 static (row, context) =>
@@ -749,8 +749,8 @@ internal static class PortableIrGraphCodecProjections
                             ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0], field.Arguments.IsEmpty ? null : field.Arguments[0])
                             : throw context.Invalid()
                         : context.OptionalTerm(row.B) is { } stored
-                        ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index
-                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0])
+                        ? row.A == (int)IrWriteRegion.Element && row.Items.Length is 1 or 2 && context.OptionalTerm(row.C) is { } index
+                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0], row.Items.Length == 2 ? context.Terms(row.Items)[1] : null)
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
                 }),

@@ -68,8 +68,9 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation)); return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
 
-    // Stores value at sequence[index]; the caller has already guarded the
-    // array's nullness and the index's range.
+    // Stores one cell, or every cell in [index, index + length). A range uses
+    // Int32 positions and length. The caller guards nullness and the complete
+    // nonnegative in-bounds interval; replay independently rejects invalid IR.
     public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -77,6 +78,15 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
             ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
             ArgumentNullGuard.NotNull(value, nameof(value))));
+    }
+
+    public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value, IrTerm? length)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
+            ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
+            ArgumentNullGuard.NotNull(value, nameof(value)), length));
     }
 
     // Stores value in receiver's field; the caller has already guarded the
@@ -343,6 +353,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
             if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
                 write.Index == null || write.Value == null ||
                 _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
+                write.Length is { } rangeLength && (ValidateTerm(rangeLength, "length") != _factory.IntegerType || write.Index.Type != _factory.IntegerType) ||
                 ValidateTerm(write.Value, "value") != sequenceType.ElementType)
             { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
         }

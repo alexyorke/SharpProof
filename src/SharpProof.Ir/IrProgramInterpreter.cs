@@ -533,9 +533,26 @@ internal sealed partial class IrWriteInstruction
             { state.Values.Heap.StoreKeyedField(target.Value, keyedField, position.Value!, element.Value!); }
             else if (position != null)
             {
-                if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
-                { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "An element store was not in bounds."); }
-                state.Values.Heap.StoreElement(target.Value!, (int)position.Value!.Integer, element.Value!);
+                if (this.Length is { } rangeLength)
+                {
+                    var length = state.Interpreter.Evaluate(rangeLength, state.Values, state.CancellationToken);
+                    if (length.Status != IrEvaluationStatus.Value)
+                    { return IrProgramInterpreter.FromEvaluation(length, this, state.Values, state.Steps); }
+                    if (target.Value!.Kind != IrValueKind.Sequence || position.Value!.Integer < 0 || length.Value!.Integer < 0 ||
+                        position.Value.Integer > target.Value.Elements.Length || length.Value.Integer > target.Value.Elements.Length - position.Value.Integer)
+                    { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "A range store was not in bounds."); }
+                    for (var offset = 0; offset < length.Value.Integer; offset++)
+                    {
+                        state.CancellationToken.ThrowIfCancellationRequested();
+                        state.Values.Heap.StoreElement(target.Value, (int)position.Value.Integer + offset, element.Value!);
+                    }
+                }
+                else
+                {
+                    if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
+                    { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "An element store was not in bounds."); }
+                    state.Values.Heap.StoreElement(target.Value!, (int)position.Value!.Integer, element.Value!);
+                }
             }
             else if (this.Field is { } field && target.Value!.Kind == IrValueKind.Reference)
             { state.Values.Heap.Fields[(target.Value.Reference, field)] = element.Value!; }

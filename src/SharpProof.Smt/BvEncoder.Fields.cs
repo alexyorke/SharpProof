@@ -73,7 +73,7 @@ internal sealed partial class BvEncoder
                     // Collection witnesses must describe a materializable finite size.
                     // Charging the logical Count rejects oversized SAT witnesses,
                     // without narrowing the SMT domain used for universal proofs.
-                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count")
+                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
                     { meter.Consume((long)(decoded.IntegerBits & int.MaxValue) + 1L); }
                     state.Fields[field.Key] = decoded;
                 }
