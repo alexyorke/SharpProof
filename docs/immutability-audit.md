@@ -2338,3 +2338,13 @@ semantics, freezing before Join. Preserve serializer dictionary property order, 
 CLI/string[] and PE/file byte[] adapters, and runtime mutable lane/result buffers until
 their synchronization/indexed-write contracts are separately addressed. Validate launcher,
 SARIF, cache eviction and path admission tests. Status: open before edits.
+
+IMM-M053: Coordinator inspected RuntimeDependencyTests, LongFuzz/ExactCounterexampleReplay,
+Pr275NativeAssumptionMapTests and Pr275OwnedSpecTermDepthAdmissionTests. Runtime assembly
+closure traversal uses immutable FIFO queue plus an Ordinal hash builder for visited
+membership, preserving enqueue/dequeue and load order. Exact replay display strings and
+binding validation use scoped builders; preserve false-on-duplicate/null InvalidModel
+returns, freeze after four-entry validation, and retain original runtime model decoding.
+Read-only one-entry/empty interpreter and proof maps become immutable values. Preserve
+runtime assembly resource objects, model elements, byte/reflection boundaries and the
+string decoder's text writer. Status: open before edits.
