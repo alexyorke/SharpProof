@@ -51,16 +51,19 @@ public sealed partial class DotnetApiInventoryTests
                 var nonnegative = row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal);
                 var empty = row.Id is "M:System.Collections.Generic.List`1.#ctor" or "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.ICollection`1.Count";
                 var incoming = row.Evidence.Contains("intrinsic=concrete-list-state", StringComparison.Ordinal);
+                var opaqueStorage = row.Evidence.Contains("intrinsic=opaque-list-value-storage", StringComparison.Ordinal);
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
-                    "compiled owned List construction, Count, Add and scalar/reference content state through concrete/interface aliases versus runtime; incoming concrete List Count, set, Add and get versus runtime where declared; optional initialization/growth and bounds faults retained; immutable generic IList/ICollection source parameters share caller scalar/reference storage versus runtime; native entry-cell proof/refutation controls; existing array and nonnegative probes retained",
+                    "compiled owned List construction, Count, Add and scalar/reference content state through concrete/interface aliases versus runtime; incoming concrete List Count, set, Add and get versus runtime where declared; optional initialization/growth and bounds faults retained; immutable generic IList/ICollection source parameters share caller scalar/reference storage versus runtime; native entry-cell proof/refutation controls; opaque generic value storage and source-helper get/set compared with decimal CLR bits where declared; existing array and nonnegative probes retained",
                     () => CheckListStateIntrinsic(compilation, false) && CheckListStateIntrinsic(compilation, false, referenceValues: true) &&
                         CheckListStateIntrinsic(compilation, false, sourceParameters: true) && CheckListStateIntrinsic(compilation, false, referenceValues: true, sourceParameters: true) &&
                         (!empty || CheckListStateIntrinsic(compilation, false, opaqueValues: true)) &&
                         (!incoming || CheckListStateIntrinsic(compilation, false, incoming: true)) &&
+                        (!opaqueStorage || CheckOpaqueListStorageIntrinsic(compilation, false) && CheckOpaqueListStorageIntrinsic(compilation, false, direct: true)) &&
                         (!arrays || CheckInterfaceArrayIntrinsic(compilation, row.Id, false)) && (!nonnegative || CheckCountInvariant(row.Id, false)),
                     () => CheckListStateIntrinsic(compilation, true) || CheckListStateIntrinsic(compilation, true, referenceValues: true) ||
                         CheckListStateIntrinsic(compilation, true, sourceParameters: true) || CheckListStateIntrinsic(compilation, true, referenceValues: true, sourceParameters: true) ||
                         empty && CheckListStateIntrinsic(compilation, true, opaqueValues: true) || incoming && CheckListStateIntrinsic(compilation, true, incoming: true) ||
+                        opaqueStorage && (CheckOpaqueListStorageIntrinsic(compilation, true) || CheckOpaqueListStorageIntrinsic(compilation, true, direct: true)) ||
                         arrays && CheckInterfaceArrayIntrinsic(compilation, row.Id, true) || nonnegative && CheckCountInvariant(row.Id, true));
             }
 
