@@ -3538,3 +3538,10 @@ DictionaryFields had one private params caller; main narrowed both call and help
 ImmutableArray roots, preserving IsDefault guarding and DFS order. The earlier adapter
 assumption was not retained. M128 passes 27 baseline/current controls and all PS parsing;
 canonical format checked 87 PowerShell and 19 shell scripts, two files normalized.
+IMM-M129: Trace context AllowObjectWidening across both LowerOnce passes, nested source
+frames and contract materialization. Its value is exactly the existing immutable source
+session MetadataRequiresEnabled option. Move it to expression-lowerer init configuration
+populated in ordinary and region initializers; remove duplicate mutable context setter
+and frame copy. Preserve null-session false and opaque-call widening behavior. Validate
+metadata nominal/IL/stack and recursive-requires controls via the Release semantic gate.
+Status: open before edits.
