@@ -172,7 +172,7 @@ public sealed class NativeResourceProgramTests
     public void MalformedTransportCannotSupplyAProducerVerdict(string node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        var payload = "{\"version\":3,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}";
+        var payload = "{\"version\":4,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}";
         Action decode = () => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(payload), TestContext.CurrentContext.CancellationToken);
         Assert.Throws<InvalidDataException>(decode);
     }
@@ -192,7 +192,7 @@ public sealed class NativeResourceProgramTests
         var node = zero;
         for (int level = 0; level < 12; level++)
         { node = "{\"kind\":2,\"length\":null,\"rank\":null,\"allocation\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[" + node + "," + node + "]}"; }
-        var payload = Encoding.UTF8.GetBytes("{\"version\":3,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}");
+        var payload = Encoding.UTF8.GetBytes("{\"version\":4,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}");
         Assert.That(payload.Length, Is.LessThan(ResourceProgramCodec.MaximumPayloadBytes));
         Action decode = () => ResourceProgramCodec.Decode(payload, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<InvalidDataException>(decode);

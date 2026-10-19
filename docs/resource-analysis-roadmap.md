@@ -844,3 +844,62 @@ The canonical/package failure on c9170a1a0 and its failed package coverage shard
 are not a qualification pass; the fixed pushed commit must receive fresh CI.
 The last complete aggregate coverage report remains the earlier 180d4a95a report,
 with the unchanged 100% baseline still required for final delivery.
+
+## Managed object and constructor integration
+
+The next memory layer adds a closed non-array managed-allocation leaf to resource
+program model 4. It transports typed storage facts, validates extent ownership,
+charges fields against the shared program budget and derives byte intervals in
+the native layout checker. The existing three count metrics charge zero for the
+managed instance itself and continue to charge all constructor/initializer arrays
+and loop entries. Protocol 21/cache 23/compiler artifact 37 invalidate model 3
+programs; expression model 1 and the reviewed layout formulas remain unchanged.
+
+Source admission covers intrinsic System.Object creation and ordinary source
+classes directly derived from System.Object, with primitive/reference fields.
+The fundamental object constructor reuses the existing total-lowering intrinsic
+rule. User constructor arguments, instance field/property initializers, explicit
+constructor bodies and field object-initializers are visited separately. Static
+initialization, recursive construction, inheritance, records/generics, COM
+activation, cleanup callbacks and events, custom layouts, unsupported value storage and
+unmodeled constructor chains remain explicit Unknown boundaries. User constructor
+effects are never inferred from instance size alone.
+
+Native replay observes concrete managed-reference allocations as well as arrays.
+An ordinary fresh instance has a model lower cost of at least 24 bytes; loose
+field-packing intervals cannot become exact costs. Mixed constructor prefixes
+are undergoing replay validation before this boundary is considered verified.
+The complete source/native tests and final checks are recorded after they pass.
+Other allocation families, liveness/escape, retained/peak memory, stack, phase E/F
+and final unchanged 100% qualification remain required.
+
+Managed integration passed 438 focused native/resource/protocol/cache/golden
+checks, all 555 IR tests and 195 source resource controls. A mixed field-initializer
+refutation initially stayed Unknown; a bounded replay trace established that the
+existing functional backend treats instance-initializer constructors as opaque,
+consuming approximation before allocation. The verifier correctly preserves
+Unknown there. Explicit plain constructor bodies replay exact array events and
+compose them with managed lower costs. Exact initializer execution is therefore
+an explicit remaining backend task, not a waived requirement. Diagnostic scaffolding
+was removed after establishing the boundary.
+
+The initial structural layout check used a banned display-string API and was
+replaced with typed namespace/name matching. Formatting and test-only guard/import
+issues were corrected with the pinned tooling. Existing Unknown expectations for
+reference locals now identify the underlying unsupported operation. Broader and
+actual NuGet validation is tracked below after completion.
+
+Final managed-object validation passed all 1400 analyzer tests, 438 focused native
+resource/protocol/cache/golden tests, all 555 IR tests and 5 actual package cases.
+The package cases cover managed/array proof and refutation, strict/advisory policy,
+AnyCPU Unknown outcomes and equivalent-artifact cache reuse. Layout passed with
+2664 source files, 59 projects and 151 pinned common files. Documentation drift
+and 723 local links passed. All non-spelling quality/compatibility categories
+passed; targeted spelling/Markdown verification passed after plain-language fixes.
+Final source formatting remains part of the delivery checks.
+
+Published checkpoint 457146536 passed every non-coverage workflow and all four
+coverage shards. Aggregate qualification failed at 3099/3180 changed trusted lines
+(97.45%), leaving 81 gaps against the unchanged 100% baseline. That measurement
+excludes this managed-object layer; fresh exact-head CI and final qualification
+remain required. No phase C/E/F requirement is removed by this checkpoint.

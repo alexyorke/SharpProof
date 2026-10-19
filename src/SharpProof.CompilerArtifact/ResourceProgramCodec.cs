@@ -122,7 +122,7 @@ internal static class ResourceProgramCodec
         if (!Enum.IsDefined(typeof(ResourceRepeatKind), repeat) || kind != ResourceProgramKind.Repeat && repeat != ResourceRepeatKind.Loop)
         { throw new InvalidDataException("Resource repeat kind is invalid."); }
         var children = node.GetProperty("children");
-        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind == ResourceProgramKind.Repeat ? 1 : 2;
+        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind == ResourceProgramKind.Repeat ? 1 : 2;
         if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() != arity)
         { throw new InvalidDataException("Resource program arity is invalid."); }
         var length = node.GetProperty("length");
@@ -130,7 +130,7 @@ internal static class ResourceProgramCodec
         var rank = node.GetProperty("rank");
         var metadataNode = node.GetProperty("metadata");
         if (kind != ResourceProgramKind.AllocateArray && length.ValueKind != JsonValueKind.Null ||
-            kind != ResourceProgramKind.AllocateArray && allocationNode.ValueKind != JsonValueKind.Null ||
+            kind is not (ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged) && allocationNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
@@ -144,6 +144,14 @@ internal static class ResourceProgramCodec
         { return ResourceProgram.MetadataBoundary; }
         if (kind == ResourceProgramKind.Zero)
         { return ResourceProgram.Zero; }
+        if (kind == ResourceProgramKind.AllocateManaged)
+        {
+            var encodedShape = Text(allocationNode);
+            var shapeBytes = Convert.FromBase64String(encodedShape);
+            if (Convert.ToBase64String(shapeBytes) != encodedShape)
+            { throw new InvalidDataException("Resource allocation encoding is not canonical."); }
+            return ResourceProgram.Managed(ResourceAllocationShapeCodec.Decode(shapeBytes, cancellation));
+        }
         if (kind == ResourceProgramKind.AllocateArray)
         {
             var decodedLength = Expression(length, cancellation);

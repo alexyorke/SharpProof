@@ -42,6 +42,7 @@ internal static class NativeResourceAllocationVerifier
         {
             case ResourceProgramKind.Zero:
                 return ResourceExpression.Zero;
+            case ResourceProgramKind.AllocateManaged:
             case ResourceProgramKind.AllocateArray:
                 if (program.Allocation is not { } allocation)
                 { throw new InvalidDataException("MissingResourceAllocationStorage"); }

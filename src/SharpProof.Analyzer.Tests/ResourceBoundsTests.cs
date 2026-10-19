@@ -25,6 +25,7 @@ public sealed partial class ResourceBoundsTests
     [TestCase("", "0", "0", "0")]
     [TestCase("int sum = 0; sum += n;", "0", "0", "0")]
     [TestCase("var a = new int[4];", "0", "1", "4")]
+    [TestCase("var a = new object();", "0", "0", "0")]
     [TestCase("var a = new int[n];", "0", "1", "max(0, n)")]
     [TestCase("var a = new byte[values.Length];", "0", "1", "values.Length")]
     [TestCase("var a = n>0 ? new int[2] : new int[4];", "0", "1", "4")]
@@ -66,17 +67,16 @@ public sealed partial class ResourceBoundsTests
     [TestCase("n=0; for (int i=0; i<n; i++) {}", "UnstableInputOrCounter")]
     [TestCase("for (int i=0; i<values.Length; i++) { values = new int[3]; }", "UnstableInputOrCounter")]
     [TestCase("var a = new int[n+1];", "UnsupportedAllocationSize")]
-    [TestCase("var a = new object();", "UnsupportedLocal")]
-    [TestCase("var a = new int[2,3];", "UnsupportedLocal")]
+    [TestCase("var a = new int[2,3];", "UnsupportedOperation:ArrayCreation")]
     [TestCase("var a = new int[] { 1,2 };", "UnsupportedOperation:ArrayCreation")]
-    [TestCase("object a = n;", "UnsupportedLocal")]
+    [TestCase("object a = n;", "UnsupportedOperation:Conversion")]
     [TestCase("System.Console.WriteLine(n);", "OpaqueCall")]
     [TestCase("M(n,m,values);", "RecursiveCostUnknown")]
     [TestCase("for (int i=0; i<n; i++) { break; }", "UnsupportedOperation:Branch")]
     [TestCase("for (int i=0; i<n; i++) { continue; }", "UnsupportedOperation:Branch")]
     [TestCase("try {} finally {}", "UnsupportedOperation:Try")]
     [TestCase("ref int x = ref n;", "UnsupportedLocal")]
-    [TestCase("System.Func<int> f = () => n;", "UnsupportedLocal")]
+    [TestCase("System.Func<int> f = () => n;", "UnsupportedOperation:DelegateCreation")]
     public void UnsupportedBodiesReturnExplicitUnknownWithoutPartialBounds(string body, string reason)
     {
         ArgumentNullException.ThrowIfNull(body);

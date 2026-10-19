@@ -197,4 +197,53 @@ public sealed class NativeResourceAllocationTests
         Assert.That(bytes.ConditionalUpperBound, Is.Null);
         Assert.That(bytes.UnknownReason, Is.EqualTo("MalformedResourceAllocation"));
     }
+    [TestCase(0, 32)]
+    [TestCase(1, 32)]
+    [TestCase(2, 24)]
+    [TestCase(3, 64)]
+    [TestCase(4, 96)]
+    public void ManagedStorageFactsRoundTripWithoutInventingArrayCounts(int kind, int expected)
+    {
+        var shape = kind switch
+        {
+            0 => ResourceAllocationShape.Object([ResourceStorageKind.Byte, ResourceStorageKind.Word32]),
+            1 => ResourceAllocationShape.String(ResourceExpression.Literal(3)),
+            2 => ResourceAllocationShape.Box(ResourceStorageKind.Word64),
+            3 => ResourceAllocationShape.Delegate(),
+            _ => ResourceAllocationShape.Closure([ResourceStorageKind.Word32, ResourceStorageKind.Word32])
+        };
+        var program = ResourceProgram.Managed(shape);
+        var result = Check(program);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.ConditionalUpperBound!.Constant, Is.EqualTo(new BigInteger(expected)));
+        var counts = NativeResourceProgramVerifier.Verify(program, "owned", Owner(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(counts.Cost!.LoopEntries.Constant, Is.EqualTo(BigInteger.Zero));
+        Assert.That(counts.Cost.Arrays.Constant, Is.EqualTo(BigInteger.Zero));
+        Assert.That(counts.Cost.Elements.Constant, Is.EqualTo(BigInteger.Zero));
+    }
+
+    [Test]
+    public void ManagedTransportRejectsArrayOrMissingStoragePayloads()
+    {
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var root = JsonNode.Parse(ResourceProgramCodec.Encode(ResourceProgram.Managed(ResourceAllocationShape.Object([])), cancellation))!.AsObject();
+        var program = root["program"]!.AsObject();
+        program["allocation"] = Convert.ToBase64String(ResourceAllocationShapeCodec.Encode(ResourceAllocationShape.Array(ResourceStorageKind.Byte, ResourceExpression.One), cancellation));
+        Action wrongShape = () => ResourceProgramCodec.Decode(System.Text.Encoding.UTF8.GetBytes(root.ToJsonString()), cancellation);
+        Assert.Throws<InvalidDataException>(wrongShape);
+        program["allocation"] = null;
+        Action missing = () => ResourceProgramCodec.Decode(System.Text.Encoding.UTF8.GetBytes(root.ToJsonString()), cancellation);
+        Assert.Throws<InvalidDataException>(missing);
+    }
+
+    [Test]
+    public void ManagedFieldsContributeToTheExpandedProgramBudget()
+    {
+        var fields = System.Collections.Immutable.ImmutableArray.CreateRange(Enumerable.Repeat(ResourceStorageKind.Byte, 1024));
+        var program = ResourceProgram.Managed(ResourceAllocationShape.Object(fields));
+        Assert.That(program.NodeCount, Is.EqualTo(1026));
+        var pair = ResourceProgram.Sequence(program, program);
+        Action tooMany = () => ResourceProgram.Sequence(pair, pair);
+        Assert.Throws<ResourceExpressionLimitException>(tooMany);
+    }
 }

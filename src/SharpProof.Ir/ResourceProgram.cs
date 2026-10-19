@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
 
@@ -32,7 +32,7 @@ internal sealed class ResourceLoopRank
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 3;
+    internal const int ModelVersion = 4;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceLoopRank? Rank { get; }
@@ -57,8 +57,8 @@ internal sealed class ResourceProgram
         Allocation = allocation;
         RepeatKind = repeatKind;
         Children = children;
-        var nodes = 1 + (length?.NodeCount ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
-        var depth = 1 + Math.Max(length?.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
+        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
+        var depth = 1 + Math.Max(length?.Depth ?? allocation?.Extent.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
         foreach (var child in children)
         {
             if (child is null)
@@ -91,6 +91,15 @@ internal sealed class ResourceProgram
         if (allocation.Kind != ResourceAllocationKind.Array)
         { throw new ArgumentException("An array program requires an array storage shape.", nameof(allocation)); }
         return new(ResourceProgramKind.AllocateArray, allocation.Extent, null, default, [], allocation: allocation);
+    }
+
+    internal static ResourceProgram Managed(ResourceAllocationShape allocation)
+    {
+        allocation = ArgumentNullGuard.NotNull(allocation, nameof(allocation));
+        if (allocation.Kind is ResourceAllocationKind.Unspecified or ResourceAllocationKind.Array ||
+            !Enum.IsDefined(typeof(ResourceAllocationKind), allocation.Kind))
+        { throw new ArgumentException("A managed allocation requires a supported non-array shape.", nameof(allocation)); }
+        return new(ResourceProgramKind.AllocateManaged, null, null, default, [], allocation: allocation);
     }
 
     internal static ResourceProgram Sequence(ResourceProgram left, ResourceProgram right)

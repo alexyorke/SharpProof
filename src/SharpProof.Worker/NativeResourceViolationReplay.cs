@@ -123,6 +123,16 @@ internal static class NativeResourceViolationReplay
             }, (instruction, approximation) =>
             {
                 ArgumentNullException.ThrowIfNull(instruction);
+                if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || instruction.Length is not null || approximation || site is not null)
+                { return; }
+                if (instruction.Target is null || factory.GetTypeInfo(instruction.AllocatedType).Kind != IrTypeKind.Reference)
+                { unsupportedByteStorage = true; return; }
+                // A concrete fresh reference instance occupies at least this
+                // amount. Unknown field packing never becomes an exact cost.
+                Observe(instruction.Operation, ResourceRuntimeLayout.MinimumObject, false);
+            }, (instruction, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
                 if (constraint.Metric == WorkerResourceMetric.LoopBodyEntries)
                 { Observe(instruction.Operation, BigInteger.One, approximation); }
             }, cancellation);

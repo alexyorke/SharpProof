@@ -62,6 +62,7 @@ internal static class NativeResourceProgramVerifier
                 if (program.Metadata is not { } metadata || bindMetadata?.Invoke(metadata) != true)
                 { throw new InvalidDataException("ResourceMetadataAssumptionsNotBound"); }
                 return Zero;
+            case ResourceProgramKind.AllocateManaged:
             case ResourceProgramKind.Zero:
                 return Zero;
             case ResourceProgramKind.AllocateArray:

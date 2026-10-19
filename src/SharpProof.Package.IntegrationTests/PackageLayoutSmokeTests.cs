@@ -3687,11 +3687,16 @@ public sealed class PackageLayoutSmokeTests
         }
         Assert.That(resourceResults, Is.EqualTo(3));
     }
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, bool managed)
     {
-        var boundLimit = violates ? 80 : 120;
+        var upper = managed ? 64 : 120;
+        var boundLimit = violates ? managed ? 50 : 80 : upper;
+        var body = managed ? "var item=new Cell();" : "for(int i=0;i<3;i++) { var a=new int[3]; }";
+        var declarations = managed ? "public class Cell { public Cell() { var data=new int[3]; } }" : string.Empty;
         var expected = violates ? "Refuted" : "Proven";
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
@@ -3699,8 +3704,9 @@ public sealed class PackageLayoutSmokeTests
             using SharpProof.Attributes;
             public static class Subject {
                 [ResourceUpperBound(ResourceMetric.AllocatedBytes, {{boundLimit}})]
-                public static void Target() { for(int i=0;i<3;i++) { var a=new int[3]; } }
+                public static void Target() { {{body}} }
             }
+            {{declarations}}
             """, "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
@@ -3723,11 +3729,11 @@ public sealed class PackageLayoutSmokeTests
         JsonAssert.Equal(bound, "metric", "AllocatedBytes");
         if (violates)
         {
-            JsonAssert.Equal(bound, "observedLowerBound", "120");
-            JsonAssert.Equal(bound, "evaluatedUpperBound", "80");
+            JsonAssert.Equal(bound, "observedLowerBound", upper.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            JsonAssert.Equal(bound, "evaluatedUpperBound", boundLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
         else
-        { JsonAssert.Equal(bound, "inferredUpperBound", "120"); }
+        { JsonAssert.Equal(bound, "inferredUpperBound", upper.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
         JsonAssert.Equal(bound, "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.AllocationCostModel);
         var dependency = bound.GetProperty("metadataAssumptions").EnumerateArray().Single();
         JsonAssert.Equal(dependency, "witnessIdentifier", "runtime-layout.coreclr-x64");

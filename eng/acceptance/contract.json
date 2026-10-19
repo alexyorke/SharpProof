@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 20,
+    "protocolVersion": 21,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 36,
+    "compilerArtifactSchemaVersion": 37,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 22,
+    "schemaVersion": 23,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -404,6 +404,7 @@
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Loops.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Calls.cs",
+          "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Allocations.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Recursion.cs",
           "src/SharpProof.Compiler.Semantics/ResourceMetadataCostCatalog.cs",
           "src/SharpProof.Compiler.Semantics/ResourceUpperBoundContract.cs",

@@ -170,7 +170,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private static bool SupportedType(ITypeSymbol type)
     {
         type = ArgumentNullGuard.NotNull(type, nameof(type));
-        return Primitive(type) || type is IArrayTypeSymbol { Rank: 1, IsSZArray: true } array && Primitive(array.ElementType);
+        return Primitive(type) || type.IsReferenceType;
     }
 
     private Cost Unknown(string reason)
@@ -240,8 +240,19 @@ internal sealed partial class ResourceBoundsAnalysis
                     Visit(conditional.WhenTrue, depth + 1).Max(
                         conditional.WhenFalse is { } alternative ? Visit(alternative, depth + 1) : Cost.Zero));
                 break;
+            case IObjectCreationOperation creation:
+                result = ObjectCreation(creation, depth);
+                break;
+            case IFieldReferenceOperation field when !field.Field.IsStatic:
+                result = field.Instance is { } receiver ? Visit(receiver, depth + 1) : Unknown("MissingFieldReceiver");
+                break;
+            case IInstanceReferenceOperation:
+            case ILiteralOperation { ConstantValue.HasValue: true, ConstantValue.Value: null }:
+            case IDefaultValueOperation { Type.IsReferenceType: true }:
+                result = Cost.Zero;
+                break;
             case IArrayCreationOperation array when array.Type is IArrayTypeSymbol type &&
-                SupportedType(type) && array.DimensionSizes.Length == 1 && array.Initializer is null:
+                type is { Rank: 1, IsSZArray: true } && Primitive(type.ElementType) && array.DimensionSizes.Length == 1 && array.Initializer is null:
                 var size = Size(array.DimensionSizes[0]);
                 result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.TypedArray(ResourceAllocationShape.Array(Storage(type.ElementType), size.Expression)));
                 break;
@@ -266,7 +277,7 @@ internal sealed partial class ResourceBoundsAnalysis
                 result = Visit(unary.Operand, depth + 1);
                 break;
             case IConversionOperation conversion when !conversion.Conversion.IsUserDefined &&
-                (conversion.Conversion.IsIdentity || conversion.Conversion.IsNumeric) &&
+                (conversion.Conversion.IsIdentity || conversion.Conversion.IsNumeric || conversion.Conversion.IsReference || conversion.Operand.ConstantValue is { HasValue: true, Value: null }) &&
                 conversion.Type is { } converted && SupportedType(converted):
                 result = Visit(conversion.Operand, depth + 1);
                 break;
@@ -317,6 +328,7 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             ILocalReferenceOperation local => local.Local.RefKind == RefKind.None && !_counters.ContainsKey(local.Local),
             IArrayElementReferenceOperation element => Primitive(element.Type),
+            IFieldReferenceOperation field => !field.Field.IsStatic,
             _ => false
         };
     }

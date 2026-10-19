@@ -264,7 +264,7 @@ effects are separate. A factory that returns a cached string or delegate does
 not establish a fresh allocation merely because its instance shape has a size.
 Unknown shapes and incompatible contexts return no partial interval.
 
-Resource program model 3 retains storage widths for every admitted primitive
+Resource program model 4 retains storage widths for every admitted primitive
 array creation, including source calls. Its strict codec rejects unrelated,
 noncanonical or conflicting shape facts. The native checker validates callable
 input ownership and progress before deriving a conditional cumulative byte upper
@@ -307,6 +307,32 @@ invent byte events. These are exact costs in the declared source storage model,
 not measured JIT/GC/process allocation traces. Refutations retain the owned
 layout dependency and expose the observed prefix and evaluated entry bound.
 Other allocation categories still need compiler extraction and effect accounting.
-Protocol 20, cache schema 22 and compiler artifact schema 36 invalidate earlier
-serialized evidence. Resource program/evidence model 3 and expression model 1
+Protocol 21, cache schema 23 and compiler artifact schema 37 invalidate earlier
+serialized evidence. Resource program/evidence model 4 and expression model 1
 are checked together; the existing three count metrics retain their meanings.
+
+### Managed objects and constructor effects
+
+The source/native path also admits `new object()` and ordinary source
+classes without type parameters directly derived from System.Object. Primitive and reference instance
+slots receive a reviewed layout interval. Constructor arguments, field and
+simple auto-property initializers, explicit constructor bodies and field object
+initializers retain their own loop/array/byte costs. The instance itself adds no
+array-allocation or element count. The intrinsic object base constructor follows
+the existing total-lowering rule; user constructor effects are visited explicitly.
+
+For example, a fresh object without fields has a 24-byte model footprint. An object
+with byte/int fields has an upper envelope of 32 bytes and a 24-byte lower cost;
+the verifier does not infer an exact 32-byte allocation from that envelope.
+Concrete fresh-reference events contribute only their justified model lower cost
+to numerical refutations. Exact array costs can then compose with that lower
+cost when the constructor body replays without approximation.
+
+Instance-initializer constructors currently use an opaque replay path in the
+functional backend. Their source-derived upper bounds are available, but a
+numeric violation needing events after that approximation stays Unknown. Exact
+initializer execution remains required work. Inheritance, custom layout, static
+type initialization, recursive construction, COM activation, cleanup callbacks and events,
+unsupported value fields and unmodeled constructor chains also remain Unknown.
+String/delegate/closure/boxing source extraction, liveness/escape, peak and
+retained space and stack models remain in the full roadmap.

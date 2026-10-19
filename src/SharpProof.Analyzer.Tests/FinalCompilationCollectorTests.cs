@@ -1051,7 +1051,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 artifact.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("20"));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("21"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
                 artifact.MaximumExpressionDepth,

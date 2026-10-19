@@ -26,10 +26,14 @@ internal static class ResourceProgramOwnership
         cancellation.ThrowIfCancellationRequested();
         if (program.Length is { } length)
         { ResourceExpressionOwnership.Validate(length, callableId, owner, cancellation); }
+        if (program.Kind == ResourceProgramKind.AllocateManaged && (program.Allocation is null || program.Length is not null))
+        { throw new InvalidDataException("MalformedResourceAllocation"); }
         if (program.Allocation is { } allocation)
         {
-            if (program.Kind != ResourceProgramKind.AllocateArray || allocation.Kind != ResourceAllocationKind.Array ||
-                !allocation.Extent.Equals(program.Length))
+            if (program.Kind == ResourceProgramKind.AllocateArray
+                ? allocation.Kind != ResourceAllocationKind.Array || !allocation.Extent.Equals(program.Length)
+                : program.Kind != ResourceProgramKind.AllocateManaged || allocation.Kind is ResourceAllocationKind.Unspecified or ResourceAllocationKind.Array ||
+                    !Enum.IsDefined(typeof(ResourceAllocationKind), allocation.Kind))
             { throw new InvalidDataException("MalformedResourceAllocation"); }
             ResourceExpressionOwnership.Validate(allocation.Extent, callableId, owner, cancellation);
         }
