@@ -3507,3 +3507,11 @@ vectors and read-only snapshots. Use ordered array builders, freeze callback tra
 each producer including partial-failure traces, and immutable helper parameter contracts.
 Preserve generated pre-state names, native reflection arguments, source text and runtime
 mutable subjects. Validate all Contracts tests after the full batch. Status: open before edits.
+IMM-M127: Review the remaining 19 safe Contracts callback/vector/snapshot rows and
+six metadata-image publications. Freeze synchronous operation-site traces after BindValue
+and immutable outer expected vectors without changing native runtime subjects. The six
+image owners are locally created exposable MemoryStreams; copy their [0, Length) bytes
+once into ImmutableArray at Roslyn CreateFromImage publication, preserving stream position
+and avoiding a writable published image. Retain seven traced native reflection/Assembly
+Load/Construct adapters and one actual mutable int[] SUT identity. Validate full Contracts.
+Status: open before edits.
