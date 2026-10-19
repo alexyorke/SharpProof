@@ -20,6 +20,14 @@ internal static class NativeResourceContractVerifier
             var violation = await NativeResourceViolationReplay.FindAsync(target, claim, limit, budgets, cancellation).ConfigureAwait(false);
             if (violation is null)
             { return result; }
+            if (claim.Constraint.ResourceUpperBound!.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes)
+            {
+                var lifetimeLayout = new NativeResourceLayoutBinding(target);
+                if (lifetimeLayout.Bind() is null)
+                { return result; }
+                lifetimeLayout.Project(violation);
+                return violation;
+            }
             var metadata = new NativeResourceMetadataBinding(target);
             var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, cancellation);
             if (!check.Verified)

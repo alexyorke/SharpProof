@@ -138,6 +138,20 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
                 state.Transfer = false;
                 var result = instruction.Execute(ref state);
+                if (replayOptions?.CompletedInstructionObserver is { } completed &&
+                    (result == null || result.Status == IrProgramExecutionStatus.Returned))
+                {
+                    IrValue? produced = result?.ReturnValue;
+                    var target = instruction switch
+                    {
+                        IrAssignInstruction assigned => (IrVarId?)assigned.Target,
+                        IrAllocationInstruction allocated => allocated.Target,
+                        _ => null
+                    };
+                    if (target is { } written)
+                    { state.Values.Current.TryGetValue(written, out produced); }
+                    completed(instruction, produced, state.Values.ConsumedApproximation);
+                }
                 if (result != null)
                 {
                     return result;

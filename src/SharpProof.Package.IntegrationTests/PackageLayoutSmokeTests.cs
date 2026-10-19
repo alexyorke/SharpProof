@@ -3705,10 +3705,13 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(false, 8)]
     [TestCase(false, 9, TestName = "MainPackageLifetimeFixedLocalPeak")]
     [TestCase(false, 10, TestName = "MainPackageLifetimeFixedLocalRetained")]
+    [TestCase(true, 7, TestName = "MainPackageLifetimeCompletedPeakViolation")]
+    [TestCase(true, 8, TestName = "MainPackageLifetimeCompletedRetainedViolation")]
+    [TestCase(true, 10, TestName = "MainPackageLifetimeFixedLocalRetainedViolation")]
     public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
     {
         var upper = allocationKind switch { 9 => 0, 10 => 32, 7 => 32, 8 => 40, 1 or 4 or 5 => 64, 6 => 88, 2 => 72, 3 => 32, _ => 120 };
-        var boundLimit = violates ? allocationKind switch { 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
+        var boundLimit = violates ? allocationKind switch { 7 or 10 => 31, 8 => 39, 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
         var body = allocationKind switch { 9 or 10 => "var size=1; return new int[size];", 7 or 8 => "var dead=new int[1]; return new int[3];", 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", 6 => "return () => n;", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
         var declarations = allocationKind switch { 1 => "public class Cell { public Cell() { var data=new int[3]; } }", 4 => "public class Cell { public int[] data=new int[3]; }", 5 => "public static class Callbacks { public static void Run() {} }", _ => string.Empty };
         var expected = violates ? "Refuted" : "Proven";

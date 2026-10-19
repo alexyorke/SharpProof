@@ -72,17 +72,18 @@ public sealed partial class NativeResourceContractTests
 
     [TestCase(5)]
     [TestCase(6)]
-    public async Task LifetimeEstimatesCannotInventNumericalViolations(int metric)
+    public async Task LifetimeViolationsRequireCompletedConcreteReplay(int metric)
     {
         var source = "using SharpProof.Attributes; public static class C { " +
             $"[ResourceUpperBound((ResourceMetric){metric}, 0)] public static int[] Target() {{ var dead = new int[1]; return new int[3]; }} }}";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
-        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.Null);
         Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
-        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
-        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.EqualTo(metric == 5 ? "32" : "40"));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+        Assert.That(result.EffectWitness!.Detail, Does.Contain("completed execution"));
     }
     [TestCase(5, 0)]
     [TestCase(6, 32)]
@@ -135,5 +136,29 @@ public sealed partial class NativeResourceContractTests
         Assert.That(WorkerProtocolMetadata.HasValidResourceConstraint(WorkerEffectContractKind.ResourceUpperBound, constraint), Is.False);
         constraint.CostModel = WorkerResourceModels.CostModel;
         Assert.That(WorkerProtocolMetadata.HasValidResourceConstraint(WorkerEffectContractKind.ResourceUpperBound, constraint), Is.False);
+    }
+    [TestCase("Contract.Requires(false);", false)]
+    [TestCase("Contract.Requires(n < 0 && n > 0);", false)]
+    [TestCase("Contract.Requires(n == 37);", true)]
+    public async Task LifetimeReplayValidatesRequiresAndSolverSuppliedEntries(string requires, bool violation)
+    {
+        ArgumentNullException.ThrowIfNull(requires);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,0)] public static int[] Target(int n) { " +
+            requires + " return new int[3]; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        if (violation)
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("40"));
+            Assert.That(result.Model.Any(static value => value is not null && value.Variable == "parameter:0" && value.Value == "37"), Is.True);
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        }
     }
 }

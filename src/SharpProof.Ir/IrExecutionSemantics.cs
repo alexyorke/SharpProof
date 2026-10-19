@@ -118,6 +118,7 @@ public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocV
     // Only a trusted replay host may replace an approximation with an observed framework value.
     internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; set; }
 
+    internal Action<IrInstruction, IrValue?, bool>? CompletedInstructionObserver { get; set; }
     public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; set; }
     public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
     public Action<IrWriteInstruction>? WriteObserver { get; set; }

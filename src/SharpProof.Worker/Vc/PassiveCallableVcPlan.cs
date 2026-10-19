@@ -288,6 +288,20 @@ internal sealed class PassiveCallableVcPlan
         }, cancellationToken);
     }
 
+    internal IrProgramExecutionResult ReplayMemory(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Action<IrInstruction, IrValue?, bool> observer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(observer);
+        return ReplayWithOptions(inputs, initial =>
+        {
+            ArgumentNullException.ThrowIfNull(initial);
+            var options = ReplayOptions(initial: initial);
+            options.CompletedInstructionObserver = observer;
+            return options;
+        }, cancellationToken);
+    }
+
     // Purity witness replay has a receiver-ownership policy of its own;
     // general effect replay continues to observe every successful store.
     internal IrProgramExecutionResult ReplayPurityEffects(ImmutableDictionary<IrVarId, IrValue> inputs,

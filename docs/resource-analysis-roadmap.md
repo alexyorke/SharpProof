@@ -1229,3 +1229,34 @@ earlier 17 package cases, 19 distinct package cases now cover this milestone.
 Final quality/compatibility categories passed. The added package controls used
 the Git-aware wrapper required by Arcade packaging; a terminal restore-process
 crash was rerun successfully with the same pinned toolchain.
+
+## Completed-execution lifetime refutations
+
+Native lifetime violations now require a concrete completed execution, independent
+of the source-produced upper envelope. A bounded interpreter observer records
+successful instructions and produced values. Replay reconstructs primitive-array
+identities, byte footprints, aliases, last-use roots and returned ownership from
+those observations, then checks the declared lifetime model. Unknown, approximate,
+exceptional, truncated, foreign or unsupported observations cannot supply numbers.
+
+Entry constraints, receiver requirements and all Requires definedness/value
+conditions are checked before replay. Samples only supply candidates. A separate
+solver-entry control requires n == 37, outside the cheap sample set, and validates
+that entry concretely. False and contradictory Requires produce no refutation.
+Lifetime witnesses identify normal completion; cumulative witnesses retain their
+execution-prefix semantics. Owned layout evidence is projected for decided
+lifetime refutations without requiring a cumulative resource program.
+
+Protocol 28, cache 30 and compiler artifact 43 invalidate earlier cached Unknown
+outcomes. Manifest 6, resource program/evidence 4, expression 1 and the lifetime
+model identity remain unchanged. All 781 affected worker/protocol/Dictionary
+cases, all 641 IR tests, all 1416 analyzer tests and five selected package cases
+passed. The package selection includes three new lifetime refutations and two
+independent-path proofs; 22 distinct package cases have now been validated across
+the lifetime milestones. Layout evaluated 2721 source files, 59 projects and 151
+pinned common files; documentation generation and 723 local links passed. A full
+IR restore-process crash was rerun successfully with private CLI/HTTP state.
+All quality categories passed. The first external-link audit received a 504 for
+an unchanged GitHub URL; its targeted retry passed without source-link changes.
+Broader graph, call/repetition/exceptional lifetime composition, stack and phases
+E/F remain open, together with unchanged 100% coverage and exact-head CI.

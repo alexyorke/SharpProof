@@ -438,9 +438,12 @@ The initial native family is finite primitive-array allocation with constant siz
 reference aliases, last-use root drops, literal copies through compiler temporaries
 and proven constant guards. Unproved branches, repeated regions, borrowed output,
 source-call lifetime effects, broader object/field graphs and unsupported storage
-return Unknown without partial numbers or used layout dependencies. A bound that
-cannot be proved also remains Unknown until an independently validated numerical
-violation exists; an allocation estimate alone cannot refute it.
+return Unknown without partial numbers or used layout dependencies. Numerical
+refutations in the admitted finite family require a validated feasible entry and
+an independently observed completed execution. Replay reconstructs identities,
+aliases and last-use roots from actual instruction values. Incomplete executions,
+approximation, unsupported observations or entry conditions that have not been
+validated cannot supply a lifetime violation; estimates alone cannot refute a bound.
 
 Cumulative metrics retain their exceptional-prefix semantics. Logical lifetime
 metrics use `coreclr-8.0.32-x64-source-storage-v1:finite-owned-strong-reachability-v1:normal-completion`.

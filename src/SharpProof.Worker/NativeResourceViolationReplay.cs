@@ -16,12 +16,16 @@ internal static class NativeResourceViolationReplay
         limit = ArgumentNullGuard.NotNull(limit, nameof(limit));
         budgets = ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         var constraint = claim.Constraint.ResourceUpperBound!;
-        if (constraint.Metric is not (WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements or WorkerResourceMetric.AllocatedBytes))
+        var lifetime = constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes;
+        if (constraint.Metric is not (WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements or WorkerResourceMetric.AllocatedBytes) && !lifetime)
         { return null; }
-        var layout = constraint.Metric == WorkerResourceMetric.AllocatedBytes ? new NativeResourceLayoutBinding(target).Bind() : null;
-        if (constraint.Metric == WorkerResourceMetric.AllocatedBytes && layout is null)
+        var needsLayout = lifetime || constraint.Metric == WorkerResourceMetric.AllocatedBytes;
+        var layout = needsLayout ? new NativeResourceLayoutBinding(target).Bind() : null;
+        if (needsLayout && layout is null)
         { return null; }
         var owner = target.Total!;
+        if (lifetime && !ResourceMemoryProgram.Evaluate(owner.Program, layout!, cancellation).Verified)
+        { return null; }
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth) ||
@@ -105,55 +109,71 @@ internal static class NativeResourceViolationReplay
                     violatingPrefix = observed;
                 }
             }
-            plan!.ReplayResources(inputs, (instruction, elements, approximation) =>
+            if (lifetime)
             {
-                ArgumentNullException.ThrowIfNull(instruction);
-                if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+                var memoryReplay = new ResourceMemoryReplay(owner.Program);
+                var completed = plan!.ReplayMemory(inputs, memoryReplay.Observe, cancellation);
+                var memory = memoryReplay.Complete(completed, layout!, cancellation);
+                if (memory.Bounds is not { } actual)
+                { return null; }
+                var lower = constraint.Metric == WorkerResourceMetric.PeakAuxiliaryBytes ? actual.PeakAuxiliaryLower : actual.RetainedLower;
+                if (lower <= evaluatedLimit || completed.Instruction is null)
+                { return null; }
+                site = completed.Instruction.Operation;
+                violatingPrefix = lower;
+            }
+            else
+            {
+                plan!.ReplayResources(inputs, (instruction, elements, approximation) =>
                 {
-                    if (approximation || site is not null)
+                    ArgumentNullException.ThrowIfNull(instruction);
+                    if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+                    {
+                        if (approximation || site is not null)
+                        { return; }
+                        var bytes = ExactArrayBytes(factory, instruction, elements, layout!, cancellation);
+                        if (bytes is null)
+                        { unsupportedByteStorage = true; return; }
+                        Observe(instruction.Operation, bytes.Value, false);
+                        return;
+                    }
+                    if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
+                    { Observe(instruction.Operation, constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements, approximation); }
+                }, (instruction, characters, approximation) =>
+                {
+                    ArgumentNullException.ThrowIfNull(instruction);
+                    if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || approximation || site is not null)
                     { return; }
-                    var bytes = ExactArrayBytes(factory, instruction, elements, layout!, cancellation);
-                    if (bytes is null)
+                    var shape = ResourceAllocationShape.String(ResourceExpression.Literal(characters));
+                    var bound = ResourceRuntimeLayout.Bound(shape, layout!, cancellation);
+                    if (bound.Bounds is not { IsExact: true, Lower.Constant: { } bytes })
                     { unsupportedByteStorage = true; return; }
-                    Observe(instruction.Operation, bytes.Value, false);
-                    return;
-                }
-                if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
-                { Observe(instruction.Operation, constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements, approximation); }
-            }, (instruction, characters, approximation) =>
-            {
-                ArgumentNullException.ThrowIfNull(instruction);
-                if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || approximation || site is not null)
-                { return; }
-                var shape = ResourceAllocationShape.String(ResourceExpression.Literal(characters));
-                var bound = ResourceRuntimeLayout.Bound(shape, layout!, cancellation);
-                if (bound.Bounds is not { IsExact: true, Lower.Constant: { } bytes })
-                { unsupportedByteStorage = true; return; }
-                Observe(instruction.Operation, bytes, false);
-            }, (instruction, approximation) =>
-            {
-                ArgumentNullException.ThrowIfNull(instruction);
-                if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || instruction.Length is not null || approximation || site is not null)
-                { return; }
-                if (instruction.Target is null || factory.GetTypeInfo(instruction.AllocatedType).Kind != IrTypeKind.Reference)
-                { unsupportedByteStorage = true; return; }
-                if (factory.TryGetClosureFrameType(instruction.AllocatedType, out var fields))
+                    Observe(instruction.Operation, bytes, false);
+                }, (instruction, approximation) =>
                 {
-                    var frame = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(fields), layout!, cancellation);
-                    if (frame.Bounds?.Lower.Constant is not { } frameBytes)
+                    ArgumentNullException.ThrowIfNull(instruction);
+                    if (constraint.Metric != WorkerResourceMetric.AllocatedBytes || instruction.Length is not null || approximation || site is not null)
+                    { return; }
+                    if (instruction.Target is null || factory.GetTypeInfo(instruction.AllocatedType).Kind != IrTypeKind.Reference)
                     { unsupportedByteStorage = true; return; }
-                    Observe(instruction.Operation, frameBytes, false);
-                    return;
-                }
-                // Certified delegates have a reviewed fixed footprint. Other
-                // fresh references contribute only the minimum instance cost.
-                Observe(instruction.Operation, factory.IsDelegateReferenceType(instruction.AllocatedType) ? ResourceRuntimeLayout.DelegateBytes : ResourceRuntimeLayout.MinimumObject, false);
-            }, (instruction, approximation) =>
-            {
-                ArgumentNullException.ThrowIfNull(instruction);
-                if (constraint.Metric == WorkerResourceMetric.LoopBodyEntries)
-                { Observe(instruction.Operation, BigInteger.One, approximation); }
-            }, cancellation);
+                    if (factory.TryGetClosureFrameType(instruction.AllocatedType, out var fields))
+                    {
+                        var frame = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(fields), layout!, cancellation);
+                        if (frame.Bounds?.Lower.Constant is not { } frameBytes)
+                        { unsupportedByteStorage = true; return; }
+                        Observe(instruction.Operation, frameBytes, false);
+                        return;
+                    }
+                    // Certified delegates have a reviewed fixed footprint. Other
+                    // fresh references contribute only the minimum instance cost.
+                    Observe(instruction.Operation, factory.IsDelegateReferenceType(instruction.AllocatedType) ? ResourceRuntimeLayout.DelegateBytes : ResourceRuntimeLayout.MinimumObject, false);
+                }, (instruction, approximation) =>
+                {
+                    ArgumentNullException.ThrowIfNull(instruction);
+                    if (constraint.Metric == WorkerResourceMetric.LoopBodyEntries)
+                    { Observe(instruction.Operation, BigInteger.One, approximation); }
+                }, cancellation);
+            }
             cancellation.ThrowIfCancellationRequested();
             if (site is not { } operation || owner.Program.Factory.GetOperationInfo(operation).SourceSpan is not { Line: > 0 } span)
             { return null; }
@@ -172,7 +192,7 @@ internal static class NativeResourceViolationReplay
             result.EffectWitness = new()
             {
                 Kind = "resource-bound-exceeded",
-                Detail = constraint.Metric + " prefix " + observedText + " exceeds entry bound " + limitText,
+                Detail = constraint.Metric + (lifetime ? " completed execution " : " prefix ") + observedText + " exceeds entry bound " + limitText,
                 Effects = constraint.Metric == WorkerResourceMetric.LoopBodyEntries ? WorkerEffectSet.None : WorkerEffectSet.Allocates,
                 Location = new() { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
             };

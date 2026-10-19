@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 27,
+    "protocolVersion": 28,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 42,
+    "compilerArtifactSchemaVersion": 43,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -388,6 +388,7 @@
           "src/SharpProof.Ir/ResourceRuntimeLayout.cs",
           "src/SharpProof.Ir/ResourceMemoryTrace.cs",
           "src/SharpProof.Ir/ResourceMemoryProgram.cs",
+          "src/SharpProof.Ir/ResourceMemoryReplay.cs",
           "src/SharpProof.Ir/ResourceProgram.cs",
           "src/SharpProof.Ir/ResourceMetadataReference.cs"
         ]
