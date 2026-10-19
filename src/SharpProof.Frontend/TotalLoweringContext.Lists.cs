@@ -8,6 +8,8 @@ internal static partial class CSharpOperationSemantics
         var method = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
         return method != null && IsFrameworkCollectionMember(method) && symbol.OriginalDefinition.GetDocumentationCommentId() is
             "M:System.Collections.Generic.List`1.#ctor" or "M:System.Collections.Generic.List`1.Add(`0)" or
+            "M:System.Collections.Generic.List`1.Insert(System.Int32,`0)" or "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" or
+            "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)" or
             "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.List`1.Item(System.Int32)" or
             "M:System.Collections.Generic.ICollection`1.Add(`0)" or "P:System.Collections.Generic.ICollection`1.Count" or
             "P:System.Collections.Generic.IList`1.Item(System.Int32)";
@@ -81,8 +83,15 @@ public sealed partial class TotalLoweringContext
             else
             { break; }
         }
-        return CSharpOperationSemantics.IsEmptyListCreation(operation) ||
+        return CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation) ||
             Symbol(operation) is { } symbol && symbols.Contains(symbol) ||
             operation is IFlowCaptureReferenceOperation capture && captures.Contains(capture.Id);
+    }
+
+    private static bool IsListRangeAllocation(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return operation is IInvocationOperation { TargetMethod: { Name: "GetRange" } method } &&
+            CSharpOperationSemantics.IsConcreteListStateMember(method);
     }
 }

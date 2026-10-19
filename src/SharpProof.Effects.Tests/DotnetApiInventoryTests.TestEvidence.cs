@@ -62,6 +62,15 @@ public sealed partial class DotnetApiInventoryTests
                         opaqueStorage && (CheckOpaqueDictionaryStorageIntrinsic(compilation, true) || CheckOpaqueDictionaryStorageIntrinsic(compilation, true, direct: true)));
             }
 
+            if (row.Evidence.Contains("intrinsic=list-insertion-range-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled concrete and exact interface List Insert/GetRange normal state versus CLR; reverse shift, independent range storage, exact declared interface reference identity and API-specific opaque generic atoms versus decimal CLR bits; growth/bounds uncertainty retained; native proof and wrong-claim controls in NativeSpecifiedCallTests.ListRangesPreserveSharedContentsAndDistinctCopies",
+                    () => CheckListRangeIntrinsic(compilation, row.Id, false) && CheckListRangeIntrinsic(compilation, row.Id, false, referenceValues: true) &&
+                        CheckOpaqueListStorageIntrinsic(compilation, false, rangeMethod: row.Id),
+                    () => CheckListRangeIntrinsic(compilation, row.Id, true) || CheckListRangeIntrinsic(compilation, row.Id, true, referenceValues: true) ||
+                        CheckOpaqueListStorageIntrinsic(compilation, true, rangeMethod: row.Id));
+            }
             if (row.Evidence.Contains("intrinsic=concrete-stack-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,

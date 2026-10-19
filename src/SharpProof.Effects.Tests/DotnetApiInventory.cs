@@ -115,13 +115,18 @@ internal static class DotnetApiInventory
             evidence.Add("intrinsic=fresh-list-state");
             if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.List`1.Add(`0)" or
                 "M:System.Collections.Generic.ICollection`1.Add(`0)" or "P:System.Collections.Generic.List`1.Item(System.Int32)" or
-                "P:System.Collections.Generic.IList`1.Item(System.Int32)")
+                "P:System.Collections.Generic.IList`1.Item(System.Int32)" or "M:System.Collections.Generic.List`1.Insert(System.Int32,`0)" or
+                "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" or "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)")
             { evidence.Add("intrinsic=opaque-list-value-storage"); }
             if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.List`1.Add(`0)" or
                 "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.List`1.Item(System.Int32)")
             { evidence.Add("intrinsic=concrete-list-state"); }
         }
 
+        if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.List`1.Insert(System.Int32,`0)" or
+            "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" or "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)" &&
+            CSharpOperationSemantics.IsListStateDeclaration(symbol))
+        { evidence.Add("intrinsic=list-insertion-range-state"); }
         if (CSharpOperationSemantics.IsStackStateDeclaration(symbol))
         { evidence.Add("intrinsic=concrete-stack-state"); }
         if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
