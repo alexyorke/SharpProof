@@ -3482,3 +3482,16 @@ Scope: CompilerOrdinaryControlAndAbstractionCoverage, CompilerTotalCallRetiremen
 FloatingEqualityEvaluationOrderAudit and three Generic tested-type audit files.
 Status: open before edits. M118/M119 first build identified a private helper concrete
 immutable-map parameter requirement (CA1859); narrow that already-immutable boundary.
+IMM-M123: Review API usage-ranking construction: fixed expectation vectors, strict
+inventory projections, overwrite-initialized inventory maps, ordered site/gap collectors,
+ordinal sorted input hashes and known-intrinsic membership. Use scoped builders/frozen
+publication, preserve strict duplicate checks and sorted JSON property order. Reuse the
+existing internal strict map capture via test friend access. Validate full ranking tests
+and output shape/count/order. Status: open before edits.
+
+IMM-M124: Review shared test infrastructure and symbol package validator captures.
+Freeze seven read-only validator projections, ordered API evidence rows, guard type/name
+vectors and visited membership, and case-insensitive metadata-name membership. Use an
+immutable FIFO for guard dependency discovery; native reflection/byte buffers remain.
+Validate shared guards, metadata callers, evidence and symbol/package controls.
+Status: open before edits. Production host live forwarded-argument alias remains open.
