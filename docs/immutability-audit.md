@@ -2553,3 +2553,15 @@ against the pre-edit implementation and confirmed singleton/plural array wire sh
 Synthetic metadata was confined to that probe and is not authenticated CI evidence.
 Script formatter checked 87 PowerShell and 19 shell files, formatting one file; the
 publication probe passed again after formatting. Comprehensive residual audit stays open.
+
+IMM-M066: Coordinator traced 23 remaining mutable construction sites in compiler
+ClaimManifestBuilder, CompilerOwnedSyntaxPath and SemanticClaimIdentity. Use scoped
+immutable array builders for LIFO worklists and reversed path emission, preserving push,
+pop and child order. Hash builders preserve SymbolEqualityComparer/default object
+comparers; ordinal rank/ID map builders retain index overwrites and strict AddUnique
+rejection. Preserve first-seen required-method order explicitly before grouped ordinal
+assignment; freeze guarded syntax, ordinal maps, selected trees and published IDs at
+phase boundaries. Replace the operation child vector with an immutable snapshot. Hash
+writers remain resource/stateful sinks. Validate manifest, query/structural identity,
+reference ownership/budgets and original syntax-path sentinel controls.
+Status: open before edits.
