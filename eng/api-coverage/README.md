@@ -250,13 +250,18 @@ model evidence does not turn that Unknown into a proof.
 ### Fresh integer-key dictionary state
 
 Parameterless framework `Dictionary<TKey,TValue>` construction now establishes
-empty shared state for proven local, unescaped receivers with primitive integer
+empty shared state for proven constructor-origin receivers with primitive integer
 keys. Empty Count and membership do not require interpreting the value type.
 Successful Add, present-key index reads and simple index assignments retain the
-scalar/reference value domain and observe shared state through aliases. Key equality
+scalar/reference/opaque value domain and observe shared state through aliases and
+immutable generic source-helper parameters. Key equality
 preserves the full integer width; argument evaluation captures values before later
 mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
-closure escape, published references and unsupported type domains keep fallback.
+closure escape and unsupported type domains keep fallback. Publication preserves
+allocation lineage, while a constructor-written heap predicate guards the current
+default comparer. Unknown writers invalidate that predicate and the contents.
+Source contracts can read Count, ContainsKey and present values, including Old;
+call preconditions are obligations and cannot restore comparer assumptions.
 
 Initialization retains conservative allocation, static cache/capability and fault
 paths. Native replay observes fixed real CoreLib primitive dictionary operations
@@ -269,17 +274,21 @@ or callback guarantee. The complete boundaries and remaining corpus sites are in
 
 Reference values retain identity, stored nulls and alias updates. Supported class,
 interface, delegate and array domains include reference-constrained type parameters;
-unconstrained generic value contents and arrays of arrays remain outside the content model. Pure
+opaque structs and unconstrained generic values can also be stored and retrieved
+as atoms. Their operators, fields and conversions and arrays of arrays remain
+outside the content model. Pure
 ReferenceEquals clauses retain reference identity when converting these values to
 object. Publishing a fetched value does not publish its dictionary owner; capturing
-or publishing the owner still removes its ownership fact. CLR/IR comparisons and
+or publishing the owner still removes its strict ownership fact. Constructor
+lineage can retain guarded state support after by-value publication. CLR/IR comparisons and
 native proof/refutation controls cover the new behavior. See the
 [reference-value evidence and remaining boundaries](gaps.md#verified-reference-dictionary-values).
 
 Empty-state support also applies to opaque structure and unconstrained generic
 value types, without invoking their value constructors. This covers four actual
-integer-key corpus constructions. Opaque value writes still invalidate empty-state
-facts; generic/reference-key operations and custom/incoming comparer state remain open. See
+integer-key corpus constructions. Opaque value writes now preserve modeled Count,
+membership and atom storage; generic/reference-key operations and custom/incoming
+comparer state remain open. See
 [empty-state evidence and remaining gaps](gaps.md#verified-empty-dictionary-state-across-value-domains).
 
 Parameterless default construction and owned Count also support generic/reference

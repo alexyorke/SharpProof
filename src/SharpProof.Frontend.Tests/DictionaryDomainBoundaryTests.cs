@@ -84,17 +84,17 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(expected));
     }
 
-    [TestCase("int", "T", "", true, false)]
+    [TestCase("int", "T", "", true, true)]
     [TestCase("int", "T", "where T : class", true, true)]
-    [TestCase("int", "T", "where T : struct", true, false)]
-    [TestCase("int", "T", "where T : unmanaged", true, false)]
-    [TestCase("int", "T", "where T : notnull", true, false)]
-    [TestCase("int", "T", "where T : System.IDisposable", true, false)]
+    [TestCase("int", "T", "where T : struct", true, true)]
+    [TestCase("int", "T", "where T : unmanaged", true, true)]
+    [TestCase("int", "T", "where T : notnull", true, true)]
+    [TestCase("int", "T", "where T : System.IDisposable", true, true)]
     [TestCase("int", "T", "where T : class, System.IDisposable", true, true)]
     [TestCase("int", "T", "where T : System.Exception", true, true)]
     [TestCase("string", "object", "", false, false)]
     [TestCase("T", "int", "where T : System.IComparable<T>", false, false)]
-    [TestCase("int", "decimal", "", true, false)]
+    [TestCase("int", "decimal", "", true, true)]
     [TestCase("int", "object[][]", "", true, false)]
     [TestCase("int", "object[]", "", true, true)]
     [TestCase("int", "int[,]", "", true, true)]

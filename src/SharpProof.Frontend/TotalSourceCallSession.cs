@@ -186,12 +186,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         graph = null;
         if (!Spend(method.Parameters.Length + 1))
         { return false; }
-        // Scalar, reference and opaque element specialization belongs to the List helper
+        // Scalar, reference and opaque specialization belongs to a supported collection
         // boundary. Other generic source calls retain their existing scalar domain.
-        var listElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type));
+        var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsDictionaryReceiverType(parameter.Type));
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
-        { return listElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
+        { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
             KnownSourceValue(method.ReturnType) != null;
         if (!contractOnly && IsActive(method) ||
@@ -316,7 +316,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) != null ||
-            TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
+            TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
+            TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -342,6 +343,16 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }
+            if (TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredDictionary &&
+                argument.Parameter.Type is INamedTypeSymbol actualDictionary)
+            {
+                for (var ordinal = 0; ordinal < declaredDictionary.TypeArguments.Length; ordinal++)
+                {
+                    if (declaredDictionary.TypeArguments[ordinal] is ITypeParameterSymbol argumentType &&
+                        KnownSourceValue(actualDictionary.TypeArguments[ordinal]) is { } actualType)
+                    { frame.SpecializeTypeParameter(argumentType, actualType); }
+                }
+            }
             if (parameter.Type is IArrayTypeSymbol { IsSZArray: true } || declarationOperations.Length != 0 &&
                 !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
@@ -355,6 +366,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDefaultComparerParameter(parameter); }
                 if (TotalLoweringContext.IsListReceiverType(parameter.Type) && caller.IsExactList(argument.Value))
                 { frame.SpecializeListParameter(parameter); }
+                if (TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) && caller.IsDefaultDictionaryOrigin(argument.Value))
+                { frame.SpecializeDictionaryOriginParameter(parameter); }
             }
         }
         if (instance != null)
