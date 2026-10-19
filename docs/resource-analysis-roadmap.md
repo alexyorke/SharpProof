@@ -976,3 +976,44 @@ four coverage shards. Aggregate qualification failed at 3219/3308 changed truste
 lines (97.31%), leaving 89 gaps against the unchanged 100% floor. This measurement
 excludes the string layer. Fresh exact-head CI and final qualification remain
 required; no roadmap item is removed by this checkpoint.
+
+## Constructor initializer replay
+
+The functional/native backend now lowers admitted instance field and simple
+auto-property initializers in source declaration order. Caller arguments are
+captured first, then the instance is allocated, then initializers execute, then
+the explicit body runs. Implicit constructors execute initializers before
+returning. Direct field object initializers then execute after construction. Field stores share the fresh instance with body/caller reads, and
+exceptions stop later initializers and body effects. Root constructor body-only
+admission remains separate; a constructor body CFG is never silently treated as
+containing its field initializers.
+
+The exact construction path requires one source type declaration without type
+parameters directly derived from System.Object. Static initialization, inheritance,
+constructor chains, partial declarations, property-setter/nested object initializers and
+unsupported initializer values retain conservative boundaries. Compiler-backed
+instance auto-property reads have no hidden getter cost; custom/virtual getters
+remain unsupported in resource cost extraction.
+
+Protocol 24, cache 26 and artifact 39 invalidate previous capability evidence;
+resource program/evidence model 4 and expression model 1 are unchanged. Tests
+cover mixed byte prefixes, initializer value flow, throwing arguments/initializers
+and package consumers. Broader phase C/E/F requirements and
+unchanged 100% final qualification remain open.
+Validation passed 881 broader native/resource/source-call/protocol/cache/golden
+cases, 180 final construction cases plus 2 constructor-fault controls, all 2062
+frontend tests and all 1409 analyzer
+tests. Eleven actual package cases passed across arrays, explicit/implicit
+construction, boxing and strings, including strict/advisory handling, AnyCPU
+Unknown and equivalent-artifact reuse. All quality and compatibility categories
+passed. The 26 pinned-runtime layout tests also passed, independently measuring
+64-byte field/auto-property construction and 104-byte field replacement after
+construction. Final source formatting passed. Layout passed with 2665 source
+files, 59 evaluated projects and 151 pinned common files; documentation drift and
+723 local links passed.
+
+Published string checkpoint 518c98d80 passed every non-coverage workflow and all
+four coverage shards. Aggregate qualification failed at 3292/3382 changed trusted
+lines (97.34%), leaving 90 gaps against the unchanged 100% baseline. This result
+excludes initializer replay. Exact-head CI, coverage gap closure and all remaining
+phase C/E/F work remain required.

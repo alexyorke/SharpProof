@@ -142,6 +142,12 @@ internal static partial class CSharpOperationSemantics
     // constructor, and the constructor chains to no other constructor.
     internal static bool IsPlainConstructor(IMethodSymbol constructor, CancellationToken cancellationToken)
     {
+        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
+        return IsDirectObjectConstructor(constructor, false, cancellationToken);
+    }
+
+    internal static bool IsDirectObjectConstructor(IMethodSymbol constructor, bool includeInitializers, CancellationToken cancellationToken)
+    {
         if (constructor is not { MethodKind: MethodKind.Constructor, IsStatic: false } ||
             constructor.ContainingType is not
             {
@@ -159,7 +165,7 @@ internal static partial class CSharpOperationSemantics
         foreach (var reference in type.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration ||
-                declaration.ParameterList != null || declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
+                declaration.ParameterList != null || !includeInitializers && declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
                 {
                     Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field => !IsStatic(field.Modifiers) &&
                         field.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),

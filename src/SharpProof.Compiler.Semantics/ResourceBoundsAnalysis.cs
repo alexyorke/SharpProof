@@ -291,6 +291,10 @@ internal sealed partial class ResourceBoundsAnalysis
             case IPropertyReferenceOperation property when IsArrayLength(property):
                 result = Visit(property.Instance!, depth + 1);
                 break;
+            case IPropertyReferenceOperation property when !property.Property.IsStatic && property.Instance != null && property.Arguments.IsEmpty &&
+                CSharpOperationSemantics.GetterField(property.Property) is { AssociatedSymbol: IPropertySymbol }:
+                result = Visit(property.Instance, depth + 1);
+                break;
             case ILocalReferenceOperation local when SupportedType(local.Local.Type):
             case IParameterReferenceOperation parameter when SupportedType(parameter.Parameter.Type):
             case ILiteralOperation literal when literal.Type is { } literalType && SupportedType(literalType):

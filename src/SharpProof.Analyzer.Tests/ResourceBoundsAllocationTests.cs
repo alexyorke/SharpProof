@@ -9,6 +9,7 @@ public sealed partial class ResourceBoundsTests
     [TestCase("public class Cell { public int[] Data { get; } = new int[3]; }", "var cell=new Cell();", "0", "1", "3")]
     [TestCase("public class Cell { public int[] data; }", "var cell=new Cell { data=new int[3] };", "0", "1", "3")]
     [TestCase("public class Cell { public int[] data; public Cell(int[] a) { data=a; } }", "var cell=new Cell(new int[3]);", "0", "1", "3")]
+    [TestCase("public class Cell { public int[] Data { get; } = new int[3]; }", "var cell=new Cell(); var values=cell.Data;", "0", "1", "3")]
     public void ManagedConstructorsAndInitializersRetainTheirResourceEffects(string declarations, string body, string loops, string arrays, string elements)
     {
         ArgumentNullException.ThrowIfNull(declarations);

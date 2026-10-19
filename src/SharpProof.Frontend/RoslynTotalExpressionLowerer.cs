@@ -1157,6 +1157,19 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     // A scalar or reference instance field of a class: its reads and stores
     // are modeled through an object-typed receiver.
+    internal bool StoreInitializer(IFieldSymbol field, IrTerm receiver, IOperation initializer, IrTerm value, IrBlockId block)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        initializer = RepositoryParameterGuard.NotNull(initializer, nameof(initializer));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (FieldMember(field) is not { } member || _factory.GetMemberInfo(member).ReturnType != value.Type)
+        { return false; }
+        _builder!.FieldStore(block, _context.Site(initializer), IrWriteRegion.Field, AsObject(receiver), member, value);
+        return true;
+    }
+
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
         if (field.IsStatic || !field.ContainingType.IsReferenceType ||

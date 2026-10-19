@@ -185,6 +185,9 @@ public sealed class ResourceRuntimeLayoutTests
             static () => new MixedFields(SharedReference, 42, 1));
         CheckMeasured(ResourceAllocationShape.Delegate(), CreateDelegate);
         CheckMeasured(ResourceAllocationShape.Closure([ResourceStorageKind.Word32]), CreateClosure);
+        Assert.That(Measure(static () => new InitializedFieldCell()), Is.EqualTo(64));
+        Assert.That(Measure(static () => new InitializedPropertyCell()), Is.EqualTo(64));
+        Assert.That(Measure(static () => new InitializedFieldCell { Data = new int[4] }), Is.EqualTo(104));
         Assert.That(Measure(static () => new string('x', 0)), Is.Zero);
         Assert.That(Bound(ResourceAllocationShape.String(ResourceExpression.Zero)).Upper.Constant, Is.GreaterThan(BigInteger.Zero));
         Assert.That(ResourceRuntimeLayout.ContentSha256, Has.Length.EqualTo(64));
@@ -230,6 +233,21 @@ public sealed class ResourceRuntimeLayoutTests
         return closure;
     }
 
+    private sealed class InitializedFieldCell
+    {
+        internal int[] Data = new int[3];
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public InitializedFieldCell() { }
+    }
+
+    private sealed class InitializedPropertyCell
+    {
+        internal int[] Data { get; } = new int[3];
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public InitializedPropertyCell() { }
+    }
     private sealed class SmallFields(int first, int second)
     {
         internal int First { get; } = first;

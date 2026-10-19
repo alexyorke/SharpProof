@@ -56,17 +56,92 @@ public sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("50"));
         Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
     }
-    [Test]
-    public async Task OpaqueInitializerReplayCannotInventMixedBytePrefixes()
+    [TestCase("public class Cell { public int[] data=new int[3]; }")]
+    [TestCase("public class Cell { public int[] Data { get; } =new int[3]; }")]
+    [TestCase("public class Cell { public int[] data=new int[3]; public Cell() {} }")]
+    public async Task InitializerReplayProducesAConcreteMixedBytePrefix(string declaration)
     {
+        ArgumentNullException.ThrowIfNull(declaration);
         var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 50)]", "var item=new Cell();") +
-            "public class Cell { public int[] data=new int[3]; }", reviewedRuntime: true, x64: true));
+            declaration, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("64"));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+        Assert.That(result.EffectWitness, Is.Not.Null);
+    }
+    [TestCase("public class Cell { public int[] data=new int[3]; public Cell() { if(data.Length==3) { var extra=new int[4]; } } }", "var item=new Cell();")]
+    [TestCase("public class Cell { public int[] Data { get; } =new int[3]; }", "var item=new Cell(); if(item.Data.Length==3) { var extra=new int[4]; }")]
+    public async Task InitializedFieldsReachConstructorAndCallerReads(string declaration, string body)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 100)]", body) + declaration,
+            reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("104"));
+    }
+
+    [TestCase(63, true)]
+    [TestCase(100, false)]
+    public async Task ThrowingInitializersStopLaterAllocationPrefixes(int bound, bool violates)
+    {
+        var source = Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {bound})]", "var item=new Cell();") +
+            "public class Cell { public int[] first=new int[3]; public int fault=1/Zero(); public int[] later=new int[10]; static int Zero() { return 0; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(violates ? "64" : null));
+    }
+
+    [Test]
+    public async Task AThrowingArgumentCannotRunInstanceInitializers()
+    {
+        var source = Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", "int zero=0; var item=new Cell(n/zero);") +
+            "public class Cell { public int[] data=new int[3]; public Cell(int argument) {} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
-        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
-        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
-        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
         Assert.That(result.EffectWitness, Is.Null);
+    }
+    [TestCase("public class Cell { public int[] data; }", "var item=new Cell { data=new int[3] };", 64)]
+    [TestCase("public class Cell { public int[] data=new int[3]; }", "var item=new Cell { data=new int[4] };", 104)]
+    [TestCase("public class Cell { public int[] data; public Cell() { data=new int[3]; } }", "var item=new Cell { data=new int[4] };", 104)]
+    public async Task ObjectFieldInitializersFollowConstructorExecution(string declaration, string body, int bytes)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {bytes - 1})]", body) + declaration,
+            reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(bytes.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+    [TestCase("public partial class Cell { public int[] data=new int[3]; } public partial class Cell {}", "var item=new Cell();")]
+    [TestCase("public class Cell { public int[] Data { get; set; } }", "var item=new Cell { Data=new int[3] };")]
+    public async Task UnsupportedInitializerReplayHasNoPartialNumericalVerdict(string declaration, string body)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 50)]", body) + declaration,
+            reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
+    [TestCase(23, true)]
+    [TestCase(24, false)]
+    public async Task ObjectInitializersCannotRunAfterAThrowingConstructor(int bound, bool violates)
+    {
+        var source = Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {bound})]", "var item=new Cell(n) { data=new int[3] };") +
+            "public class Cell { public int[] data; public Cell(int n) { int zero=0; int value=n/zero; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(violates ? "24" : null));
     }
 }

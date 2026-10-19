@@ -328,13 +328,17 @@ Concrete fresh-reference events contribute only their justified model lower cost
 to numerical refutations. Exact array costs can then compose with that lower
 cost when the constructor body replays without approximation.
 
-Instance-initializer constructors currently use an opaque replay path in the
-functional backend. Their source-derived upper bounds are available, but a
-numeric violation needing events after that approximation stays Unknown. Exact
-initializer execution remains required work. Inheritance, custom layout, static
+For admitted source construction, field and simple auto-property initializers
+now execute in declaration order after argument evaluation and allocation, before
+the constructor body. Argument values are captured before initializer effects.
+Direct field object initializers execute after the constructor body. Initializer
+stores reach body/caller reads; exceptions prevent later events. This path admits
+one type declaration without type parameters;
+partial declarations, property-setter/nested object initializers and unsupported initializer
+values retain conservative replay boundaries. Inheritance, custom layout, static
 type initialization, recursive construction, COM activation, cleanup callbacks and events,
 unsupported value fields and unmodeled constructor chains also remain Unknown.
-String/delegate/closure source extraction, liveness/escape, peak and
+Broader string and delegate/closure source extraction, liveness/escape, peak and
 retained space and stack models remain in the full roadmap.
 
 ### Scalar boxing

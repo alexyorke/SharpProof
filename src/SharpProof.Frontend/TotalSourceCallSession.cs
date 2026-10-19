@@ -174,10 +174,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // With `contractOnly`, a callee already being inlined (a recursive call)
     // gets a frame for its preconditions and no body; so does an iterator
     // without preconditions, whose body runs only as it is enumerated, and a
-    // class constructor that chains, initializes fields or has a base class.
+    // class constructor whose body is not admitted. constructorInitializers is
+    // set only by a caller that explicitly lowers instance initializers.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
-        bool assigned = false, bool contractOnly = false)
+        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -200,7 +201,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 MethodKind.LocalFunction) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
-                ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken) &&
+                ? instance != null || !CSharpOperationSemantics.IsDirectObjectConstructor(method, constructorInitializers, cancellationToken) &&
                     !(contractOnly && method.ContainingType.TypeKind == TypeKind.Class)
                 : method.MethodKind == MethodKind.LocalFunction ? instance != null : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
@@ -371,7 +372,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDictionaryOriginParameter(parameter); }
             }
         }
-        if (instance != null)
+        if (instance != null || constructorInitializers && method.MethodKind == MethodKind.Constructor)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))
         { frame = null; return false; }
