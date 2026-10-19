@@ -55,7 +55,7 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         Assert.That(rejected.Term, Is.TypeOf<IrOpaqueTerm>());
 
         using var control = TypedProgramSubject.Create("string Target(string text) => text ?? \"fallback\";");
-        object[] inputs = [null!];
+        ImmutableArray<object> inputs = [null!];
         Assert.That(control.Invoke(inputs), Is.EqualTo("fallback"));
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);

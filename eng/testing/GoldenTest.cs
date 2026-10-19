@@ -34,11 +34,11 @@ internal static class GoldenTest
         var relative = Path.GetRelativePath(root, Path.Combine(directory, name + ".cs"));
         var source = ReadPlainFile(root, relative);
         var expected = ReadExpectation(root, Path.ChangeExtension(relative, ".expected"));
-        if (expected == null && Environment.GetEnvironmentVariable("SHARPPROOF_UPDATE_GOLDEN") != "1")
+        if (expected is null && Environment.GetEnvironmentVariable("SHARPPROOF_UPDATE_GOLDEN") != "1")
         {
             throw new InvalidDataException("Missing paired golden expectation: " + relative.Replace('\\', '/'));
         }
-        return new GoldenCase(root, relative, source, expected, Decode(source), expected == null ? "" : Decode(expected.Value));
+        return new GoldenCase(root, relative, source, expected, Decode(source), expected is null ? "" : Decode(expected.Value));
     }
 
     internal static void Compare(GoldenCase fixture, string actual)

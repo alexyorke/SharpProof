@@ -61,7 +61,7 @@ public sealed class CompilerErrorReferenceNullComparisonApiCoverageTests
 
         using var control = TypedProgramSubject.Create("bool Target(object value) => value " +
             (unequal ? "!=" : "==") + " null;");
-        object[] inputs = [null!];
+        ImmutableArray<object> inputs = [null!];
         Assert.That(control.Invoke(inputs), Is.EqualTo(!unequal));
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);

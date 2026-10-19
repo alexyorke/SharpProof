@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -82,7 +83,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
-        object[] inputs = [input, 1];
+        ImmutableArray<object> inputs = [input, 1];
         var native = subject.Invoke(inputs);
         if (overflow)
         {

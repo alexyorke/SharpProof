@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -57,7 +58,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         System.ArgumentNullException.ThrowIfNull(input);
         System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
-        object[] inputs = [input, count];
+        ImmutableArray<object> inputs = [input, count];
         Assert.That(subject.Invoke(inputs), Is.EqualTo(input is sbyte ? (object)(sbyte)expected
             : input is long ? expected : (object)(int)expected));
         var tree = subject.Compilation.SyntaxTrees.Single();

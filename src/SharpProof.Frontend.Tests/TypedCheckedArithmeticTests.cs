@@ -10,33 +10,33 @@ public sealed class TypedCheckedArithmeticTests
 {
     public static IEnumerable<TestCaseData> CheckedCases()
     {
-        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x & 128));", (sbyte)-1);
-        yield return Case("short Target(short x) => checked((short)(x & 32768));", (short)-1);
-        yield return Case("byte Target(byte x) { checked { x &= 255; return x; } }", byte.MaxValue);
-        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x | 128));", (sbyte)0);
-        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x ^ 255));", (sbyte)-1);
-        yield return Case("byte Target(byte x) => checked((byte)~x);", (byte)0);
-        yield return Case("short Target(short x) { checked { x ^= -1; return x; } }", short.MinValue);
-        yield return Case("byte Target(byte x) { checked { x |= 128; return x; } }", (byte)1);
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x & 128));", [(sbyte)-1]);
+        yield return Case("short Target(short x) => checked((short)(x & 32768));", [(short)-1]);
+        yield return Case("byte Target(byte x) { checked { x &= 255; return x; } }", [byte.MaxValue]);
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x | 128));", [(sbyte)0]);
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x ^ 255));", [(sbyte)-1]);
+        yield return Case("byte Target(byte x) => checked((byte)~x);", [(byte)0]);
+        yield return Case("short Target(short x) { checked { x ^= -1; return x; } }", [short.MinValue]);
+        yield return Case("byte Target(byte x) { checked { x |= 128; return x; } }", [(byte)1]);
         foreach (var expression in ImmutableArray.Create("x + y", "x - y", "x * y"))
         {
             foreach (var pair in ImmutableArray.Create((int.MaxValue, 2), (int.MinValue, -1), (int.MaxValue, -1), (int.MinValue, 1),
                 (-2, -3), (2, -3), (-2, 3), (0, int.MinValue), (int.MinValue, 0), (int.MinValue, int.MinValue), (int.MaxValue, int.MaxValue)))
-            { yield return Case($"int Target(int x, int y) => checked({expression});", pair.Item1, pair.Item2); }
+            { yield return Case($"int Target(int x, int y) => checked({expression});", [pair.Item1, pair.Item2]); }
             foreach (var pair in ImmutableArray.Create((long.MaxValue, 2L), (long.MinValue, -1L), (long.MaxValue, -1L), (long.MinValue, 1L),
                 (-2L, -3L), (2L, -3L), (-2L, 3L), (0L, long.MinValue), (long.MinValue, 0L), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue)))
-            { yield return Case($"long Target(long x, long y) => checked({expression});", pair.Item1, pair.Item2); }
+            { yield return Case($"long Target(long x, long y) => checked({expression});", [pair.Item1, pair.Item2]); }
             foreach (var pair in ImmutableArray.Create((uint.MaxValue, 2U), (0U, 1U), (2U, 3U), (0U, uint.MaxValue), (uint.MaxValue, 0U), (uint.MaxValue, uint.MaxValue)))
-            { yield return Case($"uint Target(uint x, uint y) => checked({expression});", pair.Item1, pair.Item2); }
+            { yield return Case($"uint Target(uint x, uint y) => checked({expression});", [pair.Item1, pair.Item2]); }
             foreach (var pair in ImmutableArray.Create((ulong.MaxValue, 2UL), (0UL, 1UL), (2UL, 3UL), (0UL, ulong.MaxValue), (ulong.MaxValue, 0UL), (ulong.MaxValue, ulong.MaxValue)))
-            { yield return Case($"ulong Target(ulong x, ulong y) => checked({expression});", pair.Item1, pair.Item2); }
-            yield return Case($"int Target(short x, short y) => checked({expression});", short.MinValue, short.MinValue);
-            yield return Case($"int Target(ushort x, ushort y) => checked({expression});", ushort.MaxValue, ushort.MaxValue);
+            { yield return Case($"ulong Target(ulong x, ulong y) => checked({expression});", [pair.Item1, pair.Item2]); }
+            yield return Case($"int Target(short x, short y) => checked({expression});", [short.MinValue, short.MinValue]);
+            yield return Case($"int Target(ushort x, ushort y) => checked({expression});", [ushort.MaxValue, ushort.MaxValue]);
         }
-        yield return Case("int Target(int x) => checked(-x);", int.MinValue);
-        yield return Case("long Target(long x) => checked(-x);", long.MinValue);
-        yield return Case("long Target(uint x) => checked(-x);", uint.MaxValue);
-        yield return Case("int Target(short x) => checked(+x);", short.MinValue);
+        yield return Case("int Target(int x) => checked(-x);", [int.MinValue]);
+        yield return Case("long Target(long x) => checked(-x);", [long.MinValue]);
+        yield return Case("long Target(uint x) => checked(-x);", [uint.MaxValue]);
+        yield return Case("int Target(short x) => checked(+x);", [short.MinValue]);
         foreach (var type in ImmutableArray.Create("sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"))
         {
             var value = type switch
@@ -51,28 +51,28 @@ public sealed class TypedCheckedArithmeticTests
                 "long" => long.MaxValue,
                 _ => ulong.MaxValue
             };
-            yield return Case($"{type} Target({type} x) {{ checked {{ return ++x; }} }}", value);
-            yield return Case($"{type} Target({type} x) {{ checked {{ x += ({type})1; return x; }} }}", value);
-            yield return Case($"{type} Target({type} x) {{ checked {{ x *= ({type})2; return x; }} }}", value);
-            yield return Case($"{type} Target({type} x) {{ checked {{ return x--; }} }}", value);
+            yield return Case($"{type} Target({type} x) {{ checked {{ return ++x; }} }}", [value]);
+            yield return Case($"{type} Target({type} x) {{ checked {{ x += ({type})1; return x; }} }}", [value]);
+            yield return Case($"{type} Target({type} x) {{ checked {{ x *= ({type})2; return x; }} }}", [value]);
+            yield return Case($"{type} Target({type} x) {{ checked {{ return x--; }} }}", [value]);
             var zero = Convert.ChangeType(0, value.GetType(), CultureInfo.InvariantCulture);
-            yield return Case($"{type} Target({type} x) {{ checked {{ return --x; }} }}", zero);
-            yield return Case($"{type} Target({type} x) {{ checked {{ x -= ({type})1; return x; }} }}", zero);
-            yield return Case($"{type} Target({type} x) {{ unchecked {{ return ++x; }} }}", value);
-            yield return Case($"{type} Target({type} x) {{ unchecked {{ x *= ({type})2; return x; }} }}", value);
+            yield return Case($"{type} Target({type} x) {{ checked {{ return --x; }} }}", [zero]);
+            yield return Case($"{type} Target({type} x) {{ checked {{ x -= ({type})1; return x; }} }}", [zero]);
+            yield return Case($"{type} Target({type} x) {{ unchecked {{ return ++x; }} }}", [value]);
+            yield return Case($"{type} Target({type} x) {{ unchecked {{ x *= ({type})2; return x; }} }}", [value]);
             if (type is "sbyte" or "short" or "int" or "long")
             {
                 var minimum = type switch { "sbyte" => (object)sbyte.MinValue, "short" => short.MinValue, "int" => int.MinValue, _ => long.MinValue };
-                yield return Case($"{type} Target({type} x) {{ checked {{ return --x; }} }}", minimum);
-                yield return Case($"{type} Target({type} x) {{ checked {{ x -= ({type})1; return x; }} }}", minimum);
+                yield return Case($"{type} Target({type} x) {{ checked {{ return --x; }} }}", [minimum]);
+                yield return Case($"{type} Target({type} x) {{ checked {{ x -= ({type})1; return x; }} }}", [minimum]);
             }
         }
-        yield return Case("byte Target(byte x, byte y) { checked { x += y; return x; } }", (byte)100, (byte)155);
-        yield return Case("byte Target(byte x, byte y) { checked { x *= y; return x; } }", (byte)10, (byte)25);
-        yield return Case("int Target(short x) => checked(-x);", short.MinValue);
-        yield return Case("int Target(sbyte x, sbyte y) => checked(x * y);", sbyte.MinValue, sbyte.MinValue);
-        yield return Case("long Target(uint x, int y) => checked(x + y);", uint.MaxValue, int.MaxValue);
-        yield return Case("long Target(uint x, int y) => checked(x * y);", uint.MaxValue, int.MinValue);
+        yield return Case("byte Target(byte x, byte y) { checked { x += y; return x; } }", [(byte)100, (byte)155]);
+        yield return Case("byte Target(byte x, byte y) { checked { x *= y; return x; } }", [(byte)10, (byte)25]);
+        yield return Case("int Target(short x) => checked(-x);", [short.MinValue]);
+        yield return Case("int Target(sbyte x, sbyte y) => checked(x * y);", [sbyte.MinValue, sbyte.MinValue]);
+        yield return Case("long Target(uint x, int y) => checked(x + y);", [uint.MaxValue, int.MaxValue]);
+        yield return Case("long Target(uint x, int y) => checked(x * y);", [uint.MaxValue, int.MinValue]);
     }
 
     // SP-CORR-0001: compile-time constants do not execute runtime fault sites.
@@ -93,9 +93,10 @@ public sealed class TypedCheckedArithmeticTests
     }
 
     [TestCaseSource(nameof(CheckedCases))]
-    public void CheckedCandidateMatchesCompiledBoundary(string members, object[] arguments)
+    public void CheckedCandidateMatchesCompiledBoundary(string members, ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke(arguments);
@@ -205,9 +206,10 @@ public sealed class TypedCheckedArithmeticTests
         { yield return child; }
     }
 
-    private static TestCaseData Case(string members, params object[] arguments)
+    private static TestCaseData Case(string members, ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(members);
         var display = arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument is char character
             ? ((int)character).ToString(CultureInfo.InvariantCulture) : Convert.ToString(argument, CultureInfo.InvariantCulture)));

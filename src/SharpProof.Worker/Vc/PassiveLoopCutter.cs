@@ -321,7 +321,8 @@ internal sealed partial class PassiveLoopCutter
                 // A loop that stores only to fixed fields and to elements
                 // forgets those; any other heap store forgets all heap contents.
                 var cells = _cells[original];
-                var memory = cells == null;
+                RepositoryParameterGuard.ThrowIfMissing(cells is { IsDefault: true }, nameof(cells));
+                var memory = cells is null;
                 var values = cells is { } stored
                     ? stored.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (_candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type))).ToImmutableArray()
                     : ImmutableArray<IrVarId>.Empty;

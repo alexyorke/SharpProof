@@ -124,32 +124,32 @@ public sealed class StackTypeCalculusCoverageTests
     [Test]
     public void ExactInputSourceHasIndependentClrControls()
     {
-        Assert.That(Invoke("Bool", true), Is.EqualTo(true));
-        Assert.That(Invoke("Bool", false), Is.EqualTo(false));
-        Assert.That(Invoke("I4", 17), Is.EqualTo(17));
-        Assert.That(Invoke("I8", -19L), Is.EqualTo(-19L));
+        Assert.That(Invoke("Bool", [true]), Is.EqualTo(true));
+        Assert.That(Invoke("Bool", [false]), Is.EqualTo(false));
+        Assert.That(Invoke("I4", [17]), Is.EqualTo(17));
+        Assert.That(Invoke("I8", [-19L]), Is.EqualTo(-19L));
         var instance = new object();
-        Assert.That(Invoke("Object", instance), Is.SameAs(instance));
+        Assert.That(Invoke("Object", [instance]), Is.SameAs(instance));
         const string text = "owned";
-        Assert.That(Invoke("Text", text), Is.SameAs(text));
-        Assert.That(Invoke("Object", (object?)null), Is.Null);
-        Assert.That(Invoke("Text", (object?)null), Is.Null);
-        Assert.That(Invoke("NullObject"), Is.Null);
-        Assert.That(Invoke("NullText"), Is.Null);
-        Assert.That(Invoke("NullableNull"), Is.Null);
-        Assert.That(Invoke("Unsupported", 1.25m), Is.EqualTo(1.25m));
+        Assert.That(Invoke("Text", [text]), Is.SameAs(text));
+        Assert.That(Invoke("Object", [(object?)null]), Is.Null);
+        Assert.That(Invoke("Text", [(object?)null]), Is.Null);
+        Assert.That(Invoke("NullObject", []), Is.Null);
+        Assert.That(Invoke("NullText", []), Is.Null);
+        Assert.That(Invoke("NullableNull", []), Is.Null);
+        Assert.That(Invoke("Unsupported", [1.25m]), Is.EqualTo(1.25m));
         int[] array = [0, 17, -19];
-        Assert.That(Invoke("UnsupportedArray", array), Is.SameAs(array));
-        Assert.That(Invoke("I1", (sbyte)-17), Is.EqualTo((sbyte)-17));
-        Assert.That(Invoke("U1", byte.MaxValue), Is.EqualTo(byte.MaxValue));
-        Assert.That(Invoke("I2", short.MinValue), Is.EqualTo(short.MinValue));
-        Assert.That(Invoke("U2", ushort.MaxValue), Is.EqualTo(ushort.MaxValue));
-        Assert.That(Invoke("Character", 'x'), Is.EqualTo('x'));
-        Assert.That(Invoke("U4", uint.MaxValue), Is.EqualTo(uint.MaxValue));
-        Assert.That(Invoke("U8", ulong.MaxValue), Is.EqualTo(ulong.MaxValue));
-        Assert.That(Invoke("Single", 1.25f), Is.EqualTo(1.25f));
-        Assert.That(Invoke("Double", 1.25d), Is.EqualTo(1.25d));
-        Assert.That(Invoke("NoValue"), Is.Null);
+        Assert.That(Invoke("UnsupportedArray", [array]), Is.SameAs(array));
+        Assert.That(Invoke("I1", [(sbyte)-17]), Is.EqualTo((sbyte)-17));
+        Assert.That(Invoke("U1", [byte.MaxValue]), Is.EqualTo(byte.MaxValue));
+        Assert.That(Invoke("I2", [short.MinValue]), Is.EqualTo(short.MinValue));
+        Assert.That(Invoke("U2", [ushort.MaxValue]), Is.EqualTo(ushort.MaxValue));
+        Assert.That(Invoke("Character", ['x']), Is.EqualTo('x'));
+        Assert.That(Invoke("U4", [uint.MaxValue]), Is.EqualTo(uint.MaxValue));
+        Assert.That(Invoke("U8", [ulong.MaxValue]), Is.EqualTo(ulong.MaxValue));
+        Assert.That(Invoke("Single", [1.25f]), Is.EqualTo(1.25f));
+        Assert.That(Invoke("Double", [1.25d]), Is.EqualTo(1.25d));
+        Assert.That(Invoke("NoValue", []), Is.Null);
     }
 
     private static IEnumerable<TestCaseData> Joins()
@@ -290,7 +290,7 @@ public sealed class StackTypeCalculusCoverageTests
         var operation = Expression(method);
         Assert.That(operation.ConstantValue.HasValue, Is.True);
         Assert.That(operation.ConstantValue.Value, Is.EqualTo(constant));
-        Assert.That(Invoke(method), Is.EqualTo(constant));
+        Assert.That(Invoke(method, []), Is.EqualTo(constant));
         var shape = TotalIlStackType.FromInt32Constant((int)operation.ConstantValue.Value!);
         Assert.That(shape.Equals(Shape(expected)), Is.True);
         Assert.That(shape.WidenBooleanCompatibleI4().Equals(Shape("int")), Is.True);
@@ -345,6 +345,6 @@ public sealed class StackTypeCalculusCoverageTests
         return TotalIlStackType.NullFromIl;
     }
 
-    private object? Invoke(string method, params object?[] arguments)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments); }
+    private object? Invoke(string method, ImmutableArray<object?> arguments)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments.ToArray()); }
 }

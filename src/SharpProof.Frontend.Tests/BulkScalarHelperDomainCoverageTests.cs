@@ -23,7 +23,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         Assert.That(clause.Classification.IsExact, Is.True);
         foreach (var flag in ImmutableArray.Create(true, false))
         {
-            object[] inputs = [flag, 17, 23];
+            ImmutableArray<object> inputs = [flag, 17, 23];
             var expected = flag ? 17 : 23;
             Assert.That(subject.Invoke(inputs), Is.EqualTo(expected));
             var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
@@ -139,9 +139,10 @@ public sealed class BulkScalarHelperDomainCoverageTests
         Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
     }
 
-    private static void Replay(TypedProgramSubject subject, object[] inputs, int expected)
+    private static void Replay(TypedProgramSubject subject, ImmutableArray<object> inputs, int expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new System.ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);

@@ -13,6 +13,22 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void BuiltInTypeRejectsPresentDefaultInterfaceMetadata()
+    {
+        var error = AssertDecoderRejects(graph =>
+        {
+            System.ArgumentNullException.ThrowIfNull(graph);
+            var malformedType = graph.Types[0] with
+            {
+                ImplementedInterfaces = default(ImmutableArray<int>)
+            };
+            Assert.That(malformedType.ImplementedInterfaces.HasValue, Is.True);
+            return graph with { Types = graph.Types.SetItem(0, malformedType) };
+        });
+        Assert.That(error.Message, Is.EqualTo("Portable IR built-in type metadata is invalid."));
+    }
+
+    [Test]
     public void PortableArrayConverterRejectsNonArrayTokens()
     {
         Assert.Throws<JsonException>((Action)(() =>

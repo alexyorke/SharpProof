@@ -48,9 +48,10 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     [TestCaseSource(nameof(ReferenceCases))]
-    public void CompiledReferenceBodyMatchesNullLengthAndIdentityObservations(string members, object[] arguments, object expected)
+    public void CompiledReferenceBodyMatchesNullLengthAndIdentityObservations(string members, ImmutableArray<object> arguments, object expected)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
@@ -189,16 +190,17 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     [TestCaseSource(nameof(ArrayReadCases))]
-    public void GuardedArrayReadsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, false); }
+    public void GuardedArrayReadsMatchCompiledExecution(string members, ImmutableArray<object> arguments, object expected)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, false); }
 
     [TestCaseSource(nameof(ArrayMutationCases))]
-    public void GuardedArrayMutationsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, true); }
+    public void GuardedArrayMutationsMatchCompiledExecution(string members, ImmutableArray<object> arguments, object expected)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, true); }
 
-    private static void AssertArrayExecution(string members, object[] arguments, object expected, bool opaqueCalls)
+    private static void AssertArrayExecution(string members, ImmutableArray<object> arguments, object expected, bool opaqueCalls)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
@@ -246,9 +248,10 @@ public sealed class TypedReferenceProgramLoweringTests
         Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
     }
 
-    private static TestCaseData Case(string members, object[] arguments, object expected, string? label = null)
+    private static TestCaseData Case(string members, ImmutableArray<object> arguments, object expected, string? label = null)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         return new TestCaseData(members, arguments, expected).SetName("Reference observations: " + members + " #" +

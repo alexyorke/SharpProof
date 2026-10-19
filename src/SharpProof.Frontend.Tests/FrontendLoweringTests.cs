@@ -27,7 +27,7 @@ public sealed class FrontendLoweringTests
             public static long Target(long value, bool enabled, long divisor) =>
                 enabled ? checked((value + 2L) * 3L) : value / divisor;
             """);
-        return compiled.CompareWithInterpreter(value, enabled, divisor);
+        return compiled.CompareWithInterpreter([value, enabled, divisor]);
     }
 
     [Test]
@@ -39,10 +39,10 @@ public sealed class FrontendLoweringTests
                 enabled && value > 0L && text != null;
             """);
         Assert.That(
-            boolean.CompareWithInterpreter(true, 5L, "ok"),
+            boolean.CompareWithInterpreter([true, 5L, "ok"]),
             Is.EqualTo(true));
         Assert.That(
-            boolean.CompareWithInterpreter(false, 5L, null),
+            boolean.CompareWithInterpreter([false, 5L, null]),
             Is.EqualTo(false));
 
         using var concatenation = CompiledMethod.Create(
@@ -50,7 +50,7 @@ public sealed class FrontendLoweringTests
             public static string Target(string text) => text + "proof";
             """);
         Assert.That(
-            concatenation.CompareWithInterpreter((object?)null),
+            concatenation.CompareWithInterpreter([(object?)null]),
             Is.EqualTo("proof"));
 
         using var length = CompiledMethod.Create(
@@ -58,7 +58,7 @@ public sealed class FrontendLoweringTests
             public static long Target(string text) => (long)text.Length;
             """);
         Assert.That(
-            length.CompareWithInterpreter("sharp"),
+            length.CompareWithInterpreter(["sharp"]),
             Is.EqualTo(5L));
 
         using var nullable = CompiledMethod.Create(
@@ -67,10 +67,10 @@ public sealed class FrontendLoweringTests
                 text == null ? 0L : text.Length;
             """);
         Assert.That(
-            nullable.CompareWithInterpreter((object?)null),
+            nullable.CompareWithInterpreter([(object?)null]),
             Is.EqualTo(0L));
         Assert.That(
-            nullable.CompareWithInterpreter("proof"),
+            nullable.CompareWithInterpreter(["proof"]),
             Is.EqualTo(5L));
     }
 
@@ -106,8 +106,8 @@ public sealed class FrontendLoweringTests
             """
             public static string Target() => "\uFFFD";
             """);
-        var pairValue = pair.CompareWithInterpreter();
-        var replacementValue = replacement.CompareWithInterpreter();
+        var pairValue = pair.CompareWithInterpreter([]);
+        var replacementValue = replacement.CompareWithInterpreter([]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(pairValue, Is.EqualTo("\U0001F600"));
@@ -125,7 +125,7 @@ public sealed class FrontendLoweringTests
                 checked(values[index] + values.LongLength);
             """);
         Assert.That(
-            element.CompareWithInterpreter(ElementValues.ToArray(), 1),
+            element.CompareWithInterpreter([ElementValues.ToArray(), 1]),
             Is.EqualTo(11L));
     }
 
@@ -150,10 +150,10 @@ public sealed class FrontendLoweringTests
         var loweredOrder = order.Lower();
         var environment = order.CreateEnvironment(
             loweredOrder,
-            10L,
+            [10L,
             0L,
             long.MinValue,
-            -1L);
+            -1L]);
         var orderResult = new IrInterpreter(order.Factory)
             .Evaluate(loweredOrder.Term, environment);
         Assert.That(orderResult.Status, Is.EqualTo(IrEvaluationStatus.Exception));
@@ -167,7 +167,7 @@ public sealed class FrontendLoweringTests
                 enabled && 10L / divisor > 0L;
             """);
         Assert.That(
-            shortCircuit.CompareWithInterpreter(false, 0L),
+            shortCircuit.CompareWithInterpreter([false, 0L]),
             Is.EqualTo(false));
     }
 
@@ -252,10 +252,10 @@ public sealed class FrontendLoweringTests
             """);
 
         Assert.That(
-            compiled.CompareWithInterpreter(uint.MaxValue, uint.MinValue),
+            compiled.CompareWithInterpreter([uint.MaxValue, uint.MinValue]),
             Is.EqualTo(true));
         Assert.That(
-            compiled.CompareWithInterpreter(uint.MinValue, uint.MaxValue),
+            compiled.CompareWithInterpreter([uint.MinValue, uint.MaxValue]),
             Is.EqualTo(false));
     }
 
@@ -1183,7 +1183,7 @@ public sealed class FrontendLoweringTests
             pureWalkLeaf = unary.Operand;
             pureWalkDepth++;
         }
-        var nativeValue = (bool)compiled.Invoke(true)!;
+        var nativeValue = (bool)compiled.Invoke([true])!;
 
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Echo"));
         Assert.That(sourceUnaryCount, Is.EqualTo(unaryCount));
@@ -1342,10 +1342,11 @@ public sealed class FrontendLoweringTests
                 expression);
         }
 
-        internal object? Invoke(params object?[] arguments)
+        internal object? Invoke(ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
-            return _method!.Invoke(null, arguments);
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
+            return _method!.Invoke(null, arguments.ToArray());
         }
 
         internal FrontendLoweringResult Lower()
@@ -1353,10 +1354,11 @@ public sealed class FrontendLoweringTests
             return new RoslynOperationLowerer(Factory).Lower(TargetExpression);
         }
 
-        internal object? CompareWithInterpreter(params object?[] arguments)
+        internal object? CompareWithInterpreter(ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
-            var actual = _method!.Invoke(null, arguments);
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
+            var actual = _method!.Invoke(null, arguments.ToArray());
             var lowered = Lower();
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             var environment = CreateEnvironment(lowered, arguments);
@@ -1376,9 +1378,10 @@ public sealed class FrontendLoweringTests
 
         internal ImmutableDictionary<IrVarId, IrValue> CreateEnvironment(
             FrontendLoweringResult lowering,
-            params object?[] arguments)
+             ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
             System.ArgumentNullException.ThrowIfNull(lowering);
             var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
             foreach (var binding in lowering.Variables)

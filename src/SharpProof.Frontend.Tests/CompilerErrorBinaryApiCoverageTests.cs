@@ -50,7 +50,7 @@ public sealed class CompilerErrorBinaryApiCoverageTests
         Assert.That(lowered.Term, Is.TypeOf<IrOpaqueTerm>());
 
         using var control = TypedProgramSubject.Create("bool Target(bool left, bool right) => left " + token + " right;");
-        object[] inputs = [true, false];
+        ImmutableArray<object> inputs = [true, false];
         Assert.That(control.Invoke(inputs), Is.False);
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);

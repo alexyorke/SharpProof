@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -16,7 +17,7 @@ public sealed class SourceStringIndexFaultCoverageTests
             "catch (System.NullReferenceException) { return 7; } " +
             "catch (System.IndexOutOfRangeException) { return 9; } } " +
             "static string Read(string value) => value;");
-        object[] arguments = [input!];
+        ImmutableArray<object> arguments = [input!];
         Assert.That(subject.Invoke(arguments), Is.EqualTo(expected));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var indexer = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();

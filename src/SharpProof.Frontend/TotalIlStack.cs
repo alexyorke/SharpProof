@@ -59,7 +59,7 @@ internal static class TotalIlStack
                 { shapeBuilder[target] = stack.ToImmutable(); shapes = shapeBuilder.ToImmutable(); pending = pending.Enqueue(target); }
             }
         }
-        return shapes.All(shape => shape != null);
+        return shapes.All(shape => shape is { IsDefault: false });
     }
 
     internal static IEnumerable<int> Successors(ImmutableArray<TotalIlInstruction> code, int index)

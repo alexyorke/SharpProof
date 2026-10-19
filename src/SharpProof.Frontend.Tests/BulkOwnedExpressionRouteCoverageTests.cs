@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -67,9 +68,10 @@ public sealed class BulkOwnedExpressionRouteCoverageTests
         ExactInteger(supported, [17], 17);
     }
 
-    private static void ExactInteger(TypedProgramSubject subject, object[] inputs, int expected)
+    private static void ExactInteger(TypedProgramSubject subject, ImmutableArray<object> inputs, int expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new System.ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
