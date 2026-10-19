@@ -2616,3 +2616,14 @@ Open includes unchecked/stale/valid construction candidates as well as remaining
 violations. Classified 29 new C# builder rows and 28 canonical PowerShell builder rows.
 Literal check against master 7e0e485a preserved 2,959 raw/interpolated tokens across
 651 changed C# files. Comprehensive classification and final exact-commit gates remain.
+
+IMM-M069: Coordinator traced exact counterexample replay's retained model vector and
+all three callers. It is internal validation input, not a native runtime argument array.
+Use ImmutableArray<WorkerModelValue> through decoder, helper and analyzer harness;
+reuse the protocol's immutable model root directly. Build intentionally invalid binding
+vectors with ToBuilder and freeze before decoding, preserving missing/duplicate/null/
+foreign/value cases and reverse-display order. Runtime CLR argument arrays and copies
+remain native SUT invocation buffers. The replay test's observation count map becomes
+an Ordinal builder; retain all source snippets and UTF-16 model displays unchanged.
+Validate the full exact replay fixture, including its real analyzer/worker/CLR case.
+Status: open before edits.
