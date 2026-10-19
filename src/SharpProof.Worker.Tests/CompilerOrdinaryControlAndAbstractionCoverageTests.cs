@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -35,11 +36,12 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
             Assert.That(attribute.ConstructorArguments.Single().Value, Is.EqualTo(string.Empty));
             Assert.That(attribute.ApplicationSyntaxReference, Is.Not.Null);
         }
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(SharpProofControlAttributePolicy.ValidateAndShouldSuppress(method, session,
-            diagnostics.Add, TestContext.CurrentContext.CancellationToken), Is.False);
-        Assert.That(diagnostics, Has.Count.EqualTo(emptyReason ? 1 : 0));
+            diagnosticBuilder.Add, TestContext.CurrentContext.CancellationToken), Is.False);
+        var diagnostics = diagnosticBuilder.ToImmutable();
+        Assert.That(diagnostics, Has.Length.EqualTo(emptyReason ? 1 : 0));
         if (emptyReason)
         {
             Assert.That(diagnostics.Single().GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("expected a non-empty reason"));

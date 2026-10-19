@@ -128,7 +128,7 @@ public sealed class WorkerFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedLabels = Enumerable.Range(0, candidate!.Requires.Length)
-                .Select(ordinal => "requires:" + ordinal).ToHashSet(StringComparer.Ordinal);
+                .Select(ordinal => "requires:" + ordinal).ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(result.Core.All(ownedLabels.Contains), Is.True);
         }
         else

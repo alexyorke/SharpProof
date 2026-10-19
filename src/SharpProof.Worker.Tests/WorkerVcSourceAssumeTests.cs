@@ -241,7 +241,10 @@ public sealed class WorkerVcSourceAssumeTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
-        var blocks = total.Program.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
+        var blocks = ImmutableDictionaryCapture.Create(
+            total.Program.Blocks,
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id),
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
         builder.SetEntry(blocks[total.Program.Entry]);
         var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
         var moved = false;

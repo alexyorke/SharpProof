@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -12,15 +13,14 @@ public sealed class CoverageLineCreditTests
     public async Task PreservesEveryOverlappingStartAndPermittedEmptyCredit()
     {
         using var results = await ReadResultsAsync();
-        var expected = new Dictionary<int, int[]>
-        {
-            [10] = [10],
-            [15] = [10, 15],
-            [20] = [10, 15],
-            [25] = [15],
-            [30] = [],
-            [35] = [35]
-        };
+        var expectedBuilder = ImmutableSortedDictionary.CreateBuilder<int, ImmutableArray<int>>();
+        expectedBuilder[10] = [10];
+        expectedBuilder[15] = [10, 15];
+        expectedBuilder[20] = [10, 15];
+        expectedBuilder[25] = [15];
+        expectedBuilder[30] = [];
+        expectedBuilder[35] = [35];
+        var expected = expectedBuilder.ToImmutable();
 
         using (Assert.EnterMultipleScope())
         {

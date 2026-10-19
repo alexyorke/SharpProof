@@ -38,11 +38,12 @@ public sealed class GenericTestedTypePatternControlAuditTests
             "pattern-readiness", "observations", runLabel!);
         Assert.That(Directory.Exists(evidenceDirectory), Is.False, "Preserve every previous observation run.");
         Directory.CreateDirectory(evidenceDirectory);
-        var observations = new List<PatternObservation>();
+        var observationBuilder = ImmutableArray.CreateBuilder<PatternObservation>();
         foreach (var form in new[] { "discard-declaration", "parenthesized-type" })
         {
-            observations.Add(await ObserveForm(form, evidenceDirectory));
+            observationBuilder.Add(await ObserveForm(form, evidenceDirectory));
         }
+        var observations = observationBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             foreach (var observation in observations)

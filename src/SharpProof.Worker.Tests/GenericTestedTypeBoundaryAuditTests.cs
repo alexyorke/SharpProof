@@ -26,11 +26,12 @@ public sealed class GenericTestedTypeBoundaryAuditTests
     public async Task BoundaryClaimsMatchFrozenControlsAndMeasuredClr()
     {
         string[] boundaries = ["fixed-int", "reference-T", "nullable-as-T", "unreachable-U"];
-        var observations = new List<BoundaryObservation>();
+        var observationBuilder = ImmutableArray.CreateBuilder<BoundaryObservation>();
         foreach (var boundary in boundaries)
         {
-            observations.Add(await ObserveBoundary(boundary));
+            observationBuilder.Add(await ObserveBoundary(boundary));
         }
+        var observations = observationBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             foreach (var observation in observations)

@@ -3197,8 +3197,11 @@ public sealed partial class WorkerTests
             }
             """);
         var compilation = project.CreateCompilation();
-        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
+        var targets = ImmutableDictionaryCapture.Create(
+            new ClaimManifestBuilder(compilation).Build().Targets.Values,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
@@ -3300,8 +3303,11 @@ public sealed partial class WorkerTests
             """,
             OptimizationLevel.Debug);
         var compilation = project.CreateCompilation();
-        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
+        var targets = ImmutableDictionaryCapture.Create(
+            new ClaimManifestBuilder(compilation).Build().Targets.Values,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
 
         foreach (var targetName in new[]
                  {

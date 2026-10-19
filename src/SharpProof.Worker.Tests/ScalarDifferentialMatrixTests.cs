@@ -98,9 +98,11 @@ public sealed class ScalarDifferentialMatrixTests
         var factory = total.Program.Factory;
         var values = new[] { left, right };
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.Select((parameter, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: values[ordinal] is { } text
-                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type)))))))
-                .ToDictionary(item => item.Entry, item => item.Value));
+            ImmutableDictionaryCapture.Create(
+                total.Parameters.Select((parameter, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: values[ordinal] is { } text
+                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type))))))),
+                item => item.Entry,
+                item => item.Value));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         using var runtime = project.EmitRuntimeAssembly();
@@ -146,7 +148,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total, Is.Not.Null);
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var interpreter = new IrProgramInterpreter(total.Program.Factory);
-        var entries = total.Parameters.ToDictionary(parameter => parameter.Entry,
+        var entries = ImmutableDictionaryCapture.Create(
+            total.Parameters,
+            parameter => parameter.Entry,
             parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L))));
         Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var execution = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
@@ -182,7 +186,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var factory = total.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.ToDictionary(parameter => parameter.Entry,
+            ImmutableDictionaryCapture.Create(
+                total.Parameters,
+                parameter => parameter.Entry,
                 parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 0L)))));
         Assert.That(execution.ConsumedApproximation, Is.False);
         using var runtime = project.EmitRuntimeAssembly();
@@ -941,14 +947,17 @@ public sealed class ScalarDifferentialMatrixTests
             throw new InvalidOperationException(
                 $"Callable '{target.Entry.CallableId}' has no Total program.");
         var factory = total.Program.Factory;
-        var initial = total.Parameters.Select((parameter, ordinal) => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: inputs[ordinal] switch
-        {
-            bool value => factory.CreateBooleanValue(value),
-            { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
-                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-            _ => throw new InvalidOperationException(
-                "Null is not a supported scalar matrix input.")
-        })))).ToDictionary(static item => item.Entry, static item => item.Value);
+        var initial = ImmutableDictionaryCapture.Create(
+            total.Parameters.Select((parameter, ordinal) => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: inputs[ordinal] switch
+            {
+                bool value => factory.CreateBooleanValue(value),
+                { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
+                    Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+                _ => throw new InvalidOperationException(
+                    "Null is not a supported scalar matrix input.")
+            })))),
+            static item => item.Entry,
+            static item => item.Value);
         return new IrProgramInterpreter(factory).Execute(total.Program, initial);
     }
 

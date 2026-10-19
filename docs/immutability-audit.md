@@ -3529,3 +3529,12 @@ entries, ++index option parsing and missing-value errors. Freeze the sample pack
 allow-list as ordinal membership. Compute documentation heading stages and final anchor
 without scalar root reassignment. Validate baseline/current controls for all branches
 and canonical script formatting before committing implementation. Status: open before edits.
+IMM-M118/M119/M122 verified: all 5,696 ordinary Release Worker tests pass, zero
+failures/skips/build warnings/errors, with exact embedded PDB export for 88 outputs.
+The initial build's CA1859 private parameter requirement was corrected before this run.
+Independent review confirms strict projections, callback publication, comparers, nested
+mutable subjects, source-universe order and credit ordering. M119 plan correction:
+DictionaryFields had one private params caller; main narrowed both call and helper to
+ImmutableArray roots, preserving IsDefault guarding and DFS order. The earlier adapter
+assumption was not retained. M128 passes 27 baseline/current controls and all PS parsing;
+canonical format checked 87 PowerShell and 19 shell scripts, two files normalized.

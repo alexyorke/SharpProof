@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -37,11 +38,10 @@ public sealed class DictionaryKeyedLoopTests
         Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
             .OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new ArgumentNullException(nameof(havoc)) :
                 havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [subject.Parameter.Entry] = factory.CreateIntegerValue(3),
-            [owner.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[subject.Parameter.Entry] = factory.CreateIntegerValue(3);
+        inputBuilder[owner.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState());
+        var inputs = inputBuilder.ToImmutable();
         foreach (var program in new[] { candidate.Program, search!.Program })
         {
             var result = new IrProgramInterpreter(factory).Execute(program, inputs, 1000);

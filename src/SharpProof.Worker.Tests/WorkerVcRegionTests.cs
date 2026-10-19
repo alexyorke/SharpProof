@@ -107,7 +107,7 @@ public sealed class WorkerVcRegionTests
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
         var ids = preparation.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures))
-            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToHashSet(StringComparer.Ordinal);
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
         var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EquivalentTo(ids));
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -27,7 +28,7 @@ public sealed class DictionaryOldHeapBindingTests
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
 
         var factory = context.Factory;
-        var fields = DictionaryFields(factory, clause.Value, clause.SafeCondition);
+        var fields = DictionaryFields(factory, [clause.Value, clause.SafeCondition]);
         var initial = new IrObjectState()
             .WithField(fields["field:dictionary:count"], factory.CreateIntegerValue(1))
             .WithField(fields["field:dictionary:default-comparer"], factory.CreateBooleanValue(true))
@@ -36,7 +37,7 @@ public sealed class DictionaryOldHeapBindingTests
             .WithKeyedField(fields["field:dictionary:value"], factory.CreateIntegerValue(1), factory.CreateIntegerValue(17));
         var ownerType = factory.GetVariableInfo(parameter.Entry).Type;
         var execution = new IrProgramInterpreter(factory).Execute(lowering.Program,
-            new Dictionary<IrVarId, IrValue> { [parameter.Entry] = factory.CreateReferenceValue(ownerType, initial) },
+            ImmutableDictionary<IrVarId, IrValue>.Empty.Add(parameter.Entry, factory.CreateReferenceValue(ownerType, initial)),
             10000, new IrProgramReplayOptions(request => request is null ? throw new ArgumentNullException(nameof(request)) : factory.CreateBooleanValue(false))
             { SnapshotVariables = [parameter.PreState] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -78,23 +79,27 @@ public sealed class DictionaryOldHeapBindingTests
         Assert.That(binding.Clauses, Is.Empty);
     }
 
-    private static Dictionary<string, IrMemberId> DictionaryFields(IrFactory factory, params IrTerm[] roots)
+    private static ImmutableDictionary<string, IrMemberId> DictionaryFields(IrFactory factory, ImmutableArray<IrTerm> roots)
     {
         ArgumentNullException.ThrowIfNull(factory);
-        ArgumentNullException.ThrowIfNull(roots);
-        var fields = new Dictionary<string, IrMemberId>(StringComparer.Ordinal);
-        var pending = new Stack<IrTerm>(roots);
-        while (pending.TryPop(out var term))
+        if (roots.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(roots)); }
+        var fieldBuilder = ImmutableDictionary.CreateBuilder<string, IrMemberId>(StringComparer.Ordinal);
+        var pending = ImmutableStack<IrTerm>.Empty;
+        foreach (var root in roots)
+        { pending = pending.Push(root); }
+        while (!pending.IsEmpty)
         {
+            pending = pending.Pop(out var term);
             if (term is IrOpaqueTerm opaque)
             {
                 var name = factory.GetString(factory.GetMemberInfo(opaque.Member).Name);
-                if (name.StartsWith("field:dictionary:", StringComparison.Ordinal))
-                { fields.TryAdd(name, opaque.Member); }
+                if (name.StartsWith("field:dictionary:", StringComparison.Ordinal) && !fieldBuilder.ContainsKey(name))
+                { fieldBuilder.Add(name, opaque.Member); }
             }
-            IrTraversal.PushChildren(term, pending);
+            pending = IrTraversal.PushChildren(term, pending);
         }
-        return fields;
+        return fieldBuilder.ToImmutable();
     }
 
     private static (Compilation Compilation, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare()

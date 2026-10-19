@@ -56,11 +56,12 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             "fixed-tested-type-readiness", "observations", runLabel!);
         Assert.That(Directory.Exists(evidenceDirectory), Is.False, "Preserve every previous observation run.");
         Directory.CreateDirectory(evidenceDirectory);
-        var observations = new List<BoundaryObservation>();
+        var observationBuilder = ImmutableArray.CreateBuilder<BoundaryObservation>();
         foreach (var form in Forms)
         {
-            observations.Add(await ObserveForm(form, evidenceDirectory));
+            observationBuilder.Add(await ObserveForm(form, evidenceDirectory));
         }
+        var observations = observationBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             foreach (var observation in observations)

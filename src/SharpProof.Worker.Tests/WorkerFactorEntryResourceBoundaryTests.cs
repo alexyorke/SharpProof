@@ -94,7 +94,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             Assert.That(entry.ProofCore, Is.Not.Empty);
             var ownedLabels = Enumerable.Range(0, preparation.TotalEntry.Clauses.Length)
                 .Select(ordinal => "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                .ToHashSet(StringComparer.Ordinal);
+                .ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(entry.ProofCore.All(ownedLabels.Contains), Is.True);
             var expectedUsed = entry.ProofCore.Select(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (preparation.TotalEntry.Clauses[
                 int.Parse(label.AsSpan("requires:".Length), System.Globalization.CultureInfo.InvariantCulture)].AssumptionId!));

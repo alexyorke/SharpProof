@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -84,17 +85,18 @@ public sealed class DictionarySourceHelperOracleTests
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         for (var ordinal = 0; ordinal < total.Parameters.Length; ordinal++)
         {
             var parameter = total.Parameters[ordinal].Entry;
             var parameterType = factory.GetVariableInfo(parameter).Type;
             // Opaque structs are atoms, including Nullable<T> with no value.
             // Only an actual reference-type null becomes the IR null value.
-            inputs[parameter] = !genericTypes[0].IsValueType && runtimeInputs[ordinal] == null
+            inputBuilder[parameter] = !genericTypes[0].IsValueType && runtimeInputs[ordinal] == null
                 ? factory.CreateNullValue(parameterType)
                 : factory.CreateReferenceValue(parameterType, new IrObjectState());
         }
+        var inputs = inputBuilder.ToImmutable();
         var choices = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);

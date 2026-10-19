@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -100,12 +101,13 @@ public sealed class CompilerTotalCallRetirementTests
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         // Excessive expansion either yields no Total body (nothing is published,
         // so nothing can be proven) or only non-proven results.
-        if (results.Count == 0)
+        if (results.Length == 0)
         { Assert.That(preparation.Total, Is.Null, "Published nothing despite an admitted Total body."); }
         Assert.That(results.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome != WorkerClaimOutcome.Proven)), Is.True);
     }
@@ -114,9 +116,10 @@ public sealed class CompilerTotalCallRetirementTests
     {
         System.ArgumentNullException.ThrowIfNull(preparation);
         Assert.That(preparation.Total, Is.Not.Null);
-        var results = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+        var resultBuilder = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results.Values.Single().Outcome, Is.EqualTo(expected), results.Values.Single().Reason.ToString());
     }

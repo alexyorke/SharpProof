@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -32,11 +33,9 @@ public sealed class DictionaryOpaqueCountOracleTests
         var factory = total.Program.Factory;
         var parameter = total.Parameters.Single().Entry;
         var parameterType = factory.GetVariableInfo(parameter).Type;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
-                : factory.CreateReferenceValue(parameterType, new IrObjectState())
-        };
+        var inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(parameter,
+            !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
+                : factory.CreateReferenceValue(parameterType, new IrObjectState()));
         IrValue? SelectNormal(IrHavocRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);

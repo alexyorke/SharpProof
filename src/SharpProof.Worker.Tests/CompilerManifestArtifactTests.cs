@@ -285,13 +285,11 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void CompilerCallableFailuresUseOnlyProducerReasons()
     {
-        var allowed = new HashSet<WorkerClaimReason>
-        {
+        var allowed = ImmutableHashSet.Create<WorkerClaimReason>(
             WorkerClaimReason.UnsupportedCallable,
             WorkerClaimReason.UnsupportedContract,
             WorkerClaimReason.UnsupportedBody,
-            WorkerClaimReason.UnsupportedExpression
-        };
+            WorkerClaimReason.UnsupportedExpression);
         var rejected = Enum.GetValues<WorkerClaimReason>()
             .Where(reason => reason is not (
                 WorkerClaimReason.Unspecified or

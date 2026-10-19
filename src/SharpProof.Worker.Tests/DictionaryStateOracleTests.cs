@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -152,12 +153,13 @@ public sealed class DictionaryStateOracleTests
                 ConcreteHavocValueProvider = request => IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) != null &&
                     factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null
             };
-            var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+            var argumentBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
             for (var index = 0; index < inputs.Length; index++)
             {
-                arguments.Add(context.Parameters[index].Entry, inputs[index] is { } value
+                argumentBuilder.AddUnique(context.Parameters[index].Entry, inputs[index] is { } value
                     ? factory.CreateReferenceValue(factory.ObjectType, value) : factory.CreateNullValue(factory.ObjectType));
             }
+            var arguments = argumentBuilder.ToImmutable();
             var result = new IrProgramInterpreter(factory).Execute(lowered.Program, arguments, 5000, options);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);
             Assert.That(result.ConsumedApproximation, Is.EqualTo(approximateInitialization));

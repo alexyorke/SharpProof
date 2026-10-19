@@ -89,7 +89,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(method.GetParameters().Single().ParameterType,
                 Is.EqualTo(valueType == "double" ? typeof(double) : typeof(float)));
             object[] witnesses = valueType == "double" ? [double.NaN, 1.25d] : [float.NaN, 1.25f];
-            var observations = new List<string>();
+            var observationBuilder = ImmutableArray.CreateBuilder<string>();
             foreach (var witness in witnesses)
             {
                 var result = (int)method.Invoke(null, [witness])!;
@@ -97,9 +97,10 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
                     $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
                     $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
                     $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
-                observations.Add(observation);
+                observationBuilder.Add(observation);
                 Assert.That(result, Is.EqualTo(1234), observation);
             }
+            var observations = observationBuilder.ToImmutable();
             await File.WriteAllTextAsync(Path.Combine(evidence, "clr.txt"), string.Join("\n", observations) + "\n");
         }
         finally
