@@ -88,6 +88,9 @@ method/local-function declarations supply schemes instantiated per call.
 | --- | --- |
 | Primitive and nominal parameter types | Generalize unconstrained leaves |
 | Func, tuples, named tuples, generic containers | Preserve shape and tuple names |
+| Nullable reference/value types | Preserve annotations; synthesize required class/struct constraints |
+| Task/ValueTask async methods and await | Infer result type through awaits; retain async modifiers and selected awaiter definitions |
+| Null/default, coalescing, suppression and conditional access | Support typed contexts; conservatively retain types for conversions and conditional receivers |
 | Arrays, jagged/rectangular arrays | Preserve rank; infer element types through indexing and Length/Rank |
 | Implicit array construction | Unify initializer elements |
 | Explicit array construction | Preserve declared element types |
@@ -123,8 +126,9 @@ resolved method and constructor definitions are compared across all supplied
 files. Calls outside the analyzed method must also retain their instantiated
 parameter and return types. This conservatively rejects changes to argument
 conversions, result boxing and caller overload selection. Indexer and collection
-Add definitions inside the method are checked too. Roslyn validates constraints;
-the engine does not invent them. Escaped identifiers are retained in signatures.
+Add definitions inside the method are checked too. Nullable shapes supply class/
+struct constraints; Roslyn validates other constraints, which are not synthesized.
+Escaped identifiers are retained in signatures.
 
 Instance methods, existing generic methods and containing generic types are
 supported. Existing type parameters are rigid; their constraints are retained.
@@ -132,10 +136,12 @@ New names avoid identifiers already in the declaration. Attributes and
 ref/out/in/params modifiers are preserved; optional parameter types remain
 concrete to retain their defaults. Ref arguments at call sites remain unsupported.
 
-The adapter skips async, nullable annotations, custom operators, expanded
-non-array params collections, null/coalescing, unsupported patterns and other
-unimplemented syntax. It does not infer mutually recursive C# method groups or
-synthesize generic constraints. See [the completion ledger](LIMITATIONS.md).
+The adapter skips async lambdas, async void roots, async iterators/enumeration/
+disposal, custom async return builders, custom operators, expanded non-array params
+collections, unsupported patterns and other unimplemented syntax. It does not
+infer mutually recursive C# method groups or
+synthesize general generic constraints. Imported unconstrained nullable `T?`
+schemes are still unsupported. See [the completion ledger](LIMITATIONS.md).
 
 Tuple deconstruction supports declarations, reassignment and mixed targets for
 local/parameter identifiers and discards. Custom Deconstruct methods (including
@@ -159,6 +165,24 @@ through switches to the nearest loop. Throws contribute no return constraint;
 an all-throw body retains declared result information when producing a C# signature.
 The suite exercises nested exit ownership, tuple iteration, thrown exceptions and
 checked overflow versus unchecked wrapping at runtime.
+
+Nullable wrappers remain distinct from their underlying types. For example,
+`int? Identity(int? x) => x` can become `T? Identity<T>(T? x) where T : struct`;
+nullable reference identities use `where T : class`. Existing constraints and
+nullable annotations are preserved when applying the IDE fix. Null comparisons,
+conditional access and assignment conversions use conservative original types.
+Candidates introducing new compiler warnings (including nullable warnings) are
+rejected; existing warnings do not become evidence of correctness.
+
+Async methods returning `Task<T>` or `ValueTask<T>` infer the body result and then
+wrap it in the original task type. Non-generic Task/ValueTask bodies may fall
+through or use `return;`. Standard generic awaits preserve their result variable;
+custom awaitable operands and configured receivers are retained conservatively.
+Awaiter/GetResult/IsCompleted definitions are rechecked. Tests apply actual IDE
+fixes, compile with no warnings, and execute nullable values/references and new
+Task/ValueTask types through completed/suspended awaits, cancellation and faults.
+Declared widening/boxing return conversions are retained rather than narrowing
+the result type, including within tuple returns.
 
 ## IDE installation and fixes
 

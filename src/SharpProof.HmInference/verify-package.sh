@@ -26,7 +26,14 @@ cat > "$consumer/Consumer.csproj" <<EOF
 </Project>
 EOF
 cat > "$consumer/Input.cs" <<'EOF'
-static class Sample { public static int Identity(int value) => value; }
+#nullable enable
+using System.Threading.Tasks;
+static class Sample {
+    public static int Identity(int value) => value;
+    public static int? NullableIdentity(int? value) => value;
+    public static string? NullableReferenceIdentity(string? value) => value;
+    public static async Task<int> AsyncIdentity(Task<int> task) => await task;
+}
 EOF
 cat > "$consumer/.editorconfig" <<'EOF'
 root = true
@@ -36,7 +43,10 @@ EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 if grep -Eq 'CS8032|AD0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
+for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'where T1 : struct' 'where T1 : class'; do
+  if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
+done
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' | tee "$evidence/package-checks.txt"

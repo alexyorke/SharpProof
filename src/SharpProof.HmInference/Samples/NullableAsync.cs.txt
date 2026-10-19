@@ -1,0 +1,14 @@
+#nullable enable
+using System.Threading.Tasks;
+
+public static class NullableAsyncSamples
+{
+    public static int? ValueIdentity(int? value) => value;
+    public static string? ReferenceIdentity(string? value) => value;
+    public static int Fallback(int? value, int fallback) => value ?? fallback;
+    public static int? Length(string? value, bool ignored) => value?.Length;
+    public static async Task<int> Echo(Task<int> task) => await task;
+    public static async ValueTask<int> ValueEcho(ValueTask<int> task) => await task;
+    public static async Task<string?> NullableEcho(Task<string?> task) => await task;
+    public static async Task Drain(Task<int> task) { await task; }
+}

@@ -15,9 +15,10 @@ The README describes today's supported subset; it is not the completion spec.
 | Complete project loading | Open: CLI compiles loose files with runtime references |
 | Instance and generic root methods | Implemented: declaration regression checks |
 | Attributes, optional/ref/out/in/params root parameters | Implemented: declaration regression checks |
-| Nullable types, null/default/coalescing/conditional access | Open |
-| Generic constraints and name allocation | Existing constraints retained and names reserved; synthesis remains open |
-| Async/await and iterators | Open |
+| Nullable types, null/default/coalescing/conditional access | Verified: reference/value wrappers, class/struct constraints and conservative nullable operations; imported unconstrained nullable T? schemes remain open |
+| Generic constraints and name allocation | Existing constraints retained, names reserved and nullable class/struct constraints synthesized; general constraint synthesis remains open; new compiler warnings reject candidates |
+| Task/ValueTask async roots and await | Verified: generic/non-generic roots, nullable results and preserved awaiter bindings; IDE-fix runtime checks cover suspension, cancellation and faults |
+| Async lambdas/void roots, iterators/enumeration/disposal, custom async builders | Open |
 | Try/catch/finally, using/lock and goto | Open |
 | Declaration/type/property/list patterns | Open |
 | Custom enumerables and Deconstruct | Open |

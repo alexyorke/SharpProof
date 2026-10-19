@@ -13,9 +13,9 @@ internal static class BindingChecks
             ("CallerOptionalOverloadPreserved", "public static int M(int x) => x;", "public static T M<T>(T x) => x;",
                 "public static int M(int x,int optional=0) => x+1; public static int Run() => M(1);", 1, "Suggestion"),
             ("CallerConstructorOverload", "public static object M(bool ignored) => 42;", "public static int M<T>(T ignored) => 42;",
-                "public static int Run() => new Box(M(true)).Value; public sealed class Box { public int Value; public Box(object x) {Value=1;} public Box(int x) {Value=2;} }", 2, "Rejected"),
+                "public static int Run() => new Box(M(true)).Value; public sealed class Box { public int Value; public Box(object x) {Value=1;} public Box(int x) {Value=2;} }", 2, "Suggestion"),
             ("CallerBoxingEquality", "public static object M(bool ignored) => 42;", "public static int M<T>(T ignored) => 42;",
-                "public static int Run() => M(true)==M(false) ? 2 : 1;", 2, "Rejected"),
+                "public static int Run() => M(true)==M(false) ? 2 : 1;", 2, "Suggestion"),
             ("CallerArgumentConversion", "public static int M(Target x) => 1;", "public static int M<T>(T x) => 1;",
                 "static int conversions; public sealed class Target {} public sealed class Source { public static implicit operator Target(Source x) {conversions++; return new Target();} } public static int Run() { conversions=0; M(new Source()); return conversions==1 ? 1 : 2; }", 2, "Rejected")
         ];
@@ -38,6 +38,10 @@ internal static class BindingChecks
             if (result.Status != test.ExpectedStatus || result.Status == "Rejected" && result.Message != "Generalization changes a supplied call's instantiated signature.")
             {
                 throw new InvalidOperationException($"Caller check failed for {test.Name}: {result.Status}: {result.Message}");
+            }
+            if (test.Declaration.StartsWith("public static object", StringComparison.Ordinal) && result.Signature?.StartsWith("object M<", StringComparison.Ordinal) != true)
+            {
+                throw new InvalidOperationException("Declared return conversion was lost: " + test.Name);
             }
             Program.Log.Info("PASS " + test.Name);
         }

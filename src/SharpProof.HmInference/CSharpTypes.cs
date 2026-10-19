@@ -5,6 +5,17 @@ namespace SharpProof.HmInference;
 
 internal static class CSharpTypes
 {
+    internal const string NullableReference = "@nullable-reference";
+    internal const string NullableValue = "global::System.Nullable";
+
+    public static string Display(ITypeSymbol type)
+    {
+        if (type is null)
+        { throw new ArgumentNullException(nameof(type)); }
+        return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
+    }
+
     public static HmType Erase(ITypeSymbol type)
     {
         if (type is null)
@@ -27,6 +38,18 @@ internal static class CSharpTypes
 
     private static HmType Convert(ITypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables)
     {
+        if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
+        {
+            return new(NullableReference, Convert(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated), erase, variables));
+        }
+        if (type is ITypeParameterSymbol { NullableAnnotation: NullableAnnotation.Annotated } nullableParameter)
+        {
+            if (variables is not null && variables.ContainsKey(nullableParameter))
+            {
+                throw new InferenceException("Imported unconstrained nullable type parameters are unsupported.");
+            }
+            return new(Display(type));
+        }
         if (type is ITypeParameterSymbol parameter && variables is not null && variables.TryGetValue(parameter, out var variable))
         {
             return variable;
@@ -34,7 +57,7 @@ internal static class CSharpTypes
 
         if (type is ITypeParameterSymbol)
         {
-            return new(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            return new(Display(type));
         }
 
         if (type is IArrayTypeSymbol array)
@@ -99,7 +122,7 @@ internal static class CSharpTypes
                 return new("void");
             }
 
-            return erase ? HmType.Variable() : new(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            return erase ? HmType.Variable() : new(Display(type));
         }
 
         throw new InferenceException($"Unsupported type: {type.ToDisplayString()}.");
@@ -123,6 +146,14 @@ internal static class CSharpTypes
         }
 
         inferred = inferred.Root;
+        if (inferred.Name == NullableReference)
+        {
+            return Render(inferred.Arguments[0], declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables) + "?";
+        }
+        if (inferred.Name == NullableValue && declared is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
+        {
+            return Render(inferred.Arguments[0], nullable.TypeArguments[0], variables) + "?";
+        }
         if (inferred.Name == "Tuple" && declared is INamedTypeSymbol { IsTupleType: true } tuple && tuple.TupleElements.Length == inferred.Arguments.Length)
         {
             return "(" + string.Join(", ", tuple.TupleElements.Select((field, i) =>

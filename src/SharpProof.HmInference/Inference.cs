@@ -12,7 +12,7 @@ public sealed record MethodResult(string Method, string Status, string Message, 
     public string Message { get; } = Message ?? throw new ArgumentNullException(nameof(Message));
 }
 
-public static class Inference
+public static partial class Inference
 {
     public static MethodResult Analyze(MethodDeclarationSyntax method, SemanticModel model, CancellationToken cancellationToken)
     {
@@ -37,7 +37,7 @@ public static class Inference
         }
     }
 
-    private sealed class Session(SemanticModel model, CancellationToken cancellationToken)
+    private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
@@ -46,11 +46,12 @@ public static class Inference
         public MethodResult Analyze(MethodDeclarationSyntax method)
         {
             var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
-            if (symbol.ReturnsVoid || symbol.IsExtern || symbol.IsAsync || method.Modifiers.Any(SyntaxKind.PartialKeyword) || method.DescendantNodes().OfType<NullableTypeSyntax>().Any())
+            if (symbol.ReturnsVoid || symbol.IsExtern || method.Modifiers.Any(SyntaxKind.PartialKeyword))
             {
-                throw new InferenceException("Extern, async, partial, void and nullable-annotated root methods are unsupported.");
+                throw new InferenceException("Extern, partial and void root methods are unsupported.");
             }
 
+            SetAsyncReturn(symbol);
             var parameters = symbol.Parameters.Select(p =>
             {
                 if (p is null)
@@ -79,17 +80,18 @@ public static class Inference
             HmType result;
             if (method.ExpressionBody is not null)
             {
-                result = Expression(method.ExpressionBody.Expression);
+                result = Returned(method.ExpressionBody.Expression);
             }
             else if (method.Body is not null)
             {
-                result = Block(method.Body);
+                result = asyncReturn is { Arity: 0 } ? AsyncBody(method.Body) : Block(method.Body);
             }
             else
             {
                 throw new InferenceException("No method body.");
             }
 
+            result = WrapAsyncResult(result);
             HmType.Unify(recursiveReturn, result);
             var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
             {
@@ -183,6 +185,7 @@ public static class Inference
                 throw new InferenceException("A result-only type variable cannot be inferred at a C# call site.");
             }
 
+            var nullableConstraints = NullableConstraints(parameters, result, variables);
             var candidate = method.WithReturnType(SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
                 if (p is null)
@@ -197,6 +200,7 @@ public static class Inference
 
                 return p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]));
             }))));
+            candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints));
             // Recheck the original compilation with just this signature changed. This catches
             // explicit local types, conversions, name collisions and broken call sites.
             var tree = method.SyntaxTree;
@@ -215,6 +219,11 @@ public static class Inference
                 return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site.");
             }
 
+            if (IntroducesCompilerWarnings(changedCompilation))
+            {
+                return new(symbol.Name, "Rejected", "Generalization introduces compiler warnings.");
+            }
+
             var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
             {
                 if (m is null)
@@ -225,6 +234,19 @@ public static class Inference
                 return m.SpanStart == method.SpanStart;
             });
             var changedModel = changedCompilation.GetSemanticModel(changed);
+            var beforeAwaits = method.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
+            var afterAwaits = changedMethod.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
+            for (var i = 0; i < beforeAwaits.Length; i++)
+            {
+                var beforeAwait = model.GetAwaitExpressionInfo(beforeAwaits[i]);
+                var afterAwait = changedModel.GetAwaitExpressionInfo(afterAwaits[i]);
+                if (beforeAwait.GetAwaiterMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.GetAwaiterMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                    || beforeAwait.GetResultMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.GetResultMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                    || beforeAwait.IsCompletedProperty?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.IsCompletedProperty?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                {
+                    return new(symbol.Name, "Rejected", "Generalization changes the selected await pattern.");
+                }
+            }
             // Validate statically resolved calls in every supplied file. Merely
             // compiling callers does not preserve conversions or overload selection
             // when this method becomes generic or its result narrows.
@@ -328,9 +350,9 @@ public static class Inference
                 })) + " ") + (p.Modifiers.Count == 0 ? "" : string.Join(" ", p.Modifiers.Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.Text)) + " ") + parameterNames[i] + " " + p.Identifier.Text + (p.Default is null ? "" : " = " + p.Default.Value.NormalizeWhitespace().ToFullString());
             });
             var signature = $"{returnName} {method.Identifier.Text}<{string.Join(", ", typeParameterNames)}>({string.Join(", ", renderedParameters)})";
-            if (method.ConstraintClauses.Count != 0)
+            if (candidate.ConstraintClauses.Count != 0)
             {
-                signature += " " + string.Join(" ", method.ConstraintClauses.Select(clause =>
+                signature += " " + string.Join(" ", candidate.ConstraintClauses.Select(clause =>
                 {
                     if (clause is null)
                     {
@@ -406,8 +428,11 @@ public static class Inference
                         // Captures and the retained local body are compiler checked
                         // after any change to the containing method signature.
                         break;
+                    case ReturnStatementSyntax { Expression: null }:
+                        flow = new(null, false);
+                        break;
                     case ReturnStatementSyntax { Expression: not null } returned:
-                        flow = new(Expression(returned.Expression), false);
+                        flow = new(Returned(returned.Expression), false);
                         break;
                     case IfStatementSyntax conditional:
                         HmType.Unify(Expression(conditional.Condition), new("bool"));
@@ -619,6 +644,19 @@ public static class Inference
             cancellationToken.ThrowIfCancellationRequested();
             switch (expression)
             {
+                case AwaitExpressionSyntax awaited:
+                    return Awaited(awaited);
+                case IsPatternExpressionSyntax pattern when pattern.Pattern is ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression }
+                    or UnaryPatternSyntax { Pattern: ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression } }:
+                    Anchor(pattern.Expression);
+                    return new("bool");
+                case ConditionalAccessExpressionSyntax conditionalAccess:
+                    return ConditionalAccess(conditionalAccess);
+                case PostfixUnaryExpressionSyntax suppressed when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                    var nullableOperand = Expression(suppressed.Operand).Root;
+                    return nullableOperand.Name == CSharpTypes.NullableReference ? nullableOperand.Arguments[0] : nullableOperand;
+                case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.NullLiteralExpression) || literal.IsKind(SyntaxKind.DefaultLiteralExpression):
+                    return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped null/default literal."));
                 case ParenthesizedExpressionSyntax parentheses:
                     return Expression(parentheses.Expression);
                 case ThrowExpressionSyntax thrown:
@@ -643,7 +681,14 @@ public static class Inference
                         return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 
-                    if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) || model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
+                    if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
+                    {
+                        AssignmentTarget(assignment.Left);
+                        Anchor(assignment.Left);
+                        Anchor(assignment.Right);
+                        return CSharpTypes.Rigid(model.GetTypeInfo(assignment, cancellationToken).Type!);
+                    }
+                    if (model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
                     {
                         throw new InferenceException("User-defined and coalescing assignments are unsupported.");
                     }
@@ -762,7 +807,7 @@ public static class Inference
                         environment.Add(model.GetDeclaredSymbol(lambdaParameters[i], cancellationToken)!, inputs[i]);
                     }
 
-                    var output = lambda.Body is ExpressionSyntax body ? Expression(body) : Block((BlockSyntax)lambda.Body);
+                    var output = lambda.Body is ExpressionSyntax body ? Returned(body) : Block((BlockSyntax)lambda.Body);
                     foreach (var parameter in lambdaParameters)
                     {
                         environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
@@ -893,7 +938,7 @@ public static class Inference
 
         private void Anchor(ExpressionSyntax expression)
         {
-            HmType.Unify(Expression(expression), CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped expression.")));
+            HmType.Unify(Expression(expression), CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? model.GetTypeInfo(expression, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped expression.")));
         }
 
         private static bool SameCallSignature(IMethodSymbol before, IMethodSymbol after)
@@ -902,13 +947,13 @@ public static class Inference
             { throw new ArgumentNullException(nameof(before)); }
             if (after is null)
             { throw new ArgumentNullException(nameof(after)); }
-            if (before.Parameters.Length != after.Parameters.Length || before.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) != after.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            if (before.Parameters.Length != after.Parameters.Length || CSharpTypes.Display(before.ReturnType) != CSharpTypes.Display(after.ReturnType))
             {
                 return false;
             }
             for (var i = 0; i < before.Parameters.Length; i++)
             {
-                if (before.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) != after.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                if (CSharpTypes.Display(before.Parameters[i].Type) != CSharpTypes.Display(after.Parameters[i].Type))
                 {
                     return false;
                 }
@@ -1008,6 +1053,14 @@ public static class Inference
                 // endpoints so widening/boxing still happens at the assignment.
                 HmType.Unify(target, CSharpTypes.Rigid(targetType));
                 HmType.Unify(value, CSharpTypes.Rigid(sourceType));
+            }
+            else if (target.Root.Name == CSharpTypes.NullableReference && value.Root.Name != CSharpTypes.NullableReference)
+            {
+                HmType.Unify(target.Root.Arguments[0], value);
+            }
+            else if (value.Root.Name == CSharpTypes.NullableReference && target.Root.Name != CSharpTypes.NullableReference)
+            {
+                HmType.Unify(target, value.Root.Arguments[0]);
             }
             else
             {
@@ -1164,7 +1217,11 @@ public static class Inference
 
         private HmType Binary(BinaryExpressionSyntax binary)
         {
-            if (binary.Kind() is SyntaxKind.CoalesceExpression or SyntaxKind.AsExpression or SyntaxKind.IsExpression || model.GetSymbolInfo(binary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+            if (binary.IsKind(SyntaxKind.CoalesceExpression))
+            {
+                return Coalesced(binary);
+            }
+            if (binary.Kind() is SyntaxKind.AsExpression or SyntaxKind.IsExpression || model.GetSymbolInfo(binary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
             {
                 throw new InferenceException("User-defined, null-coalescing and type-test operators are unsupported.");
             }
@@ -1179,6 +1236,12 @@ public static class Inference
         private HmType Member(MemberAccessExpressionSyntax member)
         {
             var receiverType = model.GetTypeInfo(member.Expression, cancellationToken).Type;
+            if (receiverType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } && member.Name.Identifier.ValueText is "Value" or "HasValue")
+            {
+                var nullableElement = HmType.Variable();
+                HmType.Unify(Expression(member.Expression), new(CSharpTypes.NullableValue, nullableElement));
+                return member.Name.Identifier.ValueText == "Value" ? nullableElement : new("bool");
+            }
             if (receiverType is INamedTypeSymbol { IsTupleType: true } tuple && model.GetSymbolInfo(member, cancellationToken).Symbol is IFieldSymbol tupleField)
             {
                 var index = tuple.TupleElements.IndexOf(tupleField);
@@ -1351,12 +1414,12 @@ public static class Inference
                     HmType.Unify(expected, new("[]", element));
                     foreach (var value in array.Initializer.ElementValues)
                     {
-                        HmType.Unify(BoundExpression(value), element);
+                        BindNullableArgument(value, element);
                     }
                 }
                 else
                 {
-                    HmType.Unify(BoundExpression(argument.Value), expected);
+                    BindNullableArgument(argument.Value, expected);
                 }
             }
         }

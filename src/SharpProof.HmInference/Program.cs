@@ -195,7 +195,7 @@ internal static class Program
             ("Cast", "static long M(int x) => (long)x;", "Concrete", null),
             ("Default", "static int M(bool ignored) => default(int);", "Suggestion", "int M<T1>(T1 ignored)"),
             ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Concrete", null),
-            ("Nullable", "static string? M(string? x) => x;", "Skipped", null),
+            ("Nullable", "static string? M(string? x) => x;", "Suggestion", "T1? M<T1>(T1? x) where T1 : class"),
             ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Concrete", null),
             ("ImplicitArray", "static int[] M(int x,int y) => new[] { x,y };", "Suggestion", "T1[] M<T1>(T1 x, T1 y)"),
             ("ExplicitArray", "static int[] M(int x) => new int[] { x };", "Concrete", null),
@@ -325,6 +325,7 @@ internal static class Program
         passed += await (SyntaxChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (FlowChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (ExitChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
+        passed += await NullableAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += BindingChecks.Run(cancellationToken);
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

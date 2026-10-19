@@ -111,7 +111,7 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
 
         var typeParameters = method.TypeParameterList is null ? shape.TypeParameterList
             : method.TypeParameterList.WithParameters(method.TypeParameterList.Parameters.AddRange(shape.TypeParameterList!.Parameters.Skip(method.TypeParameterList.Parameters.Count)));
-        var replacement = method.WithReturnType(shape.ReturnType.WithTriviaFrom(method.ReturnType)).WithTypeParameterList(typeParameters).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.ParameterList.Parameters.Select((parameter, index) =>
+        var replacement = method.WithConstraintClauses(method.ConstraintClauses.AddRange(shape.ConstraintClauses.Skip(method.ConstraintClauses.Count))).WithReturnType(shape.ReturnType.WithTriviaFrom(method.ReturnType)).WithTypeParameterList(typeParameters).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.ParameterList.Parameters.Select((parameter, index) =>
         {
             if (parameter is null)
             {

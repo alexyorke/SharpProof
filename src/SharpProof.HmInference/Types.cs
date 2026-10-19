@@ -145,6 +145,10 @@ public sealed class HmType(string name, params HmType[] arguments)
             return name;
         }
 
+        if (type.Name == CSharpTypes.NullableReference)
+        {
+            return type.Arguments[0].Format(variables) + "?";
+        }
         if (type.Name == "Tuple")
         {
             return $"({string.Join(", ", type.Arguments.Select(t => { if (t is null) { throw new global::System.ArgumentNullException(nameof(t)); } return t.Format(variables); }))})";
