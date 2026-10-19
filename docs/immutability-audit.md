@@ -2491,3 +2491,15 @@ pointer ownership and cleanup, lint build selection and exit-code propagation un
 This wrapper must remain host orchestration; all repository validation still runs in the
 canonical Linux amd64 container. Validate through the real worktree-aware layout call.
 Status: open before edits.
+
+IMM-M064: Coordinator reviewed the exhaustive Frontend.Tests fixed-array findings.
+Of 98 ArrayCreation and 18 typed collection-expression rows, preserve 26 native/alias
+array creations and 13 typed runtime input buffers. The 72 fixed/materialized array
+creations include the spelling buffer already fixed in M059; migrate the other 71 and
+five readonly typed domains to ImmutableArray values. Preserve order, duplicates,
+nullable element types, explicit ISymbol/IrTypeId typing and nested runtime array
+identity. Use checked Roslyn nodes against the inventory's d670e2eff source checkpoint,
+accounting for shifted imports/snapshot calls; change only initializer delimiters/types.
+Reject mismatched or unsupported nodes before any write. Run the ordinary frontend
+suite and keep reflection/rank/mutation arrays at their concrete native boundaries.
+Status: open before edits.
