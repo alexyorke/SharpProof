@@ -557,10 +557,10 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrTerm TermRow(
             IrTerm term, int a = -1, int b = -1, int c = -1, int d = -1,
-            long number = 0, string? text = null, int[]? items = null)
+            long number = 0, string? text = null, ImmutableArray<int>? items = null)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
-            return new(term.Kind, TypeIndex(term.Type), a, b, c, d, number, text, items);
+            return new(term.Kind, TypeIndex(term.Type), a, b, c, d, number, text) { Items = items ?? [] };
         }
 
         private PortableIrLocation LocationRow(IrLocation location)
@@ -573,7 +573,10 @@ internal static partial class PortableIrGraphCodec
                 TermIndex,
                 TermIndices,
                 (value, a, b, items) => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(
-                    value.Kind, TypeIndex(value.Type), a, b, items)));
+                    value.Kind, TypeIndex(value.Type), a, b)
+                {
+                    Items = items ?? []
+                }));
         }
 
         private PortableIrBlock BlockRow(IrBasicBlock block)
@@ -582,7 +585,10 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             return new(
                 block.Name.HasValue ? _factory.GetString(block.Name.Value) : null,
-                [.. block.Instructions.Select(InstructionRow)]);
+                instructions: null)
+            {
+                Instructions = block.Instructions.Select(InstructionRow).ToImmutableArray()
+            };
         }
 
         private PortableIrInstruction InstructionRow(IrInstruction instruction)
@@ -608,13 +614,14 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrInstruction InstructionRow(
             IrInstruction instruction, int operation, int a = -1, int b = -1, int c = -1,
-            int[]? items = null, PortableIrLocation? location = null)
+            ImmutableArray<int>? items = null, PortableIrLocation? location = null)
         {
             instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
             return new(
                 instruction.Kind, operation,
-                a, b, c, items, location)
+                a, b, c, location: location)
             {
+                Items = items ?? [],
                 Origin = instruction is IrHavocInstruction havoc ? havoc.Origin : IrHavocOrigin.Approximation
             };
         }
@@ -686,7 +693,7 @@ internal static partial class PortableIrGraphCodec
             return term == null ? -1 : TermIndex(term);
         }
 
-        private int[] TermIndices(IEnumerable<IrTerm> terms)
+        private ImmutableArray<int> TermIndices(IEnumerable<IrTerm> terms)
         {
             terms = RepositoryParameterGuard.NotNull(terms, nameof(terms));
             return [.. terms.Select(TermIndex)];

@@ -35,19 +35,24 @@ public sealed class IrProgramBuilder(IrFactory factory)
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        ImmutableArray<IrTerm> immutableArguments = [.. arguments];
+        return MemberLocationSnapshot(member, receiver, [.. arguments]);
+    }
 
+    internal IrMemberLocation MemberLocationSnapshot(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         var memberInfo = _factory.GetMemberInfo(member);
         _factory.ValidateCallShape(
             memberInfo,
             receiver,
-            immutableArguments,
+            arguments,
             nameof(arguments));
         return new IrMemberLocation(
             memberInfo.ReturnType,
             member,
             receiver,
-            immutableArguments);
+            arguments);
     }
 
     public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index)
@@ -230,6 +235,16 @@ public sealed class IrProgramBuilder(IrFactory factory)
         RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(variables, nameof(variables));
 
+        return HavocSnapshot(block, operation, havocKind, origin, variables.ToImmutableArray());
+    }
+
+    internal IrHavocInstruction HavocSnapshot(
+        IrBlockId block, OperationId operation, IrHavocKind havocKind,
+        IrHavocOrigin origin, ImmutableArray<IrVarId> variables)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         var distinct = variables
             .Distinct()
             .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))

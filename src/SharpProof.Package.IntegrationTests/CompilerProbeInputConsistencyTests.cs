@@ -98,12 +98,12 @@ public sealed class CompilerProbeInputConsistencyTests
         string metadataValue) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            (input is null ? throw new System.ArgumentNullException(nameof(input)) : new DictionaryAnalyzerConfigOptions(
-                (CompilerProbeContract.OutputPathOptionKey, (outputPath ?? throw new System.ArgumentNullException(nameof(outputPath))))));
+            (input is null ? throw new System.ArgumentNullException(nameof(input)) : new DictionaryAnalyzerConfigOptions([
+                (CompilerProbeContract.OutputPathOptionKey, (outputPath ?? throw new System.ArgumentNullException(nameof(outputPath))))]));
         private readonly AnalyzerConfigOptions _input =
-            new DictionaryAnalyzerConfigOptions(
+            new DictionaryAnalyzerConfigOptions([
                 (CompilerProbeContract.AdditionalFileMetadataOptionKey,
-                    (metadataValue ?? throw new System.ArgumentNullException(nameof(metadataValue)))));
+                    (metadataValue ?? throw new System.ArgumentNullException(nameof(metadataValue))))]);
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 

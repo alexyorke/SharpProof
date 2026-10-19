@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -139,8 +140,17 @@ public sealed partial class DotnetApiInventoryTests
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         if (!lowered.IsExact)
         { return false; }
-        var inputs = context.Parameters.ToDictionary(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Entry,
-            parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new IrObjectState()));
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        foreach (var parameter in context.Parameters)
+        {
+            ArgumentNullException.ThrowIfNull(parameter);
+            var key = parameter.Entry;
+            var value = factory.CreateReferenceValue(factory.GetVariableInfo(key).Type, new IrObjectState());
+            if (inputBuilder.ContainsKey(key))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + key); }
+            inputBuilder.Add(key, value);
+        }
+        var inputs = inputBuilder.ToImmutable();
         // Select an initialized normal return only for this bounded semantic oracle.
         // This does not make framework initialization or faults exact for native replay.
         var normal = new IrProgramReplayOptions(request =>

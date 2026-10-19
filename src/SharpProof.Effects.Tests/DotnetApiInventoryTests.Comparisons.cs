@@ -94,9 +94,10 @@ public sealed partial class DotnetApiInventoryTests
         };
     }
 
-    private static int CompareRuntimeValues<T>(T[] values, int left, int right, bool comparer) where T : IComparable<T>
+    private static int CompareRuntimeValues<T>(ImmutableArray<T> values, int left, int right, bool comparer) where T : IComparable<T>
     {
-        ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         var first = values[left];
         var second = values[right];
         ArgumentNullException.ThrowIfNull(first);

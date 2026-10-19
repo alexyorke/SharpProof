@@ -10,12 +10,12 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void TreeConfigurationDistinguishesRedundantAndLocalValues()
     {
-        var tree = new DictionaryAnalyzerConfigOptions(
-            ("sharpproof_profile", "strict"));
-        var sameGlobal = new DictionaryAnalyzerConfigOptions(
-            ("sharpproof_profile", "STRICT"));
-        var differentGlobal = new DictionaryAnalyzerConfigOptions(
-            ("sharpproof_profile", "advisory"));
+        var tree = new DictionaryAnalyzerConfigOptions([
+            ("sharpproof_profile", "strict")]);
+        var sameGlobal = new DictionaryAnalyzerConfigOptions([
+            ("sharpproof_profile", "STRICT")]);
+        var differentGlobal = new DictionaryAnalyzerConfigOptions([
+            ("sharpproof_profile", "advisory")]);
 
         var redundant =
             CompilerConfiguration.GetInvalidTreeConfigurationValues(
@@ -45,9 +45,9 @@ public sealed class AnalyzerConfigurationUnitTests
     {
         var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
+                new DictionaryAnalyzerConfigOptions([
                     ("sharpproof_profile", "strict"),
-                    ("build_property.SharpProofProfile", "advisory"))));
+                    ("build_property.SharpProofProfile", "advisory")])));
 
         Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
         Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(1));
@@ -61,9 +61,9 @@ public sealed class AnalyzerConfigurationUnitTests
     {
         var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
+                new DictionaryAnalyzerConfigOptions([
                     ("sharpproof_profile", "everything"),
-                    ("sharpproof_mode", "effects"))));
+                    ("sharpproof_mode", "effects")])));
 
         using (Assert.EnterMultipleScope())
         {
@@ -82,11 +82,11 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void ConflictingTreeAliasesCannotHideBehindMatchingGlobalValue()
     {
-        var tree = new DictionaryAnalyzerConfigOptions(
+        var tree = new DictionaryAnalyzerConfigOptions([
             ("sharpproof_profile", "advisory"),
-            ("build_property.SharpProofProfile", "strict"));
-        var global = new DictionaryAnalyzerConfigOptions(
-            ("sharpproof_profile", "advisory"));
+            ("build_property.SharpProofProfile", "strict")]);
+        var global = new DictionaryAnalyzerConfigOptions([
+            ("sharpproof_profile", "advisory")]);
 
         var invalid = CompilerConfiguration.GetInvalidTreeConfigurationValues(
             tree,

@@ -451,8 +451,8 @@ internal static partial class PortableIrGraphCodec
                 TypeIndex(value.DeclaringType),
                 _factory.GetString(value.Name),
                 TypeIndex(value.ReturnType),
-                value.IsStatic,
-                [.. value.ParameterTypes.Select(TypeIndex)]);
+                value.IsStatic)
+            { ParameterTypes = value.ParameterTypes.Select(TypeIndex).ToImmutableArray() };
         }
 
         private PortableIrOperation OperationRow(OperationId id)
@@ -490,11 +490,11 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> MemberIndex,
         Func<OperationId, int> OperationIndex,
         Func<IrTerm?, int> OptionalTermIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
         Func<IrOpaquePurity, int> OpaquePurity,
         Func<IrUnaryOperator, int> UnaryOperator,
         Func<IrBinaryOperator, int> BinaryOperator,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> Row);
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> Row);
 
     private readonly record struct TermDecodingContext(
         IrFactory Factory,
@@ -505,7 +505,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> Variable,
         Func<int, IrMemberId> Member,
         Func<int, OperationId> Operation,
-        Func<ImmutableArray<int>, int, IrTerm[]> Terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> Terms,
         Func<int, IrOpaquePurity> OpaquePurity,
         Func<int, IrUnaryOperator> UnaryOperator,
         Func<int, IrBinaryOperator> BinaryOperator,
@@ -515,15 +515,15 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> MemberIndex,
         Func<IrTerm?, int> OptionalTermIndex,
         Func<IrTerm, int> TermIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
-        Func<IrLocation, int, int, int[]?, PortableIrLocation> Row);
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
+        Func<IrLocation, int, int, ImmutableArray<int>?, PortableIrLocation> Row);
 
     private readonly record struct LocationDecodingContext(
         IrProgramBuilder Builder,
         Func<int, IrMemberId> Member,
         Func<int, IrTerm?> OptionalTerm,
         Func<int, IrTerm> Term,
-        Func<ImmutableArray<int>, IrTerm[]> Terms);
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> Terms);
 
     private readonly record struct InstructionEncodingContext(
         Func<IrTypeId, int> TypeIndex,
@@ -535,10 +535,10 @@ internal static class PortableIrGraphCodecProjections
         Func<IrTerm?, int> OptionalTermIndex,
         Func<IrHavocKind, int> HavocKind,
         Func<IrBlockId, int> BlockIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
-        Func<IEnumerable<IrVarId>, int[]> VariableIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
+        Func<IEnumerable<IrVarId>, ImmutableArray<int>> VariableIndices,
         Func<IrLocation, PortableIrLocation> Location,
-        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> Row);
+        Func<IrInstruction, int, int, int, int, ImmutableArray<int>?, PortableIrLocation?, PortableIrInstruction> Row);
 
     private readonly record struct InstructionDecodingContext(
         IrProgramBuilder Builder,
@@ -553,8 +553,8 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> HavocKind,
         Func<int, IrBlockId> BlockAt,
         Func<PortableIrLocation?, IrLocation> Location,
-        Func<ImmutableArray<int>, IrTerm[]> Terms,
-        Func<ImmutableArray<int>, IrVarId[]> Variables,
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> Terms,
+        Func<ImmutableArray<int>, ImmutableArray<IrVarId>> Variables,
         Func<Exception> Invalid);
 
     private static readonly ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> TermProjections =
@@ -799,7 +799,7 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.MemberLocation(
+                    return context.Builder.MemberLocationSnapshot(
                         context.Member(row.A),
                         context.OptionalTerm(row.B),
                         context.Terms(row.Items));
@@ -963,7 +963,7 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Call(
+                    return context.Builder.CallSnapshot(
                         context.Block,
                         context.Operation(row.Operation),
                         context.OptionalVariable(row.A),
@@ -1029,7 +1029,7 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Havoc(
+                    return context.Builder.HavocSnapshot(
                         context.Block,
                         context.Operation(row.Operation),
                         context.HavocKind(row.A),
@@ -1160,11 +1160,11 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> memberIndex,
         Func<OperationId, int> operationIndex,
         Func<IrTerm?, int> optionalTermIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
         Func<IrOpaquePurity, int> opaquePurity,
         Func<IrUnaryOperator, int> unaryOperator,
         Func<IrBinaryOperator, int> binaryOperator,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> row)
     {
         var projection = GetProjection(TermProjections, term.Kind);
         var context = new TermEncodingContext(
@@ -1192,7 +1192,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> variable,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<ImmutableArray<int>, int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<int, IrUnaryOperator> unaryOperator,
         Func<int, IrBinaryOperator> binaryOperator,
@@ -1221,8 +1221,8 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> memberIndex,
         Func<IrTerm?, int> optionalTermIndex,
         Func<IrTerm, int> termIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IrLocation, int, int, int[]?, PortableIrLocation> row)
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
+        Func<IrLocation, int, int, ImmutableArray<int>?, PortableIrLocation> row)
     {
         var projection = GetProjection(LocationProjections, location.Kind);
         var context = new LocationEncodingContext(
@@ -1240,7 +1240,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrMemberId> member,
         Func<int, IrTerm?> optionalTerm,
         Func<int, IrTerm> term,
-        Func<ImmutableArray<int>, IrTerm[]> terms)
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> terms)
     {
         var projection = GetProjection(LocationProjections, row.Kind);
         var context = new LocationDecodingContext(
@@ -1263,10 +1263,10 @@ internal static class PortableIrGraphCodecProjections
         Func<IrTerm?, int> optionalTermIndex,
         Func<IrHavocKind, int> havocKind,
         Func<IrBlockId, int> blockIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IEnumerable<IrVarId>, int[]> variableIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
+        Func<IEnumerable<IrVarId>, ImmutableArray<int>> variableIndices,
         Func<IrLocation, PortableIrLocation> location,
-        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> row)
+        Func<IrInstruction, int, int, int, int, ImmutableArray<int>?, PortableIrLocation?, PortableIrInstruction> row)
     {
         var projection = GetProjection(InstructionProjections, instruction.Kind);
         var context = new InstructionEncodingContext(
@@ -1300,8 +1300,8 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> havocKind,
         Func<int, IrBlockId> blockAt,
         Func<PortableIrLocation?, IrLocation> location,
-        Func<ImmutableArray<int>, IrTerm[]> terms,
-        Func<ImmutableArray<int>, IrVarId[]> variables,
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> terms,
+        Func<ImmutableArray<int>, ImmutableArray<IrVarId>> variables,
         Func<Exception> invalid)
     {
         var projection = GetProjection(InstructionProjections, row.Kind);
@@ -1325,7 +1325,7 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static PortableIrTerm IntegerRow(IrIntegerTerm value,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> row)
     {
         var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
         return result with { Bits = value.Width == 0 ? 0 : value.Bits };
@@ -1338,7 +1338,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, int, IrTerm?> optionalTerm,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<ImmutableArray<int>, int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<Exception> invalid)
     {
@@ -1348,9 +1348,9 @@ internal static class PortableIrGraphCodecProjections
         return purity switch
         {
             IrOpaquePurity.Pure when row.D == -1 =>
-                factory.PureOpaque(member(row.A), receiver, arguments),
+                factory.PureOpaqueSnapshot(member(row.A), receiver, arguments),
             IrOpaquePurity.Impure =>
-                factory.ImpureOpaque(operation(row.D), member(row.A), receiver, arguments),
+                factory.ImpureOpaqueSnapshot(operation(row.D), member(row.A), receiver, arguments),
             _ => throw invalid()
         };
     }

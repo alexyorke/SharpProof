@@ -12,20 +12,27 @@ internal sealed class DictionaryAnalyzerConfigOptions(
         new(ImmutableDictionary<string, string>.Empty);
 
     internal DictionaryAnalyzerConfigOptions(
-        params (string Key, string Value)[] values)
-        : this(values.Aggregate(
-            ImmutableDictionary.Create<string, string>(StringComparer.OrdinalIgnoreCase),
-            static (map, pair) =>
-            {
-                System.ArgumentNullException.ThrowIfNull(map);
-                if (map.ContainsKey(pair.Key))
-                { throw new ArgumentException("An item with the same key has already been added. Key: " + pair.Key); }
-                return map.Add(pair.Key, pair.Value);
-            }))
+        ImmutableArray<(string Key, string Value)> values)
+        : this(Capture(values))
     {
-        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
     }
 
+    private static ImmutableDictionary<string, string> Capture(
+        ImmutableArray<(string Key, string Value)> values)
+    {
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in values)
+        {
+            if (builder.ContainsKey(pair.Key))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + pair.Key); }
+            builder.Add(pair.Key, pair.Value);
+        }
+        return builder.ToImmutable();
+    }
     internal DictionaryAnalyzerConfigOptions(Dictionary<string, string> values)
         : this(values, values?.Comparer ?? throw new ArgumentNullException(nameof(values)))
     {

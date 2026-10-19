@@ -165,8 +165,8 @@ public sealed class CompilerProbeSnapshotTests
         var analyzerOptions = new AnalyzerOptions(
             [],
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
-                    (CompilerProbeContract.OutputPathOptionKey, outputPath))));
+                new DictionaryAnalyzerConfigOptions([
+                    (CompilerProbeContract.OutputPathOptionKey, outputPath)])));
         var withAnalyzers = compilation.WithAnalyzers(
             [new CompilerProbeAnalyzer()],
             new CompilationWithAnalyzersOptions(

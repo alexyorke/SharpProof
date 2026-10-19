@@ -71,11 +71,11 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         {
             await SaveFileAsync(Path.Combine(consumer, name), Path.Combine(evidence, name));
         }
-        string[] restoreArguments = [
+        ImmutableArray<string> restoreArguments = [
             "restore", projectPath, "--nologo", "/m:1", "/nodeReuse:false",
             "--configfile", nugetConfig, "--packages", packageCache, "-p:NuGetAudit=false"
         ];
-        string[] buildArguments = [
+        ImmutableArray<string> buildArguments = [
             "build", projectPath, "-c", "Release", "--no-restore", "--nologo",
             "--verbosity", "minimal", "/m:1", "/nodeReuse:false",
             "-p:SharpProofProfile=strict", "-p:SharpProofFeatures=contracts",
@@ -84,10 +84,10 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         ];
         await File.WriteAllTextAsync(Path.Combine(evidence, "commands.json"), JsonSerializer.Serialize(
             new { WorkingDirectory = consumer, FileName = "dotnet", Restore = restoreArguments, Build = buildArguments }));
-        var restore = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", TestContext.CurrentContext.CancellationToken, restoreArguments);
+        var restore = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", restoreArguments, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "restore.log"), restore.CombinedOutput);
         Assert.That(restore.ExitCode, Is.Zero, "Consumer restore setup failed.\n" + restore.CombinedOutput);
-        var build = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", TestContext.CurrentContext.CancellationToken, buildArguments);
+        var build = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", buildArguments, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "build.log"), build.CombinedOutput);
         await TestContext.Out.WriteLineAsync("PUBLIC CONSUMER BUILD\n" + build.CombinedOutput);
 

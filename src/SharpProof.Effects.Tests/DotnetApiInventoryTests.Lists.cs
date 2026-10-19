@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -53,7 +54,7 @@ public sealed partial class DotnetApiInventoryTests
             ArgumentNullException.ThrowIfNull(request);
             return factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null;
         });
-        Dictionary<ScopedIrId<IrVariableTag>, IrValue>? inputs = null;
+        ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>? inputs = null;
         if (incoming)
         {
             var count = lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
@@ -61,11 +62,9 @@ public sealed partial class DotnetApiInventoryTests
                 .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
                 .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
             var parameter = context.Parameters.Single().Entry;
-            inputs = new()
-            {
-                [parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
-                new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(1)))
-            };
+            inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(
+                parameter, factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
+                    new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(1))));
         }
         var result = new IrProgramInterpreter(factory).Execute(lowered.Program, inputs, 5000, normal);
         using var image = new MemoryStream();

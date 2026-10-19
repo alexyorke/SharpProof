@@ -36,16 +36,16 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
     {
         Assert.Throws<ArgumentException>((Action)(() =>
         {
-            _ = new DictionaryAnalyzerConfigOptions(("key", "value"), ("KEY", "value"));
+            _ = new DictionaryAnalyzerConfigOptions([("key", "value"), ("KEY", "value")]);
         }));
     }
 
     [Test]
     public void TupleOptionsParseMixedCaseKeysAndValuesAndReportMissingKeys()
     {
-        var options = new DictionaryAnalyzerConfigOptions(
+        var options = new DictionaryAnalyzerConfigOptions([
             ("SHARPPROOF_PROFILE", " StRiCt "),
-            ("SharpProof_Features", " EfFeCtS "));
+            ("SharpProof_Features", " EfFeCtS ")]);
         var provider = new DictionaryAnalyzerConfigOptionsProvider(options);
         var configuration = CompilerConfiguration.FromOptions(provider);
 
@@ -98,9 +98,9 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
     [TestCase(false)]
     public void FileOptionSharingPreservesGlobalIdentityAndConfiguration(bool globalForFiles)
     {
-        var options = new DictionaryAnalyzerConfigOptions(
+        var options = new DictionaryAnalyzerConfigOptions([
             ("sharpproof_profile", "strict"),
-            ("sharpproof_features", "effects"));
+            ("sharpproof_features", "effects")]);
         var provider = new DictionaryAnalyzerConfigOptionsProvider(options, globalForFiles);
         var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
         var additional = new ConfigurationAdditionalText();

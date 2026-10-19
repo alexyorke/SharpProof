@@ -18,7 +18,7 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(EffectRegionSet.Unknown.Union(first), Is.EqualTo(EffectRegionSet.Unknown));
         Assert.That(EffectRegionSet.Unknown.IsSubsetOf(first), Is.False);
         Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)ImmutableArray.Create(EffectRegionId.Unknown, EffectRegionId.Parameter(1))), Is.EqualTo(EffectRegionSet.Unknown));
-        Assert.That(EffectRegionSet.Create(Array.Empty<EffectRegionId>()).IsEmpty, Is.True);
+        Assert.That(EffectRegionSet.Create().IsEmpty, Is.True);
         Assert.That(EffectRegionSet.Create(ImmutableArray.Create(EffectRegionId.Parameter(1))), Is.EqualTo(first));
         Assert.That(((object)first).Equals(first), Is.True);
         Assert.That(((object)first).Equals(second), Is.False);

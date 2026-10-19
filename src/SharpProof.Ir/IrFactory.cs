@@ -655,6 +655,21 @@ public sealed class IrFactory
         return Opaque(member, receiver, ImmutableArray.CreateRange(arguments), IrOpaquePurity.Impure, operation);
     }
 
+    internal IrOpaqueTerm PureOpaqueSnapshot(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
+    }
+
+    internal IrOpaqueTerm ImpureOpaqueSnapshot(OperationId operation, IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
+    }
+
     public IrTerm Unary(IrUnaryOperator @operator, IrTerm operand)
     {
         ArgumentNullGuard.NotNull(operand, nameof(operand));

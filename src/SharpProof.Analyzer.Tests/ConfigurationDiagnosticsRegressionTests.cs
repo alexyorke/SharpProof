@@ -65,10 +65,10 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             "public static class Fixture { public static int Run() => 1; }", ["SP0025"]);
         var options = new FixedOptionsProvider(
-            new DictionaryAnalyzerConfigOptions(
+            new DictionaryAnalyzerConfigOptions([
                 ("build_property.SharpProofProfile", "advisory"),
-                ("build_property.SharpProofFeatures", "all")),
-            new DictionaryAnalyzerConfigOptions((key, value)));
+                ("build_property.SharpProofFeatures", "all")]),
+            new DictionaryAnalyzerConfigOptions([(key, value)]));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation, options, new SharpProofAnalyzer());
         AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
@@ -83,10 +83,10 @@ public sealed class ConfigurationDiagnosticsRegressionTests
             "public static class Fixture { public static int Run() => 1; }",
             ["SP0025"]);
         var options = new FixedOptionsProvider(
-            new DictionaryAnalyzerConfigOptions(
-                ("sharpproof_profile", "invalid")),
-            new DictionaryAnalyzerConfigOptions(
-                ("sharpproof_features", "invalid")));
+            new DictionaryAnalyzerConfigOptions([
+                ("sharpproof_profile", "invalid")]),
+            new DictionaryAnalyzerConfigOptions([
+                ("sharpproof_features", "invalid")]));
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
@@ -140,7 +140,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         bool failTreeOptions = false) : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions Empty =
-            new DictionaryAnalyzerConfigOptions();
+            new DictionaryAnalyzerConfigOptions(global::System.Collections.Immutable.ImmutableArray<(string Key, string Value)>.Empty);
 
         public override AnalyzerConfigOptions GlobalOptions =>
             failGlobalOptions

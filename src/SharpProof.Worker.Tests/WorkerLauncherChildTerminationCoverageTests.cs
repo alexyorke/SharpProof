@@ -59,8 +59,8 @@ public sealed partial class WorkerTests
                 Assert.That(child.IsCompleted, Is.False);
             }
             var signal = await ProcessRunner.RunCapturedAsync(Environment.CurrentDirectory,
-                "/bin/bash", TestContext.CurrentContext.CancellationToken, "-c", "kill -TERM \"$1\"", "sharpproof-owned-child",
-                childPid.ToString(CultureInfo.InvariantCulture));
+                "/bin/bash", ["-c", "kill -TERM \"$1\"", "sharpproof-owned-child",
+                childPid.ToString(CultureInfo.InvariantCulture)], TestContext.CurrentContext.CancellationToken);
             Assert.That(signal.ExitCode, Is.Zero, signal.CombinedOutput);
             var completed = await child;
             Assert.That(File.Exists(ready + ".completed"), Is.True, completed.CombinedOutput);

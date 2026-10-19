@@ -53,36 +53,41 @@ internal static class PortableGraphChanges
         ArgumentNullException.ThrowIfNull(replacement);
         if (rows.IsDefault)
         { return rows; }
+        ImmutableArray<TRow>.Builder? replacements = null;
         for (var index = 0; index < rows.Length; index++)
         {
             var row = rows[index];
             if (ReferenceEquals(row, original))
             {
-                rows = rows.SetItem(index, (TRow)(object)replacement);
+                replacements ??= rows.ToBuilder();
+                replacements[index] = (TRow)(object)replacement;
             }
             else if (row is PortableIrOperation operation && ReferenceEquals(operation.SourceSpan, original))
             {
-                rows = rows.SetItem(index, (TRow)(object)(operation with
+                replacements ??= rows.ToBuilder();
+                replacements[index] = (TRow)(object)(operation with
                 {
                     SourceSpan = (PortableIrSourceSpan)(object)replacement
-                }));
+                });
             }
             else if (row is PortableIrInstruction instruction && ReferenceEquals(instruction.Location, original))
             {
-                rows = rows.SetItem(index, (TRow)(object)(instruction with
+                replacements ??= rows.ToBuilder();
+                replacements[index] = (TRow)(object)(instruction with
                 {
                     Location = (PortableIrLocation)(object)replacement
-                }));
+                });
             }
             else if (row is PortableIrBlock block)
             {
                 var instructions = ReplaceRows(block.Instructions, original, replacement);
                 if (!instructions.Equals(block.Instructions))
                 {
-                    rows = rows.SetItem(index, (TRow)(object)(block with { Instructions = instructions }));
+                    replacements ??= rows.ToBuilder();
+                    replacements[index] = (TRow)(object)(block with { Instructions = instructions });
                 }
             }
         }
-        return rows;
+        return replacements?.ToImmutable() ?? rows;
     }
 }
