@@ -40,11 +40,11 @@ public sealed class CompilerReferencedBodyOwnershipTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("BodyOwnershipControl", isCollectible: true);
         try
         {
-            using var dependencyStream = new MemoryStream(dependencyImage, writable: false);
+            using var dependencyStream = new MemoryStream((dependencyImage).ToArray(), writable: false);
             loadContext.LoadFromStream(dependencyStream);
             foreach (var compilation in ImmutableArray.Create(referenced, owned))
             {
-                using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+                using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
                 var assembly = loadContext.LoadFromStream(image);
                 Assert.That(assembly.GetType("Caller", throwOnError: true)!.GetMethod("Root")!
                     .Invoke(null, []), Is.EqualTo(7));

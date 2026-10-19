@@ -74,9 +74,10 @@ public sealed class FrontendSemanticEdgeTopologyControls
         return new(returnType, "", expression, arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
     }
 
-    private static CompilationUnitSyntax CompileActual(IReadOnlyList<FrontendSemanticEdgeCase> cases)
+    private static CompilationUnitSyntax CompileActual(ImmutableArray<FrontendSemanticEdgeCase> cases)
     {
-        System.ArgumentNullException.ThrowIfNull(cases, nameof(cases));
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
         var source = new StringBuilder();
         source.AppendLine("#nullable enable");
         source.AppendLine("public enum SharpProofGeneratedEdgeEnum { One = 1 }");
@@ -86,7 +87,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         source.AppendLine("    public static explicit operator long(SharpProofGeneratedConvertible value) => value._value;");
         source.AppendLine("}");
         source.AppendLine("public static class SharpProofGeneratedFrontendEdges {");
-        for (var index = 0; index < cases.Count; index++)
+        for (var index = 0; index < cases.Length; index++)
         {
             var generated = cases[index];
             source.Append("    public static ");

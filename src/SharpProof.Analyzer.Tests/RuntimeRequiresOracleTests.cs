@@ -63,7 +63,7 @@ public sealed class RuntimeRequiresOracleTests
 
         RuntimeAssemblyTestHost.WithRuntimeAssembly(
             "SharpProof.Analyzer.Test.RuntimeRequires",
-            image,
+            (image).ToArray(),
             assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);

@@ -57,7 +57,7 @@ public sealed class CompilerScalarSignatureProviderTests
             """, []).WithAssemblyName("CompilerScalarSignatures");
         compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true)
             .WithOptimizationLevel(OptimizationLevel.Debug));
-        _image = AnalyzerTestHost.EmitImage(compilation).ToImmutableArray();
+        _image = AnalyzerTestHost.EmitImage(compilation);
     }
 
     [TestCase("Boolean", SpecialType.System_Boolean)]

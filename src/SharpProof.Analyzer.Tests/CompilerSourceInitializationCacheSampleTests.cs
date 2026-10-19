@@ -44,7 +44,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
         var runtime = new AssemblyLoadContext("SourceCacheSample", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var type = runtime.LoadFromStream(stream).GetType("SourceCacheRoot", throwOnError: true)!;
             for (var owner = 0; owner < ownerCount; owner++)
             {

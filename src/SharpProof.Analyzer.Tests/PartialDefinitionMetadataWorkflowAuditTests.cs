@@ -37,7 +37,7 @@ public sealed class PartialDefinitionMetadataWorkflowAuditTests
         Assert.That(attribute.ConstructorArguments.Single().Value, Is.EqualTo(1L << 40));
         Assert.That(attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath, Is.EqualTo("Subject.Definition.cs"));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialDefinitionMetadataWorkflowAudit",
-            AnalyzerTestHost.EmitImage(compilation), assembly =>
+            (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var method = assembly.GetType("Subject", throwOnError: true)!.GetMethod("Run", BindingFlags.Static | BindingFlags.Public)!;

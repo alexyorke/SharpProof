@@ -35,7 +35,7 @@ public sealed class InterpolatedStringHandlerCrashRegressionTests
         var source = shouldAppend ? Source.Replace("shouldAppend = false", "shouldAppend = true", StringComparison.Ordinal) : Source;
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002", "SP0045", "SP0047"], filePath: "HandlerSubject.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("HandlerEffectsBoundaryRuntime", AnalyzerTestHost.EmitImage(compilation), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("HandlerEffectsBoundaryRuntime", (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var run = assembly.GetType("Subject")!.GetMethod("Run")!.CreateDelegate<Func<int>>();

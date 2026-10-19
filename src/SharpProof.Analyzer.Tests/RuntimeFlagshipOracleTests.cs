@@ -86,7 +86,7 @@ public sealed class RuntimeFlagshipOracleTests
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly(
             "SharpProof.Analyzer.Test.RuntimeFlagship",
-            image,
+            (image).ToArray(),
             assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);

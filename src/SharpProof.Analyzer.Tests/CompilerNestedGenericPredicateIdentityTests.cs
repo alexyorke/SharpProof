@@ -91,7 +91,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("NestedGenericPredicateControl", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject", throwOnError: true)!;
             var observed = subject.GetField("Observed")!;
             Assert.That(observed.GetValue(null), Is.EqualTo(!expectedResult));

@@ -310,7 +310,7 @@ internal static class AnalyzerTestHost
             string.Join(Environment.NewLine, errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
     }
 
-    internal static byte[] EmitImage(CSharpCompilation compilation)
+    internal static ImmutableArray<byte> EmitImage(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
@@ -324,7 +324,7 @@ internal static class AnalyzerTestHost
                         diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 
     internal static MetadataReference EmitReference(

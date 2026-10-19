@@ -61,7 +61,7 @@ public sealed class ExpressionAccessorWrapperWorkflowAuditTests
         Assert.That(SymbolEqualityComparer.Default.Equals(
             attributes.Single().AttributeClass, expectedAttribute), Is.True);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("ExpressionAccessorWrapperWorkflowAudit",
-            AnalyzerTestHost.EmitImage(compilation), assembly =>
+            (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var type = assembly.GetType("Subject", throwOnError: true)!;

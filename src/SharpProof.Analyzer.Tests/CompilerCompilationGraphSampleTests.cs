@@ -44,16 +44,16 @@ public sealed class CompilerCompilationGraphSampleTests
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(reference)!).Name)),
                 Is.EqualTo(leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.AssemblyName))));
         }
-        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToArray();
+        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToImmutableArray();
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("GraphControl", isCollectible: true);
         try
         {
             for (var index = 0; index < leaves.Length; index++)
             {
-                using var stream = new MemoryStream(images[index], writable: false);
+                using var stream = new MemoryStream((images[index]).ToArray(), writable: false);
                 loadContext.LoadFromStream(stream);
             }
-            using var callerStream = new MemoryStream(images[^1], writable: false);
+            using var callerStream = new MemoryStream((images[^1]).ToArray(), writable: false);
             var runtimeCaller = loadContext.LoadFromStream(callerStream);
             Assert.That(runtimeCaller.GetType("Caller", throwOnError: true)!.GetMethod("Root")!
                 .Invoke(null, [17]), Is.EqualTo(17 * leafCount + leafCount * (leafCount - 1) / 2));

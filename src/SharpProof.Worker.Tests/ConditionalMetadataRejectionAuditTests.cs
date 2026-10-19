@@ -115,7 +115,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         await File.WriteAllTextAsync(Path.Combine(directory, "Producer.cs"), settings.Producer);
         await File.WriteAllTextAsync(Path.Combine(directory, "Subject.cs"), CallerSource);
         var referenceBuilder = TestMetadataReferences.Platform.ToBuilder();
-        byte[]? markerBytes = null;
+        ImmutableArray<byte>? markerBytes = null;
         if (settings.External)
         {
             await File.WriteAllTextAsync(Path.Combine(directory, "Marker.cs"), NestedMarkerSource);
@@ -197,11 +197,11 @@ public sealed class ConditionalMetadataRejectionAuditTests
         };
     }
 
-    private static int FindLogToken(byte[] bytes)
+    private static int FindLogToken(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var reader = pe.GetMetadataReader();
         var owner = reader.TypeDefinitions.Single(handle => reader.GetString(reader.GetTypeDefinition(handle).Name) == "Sink");
         var method = reader.GetTypeDefinition(owner).GetMethods()
@@ -209,11 +209,11 @@ public sealed class ConditionalMetadataRejectionAuditTests
         return MetadataTokens.GetToken(method);
     }
 
-    private static ImageObservation DescribeImage(byte[] bytes, int logToken)
+    private static ImageObservation DescribeImage(ImmutableArray<byte> bytes, int logToken)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var reader = pe.GetMetadataReader();
         var handle = (MethodDefinitionHandle)MetadataTokens.Handle(logToken);
         var log = reader.GetMethodDefinition(handle);
@@ -303,15 +303,16 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 Convert.ToHexStringLower(rawValue), symbol, constructorError, valueError));
         }
         var tables = Enum.GetValues<TableIndex>().Select(index => index + ":" + reader.GetTableRowCount(index)).ToImmutableArray();
-        return new(Hash(bytes), bytes.Length, reader.GetGuid(reader.GetModuleDefinition().Mvid),
+        return new(Hash(bytes.AsSpan()), bytes.Length, reader.GetGuid(reader.GetModuleDefinition().Mvid),
             reader.GetString(reader.GetAssemblyDefinition().Name), logToken, reader.GetString(log.Name),
             Convert.ToHexStringLower(reader.GetBlobBytes(log.Signature)),
             Convert.ToHexStringLower(pe.GetMethodBody(log.RelativeVirtualAddress).GetILBytes()!), tables, rows.ToImmutable());
     }
 
-    private static async Task QualifyImage(string directory, byte[] bytes, int logToken, string scenario, bool mutated)
+    private static async Task QualifyImage(string directory, ImmutableArray<byte> bytes, int logToken, string scenario, bool mutated)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(scenario);
         var image = DescribeImage(bytes, logToken);
@@ -385,13 +386,13 @@ public sealed class ConditionalMetadataRejectionAuditTests
         }
     }
 
-    private static async Task<byte[]> Mutate(string directory, byte[] original, int logToken, string mutation)
+    private static async Task<ImmutableArray<byte>> Mutate(string directory, ImmutableArray<byte> original, int logToken, string mutation)
     {
-        System.ArgumentNullException.ThrowIfNull(original, nameof(original));
+        if (original.IsDefault)
+        { throw new ArgumentNullException(nameof(original)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(mutation);
-        using var stream = new MemoryStream(original);
-        using var pe = new PEReader(stream);
+        using var pe = new PEReader(original);
         var reader = pe.GetMetadataReader();
         var attributes = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(logToken)).GetCustomAttributes();
         var selected = attributes.Single(handle => ReadSymbol(reader, reader.GetCustomAttribute(handle).Value) == "PRIVATE_PRESENT");
@@ -410,10 +411,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(expectedParent, Is.LessThanOrEqualTo(ushort.MaxValue));
         Assert.That(expectedType, Is.LessThanOrEqualTo(ushort.MaxValue));
         Assert.That(valueOffset, Is.LessThanOrEqualTo(ushort.MaxValue));
-        Assert.That(BitConverter.ToUInt16(original, rowOffset), Is.EqualTo(expectedParent));
-        Assert.That(BitConverter.ToUInt16(original, rowOffset + 2), Is.EqualTo(expectedType));
-        Assert.That(BitConverter.ToUInt16(original, rowOffset + 4), Is.EqualTo(valueOffset));
-        var mutated = (byte[])original.Clone();
+        Assert.That(BitConverter.ToUInt16(original.AsSpan(rowOffset, sizeof(ushort))), Is.EqualTo(expectedParent));
+        Assert.That(BitConverter.ToUInt16(original.AsSpan(rowOffset + 2, sizeof(ushort))), Is.EqualTo(expectedType));
+        Assert.That(BitConverter.ToUInt16(original.AsSpan(rowOffset + 4, sizeof(ushort))), Is.EqualTo(valueOffset));
+        var mutated = original.ToArray();
         ImmutableArray<int> allowedOffsets;
         if (mutation is "nil-value" or "invalid-constructor-tag")
         {
@@ -437,8 +438,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
         }
         var changedOffsets = Enumerable.Range(0, original.Length).Where(offset => original[offset] != mutated[offset]).ToImmutableArray();
         var before = DescribeImage(original, logToken);
-        var after = DescribeImage(mutated, logToken);
-        await File.WriteAllBytesAsync(Path.Combine(directory, "mutated-producer.dll"), mutated);
+        var mutatedImage = ImmutableArray.Create<byte>(mutated.AsSpan());
+        var after = DescribeImage(mutatedImage, logToken);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "mutated-producer.dll"), mutatedImage.AsMemory());
         await Save(directory, "mutation.json", new
         {
             Mutation = mutation,
@@ -461,7 +463,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(after.LogIl, Is.EqualTo(before.LogIl));
         Assert.That(after.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact))),
             Is.EqualTo(before.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact)))));
-        return mutated;
+        return mutatedImage;
     }
 
     private static string? ReadSymbol(MetadataReader reader, BlobHandle value)
@@ -472,24 +474,25 @@ public sealed class ConditionalMetadataRejectionAuditTests
         return blob.ReadSerializedString();
     }
 
-    private static async Task ObserveCaller(string directory, string version, byte[] producerBytes, byte[]? markerBytes,
+    private static async Task ObserveCaller(string directory, string version, ImmutableArray<byte> producerBytes, ImmutableArray<byte>? markerBytes,
         int logToken, ImmutableArray<string> symbols, bool retained)
     {
-        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        if (producerBytes.IsDefault)
+        { throw new ArgumentNullException(nameof(producerBytes)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(version);
         var output = Path.Combine(directory, version);
         Directory.CreateDirectory(output);
         var producerPath = Path.Combine(output, "producer.dll");
-        await File.WriteAllBytesAsync(producerPath, producerBytes);
+        await File.WriteAllBytesAsync(producerPath, producerBytes.AsMemory());
         var prior = MetadataReference.CreateFromFile(producerPath,
             MetadataReferenceProperties.Assembly.WithAliases(PriorAliases));
         var referenceBuilder = TestMetadataReferences.Platform.ToBuilder();
         referenceBuilder.Add(prior);
-        if (markerBytes != null)
+        if (markerBytes.HasValue)
         {
             var markerPath = Path.Combine(output, "marker.dll");
-            await File.WriteAllBytesAsync(markerPath, markerBytes);
+            await File.WriteAllBytesAsync(markerPath, markerBytes.Value.AsMemory());
             referenceBuilder.Add(MetadataReference.CreateFromFile(markerPath,
                 MetadataReferenceProperties.Assembly.WithAliases(MarkerAliases)));
         }
@@ -530,7 +533,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         Assert.That(prior.Properties.Aliases, Is.EqualTo(PriorAliases));
         Assert.That(prior.FilePath, Is.EqualTo(producerPath));
-        Assert.That(Hash(await File.ReadAllBytesAsync(producerPath)), Is.EqualTo(Hash(producerBytes)));
+        Assert.That(Hash(await File.ReadAllBytesAsync(producerPath)), Is.EqualTo(Hash(producerBytes.AsSpan())));
         Assert.That(SymbolEqualityComparer.Default.Equals(log.ContainingAssembly, importedAssembly), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(log.ContainingAssembly, compilation.Assembly), Is.False);
         Assert.That(log.IsConditional, Is.True);
@@ -551,29 +554,31 @@ public sealed class ConditionalMetadataRejectionAuditTests
             ActualPolicyElided = actualElided,
             ExpectedPolicyElided = !retained,
             ExpectedRetainedCall = retained,
-            ProducerSha256 = Hash(producerBytes),
-            CallerSha256 = Hash(callerBytes)
+            ProducerSha256 = Hash(producerBytes.AsSpan()),
+            CallerSha256 = Hash(callerBytes.AsSpan())
         });
         Assert.That(actualElided, Is.EqualTo(!retained));
     }
 
-    private static async Task ObserveEmission(string directory, byte[] producerBytes, byte[]? markerBytes,
-        byte[] callerBytes, int logToken, bool retained)
+    private static async Task ObserveEmission(string directory, ImmutableArray<byte> producerBytes, ImmutableArray<byte>? markerBytes,
+        ImmutableArray<byte> callerBytes, int logToken, bool retained)
     {
-        System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
-        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        if (callerBytes.IsDefault)
+        { throw new ArgumentNullException(nameof(callerBytes)); }
+        if (producerBytes.IsDefault)
+        { throw new ArgumentNullException(nameof(producerBytes)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         var context = new AssemblyLoadContext("metadata-rejection-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            if (markerBytes != null)
+            if (markerBytes.HasValue)
             {
-                using var markerStream = new MemoryStream(markerBytes);
+                using var markerStream = new MemoryStream(markerBytes.Value.ToArray(), writable: false);
                 context.LoadFromStream(markerStream);
             }
-            using var producerStream = new MemoryStream(producerBytes);
+            using var producerStream = new MemoryStream(producerBytes.ToArray(), writable: false);
             var producer = context.LoadFromStream(producerStream);
-            using var callerStream = new MemoryStream(callerBytes);
+            using var callerStream = new MemoryStream(callerBytes.ToArray(), writable: false);
             var caller = context.LoadFromStream(callerStream);
             var targetType = caller.GetType("Fixture")!;
             var targetMethod = targetType.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
@@ -592,13 +597,13 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 {
                     Name = producer.GetName().Name,
                     Mvid = producer.ManifestModule.ModuleVersionId,
-                    Sha256 = Hash(producerBytes)
+                    Sha256 = Hash(producerBytes.AsSpan())
                 },
                 Caller = new
                 {
                     Name = caller.GetName().Name,
                     Mvid = caller.ManifestModule.ModuleVersionId,
-                    Sha256 = Hash(callerBytes)
+                    Sha256 = Hash(callerBytes.AsSpan())
                 },
                 TargetIl = targetIl,
                 LogIl = logIl,
@@ -674,7 +679,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 .WithOptimizationLevel(OptimizationLevel.Release));
     }
 
-    private static async Task<byte[]> Emit(string directory, string name, CSharpCompilation compilation)
+    private static async Task<ImmutableArray<byte>> Emit(string directory, string name, CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(directory);
@@ -685,8 +690,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
         await Save(directory, name + "-emit-diagnostics.json", Diagnostics(result.Diagnostics));
         Assert.That(result.Success, Is.True);
         Assert.That(result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes.AsMemory());
         await Save(directory, name + "-pe.json", DescribePe(bytes));
         return bytes;
     }
@@ -703,12 +708,12 @@ public sealed class ConditionalMetadataRejectionAuditTests
             return new(input, null, exception.GetType().FullName);
         }
     }
-    private static IlObservation DecodeIl(MethodBase method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodBase method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
         System.ArgumentNullException.ThrowIfNull(method);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
@@ -747,13 +752,13 @@ public sealed class ConditionalMetadataRejectionAuditTests
         return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
     }
 
-    private static PeObservation DescribePe(byte[] bytes)
+    private static PeObservation DescribePe(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
-        return new(Hash(bytes), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
+        return new(Hash(bytes.AsSpan()), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
             metadata.GetGuid(metadata.GetModuleDefinition().Mvid));
     }
 
@@ -778,9 +783,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value, JsonOptions) + "\n");
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(
+        ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans hash the empty payload */
+        bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 

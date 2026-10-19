@@ -78,7 +78,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
             method.DescendantNodesAndSelf().Count() + typeInitializationCost +
             symbol.Parameters.Length * 3 + 1 + 1;
         var sourceBudgetRemainingBeforePrepare = MaximumWork - sourceBudgetSpentBeforePrepare;
-        var emitted = errors.Length == 0 ? AnalyzerTestHost.EmitImage(compilation) : [];
+        var emitted = errors.Length == 0 ? AnalyzerTestHost.EmitImage(compilation) : ImmutableArray<byte>.Empty;
 
         return new CompilerObservation(
             testCase,

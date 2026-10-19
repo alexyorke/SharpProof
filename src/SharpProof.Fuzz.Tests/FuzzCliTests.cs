@@ -10,6 +10,21 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FuzzCliTests
 {
     [Test]
+    public void DefaultArgumentVectorRejectsBeforeLogging()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await FuzzRunner.RunCliAsync(default, output, error,
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
+    [Test]
     [NonParallelizable]
     public async Task CliPrintsHelpAndCanBeCalledAgain()
     {

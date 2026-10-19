@@ -368,7 +368,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("QueryValueControl", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image, writable: false);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var method = runtime.LoadFromStream(stream).GetType("QueryValueControl", throwOnError: true)!
                     .GetMethod("Root")!;
                 using (Assert.EnterMultipleScope())
@@ -418,7 +418,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("DistinctQueryRoleControl", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image, writable: false);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var method = runtime.LoadFromStream(stream).GetType("DistinctQueryRoleControl", throwOnError: true)!
                     .GetMethod("Root")!;
                 using (Assert.EnterMultipleScope())

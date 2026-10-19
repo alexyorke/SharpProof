@@ -154,12 +154,12 @@ public static class FuzzRunner
     internal const int MaximumRetainedFailures = 64;
 
     internal static async Task<int> RunCliAsync(
-        IReadOnlyList<string> arguments,
+        ImmutableArray<string> arguments,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
         error = RepositoryParameterGuard.NotNull(error, nameof(error));
         output = RepositoryParameterGuard.NotNull(output, nameof(output));
         var log = new RepositoryLogger(output, error);

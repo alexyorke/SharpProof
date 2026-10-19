@@ -24,7 +24,7 @@ public sealed class CompilerMetadataApiBoundaryTests
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var libraryImage = AnalyzerTestHost.EmitImage(library);
             var path = Path.Combine(directory, "PlainMetadataApiLibrary.dll");
-            File.WriteAllBytes(path, libraryImage);
+            File.WriteAllBytes(path, (libraryImage).ToArray());
             var reference = MetadataReference.CreateFromFile(path);
             const string source = "public static class Caller { public static int Root() => PlainLibrary.Value(7); }";
             var unavailable = AnalyzerTestHost.CreateCompilation(source, [])
@@ -50,11 +50,11 @@ public sealed class CompilerMetadataApiBoundaryTests
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("MetadataApiControl", isCollectible: true);
             try
             {
-                using var libraryStream = new MemoryStream(libraryImage, writable: false);
+                using var libraryStream = new MemoryStream((libraryImage).ToArray(), writable: false);
                 loadContext.LoadFromStream(libraryStream);
                 foreach (var caller in callers)
                 {
-                    using var image = new MemoryStream(AnalyzerTestHost.EmitImage(caller), writable: false);
+                    using var image = new MemoryStream((AnalyzerTestHost.EmitImage(caller)).ToArray(), writable: false);
                     var assembly = loadContext.LoadFromStream(image);
                     Assert.That(assembly.GetType("Caller", throwOnError: true)!.GetMethod("Root")!
                         .Invoke(null, []), Is.EqualTo(7));

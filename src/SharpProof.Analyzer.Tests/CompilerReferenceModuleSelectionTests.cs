@@ -118,7 +118,7 @@ public sealed class CompilerReferenceModuleSelectionTests
     {
         return AnalyzerTestHost.EmitImage(AnalyzerTestHost.CreateCompilation(
             $"public static class Dependency {{ public static int Value() => {value}; }}", [])
-            .WithAssemblyName("MetadataSelectionDependency")).ToImmutableArray();
+            .WithAssemblyName("MetadataSelectionDependency"));
     }
 
     private sealed class ModuleFiles : IDisposable

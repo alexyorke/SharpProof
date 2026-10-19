@@ -136,20 +136,21 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
         var actual = DescribeDiagnostics(diagnostics);
         var expected = string.Join("\n", expectedDiagnostics);
         var observation = $"sourceSHA256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)))};" +
-            $"peSHA256={Convert.ToHexString(SHA256.HashData(image))};compilerErrors=0\n" +
+            $"peSHA256={Convert.ToHexString(SHA256.HashData((image).AsSpan()))};compilerErrors=0\n" +
             string.Join("\n", bindings) + "\n" + runtimeBinding +
             $"\nExpected complete diagnostics: [{expected}]\nActual complete diagnostics: [{actual}]";
         await TestContext.Out.WriteLineAsync(observation);
         Assert.That(actual, Is.EqualTo(expected), observation);
     }
 
-    private static string VerifyConstructionAndDelegates(byte[] image, bool intrinsic)
+    private static string VerifyConstructionAndDelegates(ImmutableArray<byte> image, bool intrinsic)
     {
-        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        if (image.IsDefault)
+        { throw new ArgumentNullException(nameof(image)); }
         var runtime = new AssemblyLoadContext("MemberInitializerMethodGroups", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var assembly = runtime.LoadFromStream(stream);
             var subject = assembly.GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);

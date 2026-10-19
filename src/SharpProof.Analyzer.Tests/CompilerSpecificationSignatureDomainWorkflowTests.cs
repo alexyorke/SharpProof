@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -41,7 +42,7 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
         Assert.That(image, Is.Not.Empty);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("SignatureProbe")!
             .GetMembers("Probe").Single();
-        var runtimeMethod = System.Reflection.Assembly.Load(image)
+        var runtimeMethod = System.Reflection.Assembly.Load((image).ToArray())
             .GetType("SignatureProbe", throwOnError: true)!.GetMethod("Probe")!;
         object? result = null;
         Assert.DoesNotThrow((Action)(() => { result = runtimeMethod.Invoke(null, arguments); }));

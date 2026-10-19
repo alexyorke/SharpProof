@@ -75,7 +75,7 @@ public sealed class CompilerInvocationIdentityBoundaryTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("QueryInvocationIdentity", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(image);
             Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
                 .Invoke(null, [4]), Is.EqualTo(4));
@@ -113,7 +113,7 @@ public sealed class CompilerInvocationIdentityBoundaryTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("NestedIdentity", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(image);
             Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
                 .Invoke(null, [4]), Is.EqualTo(4));
@@ -207,7 +207,7 @@ public sealed class CompilerInvocationIdentityBoundaryTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("InvocationIdentity", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(image);
             Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
                 .Invoke(null, [4]), Is.EqualTo(expected));

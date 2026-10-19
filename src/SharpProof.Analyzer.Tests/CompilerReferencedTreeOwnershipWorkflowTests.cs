@@ -44,9 +44,9 @@ public sealed class CompilerReferencedTreeOwnershipWorkflowTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("OwnedReferences_" + suffix, isCollectible: true);
         try
         {
-            using var firstImage = new MemoryStream(AnalyzerTestHost.EmitImage(first), writable: false);
-            using var secondImage = new MemoryStream(AnalyzerTestHost.EmitImage(second), writable: false);
-            using var callerImage = new MemoryStream(AnalyzerTestHost.EmitImage(caller), writable: false);
+            using var firstImage = new MemoryStream((AnalyzerTestHost.EmitImage(first)).ToArray(), writable: false);
+            using var secondImage = new MemoryStream((AnalyzerTestHost.EmitImage(second)).ToArray(), writable: false);
+            using var callerImage = new MemoryStream((AnalyzerTestHost.EmitImage(caller)).ToArray(), writable: false);
             loadContext.LoadFromStream(firstImage);
             loadContext.LoadFromStream(secondImage);
             var runtimeCaller = loadContext.LoadFromStream(callerImage);

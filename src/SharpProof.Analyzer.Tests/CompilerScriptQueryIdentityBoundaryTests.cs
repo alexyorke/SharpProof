@@ -80,7 +80,7 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ScriptQueryIdentity", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(image);
             var factory = assembly.GetType(entryPoint.ContainingType.MetadataName, throwOnError: true)!
                 .GetMethod(entryPoint.MetadataName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;

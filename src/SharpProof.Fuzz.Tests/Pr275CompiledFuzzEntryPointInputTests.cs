@@ -61,7 +61,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
     [Test]
     public void PublicParserRejectsMissingArgumentCollection()
     {
-        Action parse = () => FuzzOptions.Parse(null!);
+        Action parse = () => FuzzOptions.Parse(default);
         Assert.That(Assert.Throws<ArgumentNullException>(parse)!.ParamName, Is.EqualTo("arguments"));
     }
 

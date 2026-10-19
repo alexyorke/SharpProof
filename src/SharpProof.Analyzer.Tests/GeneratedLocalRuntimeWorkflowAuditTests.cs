@@ -42,7 +42,7 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         Assert.That(SymbolEqualityComparer.Default.Equals(
             operation.Symbol.GetAttributes().Single().AttributeClass, expectedAttribute), Is.True);
         var image = AnalyzerTestHost.EmitImage(compilation);
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("GeneratedLocalRuntimeWorkflowAudit", image, assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("GeneratedLocalRuntimeWorkflowAudit", (image).ToArray(), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var type = assembly.GetType("Subject", throwOnError: true)!;

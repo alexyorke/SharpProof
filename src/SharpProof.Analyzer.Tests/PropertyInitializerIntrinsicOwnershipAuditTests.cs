@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -78,7 +79,7 @@ public sealed class PropertyInitializerIntrinsicOwnershipAuditTests
         string runtimeMessage;
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var thrown = Assert.Throws<TargetInvocationException>(
                 (Action)(() => Activator.CreateInstance(subject)))!;
@@ -128,7 +129,7 @@ public sealed class PropertyInitializerIntrinsicOwnershipAuditTests
         var runtime = new AssemblyLoadContext("PropertyInitializerControl-" + ordinaryProperty, isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);

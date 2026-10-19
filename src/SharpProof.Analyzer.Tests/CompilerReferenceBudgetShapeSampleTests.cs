@@ -134,7 +134,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         }
         var inspectionMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
-        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToArray();
+        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToImmutableArray();
         var emitMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
         var loadContext = new AssemblyLoadContext("BudgetShapeControl_" + suffix, isCollectible: true);
@@ -142,11 +142,11 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         {
             for (var index = 0; index < leaves.Length; index++)
             {
-                using var stream = new MemoryStream(images[index], writable: false);
+                using var stream = new MemoryStream((images[index]).ToArray(), writable: false);
                 var loaded = loadContext.LoadFromStream(stream);
                 Assert.That(loaded.GetName().Name, Is.EqualTo(leaves[index].AssemblyName));
             }
-            using var rootStream = new MemoryStream(images[^1], writable: false);
+            using var rootStream = new MemoryStream((images[^1]).ToArray(), writable: false);
             var runtimeRoot = loadContext.LoadFromStream(rootStream);
             Assert.That(runtimeRoot.GetType("BudgetRoot", throwOnError: true)!.GetMethod("Read")!
                 .Invoke(null, []), Is.EqualTo(7));

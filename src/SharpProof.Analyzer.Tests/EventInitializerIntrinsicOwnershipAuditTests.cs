@@ -83,7 +83,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         var runtime = new AssemblyLoadContext("EventInitializerMisuse", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var assembly = runtime.LoadFromStream(stream);
             foreach (var typeName in ImmutableArray.Create("ResultSubject", "OldSubject"))
             {
@@ -145,7 +145,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         var runtime = new AssemblyLoadContext("EventInitializerLambdaControl", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);

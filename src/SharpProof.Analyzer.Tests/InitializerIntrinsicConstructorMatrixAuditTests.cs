@@ -54,7 +54,7 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
         var runtime = new AssemblyLoadContext("InitializerIntrinsicConstructorMatrixAudit", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>((Action)(() => Activator.CreateInstance(subject)))!;
             Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());

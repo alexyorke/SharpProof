@@ -26,8 +26,8 @@ public sealed class CompilerIlSnapshotBoundaryTests
             var secondImage = AnalyzerTestHost.EmitImage(second);
             var firstPath = Path.Combine(directory, "SnapshotFirst.dll");
             var secondPath = Path.Combine(directory, "SnapshotSecond.dll");
-            File.WriteAllBytes(firstPath, firstImage);
-            File.WriteAllBytes(secondPath, secondImage);
+            File.WriteAllBytes(firstPath, (firstImage).ToArray());
+            File.WriteAllBytes(secondPath, (secondImage).ToArray());
             var firstReference = MetadataReference.CreateFromFile(firstPath);
             var secondReference = MetadataReference.CreateFromFile(secondPath);
             var earlier = AnalyzerTestHost.CreateCompilation(
@@ -48,13 +48,13 @@ public sealed class CompilerIlSnapshotBoundaryTests
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("IlSnapshot", isCollectible: true);
             try
             {
-                using var firstStream = new MemoryStream(firstImage, writable: false);
-                using var secondStream = new MemoryStream(secondImage, writable: false);
+                using var firstStream = new MemoryStream((firstImage).ToArray(), writable: false);
+                using var secondStream = new MemoryStream((secondImage).ToArray(), writable: false);
                 loadContext.LoadFromStream(firstStream);
                 loadContext.LoadFromStream(secondStream);
                 foreach (var (compilation, expected) in ImmutableArray.Create((earlier, 7), (current, 9)))
                 {
-                    using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+                    using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
                     var assembly = loadContext.LoadFromStream(image);
                     Assert.That(assembly.GetType("Caller", throwOnError: true)!.GetMethod("Root")!
                         .Invoke(null, []), Is.EqualTo(expected));

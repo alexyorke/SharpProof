@@ -925,7 +925,7 @@ public static class FrontendDifferentialOracle
     }
 
     public static ImmutableArray<FrontendDifferentialResult> CompareBatch(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        ImmutableArray<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken)
     {
         if (!HasValidBatch(generatedCases))
@@ -945,17 +945,17 @@ public static class FrontendDifferentialOracle
                 DifferentialFormatting.FormatErrors(
                     emit.Diagnostics,
                     includeIdTieBreak: true));
-            if (generatedCases.Count == 1)
+            if (generatedCases.Length == 1)
             {
                 return [failure];
             }
 
-            var midpoint = generatedCases.Count / 2;
+            var midpoint = generatedCases.Length / 2;
             var left = CompareBatch(
-                generatedCases.Take(midpoint).ToImmutableArray(),
+                generatedCases.Slice(0, midpoint),
                 cancellationToken);
             var right = CompareBatch(
-                generatedCases.Skip(midpoint).ToImmutableArray(),
+                generatedCases.Slice(midpoint, generatedCases.Length - midpoint),
                 cancellationToken);
             return [.. left, .. right];
         }
@@ -965,7 +965,7 @@ public static class FrontendDifferentialOracle
 
     internal static ImmutableArray<FrontendDifferentialResult> CompareSourceBatch(
         string source,
-        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        ImmutableArray<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken)
     {
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
@@ -985,20 +985,20 @@ public static class FrontendDifferentialOracle
                 DifferentialFormatting.FormatErrors(
                     emit.Diagnostics,
                     includeIdTieBreak: true));
-            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+            return [.. Enumerable.Repeat(failure, generatedCases.Length)];
         }
 
         return CompareCompiledBatch(generatedCases, syntaxTree, compilation, image, cancellationToken);
     }
 
-    private static bool HasValidBatch(IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    private static bool HasValidBatch(ImmutableArray<GeneratedCSharpCase> generatedCases)
     {
-        if (generatedCases == null)
+        if (generatedCases.IsDefault)
         {
             throw new ArgumentNullException(nameof(generatedCases));
         }
 
-        if (generatedCases.Count == 0)
+        if (generatedCases.Length == 0)
         {
             return false;
         }
@@ -1014,7 +1014,7 @@ public static class FrontendDifferentialOracle
     }
 
     private static ImmutableArray<FrontendDifferentialResult> CompareCompiledBatch(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        ImmutableArray<GeneratedCSharpCase> generatedCases,
         SyntaxTree syntaxTree,
         CSharpCompilation compilation,
         MemoryStream image,
@@ -1034,11 +1034,11 @@ public static class FrontendDifferentialOracle
                 static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ParseMethodIndex(
                     method.Identifier.ValueText)))
             .ToImmutableArray();
-        if (methodSyntaxes.Length != generatedCases.Count)
+        if (methodSyntaxes.Length != generatedCases.Length)
         {
             var failure = Mismatch(
                 "Roslyn exposed an unexpected generated method count.");
-            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+            return [.. Enumerable.Repeat(failure, generatedCases.Length)];
         }
 
         return WithLoadedGeneratedAssembly(
@@ -1048,8 +1048,8 @@ public static class FrontendDifferentialOracle
             runtimeType =>
             {
                 var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
-                    generatedCases.Count);
-                for (var index = 0; index < generatedCases.Count; index++)
+                    generatedCases.Length);
+                for (var index = 0; index < generatedCases.Length; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var methodSyntax = methodSyntaxes[index];
@@ -1109,20 +1109,20 @@ public static class FrontendDifferentialOracle
     }
 
     public static ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
-        IReadOnlyList<FrontendSemanticEdgeCase> cases,
+        ImmutableArray<FrontendSemanticEdgeCase> cases,
         CancellationToken cancellationToken)
     {
-        if (cases == null)
+        if (cases.IsDefault)
         {
             throw new ArgumentNullException(nameof(cases));
         }
 
-        if (cases.Count == 0)
+        if (cases.Length == 0)
         {
             return [];
         }
 
-        for (var index = 0; index < cases.Count; index++)
+        for (var index = 0; index < cases.Length; index++)
         {
             var generated = cases[index] ??
                 throw new ArgumentException(
@@ -1196,8 +1196,8 @@ public static class FrontendDifferentialOracle
         var methods = generatedType.Members
             .OfType<MethodDeclarationSyntax>()
             .ToImmutableArray();
-        if (methods.Length != cases.Count ||
-            generatedType.Members.Count != cases.Count)
+        if (methods.Length != cases.Length ||
+            generatedType.Members.Count != cases.Length)
         {
             return IsolateSemanticEdgeFailure(
                 cases,
@@ -1220,8 +1220,8 @@ public static class FrontendDifferentialOracle
         }
 
         var namedMethods = methodsByName.ToImmutable();
-        var orderedMethods = ImmutableArray.CreateBuilder<MethodDeclarationSyntax>(cases.Count);
-        for (var index = 0; index < cases.Count; index++)
+        var orderedMethods = ImmutableArray.CreateBuilder<MethodDeclarationSyntax>(cases.Length);
+        for (var index = 0; index < cases.Length; index++)
         {
             if (!namedMethods.TryGetValue(
                     SemanticEdgeMethodName(index),
@@ -1246,8 +1246,8 @@ public static class FrontendDifferentialOracle
                 runtimeType = RepositoryParameterGuard.NotNull(runtimeType, nameof(runtimeType));
                 var results =
                     ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
-                        cases.Count);
-                for (var index = 0; index < cases.Count; index++)
+                        cases.Length);
+                for (var index = 0; index < cases.Length; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     results.Add(CompareSemanticEdge(
@@ -1291,22 +1291,22 @@ public static class FrontendDifferentialOracle
 
     private static ImmutableArray<FrontendSemanticEdgeResult>
         IsolateSemanticEdgeFailure(
-            IReadOnlyList<FrontendSemanticEdgeCase> cases,
+            ImmutableArray<FrontendSemanticEdgeCase> cases,
             string detail,
             CancellationToken cancellationToken)
     {
         detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        if (cases.Count == 1)
+        if (cases.Length == 1)
         {
             return RepeatSemanticFailure(1, detail);
         }
 
-        var midpoint = cases.Count / 2;
+        var midpoint = cases.Length / 2;
         var left = CompareSemanticEdges(
-            cases.Take(midpoint).ToImmutableArray(),
+            cases.Slice(0, midpoint),
             cancellationToken);
         var right = CompareSemanticEdges(
-            cases.Skip(midpoint).ToImmutableArray(),
+            cases.Slice(midpoint, cases.Length - midpoint),
             cancellationToken);
         return [.. left, .. right];
     }
@@ -1425,11 +1425,16 @@ public static class FrontendDifferentialOracle
             return SemanticAgreement(actual);
         }
 
+        var arguments = ImmutableArray.CreateBuilder<object?>(method.Parameters.Length);
+        for (var argumentIndex = 0; argumentIndex < method.Parameters.Length; argumentIndex++)
+        {
+            arguments.Add(generated.Arguments[argumentIndex]);
+        }
         var environment = CreateSemanticEdgeEnvironment(
             factory,
             method,
             lowering,
-            generated.Arguments);
+            arguments.MoveToImmutable());
         var interpreted = new IrInterpreter(factory).Evaluate(
             lowering.Term,
             environment.Variables,
@@ -1461,9 +1466,9 @@ public static class FrontendDifferentialOracle
             IrFactory factory,
             IMethodSymbol method,
             FrontendLoweringResult lowering,
-            IReadOnlyList<object?> arguments)
+            ImmutableArray<object?> arguments)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -1653,14 +1658,14 @@ public static class FrontendDifferentialOracle
     }
 
     internal static string CreateBatchSource(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        ImmutableArray<GeneratedCSharpCase> generatedCases,
         bool indexedMethods = true)
     {
-        generatedCases = RepositoryParameterGuard.NotNull(generatedCases, nameof(generatedCases));
+        RepositoryParameterGuard.ThrowIfMissing(generatedCases.IsDefault, nameof(generatedCases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine("public static class SharpProofGeneratedFrontend {");
-        for (var index = 0; index < generatedCases.Count; index++)
+        for (var index = 0; index < generatedCases.Length; index++)
         {
             var generated = generatedCases[index];
             builder.Append("    public static ");
@@ -1678,9 +1683,9 @@ public static class FrontendDifferentialOracle
     }
 
     private static string CreateSemanticEdgeSource(
-        IReadOnlyList<FrontendSemanticEdgeCase> cases)
+        ImmutableArray<FrontendSemanticEdgeCase> cases)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
+        RepositoryParameterGuard.ThrowIfMissing(cases.IsDefault, nameof(cases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine(
@@ -1695,7 +1700,7 @@ public static class FrontendDifferentialOracle
         builder.AppendLine("}");
         builder.AppendLine(
             "public static class SharpProofGeneratedFrontendEdges {");
-        for (var index = 0; index < cases.Count; index++)
+        for (var index = 0; index < cases.Length; index++)
         {
             var generated = cases[index];
             builder.Append("    public static ");

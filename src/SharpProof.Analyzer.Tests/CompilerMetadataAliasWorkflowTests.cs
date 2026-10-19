@@ -40,7 +40,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             }
             await TestContext.Out.WriteLineAsync($"actual dependency assembly bytes={originalImage.Length}; actual replacement SDK attributes assembly bytes={replacementImage.Length}");
             var dependencyPath = Path.Combine(directory, "dependency.dll");
-            await File.WriteAllBytesAsync(dependencyPath, originalImage);
+            await File.WriteAllBytesAsync(dependencyPath, (originalImage).ToArray());
             var reference = MetadataReference.CreateFromImage(originalImage, filePath: dependencyPath);
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
@@ -51,7 +51,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
                 module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
-            await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : originalImage);
+            await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : (originalImage).ToArray());
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
@@ -114,7 +114,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             dependency = dependency.WithOptions(dependency.Options
                 .WithOptimizationLevel(OptimizationLevel.Debug));
             var dependencyPath = Path.Combine(directory, "dependency.dll");
-            await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+            await File.WriteAllBytesAsync(dependencyPath, (AnalyzerTestHost.EmitImage(dependency)).ToArray());
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], [MetadataReference.CreateFromFile(dependencyPath)]);
@@ -174,8 +174,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var image = AnalyzerTestHost.EmitImage(dependency);
             var firstPath = Path.Combine(directory, "A.dll");
             var secondPath = Path.Combine(directory, "B.dll");
-            await File.WriteAllBytesAsync(firstPath, image);
-            await File.WriteAllBytesAsync(secondPath, image);
+            await File.WriteAllBytesAsync(firstPath, (image).ToArray());
+            await File.WriteAllBytesAsync(secondPath, (image).ToArray());
             var first = MetadataReference.CreateFromFile(firstPath);
             var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
             MetadataReference[] references = includeAlias ? [first, second] : [first];
@@ -224,8 +224,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var image = AnalyzerTestHost.EmitImage(dependency);
             var firstPath = Path.Combine(directory, "A.dll");
             var secondPath = Path.Combine(directory, "B.dll");
-            await File.WriteAllBytesAsync(firstPath, image);
-            await File.WriteAllBytesAsync(secondPath, image);
+            await File.WriteAllBytesAsync(firstPath, (image).ToArray());
+            await File.WriteAllBytesAsync(secondPath, (image).ToArray());
             var first = MetadataReference.CreateFromFile(firstPath);
             var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
 

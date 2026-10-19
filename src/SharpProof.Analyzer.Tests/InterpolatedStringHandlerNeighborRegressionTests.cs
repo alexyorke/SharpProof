@@ -39,7 +39,7 @@ public sealed class InterpolatedStringHandlerNeighborRegressionTests
                 .Replace("Consume($\"{Touch()}\");", "try { throw new System.Exception(); } catch (System.Exception) when (Consume($\"{Touch()}\")) { }", StringComparison.Ordinal);
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002", "SP0045", "SP0047"], filePath: "HandlerSubject.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("HandlerEffectsBoundaryRuntime", AnalyzerTestHost.EmitImage(compilation), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("HandlerEffectsBoundaryRuntime", (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var run = assembly.GetType("Subject")!.GetMethod("Run")!.CreateDelegate<Func<int>>();

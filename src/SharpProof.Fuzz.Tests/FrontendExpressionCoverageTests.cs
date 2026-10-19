@@ -65,13 +65,15 @@ public sealed class FrontendExpressionCoverageTests
         Assert.That(FrontendDifferentialOracle.CompareBatch([], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Empty);
         Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Empty);
         AssertParameter<ArgumentNullException>(
+            () => FrontendDifferentialOracle.CreateBatchSource(default), "generatedCases");
+        AssertParameter<ArgumentNullException>(
             () => FrontendDifferentialOracle.Compare(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "generated");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareBatch(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
+            () => FrontendDifferentialOracle.CompareBatch(default, cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
         AssertParameter<ArgumentException>(
             () => FrontendDifferentialOracle.CompareBatch([null!], cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareSemanticEdges(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
+            () => FrontendDifferentialOracle.CompareSemanticEdges(default, cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
         AssertParameter<ArgumentException>(
             () => FrontendDifferentialOracle.CompareSemanticEdges([null!], cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
         AssertParameter<ArgumentOutOfRangeException>(

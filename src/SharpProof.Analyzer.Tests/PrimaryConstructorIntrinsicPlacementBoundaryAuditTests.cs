@@ -85,7 +85,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var runtime = new AssemblyLoadContext("PrimaryIntrinsicValidLambda", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray());
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             Assert.That(Activator.CreateInstance(subject), Is.Not.Null);
         }
@@ -200,7 +200,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
             var runtime = new AssemblyLoadContext("PrimaryIntrinsicBoundaryMisuse", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image);
+                using var stream = new MemoryStream((image).ToArray());
                 var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
                 var exception = Assert.Throws<TargetInvocationException>(
                     (Action)(() => Activator.CreateInstance(subject)))!;
