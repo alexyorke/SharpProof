@@ -3474,3 +3474,11 @@ builders and immutable helper return values. Preserve candidate/source order, na
 runtime Values subjects, batch outcomes and the missing-index sentinel. Freeze before
 CompareBatch and assertions; update array length assertions and census counts only.
 Status: open before edits.
+IMM-M122: Trace six Worker test collector owners through synchronous diagnostic
+publication and serial awaited verification/reflection helpers. Replace local lists
+with array builders and callback maps with ordinal dictionary builders; freeze before
+assertions/output, preserving callback indexer overwrite, append order and native inputs.
+Scope: CompilerOrdinaryControlAndAbstractionCoverage, CompilerTotalCallRetirement,
+FloatingEqualityEvaluationOrderAudit and three Generic tested-type audit files.
+Status: open before edits. M118/M119 first build identified a private helper concrete
+immutable-map parameter requirement (CA1859); narrow that already-immutable boundary.
