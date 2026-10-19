@@ -140,6 +140,16 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(original)); }
             if (symbol is null)
             { throw new InferenceException("Unresolved pattern member."); }
+            if (symbol is IPropertySymbol { ContainingType.IsAnonymousType: true } anonymousProperty)
+            {
+                var shape = ConversionCore(input);
+                var properties = anonymousProperty.ContainingType.GetMembers().OfType<IPropertySymbol>().ToArray();
+                if (shape.Name != CSharpTypes.AnonymousName(anonymousProperty.ContainingType) || shape.Arguments.Length != properties.Length)
+                { throw new InferenceException("Anonymous property shape mismatch."); }
+                for (var i = 0; i < properties.Length; i++)
+                { if (properties[i].Name == anonymousProperty.Name) { return shape.Arguments[i]; } }
+                throw new InferenceException("Unresolved anonymous property.");
+            }
             var mapping = PatternOwnerMapping(symbol.ContainingType, input, original);
             return symbol.OriginalDefinition switch
             {
@@ -242,6 +252,8 @@ public static partial class Inference
                     return reference.SyntaxTree == changedTree && reference.Span.Start == changedMethod.SpanStart;
                 }))
             { return SameCallSignature(original, candidate); }
+            if (before is IPropertySymbol { ContainingType.IsAnonymousType: true } left && after is IPropertySymbol { ContainingType.IsAnonymousType: true } right)
+            { return MemberSymbol(left) == MemberSymbol(right); }
             return ProtocolMember(before) == ProtocolMember(after);
         }
 

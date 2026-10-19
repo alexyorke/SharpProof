@@ -1,0 +1,19 @@
+#nullable enable
+public record SampleWithRecord<T>(T Value);
+public record struct SampleWithStruct<T>(T Value);
+public static class StructuralValueSamples
+{
+    public static int AnonymousValue(int value)
+    {
+        var item = new { Inner = new { Value = value } };
+        return item.Inner.Value;
+    }
+    public static int AnonymousReplacement(int value, int replacement)
+    {
+        var item = new { Value = value };
+        return (item with { Value = replacement }).Value;
+    }
+    public static SampleWithRecord<int> RecordReplacement(SampleWithRecord<int> value, int replacement) => value with { Value = replacement };
+    public static SampleWithStruct<int> StructReplacement(SampleWithStruct<int> value, int replacement) => value with { Value = replacement };
+    public static SampleWithRecord<int> RecordClone(SampleWithRecord<int> value) => value with { };
+}

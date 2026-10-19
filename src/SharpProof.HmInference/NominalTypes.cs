@@ -13,6 +13,8 @@ internal static partial class CSharpTypes
         { throw new ArgumentNullException(nameof(type)); }
         if (type is INamedTypeSymbol named)
         {
+            if (named.IsAnonymousType)
+            { return named.ContainingAssembly.Identity + ":" + AnonymousName(named); }
             return named.ContainingAssembly.Identity + ":" + (named.ContainingType is null
                 ? named.ContainingNamespace.ToDisplayString() : ConstructorIdentity(named.ContainingType)) + "." + named.MetadataName;
         }

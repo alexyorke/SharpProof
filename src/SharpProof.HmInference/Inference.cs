@@ -893,6 +893,14 @@ public static partial class Inference
                     }
 
                     return CSharpTypes.Rigid(createdArray);
+                case AnonymousObjectCreationExpressionSyntax anonymous:
+                    var anonymousType = model.GetTypeInfo(anonymous, cancellationToken).Type as INamedTypeSymbol
+                        ?? throw new InferenceException("Unresolved anonymous object.");
+                    return new HmType(CSharpTypes.AnonymousName(anonymousType), anonymous.Initializers.Select(initializer =>
+                    { if (initializer is null) { throw new ArgumentNullException(nameof(initializer)); } return Expression(initializer.Expression); }).ToArray())
+                    { CSharpSymbol = anonymousType, IsValueType = false };
+                case WithExpressionSyntax cloned:
+                    return WithExpression(cloned);
                 case AnonymousFunctionExpressionSyntax lambda:
                     return Lambda(lambda);
                 case InvocationExpressionSyntax invocation:

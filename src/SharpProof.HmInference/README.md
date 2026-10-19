@@ -87,6 +87,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Feature | Behavior |
 | --- | --- |
 | Local function captures | Infer supported bodies after the enclosing local declarations; retain declared local schemes and propagate capture constraints, async and iterator results |
+| Anonymous objects and with expressions | Infer internal anonymous property graphs and clone initializer constraints; preserve nominal record/struct types, conversions and selected clone members |
 | Reference calls and delegates | Infer invariant ref/out/in slots, out variables/discards, ref aliases/returns and ref delegate invocation; retain lambda modifiers/attributes and compiler escape checks |
 | Primary-constructor captures | Preserve declared instance storage types while generalizing unrelated method inputs |
 | Primitive and nominal parameter types | Generalize unconstrained leaves; retain assembly identity and generic-parameter scopes, verify spelling through extern aliases and shadowed nested names |
@@ -141,7 +142,7 @@ Instance methods, existing generic methods and containing generic types are
 supported. Existing type parameters are rigid; their constraints are retained.
 New names avoid identifiers already in the declaration. Attributes and
 ref/out/in/params modifiers are preserved; optional parameter types remain
-concrete to retain their defaults. Ref arguments at call sites remain unsupported.
+concrete to retain their defaults. Ref/out arguments retain invariant storage types; omitted readonly arguments preserve their conversions.
 
 The adapter supports void/async void roots, Task/ValueTask async and anonymous
 lambdas, Action and custom delegates, and static/instance method-group conversions.
@@ -176,9 +177,9 @@ return their converted target tuples. Selected implicit methods and conversions 
 rechecked across supplied files, including sync/async foreach deconstruction.
 Existing body warnings are matched by ID and body-relative source location;
 warnings at new sites reject a candidate even if that warning ID already exists.
-Ref constructors, anonymous objects, record with
-expressions, FormattableString and custom interpolation handlers
-are also unsupported. A nameof member lookup may reject a candidate even though
+Anonymous objects use internal structural property graphs; record/struct with
+expressions retain nominal receivers and inferred initializer constraints.
+FormattableString and custom interpolation handlers remain unsupported. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.
 
 Loop analysis accumulates constraints over monomorphic bindings; it does not

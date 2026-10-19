@@ -4,6 +4,14 @@ namespace SharpProof.HmInference;
 
 internal static partial class CSharpTypes
 {
+    internal static string AnonymousName(INamedTypeSymbol type)
+    {
+        if (type is null)
+        { throw new ArgumentNullException(nameof(type)); }
+        return "@anonymous:" + string.Join(",", type.GetMembers().OfType<IPropertySymbol>().Select(property =>
+        { if (property is null) { throw new ArgumentNullException(nameof(property)); } return property.Name; }));
+    }
+
     private static HmType NestedShape(INamedTypeSymbol type, bool erase, Dictionary<ITypeParameterSymbol, HmType>? variables, bool allowRefLike)
     {
         if (type is null)

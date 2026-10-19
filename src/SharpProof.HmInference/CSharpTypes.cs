@@ -107,7 +107,12 @@ internal static partial class CSharpTypes
                 }).ToArray());
             }
 
-            if (named.IsAnonymousType || named.IsUnboundGenericType)
+            if (named.IsAnonymousType)
+            {
+                return new(AnonymousName(named), named.GetMembers().OfType<IPropertySymbol>().Select(property =>
+                { if (property is null) { throw new ArgumentNullException(nameof(property)); } return Convert(property.Type, erase, variables, allowRefLike); }).ToArray());
+            }
+            if (named.IsUnboundGenericType)
             {
                 throw new InferenceException($"Unsupported type: {type.ToDisplayString()}.");
             }
@@ -162,6 +167,8 @@ internal static partial class CSharpTypes
         }
 
         inferred = inferred.Root;
+        if (inferred.CSharpSymbol is INamedTypeSymbol { IsAnonymousType: true })
+        { throw new InferenceException("An anonymous type cannot appear in the suggested signature."); }
         // A narrowed result can have a different constructor than its declaration.
         if (inferred.CSharpSymbol is { } inferredSymbol && ConstructorIdentity(inferredSymbol) != ConstructorIdentity(declared))
         { declared = inferredSymbol; }

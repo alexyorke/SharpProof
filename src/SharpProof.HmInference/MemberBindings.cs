@@ -8,6 +8,32 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private HmType WithExpression(WithExpressionSyntax syntax)
+        {
+            if (syntax is null)
+            { throw new ArgumentNullException(nameof(syntax)); }
+            var operation = model.GetOperation(syntax, cancellationToken) as IWithOperation
+                ?? throw new InferenceException("Unresolved with expression.");
+            var original = operation.Operand.Type ?? throw new InferenceException("Unresolved clone receiver.");
+            var receiver = Expression(syntax.Expression);
+            var core = ConversionCore(receiver);
+            if (core.IsVariable)
+            {
+                if (original.IsValueType && syntax.Initializer.Expressions.Count == 0)
+                { RequireKeyword(core, "struct"); }
+                else
+                { HmType.Unify(core, CSharpTypes.Rigid(original.WithNullableAnnotation(NullableAnnotation.NotAnnotated))); }
+            }
+            foreach (var entry in syntax.Initializer.Expressions)
+            {
+                if (model.GetOperation(entry, cancellationToken) is not ISimpleAssignmentOperation assignment
+                    || assignment.Target is not IMemberReferenceOperation member)
+                { throw new InferenceException("Unsupported with initializer."); }
+                var expected = PatternSymbolType(member.Member, receiver, original);
+                BindNullableArgument(assignment.Value, expected);
+            }
+            return receiver;
+        }
         private HmType IndexedProperty(ElementAccessExpressionSyntax syntax, IPropertyReferenceOperation indexer)
         {
             if (syntax is null)
@@ -38,6 +64,8 @@ public static partial class Inference
         {
             if (symbol is null)
             { throw new ArgumentNullException(nameof(symbol)); }
+            if (symbol is IPropertySymbol { ContainingType.IsAnonymousType: true } anonymous)
+            { return CSharpTypes.AnonymousName(anonymous.ContainingType) + "." + anonymous.Name; }
             return symbol is IFieldSymbol { ContainingType.IsTupleType: true } field
                 ? "tuple:" + (field.CorrespondingTupleField ?? field).Name : ProtocolMember(symbol);
         }
@@ -52,8 +80,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(beforeModel)); }
             if (afterModel is null)
             { throw new ArgumentNullException(nameof(afterModel)); }
-            var originals = before.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax; }).ToArray();
-            var candidates = after.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax; }).ToArray();
+            var originals = before.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or WithExpressionSyntax; }).ToArray();
+            var candidates = after.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or WithExpressionSyntax; }).ToArray();
             if (originals.Length != candidates.Length)
             { return false; }
             for (var i = 0; i < originals.Length; i++)
@@ -61,7 +89,9 @@ public static partial class Inference
                 cancellationToken.ThrowIfCancellationRequested();
                 var left = beforeModel.GetOperation(originals[i], cancellationToken);
                 var right = afterModel.GetOperation(candidates[i], cancellationToken);
-                if (left is IMemberReferenceOperation member && member.Member is IPropertySymbol or IFieldSymbol)
+                if (left is IWithOperation withOperation)
+                { if (right is not IWithOperation otherWith || ProtocolMember(withOperation.CloneMethod) != ProtocolMember(otherWith.CloneMethod)) { return false; } }
+                else if (left is IMemberReferenceOperation member && member.Member is IPropertySymbol or IFieldSymbol)
                 { if (right is not IMemberReferenceOperation other || MemberSymbol(member.Member) != MemberSymbol(other.Member)) { return false; } }
                 else if (left is IImplicitIndexerReferenceOperation implicitIndexer)
                 {

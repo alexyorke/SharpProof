@@ -326,6 +326,7 @@ internal static class Program
         passed += await LocalFunctionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ReferenceChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ExpressionTreeChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await StructuralValueChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ProtocolEnumerationChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PatternChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CallChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
