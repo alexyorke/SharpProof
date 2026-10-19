@@ -1,0 +1,30 @@
+#nullable enable
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+
+public static class ConstraintLifetimeSamples
+{
+    public static Dictionary<string, int> DictionaryIdentity(Dictionary<string, int> values) => values;
+    public static string RequireNotNull(string value) => Required(value);
+    private static T Required<T>(T value) where T : notnull => value;
+    public static int Recover(int value, int fallback, bool recover)
+    {
+        try { return value; }
+        catch (System.Exception) when (recover) { return fallback; }
+        finally { recover = false; }
+    }
+    public static int Dispose(MemoryStream stream, int value)
+    {
+        using (stream) { return value; }
+    }
+    public static async Task<int> DisposeAsync(MemoryStream stream, int value)
+    {
+        await using var resource = stream;
+        return value;
+    }
+    public static int Locked(object gate, int value)
+    {
+        lock (gate) { return value; }
+    }
+}

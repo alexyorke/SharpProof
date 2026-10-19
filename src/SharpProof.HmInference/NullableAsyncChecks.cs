@@ -54,8 +54,8 @@ internal static class NullableAsyncChecks
             ("AsyncRecursive", "static async Task<int> M(bool again,int x) { if(again) return await M(false,x); return x; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(bool again, T1 x)"),
             ("NullableTuple", "static (int? value,string? label) M(int? value,string? label)=>(value,label);", "Suggestion", "(T1? value, T2? label) M<T1, T2>(T1? value, T2? label) where T1 : struct where T2 : class"),
             ("NullableTupleLift", "static (string? text,int? value) M(string text,int value)=>(text,value);", "Suggestion", "(T1? text, T2? value) M<T1, T2>(T1 text, T2 value) where T1 : class where T2 : struct"),
-            ("NullableNotNullConstraintWarning", "static string M(string x)=>Id(x); static T Id<T>(T x) where T:notnull=>x;", "Rejected", null),
-            ("AsyncNotNullConstraintWarning", "static async Task<string> M(string x)=>await Task.FromResult(Id(x)); static T Id<T>(T x) where T:notnull=>x;", "Rejected", null),
+            ("NullableNotNullConstraintWarning", "static string M(string x)=>Id(x); static T Id<T>(T x) where T:notnull=>x;", "Suggestion", "T1 M<T1>(T1 x) where T1 : notnull"),
+            ("AsyncNotNullConstraintWarning", "static async Task<string> M(string x)=>await Task.FromResult(Id(x)); static T Id<T>(T x) where T:notnull=>x;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(T1 x) where T1 : notnull"),
             ("NullableExistingStruct", "static T? M<T>(T? x,bool ignored) where T:struct=>x;", "Suggestion", "T? M<T, T1>(T? x, T1 ignored) where T : struct"),
             ("AsyncNullableTaskOperand", "static async Task<int> M(Task<int>? task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task<T1>? task)"),
             ("AsyncNullableReferenceLift", "static async Task<string?> M(string x) { await Task.Yield(); return x; }", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(T1 x) where T1 : class"),
@@ -106,7 +106,23 @@ internal static class NullableAsyncChecks
         var document = project.AddDocument("Probe.cs", """
             #nullable enable
             using System.Threading.Tasks;
+            public sealed class LifetimeResource : System.IDisposable, System.IAsyncDisposable {
+                public int Trace;
+                public void Dispose() { Trace=1; }
+                public ValueTask DisposeAsync() { Trace=2; return default; }
+                ValueTask System.IAsyncDisposable.DisposeAsync() { Trace=3; return default; }
+            }
             public static class NullableAsyncProbe {
+                public static int Finalizers;
+                public static int Guarded(int x,bool fail) {
+                    try { if(fail) throw new System.InvalidOperationException(); return x; }
+                    catch(System.InvalidOperationException) when(fail) { return x; }
+                    finally { Finalizers++; }
+                }
+                public static int Resource(LifetimeResource resource,int x) { using(resource) { return x; } }
+                public static async Task<int> AsyncResource(LifetimeResource resource,int x) { await using(resource) { return x; } }
+                public static string Constrained(string x)=>Required(x);
+                private static T Required<T>(T x) where T:notnull=>x;
                 public static int? Value(int? x) => x;
                 public static string? Reference(string? x) => x;
                 public static int Fallback(int? x,int fallback) => x??fallback;
@@ -119,7 +135,7 @@ internal static class NullableAsyncChecks
             """);
         var provider = new HmSignatureCodeFixProvider();
         var applied = 0;
-        for (var round = 0; round < 12; round++)
+        for (var round = 0; round < 16; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false)).GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
@@ -132,8 +148,8 @@ internal static class NullableAsyncChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             applied++;
         }
-        if (applied != 8)
-        { throw new InvalidOperationException($"Expected eight nullable/async code fixes; applied {applied}."); }
+        if (applied != 12)
+        { throw new InvalidOperationException($"Expected twelve nullable/async/lifetime code fixes; applied {applied}."); }
         var finalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var problems = finalCompilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
         if (problems.Length != 0)
@@ -169,6 +185,22 @@ internal static class NullableAsyncChecks
             throw new InvalidOperationException("Generic async result runtime behavior changed.");
         }
         await ((Task)probe.GetMethod("Ignore")!.MakeGenericMethod(typeof(string)).Invoke(null, new object[] { Task.FromResult("ok") })!).ConfigureAwait(false);
+        var guarded = probe.GetMethod("Guarded")!.MakeGenericMethod(typeof(Guid));
+        if (!Equals(guarded.Invoke(null, new object[] { guid, false }), guid)
+            || !Equals(guarded.Invoke(null, new object[] { guid, true }), guid)
+            || !Equals(probe.GetField("Finalizers")!.GetValue(null), 2))
+        { throw new InvalidOperationException("Exception filter or finalizer behavior changed."); }
+        var resourceType = probe.Assembly.GetType("LifetimeResource")!;
+        var resource = Activator.CreateInstance(resourceType)!;
+        if (!Equals(probe.GetMethod("Resource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, guid }), guid)
+            || !Equals(resourceType.GetField("Trace")!.GetValue(resource), 1))
+        { throw new InvalidOperationException("Synchronous disposal behavior changed."); }
+        if (await ((Task<Guid>)probe.GetMethod("AsyncResource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, guid })!).ConfigureAwait(false) != guid
+            || !Equals(resourceType.GetField("Trace")!.GetValue(resource), 2))
+        { throw new InvalidOperationException("Async disposal pattern changed to explicit interface dispatch."); }
+        if (!Equals(probe.GetMethod("Constrained")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { guid }), guid))
+        { throw new InvalidOperationException("Imported generic constraint code fix failed."); }
+        Program.Log.Info("PASS ExceptionDisposalConstraintCodeFixRuntime");
         Program.Log.Info("PASS NullableAsyncCodeFixRuntime");
         var taskSource = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pendingTask = (Task<string>)echo.Invoke(null, new object[] { taskSource.Task })!;
@@ -201,6 +233,6 @@ internal static class NullableAsyncChecks
         }
         catch (InvalidOperationException exception) when (ReferenceEquals(exception, marker)) { }
         Program.Log.Info("PASS NullableAsyncFaultPropagation");
-        return 4;
+        return 5;
     }
 }

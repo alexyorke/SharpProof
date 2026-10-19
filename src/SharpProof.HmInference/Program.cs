@@ -181,7 +181,7 @@ internal static class Program
             ("RecursiveChoose", "static int M(bool b,int x) => b ? x : M(true,x);", "Suggestion", "T1 M<T1>(bool b, T1 x)"),
             ("GenericCall", "static int M(int x) => Id(x); static T Id<T>(T x) => x;", "Suggestion", "T1 M<T1>(T1 x)"),
             ("GenericCallsFresh", "static (int,string) M(int x,string y) => (Id(x),Id(y)); static T Id<T>(T x) => x;", "Suggestion", "(T1, T2) M<T1, T2>(T1 x, T2 y)"),
-            ("GenericConstraint", "static object M(object x) => Id(x); static T Id<T>(T x) where T:class => x;", "Rejected", null),
+            ("GenericConstraint", "static object M(object x) => Id(x); static T Id<T>(T x) where T:class => x;", "Suggestion", "T1 M<T1>(T1 x) where T1 : class"),
             ("ExplicitTypeArgument", "static int M(int x) => Id<int>(x); static T Id<T>(T x) => x;", "Rejected", null),
             ("NumericPromotion", "static long M(int x,long y) => x+y;", "Concrete", null),
             ("Comparison", "static bool M(double x,double y) => x < y;", "Concrete", null),
@@ -326,6 +326,7 @@ internal static class Program
         passed += await (FlowChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (ExitChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await NullableAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await ConstraintFlowChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += BindingChecks.Run(cancellationToken);
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

@@ -69,6 +69,8 @@ public static partial class Inference
                 }
             }
 
+            for (var i = 0; i < parameters.Length; i++)
+            { ImportConstructedConstraints(symbol.Parameters[i].Type, parameters[i]); }
             currentMethod = symbol;
             var recursiveReturn = HmType.Variable();
             currentFunction = HmType.Function(parameters, recursiveReturn);
@@ -185,6 +187,7 @@ public static partial class Inference
                 throw new InferenceException("A result-only type variable cannot be inferred at a C# call site.");
             }
 
+            ImportConstructedConstraints(symbol.ReturnType, result);
             var nullableConstraints = NullableConstraints(parameters, result, variables);
             var candidate = method.WithReturnType(SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
@@ -419,6 +422,30 @@ public static partial class Inference
                 {
                     case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0 && local.UsingKeyword == default:
                         Declare(local.Declaration);
+                        break;
+                    case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0:
+                        DeclareResource(local.Declaration);
+                        break;
+                    case UsingStatementSyntax resource:
+                        flow = Scoped(() =>
+                        {
+                            if (resource.Declaration is not null)
+                            { DeclareResource(resource.Declaration); }
+                            if (resource.Expression is not null)
+                            { Anchor(resource.Expression); }
+                            return Branch(resource.Statement);
+                        });
+                        break;
+                    case LockStatementSyntax locked:
+                        // Retain Monitor versus System.Threading.Lock lowering and receiver conversions.
+                        Anchor(locked.Expression);
+                        flow = Branch(locked.Statement);
+                        break;
+                    case TryStatementSyntax attempted:
+                        flow = TryFlow(attempted);
+                        break;
+                    case ThrowStatementSyntax { Expression: null }:
+                        flow = new(null, false);
                         break;
                     case ExpressionStatementSyntax expression:
                         Expression(expression.Expression);
@@ -1355,6 +1382,8 @@ public static partial class Inference
 
                 return CSharpTypes.Rigid(p.Type, variables);
             }).ToArray());
+            foreach (var parameter in definition.TypeParameters)
+            { ImportConstraints(parameter, variables[parameter], variables); }
             return CSharpTypes.Rigid(definition.ReturnType, variables);
         }
 

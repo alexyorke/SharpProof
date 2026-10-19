@@ -127,7 +127,9 @@ files. Calls outside the analyzed method must also retain their instantiated
 parameter and return types. This conservatively rejects changes to argument
 conversions, result boxing and caller overload selection. Indexer and collection
 Add definitions inside the method are checked too. Nullable shapes supply class/
-struct constraints; Roslyn validates other constraints, which are not synthesized.
+struct constraints. Calls and constructed signature types supply class/class?, struct,
+unmanaged, notnull, new(), interface, base-class and dependent constraints; Roslyn
+checks their combined legality.
 Escaped identifiers are retained in signatures.
 
 Instance methods, existing generic methods and containing generic types are
@@ -136,11 +138,11 @@ New names avoid identifiers already in the declaration. Attributes and
 ref/out/in/params modifiers are preserved; optional parameter types remain
 concrete to retain their defaults. Ref arguments at call sites remain unsupported.
 
-The adapter skips async lambdas, async void roots, async iterators/enumeration/
-disposal, custom async return builders, custom operators, expanded non-array params
+The adapter skips async lambdas, async void roots, async iterators/enumeration,
+custom async return builders, custom operators, expanded non-array params
 collections, unsupported patterns and other unimplemented syntax. It does not
-infer mutually recursive C# method groups or
-synthesize general generic constraints. Imported unconstrained nullable `T?`
+infer mutually recursive C# method groups or fully simplify arbitrary combinations
+of generic constraints. Imported unconstrained nullable `T?`
 schemes are still unsupported. See [the completion ledger](LIMITATIONS.md).
 
 Tuple deconstruction supports declarations, reassignment and mixed targets for
@@ -155,7 +157,10 @@ generalize at iteration boundaries or prove termination. Loops conservatively
 fall through, so methods whose only return is inside an infinite loop are skipped.
 Goto, foreach over custom enumerables and void delegate calls remain unsupported.
 Switch statements support constant labels and guards,
-not declaration/type patterns. Try/catch/finally and rethrow are unsupported.
+not declaration/type patterns. Try/catch/finally supports exception locals, filters,
+rethrow and pending loop/return exits. Using statements/declarations, await using
+and lock retain concrete resource/receiver types to preserve disposal conversions,
+pattern/interface selection and Monitor versus System.Threading.Lock lowering.
 Ordinary void
 method calls can appear as expression statements. The standalone HM core remains
 pure; these imperative extensions belong to the C# adapter only.

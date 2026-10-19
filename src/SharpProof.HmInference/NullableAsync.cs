@@ -207,7 +207,7 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped conditional access."));
         }
 
-        private static List<TypeParameterConstraintClauseSyntax> NullableConstraints(HmType[] parameters, HmType result, Dictionary<HmType, string> variables)
+        private List<TypeParameterConstraintClauseSyntax> NullableConstraints(HmType[] parameters, HmType result, Dictionary<HmType, string> variables)
         {
             if (parameters is null)
             { throw new ArgumentNullException(nameof(parameters)); }
@@ -215,7 +215,6 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(result)); }
             if (variables is null)
             { throw new ArgumentNullException(nameof(variables)); }
-            var requirements = new Dictionary<HmType, string>();
             var visited = new HashSet<HmType>();
             void Visit(HmType type)
             {
@@ -226,13 +225,7 @@ public static partial class Inference
                 { return; }
                 if (type.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue && type.Arguments[0].Root.IsVariable)
                 {
-                    var variable = type.Arguments[0].Root;
-                    var constraint = type.Name == CSharpTypes.NullableReference ? "class" : "struct";
-                    if (requirements.TryGetValue(variable, out var existing) && existing != constraint)
-                    {
-                        throw new InferenceException("Conflicting nullable reference/value constraints.");
-                    }
-                    requirements[variable] = constraint;
+                    RequireKeyword(type.Arguments[0], type.Name == CSharpTypes.NullableReference ? "class" : "struct");
                 }
                 foreach (var argument in type.Arguments)
                 { Visit(argument); }
@@ -240,16 +233,7 @@ public static partial class Inference
             foreach (var parameter in parameters)
             { Visit(parameter); }
             Visit(result);
-            var clauses = new List<TypeParameterConstraintClauseSyntax>();
-            foreach (var variable in variables)
-            {
-                if (requirements.TryGetValue(variable.Key, out var constraint))
-                {
-                    var shape = (MethodDeclarationSyntax)SyntaxFactory.ParseMemberDeclaration($"void C<{variable.Value}>() where {variable.Value} : {constraint} {{}}")!;
-                    clauses.Add(shape.ConstraintClauses[0]);
-                }
-            }
-            return clauses;
+            return BuildConstraints(variables);
         }
 
         private bool IntroducesCompilerWarnings(Compilation changed)

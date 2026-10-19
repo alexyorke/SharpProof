@@ -16,10 +16,11 @@ The README describes today's supported subset; it is not the completion spec.
 | Instance and generic root methods | Implemented: declaration regression checks |
 | Attributes, optional/ref/out/in/params root parameters | Implemented: declaration regression checks |
 | Nullable types, null/default/coalescing/conditional access | Verified: reference/value wrappers, class/struct constraints and conservative nullable operations; imported unconstrained nullable T? schemes remain open |
-| Generic constraints and name allocation | Existing constraints retained, names reserved and nullable class/struct constraints synthesized; general constraint synthesis remains open; new compiler warnings reject candidates |
+| Generic constraints and name allocation | Existing constraints retained and names reserved; class/class?/struct/unmanaged/notnull/new(), interface, base and dependent constraints imported from calls and constructed signature types; constraint simplification and unsupported type shapes remain open; new compiler warnings reject candidates |
 | Task/ValueTask async roots and await | Verified: generic/non-generic roots, nullable results and preserved awaiter bindings; IDE-fix runtime checks cover suspension, cancellation and faults |
-| Async lambdas/void roots, iterators/enumeration/disposal, custom async builders | Open |
-| Try/catch/finally, using/lock and goto | Open |
+| Async lambdas/void roots, iterators/enumeration, custom async builders | Open |
+| Try/catch/finally, using/await using and lock | Implemented: filtered catches, rethrow, finalizer flow and concrete lifetime receivers; IDE-fix runtime checks preserve disposal pattern selection. Structural disposal constraint generalization remains open |
+| Goto and labels | Open |
 | Declaration/type/property/list patterns | Open |
 | Custom enumerables and Deconstruct | Open |
 | Field/property/indexer stores and object/collection initializers | Verified: conservative receiver/value types, overload/conversion tests and runtime probe; anonymous objects and record with expressions remain open |

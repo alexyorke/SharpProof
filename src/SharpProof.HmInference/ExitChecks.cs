@@ -35,7 +35,7 @@ internal static class ExitChecks
             ("ThrowOnly", "static int M(bool ignored) { throw new System.InvalidOperationException(); }", "Suggestion", "int M<T1>(T1 ignored)"),
             ("ThrowExpression", "static int M(bool fail,int x) => fail ? throw new System.InvalidOperationException() : x;", "Suggestion", "T1 M<T1>(bool fail, T1 x)"),
             ("SwitchThrow", "static int M(int tag,int x) { switch(tag) { case 0: return x; default: throw new System.InvalidOperationException(); } }", "Suggestion", "T1 M<T1>(int tag, T1 x)"),
-            ("TrySkipped", "static int M(int x) { try { return x; } finally {} }", "Skipped", null)
+            ("TryFinally", "static int M(int x) { try { return x; } finally {} }", "Suggestion", "T1 M<T1>(T1 x)")
         ];
         var failures = new List<string>();
         var passed = 0;
