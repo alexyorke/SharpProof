@@ -1184,7 +1184,7 @@ System.Collections	M:System.Collections.Generic.CollectionExtensions.TryAdd``2(S
 System.Collections	M:System.Collections.Generic.Comparer`1.#ctor	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Comparer`1.Compare(`0,`0)	Method	partially-modeled	intrinsic=default-integer-comparer-only
 System.Collections	M:System.Collections.Generic.Comparer`1.Create(System.Comparison{`0})	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state
+System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IDictionary{`0,`1})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IDictionary{`0,`1},System.Collections.Generic.IEqualityComparer{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IEnumerable{System.Collections.Generic.KeyValuePair{`0,`1}})	Method	unmodeled	-
@@ -1193,7 +1193,7 @@ System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collec
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32,System.Collections.Generic.IEqualityComparer{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Dictionary`2.Add(`0,`1)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state
+System.Collections	M:System.Collections.Generic.Dictionary`2.Add(`0,`1)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage
 System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.#ctor	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.ContainsKey(`2)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.Remove(`2)	Method	unmodeled	-
@@ -1202,7 +1202,7 @@ System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.T
 System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.TryGetValue(`2,`0@,`1@)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.AlternateLookup`1.TryGetValue(`2,`1@)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.Clear	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state
+System.Collections	M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state
 System.Collections	M:System.Collections.Generic.Dictionary`2.ContainsValue(`1)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.EnsureCapacity(System.Int32)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.Enumerator.#ctor	Method	unmodeled	-
@@ -1555,9 +1555,9 @@ System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.D
 System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.Item(`2)	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Capacity	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Comparer	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Dictionary`2.Count	Property	partially-modeled	catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state
+System.Collections	P:System.Collections.Generic.Dictionary`2.Count	Property	partially-modeled	catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state
 System.Collections	P:System.Collections.Generic.Dictionary`2.Enumerator.Current	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Dictionary`2.Item(`0)	Property	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state
+System.Collections	P:System.Collections.Generic.Dictionary`2.Item(`0)	Property	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage
 System.Collections	P:System.Collections.Generic.Dictionary`2.KeyCollection.Count	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.KeyCollection.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Keys	Property	unmodeled	-

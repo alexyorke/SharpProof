@@ -77,6 +77,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IPropertyReferenceOperation listProperty &&
             ListClause(listProperty, state, depth) is { } listClause)
         { return listClause; }
+        if (depth < 256 && operation is IPropertyReferenceOperation or IInvocationOperation &&
+            DictionaryClause(operation, state, depth) is { } dictionaryClause)
+        { return dictionaryClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation interfaceProperty &&
             ArrayCollectionClause(interfaceProperty, state, depth) is { } arrayProperty)
         { return arrayProperty; }

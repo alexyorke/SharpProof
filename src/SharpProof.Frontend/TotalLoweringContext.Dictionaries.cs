@@ -12,20 +12,19 @@ internal static partial class CSharpOperationSemantics
             "P:System.Collections.Generic.Dictionary`2.Item(`0)";
     }
 
-    internal static bool IsDefaultDictionaryStateMember(IMethodSymbol method)
+    internal static bool IsDefaultDictionaryStateMember(IMethodSymbol method, ITypeSymbol? knownKey = null, ITypeSymbol? knownValue = null)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return IsDictionaryStateDeclaration(method.AssociatedSymbol ?? method) && !method.IsStatic &&
             method.ContainingType is { TypeArguments.Length: 2 } type &&
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
-            (IsComparisonIntegerType(type.TypeArguments[0]) || method.MethodKind == MethodKind.Constructor ||
+            (IsComparisonIntegerType(knownKey ?? type.TypeArguments[0]) || method.MethodKind == MethodKind.Constructor ||
                 method.AssociatedSymbol is IPropertySymbol { Name: "Count" }) &&
             // Empty construction, Count and key membership do not inspect values.
-            // Contents still require the supported scalar/reference value domain.
+            // Contents are stored without interpreting opaque values.
             (method.MethodKind == MethodKind.Constructor || method.Name == "ContainsKey" ||
                 method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
-                IsScalar(type.TypeArguments[1]) || IsReferenceDomain(type.TypeArguments[1]) ||
-                type.TypeArguments[1] is ITypeParameterSymbol { IsReferenceType: true });
+                IsValueDomain(knownValue ?? type.TypeArguments[1]));
     }
 
     internal static bool IsEmptyDefaultDictionaryCreation(IOperation operation)
@@ -40,11 +39,17 @@ public sealed partial class TotalLoweringContext
 {
     private readonly HashSet<ISymbol> _defaultDictionaries = new(SymbolEqualityComparer.Default);
     private readonly HashSet<CaptureId> _defaultDictionaryCaptures = [];
+    private readonly HashSet<ISymbol> _defaultDictionaryOrigins = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<CaptureId> _defaultDictionaryOriginCaptures = [];
 
     // The comparer is a constructor-established invariant. A dictionary-typed
     // incoming value, callback, ref escape or cyclic definition supplies no proof.
     internal void TrackDefaultDictionaries(ControlFlowGraph graph)
-    { TrackFreshCollections(RepositoryParameterGuard.NotNull(graph, nameof(graph)), false); }
+    {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        TrackFreshCollections(graph, false);
+        TrackFreshCollections(graph, false, dictionaryOrigins: true);
+    }
 
     internal bool IsDefaultDictionary(IOperation operation)
     {
@@ -52,5 +57,38 @@ public sealed partial class TotalLoweringContext
         return CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation) ||
             Symbol(operation) is { } symbol && _defaultDictionaries.Contains(symbol) ||
             operation is IFlowCaptureReferenceOperation capture && _defaultDictionaryCaptures.Contains(capture.Id);
+    }
+
+    internal static bool IsDictionaryReceiverType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol named &&
+            named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
+            named.GetMembers("Count").Any(CSharpOperationSemantics.IsDictionaryStateDeclaration);
+    }
+
+    internal void SpecializeDictionaryOriginParameter(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        _defaultDictionaryOrigins.Add(parameter);
+    }
+
+    // Constructor lineage identifies the storage, not its current comparer.
+    // After publication, the modeled heap predicate gates primitive operations.
+    internal bool IsDefaultDictionaryOrigin(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        while (true)
+        {
+            if (operation is IConversionOperation { OperatorMethod: null } conversion &&
+                (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
+            { operation = conversion.Operand; }
+            else if (operation is ISimpleAssignmentOperation { IsRef: false } assignment)
+            { operation = assignment.Value; }
+            else
+            { break; }
+        }
+        return CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation) ||
+            Symbol(operation) is { } symbol && _defaultDictionaryOrigins.Contains(symbol) ||
+            operation is IFlowCaptureReferenceOperation capture && _defaultDictionaryOriginCaptures.Contains(capture.Id);
     }
 }
