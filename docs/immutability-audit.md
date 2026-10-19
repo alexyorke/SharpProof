@@ -3297,4 +3297,12 @@ order, fast flag, isolated OutDir position, exclusive/direct selection, coverage
 DOTNET_HOST_PATH and native adapters. Keep timing/scheduler/environment mutations.
 Compare extracted baseline/current blocks for direct, exclusive, coverage, empty/null
 and Debug/Release/Fast combinations before the real package workflow.
+Status: open before edits.IMM-M110: Main traced nine TotalLoweringContext private collection roots across every
+partial file. Convert local/capture maps, concatenation operands, this/field/storage
+captures, specification exclusions, exact continuation cache and assumptions to readonly
+builders. No root escapes; variables/captures/entry assumptions already publish immutable
+snapshots. Retain symbol/default comparers, strict AddUnique, overwrite/idempotent set
+semantics and local order. Preserve add/remove before cache clear, cache clear before
+graph/compilation reassignment, and assumption clear before entry-assumption clear.
+Validate full Frontend and specification reuse/capture/concatenation ownership controls.
 Status: open before edits.
