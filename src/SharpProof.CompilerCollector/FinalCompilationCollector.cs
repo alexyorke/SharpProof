@@ -120,8 +120,8 @@ internal static class FinalCompilationCollector
             return [];
         }
 
-        var packs = ImmutableList<string>.Empty;
-        var seen = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var packs = ImmutableArray.CreateBuilder<string>();
+        var seen = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var valuePart in value.Split([';'], StringSplitOptions.None))
         {
             var pack = valuePart.Trim();
@@ -137,11 +137,11 @@ internal static class FinalCompilationCollector
                     "SharpProofSpecificationPacks must not contain duplicate identifiers.");
             }
 
-            seen = seen.Add(pack);
-            packs = packs.Add(pack);
+            seen.Add(pack);
+            packs.Add(pack);
         }
 
-        return [.. packs.OrderBy(static pack => pack is null ? throw new ArgumentNullException(nameof(pack)) : pack, StringComparer.Ordinal)];
+        return [.. packs.ToImmutable().OrderBy(static pack => pack is null ? throw new ArgumentNullException(nameof(pack)) : pack, StringComparer.Ordinal)];
     }
 
     private static string Get(AnalyzerConfigOptions options, string key)

@@ -21,12 +21,12 @@ internal static class CompilerMetadataResolution
     {
         private readonly CSharpCompilation _compilation =
             ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        private ImmutableDictionary<PortableExecutableReference, ISymbol?> _symbols =
-            ImmutableDictionary.Create<PortableExecutableReference, ISymbol?>(ReferenceComparer<PortableExecutableReference>.Instance);
+        private readonly ImmutableDictionary<PortableExecutableReference, ISymbol?>.Builder _symbols =
+            ImmutableDictionary.CreateBuilder<PortableExecutableReference, ISymbol?>(ReferenceComparer<PortableExecutableReference>.Instance);
         private CSharpCompilation? _metadataCompilation;
-        private ImmutableDictionary<
+        private readonly ImmutableDictionary<
             (AssemblyIdentity Identity, string ModuleName),
-            ImmutableArray<ReferenceModule>> _referenceModules = ImmutableDictionary<(AssemblyIdentity Identity, string ModuleName), ImmutableArray<ReferenceModule>>.Empty;
+            ImmutableArray<ReferenceModule>>.Builder _referenceModules = ImmutableDictionary.CreateBuilder<(AssemblyIdentity Identity, string ModuleName), ImmutableArray<ReferenceModule>>();
 
         internal ISymbol? Resolve(PortableExecutableReference reference)
         {
@@ -40,7 +40,7 @@ internal static class CompilerMetadataResolution
                 _compilation.Options.WithMetadataImportOptions(
                     MetadataImportOptions.All));
             symbol = _metadataCompilation.GetAssemblyOrModuleSymbol(reference);
-            _symbols = _symbols.Add(reference, symbol);
+            _symbols.Add(reference, symbol);
             return symbol;
         }
 
@@ -85,7 +85,7 @@ internal static class CompilerMetadataResolution
                 return cached;
             }
 
-            var matches = ImmutableList<ReferenceModule>.Empty;
+            var matches = ImmutableArray.CreateBuilder<ReferenceModule>();
             foreach (var candidate in _compilation.References
                          .OfType<PortableExecutableReference>())
             {
@@ -120,15 +120,15 @@ internal static class CompilerMetadataResolution
                         : CompilerCompilationCapture.ResolveSiblingModule(
                             candidate.FilePath,
                             currentName);
-                    matches = matches.Add(new ReferenceModule(
+                    matches.Add(new ReferenceModule(
                         candidate,
                         module,
                         path));
                 }
             }
 
-            cached = SelectReferenceModules(matches, cancellationToken);
-            _referenceModules = _referenceModules.Add(key, cached);
+            cached = SelectReferenceModules(matches.ToImmutable(), cancellationToken);
+            _referenceModules.Add(key, cached);
             return cached;
         }
     }
@@ -144,7 +144,7 @@ internal static class CompilerMetadataResolution
             // when aliases or duplicate paths are present.  Preserve the
             // fail-closed behavior for different images, but collapse
             // byte-identical images to one deterministic representative.
-            var hashes = ImmutableDictionary.Create<string, ReferenceModule>(StringComparer.Ordinal);
+            var hashes = ImmutableDictionary.CreateBuilder<string, ReferenceModule>(StringComparer.Ordinal);
             foreach (var match in matches)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -158,7 +158,7 @@ internal static class CompilerMetadataResolution
 
                 if (!hashes.ContainsKey(hash))
                 {
-                    hashes = hashes.Add(hash, match);
+                    hashes.Add(hash, match);
                 }
             }
 

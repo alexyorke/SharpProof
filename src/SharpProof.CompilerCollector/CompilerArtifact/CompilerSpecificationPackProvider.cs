@@ -6,8 +6,8 @@ internal sealed class CompilerSpecificationPackProvider
 {
     private readonly IrFactory _factory;
     private readonly ImmutableDictionary<string, CompilerSpecificationMethodEvidence> _methods;
-    private ImmutableDictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
-        ImmutableDictionary.Create<IMethodSymbol, CompilerSpecificationMethodEvidence?>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?>.Builder _resolved =
+        ImmutableDictionary.CreateBuilder<IMethodSymbol, CompilerSpecificationMethodEvidence?>(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
@@ -134,7 +134,7 @@ internal sealed class CompilerSpecificationPackProvider
             ? CompilerSpecificationMethodBinding.Admit(method, candidate)
             : null;
         definition = resolved!;
-        _resolved = _resolved.SetItem(method, resolved);
+        _resolved[method] = resolved;
         return resolved != null;
     }
 }

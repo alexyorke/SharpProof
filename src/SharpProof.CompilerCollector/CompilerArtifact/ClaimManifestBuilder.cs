@@ -393,33 +393,33 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
-        var features = selected.ToImmutableHashSet();
+        var features = selected.ToImmutableHashSet().ToBuilder();
         if (!postconditions.IsDefaultOrEmpty)
         {
-            features = features.Add(WorkerSelectedFeature.Contracts);
+            features.Add(WorkerSelectedFeature.Contracts);
         }
 
         if (!effects.IsDefaultOrEmpty)
         {
-            features = features.Add(WorkerSelectedFeature.Effects);
+            features.Add(WorkerSelectedFeature.Effects);
         }
 
-        var reasons = ImmutableArray<WorkerSelectionReason>.Empty;
+        var reasons = ImmutableArray.CreateBuilder<WorkerSelectionReason>(2);
         if (!selected.IsDefaultOrEmpty || !assumptions.IsDefaultOrEmpty)
         {
-            reasons = reasons.Add(WorkerSelectionReason.ExplicitAnnotation);
+            reasons.Add(WorkerSelectionReason.ExplicitAnnotation);
         }
 
         if (!postconditions.IsDefaultOrEmpty)
         {
-            reasons = reasons.Add(WorkerSelectionReason.DiscoveredPostcondition);
+            reasons.Add(WorkerSelectionReason.DiscoveredPostcondition);
         }
 
         var entry = new WorkerCallableManifestEntry
         {
             CallableId = callableId,
-            SelectedFeatures = [.. features.OrderBy(static feature => feature)],
-            SelectionReasons = reasons,
+            SelectedFeatures = [.. features.ToImmutable().OrderBy(static feature => feature)],
+            SelectionReasons = reasons.ToImmutable(),
             Location = location.IsInSource
                 ? ToSourceLocation(location)
                 : postconditions.FirstOrDefault()?.Entry.Location ??
