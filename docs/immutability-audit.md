@@ -2442,3 +2442,14 @@ memo can use a readonly builder with existing immutable Add equality semantics. 
 spelling vectors with an exact-capacity array builder before Join. Preserve golden text,
 span boundaries, occurrence counting, source-token order and native reflection arrays.
 Status: open before edits.
+
+IMM-M060: Coordinator read Test-SharpProofDocumentation.ps1 and the source-document
+membership regression plus its IReadOnlySet consumer. Markdown anchor membership uses
+an Ordinal hash builder; duplicate-heading counts use an OrdinalIgnoreCase dictionary
+builder and retain increment/suffix rules. Files and inline/reference link targets use
+ordered array builders, frozen before traversal, preserving generated-file inclusion,
+PowerShell case-insensitive -notin behavior and duplicate link checks. Git output remains
+its native process adapter. The source compile-membership input can freeze an Ordinal
+hash builder before passing to IReadOnlySet; preserve the negative uncompiled-document
+control and filesystem symlink containment checks. Validate actual link traversal and
+all source-document controls in the canonical container. Status: open before edits.
