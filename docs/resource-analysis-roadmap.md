@@ -705,3 +705,38 @@ all four coverage shards. Aggregate qualification failed at 2807/2876 changed
 trusted lines (97.60%), with 69 gaps against the unchanged 100% baseline. That
 measurement excludes the newer typed-program integration and cannot qualify it.
 The exported local report records the complete gap list for later qualification.
+
+## Native byte-contract integration plan
+
+Add AllocatedBytes as public metric 4. Its initial cost model explicitly names
+CoreCLR 8.0.32 x64 source-owned fresh-instance storage; it does not represent
+process RSS or arbitrary runtime allocations. Existing three-metric contracts
+retain their cost model. A byte contract declares a callable-owned trusted layout
+dependency using the existing resource assumption identity/evidence machinery.
+The strict profile retains its existing rejection policy for such dependencies.
+
+Capture the compiler target platform, preserve the relevant reviewed core-library
+reference evidence only for byte-selected compilations, and require net8.0 plus
+an explicit x64 target. Bind the owned declaration, actual captured reference
+identity/hash, layout digest and immutable source evidence before deriving bytes.
+An incompatible/missing target, reference or assumption yields Unknown. A context
+string alone cannot establish target compatibility or a deployed runtime.
+
+The native upper-bound verifier will consume the already checked typed array
+program, compare its byte envelope with the declared bound, and project the layout
+dependency into validated results/SARIF. Numerical refutations require a later
+exact byte-event replay; an insufficient envelope alone remains Unknown. Other
+allocation families and all remaining phase C/E/F items stay required.
+
+Coordinate protocol/cache/artifact invalidation for the new metric and captured
+target evidence. Also correct the evidence program-model constant, which still
+reported 2 after the typed-program codec moved to 3; add a cross-layer identity
+control to prevent recurrence. Validate missing/conflicting declarations,
+platform/framework/reference mismatches, ownership, cached/result tampering,
+independent outcomes and actual consumers.
+
+The completed broad worker run for typed-program checkpoint 180d4a95a recorded
+5862 passing tests and the two previously identified schema-only golden failures.
+All 81 corrected golden controls passed separately, as did the final 380-test
+native/protocol/golden run. This is distinct from an entirely green full-suite
+rerun; exact-head CI remains the authoritative delivery qualification.
