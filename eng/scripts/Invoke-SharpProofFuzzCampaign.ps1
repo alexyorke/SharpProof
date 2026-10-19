@@ -86,7 +86,7 @@ try {
         -WrapperPath $dotnetWrapper `
         -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
         -WorkingDirectory $repositoryRoot `
-        -Arguments ([string[]]@($buildArguments))
+        -ImmutableArguments $buildArguments
     if ($buildProcess.ExitCode -ne 0) {
         throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
     }
@@ -131,7 +131,7 @@ try {
             -WrapperPath $dotnetWrapper `
             -TimeoutSeconds $TimeoutSeconds `
             -WorkingDirectory $repositoryRoot `
-            -Arguments ([string[]]@($dotnetArguments)) `
+            -ImmutableArguments $dotnetArguments `
             -StandardOutput $standardOutput `
             -StandardError $standardError
         $validationError = $null

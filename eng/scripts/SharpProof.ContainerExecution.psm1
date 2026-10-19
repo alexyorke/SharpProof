@@ -205,33 +205,46 @@ function Invoke-SharpProofRequiredDotnet {
 }
 
 function Start-SharpProofEncodedPowerShell {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Arguments')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 0)]
         [string]$WrapperPath,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 1)]
         [int]$TimeoutSeconds,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 2, ParameterSetName = 'Arguments')]
         [string[]]$Arguments,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 2, ParameterSetName = 'ImmutableArguments')]
+        [Collections.Immutable.ImmutableArray[string]]$ImmutableArguments,
+
+        [Parameter(Mandatory = $true, Position = 3)]
         [string]$WorkingDirectory,
 
+        [Parameter(Position = 4)]
         [AllowEmptyString()]
         [string]$StandardOutput = '',
 
+        [Parameter(Position = 5)]
         [AllowEmptyString()]
         [string]$StandardError = ''
     )
 
-    $quotedArguments = @(
-        $Arguments |
-            ForEach-Object {
-                "'" + ([string]$_).Replace("'", "''") + "'"
-            }
-    ) -join ','
+    if ($PSCmdlet.ParameterSetName -eq 'ImmutableArguments') {
+        if ($ImmutableArguments.IsDefault) {
+            throw [ArgumentException]::new('Arguments must be initialized.', 'ImmutableArguments')
+        }
+        $argumentSnapshot = $ImmutableArguments
+    }
+    else {
+        $argumentSnapshot = [Collections.Immutable.ImmutableArray]::CreateRange[string]($Arguments)
+    }
+    $quotedArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($argument in $argumentSnapshot) {
+        $quotedArgumentBuilder.Add("'" + $argument.Replace("'", "''") + "'")
+    }
+    $quotedArguments = $quotedArgumentBuilder.ToImmutable() -join ','
     $escapedWrapper = $WrapperPath.Replace("'", "''")
     $command = (
         "& '$escapedWrapper' -TimeoutSeconds " +
@@ -239,10 +252,14 @@ function Start-SharpProofEncodedPowerShell {
         " @($quotedArguments); exit " + '$LASTEXITCODE')
     $encodedCommand = [Convert]::ToBase64String(
         [Text.Encoding]::Unicode.GetBytes($command))
-    $startParameters = @{
+    $processArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string](4)
+    $processArguments.Add('-NoLogo')
+    $processArguments.Add('-NoProfile')
+    $processArguments.Add('-EncodedCommand')
+    $processArguments.Add($encodedCommand)
+    $startParameters = [ordered]@{
         FilePath         = 'pwsh'
-        ArgumentList     = @(
-            '-NoLogo', '-NoProfile', '-EncodedCommand', $encodedCommand)
+        ArgumentList     = $processArguments.MoveToImmutable()
         WorkingDirectory = $WorkingDirectory
         Wait             = $true
         PassThru         = $true
@@ -253,7 +270,8 @@ function Start-SharpProofEncodedPowerShell {
     if (-not [string]::IsNullOrWhiteSpace($StandardError)) {
         $startParameters.RedirectStandardError = $StandardError
     }
-    return Start-Process @startParameters
+    $startSnapshot = $startParameters.AsReadOnly()
+    return Start-Process @startSnapshot
 }
 
 function Invoke-SharpProofCheckedCommand {

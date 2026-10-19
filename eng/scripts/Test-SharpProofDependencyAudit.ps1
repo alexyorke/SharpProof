@@ -257,24 +257,24 @@ function Invoke-DependencyAudit {
     ('.dependency-audit.' + [Guid]::NewGuid().ToString('N') + '.json')
     $standardError = [IO.Path]::ChangeExtension($standardOutput, '.stderr.txt')
     $wrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
-    $dotnetArguments = @(
-        'list',
-        $Solution,
-        'package',
-        '--vulnerable',
-        '--include-transitive',
-        '--format',
-        'json',
-        '--output-version',
-        '1',
-        '--config',
-        $Configuration
-    )
+    $dotnetArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string](11)
+    $dotnetArgumentBuilder.Add('list')
+    $dotnetArgumentBuilder.Add($Solution)
+    $dotnetArgumentBuilder.Add('package')
+    $dotnetArgumentBuilder.Add('--vulnerable')
+    $dotnetArgumentBuilder.Add('--include-transitive')
+    $dotnetArgumentBuilder.Add('--format')
+    $dotnetArgumentBuilder.Add('json')
+    $dotnetArgumentBuilder.Add('--output-version')
+    $dotnetArgumentBuilder.Add('1')
+    $dotnetArgumentBuilder.Add('--config')
+    $dotnetArgumentBuilder.Add($Configuration)
+    $dotnetArguments = $dotnetArgumentBuilder.MoveToImmutable()
     try {
         $process = Start-SharpProofEncodedPowerShell `
             -WrapperPath $wrapper `
             -TimeoutSeconds $auditTimeoutSeconds `
-            -Arguments $dotnetArguments `
+            -ImmutableArguments $dotnetArguments `
             -WorkingDirectory $repositoryRoot `
             -StandardOutput $standardOutput `
             -StandardError $standardError
