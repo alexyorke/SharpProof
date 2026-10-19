@@ -2728,3 +2728,14 @@ params consumer to JoinFrom(Bottom, immutable effects). Preserve all source lite
 case order/identity and deliberately mutable collection/culture callback subjects.
 Validate all 120 ordinary Effects cases, including compiler/CLR identity controls.
 Status: open before edits.
+
+IMM-M075: Coordinator rechecked the staged-publication and read-observer cases that the
+read-only audit initially excluded too broadly. AtomicFileTests stages filenames only
+locally before concurrent publication, so use a scoped immutable array builder and freeze
+before task creation; retain native file bytes and barrier/atomic file behavior. Its
+TemporaryFiles helper can publish an immutable directory snapshot. Read observer lists
+in IrTotalExecutionTests are aggregation, not mutable subjects: use one builder per task,
+freeze after settlement, and preserve exact lazy read order. Freeze their fixed expected/
+task vectors and Task.WhenAll result snapshot. Keep concurrent tasks' observers separate
+and preserve interpreter inputs/callback timing. Validate all ordinary IR tests.
+Status: open before edits.
