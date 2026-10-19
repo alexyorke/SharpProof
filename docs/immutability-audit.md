@@ -3603,3 +3603,10 @@ build warnings/errors; 64 exact embedded PDB outputs. Review confirms Task.WhenA
 IEnumerable inputs, snapshot consumers, symbol identity and native/SUT preservation.
 Canonical whitespace check of pending C# files requires zero changes. M132 Package
 vectors/deep expected graph/atomic cache pass independent review; workflow remains pending.
+IMM-M134: Review twenty-two PowerShell literal snapshot rows and coupled format argv/
+developer-build argument scopes across seven scripts. Use immutable profile/source/path/
+seed/report/plan/version snapshots and scoped argv builders with typed native adapters.
+Preserve case-sensitive sorted path uniqueness, original PowerShell Unique comparers,
+empty/singleton array shape, duplicate plan validation, parallel normalization completion
+and error order, and nested native JSON/runtime subjects. Validate baseline/current
+fragments and full script format/contract controls. Status: open before edits.
