@@ -28,6 +28,11 @@ internal static class CollectionExpressionChecks
             private readonly T[] items;public BuiltBag(T[] items){this.items=items;}
             public IEnumerator<T> GetEnumerator()=>((IEnumerable<T>)items).GetEnumerator();IEnumerator IEnumerable.GetEnumerator()=>GetEnumerator();
         }
+        [InterpolatedStringHandler]public struct CollectionValueHandler {
+            public CollectionValueHandler(int literalLength,int formattedCount){}
+            public void AppendLiteral(string text){}
+            public void AppendFormatted<T>(T value){}
+        }
         public static class CollectionTrace {public static string Log="";public static T Item<T>(T value){Log+="item;";return value;}}
         public class TraceEnumerable<T>(T value):IEnumerable<T> {
             public IEnumerator<T> GetEnumerator(){CollectionTrace.Log+="get;";try{CollectionTrace.Log+="next;";yield return value;}finally{CollectionTrace.Log+="dispose;";}}
@@ -54,6 +59,10 @@ internal static class CollectionExpressionChecks
             ("CollectionBuilder", "static BuiltBag<int> M(int value)=>[value];", "global::BuiltBag<T1> M<T1>(T1 value)"),
             ("CollectionBuilderSpread", "static BuiltBag<int> M(int[] values)=>[..values];", "global::BuiltBag<T1> M<T1>(T1[] values)"),
             ("CollectionAddOverload", "static OverloadedBag<int> M(int value,bool ignored)=>[value];", "global::OverloadedBag<int> M<T1>(int value, T1 ignored)"),
+            ("CollectionBoxing", "static List<object?> M(int value)=>[value];", "global::System.Collections.Generic.List<object?> M<T1>(T1 value)"),
+            ("CollectionListNumericElement", "static List<long> M(int value,bool ignored)=>[value];", "global::System.Collections.Generic.List<long> M<T1>(int value, T1 ignored)"),
+            ("CollectionFormattableElement", "static List<FormattableString> M(int value)=>[$\"{value}\"];", "global::System.Collections.Generic.List<global::System.FormattableString> M<T1>(T1 value)"),
+            ("CollectionHandlerElement", "static List<CollectionValueHandler> M(int value)=>[$\"{value}\"];", "global::System.Collections.Generic.List<global::CollectionValueHandler> M<T1>(T1 value)"),
             ("CollectionNullable", "static List<string?> M(string? value)=>[value];", "global::System.Collections.Generic.List<T1?> M<T1>(T1? value) where T1 : class"),
             ("CollectionBuilderConstraint", "static BuiltBag<int> M(int value)=>[value];", "global::BuiltBag<T1> M<T1>(T1 value) where T1 : struct"),
             ("CollectionTypedLocal", "static int M(int value,bool ignored){List<int> values=[value];return values[0];}", "int M<T1>(int value, T1 ignored)")

@@ -146,10 +146,12 @@ public static partial class Inference
                     }
                     else
                     {
-                        BindNullableArgument(item, element.Shape);
-                        var source = model.GetTypeInfo(item.Syntax, cancellationToken).Type ?? item.Type ?? element.Type;
+                        var syntax = (ExpressionSyntax)item.Syntax;
+                        var info = model.GetTypeInfo(syntax, cancellationToken);
+                        var source = (IsTargetedInterpolation(syntax) ? info.ConvertedType : info.Type) ?? item.Type ?? element.Type;
                         var value = BoundExpression(item);
-                        BindCollectionAdd(operation, source, value, (ExpressionSyntax)item.Syntax, shape);
+                        BindConvertedArgument(source, element.Type, value, element.Shape);
+                        BindCollectionAdd(operation, source, value, syntax, shape);
                     }
                 }
             }
@@ -163,17 +165,31 @@ public static partial class Inference
             if (semantic is null)
             { throw new ArgumentNullException(nameof(semantic)); }
             var seen = new HashSet<ICollectionExpressionOperation>();
+            var seenHandlers = new HashSet<IInterpolatedStringHandlerCreationOperation>();
             foreach (var expression in root.DescendantNodes().OfType<ExpressionSyntax>())
             {
                 var operation = semantic.GetOperation(expression);
                 if (operation is ICollectionExpressionOperation collection)
                 { if (seen.Add(collection)) { yield return collection; } }
-                if (InterpolationHandler(operation)?.HandlerCreation is IObjectCreationOperation handlerConstruction)
+                if (InterpolationHandler(operation) is { } handler && seenHandlers.Add(handler))
                 {
-                    foreach (var argument in handlerConstruction.Arguments)
+                    if (handler.HandlerCreation is IObjectCreationOperation handlerConstruction)
                     {
-                        if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation pack && seen.Add(pack))
-                        { yield return pack; }
+                        foreach (var argument in handlerConstruction.Arguments)
+                        {
+                            if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation pack && seen.Add(pack))
+                            { yield return pack; }
+                        }
+                    }
+                    foreach (var append in InterpolationOperations(handler.Content).OfType<IInterpolatedStringAppendOperation>())
+                    {
+                        if (append.AppendCall is not IInvocationOperation appendCall)
+                        { continue; }
+                        foreach (var argument in appendCall.Arguments)
+                        {
+                            if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation pack && seen.Add(pack))
+                            { yield return pack; }
+                        }
                     }
                 }
                 var arguments = operation switch { IInvocationOperation call => call.Arguments, IObjectCreationOperation creation => creation.Arguments, IPropertyReferenceOperation property => property.Arguments, _ => default };

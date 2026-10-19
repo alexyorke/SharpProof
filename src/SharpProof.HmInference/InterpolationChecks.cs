@@ -90,6 +90,26 @@ internal static class InterpolationChecks
             public void AppendLiteral(string text){}
             public void AppendFormatted<T>(T value){}
         }
+        [InterpolatedStringHandler]public struct ProbeSpanAppendHandler {
+            public ProbeSpanAppendHandler(int literalLength,int formattedCount){InterpolationTrace.Log+="append-ctor;";}
+            public bool AppendLiteral(string text){InterpolationTrace.Log+="append-literal;";return InterpolationTrace.Continue;}
+            public bool AppendFormatted<T>(params ReadOnlySpan<T> values){InterpolationTrace.Log+="append-call;";InterpolationTrace.LastContext=values[0];return InterpolationTrace.Continue;}
+        }
+        [InterpolatedStringHandler]public struct ProbeListAppendHandler {
+            public ProbeListAppendHandler(int literalLength,int formattedCount){InterpolationTrace.Log+="append-ctor;";}
+            public bool AppendLiteral(string text){InterpolationTrace.Log+="append-literal;";return InterpolationTrace.Continue;}
+            public bool AppendFormatted<T>(params List<T> values){InterpolationTrace.Log+="append-call;";InterpolationTrace.LastContext=values[0];return InterpolationTrace.Continue;}
+        }
+        [InterpolatedStringHandler]public struct ProbeBuilderAppendHandler {
+            public ProbeBuilderAppendHandler(int literalLength,int formattedCount){InterpolationTrace.Log+="append-ctor;";}
+            public bool AppendLiteral(string text){InterpolationTrace.Log+="append-literal;";return InterpolationTrace.Continue;}
+            public bool AppendFormatted<T>(params ProbeContextPack<T> values){InterpolationTrace.Log+="append-call;";InterpolationTrace.LastContext=values.First;return InterpolationTrace.Continue;}
+        }
+        [InterpolatedStringHandler]public struct ProbeOverloadedAppendHandler {
+            public ProbeOverloadedAppendHandler(int literalLength,int formattedCount){InterpolationTrace.Log+="append-ctor;";}
+            public bool AppendLiteral(string text){InterpolationTrace.Log+="append-literal;";return InterpolationTrace.Continue;}
+            public bool AppendFormatted(params ProbeOverloadedContexts values){InterpolationTrace.Log+="append-call;";InterpolationTrace.LastContext=values.First;return InterpolationTrace.Continue;}
+        }
         [InterpolatedStringHandler]public struct ProbeThisHandler {
             public ProbeThisHandler(int literalLength,int formattedCount,object owner){}
             public void AppendLiteral(string text){}
@@ -117,6 +137,10 @@ internal static class InterpolationChecks
             public static void BuilderPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeBuilderPackedHandler<T> handler){}
             public static void OverloadedPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeOverloadedPackedHandler handler){}
             public static void NamedOverloadedPacked<T>(bool flag,T context,[InterpolatedStringHandlerArgument("context")]ProbeOverloadedPackedHandler handler){}
+            public static void SpanAppend(ProbeSpanAppendHandler handler){}
+            public static void ListAppend(ProbeListAppendHandler handler){}
+            public static void BuilderAppend(ProbeBuilderAppendHandler handler){}
+            public static void OverloadedAppend(ProbeOverloadedAppendHandler handler){}
             public static FormattableString Capture(FormattableString value)=>value;
         }
         """;
@@ -155,6 +179,10 @@ internal static class InterpolationChecks
             ("HandlerConstructorBuilderParams", "static void M(int context,int value)=>InterpolationApi.BuilderPacked(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value)"),
             ("HandlerConstructorOverloadedAdd", "static void M(int context,int value)=>InterpolationApi.OverloadedPacked(context,$\"{value}\");", "void M<T1>(int context, T1 value)"),
             ("HandlerConstructorNamedArguments", "static void M(bool flag,int context,int value)=>InterpolationApi.NamedOverloadedPacked(context:context,flag:flag,handler:$\"{value}\");", "void M<T1>(bool flag, int context, T1 value)"),
+            ("HandlerAppendSpanParams", "static void M(int value)=>InterpolationApi.SpanAppend($\"{value}\");", "void M<T1>(T1 value)"),
+            ("HandlerAppendListParams", "static void M(int value)=>InterpolationApi.ListAppend($\"{value}\");", "void M<T1>(T1 value)"),
+            ("HandlerAppendBuilderParams", "static void M(int value)=>InterpolationApi.BuilderAppend($\"{value}\");", "void M<T1>(T1 value)"),
+            ("HandlerAppendOverloadedAdd", "static void M(int value,bool ignored)=>InterpolationApi.OverloadedAppend($\"{value}\");", "void M<T1>(int value, T1 ignored)"),
             ("HandlerConcatenation", "static void M(int left,int right)=>InterpolationApi.Take($\"a{left}\"+$\"b{right}\");", "void M<T1, T2>(T1 left, T2 right)"),
             ("HandlerNested", "static void M(int value)=>InterpolationApi.Take($\"outer{InterpolationApi.Forward(true,$\"inner{value}\")}\");", "void M<T1>(T1 value)")
         ];
@@ -178,7 +206,28 @@ internal static class InterpolationChecks
         if (protocolResult.Signature != "void AppendLiteral<T1>(T1 text)")
         { throw new InvalidOperationException("Interpolation protocol root: " + protocolResult); }
         Program.Log.Info("PASS InterpolationProtocolMethodGeneralization");
-        return tests.Length + 1 + await Runtime(cancellationToken).ConfigureAwait(false);
+        const string unsafeCaller = """
+            public static class AppendBindingRunner {
+                private static void Use(string value)=>InterpolationApi.OverloadedAppend($"{value}");
+                public static string Run(){InterpolationTrace.Log="";InterpolationTrace.Continue=true;Use("payload");return InterpolationTrace.Log;}
+            }
+            """;
+        var unsafeTree = CSharpSyntaxTree.ParseText(Support + unsafeCaller, cancellationToken: cancellationToken);
+        var originalBinding = Program.Compile([unsafeTree]);
+        var unsafeSupport = Support.Replace("public void Add(int value)", "public void Add<T>(T value)", StringComparison.Ordinal);
+        var unsafeBinding = Program.Compile([CSharpSyntaxTree.ParseText(unsafeSupport + unsafeCaller, cancellationToken: cancellationToken)]);
+        var beforeBinding = Load(originalBinding, cancellationToken).GetType("AppendBindingRunner")!.GetMethod("Run")!.Invoke(null, null);
+        var afterBinding = Load(unsafeBinding, cancellationToken).GetType("AppendBindingRunner")!.GetMethod("Run")!.Invoke(null, null);
+        if (!Equals(beforeBinding, "append-ctor;collection;add-object;append-call;") || !Equals(afterBinding, "append-ctor;collection;add-int;append-call;"))
+        { throw new InvalidOperationException("Hidden append overload reproduction failed: " + beforeBinding + " -> " + afterBinding); }
+        var unsafeRoot = await unsafeTree.GetRootAsync(cancellationToken).ConfigureAwait(false);
+        var selectedAdd = unsafeRoot.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single(method =>
+        { ArgumentNullException.ThrowIfNull(method); return method.Identifier.ValueText == "Add" && method.ParameterList.Parameters.Single().Type?.ToString() == "int"; });
+        var rejected = Inference.Analyze(selectedAdd, originalBinding.GetSemanticModel(unsafeTree), cancellationToken);
+        if (rejected.Status != "Rejected")
+        { throw new InvalidOperationException("Hidden append Add binding should reject: " + rejected); }
+        Program.Log.Info("PASS HiddenAppendCollectionAddOverloadRejected");
+        return tests.Length + 2 + await Runtime(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
@@ -194,6 +243,10 @@ internal static class InterpolationChecks
                 public static void BuilderPacked(int context,int value)=>InterpolationApi.BuilderPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
                 public static void OverloadedPacked(int context,int value)=>InterpolationApi.OverloadedPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
                 public static void NamedOverloadedPacked(bool flag,int context,int value)=>InterpolationApi.NamedOverloadedPacked(context:InterpolationTrace.Touch(context),flag:flag,handler:$"{InterpolationTrace.Touch(value)}");
+                public static void SpanAppend(int value)=>InterpolationApi.SpanAppend($"before{InterpolationTrace.Touch(value)}after");
+                public static void ListAppend(int value)=>InterpolationApi.ListAppend($"before{InterpolationTrace.Touch(value)}after");
+                public static void BuilderAppend(int value)=>InterpolationApi.BuilderAppend($"before{InterpolationTrace.Touch(value)}after");
+                public static void OverloadedAppend(int value,bool ignored)=>InterpolationApi.OverloadedAppend($"before{InterpolationTrace.Touch(value)}after");
                 public static string Render(int value,bool enabled)=>InterpolationApi.Forward(enabled,$"before{InterpolationTrace.Touch(value),4:D2}after");
             }
             public static class OriginalInterpolationRunner {
@@ -213,7 +266,14 @@ internal static class InterpolationChecks
                     if(!Equals(InterpolationTrace.LastContext,31)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return "bad";
                     var overloaded=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.NamedOverloadedPacked(false,37,7);
                     if(!Equals(InterpolationTrace.LastContext,37)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return "bad";
-                    return full+disabled+stopped+built+overloaded+InterpolationTrace.Log;
+                    var named=InterpolationTrace.Log;InterpolationTrace.Continue=true;
+                    InterpolationTrace.Log="";InterpolationProbe.SpanAppend(41);if(!Equals(InterpolationTrace.LastContext,41)||InterpolationTrace.Log!="append-ctor;append-literal;hole;append-call;append-literal;")return "bad";
+                    var span=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.ListAppend(43);if(!Equals(InterpolationTrace.LastContext,43)||InterpolationTrace.Log!="append-ctor;append-literal;hole;append-call;append-literal;")return "bad";
+                    var list=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.BuilderAppend(47);if(!Equals(InterpolationTrace.LastContext,47)||InterpolationTrace.Log!="append-ctor;append-literal;hole;pack-builder;append-call;append-literal;")return "bad";
+                    var builder=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.OverloadedAppend(53,false);if(!Equals(InterpolationTrace.LastContext,53)||InterpolationTrace.Log!="append-ctor;append-literal;collection;hole;add-int;append-call;append-literal;")return "bad";
+                    var specialized=InterpolationTrace.Log;InterpolationTrace.Continue=false;InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.BuilderAppend(59);
+                    if(InterpolationTrace.LastContext!=null||InterpolationTrace.Log!="append-ctor;append-literal;")return "bad";
+                    return full+disabled+stopped+built+overloaded+named+span+list+builder+specialized+InterpolationTrace.Log;
                 }
             }
             """;
@@ -224,9 +284,9 @@ internal static class InterpolationChecks
         var original = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
         var originalTrace = original.GetType("OriginalInterpolationRunner")!.GetMethod("Run")!.Invoke(null, null);
         if (Equals(originalTrace, "bad"))
-        { throw new InvalidOperationException("Original interpolation behavior failed."); }
+        { throw new InvalidOperationException("Original interpolation behavior failed: " + original.GetType("InterpolationTrace")!.GetField("Log")!.GetValue(null) + "; stored=" + original.GetType("InterpolationTrace")!.GetField("LastContext")!.GetValue(null)); }
         var provider = new HmSignatureCodeFixProvider();
-        for (var round = 0; round < 10; round++)
+        for (var round = 0; round < 14; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -266,7 +326,17 @@ internal static class InterpolationChecks
                     InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.OverloadedPacked(31,value);
                     if(!Equals(InterpolationTrace.LastContext,31)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return false;
                     InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.NamedOverloadedPacked(false,37,value);
-                    return Equals(InterpolationTrace.LastContext,37)&&InterpolationTrace.Log=="hole;collection;add-int;overload-ctor;hole;";
+                    if(!Equals(InterpolationTrace.LastContext,37)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.SpanAppend(value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="append-ctor;append-literal;hole;append-call;append-literal;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.ListAppend(value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="append-ctor;append-literal;hole;append-call;append-literal;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.BuilderAppend(value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="append-ctor;append-literal;hole;pack-builder;append-call;append-literal;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.OverloadedAppend(53,value);
+                    if(!Equals(InterpolationTrace.LastContext,53)||InterpolationTrace.Log!="append-ctor;append-literal;collection;hole;add-int;append-call;append-literal;")return false;
+                    InterpolationTrace.Continue=false;InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.BuilderAppend(value);
+                    return InterpolationTrace.LastContext==null&&InterpolationTrace.Log=="append-ctor;append-literal;";
                 }
             }
             """);

@@ -42,6 +42,27 @@ public struct SampleBuilderContextHandler<T>
     public void AppendLiteral(string text) { }
     public void AppendFormatted<TValue>(TValue value) { }
 }
+[InterpolatedStringHandler]
+public struct SampleSpanAppendHandler
+{
+    public SampleSpanAppendHandler(int literalLength, int formattedCount) { }
+    public bool AppendLiteral(string text) => true;
+    public bool AppendFormatted<T>(params ReadOnlySpan<T> values) => true;
+}
+[InterpolatedStringHandler]
+public struct SampleListAppendHandler
+{
+    public SampleListAppendHandler(int literalLength, int formattedCount) { }
+    public bool AppendLiteral(string text) => true;
+    public bool AppendFormatted<T>(params List<T> values) => true;
+}
+[InterpolatedStringHandler]
+public struct SampleBuilderAppendHandler
+{
+    public SampleBuilderAppendHandler(int literalLength, int formattedCount) { }
+    public bool AppendLiteral(string text) => true;
+    public bool AppendFormatted<T>(params SampleContextPack<T> values) => true;
+}
 public static class InterpolationSamples
 {
     private static void Consume(SampleFormattingHandler handler) { }
@@ -52,6 +73,15 @@ public static class InterpolationSamples
     public static void SpanPackedFormat(int context, int value) => SpanContexts(context, $"{value}");
     public static void ListPackedFormat(int context, int value) => ListContexts(context, $"{value}");
     public static void BuilderPackedFormat(int context, int value) => BuilderContexts(context, $"{value}");
+    private static void SpanAppend(SampleSpanAppendHandler handler) { }
+    private static void ListAppend(SampleListAppendHandler handler) { }
+    private static void BuilderAppend(SampleBuilderAppendHandler handler) { }
+    public static void SpanAppendFormat(int value) => SpanAppend($"{value}");
+    public static void ListAppendFormat(int value) => ListAppend($"{value}");
+    public static void BuilderAppendFormat(int value) => BuilderAppend($"{value}");
+    public static List<object?> BoxedElements(int value) => [value];
+    public static List<long> WidenedElements(int value, bool ignored) => [value];
+    public static List<FormattableString> FormattedElements(int value) => [$"{value}"];
     public static FormattableString CaptureFormat(int value) => $"value={value,6:D4}";
     public static FormattableString CaptureNullableFormat(string? value) => $"value={value}";
     public static async Task<FormattableString> CaptureAwaitedFormat(Task<int> pending) => $"value={await pending}";
