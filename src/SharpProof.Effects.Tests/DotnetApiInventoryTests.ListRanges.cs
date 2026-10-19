@@ -12,7 +12,9 @@ public sealed partial class DotnetApiInventoryTests
         ArgumentNullException.ThrowIfNull(references);
         ArgumentNullException.ThrowIfNull(id);
         var body = referenceValues
-            ? "var data = new System.Collections.Generic.List<object>(); var first = new object(); var second = new object(); data.Add(first); data.Insert(0, second); data.Insert(2, null); var copy = data.GetRange(0, 3); data[0] = first; copy[1] = null; return !object.ReferenceEquals(data, copy) && object.ReferenceEquals(copy[0], second) && data[1] != null && copy[1] == null && copy[2] == null ? 1 : 0;"
+            ? "var data = new System.Collections.Generic.List<object>(); var first = new object(); var second = new object(); data.Add(first); " +
+                (id.Contains("IList", StringComparison.Ordinal) ? "System.Collections.Generic.IList<object> alias = data; alias.Insert(0, second); alias.Insert(2, null);" : "data.Insert(0, second); data.Insert(2, null);") +
+                "var copy = data.GetRange(0, 3); data[0] = first; copy[1] = null; return !object.ReferenceEquals(data, copy) && object.ReferenceEquals(copy[0], second) && data[1] != null && copy[1] == null && copy[2] == null ? 1 : 0;"
             : "var data = new System.Collections.Generic.List<int>(); data.Add(11); data.Add(23); " +
                 (id.Contains("IList", StringComparison.Ordinal) ? "System.Collections.Generic.IList<int> alias = data; alias.Insert(1, 17);" : "data.Insert(1, 17);") +
                 "var copy = data.GetRange(0, 3); copy[0] = 29; data[2] = 31; return copy.Count * 1000 + data[0] * 100 + copy[1] * 10 + copy[2];";

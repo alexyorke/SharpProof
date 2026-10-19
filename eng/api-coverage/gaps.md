@@ -751,11 +751,11 @@ These 48 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state |
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
-| M:System.Collections.Generic.IList`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=list-insertion-range-state |
+| M:System.Collections.Generic.IList`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=concrete-list-state |
-| M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | intrinsic=fresh-list-state;intrinsic=list-insertion-range-state |
-| M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=list-insertion-range-state |
+| M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
+| M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Int16.CompareTo(System.Int16) | intrinsic=integer-comparison |

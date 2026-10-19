@@ -27,7 +27,7 @@ public sealed class ListRangeOpaqueValueOracleTests
     {
         ArgumentNullException.ThrowIfNull(domain);
         var (type, first, second) = Inputs(domain);
-        var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new List<T>(); data.Add(first); data.Insert(0, second); var copy = data.GetRange(0, 2); data[0] = first; copy[1] = first; return Read<T>(copy); } static U Read<U>(IList<U> data) => data[0]; }";
+        var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new List<T>(); data.Add(first); Put<T>(data, second); var copy = data.GetRange(0, 2); data[0] = first; copy[1] = first; return Read<T>(copy); } static void Put<U>(IList<U> data, U item) { data.Insert(0, item); } static U Read<U>(IList<U> data) => data[0]; }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
