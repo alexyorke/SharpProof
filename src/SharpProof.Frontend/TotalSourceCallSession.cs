@@ -49,6 +49,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // Element reads are assigned where they occur, so later stores cannot
     // change them.
     internal bool PinElementReads { get; set; }
+    internal bool CaptureResourceLoopEntries { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { body = RepositoryParameterGuard.NotNull(body, nameof(body)); frame = RepositoryParameterGuard.NotNull(frame, nameof(frame)); return prepareMetadata?.Invoke(frame, body) ?? true; }
 

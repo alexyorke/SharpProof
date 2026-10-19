@@ -284,4 +284,55 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("7"));
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
     }
+    [TestCase("for(int i=0;i<4;i++) {}", 2, "3")]
+    [TestCase("for(int i=0;(i<4);i++) {}", 2, "3")]
+    [TestCase("for(long i=0;i<4;i++) {}", 2, "3")]
+    [TestCase("for(int i=1;i<17;i*=2) {}", 2, "3")]
+    [TestCase("for(int i=7;i>0;i-=2) {}", 1, "2")]
+    [TestCase("int remaining=5; while(remaining>0) { remaining/=2; }", 1, "2")]
+    [TestCase("for(int i=0;i<2;i++) { for(int j=0;j<3;j++) {} }", 6, "7")]
+    [TestCase("checked { for(int i=2147483646;i<2147483647;i+=2) {} }", 0, "1")]
+    [TestCase("for(int i=0;i<4;i++) { return; }", 0, "1")]
+    public async Task LoopViolationsCountOnlyActualSourceBodyEntries(string body, long limit, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(expected);
+        var preparation = Prepare(Source($"[ResourceUpperBound(ResourceMetric.LoopBodyEntries, {limit})]", body));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(expected));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(result.EffectWitness!.Effects, Is.EqualTo(WorkerEffectSet.None));
+        Assert.That(result.EffectWitness.Location.Line, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public async Task SourceCallInliningPreservesLoopEntrySemantics()
+    {
+        var preparation = Prepare("""
+            using SharpProof.Attributes;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 5)]
+                public static void Target() { Leaf(); Leaf(); }
+                static void Leaf() { for(int i=0;i<4;i++) {} }
+            }
+            """);
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("6"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("5"));
+    }
+
+    [TestCase("for(int i=0;i<4;i++) { return; }")]
+    [TestCase("Contract.Requires(n<=0); for(int i=0;i<n;i++) {}")]
+    [TestCase("int x=3; if(x>0) {} if(x>0) {} for(int i=0;i<4;i++) { return; }")]
+    public async Task LooseLoopEnvelopesDoNotProduceInventedEntries(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.LoopBodyEntries, 1)]", body));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
 }

@@ -49,7 +49,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] Compiler-neutral proof/cost representation and collector artifact encoding.
 - [x] Native-worker derivation and checking of cumulative resource upper bounds.
 - [x] Exact-prefix numeric violations for array allocations and allocated elements.
-- [ ] Exact source-loop-entry numeric violation evidence.
+- [x] Exact source-loop-entry numeric violation evidence.
 - [ ] Bind native metadata cost assumptions and their provenance.
 - [x] Protocol, manifest, schema and cache-identity integration.
 - [x] SARIF/result projection with independent claim outcomes and Unknown reasons.
@@ -382,3 +382,63 @@ quality run passed every category except one spelling finding in this document;
 after rewording it, the pinned spelling engine checked all 71 configured files
 with zero findings. The 100% coverage baseline is unchanged and final coverage
 qualification remains required. No full-roadmap completion is claimed.
+
+## Exact source-loop-entry violations (in progress)
+
+Resource-selected total lowering now identifies admitted C# for/while guards by
+their owned source syntax and typed strict comparison. A compiler-owned semantic
+marker records the true edge's body-entry meaning and original source span. The
+shared source-call session preserves these annotations through inlining. Ordinary
+lowering keeps its prior operation sites. The worker observes marked true edges
+only after condition evaluation and retains the sticky approximation state.
+Neither an ordinary conditional, a jump to an earlier block nor a loose upper envelope invents
+a source body entry. Guard annotations are trusted lowering semantics, not an
+independent progress certificate; the native upper-bound checker still validates
+rank/overflow evidence separately.
+
+Numeric loop witnesses use no allocation/effect flags. Resource-specific protocol
+validation checks the metric/flag relationship without allowing empty qualitative
+effect witnesses. Protocol 16, cache 18 and compiler artifact 33 bind these
+semantics; manifest 6 and the v3 cost units remain unchanged. Schema-only golden
+expectations were updated without changing verdicts.
+
+The first 46 focused native contract tests passed, followed by 301 native,
+protocol, worker/cache/SARIF and golden controls. Independent total-execution
+controls passed all 74 cases. Controls include parenthesized/Int64 guards,
+non-unit/geometric/descending progress, dependent nesting, inlined callees,
+checked-overflow prefixes, early return, approximation and loose envelopes.
+Broader gate results are recorded below.
+
+CI aggregate failures for published `0e69f12d0` were traced to cancelled upstream
+jobs: the build aggregator received cancelled quality/main/package/Gates/
+self-application jobs, and the coverage aggregator received cancelled shards.
+These runs contain no completed cohort/coverage qualification and do not establish
+a code regression. Final coverage qualification is still required.
+
+Final loop-entry checkpoint gates passed: 2052 frontend tests, 521 IR tests,
+1302 analyzer tests, 10 architecture tests, the 301 focused native/protocol/
+consumer/golden cases, and all three ordinary-conditional/loose-loop controls.
+All three actual NuGet strict consumers passed, covering valid bounds, array
+violations and loop-entry violations with numeric JSON/SARIF evidence. Builds
+reported zero warnings/errors. Final changed-source formatting and documentation
+drift/lifecycle passed; layout evaluated 2640 source files, 59 projects and 151
+pinned common files. The quality categories passed after two technical words in
+this document/guide were reworded and the pinned spelling engine rechecked all
+71 configured files with zero findings.
+
+The native source-loop-entry evidence item is complete for the admitted families.
+Native metadata cost assumptions/provenance remain the next phase D item. Every
+other unchecked requirement remains required, including final coverage at the
+unchanged 100% baseline. The merge request remains draft.
+
+Before publication, the remote branch advanced to `91fe3b184`, the user's merge
+of master containing dictionary-state modeling (#331) and CI image caching
+(#339). The local loop-entry commit rebased cleanly onto that merge. The shared
+source-call session retained both the upstream dictionary changes and the new
+resource-tracking flag. Integrated-state rechecks passed 2062 frontend tests,
+302 native/protocol/consumer/golden cases and all three actual NuGet consumers,
+with zero build warnings/errors. Earlier layout counts above describe the
+pre-merge checkpoint; the remote merge is preserved in the published history.
+
+Integrated layout also passed: 2648 source files, 59 projects and 151 pinned
+common files.

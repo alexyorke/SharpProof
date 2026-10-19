@@ -189,6 +189,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             {
                 var value = Condition(condition, block);
                 var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
+                site = ResourceLoopSite(condition, site);
                 _builder.Branch(value.Continuation, site, value.Value,
                     _blocks[whenTrue ? conditional : fallThrough], _blocks[whenTrue ? fallThrough : conditional]);
             }

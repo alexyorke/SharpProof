@@ -113,6 +113,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         calls.OpaqueEffects = opaqueEffects;
         calls.ApproximateElementReads = approximateElementReads;
         calls.PinElementReads = pinElementReads;
+        calls.CaptureResourceLoopEntries = context.CaptureResourceLoopEntries;
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls).Lower(graph);
     }
 }

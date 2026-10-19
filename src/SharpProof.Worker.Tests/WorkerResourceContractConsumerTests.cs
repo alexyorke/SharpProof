@@ -44,16 +44,14 @@ public sealed partial class WorkerTests
         second.Manifest.Claims.Single().ResourceUpperBound!.UpperBound = null!;
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
     }
-    [Test]
-    public async Task NumericResourceViolationsReachValidatedCacheAndSarifConsumers()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task NumericResourceViolationsReachValidatedCacheAndSarifConsumers(bool loop)
     {
-        using var project = TestProject.Create("""
-            using SharpProof.Attributes;
-            public static class Subject {
-                [ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]
-                public static void Target() { var a = new int[3]; }
-            }
-            """);
+        var metric = loop ? "LoopBodyEntries" : "AllocatedElements";
+        var body = loop ? "for(int i=0;i<3;i++) {}" : "var a=new int[3];";
+        using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ", 2)] public static void Target() { " + body + " } }");
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -76,6 +74,11 @@ public sealed partial class WorkerTests
             evidence.ObservedLowerBound = malformed;
             Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False, malformed);
         }
+        evidence.ObservedLowerBound = "3";
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+        claim.EffectWitness!.Effects = loop ? WorkerEffectSet.Allocates : WorkerEffectSet.None;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        claim.EffectWitness.Effects = loop ? WorkerEffectSet.None : WorkerEffectSet.Allocates;
         evidence.ObservedLowerBound = "3";
         evidence.EvaluatedUpperBound = "02";
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);

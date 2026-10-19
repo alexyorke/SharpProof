@@ -83,6 +83,8 @@ internal static class CompilerTotalCallableLowerer
                 !documents.TryGetValue(syntax.SyntaxTree, out var clauseDocument) || clauseDocument != span.Document)
             { return null; }
         }
+        context.CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound);
         ControlFlowGraph? graph = null;
         FrontendProgramLoweringResult? lowering;
         if (autoAccessor != null)

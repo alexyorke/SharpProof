@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 15,
+    "protocolVersion": 16,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 32,
+    "compilerArtifactSchemaVersion": 33,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 17,
+    "schemaVersion": 18,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -209,6 +209,7 @@
           "src/SharpProof.Frontend/TotalIlStack.cs",
           "src/SharpProof.Frontend/TotalIlStackType.cs",
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
+          "src/SharpProof.Frontend/RoslynTotalProgramLowerer.ResourceLoops.cs",
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs",
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.FilterEdgeResolver.cs"
         ]

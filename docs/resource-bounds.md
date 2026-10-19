@@ -190,7 +190,7 @@ assumptions produce Unknown. A modeled upper bound larger than the requested
 limit also remains Unknown until an actual violating execution is established;
 an upper envelope alone does not refute a contract.
 
-For array allocation counts and allocated elements, the worker also searches for
+For all three metrics, the worker also searches for
 an exact violating execution prefix. Every candidate must satisfy the owned
 entry constraints, receiver requirements, and all Requires clauses with their
 definedness guards. Successful array events carry their evaluated element count;
@@ -201,8 +201,14 @@ a later operation throws or concrete replay reaches its step limit.
 The search uses bounded small inputs and constant thresholds, then native
 feasibility/allocation models. It cannot prove a bound from samples or establish
 that no violating execution exists. Failure to produce an exact witness remains
-Unknown. Loop-body-entry refutations still require source-entry instrumentation;
-the current worker does not infer them from branch counts or a loose envelope.
+Unknown. Loop-body-entry refutations use compiler-owned guard annotations for the
+admitted top-tested C# for/while families. Resource-selected lowering identifies
+the source loop's strict local-counter condition and preserves its source span
+and true-edge semantics through inlining. Replay counts one body entry only when
+that guard evaluates true without consuming an approximation. Ordinary branches,
+false guards and jumps to earlier blocks do not supply loop-entry evidence. The annotations are
+part of trusted source lowering and compiler artifact schema 33; display labels
+alone do not establish callable ownership or a progress proof.
 
 Compiler-elided calls, including contract clauses, do not add runtime costs or
 argument allocations. Enabled conditional calls retain their normal costs.
@@ -210,7 +216,7 @@ The reserved contract symbol remains invalid for production compilation.
 
 Validated results and SARIF expose `resourceBound` evidence with the metric,
 cost model, expression/program versions, declared-bound digest and inferred
-upper bound. Refuted array evidence contains `observedLowerBound` and
+upper bound. Refuted resource evidence contains `observedLowerBound` and
 `evaluatedUpperBound`, a concrete source location, and the replayed entry model.
 Both values are canonical nonnegative integers and the observed prefix must be
 strictly larger. Unknown evidence contains its reason and no partial numeric bound.

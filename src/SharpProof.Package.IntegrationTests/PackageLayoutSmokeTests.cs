@@ -3548,4 +3548,35 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Refuted"), Is.EqualTo(2));
     }
+    [Test]
+    public async Task MainPackageRefutesLoopEntryBoundsWithConcreteWorkEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 2)]
+                public static void Target() { for(int i=0;i<3;i++) {} }
+            }
+            """, "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Refuted");
+        var evidence = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(evidence, "metric", "LoopBodyEntries");
+        JsonAssert.Equal(evidence, "observedLowerBound", "3");
+        JsonAssert.Equal(evidence, "evaluatedUpperBound", "2");
+        JsonAssert.Equal(claim.GetProperty("effectWitness"), "effects", "None");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Refuted");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("LoopBodyEntries observed prefix: 3 > 2"));
+    }
 }

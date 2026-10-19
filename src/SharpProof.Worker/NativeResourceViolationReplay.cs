@@ -16,7 +16,7 @@ internal static class NativeResourceViolationReplay
         limit = ArgumentNullGuard.NotNull(limit, nameof(limit));
         budgets = ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         var constraint = claim.Constraint.ResourceUpperBound!;
-        if (constraint.Metric is not (WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements))
+        if (constraint.Metric is not (WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements))
         { return null; }
         var owner = target.Total!;
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
@@ -89,17 +89,28 @@ internal static class NativeResourceViolationReplay
             BigInteger observed = 0;
             OperationId? site = null;
             BigInteger violatingPrefix = 0;
-            plan!.ReplayArrayAllocations(inputs, (instruction, elements, approximation) =>
+            void Observe(OperationId operation, BigInteger amount, bool approximation)
             {
-                ArgumentNullException.ThrowIfNull(instruction);
+                RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
                 if (approximation || site is not null)
                 { return; }
-                observed += constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements;
+                observed += amount;
                 if (observed > evaluatedLimit)
                 {
-                    site = instruction.Operation;
+                    site = operation;
                     violatingPrefix = observed;
                 }
+            }
+            plan!.ReplayResources(inputs, (instruction, elements, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
+                { Observe(instruction.Operation, constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements, approximation); }
+            }, (instruction, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                if (constraint.Metric == WorkerResourceMetric.LoopBodyEntries)
+                { Observe(instruction.Operation, BigInteger.One, approximation); }
             }, cancellation);
             cancellation.ThrowIfCancellationRequested();
             if (site is not { } operation || owner.Program.Factory.GetOperationInfo(operation).SourceSpan is not { Line: > 0 } span)
@@ -119,7 +130,7 @@ internal static class NativeResourceViolationReplay
             {
                 Kind = "resource-bound-exceeded",
                 Detail = constraint.Metric + " prefix " + observedText + " exceeds entry bound " + limitText,
-                Effects = WorkerEffectSet.Allocates,
+                Effects = constraint.Metric == WorkerResourceMetric.LoopBodyEntries ? WorkerEffectSet.None : WorkerEffectSet.Allocates,
                 Location = new() { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
             };
             result.Model = [.. owner.Parameters.Select((parameter, ordinal) =>

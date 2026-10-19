@@ -124,10 +124,25 @@ public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocV
     public Action<IrLockInstruction>? LockObserver { get; set; }
     public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; set; }
     internal Action<IrAllocationInstruction, int, bool>? ArrayAllocationPrefixObserver { get; set; }
+    internal Action<IrBranchInstruction, bool>? SourceLoopEntryObserver { get; set; }
     public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; set; }
     internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; set; }
     public Action<IrLockInstruction, bool>? LockPrefixObserver { get; set; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));
+}
+
+// Compiler-owned source semantics, not a user diagnostic label. Only a true
+// edge of an admitted, top-tested source loop guard denotes one body entry.
+internal static class IrSourceLoopEntry
+{
+    internal const string GuardMarker = "SharpProof:source-loop-guard:v1";
+
+    internal static bool IsGuard(IrFactory factory, OperationId operation)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return factory.GetOperationInfo(operation).Description is { } description && factory.GetString(description) == GuardMarker;
+    }
 }

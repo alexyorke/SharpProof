@@ -268,16 +268,18 @@ internal sealed class PassiveCallableVcPlan
             allocationPrefixObserver, writePrefixObserver, lockPrefixObserver)), cancellationToken);
     }
 
-    internal IrProgramExecutionResult ReplayArrayAllocations(ImmutableDictionary<IrVarId, IrValue> inputs,
-        Action<IrAllocationInstruction, int, bool> observer, CancellationToken cancellationToken)
+    internal IrProgramExecutionResult ReplayResources(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Action<IrAllocationInstruction, int, bool> observer, Action<IrBranchInstruction, bool> loopObserver, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(inputs);
         ArgumentNullException.ThrowIfNull(observer);
+        ArgumentNullException.ThrowIfNull(loopObserver);
         return ReplayWithOptions(inputs, initial =>
         {
             ArgumentNullException.ThrowIfNull(initial);
             var options = ReplayOptions(initial: initial);
             options.ArrayAllocationPrefixObserver = observer;
+            options.SourceLoopEntryObserver = loopObserver;
             return options;
         }, cancellationToken);
     }

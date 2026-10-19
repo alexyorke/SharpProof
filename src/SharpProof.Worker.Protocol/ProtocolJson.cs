@@ -752,8 +752,8 @@ public static partial class WorkerProtocolJson
         {
             WorkerClaimOutcome.Proven => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
             WorkerClaimOutcome.Refuted => evidence.InferredUpperBound is null && evidence.UnknownReason is null &&
-                evidence.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements &&
-                HasValidResourceViolation(evidence),
+                (evidence.Metric == WorkerResourceMetric.LoopBodyEntries ? value.EffectWitness?.Effects == WorkerEffectSet.None :
+                    value.EffectWitness?.Effects == WorkerEffectSet.Allocates) && HasValidResourceViolation(evidence),
             WorkerClaimOutcome.Unknown => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.InferredUpperBound is null && !string.IsNullOrWhiteSpace(evidence.UnknownReason) && evidence.UnknownReason!.Length <= 256 && !evidence.UnknownReason.Any(static character => char.IsControl(character)),
             _ => false
         };
@@ -778,6 +778,12 @@ public static partial class WorkerProtocolJson
 
     private static bool HasValidEffectWitness(WorkerEffectContractKind kind, WorkerEffectViolationWitness? witness)
     {
+        if (kind == WorkerEffectContractKind.ResourceUpperBound)
+        {
+            return witness is not null && witness.Kind == "resource-bound-exceeded" && !string.IsNullOrWhiteSpace(witness.Detail) &&
+                witness.Effects is WorkerEffectSet.None or WorkerEffectSet.Allocates && witness.Capabilities == WorkerEffectCapabilitySet.None &&
+                witness.ExactExceptionTypeHierarchy is { Length: 0 };
+        }
         if (witness == null || !WorkerProtocolMetadata.IsEffectWitnessValid(witness))
         {
             return false;
@@ -791,8 +797,6 @@ public static partial class WorkerProtocolJson
             WorkerEffectContractKind.EnforcePure => witness.Capabilities != WorkerEffectCapabilitySet.None ||
                 (witness.Effects & impureState) != 0,
             WorkerEffectContractKind.ZeroAllocations => (witness.Effects & WorkerEffectSet.Allocates) != 0,
-            WorkerEffectContractKind.ResourceUpperBound => witness.Kind == "resource-bound-exceeded" &&
-                witness.Effects == WorkerEffectSet.Allocates && witness.Capabilities == WorkerEffectCapabilitySet.None,
             WorkerEffectContractKind.AllowedCapabilities => witness.Capabilities != WorkerEffectCapabilitySet.None,
             WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions =>
                 (witness.Effects & WorkerEffectSet.Throws) != 0,

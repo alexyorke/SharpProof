@@ -736,4 +736,36 @@ public sealed class IrTotalExecutionTests
         if (count == 1)
         { Assert.That(observed.Single(), Is.EqualTo((length, approximate))); }
     }
+    [TestCase(true, true, false, 1)]
+    [TestCase(true, false, false, 0)]
+    [TestCase(false, true, false, 0)]
+    [TestCase(true, true, true, 1)]
+    public void SourceLoopEventsRequireAMarkedTrueEdge(bool marked, bool condition, bool approximation, int expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var guard = factory.CreateVariable("guard", factory.BooleanType);
+        if (approximation)
+        { builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, guard); }
+        else
+        { builder.Assign(entry, factory.CreateOperation(), guard, factory.Boolean(condition)); }
+        builder.Branch(entry, factory.CreateOperation(marked ? IrSourceLoopEntry.GuardMarker : "ordinary-if"), factory.Variable(guard), exit, exit);
+        builder.Return(exit, factory.CreateOperation());
+        var observed = new List<bool>();
+        var options = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(condition))
+        {
+            SourceLoopEntryObserver = (instruction, consumed) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                observed.Add(consumed);
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 16, options);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(observed, Has.Count.EqualTo(expected));
+        if (expected == 1)
+        { Assert.That(observed.Single(), Is.EqualTo(approximation)); }
+    }
 }
