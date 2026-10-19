@@ -128,7 +128,7 @@ public sealed class ContractApiIdentityResolverTests
             "SharpProof.Attributes.dll");
         File.WriteAllBytes(
             path,
-            EmitContractImage(validContractShape));
+            EmitContractImage(validContractShape).ToArray());
         var reference = MetadataReference.CreateFromFile(path);
         var compilation = CreateConsumer(reference);
         var resolver =
@@ -221,7 +221,7 @@ public sealed class ContractApiIdentityResolverTests
         return compilation;
     }
 
-    private static byte[] EmitContractImage(bool validContractShape)
+    private static ImmutableArray<byte> EmitContractImage(bool validContractShape)
     {
         var version =
             typeof(ContractApiIdentityResolver).Assembly
@@ -328,7 +328,7 @@ public sealed class ContractApiIdentityResolverTests
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 
     private static void AssertNoErrors(Compilation compilation)

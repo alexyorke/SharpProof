@@ -33,7 +33,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
             """);
         var original = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(original, CSharpSyntaxTree.ParseText(
-            original.GetText(), ((CSharpParseOptions)original.Options).WithPreprocessorSymbols(Array.Empty<string>()),
+            original.GetText(), ((CSharpParseOptions)original.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty),
             original.FilePath));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
             Is.Empty);

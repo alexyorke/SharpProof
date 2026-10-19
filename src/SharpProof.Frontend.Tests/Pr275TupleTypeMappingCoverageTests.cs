@@ -24,7 +24,7 @@ public sealed class Pr275TupleTypeMappingCoverageTests
         var tuple = (INamedTypeSymbol)method.Parameters.Single().Type;
         Assert.That(tuple.IsTupleType, Is.True);
         var underlying = compilation.GetTypeByMetadataName("System.ValueTuple`" + tuple.Arity)!
-            .Construct(tuple.TypeArguments.ToArray());
+            .Construct(tuple.TypeArguments, tuple.TypeArgumentNullableAnnotations);
         var mapper = new RoslynTypeMapper(new IrFactory());
 
         var tupleType = mapper.GetTypeId(tuple);

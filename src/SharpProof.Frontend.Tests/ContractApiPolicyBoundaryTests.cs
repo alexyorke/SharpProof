@@ -319,7 +319,7 @@ public sealed class ContractApiPolicyBoundaryTests
         var runtime = new AssemblyLoadContext("ContractPolicyOwner", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var owner = runtime.LoadFromStream(stream);
             var policy = ContractApiPayloadPolicy.FromRuntimeOwner(owner);
             Assert.That(policy.ExpectedAssemblyVersion, Is.EqualTo(owner.GetName().Version));
@@ -331,7 +331,7 @@ public sealed class ContractApiPolicyBoundaryTests
         }
     }
 
-    private static byte[] Emit(string source, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
+    private static ImmutableArray<byte> Emit(string source, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12),
@@ -345,7 +345,7 @@ public sealed class ContractApiPolicyBoundaryTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        return image.ToArray();
+        return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 
     private static CSharpCompilation ShapeConsumer(string source)

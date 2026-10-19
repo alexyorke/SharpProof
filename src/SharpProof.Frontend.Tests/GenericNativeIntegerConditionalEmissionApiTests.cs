@@ -102,7 +102,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var targetDefinition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
             .Single(candidate => reader.GetString(candidate.Name) == "Target");
         var targetIl = pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!;
-        Assert.That(TraceCalls(image.ToArray()), Has.Length.EqualTo(enabled ? 1 : 0));
+        Assert.That(TraceCalls(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)))), Has.Length.EqualTo(enabled ? 1 : 0));
         if (!enabled)
         { Assert.That(targetIl, Is.EqualTo(OmittedTargetIl)); }
         TestContext.WriteLine(JsonSerializer.Serialize(new
@@ -144,11 +144,11 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         }
     }
 
-    private static ImmutableArray<string> TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");

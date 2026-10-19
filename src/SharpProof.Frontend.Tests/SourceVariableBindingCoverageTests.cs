@@ -84,7 +84,7 @@ public sealed class SourceVariableBindingCoverageTests
             "long Target(bool select, long left, long right) => select ? left : right;");
         var lowerer = new RoslynOperationLowerer(new IrFactory());
         var roots = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToImmutableArray();
+            .Concat(block.BranchValue is { } branch ? ImmutableArray.Create<IOperation>(branch) : ImmutableArray<IOperation>.Empty))).ToImmutableArray();
         foreach (var operation in roots)
         {
             Assert.That(lowerer.Lower(operation).IsExact, Is.True);

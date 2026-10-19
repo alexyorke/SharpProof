@@ -102,7 +102,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         Assert.That(compilation.Options.OutputKind, Is.EqualTo(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames,
-            Is.EqualTo(enabled ? EnabledSymbols : Array.Empty<string>()));
+            Is.EqualTo(enabled ? EnabledSymbols : ImmutableArray<string>.Empty));
         Assert.That(method.IsConditional, Is.True);
         Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(method.OriginalDefinition, Is.SameAs(method));
@@ -185,7 +185,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         var runtime = new AssemblyLoadContext("FrameworkConditionalControl", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(bytes);
+            using var image = new MemoryStream(bytes.ToArray());
             var subject = runtime.LoadFromStream(image).GetType("Subject")!;
             Assert.That(subject.GetMethod("Target")!.Invoke(null, null), Is.EqualTo(enabled ? 8 : 7));
         }
@@ -208,20 +208,20 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         return compilation;
     }
 
-    private static byte[] Emit(CSharpCompilation compilation)
+    private static ImmutableArray<byte> Emit(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        return image.ToArray();
+        return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 
-    private static ImmutableArray<string> TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");

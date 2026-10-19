@@ -102,7 +102,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     [Test]
     public void RealEmittedMethodDefinitionTokenResolvesItsHandle()
     {
-        using var pe = new PEReader(new MemoryStream(EmitPlatform("Small", 1)));
+        using var pe = new PEReader(EmitPlatform("Small", 1));
         var reader = pe.GetMetadataReader();
         var actual = reader.MethodDefinitions.Single();
         Assert.That(ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(
@@ -112,7 +112,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     [Test]
     public void RealEmittedTypeDefinitionTokenIsNotAMethod()
     {
-        using var pe = new PEReader(new MemoryStream(EmitPlatform("Small", 1)));
+        using var pe = new PEReader(EmitPlatform("Small", 1));
         var reader = pe.GetMetadataReader();
         var actualType = reader.TypeDefinitions.Single(handle =>
             reader.GetString(reader.GetTypeDefinition(handle).Name) == "Subject");
@@ -128,8 +128,8 @@ public sealed class ConditionalMethodIdentityPolicyTests
     [Test]
     public void RealForeignMethodDefinitionTokenOutsideModuleIsRejected()
     {
-        using var bigPe = new PEReader(new MemoryStream(EmitPlatform("Big", 24)));
-        using var smallPe = new PEReader(new MemoryStream(EmitPlatform("Small", 1)));
+        using var bigPe = new PEReader(EmitPlatform("Big", 24));
+        using var smallPe = new PEReader(EmitPlatform("Small", 1));
         var big = bigPe.GetMetadataReader();
         var small = smallPe.GetMetadataReader();
         var actualForeignMethod = big.MethodDefinitions.Last();
@@ -144,7 +144,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
                 "Conditional method token is outside its module."));
     }
 
-    private static byte[] EmitPlatform(string name, int count)
+    private static ImmutableArray<byte> EmitPlatform(string name, int count)
     {
         System.ArgumentNullException.ThrowIfNull(name);
         var methods = string.Join(" ", Enumerable.Range(0, count)
@@ -207,12 +207,12 @@ public sealed class ConditionalMethodIdentityPolicyTests
         return (compilation, declaration, candidates);
     }
 
-    private static byte[] Emit(CSharpCompilation compilation)
+    private static ImmutableArray<byte> Emit(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        return image.ToArray();
+        return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 }

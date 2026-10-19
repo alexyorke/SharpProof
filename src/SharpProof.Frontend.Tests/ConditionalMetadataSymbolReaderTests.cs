@@ -28,7 +28,7 @@ public sealed class ConditionalMetadataSymbolReaderTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        using var metadata = ModuleMetadata.CreateFromImage(image.ToArray());
+        using var metadata = ModuleMetadata.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
         var reader = metadata.GetMetadataReader();
         Assert.That(reader.MetadataKind, Is.EqualTo(MetadataKind.Ecma335));
         var handle = reader.MethodDefinitions.Single(candidate =>

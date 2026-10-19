@@ -33,7 +33,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
             }
             """);
         var originalTree = compilation.SyntaxTrees.Single();
-        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty);
         compilation = compilation.ReplaceSyntaxTree(originalTree,
             CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);

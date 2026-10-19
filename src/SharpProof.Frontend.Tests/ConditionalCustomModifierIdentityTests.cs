@@ -34,7 +34,7 @@ public sealed class ConditionalCustomModifierIdentityTests
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var consumer = TestCompilation.Create("ModifierIdentityConsumer", "public class Consumer { }",
                 includeSharpProofReference: false)
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)))));
         TestCompilation.AssertNoErrors(consumer);
         var subject = consumer.GetTypeByMetadataName("ModifierSubject")!;
         Assert.That(subject, Is.Not.Null);

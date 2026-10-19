@@ -18,7 +18,7 @@ public sealed class CfgExpressionLoweringCoverageTests
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
         var operations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToImmutableArray();
+            .Concat(block.BranchValue is { } branch ? ImmutableArray.Create<IOperation>(branch) : ImmutableArray<IOperation>.Empty))).ToImmutableArray();
         Assert.That(operations.OfType<IFlowCaptureOperation>(), Is.Not.Empty);
         foreach (var operation in operations)
         {
