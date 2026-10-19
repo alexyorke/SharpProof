@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class ClosedClassIdentityTests
+internal sealed class ClosedClassIdentityTests
 {
     [TestCase("public class Box<T> { }", "Box<int>", "Box<string>", "", WorkerClaimOutcome.Proven)]
     [TestCase("public class A { } public class B { }", "A", "B", "", WorkerClaimOutcome.Proven)]
