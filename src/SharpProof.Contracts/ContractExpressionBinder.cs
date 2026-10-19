@@ -6,12 +6,12 @@ internal sealed class ContractExpressionBinder
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
     private readonly RoslynOperationLowerer _lowerer;
-    private ImmutableHashSet<IrVarId> _boundVariables = ImmutableHashSet<IrVarId>.Empty;
-    private ImmutableHashSet<IrVarId> _receiverVariables = ImmutableHashSet<IrVarId>.Empty;
-    private ImmutableDictionary<IrVarId, IrVarId> _preState = ImmutableDictionary<IrVarId, IrVarId>.Empty;
-    private ImmutableArray<KeyValuePair<IrVarId, IrVarId>> _preStateOrder = [];
-    private ImmutableHashSet<IrVarId> _preStateValues = ImmutableHashSet<IrVarId>.Empty;
-    private ImmutableList<IrVarId> _receiverOrder = ImmutableList<IrVarId>.Empty;
+    private readonly ImmutableHashSet<IrVarId>.Builder _boundVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableHashSet<IrVarId>.Builder _receiverVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableDictionary<IrVarId, IrVarId>.Builder _preState = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
+    private readonly ImmutableArray<KeyValuePair<IrVarId, IrVarId>>.Builder _preStateOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrVarId>>();
+    private readonly ImmutableHashSet<IrVarId>.Builder _preStateValues = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableArray<IrVarId>.Builder _receiverOrder = ImmutableArray.CreateBuilder<IrVarId>();
     private ImmutableArray<FrontendVariableBinding> _variableBindings;
     private IrVarId? _result;
 
@@ -34,10 +34,10 @@ internal sealed class ContractExpressionBinder
     }
 
     internal ImmutableArray<IrVarId> ReceiverVariables =>
-        [.. _receiverOrder];
+        _receiverOrder.ToImmutable();
 
-    internal ImmutableDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
-    internal ImmutableArray<KeyValuePair<IrVarId, IrVarId>> PreStateVariablePairs => _preStateOrder;
+    internal ImmutableDictionary<IrVarId, IrVarId> PreStateVariables => _preState.ToImmutable();
+    internal ImmutableArray<KeyValuePair<IrVarId, IrVarId>> PreStateVariablePairs => _preStateOrder.ToImmutable();
 
     internal IrVarId? ResultVariable => _result;
 
@@ -91,9 +91,9 @@ internal sealed class ContractExpressionBinder
                     variable.Value.ToString(
                         System.Globalization.CultureInfo.InvariantCulture),
                     info.Type);
-                _preState = _preState.Add(variable, preState);
-                _preStateOrder = _preStateOrder.Add(new(variable, preState));
-                _preStateValues = _preStateValues.Add(preState);
+                _preState.Add(variable, preState);
+                _preStateOrder.Add(new(variable, preState));
+                _preStateValues.Add(preState);
             }
             substitutions[variable] = _factory.Variable(preState);
         }
@@ -115,7 +115,7 @@ internal sealed class ContractExpressionBinder
         _variableBindings = result.Variables;
         foreach (var binding in result.Variables)
         {
-            _boundVariables = _boundVariables.Add(binding.Variable);
+            _boundVariables.Add(binding.Variable);
         }
 
         var variables = IrTraversal.CollectVariables(result.Term);
@@ -133,10 +133,9 @@ internal sealed class ContractExpressionBinder
                 return ExpressionBindingResult.Unsupported;
             }
 
-            if (!_receiverVariables.Contains(variable))
+            if (_receiverVariables.Add(variable))
             {
-                _receiverVariables = _receiverVariables.Add(variable);
-                _receiverOrder = _receiverOrder.Add(variable);
+                _receiverOrder.Add(variable);
             }
         }
         return ExpressionBindingResult.Success(result.Term, variables);

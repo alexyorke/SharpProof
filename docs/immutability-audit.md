@@ -3195,3 +3195,9 @@ expected-entry inputs are immutable vectors with a default guard. Preserve order
 wire text, eager materialization before disposal and mutable Prepare(string[]) subjects.
 Validate package integration/real MSBuild workflow and compare source literal tokens.
 Status: open before edits.
+
+IMM-M098 and IMM-M099 verified: all 640 Contracts tests pass, zero failures/skips/
+warnings/errors. Main and independent review checked recursive old() binding, first-seen
+ordering, stable published snapshots, constructor-only symbol maps, nullable comparers
+and partial generic callback timing. The new callback now has its explicit null guard,
+as required by the repository analyzer; construction builders do not escape.

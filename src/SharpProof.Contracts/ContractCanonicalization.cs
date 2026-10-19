@@ -19,10 +19,8 @@ internal sealed class ContractCanonicalization(
     private sealed class TypeSpecializer
     {
         private readonly Compilation _compilation;
-        private ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>
-            _substitutions = ImmutableDictionary.Create<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
-        private ImmutableDictionary<ITypeSymbol, ITypeSymbol> _signatureTypes =
-            ImmutableDictionary.Create<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.IncludeNullability);
+        private readonly ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol> _substitutions;
+        private readonly ImmutableDictionary<ITypeSymbol, ITypeSymbol> _signatureTypes;
 
         internal TypeSpecializer(
             Compilation compilation,
@@ -31,18 +29,20 @@ internal sealed class ContractCanonicalization(
             compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             source = RepositoryParameterGuard.NotNull(source, nameof(source));
             _compilation = compilation;
-            AddParameters(
+            var substitutions = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+            var signatureTypes = ImmutableDictionary.CreateBuilder<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.IncludeNullability);
+            AddParameters(substitutions,
                 source.OriginalDefinition.TypeParameters,
                 source.TypeArguments);
             for (var type = source.ContainingType;
                  type != null;
                  type = type.ContainingType)
             {
-                AddParameters(
+                AddParameters(substitutions,
                     type.OriginalDefinition.TypeParameters,
                     type.TypeArguments);
             }
-            AddMethodSignature(source.OriginalDefinition, source);
+            AddMethodSignature(signatureTypes, source.OriginalDefinition, source);
             var partialCounterpart =
                 source.OriginalDefinition.PartialImplementationPart ??
                 source.OriginalDefinition.PartialDefinitionPart;
@@ -50,10 +50,10 @@ internal sealed class ContractCanonicalization(
                 partialCounterpart.TypeParameters.Length == source.TypeArguments.Length &&
                 partialCounterpart.Parameters.Length == source.Parameters.Length)
             {
-                AddParameters(
+                AddParameters(substitutions,
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
-                AddMethodSignature(partialCounterpart, source,
+                AddMethodSignature(signatureTypes, partialCounterpart, source,
                     includeReturn: ContractForSymbolMatcher.TypesMatch(
                         source.OriginalDefinition.ReturnType,
                         partialCounterpart.ReturnType,
@@ -61,32 +61,39 @@ internal sealed class ContractCanonicalization(
                         partialCounterpart,
                         normalizeMappedTypeParameters: true,
                         compareRuntimeShape: true,
-                        mapTypeParameter: MapTypeParameter));
+                        mapTypeParameter: type => type is null ? throw new ArgumentNullException(nameof(type)) : MapTypeParameter(type, substitutions)));
             }
+            _substitutions = substitutions.ToImmutable();
+            _signatureTypes = signatureTypes.ToImmutable();
         }
 
-        private ITypeSymbol MapTypeParameter(ITypeSymbol type)
+        private static ITypeSymbol MapTypeParameter(
+            ITypeSymbol type,
+            ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>.Builder substitutions)
         {
+            substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
             type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type is ITypeParameterSymbol parameter &&
-                _substitutions.TryGetValue(parameter, out var replacement)
+                substitutions.TryGetValue(parameter, out var replacement)
                 ? replacement : type;
         }
 
-        private void AddMethodSignature(
+        private static void AddMethodSignature(
+            ImmutableDictionary<ITypeSymbol, ITypeSymbol>.Builder signatureTypes,
             IMethodSymbol definition,
             IMethodSymbol constructed,
             bool includeReturn = true)
         {
+            signatureTypes = RepositoryParameterGuard.NotNull(signatureTypes, nameof(signatureTypes));
             constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
             definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
             if (includeReturn)
             {
-                AddSignatureType(definition.ReturnType, constructed.ReturnType);
+                AddSignatureType(signatureTypes, definition.ReturnType, constructed.ReturnType);
             }
             for (var index = 0; index < constructed.Parameters.Length; index++)
             {
-                AddSignatureType(
+                AddSignatureType(signatureTypes,
                     definition.Parameters[index].Type,
                     constructed.Parameters[index].Type);
             }
@@ -224,55 +231,59 @@ internal sealed class ContractCanonicalization(
                 ? specializedType : null;
         }
 
-        private void AddParameters(
+        private static void AddParameters(
+            ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>.Builder substitutions,
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
 
 
+            substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
             RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
             RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
             for (var index = 0; index < parameters.Length; index++)
             {
-                _substitutions = _substitutions.SetItem(parameters[index], arguments[index]);
+                substitutions[parameters[index]] = arguments[index];
             }
         }
 
-        private void AddSignatureType(
+        private static void AddSignatureType(
+            ImmutableDictionary<ITypeSymbol, ITypeSymbol>.Builder signatureTypes,
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
+            signatureTypes = RepositoryParameterGuard.NotNull(signatureTypes, nameof(signatureTypes));
             constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
-            if (_signatureTypes.ContainsKey(original))
+            if (signatureTypes.ContainsKey(original))
             {
                 return;
             }
-            _signatureTypes = _signatureTypes.Add(original, constructed);
+            signatureTypes.Add(original, constructed);
 
             switch (original, constructed)
             {
                 case (IArrayTypeSymbol originalArray,
                       IArrayTypeSymbol constructedArray):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalArray.ElementType,
                         constructedArray.ElementType);
                     break;
                 case (IPointerTypeSymbol originalPointer,
                       IPointerTypeSymbol constructedPointer):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalPointer.PointedAtType,
                         constructedPointer.PointedAtType);
                     break;
                 case (IFunctionPointerTypeSymbol originalFunction,
                       IFunctionPointerTypeSymbol constructedFunction):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalFunction.Signature.ReturnType,
                         constructedFunction.Signature.ReturnType);
                     for (var index = 0;
                          index < originalFunction.Signature.Parameters.Length;
                          index++)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalFunction.Signature.Parameters[index].Type,
                             constructedFunction.Signature.Parameters[index].Type);
                     }
@@ -282,7 +293,7 @@ internal sealed class ContractCanonicalization(
                     if (originalNamed.ContainingType is { } originalContaining &&
                         constructedNamed.ContainingType is { } constructedContaining)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalContaining,
                             constructedContaining);
                     }
@@ -290,7 +301,7 @@ internal sealed class ContractCanonicalization(
                          index < originalNamed.TypeArguments.Length;
                          index++)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalNamed.TypeArguments[index],
                             constructedNamed.TypeArguments[index]);
                     }
