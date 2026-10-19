@@ -46,7 +46,7 @@ internal static class NullableAsyncChecks
             ("AsyncNonGenericTask", "static async Task M(Task<int> task) { await task; }", "Suggestion", "global::System.Threading.Tasks.Task M<T1>(global::System.Threading.Tasks.Task<T1> task)"),
             ("AsyncNonGenericValueTask", "static async ValueTask M(ValueTask<int> task) { await task; return; }", "Suggestion", "global::System.Threading.Tasks.ValueTask M<T1>(global::System.Threading.Tasks.ValueTask<T1> task)"),
             ("AsyncVoidAwait", "static async Task<int> M(Task task,int x) { await task; return x; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task task, T1 x)"),
-            ("AsyncConfiguredTask", "static async Task<int> M(Task<int> task,bool ignored)=>await task.ConfigureAwait(false);", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::System.Threading.Tasks.Task<int> task, T1 ignored)"),
+            ("AsyncConfiguredTask", "static async Task<int> M(Task<int> task,bool ignored)=>await task.ConfigureAwait(false);", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1, T2>(global::System.Threading.Tasks.Task<T1> task, T2 ignored)"),
             ("AsyncNullableValue", "static async Task<int?> M(Task<int?> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<T1?> task) where T1 : struct"),
             ("AsyncNullableReference", "static async Task<string?> M(Task<string?> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<T1?> task) where T1 : class"),
             ("AsyncBoxingReturn", "static async Task<object> M(int x,bool ignored) { await Task.Yield(); return x; }", "Suggestion", "global::System.Threading.Tasks.Task<object> M<T1>(int x, T1 ignored)"),
@@ -65,7 +65,7 @@ internal static class NullableAsyncChecks
             ("AsyncTypedLocalRejected", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Rejected", null),
             ("AsyncGenericRoot", "static async Task<T> M<T>(Task<T> task)=>await task;", "Concrete", null),
             ("AsyncVoidRoot", "static async void M(int x) { await Task.Yield(); }", "Suggestion", "void M<T1>(T1 x)"),
-            ("AsyncForeachExcluded", "static async Task<int> M(System.Collections.Generic.IAsyncEnumerable<int> xs,int seed) { await foreach(var x in xs) seed=x; return seed; }", "Skipped", null),
+            ("AsyncForeach", "static async Task<int> M(System.Collections.Generic.IAsyncEnumerable<int> xs,int seed) { await foreach(var x in xs) seed=x; return seed; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<T1> xs, T1 seed)"),
             ("NullableReferenceAssignment", "static string? M(string? x,string y) { x=y; return x; }", "Suggestion", "T1? M<T1>(T1? x, T1 y) where T1 : class"),
             ("NullableToNonnullableAssignment", "static string M(string x,string? y) { x=y; return x; }", "Suggestion", "T1 M<T1>(T1 x, T1? y) where T1 : class"),
             ("NullableBothAssignment", "static string? M(string? x,string? y) { x=y; return x; }", "Suggestion", "T1? M<T1>(T1? x, T1? y) where T1 : class"),
@@ -73,7 +73,7 @@ internal static class NullableAsyncChecks
             ("NullableNullCallerRejected", "static int? M(int? x)=>x; static int? Use()=>M(null);", "Rejected", null),
             ("NullableReferenceCaller", "static string? M(string? x)=>x; static string? Use(string? x)=>M(x);", "Suggestion", "T1? M<T1>(T1? x) where T1 : class"),
             ("AsyncExistingCaller", "static async Task<int> M(Task<int> task)=>await task; static Task<int> Use()=>M(Task.FromResult(1));", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task<T1> task)"),
-            ("AsyncIteratorExcluded", "static async System.Collections.Generic.IAsyncEnumerable<int> M(int x) { await Task.Yield(); yield return x; }", "Skipped", null)
+            ("AsyncIterator", "static async System.Collections.Generic.IAsyncEnumerable<int> M(int x) { await Task.Yield(); yield return x; }", "Suggestion", "global::System.Collections.Generic.IAsyncEnumerable<T1> M<T1>(T1 x)")
         ];
         var failures = new List<string>();
         foreach (var test in tests)

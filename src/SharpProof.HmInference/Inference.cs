@@ -51,7 +51,9 @@ public static partial class Inference
                 throw new InferenceException("Extern and partial root methods are unsupported.");
             }
 
-            SetAsyncReturn(symbol);
+            SetIteratorReturn(method, symbol);
+            if (iteratorReturn is null)
+            { SetAsyncReturn(symbol); }
             var parameters = symbol.Parameters.Select(p =>
             {
                 if (p is null)
@@ -89,14 +91,15 @@ public static partial class Inference
             }
             else if (method.Body is not null)
             {
-                result = symbol.ReturnsVoid || asyncReturn is { Arity: 0 } ? VoidBody(method.Body) : Block(method.Body);
+                result = iteratorReturn is not null ? IteratorBody(method.Body)
+                    : symbol.ReturnsVoid || asyncReturn is { Arity: 0 } ? VoidBody(method.Body) : Block(method.Body);
             }
             else
             {
                 throw new InferenceException("No method body.");
             }
 
-            result = WrapAsyncResult(result);
+            result = iteratorReturn is not null ? WrapIteratorResult() : WrapAsyncResult(result);
             HmType.Unify(recursiveReturn, result);
             var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
             {
@@ -253,6 +256,8 @@ public static partial class Inference
                     return new(symbol.Name, "Rejected", "Generalization changes the selected await pattern.");
                 }
             }
+            if (!PreservesForEachBindings(method, changedMethod, changedModel))
+            { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol."); }
             // Validate statically resolved calls in every supplied file. Merely
             // compiling callers does not preserve conversions or overload selection
             // when this method becomes generic or its result narrows.
@@ -535,38 +540,16 @@ public static partial class Inference
                             return LoopFlow(body);
                         });
                         break;
-                    case ForEachStatementSyntax loop when loop.AwaitKeyword == default:
-                        flow = Scoped(() =>
-                        {
-                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array foreach is supported.");
-                            var element = HmType.Variable();
-                            HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
-                            var iteration = element;
-                            if (!loop.Type.IsVar)
-                            {
-                                // Preserve explicit foreach conversions, e.g. int[] to long.
-                                HmType.Unify(element, CSharpTypes.Rigid(source.ElementType));
-                                iteration = CSharpTypes.Rigid(model.GetTypeInfo(loop.Type, cancellationToken).Type!);
-                            }
-
-                            environment.Add(model.GetDeclaredSymbol(loop, cancellationToken)!, iteration);
-                            return LoopFlow(Branch(loop.Statement));
-                        });
+                    case CommonForEachStatementSyntax loop:
+                        flow = ForEachFlow(loop);
                         break;
-                    case ForEachVariableStatementSyntax loop when loop.AwaitKeyword == default:
-                        flow = Scoped(() =>
-                        {
-                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array foreach deconstruction is supported.");
-                            if (source.ElementType is not INamedTypeSymbol { IsTupleType: true })
-                            {
-                                throw new InferenceException("Only tuple array elements can be deconstructed.");
-                            }
-
-                            var element = HmType.Variable();
-                            HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
-                            BindDeconstruction(loop.Variable, element, source.ElementType);
-                            return LoopFlow(Branch(loop.Statement));
-                        });
+                    case YieldStatementSyntax yielded:
+                        if (iteratorElement is null)
+                        { throw new InferenceException("Yield outside the current iterator."); }
+                        if (yielded.Expression is null)
+                        { flow = new(null, false); }
+                        else
+                        { HmType.Unify(iteratorElement, Returned(yielded.Expression, iteratorDeclaredElement)); }
                         break;
                     case BreakStatementSyntax:
                         flow = new(null, false, Breaks: true);
@@ -1118,7 +1101,16 @@ public static partial class Inference
                 case DeclarationExpressionSyntax declaration:
                     if (!declaration.Type.IsVar)
                     {
-                        HmType.Unify(value, CSharpTypes.Rigid(model.GetTypeInfo(declaration.Type, cancellationToken).Type!));
+                        var declaredType = model.GetTypeInfo(declaration.Type, cancellationToken).Type!;
+                        if (!SymbolEqualityComparer.IncludeNullability.Equals(original, declaredType))
+                        {
+                            // Explicit deconstruction conversions keep separate source and local types.
+                            HmType.Unify(value, CSharpTypes.Rigid(original));
+                            value = CSharpTypes.Rigid(declaredType);
+                            original = declaredType;
+                        }
+                        else
+                        { HmType.Unify(value, CSharpTypes.Rigid(declaredType)); }
                     }
 
                     BindDesignation(declaration.Designation, value, original);
@@ -1338,27 +1330,23 @@ public static partial class Inference
                 return currentFunction.Arguments[currentFunction.Arguments.Length - 1];
             }
 
+            ExpressionSyntax? instanceReceiver = null;
             if (!called.IsStatic && called.MethodKind != MethodKind.LocalFunction)
             {
                 if (invocation.Expression is MemberAccessExpressionSyntax member)
-                {
-                    Anchor(member.Expression);
-                }
+                { instanceReceiver = member.Expression; }
                 else if (operation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance })
-                {
-                    throw new InferenceException("Implicit instance calls are unsupported.");
-                }
+                { throw new InferenceException("Implicit instance calls are unsupported."); }
             }
-
-            // Imported generic schemes are instantiated per call. Constraints are
-            // checked by Roslyn after rewriting; no C# constraint language is invented.
-            var definition = called.IsGenericMethod ? called.ConstructedFrom : called;
-            var variables = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            foreach (var parameter in definition.TypeParameters)
+            var variables = ReceiverMapping(called, instanceReceiver);
+            var definition = called.OriginalDefinition;
+            var explicitArguments = invocation.Expression is GenericNameSyntax generic ? generic.TypeArgumentList.Arguments
+                : invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax name } ? name.TypeArgumentList.Arguments : default;
+            for (var i = 0; i < definition.TypeParameters.Length; i++)
             {
-                variables.Add(parameter, HmType.Variable());
+                variables.Add(definition.TypeParameters[i], explicitArguments.Count == 0 ? HmType.Variable()
+                    : CSharpTypes.Rigid(model.GetTypeInfo(explicitArguments[i], cancellationToken).Type!));
             }
-
             BindArguments(operation, definition.Parameters.Select(p =>
             {
                 if (p is null)

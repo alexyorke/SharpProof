@@ -144,8 +144,14 @@ Each lambda has its own async return context. Explicit parameter/return types st
 concrete; variance and reduced extension method groups retain their target types.
 Supplied method groups are rechecked for selected overloads after rewriting.
 
-The adapter skips async iterators/enumeration,
-custom async return builders, custom operators, expanded non-array params
+Sync and async iterator roots infer element types from yield return, retain
+non-generic yield conversions, and support yield break and finalizer flow.
+Foreach supports arrays, generic interfaces and custom instance patterns, including
+nested/inherited enumerators. Await foreach supports configured and cancelable
+sources. Protocol members and conversions are rechecked after rewriting.
+Generic instance calls preserve receiver substitutions and explicit type arguments.
+
+The adapter skips custom async return builders, custom operators, expanded non-array params
 collections, unsupported patterns and other unimplemented syntax. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
 of generic constraints. Imported unconstrained nullable `T?`
@@ -161,7 +167,8 @@ its operand is not executed, because the lookup still has to compile.
 Loop analysis accumulates constraints over monomorphic bindings; it does not
 generalize at iteration boundaries or prove termination. Loops conservatively
 fall through, so methods whose only return is inside an infinite loop are skipped.
-Goto and foreach over custom enumerables remain unsupported. Ref delegates,
+Goto, ref foreach, generalized extension enumeration and type-parameter enumerator
+patterns remain unsupported. Ref delegates,
 attributed/modified lambdas and expression trees remain unsupported.
 Switch statements support constant labels and guards,
 not declaration/type patterns. Try/catch/finally supports exception locals, filters,

@@ -1,0 +1,27 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+public static class EnumerationSamples
+{
+    public static IEnumerable<int> Sequence(int value) { yield return value; yield return value; }
+    public static IEnumerator<int> Enumerator(int value) { yield return value; }
+    public static int Last(IEnumerable<int> source,int seed)
+    {
+        foreach(var value in source) seed=value;
+        return seed;
+    }
+    public static async IAsyncEnumerable<int> AsyncSequence(int value)
+    {
+        await Task.Yield();
+        yield return value;
+    }
+    public static async Task<int> LastAsync(IAsyncEnumerable<int> source,int seed,CancellationToken token)
+    {
+        await foreach(var value in source.WithCancellation(token).ConfigureAwait(false)) seed=value;
+        return seed;
+    }
+    public static void Append(List<int> sink,int value) => sink.Add(value);
+    public static async Task<int> Configured(Task<int> task) => await task.ConfigureAwait(false);
+}
