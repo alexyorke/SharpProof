@@ -2922,3 +2922,12 @@ Status: open before edits.
 IMM-M082 verified: all 150 ordinary Specs tests pass, zero failures/skips and zero
 warnings/errors. Main traced the sole instantiation constructor and immutable bySlot
 callers; public input capture, guards and reference comparer behavior are preserved.
+
+IMM-M085: BuildTasks production review covers all 39 inventory rows: three existing
+immutable constructions and 36 remaining framework/native contract rows. Main checked
+MSBuild target parameter bindings, Required/Output task properties, native ITaskItem[]
+shapes, Prepare(string[]) in-place publication rewriting and bounded pipe-draining
+buffers. Preserve these explicit mutable APIs and stream/text resource owners. No
+BuildTasks source change is needed; all current production syntax rows are classified.
+Agent's additional source scan found cancellation/process ownership state and params
+adapters only. This classification does not close unreviewed scopes elsewhere.
