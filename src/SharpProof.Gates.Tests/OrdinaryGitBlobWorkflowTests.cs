@@ -20,17 +20,17 @@ public sealed class OrdinaryGitBlobWorkflowTests
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
         using var repository = new TempDirectory("SharpProof-ordinary-git-blob-");
-        await GitAsync(repository.FullName, "init", "--quiet");
-        await GitAsync(repository.FullName, "config", "user.name", "SharpProof Test");
-        await GitAsync(repository.FullName, "config", "user.email", "test@example.invalid");
+        await GitAsync(repository.FullName, ["init", "--quiet"]);
+        await GitAsync(repository.FullName, ["config", "user.name", "SharpProof Test"]);
+        await GitAsync(repository.FullName, ["config", "user.email", "test@example.invalid"]);
         var pipeMaximum = int.Parse(await File.ReadAllTextAsync("/proc/sys/fs/pipe-max-size"), CultureInfo.InvariantCulture);
         var source = "public static class OrdinaryBlob { public static int Value() => 37; }\n/*" +
             new string('a', checked(pipeMaximum + 4096)) + "*/\n";
         var expected = Encoding.UTF8.GetBytes(source);
         await File.WriteAllBytesAsync(Path.Combine(repository.FullName, "ordinary.cs"), expected);
-        await GitAsync(repository.FullName, "add", "ordinary.cs");
-        await GitAsync(repository.FullName, "commit", "--quiet", "-m", "ordinary source blob");
-        var commit = await GitAsync(repository.FullName, "rev-parse", "HEAD");
+        await GitAsync(repository.FullName, ["add", "ordinary.cs"]);
+        await GitAsync(repository.FullName, ["commit", "--quiet", "-m", "ordinary source blob"]);
+        var commit = await GitAsync(repository.FullName, ["rev-parse", "HEAD"]);
         Assert.That(GitProcessesIn(repository.FullName), Is.Empty);
 
         if (scenario == "cancelled")
@@ -54,20 +54,21 @@ public sealed class OrdinaryGitBlobWorkflowTests
         }
 
         Assert.That(GitProcessesIn(repository.FullName), Is.Empty);
-        Assert.That(await GitAsync(repository.FullName, "status", "--porcelain"), Is.Empty);
+        Assert.That(await GitAsync(repository.FullName, ["status", "--porcelain"]), Is.Empty);
     }
 
-    private static Task<string> GitAsync(string path, params string[] arguments)
+    private static Task<string> GitAsync(string path, ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(path);
         return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static int[] GitProcessesIn(string directory)
+    private static ImmutableArray<int> GitProcessesIn(string directory)
     {
         System.ArgumentNullException.ThrowIfNull(directory);
-        var ids = new List<int>();
+        var ids = ImmutableArray.CreateBuilder<int>();
         foreach (var process in Process.GetProcessesByName("git"))
         {
             using (process)
@@ -87,6 +88,6 @@ public sealed class OrdinaryGitBlobWorkflowTests
                 }
             }
         }
-        return [.. ids];
+        return ids.ToImmutable();
     }
 }

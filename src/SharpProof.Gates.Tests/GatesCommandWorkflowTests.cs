@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
@@ -40,7 +41,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [Test]
     public async Task UnknownCommandReturnsTheDocumentedUsageStatus()
     {
-        var result = await RunAsync("ordinary-unknown-command");
+        var result = await RunAsync(["ordinary-unknown-command"]);
         Assert.That(result.ExitCode, Is.EqualTo(2));
         Assert.That(result.Output, Is.Empty);
         Assert.That(result.Error, Does.StartWith("Usage: SharpProof.Gates [corpus|corpus-update|"));
@@ -49,7 +50,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [Test]
     public async Task UnsupportedOracleArgumentsReturnAnActionableError()
     {
-        var result = await RunAsync("exception-oracle", "--unknown", "1");
+        var result = await RunAsync(["exception-oracle", "--unknown", "1"]);
         Assert.That(result.ExitCode, Is.EqualTo(1));
         Assert.That(result.Output, Is.Empty);
         Assert.That(result.Error, Does.Contain("Use exception-oracle, allocation-oracle, purity-oracle, capability-oracle or"));
@@ -58,7 +59,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [Test]
     public async Task NonNumericOracleLimitReturnsAConversionError()
     {
-        var result = await RunAsync("exception-oracle", "--limit", "ordinary-text");
+        var result = await RunAsync(["exception-oracle", "--limit", "ordinary-text"]);
         Assert.That(result.ExitCode, Is.EqualTo(1));
         Assert.That(result.Output, Is.Empty);
         Assert.That(result.Error, Does.StartWith("System.FormatException:"));
@@ -74,7 +75,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     {
         System.ArgumentNullException.ThrowIfNull(command);
         System.ArgumentNullException.ThrowIfNull(contract);
-        var result = await RunAsync(command, "--limit", "1");
+        var result = await RunAsync([command, "--limit", "1"]);
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         Assert.That(result.Error, Is.Empty);
         using var document = JsonDocument.Parse(result.Output);
@@ -94,7 +95,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [Test]
     public async Task DefaultCorpusCommandVerifiesTheReviewedCorpus()
     {
-        var result = await RunAsync();
+        var result = await RunAsync([]);
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         Assert.That(result.Error, Does.StartWith("Corpus gate wall time: "));
         using var document = JsonDocument.Parse(result.Output);
@@ -111,7 +112,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         var snapshot = Path.Combine(repository!.FullName, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
         var before = await File.ReadAllBytesAsync(snapshot);
 
-        var result = await RunAsync("corpus-update");
+        var result = await RunAsync(["corpus-update"]);
 
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         Assert.That(result.Error, Is.Empty);
@@ -119,9 +120,10 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         Assert.That(await File.ReadAllBytesAsync(snapshot), Is.EqualTo(before));
     }
 
-    private Task<GateProcessResult> RunAsync(params string[] arguments)
+    private Task<GateProcessResult> RunAsync(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         var start = GateProcess.CreateCaptured("dotnet", repository!.FullName);
         start.ArgumentList.Add("exec");
         start.ArgumentList.Add("--runtimeconfig");

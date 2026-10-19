@@ -229,10 +229,9 @@ internal static class CorpusFileTransaction
 
     private static async Task WriteDurablyAsync(
         string path,
-        byte[] content,
+        ReadOnlyMemory<byte> /* SPINT001: all values valid - empty content creates an empty durable file */ content,
         CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(content, nameof(content));
         System.ArgumentNullException.ThrowIfNull(path);
         using var stream = OpenDurableFile(path, asynchronous: true);
         await stream.WriteAsync(content, cancellationToken)

@@ -41,7 +41,7 @@ internal static class CorpusSnapshotFormat
         return ParseDocument(bytes).DataLines;
     }
 
-    private static ParsedSnapshot ParseDocument(byte[] bytes)
+    private static ParsedSnapshot ParseDocument(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length == 0 || (bytes.Length >= 3 && bytes[0] == 0xEF &&
                 bytes[1] == 0xBB && bytes[2] == 0xBF))
