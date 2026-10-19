@@ -1045,7 +1045,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(firstDiagnostics, Is.Empty);
             Assert.That(secondDiagnostics, Is.Empty);
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
+            Assert.That(first.Take(3).ToImmutableArray(), Is.Not.EqualTo(ImmutableArray.Create<byte>(0xEF, 0xBB, 0xBF)));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
             Assert.That(

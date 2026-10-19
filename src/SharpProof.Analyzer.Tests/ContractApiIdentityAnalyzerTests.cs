@@ -403,7 +403,7 @@ public sealed class ContractApiIdentityAnalyzerTests
                          FileAccess.Write,
                          FileShare.None))
         {
-            await stream.WriteAsync(new byte[] { 0x5a });
+            await stream.WriteAsync(ImmutableArray.Create<byte>(0x5a).AsMemory());
         }
 
         var wrongPayload = MetadataReference.CreateFromFile(copied);

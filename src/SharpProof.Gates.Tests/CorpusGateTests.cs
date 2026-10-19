@@ -528,13 +528,11 @@ public sealed class CorpusGateTests
         File.WriteAllText(destination, "published");
         File.WriteAllText(backup, "original");
         File.WriteAllText(staged, "staged");
-        var second = new Dictionary<string, object?>
-        {
-            ["DestinationPath"] = Path.Combine(root, "second.txt"),
-            ["StagedPath"] = Path.Combine(root, "second.new"),
-            ["BackupPath"] = Path.Combine(root, "second.old"),
-            ["DestinationExisted"] = false
-        };
+        var second = ImmutableDictionary.CreateBuilder<string, object?>(StringComparer.Ordinal);
+        second["DestinationPath"] = Path.Combine(root, "second.txt");
+        second["StagedPath"] = Path.Combine(root, "second.new");
+        second["BackupPath"] = Path.Combine(root, "second.old");
+        second["DestinationExisted"] = false;
         switch (corruption)
         {
             case "destination":
@@ -574,7 +572,7 @@ public sealed class CorpusGateTests
                 StagedPath = staged,
                 BackupPath = backup,
                 DestinationExisted = true
-            }, corruption == "null-entry" ? null : second
+            }, corruption == "null-entry" ? null : second.ToImmutable()
 )
         });
         File.WriteAllText(marker, json);

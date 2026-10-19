@@ -16,7 +16,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     private readonly IrInterpreter _terms =
         new(factory);
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
@@ -25,7 +25,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
         CancellationToken cancellationToken)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
@@ -35,7 +35,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     internal IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         CancellationToken cancellationToken)
@@ -45,7 +45,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions)
     {
         replayOptions = RepositoryParameterGuard.NotNull(replayOptions, nameof(replayOptions));
@@ -57,7 +57,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions,
         CancellationToken cancellationToken)
     {
@@ -67,7 +67,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     internal IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         IrProgramReplayOptions? replayOptions, CancellationToken cancellationToken)

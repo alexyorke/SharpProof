@@ -78,7 +78,7 @@ public static class IrSubstitution
         IrFactory factory,
         IrTerm root,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        ISet<IrVarId>? freeVariables,
+        ImmutableHashSet<IrVarId>? freeVariables,
         out IrTerm result)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -93,7 +93,7 @@ public static class IrSubstitution
             root,
             replacementMap,
             memo,
-            freeVariables?.ToImmutableHashSet(),
+            freeVariables?.WithComparer(EqualityComparer<IrVarId>.Default),
             out var variablesValid, out _);
         return variablesValid;
     }

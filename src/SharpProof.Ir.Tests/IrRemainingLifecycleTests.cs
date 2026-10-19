@@ -167,9 +167,9 @@ public sealed class IrRemainingLifecycleTests
         }
         var inputs = inputBuilder.ToImmutable();
         var interpreter = new IrInterpreter(factory);
-        var valid = interpreter.Evaluate(factory.PureOpaque(field, factory.Variable(first)), inputs, null, heap, default, [first]);
+        var valid = interpreter.Evaluate(factory.PureOpaque(field, factory.Variable(first)), inputs, null, heap, default, ImmutableHashSet.Create(first));
         Assert.That(valid.Value!.Integer, Is.EqualTo(3));
-        var exhausted = interpreter.Evaluate(factory.PureOpaque(field, leaves[0]), inputs, null, heap, default, [first]);
+        var exhausted = interpreter.Evaluate(factory.PureOpaque(field, leaves[0]), inputs, null, heap, default, ImmutableHashSet.Create(first));
         Assert.That(exhausted.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(exhausted.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
         Assert.That(heap.ConsumedApproximation, Is.False);

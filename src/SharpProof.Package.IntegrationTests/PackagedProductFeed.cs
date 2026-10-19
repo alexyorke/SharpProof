@@ -143,16 +143,7 @@ internal sealed class PackagedProductFeed : IDisposable
             // before packing those same assemblies without another compilation.
             _ = ReadPackageProjects(repositoryRoot);
             var build = await RunProcessAsync(
-                repositoryRoot,
-                "dotnet",
-                "build",
-                "SharpProof.slnx",
-                "-c",
-                "Release",
-                "--nologo",
-                "/nodeReuse:false",
-                "-p:GeneratePackageOnBuild=false",
-                "-p:RunAnalyzersDuringBuild=false");
+                repositoryRoot, "dotnet", ["build", "SharpProof.slnx", "-c", "Release", "--nologo", "/nodeReuse:false", "-p:GeneratePackageOnBuild=false", "-p:RunAnalyzersDuringBuild=false"]);
             if (build.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -161,16 +152,7 @@ internal sealed class PackagedProductFeed : IDisposable
             }
 
             var symbols = await RunProcessAsync(
-                repositoryRoot,
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-File",
-                Path.Combine(repositoryRoot, "eng", "scripts", "Export-SharpProofEmbeddedSymbols.ps1"),
-                "-RepositoryRoot",
-                repositoryRoot,
-                "-Configuration",
-                "Release");
+                repositoryRoot, "pwsh", ["-NoLogo", "-NoProfile", "-File", Path.Combine(repositoryRoot, "eng", "scripts", "Export-SharpProofEmbeddedSymbols.ps1"), "-RepositoryRoot", repositoryRoot, "-Configuration", "Release"]);
             if (symbols.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -179,20 +161,7 @@ internal sealed class PackagedProductFeed : IDisposable
             }
 
             var result = await RunProcessAsync(
-                repositoryRoot,
-                "dotnet",
-                "pack",
-                "SharpProof.slnx",
-                "-c",
-                "Release",
-                "--nologo",
-                "/nodeReuse:false",
-                "-p:GeneratePackageOnBuild=false",
-                "-p:RunAnalyzersDuringBuild=false",
-                "--no-build",
-                "--no-restore",
-                "--output",
-                sourceDirectory);
+                repositoryRoot, "dotnet", ["pack", "SharpProof.slnx", "-c", "Release", "--nologo", "/nodeReuse:false", "-p:GeneratePackageOnBuild=false", "-p:RunAnalyzersDuringBuild=false", "--no-build", "--no-restore", "--output", sourceDirectory]);
             if (result.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -341,9 +310,10 @@ internal sealed class PackagedProductFeed : IDisposable
     private static async Task<PackageProcessResult> RunProcessAsync(
         string workingDirectory,
         string executable,
-        params string[] arguments)
+        ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(executable);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = ProcessRunner.CreateStartInfo(

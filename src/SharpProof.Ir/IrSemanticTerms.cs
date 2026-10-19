@@ -22,20 +22,22 @@ public static class IrSemanticTerms
 
     public static IrTerm Conjoin(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms)
+        ImmutableArray<IrTerm> terms)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(terms, nameof(terms));
-        return Combine(factory, terms.ToImmutableArray(), IrBinaryOperator.AndAlso, identity: true);
+        if (terms.IsDefault)
+        { throw new ArgumentNullException(nameof(terms)); }
+        return Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
     }
 
     public static IrTerm Disjoin(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms)
+        ImmutableArray<IrTerm> terms)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(terms, nameof(terms));
-        return Combine(factory, terms.ToImmutableArray(), IrBinaryOperator.OrElse, identity: false);
+        if (terms.IsDefault)
+        { throw new ArgumentNullException(nameof(terms)); }
+        return Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
     }
 
     private static IrTerm Combine(

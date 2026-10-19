@@ -40,13 +40,13 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
             }
             """, ["SP0027"]);
         var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
+        Assert.That(errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(missingBody ? MissingBodyErrorIds : ImmutableArray<string>.Empty));
         using (var image = new MemoryStream())
         {
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.EqualTo(!missingBody));
             Assert.That(emitted.Diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)),
-                Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
+                Is.EqualTo(missingBody ? MissingBodyErrorIds : ImmutableArray<string>.Empty));
         }
 
         var tree = compilation.SyntaxTrees.Single();

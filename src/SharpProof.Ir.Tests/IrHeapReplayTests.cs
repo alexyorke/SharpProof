@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -86,13 +87,13 @@ public sealed class IrHeapReplayTests
                 : factory.PureOpaque(other ? second : first, factory.Variable(receiver));
         }
         var interpreter = new IrInterpreter(factory);
-        var restored = interpreter.Evaluate(Read(owner, false), variables, null, heap, default, [old]);
+        var restored = interpreter.Evaluate(Read(owner, false), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(restored.Value!.Integer, Is.EqualTo(7));
         Assert.That(heap.ConsumedApproximation, Is.False);
-        var snapshot = interpreter.Evaluate(Read(old, false), variables, null, heap, default, [old]);
+        var snapshot = interpreter.Evaluate(Read(old, false), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(snapshot.Value!.Integer, Is.EqualTo(3));
         Assert.That(heap.ConsumedApproximation, Is.False);
-        var unknown = interpreter.Evaluate(Read(owner, true), variables, null, heap, default, [old]);
+        var unknown = interpreter.Evaluate(Read(owner, true), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(unknown.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(heap.ConsumedApproximation, Is.True);
         heap.Invalidate();

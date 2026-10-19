@@ -21,7 +21,7 @@ public sealed class IrSnapshotReadTests
         var heap = new IrHeap();
         heap.Fields.Add((identity, field), factory.CreateIntegerValue(7));
         var owner = factory.Conditional(factory.Variable(flag), factory.Variable(old), factory.Variable(current));
-        var result = new IrInterpreter(factory).Evaluate(factory.PureOpaque(field, owner), variables, null, heap, default, [old]);
+        var result = new IrInterpreter(factory).Evaluate(factory.PureOpaque(field, owner), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(expected));
     }
@@ -37,7 +37,7 @@ public sealed class IrSnapshotReadTests
         var heap = new IrHeap();
         heap.StoreElement(value, 0, factory.CreateIntegerValue(7));
         var result = new IrInterpreter(factory).Evaluate(factory.SequenceAccess(factory.Variable(array), factory.Variable(index)),
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, value).SetItem(index, factory.CreateIntegerValue(0)), null, heap, default, [index]);
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, value).SetItem(index, factory.CreateIntegerValue(0)), null, heap, default, ImmutableHashSet.Create(index));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(7));
     }
@@ -59,7 +59,7 @@ public sealed class IrSnapshotReadTests
         var owner = factory.Conditional(factory.Variable(flag), factory.Variable(first), factory.Variable(second));
         var result = new IrInterpreter(factory).Evaluate(factory.SequenceAccess(owner, factory.Integer(0)),
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(first, value).SetItem(second, value).SetItem(flag, factory.CreateBooleanValue(choose)),
-            null, heap, default, oldBranch ? [first, flag] : [flag]);
+            null, heap, default, oldBranch ? ImmutableHashSet.Create(first, flag) : ImmutableHashSet.Create(flag));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(expected));
     }

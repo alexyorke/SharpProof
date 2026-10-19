@@ -142,7 +142,7 @@ public sealed class Pr275CorpusRatchetParserTests
             }
             writer.WriteEndObject();
         }
-        using var document = JsonDocument.Parse(Encoding.UTF8.GetString(stream.ToArray()));
+        using var document = JsonDocument.Parse(Encoding.UTF8.GetString(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement)));
         Assert.That(error!.Message, Is.EqualTo($"Duplicate corpus Unknown reason: {duplicate}."));

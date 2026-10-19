@@ -192,7 +192,7 @@ public sealed class IrInterpreter(IrFactory factory)
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken,
-        IReadOnlyCollection<IrVarId>? snapshots = null)
+        ImmutableHashSet<IrVarId>? snapshots = null)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
@@ -925,7 +925,7 @@ public sealed class IrInterpreter(IrFactory factory)
     private sealed class EvaluationState(
         ImmutableDictionary<IrVarId, IrValue> variables,
         Action<IrVarId>? onVariableRead,
-        IReadOnlyCollection<IrVarId>? snapshots,
+        ImmutableHashSet<IrVarId>? snapshots,
         IrHeap? heap,
         CancellationToken cancellationToken)
     {
@@ -935,7 +935,7 @@ public sealed class IrInterpreter(IrFactory factory)
         internal ImmutableDictionary<IrId, IrEvaluationResult>.Builder Results { get; } = ImmutableDictionary.CreateBuilder<IrId, IrEvaluationResult>();
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; } = heap;
-        internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots is ImmutableHashSet<IrVarId> immutable ? immutable : snapshots?.ToImmutableHashSet();
+        internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots;
         internal ImmutableDictionary<IrId, IrTerm> SnapshotSelectors { get; set; } = ImmutableDictionary<IrId, IrTerm>.Empty;
         internal int SnapshotWork = 4096;
     }

@@ -47,15 +47,15 @@ public sealed class DictionaryOldHeapBindingTests
         Assert.That(execution.Heap, Is.Not.Null);
         var interpreter = new IrInterpreter(factory);
         var safe = interpreter.Evaluate(clause.SafeCondition, execution.Values, onVariableRead: null,
-            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: [parameter.PreState]);
+            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: ImmutableHashSet.Create(parameter.PreState));
         var value = interpreter.Evaluate(clause.Value, execution.Values, onVariableRead: null,
-            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: [parameter.PreState]);
+            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: ImmutableHashSet.Create(parameter.PreState));
         Assert.That(safe.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(safe.Value!.Boolean, Is.True);
         Assert.That(value.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(value.Value!.Boolean, Is.True);
         var withoutSnapshot = interpreter.Evaluate(clause.Value, execution.Values, onVariableRead: null,
-            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: []);
+            heap: execution.Heap, cancellationToken: TestContext.CurrentContext.CancellationToken, snapshots: ImmutableHashSet<IrVarId>.Empty);
         Assert.That(withoutSnapshot.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(withoutSnapshot.Value!.Boolean, Is.False, "Old must not silently read the current heap.");
 

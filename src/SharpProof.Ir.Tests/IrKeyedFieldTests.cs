@@ -27,12 +27,12 @@ public sealed class IrKeyedFieldTests
         heap.StoreKeyedField(value, field, key, factory.CreateIntegerValue(31));
         Assert.That(interpreter.Evaluate(read, variables, null, heap, default).Value!.Integer, Is.EqualTo(31));
         var snapshot = factory.PureOpaque(field, factory.Variable(old), factory.Integer(keyType, bits));
-        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, [old]).Value!.Integer, Is.EqualTo(23));
+        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, ImmutableHashSet.Create(old)).Value!.Integer, Is.EqualTo(23));
         Assert.That(state.TryRead(field, factory.CreateIntegerValue(0), out _), Is.False, "Key type participates in identity.");
         Assert.That(state.TryRead(field, factory.CreateIntegerValue(keyType, bits == 0 ? 1 : 0), out _), Is.False);
         heap.Invalidate();
         Assert.That(interpreter.Evaluate(read, variables, null, heap, default).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
-        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, [old]).Value!.Integer, Is.EqualTo(23));
+        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, ImmutableHashSet.Create(old)).Value!.Integer, Is.EqualTo(23));
     }
 
     [Test]

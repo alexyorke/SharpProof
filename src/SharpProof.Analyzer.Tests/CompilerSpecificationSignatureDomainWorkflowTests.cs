@@ -23,14 +23,14 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
         ArgumentNullException.ThrowIfNull(scenario);
         var (declaration, arguments, expected) = scenario switch
         {
-            "BooleanConstant" => ("bool Probe() => true", Array.Empty<object>(), (object)true),
-            "BooleanIdentity" => ("bool Probe(bool value) => value", new object[] { true }, (object)true),
-            "Int32Sum" => ("int Probe(int left, int right) => left + right", new object[] { 17, 3 }, (object)20),
-            "Int64Sum" => ("long Probe(long left, long right) => left + right", new object[] { 4294967297L, 3L }, (object)4294967300L),
-            "WidenInt32" => ("long Probe(int value) => value", new object[] { 17 }, (object)17L),
-            "MixedComparison" => ("bool Probe(int left, long right) => left < right", new object[] { 17, 4294967297L }, (object)true),
-            "StringResult" => ("string Probe(string value) => value", new object[] { "text" }, (object)"text"),
-            "StringArgument" => ("bool Probe(string value) => value.Length > 0", new object[] { "text" }, (object)true),
+            "BooleanConstant" => ("bool Probe() => true", ImmutableArray<object>.Empty, (object)true),
+            "BooleanIdentity" => ("bool Probe(bool value) => value", ImmutableArray.Create<object>(true), (object)true),
+            "Int32Sum" => ("int Probe(int left, int right) => left + right", ImmutableArray.Create<object>(17, 3), (object)20),
+            "Int64Sum" => ("long Probe(long left, long right) => left + right", ImmutableArray.Create<object>(4294967297L, 3L), (object)4294967300L),
+            "WidenInt32" => ("long Probe(int value) => value", ImmutableArray.Create<object>(17), (object)17L),
+            "MixedComparison" => ("bool Probe(int left, long right) => left < right", ImmutableArray.Create<object>(17, 4294967297L), (object)true),
+            "StringResult" => ("string Probe(string value) => value", ImmutableArray.Create<object>("text"), (object)"text"),
+            "StringArgument" => ("bool Probe(string value) => value.Length > 0", ImmutableArray.Create<object>("text"), (object)true),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         var compilation = AnalyzerTestHost.CreateCompilation(
@@ -45,7 +45,7 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
         var runtimeMethod = System.Reflection.Assembly.Load((image).ToArray())
             .GetType("SignatureProbe", throwOnError: true)!.GetMethod("Probe")!;
         object? result = null;
-        Assert.DoesNotThrow((Action)(() => { result = runtimeMethod.Invoke(null, arguments); }));
+        Assert.DoesNotThrow((Action)(() => { result = runtimeMethod.Invoke(null, arguments.ToArray()); }));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result, Is.EqualTo(expected));

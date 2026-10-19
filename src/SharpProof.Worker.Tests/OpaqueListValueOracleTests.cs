@@ -41,7 +41,7 @@ public sealed class OpaqueListValueOracleTests
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         for (var ordinal = 0; ordinal < total.Parameters.Length; ordinal++)
         {
             var parameter = total.Parameters[ordinal].Entry;
@@ -49,9 +49,10 @@ public sealed class OpaqueListValueOracleTests
             var value = ordinal == 0 ? first : second;
             // Each opaque value is an abstract atom. Struct payloads are never
             // interpreted as fields or numbers by this differential execution.
-            inputs[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
+            inputBuilder[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
                 : factory.CreateReferenceValue(parameterType, new IrObjectState());
         }
+        var inputs = inputBuilder.ToImmutable();
         var choices = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);

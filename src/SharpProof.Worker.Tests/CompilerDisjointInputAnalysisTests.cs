@@ -30,7 +30,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("OwnedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream(image.ToArray());
             var root = runtime.LoadFromStream(stream).GetType("Subject")!.GetMethod("Root")!;
             Assert.That(root.GetParameters(), Has.Length.EqualTo(count));
             Assert.That(root.Invoke(null, new object?[count]), Is.EqualTo(count));
@@ -60,7 +60,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("RelatedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream(image.ToArray());
             var assembly = runtime.LoadFromStream(stream);
             var first = Activator.CreateInstance(assembly.GetType("A")!);
             var second = Activator.CreateInstance(assembly.GetType("A")!);
@@ -87,7 +87,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         Assert.That(CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
     }
 
-    private static (CSharpCompilation Compilation, IMethodSymbol Method, byte[] Image) Compile(string source)
+    private static (CSharpCompilation Compilation, IMethodSymbol Method, ImmutableArray<byte> Image) Compile(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("OwnedDisjointInputAnalysis", ("disjoint-analysis.cs", source));
@@ -98,6 +98,6 @@ public sealed class CompilerDisjointInputAnalysisTests
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
-        return (compilation, method, image.ToArray());
+        return (compilation, method, ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
     }
 }

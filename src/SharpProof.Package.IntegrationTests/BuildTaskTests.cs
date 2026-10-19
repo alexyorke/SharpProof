@@ -44,20 +44,17 @@ public sealed class BuildTaskTests
             declared = Path.Combine(alias, "worker.dll");
             File.CreateSymbolicLink(declared, worker);
         }
-        var arguments = new List<string> { workerIdentity == "launch" ? worker : "verify",
-            "--request", Path.Combine(directory.FullName, "request.json"),
-            "--result", Path.Combine(directory.FullName, "result.json"),
-            "--publish-request", Path.Combine(directory.FullName, "published-request.json"),
-            "--publish-result", companion,
-            "--publish-compiler-manifest", Path.Combine(directory.FullName, "manifest.json") };
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange((ImmutableArray<string>)[workerIdentity == "launch" ? worker : "verify", "--request", Path.Combine(directory.FullName, "request.json"), "--result", Path.Combine(directory.FullName, "result.json"), "--publish-request", Path.Combine(directory.FullName, "published-request.json"), "--publish-result", companion, "--publish-compiler-manifest", Path.Combine(directory.FullName, "manifest.json")]);
         if (workerIdentity != "launch")
         {
-            arguments.AddRange(["--worker", declared]);
+            arguments.AddRange((ImmutableArray<string>)["--worker", declared]);
         }
-        var invocation = arguments.ToArray();
+        var expectedArguments = arguments.ToImmutable();
+        var invocation = expectedArguments.ToArray();
         Action prepare = () => { VerificationPublication.Prepare(invocation, directory.FullName); };
         Assert.That(prepare, Throws.ArgumentException);
-        Assert.That(invocation, Is.EqualTo(arguments));
+        Assert.That(invocation, Is.EqualTo(expectedArguments));
         Assert.That(File.ReadAllText(worker), Is.EqualTo("preserved worker"));
         Assert.That(File.ReadAllText(companion), Is.EqualTo("preserved companion"));
     }
@@ -190,18 +187,16 @@ public sealed class BuildTaskTests
     public void PublicationEvidenceMessageUsesResolvedStablePathsAndOptionalSarif(bool includeSarif)
     {
         using var directory = new TempDirectory("sharpproof-publication-message-");
-        var arguments = new List<string>
-        {
-            "verify", "--request", "private-request.json", "--result", "private-result.json",
-            "--publish-request", "request.json", "--publish-result", "result.json",
-            "--publish-compiler-manifest", "manifest.json"
-        };
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange((ImmutableArray<string>)[            "verify","--request","private-request.json","--result","private-result.json",            "--publish-request","request.json","--publish-result","result.json",            "--publish-compiler-manifest","manifest.json"
+        ]);
         if (includeSarif)
         {
             arguments.Add("--publish-sarif");
             arguments.Add("report.sarif");
         }
-        var invocation = arguments.ToArray();
+        var expectedArguments = arguments.ToImmutable();
+        var invocation = expectedArguments.ToArray();
         var publication = VerificationPublication.Prepare(invocation, directory.FullName)!;
         var expected = "SharpProof evidence: request=" + Path.Combine(directory.FullName, "request.json") +
             "; result=" + Path.Combine(directory.FullName, "result.json") +
@@ -212,9 +207,10 @@ public sealed class BuildTaskTests
     }
 
     private static VerificationPublication PreparePublication(string root, string name, char inputIdentity,
-        string[] stablePaths, out string[] arguments)
+        ImmutableArray<string> stablePaths, out string[] arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(stablePaths, nameof(stablePaths));
+        if (stablePaths.IsDefault)
+        { throw new ArgumentNullException(nameof(stablePaths)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(root);
         var invocation = Path.Combine(root, name);
@@ -277,7 +273,7 @@ public sealed class BuildTaskTests
         using var directory = new TempDirectory("sharpproof-publication-binding-");
         var stableDirectory = Path.Combine(directory.FullName, "stable");
         Directory.CreateDirectory(stableDirectory);
-        string[] stable = [Path.Combine(stableDirectory, "request.json"), Path.Combine(stableDirectory, "result.json"),
+        ImmutableArray<string> stable = [Path.Combine(stableDirectory, "request.json"), Path.Combine(stableDirectory, "result.json"),
             Path.Combine(stableDirectory, "manifest.json"), Path.Combine(stableDirectory, "result.sarif")];
         var plan = PreparePublication(directory.FullName, "private", 'a', stable, out var arguments);
         foreach (var path in stable)
@@ -469,14 +465,14 @@ public sealed class BuildTaskTests
         var invocationResultPath = Path.Combine(
             directory.FullName,
             "invocation-result.json");
-        var manifestBytes = "{}"u8.ToArray();
-        File.WriteAllBytes(manifestPath, manifestBytes);
+        var manifestBytes = ImmutableArray.Create<byte>("{}"u8);
+        File.WriteAllBytes(manifestPath, manifestBytes.AsSpan());
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference
             {
                 Path = manifestPath,
-                Sha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())
+                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
             }
         };
         var responseManifest = new WorkerClaimManifest();
@@ -564,14 +560,14 @@ public sealed class BuildTaskTests
         var invocationResultPath = Path.Combine(
             directory.FullName,
             "invocation-result.json");
-        var manifestBytes = "{}"u8.ToArray();
-        File.WriteAllBytes(manifest, manifestBytes);
+        var manifestBytes = ImmutableArray.Create<byte>("{}"u8);
+        File.WriteAllBytes(manifest, manifestBytes.AsSpan());
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference
             {
                 Path = manifest,
-                Sha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())
+                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
             }
         };
         var responseManifest = new WorkerClaimManifest();
@@ -706,7 +702,7 @@ public sealed class BuildTaskTests
         Directory.CreateDirectory(runtime);
         var helper = CreateTimedProcessAssembly(runtime, fixture.Source);
         var marker = Path.Combine(directory.FullName, "ready.pid");
-        string[] stable = [Path.Combine(directory.FullName, "request.json"),
+        ImmutableArray<string> stable = [Path.Combine(directory.FullName, "request.json"),
             Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
         foreach (var path in stable)
         { await File.WriteAllTextAsync(path, "preserved publication"); }
@@ -1061,7 +1057,7 @@ public sealed class BuildTaskTests
     {
         using var directory = new TempDirectory("sharpproof-invalidation-");
         Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
-        string[] names = ["result.json", "result.sarif", "request.json", "manifest.json",
+        ImmutableArray<string> names = ["result.json", "result.sarif", "request.json", "manifest.json",
             "invocation-request.json", "invocation-result.json", "invocation-manifest.json",
             "compiler.dll", "runtime/worker.dll", "runtime/protocol.dll"];
         foreach (var name in names)
@@ -1163,7 +1159,7 @@ public sealed class BuildTaskTests
     public void ResetRemovesOnlyTheConfiguredPublicationSet()
     {
         using var directory = new TempDirectory("sharpproof-reset-publication-");
-        string[] names = ["request.json", "result.json", "manifest.json", "result.sarif", "unrelated.txt"];
+        ImmutableArray<string> names = ["request.json", "result.json", "manifest.json", "result.sarif", "unrelated.txt"];
         foreach (var name in names)
         {
             File.WriteAllText(Path.Combine(directory.FullName, name), name);
@@ -1214,7 +1210,7 @@ public sealed class BuildTaskTests
         var request = Path.Combine(directory.FullName, "a-request.json");
         var result = Path.Combine(directory.FullName, "b-result.json");
         var manifest = Path.Combine(directory.FullName, "z-manifest.json");
-        foreach (var path in new[] { request, result, manifest })
+        foreach (var path in ImmutableArray.Create<string>(request, result, manifest))
         {
             await File.WriteAllTextAsync(path, "preserved publication");
         }
@@ -1243,7 +1239,7 @@ public sealed class BuildTaskTests
 
             Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.False);
             Assert.That(engine.Errors, Is.Empty);
-            foreach (var path in new[] { request, result, manifest })
+            foreach (var path in ImmutableArray.Create<string>(request, result, manifest))
             {
                 Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("preserved publication"));
             }
@@ -1318,7 +1314,7 @@ public sealed class BuildTaskTests
         Directory.CreateDirectory(runtime);
         var helper = CreateTimedProcessAssembly(runtime,
             "System.IO.File.WriteAllText(\"completed.txt\", \"completed\"); return 0;");
-        string[] stable = [Path.Combine(directory.FullName, "request.json"),
+        ImmutableArray<string> stable = [Path.Combine(directory.FullName, "request.json"),
             Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
         foreach (var path in stable)
         {
@@ -1351,7 +1347,7 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task LauncherCancellationWhilePublishingPreservesThePreviousPublication()
     {
         using var directory = new TempDirectory("sharpproof-launcher-publication-cancel-");
-        string[] stable = [Path.Combine(directory.FullName, "a-request.json"),
+        ImmutableArray<string> stable = [Path.Combine(directory.FullName, "a-request.json"),
             Path.Combine(directory.FullName, "b-result.json"), Path.Combine(directory.FullName, "z-manifest.json"),
             Path.Combine(directory.FullName, "c-result.sarif")];
         PreparePublication(directory.FullName, "private", 'a', stable, out var fixtureArguments);
@@ -1467,7 +1463,7 @@ public sealed class BuildTaskTests
             File.WriteAllText("completed.txt", "completed");
             return 0;
             """);
-        string[] stable = [Path.Combine(directory.FullName, "request.json"),
+        ImmutableArray<string> stable = [Path.Combine(directory.FullName, "request.json"),
             Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
         foreach (var path in stable)
         {
@@ -1715,7 +1711,7 @@ public sealed class BuildTaskTests
         var coreLibrary = Path.Combine(root, "shared", "Microsoft.NETCore.App", "10.0.12", "System.Private.CoreLib.dll");
         var entryAssembly = Path.Combine(root, "sdk", "10.0.402", "MSBuild.dll");
         Directory.CreateDirectory(Path.Combine(root, "host", "fxr"));
-        foreach (var file in new[] { muxer, appHost, coreLibrary, entryAssembly })
+        foreach (var file in ImmutableArray.Create<string>(muxer, appHost, coreLibrary, entryAssembly))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, "filesystem identity fixture; never executed");

@@ -79,9 +79,9 @@ public sealed class CompilerScalarIlDecoderTests
             using var imageStream = new MemoryStream();
             var emitted = dependency.Emit(imageStream);
             Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-            var image = imageStream.ToArray();
+            var image = ImmutableArray.Create<byte>(imageStream.GetBuffer().AsSpan(0, checked((int)imageStream.Length)));
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, image.AsSpan());
             var reference = MetadataReference.CreateFromFile(path);
             var compilation = CSharpCompilation.Create("ScalarIlCaller_" + Guid.NewGuid().ToString("N"),
                 [CSharpSyntaxTree.ParseText(
@@ -94,7 +94,7 @@ public sealed class CompilerScalarIlDecoderTests
             var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
             var method = (IMethodSymbol)assembly.GetTypeByMetadataName("ScalarBody")!.GetMembers("Read").Single();
             Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, assembly), Is.True);
-            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
             var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
