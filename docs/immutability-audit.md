@@ -3312,4 +3312,12 @@ after cancellation/preflight/model capture and construction limits, retaining _c
 and finally Leave, callback bodies, caller budget/continued block order and top-level
 SetEntry behavior. No frame-dependent code runs before that point. Validate composed
 source exception/filter, session reentry, construction-budget and cancellation paths.
-Status: open before edits.
+Status: open before edits.IMM-M107 verified: five baseline/current canonical classifier probes pass ordered and
+duplicate requests, invalid syntax, primary-constructor executable boundaries and exact
+JSON publication. Independent six-site review is clean; whitespace requires no changes.
+Raw/interpolated literal checkpoint verifies 3,219 text tokens in 736 changed C# files.
+
+IMM-M102-M105 live Release gate is not yet complete. Worker compiler/core/claim/other
+shards pass 48/240/88/4,322 tests; heavy shard passes 928 and fails one golden
+vc-shadow-core assertion after MethodTimeout (expected proof). Isolated reproduction
+is pending; this is not a clean full-gate result and the cause is not established.
