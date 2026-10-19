@@ -3166,3 +3166,14 @@ only frozen fields after construction. Preserve substitution indexer overwrite s
 signature first-seen behavior, recursive type shape and nullable annotations. Validate
 constructed/partial generic contracts, flow capture and all Contracts tests.
 Status: open before edits.
+
+IMM-M100: Main traced nineteen Worker test construction/worklist scopes across nine
+files: synchronous advisory/replay observations, serial verifier callback maps, allocation
+oracle observations outside measured intervals, compiler argv, flag-combination snapshot
+maps, identity membership and DFS traversal. Use scoped immutable builders and freeze
+after producers complete, before assertions/JSON publication. Keep enum-map indexer
+semantics and pre-mutation snapshots, callback/order/duplicate observations, LIFO child
+order, native reflected argv and all actual mutable SUT buffers. Verifier callbacks are
+awaited serially and replay observers run inline; no new synchronization is required.
+Validate affected classes, preserving raw source literals and measurement boundaries.
+Status: open before edits.
