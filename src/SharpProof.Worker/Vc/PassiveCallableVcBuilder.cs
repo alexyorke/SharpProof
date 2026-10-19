@@ -40,41 +40,42 @@ internal sealed class PassiveCallableVcBuilder
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
     private readonly ImmutableHashSet<IrInstructionId> _stops;
-    private readonly List<Assumption> _facts = [];
-    private readonly Dictionary<IrBlockId, BigInteger> _blockAncestors = [];
+    private readonly ImmutableArray<Assumption>.Builder _facts = ImmutableArray.CreateBuilder<Assumption>();
+    private readonly ImmutableDictionary<IrBlockId, BigInteger>.Builder _blockAncestors = ImmutableDictionary.CreateBuilder<IrBlockId, BigInteger>();
     private IrBlockId _activeBlock;
-    private readonly Dictionary<IrId, IrTerm> _entryFieldReferences = [];
-    private readonly List<(IrTerm Reach, IrTerm Value, OperationId Site)> _freshReferences = [];
-    private readonly Dictionary<ProofJustification, string> _labels = [];
-    private readonly Dictionary<ProofJustification, OperationId> _assumes = [];
-    private readonly List<IrVarId> _model = [];
-    private readonly Dictionary<IrBlockId, List<Edge>> _incoming = [];
-    private readonly List<Exit> _returns = [];
-    private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
-    private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
-    private readonly List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes = [];
-    private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
-    private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
+    private readonly ImmutableDictionary<IrId, IrTerm>.Builder _entryFieldReferences = ImmutableDictionary.CreateBuilder<IrId, IrTerm>();
+    private readonly ImmutableArray<IrId>.Builder _entryFieldReferenceOrder = ImmutableArray.CreateBuilder<IrId>();
+    private readonly ImmutableArray<(IrTerm Reach, IrTerm Value, OperationId Site)>.Builder _freshReferences = ImmutableArray.CreateBuilder<(IrTerm Reach, IrTerm Value, OperationId Site)>();
+    private readonly ImmutableDictionary<ProofJustification, string>.Builder _labels = ImmutableDictionary.CreateBuilder<ProofJustification, string>();
+    private readonly ImmutableDictionary<ProofJustification, OperationId>.Builder _assumes = ImmutableDictionary.CreateBuilder<ProofJustification, OperationId>();
+    private readonly ImmutableArray<IrVarId>.Builder _model = ImmutableArray.CreateBuilder<IrVarId>();
+    private readonly ImmutableDictionary<IrBlockId, ImmutableArray<Edge>.Builder>.Builder _incoming = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableArray<Edge>.Builder>();
+    private readonly ImmutableArray<Exit>.Builder _returns = ImmutableArray.CreateBuilder<Exit>();
+    private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)>.Builder _exceptions = ImmutableArray.CreateBuilder<(IrTerm Reach, IrTerm Kind)>();
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _allocations = ImmutableArray.CreateBuilder<(IrTerm Reach, OperationId Site)>();
+    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)>.Builder _writes = ImmutableArray.CreateBuilder<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)>();
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _locks = ImmutableArray.CreateBuilder<(IrTerm Reach, OperationId Site)>();
+    private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>.Builder _callPreconditions = ImmutableArray.CreateBuilder<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>();
     private readonly ImmutableDictionary<IrInstructionId, int> _callMarkers;
     private readonly ImmutableDictionary<IrInstructionId, int> _checkpointMarkers;
     private readonly ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>> _pendingThrows;
-    private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints = [];
+    private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>.Builder _checkpoints = ImmutableArray.CreateBuilder<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>();
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> Checkpoints =>
-        [.. _checkpoints];
-    private readonly List<IrTerm> _potentialExceptionAllocations = [];
+        _checkpoints.ToImmutable();
+    private readonly ImmutableArray<IrTerm>.Builder _potentialExceptionAllocations = ImmutableArray.CreateBuilder<IrTerm>();
     // Opaque calls: each may allocate, write and synchronize.
-    private readonly List<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls = [];
+    private readonly ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)>.Builder _opaqueCalls = ImmutableArray.CreateBuilder<(IrTerm Reach, IrOpaqueCallEffects Effects)>();
     // Approximated field and element reads.
-    private readonly List<IrTerm> _reads = [];
-    internal ImmutableArray<IrTerm> Reads => [.. _reads];
+    private readonly ImmutableArray<IrTerm>.Builder _reads = ImmutableArray.CreateBuilder<IrTerm>();
+    internal ImmutableArray<IrTerm> Reads => _reads.ToImmutable();
     private readonly ImmutableHashSet<IrInstructionId> _sequenceReaders;
     // Static field reads, which observable purity excludes.
-    private readonly List<IrTerm> _ambientReads = [];
-    internal ImmutableArray<IrTerm> AmbientReads => [.. _ambientReads];
+    private readonly ImmutableArray<IrTerm>.Builder _ambientReads = ImmutableArray.CreateBuilder<IrTerm>();
+    internal ImmutableArray<IrTerm> AmbientReads => _ambientReads.ToImmutable();
     private const string StaticReadPrefix = "StaticFieldReference@";
-    private readonly List<(IrTerm Predicate, OperationId Site)> _exceptionFacts = [];
-    private readonly Dictionary<IrVarId, IrVarId> _oldInputs = [];
-    private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
+    private readonly ImmutableArray<(IrTerm Predicate, OperationId Site)>.Builder _exceptionFacts = ImmutableArray.CreateBuilder<(IrTerm Predicate, OperationId Site)>();
+    private readonly ImmutableDictionary<IrVarId, IrVarId>.Builder _oldInputs = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
+    private readonly ImmutableDictionary<IrVarId, IrVarId>.Builder _inputBindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
     private int _fresh;
     private bool _hasStringConcat;
     private Heap _heap = new([]);
@@ -98,24 +99,24 @@ internal sealed class PassiveCallableVcBuilder
     }
     internal ImmutableArray<IrTerm> Goals { get; private set; }
     internal IrTerm NormalCompletion { get; private set; } = null!;
-    internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => [.. _exceptions];
+    internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => _exceptions.ToImmutable();
     // Each explicit throw site carries its own exception code, so a claim can
     // admit the sites whose static type it allows.
     internal const int ExplicitSiteCode = 1024;
-    private readonly List<OperationId> _explicitSites = [];
-    internal ImmutableArray<OperationId> ExplicitSites => [.. _explicitSites];
-    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
-    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> Writes => [.. _writes];
-    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
+    private readonly ImmutableArray<OperationId>.Builder _explicitSites = ImmutableArray.CreateBuilder<OperationId>();
+    internal ImmutableArray<OperationId> ExplicitSites => _explicitSites.ToImmutable();
+    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => _allocations.ToImmutable();
+    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> Writes => _writes.ToImmutable();
+    internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => _locks.ToImmutable();
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
-        [.. _callPreconditions];
-    internal ImmutableArray<IrTerm> PotentialExceptionAllocations => [.. _potentialExceptionAllocations];
-    internal ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> OpaqueCalls => [.. _opaqueCalls];
+        _callPreconditions.ToImmutable();
+    internal ImmutableArray<IrTerm> PotentialExceptionAllocations => _potentialExceptionAllocations.ToImmutable();
+    internal ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> OpaqueCalls => _opaqueCalls.ToImmutable();
     internal bool HasUnmodeledAllocations => _hasUnmodeledStringAllocations;
-    internal ImmutableArray<Assumption> Facts => [.. _facts];
+    internal ImmutableArray<Assumption> Facts => _facts.ToImmutable();
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
-    internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutableDictionary();
-    internal ImmutableDictionary<ProofJustification, OperationId> Assumes => _assumes.ToImmutableDictionary();
+    internal ImmutableDictionary<ProofJustification, string> Labels => _labels.ToImmutable();
+    internal ImmutableDictionary<ProofJustification, OperationId> Assumes => _assumes.ToImmutable();
 
     private PassiveCallableVcBuilder(PassiveCallableCandidate candidate, CancellationToken cancellationToken,
         PassiveLoopCutter.Encoding? encoding = null)
@@ -223,7 +224,7 @@ internal sealed class PassiveCallableVcBuilder
             _blockAncestors[blockId] = ancestors;
             // The acyclic-order check already validated each reachable terminator.
             var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(blockId).Terminator).GetValueOrDefault();
-            foreach (var successor in new[] { successors.First, successors.Second })
+            foreach (var successor in ImmutableArray.Create(successors.First, successors.Second))
             {
                 if (successor is { } target)
                 { _blockAncestors[target] = _blockAncestors.GetValueOrDefault(target) | ancestors; }
@@ -238,9 +239,9 @@ internal sealed class PassiveCallableVcBuilder
             { return null; }
             initial[parameter.Entry] = _factory.Variable(parameter.Entry);
             initial[parameter.Current] = _factory.Variable(parameter.Entry);
-            _oldInputs.Add(parameter.Old, parameter.Entry);
-            _inputBindings.Add(parameter.Entry, parameter.Entry);
-            _inputBindings.Add(parameter.Current, parameter.Entry);
+            _oldInputs.AddUnique(parameter.Old, parameter.Entry);
+            _inputBindings.AddUnique(parameter.Entry, parameter.Entry);
+            _inputBindings.AddUnique(parameter.Current, parameter.Entry);
             _model.Add(parameter.Entry);
             _model.Add(parameter.Current);
             // Replay initializes original current storage from this model
@@ -248,7 +249,9 @@ internal sealed class PassiveCallableVcBuilder
             Fact(Equal(_factory.Variable(parameter.Current), _factory.Variable(parameter.Entry)), entry, "input");
         }
 
-        _incoming.Add(program.Entry, [new(_factory.Boolean(true), initial.ToImmutable(), null)]);
+        var entryEdges = ImmutableArray.CreateBuilder<Edge>();
+        entryEdges.Add(new(_factory.Boolean(true), initial.ToImmutable(), null));
+        _incoming.AddUnique(program.Entry, entryEdges);
         foreach (var blockId in order)
         {
             Spend();
@@ -258,7 +261,15 @@ internal sealed class PassiveCallableVcBuilder
             var predecessors = _incoming[blockId];
             IrTerm reach = Fresh(_factory.BooleanType);
             Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.Reach)))), site, "reach");
-            var state = new Dictionary<IrVarId, IrTerm>();
+            var state = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+            var stateOrder = ImmutableArray.CreateBuilder<IrVarId>();
+            void SetState(IrVarId variable /* SPINT001: all values valid - preserve dictionary key storage semantics */, IrTerm replacement)
+            {
+                System.ArgumentNullException.ThrowIfNull(replacement);
+                if (!state.ContainsKey(variable))
+                { stateOrder.Add(variable); }
+                state[variable] = replacement;
+            }
             foreach (var variable in predecessors[0].State.Keys.OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)))
             {
                 Spend(predecessors.Count);
@@ -267,7 +278,8 @@ internal sealed class PassiveCallableVcBuilder
                 var incomingValue = predecessors[0].State[variable];
                 if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.State[variable].Id == incomingValue.Id)))
                 {
-                    state.Add(variable, incomingValue);
+                    state.AddUnique(variable, incomingValue);
+                    stateOrder.Add(variable);
                     continue;
                 }
                 if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (HasStringConcat(edge.State[variable]))))
@@ -278,13 +290,15 @@ internal sealed class PassiveCallableVcBuilder
                     var merged = predecessors[^1].State[variable];
                     for (var index = predecessors.Count - 2; index >= 0; index--)
                     { merged = _factory.Conditional(predecessors[index].Reach, predecessors[index].State[variable], merged); }
-                    state.Add(variable, merged);
+                    state.AddUnique(variable, merged);
+                    stateOrder.Add(variable);
                     continue;
                 }
                 var phi = Fresh(_factory.GetVariableInfo(variable).Type);
                 foreach (var predecessor in predecessors)
                 { Fact(Guard(predecessor.Reach, Equal(phi, predecessor.State[variable])), site, "phi"); }
-                state.Add(variable, phi);
+                state.AddUnique(variable, phi);
+                stateOrder.Add(variable);
             }
             IrTerm? pendingException = null;
             if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.PendingException != null)))
@@ -367,7 +381,7 @@ internal sealed class PassiveCallableVcBuilder
                             { _freshReferences.Add((reach, allocated, allocation.Operation)); }
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
-                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type == allocated.Type || referenceObject &&
+                            foreach (var existing in stateOrder.Select((IrVarId variable /* SPINT001: all values valid - retain dictionary key storage semantics */) => state[variable]).Concat(_entryFieldReferenceOrder.Select((IrId id /* SPINT001: all values valid - retain dictionary key storage semantics */) => _entryFieldReferences[id])).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type == allocated.Type || referenceObject &&
                                 _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)).Distinct())
                             {
                                 Spend();
@@ -375,7 +389,7 @@ internal sealed class PassiveCallableVcBuilder
                                 var existingOwner = referenceObject && existing.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, existing) : existing;
                                 Fact(Guard(reach, Not(Equal(freshOwner, existingOwner))), allocation.Operation, "allocation-fresh");
                             }
-                            state[allocatedTarget] = allocated;
+                            SetState(allocatedTarget, allocated);
                         }
                         break;
                     case IrLockInstruction synchronization:
@@ -461,7 +475,7 @@ internal sealed class PassiveCallableVcBuilder
                             // expression instead of asking SAT replay to reproduce
                             // a freshly allocated SSA reference or an abstract
                             // observation (such as its length) of that reference.
-                            state[assign.Target] = value;
+                            SetState(assign.Target, value);
                             break;
                         }
                         var assigned = Fresh(_factory.GetVariableInfo(assign.Target).Type);
@@ -469,7 +483,7 @@ internal sealed class PassiveCallableVcBuilder
                         // Rewritten array reads already denote a fixed heap snapshot.
                         // Forward those atoms and one arithmetic term of frozen operands
                         // to avoid bit-blasting duplicate arithmetic circuits.
-                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm or
+                        SetState(assign.Target, value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm or
                             IrSequenceAccessTerm { Sequence: IrVariableTerm, Index: IrVariableTerm or IrIntegerTerm } or
                             IrBinaryTerm
                         {
@@ -477,7 +491,7 @@ internal sealed class PassiveCallableVcBuilder
                             Left: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm,
                             Right: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm
                         }
-                            ? value : assigned;
+                            ? value : assigned);
                         break;
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory &&
@@ -507,14 +521,14 @@ internal sealed class PassiveCallableVcBuilder
                             }
                             else if (_inputBindings.TryGetValue(variable, out var approximatedInput) && approximatedInput == variable)
                             { return null; }
-                            state[variable] = replacement;
+                            SetState(variable, replacement);
                         }
                         if (pendingException != null && _pendingThrows.TryGetValue(havoc.Id, out var possibleThrows))
                         {
                             var incomingException = pendingException;
                             pendingException = Fresh(_factory.IntegerType);
                             var range = Equal(pendingException, incomingException);
-                            var codes = new HashSet<int>();
+                            var codes = ImmutableHashSet.CreateBuilder<int>();
                             foreach (var possibleThrow in possibleThrows)
                             {
                                 Spend();
@@ -563,7 +577,7 @@ internal sealed class PassiveCallableVcBuilder
                             : returnedValue != null)
                         { return null; }
                         Spend(state.Count);
-                        _returns.Add(new(reach, state.ToImmutableDictionary(), returnedValue, _heap, blockId));
+                        _returns.Add(new(reach, state.ToImmutable(), returnedValue, _heap, blockId));
                         break;
                     default:
                         return null;
@@ -575,20 +589,20 @@ internal sealed class PassiveCallableVcBuilder
         {
             Spend();
             var assumption = new Assumption(_factory, And(clause.Safe, clause.Value), new LoweredJustification(clause.Operation));
-            _labels.Add(assumption.Justification, "requires:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
+            _labels.AddUnique(assumption.Justification, "requires:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
             entryAssumptions.Add(assumption);
         }
         if (_candidate.HasReceiver)
         {
             var receiver = ReceiverAssumption(_factory, _candidate.Parameters[_candidate.Parameters.Length - 1].Entry, entry);
-            _labels.Add(receiver.Justification, ReceiverLabel);
+            _labels.AddUnique(receiver.Justification, ReceiverLabel);
             entryAssumptions.Add(receiver);
         }
         foreach (var constraint in _candidate.EntryConstraints)
         {
             Spend();
             var assumption = new Assumption(_factory, constraint, new LoweredJustification(_factory.CreateOperation("disjoint-input")));
-            _labels.Add(assumption.Justification, "input:disjoint:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
+            _labels.AddUnique(assumption.Justification, "input:disjoint:" + entryAssumptions.Count.ToString(CultureInfo.InvariantCulture));
             entryAssumptions.Add(assumption);
         }
         var goals = ImmutableArray.CreateBuilder<IrTerm>();
@@ -634,7 +648,7 @@ internal sealed class PassiveCallableVcBuilder
         return ExplicitSiteCode + _explicitSites.IndexOf(thrown.Operation);
     }
 
-    private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,
+    private void AddEdge(IrBlockId destination, IrTerm condition, ImmutableDictionary<IrVarId, IrTerm>.Builder state,
         IrTerm? pendingException, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(destination.IsDefault, nameof(destination));
@@ -645,8 +659,8 @@ internal sealed class PassiveCallableVcBuilder
         var edge = Fresh(_factory.BooleanType);
         Fact(Equal(edge, condition), site, "edge");
         if (!_incoming.TryGetValue(destination, out var predecessors))
-        { _incoming.Add(destination, predecessors = []); }
-        predecessors.Add(new(edge, state.ToImmutableDictionary(), pendingException));
+        { _incoming.AddUnique(destination, predecessors = ImmutableArray.CreateBuilder<Edge>()); }
+        predecessors.Add(new(edge, state.ToImmutable(), pendingException));
     }
 
     private IrVariableTerm Fresh(IrTypeId type)
@@ -666,9 +680,9 @@ internal sealed class PassiveCallableVcBuilder
         Spend();
         ProofJustification justification = userAssume
             ? new UserAssumedJustification(new SourceLocationId(site.Value)) : new LoweredJustification(site);
-        _labels.Add(justification, kind + ":" + _facts.Count.ToString(CultureInfo.InvariantCulture));
+        _labels.AddUnique(justification, kind + ":" + _facts.Count.ToString(CultureInfo.InvariantCulture));
         if (userAssume)
-        { _assumes.Add(justification, site); }
+        { _assumes.AddUnique(justification, site); }
         _facts.Add(new(_factory, predicate, justification));
     }
 
@@ -680,7 +694,7 @@ internal sealed class PassiveCallableVcBuilder
         var readAncestors = _blockAncestors[returned?.Block ?? _activeBlock];
         if (!Term(root))
         { value = null!; return false; }
-        var substitutions = new Dictionary<IrVarId, IrTerm>();
+        var substitutions = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var variable in IrTraversal.CollectVariables(root))
         {
             Spend();
@@ -693,7 +707,7 @@ internal sealed class PassiveCallableVcBuilder
             { state.TryGetValue(variable, out replacement); }
             if (replacement == null)
             { value = null!; return false; }
-            substitutions.Add(variable, replacement);
+            substitutions.AddUnique(variable, replacement);
         }
         var consistent = true;
         var snapshotSelectors = ImmutableDictionary<IrId, IrTerm>.Empty;
@@ -827,7 +841,7 @@ internal sealed class PassiveCallableVcBuilder
                 : _factory.GetTypeInfo(index.Type) is { Kind: IrTypeKind.Integer, Width: > 0 and < 32 } ? _factory.Cast(_factory.IntegerType, index)
                 : null;
         }
-        value = IrSubstitution.SubstituteWithReads(_factory, root, substitutions, Read);
+        value = IrSubstitution.SubstituteWithReads(_factory, root, substitutions.ToImmutable(), Read);
         return consistent;
     }
 
@@ -841,7 +855,11 @@ internal sealed class PassiveCallableVcBuilder
             // Only unkeyed entry fields have complete replay state evidence.
             if (entryFields && IrFieldSites.IsFieldRead(_factory, term) && term is IrOpaqueTerm { Arguments.IsEmpty: true } &&
                 _factory.GetTypeInfo(term.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
-            { _entryFieldReferences[term.Id] = term; }
+            {
+                if (!_entryFieldReferences.ContainsKey(term.Id))
+                { _entryFieldReferenceOrder.Add(term.Id); }
+                _entryFieldReferences[term.Id] = term;
+            }
             return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||
                 term is IrOpaqueTerm && !IrFieldSites.IsFieldRead(_factory, term) && !IrInvariantRelations.IsRelation(_factory, term) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||

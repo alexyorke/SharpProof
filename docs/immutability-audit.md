@@ -2278,3 +2278,26 @@ input maps may use direct immutable singleton construction without incremental r
 Freeze write observations after synchronous replay; retain the actual array/reference runtime
 subjects and IrValue identities. Method/local syntax vectors can be immutable; the PE image
 byte[] passed to MetadataReference.CreateFromImage remains its native adapter. Status: open before edits.
+## M040-M048 implementation checkpoint and next frontend inventory
+
+Coordinator implementation and read-only reviews confirm builder comparer, insertion-order
+sidecars, snapshot boundaries and mutable-subject exclusions described above. Canonical
+Linux tests pass: all 5,590 ordinary Worker tests; 1,686 loop tests; 174 candidate tests;
+the two corrected LongFuzz counter snapshot controls; and all 42 M048 frontend tests.
+Builds report zero warnings/errors. Repository layout validates 59 projects and 151
+unchanged pinned common files. Raw/interpolated preservation checks 2,808 tokens across
+611 changed C# files against master 6b062e611. The initial full Worker run had two stale
+reflection casts, corrected and covered by the complete rerun. M044's missing namespace
+and redundant immutable materialization compile errors were corrected before that rerun.
+Inventory classifications cover 122 added builder/snapshot rows and eight layout-script
+builder operations; 21 protocol setters are verified mutable-subject exclusions (M047).
+
+IMM-M049: Coordinator inspected CSharpScalarOperatorSemanticsTests, FrontendLoweringTests
+and GoldenLoweringTests. Fixed expected operator maps can use indexer-populated builders
+and frozen snapshots; membership tables and retained syntax vectors can be immutable.
+The operation visit counter uses reference equality and must freeze after Lower completes.
+Golden recursive term memo must publish each key before recursion, retain first-entry
+TryAdd semantics and sort output by term ID; use a scoped builder and freeze before
+printing. Callback observations freeze after replay. Preserve native interpreter argument
+arrays, emitted PE byte buffers and StringBuilder's text writer contract. No embedded
+source/literal text may change. Status: open before edits.

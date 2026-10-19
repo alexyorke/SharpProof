@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -29,10 +30,11 @@ public sealed class ArrayReceiverModelOwnershipTests
         Assert.That(lowered.IsExact, Is.True);
         var parameter = context.Parameters[0].Entry;
         var array = factory.CreateSequenceValue(factory.GetVariableInfo(parameter).Type, [factory.CreateIntegerValue(17)]);
-        var writes = new List<IrWriteInstruction>();
+        var writeBuilder = ImmutableArray.CreateBuilder<IrWriteInstruction>();
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-            new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [parameter] = array }, 1000,
-            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(5)) { WriteObserver = writes.Add });
+            ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(parameter, array), 1000,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(5)) { WriteObserver = writeBuilder.Add });
+        var writes = writeBuilder.ToImmutable();
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
         Assert.That(replay.ConsumedApproximation, Is.True);
@@ -98,7 +100,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var compilation = CSharpCompilation.Create("ComparerReceiverOwner", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var invocation = (IInvocationOperation)model.GetOperation(methods[0].ExpressionBody!.Expression)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(methods[0])!);
@@ -168,7 +170,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var compilation = CSharpCompilation.Create("LocalElementOwner", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
-        var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().ToArray();
+        var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().ToImmutableArray();
         var read = (IMethodSymbol)model.GetDeclaredSymbol(locals[0])!;
         var other = (IMethodSymbol)model.GetDeclaredSymbol(locals[1])!;
         var factory = new IrFactory(IrExecutionSemantics.Total);

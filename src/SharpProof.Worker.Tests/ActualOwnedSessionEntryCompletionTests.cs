@@ -76,8 +76,8 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(factory.GetTypeInfo(x.Type).Width, Is.EqualTo(64));
         Assert.That(factory.GetTypeInfo(x.Type).Signed, Is.True);
         Assert.That(y.Type, Is.EqualTo(x.Type));
-        var labels = new Dictionary<ProofJustification, string>();
-        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
+        var labels = ImmutableDictionary.CreateBuilder<ProofJustification, string>();
+        var ids = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         var domainBuilder = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length);
         foreach (var clause in entry.Clauses)
         {
@@ -85,8 +85,8 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             var assumption = new Assumption(factory, factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value),
                 new LoweredJustification(clause.Operation));
             domainBuilder.Add(assumption);
-            labels.Add(assumption.Justification, label);
-            ids.Add(label, clause.AssumptionId!);
+            labels.AddUnique(assumption.Justification, label);
+            ids.AddUnique(label, clause.AssumptionId!);
         }
         var domain = domainBuilder.MoveToImmutable();
         var entryQuery = new VerificationQuery(factory, domain, Goal.CreateInternalConsistency(factory),
@@ -95,12 +95,12 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         var controlMeter = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         var controlOutcome = await kernel.VerifyAsync(entryQuery, TestContext.CurrentContext.CancellationToken);
         Assert.That(controlOutcome, Is.TypeOf<RefutedOutcome>());
-        var control = TotalCallableVerifier.CompleteEntry(controlOutcome, controlMeter, labels, ids);
+        var control = TotalCallableVerifier.CompleteEntry(controlOutcome, controlMeter, labels.ToImmutable(), ids.ToImmutable());
         Assert.That(control.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(control.Reason, Is.EqualTo(WorkerClaimReason.None));
         var batchStart = session.ConsumedResourceCount;
         var meter = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        long[] primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
+        ImmutableArray<long> primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
         const long maximumInput = 1000000033L;
         foreach (var prime in primes)
         {
@@ -123,18 +123,16 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             var product = checked(p * q);
             Assert.That((BigInteger)p * q, Is.EqualTo(new BigInteger(product)));
             Assert.That(new BigInteger(product), Is.InRange(new BigInteger(4), maximumProduct));
-            var constraints = new List<IrTerm>
-            {
-                factory.Binary(IrBinaryOperator.Equal,
-                    factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)),
-                factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p))
-            };
+            var constraints = ImmutableArray.CreateBuilder<IrTerm>();
+            constraints.Add(factory.Binary(IrBinaryOperator.Equal,
+                factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)));
+            constraints.Add(factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p)));
             if (p != q)
             { constraints.Add(factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, q))); }
             Assert.That(runtimeTarget.Invoke(null, [p, 2L]), Is.EqualTo(p));
             // Manually constructed IR/Smt API lemmas use compiler-decoded
             // bindings. They are not compiler-produced contract clauses.
-            var assumptions = domain.AddRange(constraints.Select(predicate =>
+            var assumptions = domain.AddRange(constraints.ToImmutable().Select(predicate =>
                 predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))));
             var query = new VerificationQuery(factory, assumptions,
                 Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
@@ -177,7 +175,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(afterEntry, Is.GreaterThan(beforeEntry));
         var exceeded = checked(afterEntry - batchStart) > budgets.MethodRlimit;
         Assert.That(meter.IsExceeded, Is.EqualTo(exceeded));
-        var result = TotalCallableVerifier.CompleteEntry(finalOutcome, meter, labels, ids);
+        var result = TotalCallableVerifier.CompleteEntry(finalOutcome, meter, labels.ToImmutable(), ids.ToImmutable());
         Assert.That(result.Kind, Is.EqualTo(exceeded ? CallableEntryFeasibilityKind.Unknown : CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(exceeded ? WorkerClaimReason.ResourceLimit : WorkerClaimReason.None));
         Assert.That(result.ProofCore, Is.Empty);

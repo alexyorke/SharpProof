@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
+using SharpProof.Ir;
 using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -66,9 +67,9 @@ public sealed class ActualNativeProjectionAdmissionTests
         var actualEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
-        var requires = target.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))
+        var requires = ImmutableDictionaryCapture.Create(target.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))
             .Select((clause, ordinal) => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ((Label: "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                Id: clause.AssumptionId!))).ToDictionary(row => row.Label, row => row.Id, StringComparer.Ordinal);
+                Id: clause.AssumptionId!))), row => row.Label, row => row.Id, StringComparer.Ordinal);
         var valid = TotalCallableVerifier.ProjectEntry(actualEntry, requires);
         Assert.That(valid.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(valid.Reason, Is.EqualTo(WorkerClaimReason.None));
@@ -95,9 +96,9 @@ public sealed class ActualNativeProjectionAdmissionTests
             }
             """;
         using var project = CreateProject(source, "CallableProjectionAdmission");
-        var targets = project.Snapshot.Callables.ToArray();
+        var targets = project.Snapshot.Callables;
         Assert.That(targets, Has.Length.EqualTo(2));
-        var checks = new List<(CompilerCallablePreparation Target, TotalCallableClaimCheck Check)>();
+        var checkBuilder = ImmutableArray.CreateBuilder<(CompilerCallablePreparation Target, TotalCallableClaimCheck Check)>();
         foreach (var target in targets)
         {
             TotalCallableClaimCheck? actual = null;
@@ -112,10 +113,11 @@ public sealed class ActualNativeProjectionAdmissionTests
             Assert.That(valid.Outcome, Is.EqualTo(actual.Evidence.Outcome is ProvenOutcome
                 ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted));
             Assert.That(valid.Reason, Is.EqualTo(WorkerClaimReason.None));
-            checks.Add((target, actual));
+            checkBuilder.Add((target, actual));
         }
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks.Select(item => item.Check.Evidence.Outcome!.GetType()),
-            Is.EquivalentTo(new[] { typeof(ProvenOutcome), typeof(RefutedOutcome) }));
+            Is.EquivalentTo(ImmutableArray.Create(typeof(ProvenOutcome), typeof(RefutedOutcome))));
         Assert.Throws<ArgumentException>(new Action(() => CallableClaimResultAssembler.FromTotal(checks[0].Target, checks[1].Check)));
         Assert.Throws<ArgumentException>(new Action(() => CallableClaimResultAssembler.FromTotal(checks[1].Target, checks[0].Check)));
     }

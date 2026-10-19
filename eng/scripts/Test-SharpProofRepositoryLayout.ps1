@@ -16,9 +16,9 @@ $files = @($inventoryText.Split([char]0, [StringSplitOptions]::RemoveEmptyEntrie
         Sort-Object -Unique | Where-Object {
             Test-Path -LiteralPath (Join-Path $repositoryRoot $_) -PathType Leaf
         })
-$failures = [Collections.Generic.List[string]]::new()
-$records = [Collections.Generic.List[object]]::new()
-$evaluations = [Collections.Generic.List[object]]::new()
+$failures = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$records = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$evaluations = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 function Require([bool]$Condition, [string]$Message) {
     if (-not $Condition) { $failures.Add($Message) }
 }
@@ -30,7 +30,7 @@ function Test-ExplicitPackageImport {
     if ([string]::IsNullOrWhiteSpace($suffix) -or $suffix -match '[$@%*?:;]' -or
         $suffix.StartsWith('/') -or $suffix.Split('/') -contains '..' -or $suffix.Split('/') -contains '.') { return $false }
     [xml]$manifest = Get-Content -LiteralPath $ManifestPath -Raw
-    $mappings = [Collections.Generic.List[object]]::new()
+    $mappings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($entry in $manifest.SelectNodes('/*[local-name()="package"]/*[local-name()="files"]/*[local-name()="file"]')) {
         $source = $entry.GetAttribute('src').Replace('\', '/')
         $destination = $entry.GetAttribute('target').Replace('\', '/')
@@ -41,11 +41,12 @@ function Test-ExplicitPackageImport {
         $member = ($destination.TrimEnd('/') + '/' + [IO.Path]::GetFileName($source)).TrimStart('/')
         $mappings.Add([pscustomobject]@{ Source = $sourcePath; Member = $member })
     }
-    $importers = @($mappings | Where-Object { $_.Source -ceq [IO.Path]::GetFullPath($ImporterPath) })
+    $mappingSnapshot = $mappings.ToImmutable()
+    $importers = @($mappingSnapshot | Where-Object { $_.Source -ceq [IO.Path]::GetFullPath($ImporterPath) })
     if ($importers.Count -ne 1 -or -not (Test-Path -LiteralPath $ImporterPath -PathType Leaf)) { return $false }
     $memberDirectory = [IO.Path]::GetDirectoryName($importers[0].Member).Replace('\', '/')
     $memberTarget = ($memberDirectory + '/' + $suffix).TrimStart('/')
-    $targets = @($mappings | Where-Object { $_.Member -ceq $memberTarget })
+    $targets = @($mappingSnapshot | Where-Object { $_.Member -ceq $memberTarget })
     return $targets.Count -eq 1 -and (Test-Path -LiteralPath $targets[0].Source -PathType Leaf)
 }
 # Exercise the same package-relative resolution with absent declarations and
@@ -112,17 +113,18 @@ foreach ($package in $packages.SelectNodes('//PackageVersion')) {
         Require ($null -ne $versions.SelectSingleNode('/Project/PropertyGroup/' + $match.Groups[1].Value)) "Missing package-version property: $value"
     }
 }
-$coveredProjects = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$coveredProjectBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
 foreach ($solutionPath in @($files | Where-Object { $_.EndsWith('.slnx', [StringComparison]::Ordinal) })) {
     $full = Join-Path $repositoryRoot $solutionPath
     [xml]$solution = Get-Content -LiteralPath $full -Raw
     foreach ($project in $solution.SelectNodes('//Project')) {
         $absolute = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $full) ([string]$project.Path)))
         Require (Test-Path -LiteralPath $absolute -PathType Leaf) "Missing solution project: $solutionPath -> $($project.Path)"
-        [void]$coveredProjects.Add([IO.Path]::GetRelativePath($repositoryRoot, $absolute).Replace('\', '/'))
+        [void]$coveredProjectBuilder.Add([IO.Path]::GetRelativePath($repositoryRoot, $absolute).Replace('\', '/'))
     }
 }
-$projectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$coveredProjects = $coveredProjectBuilder.ToImmutable()
+$projectNames = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::OrdinalIgnoreCase)
 foreach ($relative in $files) {
     $classification = if ($relative.StartsWith('eng/common/', [StringComparison]::Ordinal)) { 'pinned-upstream-bootstrapper' }
     elseif ($relative.StartsWith('src/', [StringComparison]::Ordinal)) { 'source-project-or-source-asset' }
@@ -212,6 +214,9 @@ foreach ($relative in @($files | Where-Object { $_.EndsWith('.slnf', [StringComp
         Require ($coveredProjects.Contains(([string]$project).Replace('\', '/'))) "Unknown solution-filter project: $relative -> $project"
     }
 }
+$recordSnapshot = $records.ToImmutable()
+$evaluationSnapshot = $evaluations.ToImmutable()
+$failureSnapshot = $failures.ToImmutable()
 $report = [ordered]@{
     schemaVersion               = 1
     standard                    = 'Microsoft.DotNet.Arcade.Sdk repository requirements'
@@ -222,9 +227,9 @@ $report = [ordered]@{
     upstreamFilesVerified       = $expectedCommon.Count
     evaluatedProjects           = $evaluations.Count
     excludedFromSourceInventory = @('Git administration', 'ignored generated outputs and local caches', 'separate registered or embedded Git worktrees')
-    files                       = @($records)
-    evaluations                 = @($evaluations)
-    failures                    = @($failures)
+    files                       = @($recordSnapshot)
+    evaluations                 = @($evaluationSnapshot)
+    failures                    = @($failureSnapshot)
 }
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $repositoryRoot 'artifacts/layout-audit/report.json'
@@ -232,6 +237,6 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 [IO.Directory]::CreateDirectory((Split-Path -Parent $OutputPath)) | Out-Null
 [IO.File]::WriteAllText($OutputPath, ($report | ConvertTo-Json -Depth 12) + "`n", [Text.UTF8Encoding]::new($false))
 if ($failures.Count -gt 0) {
-    throw ("Arcade repository layout failed with $($failures.Count) issues:`n" + (($failures | Select-Object -First 20) -join "`n"))
+    throw ("Arcade repository layout failed with $($failures.Count) issues:`n" + (($failureSnapshot | Select-Object -First 20) -join "`n"))
 }
 Write-Host "Arcade repository layout passed: $($files.Count) source files, $($projectNames.Count) projects, $($expectedCommon.Count) pinned common files, $($evaluations.Count) evaluated projects."

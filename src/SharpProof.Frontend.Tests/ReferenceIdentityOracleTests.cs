@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,11 +33,10 @@ public sealed class ReferenceIdentityOracleTests
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         object? left = scenario is 0 or 1 ? null : new EqualByValue();
         object? right = scenario is 0 or 2 ? null : scenario == 3 ? left : new EqualByValue();
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [clause ? context.Parameters[0].Current : context.Parameters[0].Entry] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left),
-            [clause ? context.Parameters[1].Current : context.Parameters[1].Entry] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right)
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[clause ? context.Parameters[0].Current : context.Parameters[0].Entry] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left);
+        inputBuilder[clause ? context.Parameters[1].Current : context.Parameters[1].Entry] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right);
+        var inputs = inputBuilder.ToImmutable();
         bool actual;
         if (clause)
         {

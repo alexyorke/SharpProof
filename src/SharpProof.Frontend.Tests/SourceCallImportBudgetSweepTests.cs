@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -38,7 +39,7 @@ public sealed class SourceCallImportBudgetSweepTests
             var runtime = load.LoadFromStream(image).GetType("Subject")!;
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, [17]), Is.EqualTo(19));
             var model = compilation.GetSemanticModel(tree);
-            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
             var target = declarations.Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
             var helper = declarations.Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Helper");
             var targetSymbol = model.GetDeclaredSymbol(target)!;
@@ -77,7 +78,7 @@ public sealed class SourceCallImportBudgetSweepTests
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(16));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [context.Parameters[0].Entry] = factory.CreateIntegerValue(17) });
+                    ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(context.Parameters[0].Entry, factory.CreateIntegerValue(17)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(19)));

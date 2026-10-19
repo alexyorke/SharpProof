@@ -75,6 +75,7 @@ internal sealed class LongFuzzSession
     internal string Output { get; }
     internal int Cases => _cases;
     internal int Hits => _hitKinds.Values.Sum();
+    internal ImmutableDictionary<string, int> Counts => _counts.ToImmutable();
 
     internal IEnumerable<int> Seeds()
     {
