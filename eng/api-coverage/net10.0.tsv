@@ -1337,11 +1337,11 @@ System.Collections	M:System.Collections.Generic.List`1.FindLastIndex(System.Int3
 System.Collections	M:System.Collections.Generic.List`1.FindLastIndex(System.Predicate{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.ForEach(System.Action{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.GetEnumerator	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=list-insertion-range-state
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0,System.Int32)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.IndexOf(`0,System.Int32,System.Int32)	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.List`1.Insert(System.Int32,`0)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.List`1.Insert(System.Int32,`0)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=list-insertion-range-state
 System.Collections	M:System.Collections.Generic.List`1.InsertRange(System.Int32,System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.LastIndexOf(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.LastIndexOf(`0,System.Int32)	Method	unmodeled	-
@@ -25737,7 +25737,7 @@ System.Runtime	M:System.Collections.Generic.IEnumerable`1.GetEnumerator	Method	u
 System.Runtime	M:System.Collections.Generic.IEqualityComparer`1.Equals(`0,`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IEqualityComparer`1.GetHashCode(`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IList`1.IndexOf(`0)	Method	unmodeled	-
-System.Runtime	M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)	Method	unmodeled	-
+System.Runtime	M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)	Method	partially-modeled	intrinsic=fresh-list-state;intrinsic=list-insertion-range-state
 System.Runtime	M:System.Collections.Generic.IList`1.RemoveAt(System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IReadOnlyDictionary`2.ContainsKey(`0)	Method	unmodeled	-
 System.Runtime	M:System.Collections.Generic.IReadOnlyDictionary`2.TryGetValue(`0,`1@)	Method	unmodeled	-

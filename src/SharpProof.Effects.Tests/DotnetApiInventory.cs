@@ -122,6 +122,10 @@ internal static class DotnetApiInventory
             { evidence.Add("intrinsic=concrete-list-state"); }
         }
 
+        if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.List`1.Insert(System.Int32,`0)" or
+            "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" or "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)" &&
+            CSharpOperationSemantics.IsListStateDeclaration(symbol))
+        { evidence.Add("intrinsic=list-insertion-range-state"); }
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
             evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");

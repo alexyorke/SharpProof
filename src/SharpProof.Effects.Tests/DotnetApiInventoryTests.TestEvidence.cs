@@ -45,6 +45,13 @@ public sealed partial class DotnetApiInventoryTests
                         genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true));
             }
 
+            if (row.Evidence.Contains("intrinsic=list-insertion-range-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled concrete and exact interface List Insert/GetRange normal state versus CLR; reverse shift, independent range storage, reference element identity; growth/bounds uncertainty retained; native proof and wrong-claim controls in NativeSpecifiedCallTests.ListRangesPreserveSharedContentsAndDistinctCopies",
+                    () => CheckListRangeIntrinsic(compilation, row.Id, false) && CheckListRangeIntrinsic(compilation, row.Id, false, referenceValues: true),
+                    () => CheckListRangeIntrinsic(compilation, row.Id, true) || CheckListRangeIntrinsic(compilation, row.Id, true, referenceValues: true));
+            }
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
             {
                 var arrays = row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal);
