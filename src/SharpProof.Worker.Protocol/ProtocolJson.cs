@@ -743,18 +743,33 @@ public static partial class WorkerProtocolJson
         { return false; }
         var evidence = value.ResourceBound;
         if (evidence is null)
-        { return value.Outcome != WorkerClaimOutcome.Proven || value.Vacuity != WorkerVacuityKind.None; }
+        { return value.Outcome == WorkerClaimOutcome.Unknown || value.Outcome == WorkerClaimOutcome.Proven && value.Vacuity != WorkerVacuityKind.None; }
         if (evidence.Metric != resource.Metric || evidence.CostModel != resource.CostModel ||
             evidence.ExpressionModel != WorkerResourceModels.Expression || evidence.ProgramModel != WorkerResourceModels.Program ||
             evidence.DeclaredBoundSha256 != ComputeSha256(resource.UpperBound))
         { return false; }
         return value.Outcome switch
         {
-            WorkerClaimOutcome.Proven => evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
-            WorkerClaimOutcome.Unknown => evidence.InferredUpperBound is null && !string.IsNullOrWhiteSpace(evidence.UnknownReason) && evidence.UnknownReason!.Length <= 256 && !evidence.UnknownReason.Any(static character => char.IsControl(character)),
+            WorkerClaimOutcome.Proven => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
+            WorkerClaimOutcome.Refuted => evidence.InferredUpperBound is null && evidence.UnknownReason is null &&
+                evidence.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements &&
+                HasValidResourceViolation(evidence),
+            WorkerClaimOutcome.Unknown => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.InferredUpperBound is null && !string.IsNullOrWhiteSpace(evidence.UnknownReason) && evidence.UnknownReason!.Length <= 256 && !evidence.UnknownReason.Any(static character => char.IsControl(character)),
             _ => false
         };
     }
+    private static bool HasValidResourceViolation(WorkerResourceBoundEvidence evidence)
+    {
+        evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
+        return evidence.ObservedLowerBound is { Length: > 0 and <= 20 } && evidence.EvaluatedUpperBound is { Length: > 0 and <= 20 } &&
+            ulong.TryParse(evidence.ObservedLowerBound, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var observed) &&
+            observed.ToString(System.Globalization.CultureInfo.InvariantCulture) == evidence.ObservedLowerBound &&
+            ulong.TryParse(evidence.EvaluatedUpperBound, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var limit) &&
+            limit.ToString(System.Globalization.CultureInfo.InvariantCulture) == evidence.EvaluatedUpperBound && observed > limit;
+    }
+
     internal static bool HasValidEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason,
         WorkerEffectEvidenceCertainty certainty)
     {
@@ -776,6 +791,8 @@ public static partial class WorkerProtocolJson
             WorkerEffectContractKind.EnforcePure => witness.Capabilities != WorkerEffectCapabilitySet.None ||
                 (witness.Effects & impureState) != 0,
             WorkerEffectContractKind.ZeroAllocations => (witness.Effects & WorkerEffectSet.Allocates) != 0,
+            WorkerEffectContractKind.ResourceUpperBound => witness.Kind == "resource-bound-exceeded" &&
+                witness.Effects == WorkerEffectSet.Allocates && witness.Capabilities == WorkerEffectCapabilitySet.None,
             WorkerEffectContractKind.AllowedCapabilities => witness.Capabilities != WorkerEffectCapabilitySet.None,
             WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions =>
                 (witness.Effects & WorkerEffectSet.Throws) != 0,

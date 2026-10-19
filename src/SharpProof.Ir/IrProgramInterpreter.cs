@@ -476,6 +476,7 @@ public sealed partial class IrAllocationInstruction
             var createdArray = state.Interpreter._factory.CreateSequenceValue(this.AllocatedType, elements);
             state.Values[this.Target!.Value] = createdArray;
             state.Values.Heap.RegisterFreshArray(createdArray);
+            state.ReplayOptions?.ArrayAllocationPrefixObserver?.Invoke(this, count, state.Values.ConsumedApproximation);
         }
         else if (this.Target is { } allocatedTarget)
         {

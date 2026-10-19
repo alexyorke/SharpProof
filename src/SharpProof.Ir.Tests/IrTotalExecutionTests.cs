@@ -701,4 +701,39 @@ public sealed class IrTotalExecutionTests
     }
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private test exception only checks exact runtime-type admission.")]
     private sealed class DerivedRangeException : ArgumentOutOfRangeException { }
+    [TestCase(0, false, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(3, false, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(3, true, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(-1, false, 16, IrProgramExecutionStatus.Exception, 0)]
+    [TestCase(100, false, 4, IrProgramExecutionStatus.StepLimit, 0)]
+    public void QuantitativeArrayEventsRequireSuccessfulAllocation(int length, bool approximate, int steps,
+        IrProgramExecutionStatus expected, int count)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var size = factory.CreateVariable("size", factory.IntegerType);
+        if (approximate)
+        { builder.Havoc(block, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, size); }
+        else
+        { builder.Assign(block, factory.CreateOperation(), size, factory.Integer(length)); }
+        var arrayType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var array = factory.CreateVariable("array", arrayType);
+        builder.Allocate(block, factory.CreateOperation(), arrayType, array, factory.Variable(size));
+        builder.Return(block, factory.CreateOperation());
+        var observed = new List<(int Length, bool Approximation)>();
+        var options = new IrProgramReplayOptions(_ => factory.CreateIntegerValue(length))
+        {
+            ArrayAllocationPrefixObserver = (instruction, elements, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                observed.Add((elements, approximation));
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, steps, options);
+        Assert.That(result.Status, Is.EqualTo(expected));
+        Assert.That(observed, Has.Count.EqualTo(count));
+        if (count == 1)
+        { Assert.That(observed.Single(), Is.EqualTo((length, approximate))); }
+    }
 }

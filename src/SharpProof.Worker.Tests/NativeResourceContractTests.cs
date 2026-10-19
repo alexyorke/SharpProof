@@ -85,8 +85,10 @@ public sealed class NativeResourceContractTests
         var results = await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(2));
         Assert.That(results[0].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(results[1].Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(results[1].ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+        Assert.That(results[1].Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(results[1].ResourceBound!.ObservedLowerBound, Is.EqualTo("3"));
+        Assert.That(results[1].ResourceBound!.EvaluatedUpperBound, Is.EqualTo("2"));
+        Assert.That(results[1].ResourceBound!.UnknownReason, Is.Null);
         Assert.That(results[1].ResourceBound!.InferredUpperBound, Is.Null);
     }
 
@@ -225,5 +227,61 @@ public sealed class NativeResourceContractTests
         CompilerEffectClaimArtifactCodec.Seal(claim);
         Action verify = () => NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<ArgumentException>(verify);
+    }
+    [TestCase("ArrayAllocations", 1, "var a=new int[0]; var b=new int[0];", "2")]
+    [TestCase("AllocatedElements", 2, "var a=new int[3];", "3")]
+    [TestCase("AllocatedElements", 2, "Contract.Requires(n>=3); var a=new int[n];", "3")]
+    [TestCase("AllocatedElements", 2, "var a=new int[3]; int denominator=0; int q=1/denominator;", "3")]
+    public async Task ExactArrayPrefixesRefuteNumericContracts(string metric, long limit, string body, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(expected);
+        var preparation = Prepare(Source($"[ResourceUpperBound(ResourceMetric.{metric}, {limit})]", body));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(expected));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.EffectWitness!.Kind, Is.EqualTo("resource-bound-exceeded"));
+        Assert.That(result.EffectWitness.Location.Line, Is.GreaterThan(0));
+        Assert.That(result.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+    }
+
+    [Test]
+    public async Task LinearAllocationViolationUsesTheReplayedEntrySize()
+    {
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"n\", 1)]",
+            "for(int i=0;i<n;i++) { var a=new int[0]; var b=new int[0]; }"));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("2"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("1"));
+        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("1"));
+    }
+
+    [TestCase("Contract.Requires(n>=0); if(n>=0)return; var a=new int[3];")]
+    [TestCase("var a=new int[5000];")]
+    public async Task LooseEnvelopesAndUnobservedLargeAllocationsNeverBecomeViolations(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]", body));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
+    [Test]
+    public async Task SolverCandidatesMustReplayDistinctConstrainedInputs()
+    {
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]",
+            "Contract.Requires(n==7 && values!=null && values.Length==11); var a=new int[n];"));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("7"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("2"));
+        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("7"));
+        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
     }
 }

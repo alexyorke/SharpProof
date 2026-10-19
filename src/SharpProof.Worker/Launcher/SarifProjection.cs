@@ -136,7 +136,9 @@ internal static class SarifProjection
         var resource = result.ResourceBound is { } bound
             ? bound.InferredUpperBound is { } upper
                 ? " [" + bound.Metric + " upper bound: " + upper + "; " + bound.CostModel + "]"
-                : " [resource: " + bound.UnknownReason + "]"
+                : bound.ObservedLowerBound is { } observed
+                    ? " [" + bound.Metric + " observed prefix: " + observed + " > " + bound.EvaluatedUpperBound + "; " + bound.CostModel + "]"
+                    : " [resource: " + bound.UnknownReason + "]"
             : string.Empty;
         var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
         return Result(

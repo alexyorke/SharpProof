@@ -190,13 +190,30 @@ assumptions produce Unknown. A modeled upper bound larger than the requested
 limit also remains Unknown until an actual violating execution is established;
 an upper envelope alone does not refute a contract.
 
+For array allocation counts and allocated elements, the worker also searches for
+an exact violating execution prefix. Every candidate must satisfy the owned
+entry constraints, receiver requirements, and all Requires clauses with their
+definedness guards. Successful array events carry their evaluated element count;
+failed allocations and observations after consuming an approximation contribute
+no violation evidence. A prefix already over the bound remains a violation when
+a later operation throws or concrete replay reaches its step limit.
+
+The search uses bounded small inputs and constant thresholds, then native
+feasibility/allocation models. It cannot prove a bound from samples or establish
+that no violating execution exists. Failure to produce an exact witness remains
+Unknown. Loop-body-entry refutations still require source-entry instrumentation;
+the current worker does not infer them from branch counts or a loose envelope.
+
 Compiler-elided calls, including contract clauses, do not add runtime costs or
 argument allocations. Enabled conditional calls retain their normal costs.
 The reserved contract symbol remains invalid for production compilation.
 
 Validated results and SARIF expose `resourceBound` evidence with the metric,
 cost model, expression/program versions, declared-bound digest and inferred
-upper bound. Unknown evidence contains its reason and no partial numeric bound.
+upper bound. Refuted array evidence contains `observedLowerBound` and
+`evaluatedUpperBound`, a concrete source location, and the replayed entry model.
+Both values are canonical nonnegative integers and the observed prefix must be
+strictly larger. Unknown evidence contains its reason and no partial numeric bound.
 Metric or declared-bound mismatches are rejected, including cached responses.
 The compiler carries declarations and programs; it cannot supply a resource
 proof verdict or substitute a qualitative trusted effect summary.

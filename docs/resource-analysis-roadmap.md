@@ -47,7 +47,10 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 - [x] Resource contract API and compiler-bound validation/selection.
 - [x] Compiler-neutral proof/cost representation and collector artifact encoding.
-- [ ] Native-worker checking of resource proofs and numeric contract violations.
+- [x] Native-worker derivation and checking of cumulative resource upper bounds.
+- [x] Exact-prefix numeric violations for array allocations and allocated elements.
+- [ ] Exact source-loop-entry numeric violation evidence.
+- [ ] Bind native metadata cost assumptions and their provenance.
 - [x] Protocol, manifest, schema and cache-identity integration.
 - [x] SARIF/result projection with independent claim outcomes and Unknown reasons.
 - [x] Reject malformed/unowned proof records; verify packaged consumer behavior.
@@ -337,3 +340,45 @@ coverage qualification. Documentation drift and automation lifecycle checks pass
 
 After the catalog expectation fixes, all 2052 frontend tests passed with zero
 build warnings/errors.
+
+## Exact numeric array violations (in progress)
+
+The native contract path now attempts exact replay after its universal upper-bound
+comparison remains unproved. The first admitted refutations are cumulative
+primitive-array allocation counts and allocated elements. Internal IR events fire
+only after successful allocation and include the evaluated length and sticky
+approximation state. Replay rejects a candidate unless its typed entry values,
+receiver constraint, declared disjointness, Requires values and definedness guards
+hold. Search uses bounded concrete candidates and native feasibility/allocation
+models; neither search exhaustion nor an envelope comparison becomes a proof.
+
+Refuted evidence carries canonical observed-prefix and evaluated-entry-limit
+values, a concrete source witness and the replayed model. Protocol 15 and cache
+17 bind the new response shape; manifest 6 and compiler artifact 32 are unchanged.
+Validation rejects noncanonical values, values that do not exceed the bound,
+missing numeric witnesses and incompatible outcome fields. Cache hits and SARIF preserve the
+numeric comparison and source location.
+
+The loose-envelope control exposed a missing Requires guard in the initial new
+replay path. Direct concrete evaluation of all owned Requires/definedness terms
+was added before any observation could be accepted. With that correction, all
+84 focused native/program/worker-cache-SARIF controls passed with zero build
+warnings/errors. Broader gate results are recorded below. Phase D remains open:
+loop-body-entry violations still need exact source-entry instrumentation, native
+metadata assumptions remain unbound, and all other unchecked roadmap work is
+still required. CI for checkpoint `ac99f280e` was cancelled across its workflows;
+those cancelled runs do not qualify the published checkpoint.
+
+Final checkpoint gates passed: 5702 full worker tests, 1302 analyzer tests,
+517 IR tests and 10 architecture tests. Independent allocation-event controls
+passed within the 70 focused total-execution cases. Both actual NuGet strict
+consumers passed: valid bounds build with three Proven metrics, while violated
+array count/element bounds fail the build with two Refuted claims and concrete
+JSON/SARIF metric evidence. All builds reported zero warnings/errors.
+
+Layout passed with 2639 source files, 59 projects and 151 pinned common files.
+Documentation drift/lifecycle and final changed-source formatting passed. The
+quality run passed every category except one spelling finding in this document;
+after rewording it, the pinned spelling engine checked all 71 configured files
+with zero findings. The 100% coverage baseline is unchanged and final coverage
+qualification remains required. No full-roadmap completion is claimed.

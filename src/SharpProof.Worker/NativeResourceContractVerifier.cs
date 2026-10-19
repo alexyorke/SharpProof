@@ -2,6 +2,29 @@ namespace SharpProof.Worker;
 
 internal static class NativeResourceContractVerifier
 {
+    internal static async Task<WorkerClaimResult> VerifyAsync(CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact claim, WorkerBudgets budgets, CancellationToken cancellation)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
+        budgets = ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        var result = Verify(target, claim, cancellation);
+        if (result.ResourceBound?.UnknownReason != "ResourceBoundComparisonUnproved")
+        { return result; }
+        try
+        {
+            var limit = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
+                target.Entry.CallableId, target.Total!, cancellation);
+            return await NativeResourceViolationReplay.FindAsync(target, claim, limit, budgets, cancellation).ConfigureAwait(false) ?? result;
+        }
+        catch (ResourceExpressionLimitException)
+        {
+            result.Reason = WorkerClaimReason.ResourceLimit;
+            result.ResourceBound.UnknownReason = "ResourceReplayBudgetExceeded";
+            return result;
+        }
+    }
+
     internal static WorkerClaimResult Verify(CompilerCallablePreparation target, CompilerEffectClaimArtifact claim, CancellationToken cancellation)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));

@@ -3512,4 +3512,40 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Proven"), Is.EqualTo(3));
     }
+    [Test]
+    public async Task MainPackageRefutesNumericResourceBoundsWithConcreteMetricEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 1)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]
+                public static void Allocate() { var first=new int[1]; var second=new int[2]; }
+            }
+            """, "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(2));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Refuted");
+            var evidence = claim.GetProperty("resourceBound");
+            var arrays = evidence.GetProperty("metric").GetString() == "ArrayAllocations";
+            JsonAssert.Equal(evidence, "observedLowerBound", arrays ? "2" : "3");
+            JsonAssert.Equal(evidence, "evaluatedUpperBound", arrays ? "1" : "2");
+            Assert.That(evidence.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            JsonAssert.Equal(claim.GetProperty("effectWitness"), "kind", "resource-bound-exceeded");
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Refuted"), Is.EqualTo(2));
+    }
 }

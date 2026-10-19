@@ -52,7 +52,7 @@ internal static class NativeEffectClaims
             cancellationToken.ThrowIfCancellationRequested();
             if (claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound)
             {
-                results.Add(NativeResourceContractVerifier.Verify(target, claim, cancellationToken));
+                results.Add(await NativeResourceContractVerifier.VerifyAsync(target, claim, budgets, cancellationToken).ConfigureAwait(false));
                 continue;
             }
             var check = claim.ContractKind switch
