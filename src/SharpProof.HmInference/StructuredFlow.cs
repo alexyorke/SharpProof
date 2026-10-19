@@ -20,20 +20,21 @@ public static partial class Inference
             }
         }
 
-        private void DeclareResource(VariableDeclarationSyntax declaration)
+        private void DeclareResource(VariableDeclarationSyntax declaration, SyntaxNode site, bool asynchronous)
         {
             if (declaration is null)
             { throw new ArgumentNullException(nameof(declaration)); }
-            // Keep concrete disposal selection, including pattern versus explicit interface methods.
-            // Also retain conversions introduced by an explicitly declared resource type.
+            if (site is null)
+            { throw new ArgumentNullException(nameof(site)); }
             foreach (var variable in declaration.Variables)
             {
                 if (variable.Initializer is null)
                 { throw new InferenceException("Uninitialized resource."); }
-                Anchor(variable.Initializer.Value);
                 var symbol = model.GetDeclaredSymbol(variable, cancellationToken) as ILocalSymbol
                     ?? throw new InferenceException("Unresolved resource local.");
-                environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
+                var inferred = declaration.Type.IsVar ? Expression(variable.Initializer.Value) : CSharpTypes.Rigid(symbol.Type);
+                InferResource(variable.Initializer.Value, site, asynchronous, inferred, declaration.Type.IsVar ? null : symbol.Type);
+                environment.Add(symbol, inferred);
             }
         }
 

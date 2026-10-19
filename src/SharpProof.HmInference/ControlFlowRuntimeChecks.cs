@@ -96,7 +96,7 @@ internal static class ControlFlowRuntimeChecks
         }
         Program.Log.Info("PASS GotoLoopCaseAndFinallyRuntime");
         using var resource = new MemoryStream();
-        if (!Equals(probe.GetMethod("Resource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, marker }), marker) || resource.CanRead)
+        if (!Equals(probe.GetMethod("Resource")!.MakeGenericMethod(typeof(MemoryStream), typeof(Guid)).Invoke(null, new object[] { resource, marker }), marker) || resource.CanRead)
         { throw new InvalidOperationException("Goto bypassed resource disposal."); }
         Program.Log.Info("PASS GotoResourceDisposalRuntime");
         foreach (var name in new[] { "Typed", "Uninitialized" })

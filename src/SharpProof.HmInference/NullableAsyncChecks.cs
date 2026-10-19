@@ -336,7 +336,7 @@ internal static class NullableAsyncChecks
         { throw new InvalidOperationException("Exception filter or finalizer behavior changed."); }
         var resourceType = probe.Assembly.GetType("LifetimeResource")!;
         var resource = Activator.CreateInstance(resourceType)!;
-        if (!Equals(probe.GetMethod("Resource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, guid }), guid)
+        if (!Equals(probe.GetMethod("Resource")!.MakeGenericMethod(resourceType, typeof(Guid)).Invoke(null, new object[] { resource, guid }), guid)
             || !Equals(resourceType.GetField("Trace")!.GetValue(resource), 1))
         { throw new InvalidOperationException("Synchronous disposal behavior changed."); }
         if (await ((Task<Guid>)probe.GetMethod("AsyncResource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, guid })!).ConfigureAwait(false) != guid

@@ -30,11 +30,11 @@ internal static class ConstraintFlowChecks
             ("TryFinallyThrow", "static int M(int x) { try { return x; } finally { throw new System.Exception(); } }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("TryLoopExit", "static int M(int x,bool flag) { while(flag) { try { break; } finally { flag=false; } } return x; }", "Suggestion", "T1 M<T1>(T1 x, bool flag)"),
             ("TryFallthrough", "static int M(int x,bool flag) { try { flag=!flag; } catch { flag=false; } return x; }", "Suggestion", "T1 M<T1>(T1 x, bool flag)"),
-            ("UsingExpression", "static int M(System.IO.MemoryStream stream,int x) { using(stream) { return x; } }", "Suggestion", "T1 M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
-            ("UsingDeclaration", "static int M(System.IO.MemoryStream stream,int x) { using var resource=stream; return x; }", "Suggestion", "T1 M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
-            ("UsingTypedConversion", "static int M(System.IO.MemoryStream stream,int x) { using(System.IDisposable resource=stream) { return x; } }", "Suggestion", "T1 M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
-            ("AwaitUsing", "static async Task<int> M(System.IO.MemoryStream stream,int x) { await using(stream) { await Task.Yield(); return x; } }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
-            ("AwaitUsingDeclaration", "static async Task<int> M(System.IO.MemoryStream stream,int x) { await using var resource=stream; return x; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
+            ("UsingExpression", "static int M(System.IO.MemoryStream stream,int x) { using(stream) { return x; } }", "Suggestion", "T2 M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IDisposable"),
+            ("UsingDeclaration", "static int M(System.IO.MemoryStream stream,int x) { using var resource=stream; return x; }", "Suggestion", "T2 M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IDisposable"),
+            ("UsingTypedConversion", "static int M(System.IO.MemoryStream stream,int x) { using(System.IDisposable resource=stream) { return x; } }", "Suggestion", "T2 M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IDisposable"),
+            ("AwaitUsing", "static async Task<int> M(System.IO.MemoryStream stream,int x) { await using(stream) { await Task.Yield(); return x; } }", "Suggestion", "global::System.Threading.Tasks.Task<T2> M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IAsyncDisposable"),
+            ("AwaitUsingDeclaration", "static async Task<int> M(System.IO.MemoryStream stream,int x) { await using var resource=stream; return x; }", "Suggestion", "global::System.Threading.Tasks.Task<T2> M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IAsyncDisposable"),
             ("MonitorLock", "static int M(object gate,int x) { lock(gate) { return x; } }", "Suggestion", "T1 M<T1>(object gate, T1 x)"),
             ("SpecialLock", "static int M(System.Threading.Lock gate,int x) { lock(gate) { return x; } }", "Suggestion", "T1 M<T1>(global::System.Threading.Lock gate, T1 x)")
         ];

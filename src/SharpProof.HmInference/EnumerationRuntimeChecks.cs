@@ -133,7 +133,7 @@ internal static class EnumerationRuntimeChecks
         { throw new InvalidOperationException("Generic interface or pattern enumeration changed."); }
         Program.Log.Info("PASS PatternInterfaceEnumerationRuntime");
         using var resource = new MemoryStream();
-        var resources = (IEnumerable<Guid>)probe.GetMethod("Resource")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { resource, marker })!;
+        var resources = (IEnumerable<Guid>)probe.GetMethod("Resource")!.MakeGenericMethod(typeof(MemoryStream), typeof(Guid)).Invoke(null, new object[] { resource, marker })!;
         if (!resource.CanRead)
         { throw new InvalidOperationException("Iterator resource disposed before enumeration."); }
         using (var iterator = resources.GetEnumerator())

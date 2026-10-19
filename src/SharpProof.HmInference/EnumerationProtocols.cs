@@ -32,7 +32,7 @@ public static partial class Inference
             return mapping;
         }
 
-        private static AwaitExpressionInfo? ImplicitAwaitInfo(SemanticModel semantic, CommonForEachStatementSyntax loop, IMethodSymbol? method)
+        private static AwaitExpressionInfo? ImplicitAwaitInfo(SemanticModel semantic, SyntaxNode loop, IMethodSymbol? method)
         {
             if (semantic is null)
             { throw new ArgumentNullException(nameof(semantic)); }
@@ -99,7 +99,7 @@ public static partial class Inference
             }
         }
 
-        private bool SameImplicitAwait(SemanticModel beforeModel, SemanticModel afterModel, CommonForEachStatementSyntax before, CommonForEachStatementSyntax after,
+        private bool SameImplicitAwait(SemanticModel beforeModel, SemanticModel afterModel, SyntaxNode before, SyntaxNode after,
             IMethodSymbol? beforeMethod, IMethodSymbol? afterMethod, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)
         {
             if (beforeModel is null)

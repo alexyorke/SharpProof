@@ -217,20 +217,22 @@ public static partial class Inference
             }
         }
 
-        private string? ValidateInterpolationEmission(SemanticModel changedModel)
+        private string? ValidateProtocolEmission(SemanticModel changedModel, string protocol)
         {
             if (changedModel is null)
             { throw new ArgumentNullException(nameof(changedModel)); }
+            if (protocol is null)
+            { throw new ArgumentNullException(nameof(protocol)); }
             using var originalImage = new System.IO.MemoryStream();
             var original = model.Compilation.Emit(originalImage, cancellationToken: cancellationToken);
             if (!original.Success)
-            { throw new InferenceException("Original interpolation-handler compilation cannot be emitted."); }
+            { throw new InferenceException("Original " + protocol + " compilation cannot be emitted."); }
             using var candidateImage = new System.IO.MemoryStream();
             var candidate = changedModel.Compilation.Emit(candidateImage, cancellationToken: cancellationToken);
             if (!candidate.Success)
-            { return "Generalization fails interpolation-handler lowering."; }
+            { return "Generalization fails " + protocol + " lowering."; }
             return IntroducesCompilerWarnings(changedModel.Compilation, original.Diagnostics, candidate.Diagnostics)
-                ? "Generalization introduces interpolation-handler emission warnings." : null;
+                ? "Generalization introduces " + protocol + " emission warnings." : null;
         }
 
         private bool PreservesInterpolationBindings(SyntaxNode before, SyntaxNode after, SemanticModel beforeModel, SemanticModel afterModel, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)

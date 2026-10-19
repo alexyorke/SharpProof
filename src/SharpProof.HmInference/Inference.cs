@@ -377,6 +377,8 @@ public static partial class Inference
                         return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
                     }
                 }
+                if (!PreservesResourceBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes resource disposal or its implicit await."); }
                 if (!PreservesInterpolationBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes interpolation handler construction or append selection."); }
                 if (!PreservesUserOperations(beforeRoot, afterRoot, beforeModel, afterModel))
@@ -409,9 +411,13 @@ public static partial class Inference
             { return new(symbol.Name, "Rejected", builderFailure); }
             if (!builderEmission && (requiresInterpolationEmission || method.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>().Any(interpolation =>
                 { if (interpolation is null) { throw new ArgumentNullException(nameof(interpolation)); } return InterpolationHandler(model.GetOperation(interpolation, cancellationToken)) is not null; }))
-                && ValidateInterpolationEmission(changedModel) is string interpolationFailure)
+                && ValidateProtocolEmission(changedModel, "interpolation-handler") is string interpolationFailure)
             { return new(symbol.Name, "Rejected", interpolationFailure); }
 
+            if (!builderEmission && method.DescendantNodes().Any(node =>
+                { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is UsingStatementSyntax or LocalDeclarationStatementSyntax { UsingKeyword.RawKind: not 0 }; })
+                && ValidateProtocolEmission(changedModel, "resource-disposal") is string resourceFailure)
+            { return new(symbol.Name, "Rejected", resourceFailure); }
             var typeParameterNames = (method.TypeParameterList?.Parameters.Select(p =>
             {
                 if (p is null)
@@ -525,15 +531,15 @@ public static partial class Inference
                         Declare(local.Declaration);
                         break;
                     case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0:
-                        DeclareResource(local.Declaration);
+                        DeclareResource(local.Declaration, local, local.AwaitKeyword != default);
                         break;
                     case UsingStatementSyntax resource:
                         flow = Scoped(() =>
                         {
                             if (resource.Declaration is not null)
-                            { DeclareResource(resource.Declaration); }
+                            { DeclareResource(resource.Declaration, resource, resource.AwaitKeyword != default); }
                             if (resource.Expression is not null)
-                            { Anchor(resource.Expression); }
+                            { InferResource(resource.Expression, resource, resource.AwaitKeyword != default); }
                             return Branch(resource.Statement);
                         });
                         break;

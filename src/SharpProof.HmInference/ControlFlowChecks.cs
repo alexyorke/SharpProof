@@ -15,7 +15,7 @@ internal static class ControlFlowChecks
             ("BackwardGoto", "static int M(int count,int x) { Again:if(count-->0) goto Again; return x; }", "Suggestion", "T1 M<T1>(int count, T1 x)"),
             ("GotoOutOfBlock", "static int M(int x) { {goto Done;} Done:return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("GotoFinally", "static int M(int x,bool flag) { try {goto Done;} finally {flag=!flag;} Done:return x; }", "Suggestion", "T1 M<T1>(T1 x, bool flag)"),
-            ("GotoUsing", "static int M(System.IO.MemoryStream stream,int x) { using(stream) {goto Done;} Done:return x; }", "Suggestion", "T1 M<T1>(global::System.IO.MemoryStream stream, T1 x)"),
+            ("GotoUsing", "static int M(System.IO.MemoryStream stream,int x) { using(stream) {goto Done;} Done:return x; }", "Suggestion", "T2 M<T1, T2>(T1 stream, T2 x) where T1 : global::System.IDisposable"),
             ("GotoCase", "static int M(int tag,int x,int y) { switch(tag) {case 0:goto case 1;case 1:return x;default:return y;} }", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"),
             ("GotoDefault", "static int M(int tag,int x) { switch(tag) {case 0:goto default;default:return x;} }", "Suggestion", "T1 M<T1>(int tag, T1 x)"),
             ("GotoNullCase", "static int M(string? tag,int x,int y) { switch(tag) {case \"\":goto case null;case null:return x;default:return y;} }", "Suggestion", "T1 M<T1>(string? tag, T1 x, T1 y)"),

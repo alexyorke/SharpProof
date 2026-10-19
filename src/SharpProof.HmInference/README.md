@@ -221,9 +221,13 @@ declared conversion endpoints remain fixed. Compiler checks enforce tree-languag
 restrictions and supplied call bindings.
 Switch statements support pattern variables and guards.
 Try/catch/finally supports exception locals, filters,
-rethrow and pending loop/return exits. Using statements/declarations, await using
-and lock retain concrete resource/receiver types to preserve disposal conversions,
-pattern/interface selection and Monitor versus System.Threading.Lock lowering.
+rethrow and pending loop/return exits. Using statements/declarations and await using
+infer IDisposable/IAsyncDisposable constraints and generic resource payloads, including
+nullable resources. Explicit storage conversions and distinct disposal patterns remain
+fixed; selected disposal members and implicit await bindings are rechecked across
+supplied files, and emission validates lowering. Applied IDE fixes preserve null handling,
+disposal on return and failure, exception precedence, and async suspension/completion.
+Lock retains its concrete receiver to preserve Monitor versus System.Threading.Lock lowering.
 Ordinary void
 method calls can appear as expression statements. The standalone HM core remains
 pure; these imperative extensions belong to the C# adapter only.
