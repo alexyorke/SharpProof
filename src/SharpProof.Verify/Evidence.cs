@@ -33,16 +33,6 @@ public abstract class ProofJustification
     }
 }
 
-public sealed class SpecJustification(SpecId spec) : ProofJustification
-{
-    public SpecId Spec
-    {
-        get;
-    } = !spec.IsDefault
-        ? spec
-        : throw new ArgumentException("A non-default spec identifier is required.", nameof(spec));
-}
-
 public sealed class LoweredJustification(OperationId operation) : ProofJustification
 {
     public OperationId Operation
