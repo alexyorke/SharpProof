@@ -92,9 +92,9 @@ public sealed partial class NativeResourceContractTests
     }
 
     [Test]
-    public async Task ByteEnvelopesCannotInventNumericalViolations()
+    public async Task LooseByteEnvelopesCannotInventSuccessfulAllocations()
     {
-        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", "var a=new int[3];"), reviewedRuntime: true, x64: true));
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", "for(int i=0;i<4;i++) { if(i==0) return; var a=new int[3]; }"), reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
@@ -109,6 +109,7 @@ public sealed partial class NativeResourceContractTests
     {
         var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 1)]", "var a=new int[3];"), reviewedRuntime: true, x64: true);
         Assert.That(artifact.Compilation.ResourceMetadataReferences, Is.Empty);
+        Assert.That(artifact.Compilation.ResourceTargetPlatform, Is.Empty);
         Assert.That(artifact.Manifest.Callables.Single().Assumptions, Is.Empty);
     }
     [Test]
@@ -122,8 +123,9 @@ public sealed partial class NativeResourceContractTests
         Assert.That(elements.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(elements.ResourceBound!.MetadataAssumptions, Is.Empty);
         Assert.That(elements.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
-        Assert.That(bytes.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(bytes.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+        Assert.That(bytes.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(bytes.ResourceBound!.ObservedLowerBound, Is.EqualTo("40"));
+        Assert.That(bytes.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
     }
     [TestCase("var a=new int[n];", 31, "n", 4)]
     [TestCase("var a=new char[n];", 31, "n", 2)]
@@ -138,5 +140,49 @@ public sealed partial class NativeResourceContractTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.InferredUpperBound, Does.Contain(size));
         Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+    }
+    [TestCase("var a=new bool[9];", 39, "40")]
+    [TestCase("var a=new byte[0];", 23, "24")]
+    [TestCase("var a=new char[3];", 31, "32")]
+    [TestCase("var a=new int[3];", 39, "40")]
+    [TestCase("var a=new long[3];", 47, "48")]
+    [TestCase("var a=new byte[1]; var b=new long[3];", 50, "80")]
+    [TestCase("for(int i=0;i<3;i++) { var a=new int[3]; }", 80, "120")]
+    [TestCase("if(n>0) { var a=new long[3]; } else { var b=new byte[1]; }", 31, "32")]
+    [TestCase("Contract.Requires(n==3); var a=new int[n];", 39, "40")]
+    public async Task ByteRefutationsUseExactSuccessfulTypedAllocationPrefixes(string body, int limit, string observed)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(observed);
+        var target = Read(CreateArtifact(Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {limit})]", body), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo(observed));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(result.ResourceBound.CostModel, Is.EqualTo(WorkerResourceModels.AllocationCostModel));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+        Assert.That(result.Assumptions.Count(static assumption => assumption is not null && assumption.Used), Is.EqualTo(1));
+        Assert.That(result.EffectWitness!.Effects, Is.EqualTo(WorkerEffectSet.Allocates));
+        Assert.That(result.EffectWitness.Location.Line, Is.GreaterThan(0));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+    }
+    [TestCase("Contract.Requires(n==0); if(n>0) { var a=new int[3]; }")]
+    [TestCase("int zero=0; int bad=n/zero; var a=new int[3];")]
+    [TestCase("int value=System.Math.Max(n,0); var a=new int[3];")]
+    [TestCase("var a=new float[3];")]
+    [TestCase("var a=new double[3];")]
+    [TestCase("var a=new float[3]; var b=new int[3];")]
+    public async Task ByteRefutationsCannotCrossInfeasibleExceptionalOrOpaquePrefixes(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]", body), reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.EffectWitness, Is.Null);
     }
 }

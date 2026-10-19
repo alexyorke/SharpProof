@@ -48,7 +48,7 @@ internal sealed class NativeResourceLayoutBinding
     internal void Project(WorkerClaimResult result)
     {
         result = ArgumentNullGuard.NotNull(result, nameof(result));
-        if (_bound is not { } dependency || result.ResourceBound is null || result.Outcome != WorkerClaimOutcome.Proven)
+        if (_bound is not { } dependency || result.ResourceBound is null || result.Outcome is not (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
         { throw new ArgumentException("A byte proof requires its owned layout dependency.", nameof(result)); }
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used)
             .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id), StringComparer.Ordinal)

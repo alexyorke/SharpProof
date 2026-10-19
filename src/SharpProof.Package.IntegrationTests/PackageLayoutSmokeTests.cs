@@ -3687,15 +3687,18 @@ public sealed class PackageLayoutSmokeTests
         }
         Assert.That(resourceResults, Is.EqualTo(3));
     }
-    [Test]
-    public async Task MainPackageProvesLayoutBoundBytesWithExplicitAssumptionProvenance()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates)
     {
+        var boundLimit = violates ? 80 : 120;
+        var expected = violates ? "Refuted" : "Proven";
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
             using SharpProof.Attributes;
             public static class Subject {
-                [ResourceUpperBound(ResourceMetric.AllocatedBytes, 120)]
+                [ResourceUpperBound(ResourceMetric.AllocatedBytes, {{boundLimit}})]
                 public static void Target() { for(int i=0;i<3;i++) { var a=new int[3]; } }
             }
             """, "all");
@@ -3705,18 +3708,26 @@ public sealed class PackageLayoutSmokeTests
             "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
-        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        Assert.That(strict.Output, Does.Contain(expected + "=1"));
         var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
             "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
             "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
-        Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
-        Assert.That(advisory.Output, Does.Contain("Proven=1"));
+        Assert.That(advisory.ExitCode, violates ? Is.Not.Zero : Is.Zero, advisory.Output);
+        if (violates)
+        { Assert.That(advisory.Output, Does.Contain("SP0051")); }
+        Assert.That(advisory.Output, Does.Contain(expected + "=1"));
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
-        JsonAssert.Equal(claim, "outcome", "Proven");
+        JsonAssert.Equal(claim, "outcome", expected);
         var bound = claim.GetProperty("resourceBound");
         JsonAssert.Equal(bound, "metric", "AllocatedBytes");
-        JsonAssert.Equal(bound, "inferredUpperBound", "120");
+        if (violates)
+        {
+            JsonAssert.Equal(bound, "observedLowerBound", "120");
+            JsonAssert.Equal(bound, "evaluatedUpperBound", "80");
+        }
+        else
+        { JsonAssert.Equal(bound, "inferredUpperBound", "120"); }
         JsonAssert.Equal(bound, "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.AllocationCostModel);
         var dependency = bound.GetProperty("metadataAssumptions").EnumerateArray().Single();
         JsonAssert.Equal(dependency, "witnessIdentifier", "runtime-layout.coreclr-x64");
@@ -3727,7 +3738,7 @@ public sealed class PackageLayoutSmokeTests
             item.GetProperty("id").GetString() == dependency.GetProperty("assumptionId").GetString() && item.GetProperty("used").GetBoolean()), Is.True);
         using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
-            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof." + expected);
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
         var incompatible = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
             "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=AnyCPU",

@@ -16,7 +16,10 @@ internal static class NativeResourceViolationReplay
         limit = ArgumentNullGuard.NotNull(limit, nameof(limit));
         budgets = ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         var constraint = claim.Constraint.ResourceUpperBound!;
-        if (constraint.Metric is not (WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements))
+        if (constraint.Metric is not (WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements or WorkerResourceMetric.AllocatedBytes))
+        { return null; }
+        var layout = constraint.Metric == WorkerResourceMetric.AllocatedBytes ? new NativeResourceLayoutBinding(target).Bind() : null;
+        if (constraint.Metric == WorkerResourceMetric.AllocatedBytes && layout is null)
         { return null; }
         var owner = target.Total!;
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
@@ -86,13 +89,14 @@ internal static class NativeResourceViolationReplay
                     _ => throw new InvalidDataException("Unsupported resource input during replay.")
                 };
             }, cancellation);
+            var unsupportedByteStorage = false;
             BigInteger observed = 0;
             OperationId? site = null;
             BigInteger violatingPrefix = 0;
             void Observe(OperationId operation, BigInteger amount, bool approximation)
             {
                 RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
-                if (approximation || site is not null)
+                if (approximation || unsupportedByteStorage || site is not null)
                 { return; }
                 observed += amount;
                 if (observed > evaluatedLimit)
@@ -104,6 +108,16 @@ internal static class NativeResourceViolationReplay
             plan!.ReplayResources(inputs, (instruction, elements, approximation) =>
             {
                 ArgumentNullException.ThrowIfNull(instruction);
+                if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+                {
+                    if (approximation || site is not null)
+                    { return; }
+                    var bytes = ExactArrayBytes(factory, instruction, elements, layout!, cancellation);
+                    if (bytes is null)
+                    { unsupportedByteStorage = true; return; }
+                    Observe(instruction.Operation, bytes.Value, false);
+                    return;
+                }
                 if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
                 { Observe(instruction.Operation, constraint.Metric == WorkerResourceMetric.ArrayAllocations ? 1 : elements, approximation); }
             }, (instruction, approximation) =>
@@ -122,6 +136,7 @@ internal static class NativeResourceViolationReplay
             result.ResourceBound = new()
             {
                 Metric = constraint.Metric,
+                CostModel = constraint.CostModel,
                 DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256(constraint.UpperBound),
                 ObservedLowerBound = observedText,
                 EvaluatedUpperBound = limitText
@@ -147,6 +162,31 @@ internal static class NativeResourceViolationReplay
             }).OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable, StringComparer.Ordinal)];
             return result;
         }
+    }
+
+    private static BigInteger? ExactArrayBytes(IrFactory factory, IrAllocationInstruction instruction, int elements,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        instruction = ArgumentNullGuard.NotNull(instruction, nameof(instruction));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        if (elements < 0 || factory.GetTypeInfo(instruction.AllocatedType).ElementType is not { } element)
+        { return null; }
+        var type = factory.GetTypeInfo(element);
+        var storage = type.Kind == IrTypeKind.Boolean ? ResourceStorageKind.Byte : type.Kind == IrTypeKind.Integer ? type.Width switch
+        {
+            8 => ResourceStorageKind.Byte,
+            16 => ResourceStorageKind.Word16,
+            32 => ResourceStorageKind.Word32,
+            64 => ResourceStorageKind.Word64,
+            _ => ResourceStorageKind.Unspecified
+        } : ResourceStorageKind.Unspecified;
+        if (storage == ResourceStorageKind.Unspecified)
+        { return null; }
+        var shape = ResourceAllocationShape.Array(storage, ResourceExpression.Literal(elements));
+        var result = ResourceRuntimeLayout.Bound(shape, layout, cancellation);
+        return result.Bounds is { IsExact: true, Lower.Constant: { } bytes } ? bytes : null;
     }
 
     private static ImmutableDictionary<IrVarId, IrValue> Sample(CompilerTotalCallablePreparation owner, int size)

@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "19";
+    public const string Current = "20";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 21;
+    public const int Current = 22;
 }
 
 public static class WorkerManifestVersions

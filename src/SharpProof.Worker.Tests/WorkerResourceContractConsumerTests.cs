@@ -193,13 +193,16 @@ public sealed partial class WorkerTests
         claim.Outcome = WorkerClaimOutcome.Unknown;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
-    [Test]
-    public async Task LayoutBoundByteContractsReachValidatedCacheAndSarifConsumers()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LayoutBoundByteContractsReachValidatedCacheAndSarifConsumers(bool violates)
     {
-        using var project = TestProject.Create("""
+        var bound = violates ? 80 : 120;
+        var expected = violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven;
+        using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
-                [ResourceUpperBound(ResourceMetric.AllocatedBytes, 120)]
+                [ResourceUpperBound(ResourceMetric.AllocatedBytes, {{bound}})]
                 public static void Target() { for(int i=0;i<3;i++) { var a=new int[3]; } }
             }
             """);
@@ -210,21 +213,28 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
-        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(first, expected);
+        AssertClaimVerdict(second, expected);
         Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
         Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
             second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
         var result = second.ClaimResults.Single();
         var evidence = result.ResourceBound!;
         Assert.That(evidence.Metric, Is.EqualTo(WorkerResourceMetric.AllocatedBytes));
-        Assert.That(evidence.InferredUpperBound, Is.EqualTo("120"));
+        if (violates)
+        {
+            Assert.That(evidence.ObservedLowerBound, Is.EqualTo("120"));
+            Assert.That(evidence.EvaluatedUpperBound, Is.EqualTo("80"));
+            Assert.That(evidence.InferredUpperBound, Is.Null);
+        }
+        else
+        { Assert.That(evidence.InferredUpperBound, Is.EqualTo("120")); }
         Assert.That(evidence.CostModel, Is.EqualTo(WorkerResourceModels.AllocationCostModel));
         var dependency = evidence.MetadataAssumptions.Single();
         Assert.That(dependency.RuntimeModel, Is.EqualTo(WorkerResourceModels.AllocationLayout));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
-            .Single(static item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof." + expected);
         Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("metric").GetString(), Is.EqualTo("AllocatedBytes"));
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
         var assumption = result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId);

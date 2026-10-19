@@ -95,7 +95,10 @@ internal static class CompilerManifestArtifactProducer
         }
         if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
-        { resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()); }
+        {
+            snapshot.ResourceTargetPlatform = compilation.Options.Platform.ToString();
+            resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
+        }
         snapshot.ResourceMetadataReferences = snapshot.References.Where(reference =>
             reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToArray();
         var artifact = new CompilerManifestArtifact

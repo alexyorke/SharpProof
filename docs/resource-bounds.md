@@ -214,7 +214,7 @@ assumptions produce Unknown. A modeled upper bound larger than the requested
 limit also remains Unknown until an actual violating execution is established;
 an upper envelope alone does not refute a contract.
 
-For all three metrics, the worker also searches for
+For the three count metrics and admitted byte contracts, the worker also searches for
 an exact violating execution prefix. Every candidate must satisfy the owned
 entry constraints, receiver requirements, and all Requires clauses with their
 definedness guards. Successful array events carry their evaluated element count;
@@ -296,9 +296,17 @@ public static class ByteAllocationExample
 The inferred fresh-array storage is 40 bytes, including its header and alignment.
 This is cumulative source-owned instance storage, including returned allocations.
 It excludes runtime/JIT/GC infrastructure costs and does not measure peak live,
-retained or stack space. Larger inferred envelopes do not establish numerical
-violations; exact byte-event refutation remains to be implemented. Other
-allocation categories still need compiler extraction and effect accounting.
-Protocol 19, cache schema 21 and compiler artifact schema 36 invalidate earlier
+retained or stack space. Larger inferred envelopes alone do not establish a
+violation. Refutations require a concrete successful allocation prefix satisfying
+entry constraints and Requires. Byte replay reads typed IR element widths and
+computes each fresh array's header, payload and alignment under the bound layout.
+Boolean and typed 8/16/32/64-bit integer storage (including char) are admitted;
+opaque/floating IR storage stays Unknown. It never guesses widths from labels.
+Early returns, infeasible branches, prior exceptions and approximations cannot
+invent byte events. These are exact costs in the declared source storage model,
+not measured JIT/GC/process allocation traces. Refutations retain the owned
+layout dependency and expose the observed prefix and evaluated entry bound.
+Other allocation categories still need compiler extraction and effect accounting.
+Protocol 20, cache schema 22 and compiler artifact schema 36 invalidate earlier
 serialized evidence. Resource program/evidence model 3 and expression model 1
 are checked together; the existing three count metrics retain their meanings.

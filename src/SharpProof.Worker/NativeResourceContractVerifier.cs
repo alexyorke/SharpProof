@@ -22,7 +22,12 @@ internal static class NativeResourceContractVerifier
             var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, cancellation);
             if (!check.Verified)
             { return result; }
+            var layout = new NativeResourceLayoutBinding(target);
+            if (claim.Constraint.ResourceUpperBound!.Metric == WorkerResourceMetric.AllocatedBytes && layout.Bind() is null)
+            { return result; }
             metadata.Project(violation);
+            if (claim.Constraint.ResourceUpperBound.Metric == WorkerResourceMetric.AllocatedBytes)
+            { layout.Project(violation); }
             return violation;
         }
         catch (ResourceExpressionLimitException)

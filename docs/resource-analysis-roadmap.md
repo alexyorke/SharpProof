@@ -51,6 +51,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] Native-worker derivation and checking of cumulative resource upper bounds.
 - [x] Exact-prefix numeric violations for array allocations and allocated elements.
 - [x] Exact source-loop-entry numeric violation evidence.
+- [x] Exact typed-array byte-prefix refutations with owned layout evidence.
 - [x] Bind native metadata cost assumptions and their provenance.
 - [x] Protocol, manifest, schema and cache-identity integration.
 - [x] SARIF/result projection with independent claim outcomes and Unknown reasons.
@@ -789,3 +790,57 @@ and all four coverage shards. Qualification failed at 2987/3062 changed trusted
 lines (97.55%), leaving 75 gaps against the unchanged 100% baseline. This report
 excludes the newer byte-contract implementation; its exact-head CI and eventual
 full qualification remain required.
+
+## Exact typed-array byte prefixes
+
+Byte refutation now observes successful typed IR array-allocation events. It
+computes header-plus-payload alignment under the owned layout model, accumulates
+actual execution-prefix costs and requires the prefix to exceed the evaluated
+entry bound. Boolean and typed 8/16/32/64-bit integer storage, including char,
+are admitted; unknown storage never acquires a guessed width. Unsupported storage
+stops later byte evidence from crossing the missing event. The existing entry,
+Requires, approximation, source-location and replay-budget guards remain required.
+
+Both Proven and Refuted byte results project the owned layout dependency. Protocol
+validation rejects decided byte evidence without that dependency, including
+cached results. Protocol 20/cache 22 invalidate the earlier semantics; compiler
+artifact 36 and program/evidence model 3 are unchanged because the event typing
+and evidence fields already existed. This concerns the declared source storage
+model, not physical JIT/GC/process allocation measurements.
+
+Initial targeted validation passed 246 native/protocol cases, then 411 combined
+native/resource/protocol/golden/cache/SARIF cases. Added controls cover zero-length
+arrays, mixed widths, sequences, repeated allocations, executed branches, Requires,
+and loop envelopes whose allocations never execute. Further prefix-boundary and
+actual NuGet proof/refutation controls are undergoing final validation.
+
+This advances the array byte path. Continue through object/string/boxing/delegate/
+closure extraction and effect accounting, alias/escape/liveness, peak auxiliary
+versus retained output, stack models and every remaining phase E/F requirement.
+The full roadmap and unchanged 100% qualification remain open.
+
+Final focused replay validation passed 417 native/resource/protocol/golden/cache/
+SARIF tests, including infeasible Requires branches, prior exceptions, opaque
+metadata and floating/unknown IR storage. Both actual NuGet proof/refutation
+consumers passed. An initial test incorrectly expected advisory verification to
+succeed for an explicit refuted contract; it now preserves and checks the existing
+SP0051 build failure while verifying the concrete byte prefix and layout evidence.
+
+Exact-head CI for c9170a1a0 exposed a separate semantic-cache regression:
+CompilerOptionChangesReuseEquivalentSemanticArtifacts failed in canonical-package
+and the package coverage shard because target platform was serialized even when
+no byte contract used it. Capture now records platform only for byte-selected
+compilations. The original cache-reuse integration test and both byte consumers
+then passed together (3 tests), and all 417 focused native tests passed after the
+fix. Ordinary resource contracts assert that both platform and layout references
+remain absent. This preserves the prior cache semantics without weakening the
+layout binding for byte claims. A new exact-head run remains required.
+
+After the platform-capture fix, the final full analyzer suite passed all 1388
+tests with zero build warnings/errors. All quality/compatibility categories
+passed; final C# formatting, documentation drift and 723 local links passed.
+Layout remains 2661 source files, 59 projects and 151 pinned common files.
+The canonical/package failure on c9170a1a0 and its failed package coverage shard
+are not a qualification pass; the fixed pushed commit must receive fresh CI.
+The last complete aggregate coverage report remains the earlier 180d4a95a report,
+with the unchanged 100% baseline still required for final delivery.
