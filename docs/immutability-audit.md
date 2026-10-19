@@ -3387,10 +3387,20 @@ Validate full Frontend generic/array/comparer/capture controls after the diction
 Status: open before edits.
 
 IMM-M115: Main verified 18 Fuzz test fixed-vector/set/singleton-map candidates across
-13 files. Freeze ordered outer vectors for semantic cases, campaign/replay sources,
+12 files. Freeze ordered outer vectors for semantic cases, campaign/replay sources,
 JSON mutation delegates and structural parents. Preserve nested runtime/reflection
 arguments and mutation callbacks. CompileActual consumes IReadOnlyList and Count.
 Freeze known-failure/child-source sets with ordinal comparer and three singleton
 interpreter maps. Eight strict ToDictionary candidates remain separate pending explicit
 construction; no blanket ToImmutableDictionary replacement. Validate all ordinary Fuzz.
+Status: open before edits.
+
+IMM-M116: Main traced the final 17 Frontend private map rebindings after #331.
+Use readonly builders for list fields, closed-sealed type cache, CFG blocks, preserved
+source calls, call preconditions, region catch/kind/entry/token/finally/filter maps and
+explicit throw types. Preserve strict AddUnique and overwrite indexers; token ordinal
+reads Count before insertion. Result freezes both published call maps. Filter resolver
+keeps its immutable input contract and receives _blocks.ToImmutable after CFG block
+registration. Keep traversal queues/stacks, phase scalars and frame lifecycle unchanged.
+Validate full Frontend and source exception/filter, opaque/list and metadata call paths.
 Status: open before edits.
