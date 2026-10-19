@@ -154,6 +154,19 @@ internal sealed partial class ResourceBoundsAnalysis
         SpecialType.System_UInt64 or SpecialType.System_Single or SpecialType.System_Double;
     }
 
+    private static ResourceStorageKind Storage(ITypeSymbol type)
+    {
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
+        return type.SpecialType switch
+        {
+            SpecialType.System_Boolean or SpecialType.System_Byte or SpecialType.System_SByte => ResourceStorageKind.Byte,
+            SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char => ResourceStorageKind.Word16,
+            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Single => ResourceStorageKind.Word32,
+            SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Double => ResourceStorageKind.Word64,
+            _ => throw new InvalidOperationException("Unsupported primitive array storage.")
+        };
+    }
+
     private static bool SupportedType(ITypeSymbol type)
     {
         type = ArgumentNullGuard.NotNull(type, nameof(type));
@@ -230,7 +243,7 @@ internal sealed partial class ResourceBoundsAnalysis
             case IArrayCreationOperation array when array.Type is IArrayTypeSymbol type &&
                 SupportedType(type) && array.DimensionSizes.Length == 1 && array.Initializer is null:
                 var size = Size(array.DimensionSizes[0]);
-                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.Array(size.Expression));
+                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.TypedArray(ResourceAllocationShape.Array(Storage(type.ElementType), size.Expression)));
                 break;
             case ISimpleAssignmentOperation assignment when !assignment.IsRef:
                 result = Writable(assignment.Target)

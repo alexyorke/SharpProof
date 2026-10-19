@@ -264,8 +264,17 @@ effects are separate. A factory that returns a cached string or delegate does
 not establish a fresh allocation merely because its instance shape has a size.
 Unknown shapes and incompatible contexts return no partial interval.
 
-These shapes and their closed codec are implementation infrastructure. They do
-not yet expose byte contracts, prove target compatibility, or measure peak/retained
-heap or stack memory. Compiler extraction, callable input ownership, native layout
-assumptions and result projection are the next integration steps. The existing
-three public metrics retain their documented meanings.
+Resource program model 3 retains storage widths for every admitted primitive
+array creation, including source calls. Its strict codec rejects unrelated,
+noncanonical or conflicting shape facts. The native checker validates callable
+input ownership and progress before deriving a conditional cumulative byte upper
+bound: sequence costs add, branch costs take a maximum, and repeated costs use
+the checked iteration envelope. Untyped arrays, opaque metadata costs, invalid
+progress and incompatible contexts yield Unknown with no partial byte bound.
+
+This internal derivation does not yet expose byte contracts, establish the target
+runtime assumption, or measure peak/retained heap or stack memory. Layout evidence
+binding and result projection remain required before publishing byte verdicts.
+Other allocation categories still need compiler extraction and effect accounting.
+Protocol 18, cache schema 20 and compiler artifact schema 35 invalidate earlier
+serialized programs. The existing three public metrics retain their meanings.

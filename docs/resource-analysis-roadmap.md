@@ -653,3 +653,55 @@ For published composed-rank checkpoint `45f6419c7`, all non-coverage workflows a
 all four coverage shards passed. Qualification failed at 2510/2572 changed trusted
 lines (97.59%), leaving 62 gaps against the unchanged 100% baseline. The memory
 layer is not included in that measurement and requires its own exact-head CI.
+
+## Owned typed-array program integration
+
+Resource program model 3 now embeds typed allocation shapes. Primitive source
+array creation preserves 1-, 2-, 4- and 8-byte element storage, including arrays
+inside source calls. The strict program codec rejects unrelated shapes, mismatched
+extents and noncanonical encodings. Native program validation checks shape/input
+ownership before deriving any established count metric.
+
+An internal native allocation checker independently derives conditional cumulative
+byte upper bounds from those facts and the reviewed layout model. Sequences add,
+choices take upper maxima, and repeats multiply by native-checked rank envelopes.
+It deliberately supplies no cumulative lower bound: a branch maximum or loop
+upper envelope is insufficient evidence for one. Untyped arrays, opaque metadata,
+foreign inputs, invalid ranks and incompatible layouts return Unknown with no
+partial bound. Cancellation propagates. The result is explicitly conditional,
+not a published byte-contract verdict or proof of the deployed runtime.
+
+This embedding changes protocol 17 to 18, cache schema 19 to 20, compiler artifact
+schema 34 to 35 and resource program model 2 to 3. Manifest schema 6, expression
+model 1 and the existing public three-metric cost model remain unchanged.
+
+Initial focused validation passed 194 native resource/protocol tests and 325
+source resource/compiler-capture tests. The latter includes all twelve admitted
+primitive element types. Expanded compiler-to-native controls additionally cover
+mixed widths, source-call substitution, repetition and branch envelopes. Final
+broader and quality results are recorded below when complete.
+
+Phase C remains unchecked. Next bind the declared runtime/layout assumption to
+compiler target platform, reviewed references and owned manifest evidence; then
+expose native byte contracts and projection. Continue with object/string/boxing/
+delegate/closure extraction and effect accounting, liveness/escape, retained
+output and stack analysis, then every remaining phase E/F requirement. No item
+is considered complete merely because this infrastructure exists.
+
+Broader validation passed all 555 IR tests and all 1387 analyzer tests. The first
+full analyzer attempt terminated in NuGet SDK resolver migration with a mutex
+exception; a clean retry passed with zero build warnings/errors. The worker run
+exposed two golden expectations for compiler artifact schema 34; both were updated
+to 35, and all 81 golden controls then passed. The final combined native resource,
+protocol, compiler-artifact and golden run passed 380 tests, including direct
+native-entry rejection of conflicting detached storage facts. The full worker
+run is tracked separately until its terminal result is available.
+All quality/compatibility categories passed, as did final C# formatting,
+documentation drift and 723 local links. Layout evaluated 2658 source files,
+59 projects and 151 pinned common files.
+
+Exact published foundation `9628aff14` passed every non-coverage CI workflow and
+all four coverage shards. Aggregate qualification failed at 2807/2876 changed
+trusted lines (97.60%), with 69 gaps against the unchanged 100% baseline. That
+measurement excludes the newer typed-program integration and cannot qualify it.
+The exported local report records the complete gap list for later qualification.

@@ -46,6 +46,11 @@ internal static class ResourceProgramCodec
         { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(length, cancellation)); }
         else
         { writer.WriteNullValue(); }
+        writer.WritePropertyName("allocation");
+        if (program.Allocation is { } allocation)
+        { writer.WriteBase64StringValue(ResourceAllocationShapeCodec.Encode(allocation, cancellation)); }
+        else
+        { writer.WriteNullValue(); }
         writer.WritePropertyName("rank");
         if (program.Rank is { } rank)
         {
@@ -109,7 +114,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "rank", "metadata", "repeatKind", "children");
+        Fields(node, "kind", "length", "allocation", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -121,9 +126,11 @@ internal static class ResourceProgramCodec
         if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() != arity)
         { throw new InvalidDataException("Resource program arity is invalid."); }
         var length = node.GetProperty("length");
+        var allocationNode = node.GetProperty("allocation");
         var rank = node.GetProperty("rank");
         var metadataNode = node.GetProperty("metadata");
         if (kind != ResourceProgramKind.AllocateArray && length.ValueKind != JsonValueKind.Null ||
+            kind != ResourceProgramKind.AllocateArray && allocationNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
@@ -138,7 +145,19 @@ internal static class ResourceProgramCodec
         if (kind == ResourceProgramKind.Zero)
         { return ResourceProgram.Zero; }
         if (kind == ResourceProgramKind.AllocateArray)
-        { return ResourceProgram.Array(Expression(length, cancellation)); }
+        {
+            var decodedLength = Expression(length, cancellation);
+            if (allocationNode.ValueKind == JsonValueKind.Null)
+            { return ResourceProgram.Array(decodedLength); }
+            var encoded = Text(allocationNode);
+            var bytes = Convert.FromBase64String(encoded);
+            if (Convert.ToBase64String(bytes) != encoded)
+            { throw new InvalidDataException("Resource allocation encoding is not canonical."); }
+            var allocation = ResourceAllocationShapeCodec.Decode(bytes, cancellation);
+            if (allocation.Kind != ResourceAllocationKind.Array || !allocation.Extent.Equals(decodedLength))
+            { throw new InvalidDataException("Resource allocation shape disagrees with its array program."); }
+            return ResourceProgram.TypedArray(allocation);
+        }
         if (kind == ResourceProgramKind.Repeat)
         {
             Fields(rank, "kind", "initial", "limit", "step", "width", "checked");

@@ -38,7 +38,7 @@ internal static class NativeResourceProgramVerifier
         cancellation.ThrowIfCancellationRequested();
         try
         {
-            ResourceExpressionOwnership.Validate(ResourceExpression.Zero, callableId, owner, cancellation);
+            ResourceProgramOwnership.Validate(program, callableId, owner, cancellation);
             return new(Visit(program, callableId, owner, bindMetadata, cancellation), null);
         }
         catch (InvalidDataException exception)
@@ -92,7 +92,7 @@ internal static class NativeResourceProgramVerifier
         }
     }
 
-    private static ResourceExpression CheckRank(ResourceLoopRank rank, CancellationToken cancellation)
+    internal static ResourceExpression CheckRank(ResourceLoopRank rank, CancellationToken cancellation)
     {
         rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
         cancellation.ThrowIfCancellationRequested();

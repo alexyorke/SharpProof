@@ -26,6 +26,13 @@ internal static class ResourceProgramOwnership
         cancellation.ThrowIfCancellationRequested();
         if (program.Length is { } length)
         { ResourceExpressionOwnership.Validate(length, callableId, owner, cancellation); }
+        if (program.Allocation is { } allocation)
+        {
+            if (program.Kind != ResourceProgramKind.AllocateArray || allocation.Kind != ResourceAllocationKind.Array ||
+                !allocation.Extent.Equals(program.Length))
+            { throw new InvalidDataException("MalformedResourceAllocation"); }
+            ResourceExpressionOwnership.Validate(allocation.Extent, callableId, owner, cancellation);
+        }
         if (program.Rank is { } rank)
         {
             ResourceExpressionOwnership.Validate(rank.Initial, callableId, owner, cancellation);

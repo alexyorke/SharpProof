@@ -32,11 +32,12 @@ internal sealed class ResourceLoopRank
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 2;
+    internal const int ModelVersion = 3;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceLoopRank? Rank { get; }
     internal ResourceMetadataReference? Metadata { get; }
+    internal ResourceAllocationShape? Allocation { get; }
     internal ResourceRepeatKind RepeatKind { get; }
     internal ImmutableArray<ResourceProgram> Children { get; }
     internal int NodeCount { get; }
@@ -45,7 +46,7 @@ internal sealed class ResourceProgram
     internal static ResourceProgram MetadataBoundary { get; } = new(ResourceProgramKind.MetadataBoundary, null, null, default, []);
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
-        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null)
+        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
@@ -53,6 +54,7 @@ internal sealed class ResourceProgram
         Length = length;
         Rank = rank;
         Metadata = metadata;
+        Allocation = allocation;
         RepeatKind = repeatKind;
         Children = children;
         var nodes = 1 + (length?.NodeCount ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
@@ -81,6 +83,14 @@ internal sealed class ResourceProgram
     {
         length = ArgumentNullGuard.NotNull(length, nameof(length));
         return new(ResourceProgramKind.AllocateArray, length, null, default, []);
+    }
+
+    internal static ResourceProgram TypedArray(ResourceAllocationShape allocation)
+    {
+        allocation = ArgumentNullGuard.NotNull(allocation, nameof(allocation));
+        if (allocation.Kind != ResourceAllocationKind.Array)
+        { throw new ArgumentException("An array program requires an array storage shape.", nameof(allocation)); }
+        return new(ResourceProgramKind.AllocateArray, allocation.Extent, null, default, [], allocation: allocation);
     }
 
     internal static ResourceProgram Sequence(ResourceProgram left, ResourceProgram right)

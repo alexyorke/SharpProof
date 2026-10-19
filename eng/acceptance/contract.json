@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 17,
+    "protocolVersion": 18,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 34,
+    "compilerArtifactSchemaVersion": 35,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 19,
+    "schemaVersion": 20,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -728,6 +728,7 @@
           "src/SharpProof.Worker/ExplicitThrowSites.cs",
           "src/SharpProof.Worker/NativeEffectClaims.cs",
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceAllocationVerifier.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",
           "src/SharpProof.Worker/NativeResourceViolationReplay.cs",

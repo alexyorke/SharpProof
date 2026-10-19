@@ -224,4 +224,26 @@ public sealed partial class ResourceBoundsTests
         const string source = "public class C { [System.CodeDom.Compiler.GeneratedCode(\"tool\", \"1\")] public void M() {} }";
         Assert.That(await AnalyzerTestHost.AnalyzeAsync(source, null, ["SP0060"]), Is.Empty);
     }
+    [TestCase("bool", 1)]
+    [TestCase("byte", 1)]
+    [TestCase("sbyte", 1)]
+    [TestCase("short", 2)]
+    [TestCase("ushort", 2)]
+    [TestCase("char", 2)]
+    [TestCase("int", 3)]
+    [TestCase("uint", 3)]
+    [TestCase("float", 3)]
+    [TestCase("long", 4)]
+    [TestCase("ulong", 4)]
+    [TestCase("double", 4)]
+    public void CompilerRetainsPrimitiveAllocationStorage(string element, int storage)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        var result = Analyze($"var values = new {element}[3];", "");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        var allocation = result.Bounds!.Program.Allocation;
+        Assert.That(allocation, Is.Not.Null);
+        Assert.That((int)allocation!.Storage, Is.EqualTo(storage));
+        Assert.That(allocation.Extent.Constant, Is.EqualTo(new System.Numerics.BigInteger(3)));
+    }
 }
