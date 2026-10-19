@@ -72,8 +72,8 @@ internal static class TotalCallableVerifier
     // Raw completion projection; callers retain admission, cancellation and
     // ownership checks. The supplied outcome and meter must be actual/non-null.
     internal static CallableEntryFeasibility CompleteEntry(ProofOutcome outcome,
-        MethodResourceBudget resourceBudget, IReadOnlyDictionary<ProofJustification, string> labels,
-        IReadOnlyDictionary<string, string> ids)
+        MethodResourceBudget resourceBudget, ImmutableDictionary<ProofJustification, string> labels,
+        ImmutableDictionary<string, string> ids)
     {
         System.ArgumentNullException.ThrowIfNull(ids);
         System.ArgumentNullException.ThrowIfNull(labels);
@@ -273,7 +273,7 @@ internal static class TotalCallableVerifier
     }
 
     internal static CallableEntryFeasibility ProjectEntry(PassiveCallableCheckResult entry,
-        IReadOnlyDictionary<string, string> requiresByLabel)
+        ImmutableDictionary<string, string> requiresByLabel)
     {
         if (entry.Reason != WorkerClaimReason.None)
         { return CallableEntryFeasibility.Unknown(entry.Reason); }

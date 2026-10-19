@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -42,7 +43,7 @@ public sealed class Pr275CompanionValidationCoverageTests
             target, Location.None, isOpenTarget: false);
         var relationships = ContractForSymbolMatcher.ClassifyCompanionRelationships(
             ContractForSymbolMatcher.DiscoverCompanionRelationships(Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         var clauses = new ContractClauseInventoryBuilder(Compilation);
 
         var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
@@ -53,14 +54,14 @@ public sealed class Pr275CompanionValidationCoverageTests
                     _ = ContractForCompanionValidator.ValidateRelationship(
                         missing == "companion" ? null! : companion,
                         missing == "relationships" ? null! : relationships,
-                        missing == "diagnostics" ? null! : diagnostics);
+                        missing == "diagnostics" ? null! : diagnostics.Add);
                     break;
                 case "validation":
                     ContractForCompanionValidator.Validate(
                         missing == "companion" ? null! : companion,
                         missing == "compilation" ? null! : Compilation,
                         missing == "clauses" ? null! : clauses,
-                        missing == "diagnostics" ? null! : diagnostics, default);
+                        missing == "diagnostics" ? null! : diagnostics.Add, default);
                     break;
                 case "location":
                     _ = ContractForCompanionValidator.GetSourceLocation(
@@ -74,7 +75,7 @@ public sealed class Pr275CompanionValidationCoverageTests
         }));
 
         Assert.That(exception!.ParamName, Is.EqualTo(missing));
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(diagnostics.ToImmutable(), Is.Empty);
     }
 
     [Test]
@@ -86,10 +87,10 @@ public sealed class Pr275CompanionValidationCoverageTests
         var descriptor = relationships.Accepted.Single();
         var companion = new ResolvedCompanion(descriptor.Type, descriptor.Target,
             Location.None, descriptor.ContractTarget.IsOpen);
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
-        Assert.That(ContractForCompanionValidator.ValidateRelationship(companion, relationships, diagnostics), Is.True);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(ContractForCompanionValidator.ValidateRelationship(companion, relationships, diagnostics.Add), Is.True);
+        Assert.That(diagnostics.ToImmutable(), Is.Empty);
     }
 
     [Test]

@@ -59,7 +59,7 @@ internal static class CallableProofCore
 {
     internal static ImmutableArray<string> Create(
         ProvenOutcome outcome,
-        IReadOnlyDictionary<ProofJustification, string> labels)
+        ImmutableDictionary<ProofJustification, string> labels)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         ArgumentNullException.ThrowIfNull(labels);
@@ -89,7 +89,7 @@ internal static class CallableProofCore
 
     internal static IEnumerable<string> AssumptionIds(
         IEnumerable<ProofJustification> proofCore,
-        IReadOnlyDictionary<ProofJustification, string>
+        ImmutableDictionary<ProofJustification, string>
             assumptionIds)
     {
         System.ArgumentNullException.ThrowIfNull(proofCore);

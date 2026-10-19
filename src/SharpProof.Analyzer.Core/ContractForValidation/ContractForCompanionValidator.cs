@@ -6,31 +6,30 @@ namespace SharpProof.ContractForValidation;
 /// </summary>
 internal static class ContractForCompanionValidator
 {
-    // These sink adapters preserve the explicitly mutable internal API used by
-    // callers that collect diagnostics. Production uses immutable owned data.
+    // Sink adapters retain guard order while callers own diagnostic collection.
     internal static bool ValidateRelationship(
         ResolvedCompanion companion,
         ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
-        List<Diagnostic> diagnostics)
+        Action<Diagnostic> diagnostics)
     {
         companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
         relationships = RepositoryParameterGuard.NotNull(relationships, nameof(relationships));
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
-        return ReportRelationship(companion, relationships, diagnostics.Add);
+        return ReportRelationship(companion, relationships, diagnostics);
     }
 
     internal static void Validate(
         ResolvedCompanion companion,
         Compilation compilation,
         ContractClauseInventoryBuilder clauses,
-        List<Diagnostic> diagnostics,
+        Action<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
         companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
-        ReportValidation(companion, compilation, clauses, diagnostics.Add, cancellationToken);
+        ReportValidation(companion, compilation, clauses, diagnostics, cancellationToken);
     }
 
     internal static bool ReportRelationship(

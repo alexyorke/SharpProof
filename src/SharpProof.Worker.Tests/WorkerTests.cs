@@ -4381,25 +4381,22 @@ public sealed partial class WorkerTests
         System.ArgumentNullException.ThrowIfNull(snapshot);
         var manifest = snapshot.CompilerManifest.Manifest;
         Assert.That(manifest.Callables, Has.Length.EqualTo(2));
-        var callables = manifest.Callables.Select((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
+        var originalCallables = manifest.Callables.Select((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
         {
             CallableId = callable.CallableId,
             Coverage = WorkerCallableCoverage.Incomplete,
             Reason = index == 0 ? WorkerCallableCoverageReason.InfrastructureFailure : WorkerCallableCoverageReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        })).ToArray();
-        var claims = manifest.Callables.SelectMany((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (new WorkerClaimResult
+        })).ToImmutableArray();
+        var originalClaims = manifest.Callables.SelectMany((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (new WorkerClaimResult
         {
             ClaimId = claimId,
             Outcome = WorkerClaimOutcome.Unknown,
             Reason = index == 0 ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        })))).ToArray();
-        if (reverseRecords)
-        {
-            Array.Reverse(callables);
-            Array.Reverse(claims);
-        }
+        })))).ToImmutableArray();
+        var callables = reverseRecords ? originalCallables.Reverse().ToImmutableArray() : originalCallables;
+        var claims = reverseRecords ? originalClaims.Reverse().ToImmutableArray() : originalClaims;
         var run = WorkerResultAssembler.Classify(callables, claims);
         return WorkerResultAssembler.Create(snapshot.InputHash, manifest, run.Status, run.Failure, callables, claims,
             request.Budgets, WorkerCacheStatus.Disabled, 0, requestHash: WorkerProtocolJson.ComputeRequestHash(request),

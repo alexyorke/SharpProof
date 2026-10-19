@@ -605,13 +605,14 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
     private IrTypeId RegionInteger => _context.Factory.GetOrCreateIntegerType(32, true);
 
-    private IrBlockId EnterRegionFinallyChain(IReadOnlyList<ControlFlowRegion> regions, IrBlockId target,
+    private IrBlockId EnterRegionFinallyChain(ImmutableArray<ControlFlowRegion> regions, IrBlockId target,
         OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
-        regions = RepositoryParameterGuard.NotNull(regions, nameof(regions));
+        if (regions.IsDefault)
+        { throw new ArgumentNullException(nameof(regions)); }
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
+        for (var ordinal = regions.Length - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
             // Every chain uses this graph's finally regions, registered before body lowering.

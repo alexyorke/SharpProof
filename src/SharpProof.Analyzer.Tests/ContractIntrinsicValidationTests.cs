@@ -83,9 +83,10 @@ public sealed class ContractIntrinsicValidationTests
     }
 
     private static void AssertNestingDiagnostic(
-        IReadOnlyCollection<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        ImmutableArray<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
-        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        if (diagnostics.IsDefault)
+        { throw new ArgumentNullException(nameof(diagnostics)); }
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Select(diagnostic =>

@@ -6,10 +6,11 @@ namespace SharpProof.Worker.Launcher;
 internal static partial class LauncherPresentation
 {
     internal static string AssumptionsDeclaredMessage(
-        string callableId, IReadOnlyList<WorkerAssumptionEvidence> assumptions)
+        string callableId, ImmutableArray<WorkerAssumptionEvidence> assumptions)
     {
         System.ArgumentNullException.ThrowIfNull(callableId);
-        ArgumentNullException.ThrowIfNull(assumptions);
+        if (assumptions.IsDefault)
+        { throw new ArgumentNullException(nameof(assumptions)); }
         var user = assumptions
             .Where(static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume))

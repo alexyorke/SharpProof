@@ -181,12 +181,13 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         CompilerCallablePreparation target,
         string claimId,
         WorkerEffectEvidenceCertainty certainty,
-        IReadOnlyList<string> proofCore,
-        IReadOnlySet<string> usedAssumptionIds)
+        ImmutableArray<string> proofCore,
+        ImmutableHashSet<string> usedAssumptionIds)
     {
         System.ArgumentNullException.ThrowIfNull(claimId);
         ArgumentNullGuard.NotNull(target, nameof(target));
-        ArgumentNullGuard.NotNull(proofCore, nameof(proofCore));
+        if (proofCore.IsDefault)
+        { throw new ArgumentNullException(nameof(proofCore)); }
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         var record = Create(
             target,
@@ -196,14 +197,14 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
             certainty,
             projectAssumptions: false);
         record = record with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions };
-        record = record with { ProofCore = [.. proofCore] };
+        record = record with { ProofCore = proofCore };
         record = record with { Assumptions = MarkAssumptionsUsed(target, usedAssumptionIds) };
         return record;
     }
 
     internal static ImmutableArray<WorkerAssumptionEvidence> MarkAssumptionsUsed(
         CompilerCallablePreparation target,
-        IReadOnlySet<string> usedAssumptionIds)
+        ImmutableHashSet<string> usedAssumptionIds)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));

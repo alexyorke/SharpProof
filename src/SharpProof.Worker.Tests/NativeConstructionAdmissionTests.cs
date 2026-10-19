@@ -120,7 +120,7 @@ public sealed class NativeConstructionAdmissionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("default-construction-admission");
-        var parameters = new List<PassiveParameterBinding>();
+        var parameters = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
         if (dimension == "parameters")
         {
             for (var index = 0; index < count; index++)
@@ -142,6 +142,6 @@ public sealed class NativeConstructionAdmissionTests
         var result = factory.CreateVariable("result", factory.IntegerType);
         var ensures = new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(result), factory.Integer(0)), factory.Boolean(true), site);
-        return new PassiveCallableCandidate("default-construction-admission", builder.Build(), [.. parameters], result, [], [ensures]);
+        return new PassiveCallableCandidate("default-construction-admission", builder.Build(), parameters.ToImmutable(), result, [], [ensures]);
     }
 }

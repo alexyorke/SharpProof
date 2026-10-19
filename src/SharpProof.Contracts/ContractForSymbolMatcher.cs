@@ -373,7 +373,7 @@ internal static class ContractForSymbolMatcher
     internal static CompanionResolution ResolveCompanion(
         ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
+        ImmutableDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
     {
 
         RepositoryParameterGuard.RequireInitialized(companions.IsDefault, nameof(companions), "Array must be initialized.");
@@ -387,7 +387,7 @@ internal static class ContractForSymbolMatcher
 
     internal static CompanionResolution ResolveCompanion(
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol,
+        ImmutableDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
@@ -472,7 +472,7 @@ internal static class ContractForSymbolMatcher
 
     private static IEnumerable<CompanionDescriptor> GetCompanionCandidates(
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol,
+        ImmutableDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));

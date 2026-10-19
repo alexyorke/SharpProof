@@ -120,7 +120,7 @@ public sealed class CompilerIlStreamFillTests
 
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token));
         Assert.That(cancellation.IsCancellationRequested, Is.True);
-        Assert.That(stream.Reads, Has.Count.EqualTo(1));
+        Assert.That(stream.Reads, Has.Length.EqualTo(1));
         Assert.That(stream.Reads[0], Is.EqualTo((Offset: 0, Count: 81920)));
         Assert.That(inner.Position, Is.EqualTo(50000));
         Assert.That(destination.Take(50000).ToImmutableArray(), Is.EqualTo(source.Take(50000).ToImmutableArray()));
@@ -146,7 +146,9 @@ public sealed class CompilerIlStreamFillTests
     // short reads; no compiler object, PE image, authority or provider hook.
     private sealed class PartialReadStream(Stream inner, int maximumRead, CancellationTokenSource? cancellation = null) : Stream
     {
-        internal List<(int Offset, int Count)> Reads { get; } = (inner is null ? throw new System.ArgumentNullException(nameof(inner)) : []);
+        private readonly ImmutableArray<(int Offset, int Count)>.Builder _reads = (inner is null ? throw new System.ArgumentNullException(nameof(inner)) : ImmutableArray.CreateBuilder<(int Offset, int Count)>());
+
+        internal ImmutableArray<(int Offset, int Count)> Reads => _reads.ToImmutable();
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
@@ -160,9 +162,9 @@ public sealed class CompilerIlStreamFillTests
         public override int Read(byte[] buffer, int offset, int count)
         {
             System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer));
-            Reads.Add((offset, count));
+            _reads.Add((offset, count));
             var read = inner.Read(buffer, offset, Math.Min(count, maximumRead));
-            if (read > 0 && Reads.Count == 1)
+            if (read > 0 && _reads.Count == 1)
             { cancellation?.Cancel(); }
             return read;
         }

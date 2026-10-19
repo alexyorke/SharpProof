@@ -682,10 +682,10 @@ internal sealed partial class LauncherArguments
 
     private readonly ImmutableDictionary<string, string> _values;
 
-    private LauncherArguments(IReadOnlyDictionary<string, string> values)
+    private LauncherArguments(ImmutableDictionary<string, string> values)
     {
         System.ArgumentNullException.ThrowIfNull(values);
-        _values = values.ToImmutableDictionary(StringComparer.Ordinal);
+        _values = values;
     }
 
     internal static bool TryParse(string[] args, out LauncherArguments arguments)

@@ -202,18 +202,19 @@ public sealed class NativeTotalCandidateCoreTests
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         using var cancellation = new CancellationTokenSource();
-        var checks = new List<TotalCandidateCheck>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCandidateCheck>();
         if (stage == "before")
         { cancellation.Cancel(); }
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, check =>
         {
             System.ArgumentNullException.ThrowIfNull(check);
-            checks.Add(check);
+            checkBuilder.Add(check);
             if (stage == "enrolled" || stage == "checked" && check.Checked)
             { cancellation.Cancel(); }
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
-        Assert.That(checks, Has.Count.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
-        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
+        var checks = checkBuilder.ToImmutable();
+        Assert.That(checks, Has.Length.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
+        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Length).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
         if (stage == "checked")
         {
@@ -261,15 +262,16 @@ public sealed class NativeTotalCandidateCoreTests
         using var session = new CallableSolverSession(preparation.Total!.Program.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         using var cancellation = new CancellationTokenSource();
-        var checks = new List<TotalCallableClaimCheck>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
         {
             System.ArgumentNullException.ThrowIfNull(check);
-            checks.Add(check);
+            checkBuilder.Add(check);
             if (check.Checked)
             { cancellation.Cancel(); }
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
-        Assert.That(checks, Has.Count.EqualTo(3));
+        var checks = checkBuilder.ToImmutable();
+        Assert.That(checks, Has.Length.EqualTo(3));
         Assert.That(checks.Take(2).Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId)), Is.EqualTo(preparation.Entry.ClaimIds));
         Assert.That(checks.Take(2).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
@@ -329,11 +331,11 @@ public sealed class NativeTotalCandidateCoreTests
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        var checks = new List<TotalCandidateCheck>();
-        var entries = new List<PassiveCallableCheckResult>();
-        await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checks.Add, entries.Add,
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCandidateCheck>();
+        var entryBuilder = ImmutableArray.CreateBuilder<PassiveCallableCheckResult>();
+        await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checkBuilder.Add, entryBuilder.Add,
             TestContext.CurrentContext.CancellationToken, session, resource, () => session.ConsumedResourceCount);
-        return new(checks.ToImmutableArray(), entries.ToImmutableArray(), session.ConsumedResourceCount);
+        return new(checkBuilder.ToImmutable(), entryBuilder.ToImmutable(), session.ConsumedResourceCount);
     }
 
     private static void AssertInitialAndProven(CoreRun run, int count)

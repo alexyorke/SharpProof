@@ -5,11 +5,12 @@ namespace SharpProof.Worker.Test;
 
 internal static class PortableGraphChanges
 {
-    internal static int FindIndex<T>(IReadOnlyList<T> rows, Predicate<T> predicate)
+    internal static int FindIndex<T>(ImmutableArray<T> rows, Predicate<T> predicate)
     {
-        ArgumentNullException.ThrowIfNull(rows);
+        if (rows.IsDefault)
+        { throw new ArgumentNullException(nameof(rows)); }
         ArgumentNullException.ThrowIfNull(predicate);
-        for (var index = 0; index < rows.Count; index++)
+        for (var index = 0; index < rows.Length; index++)
         {
             if (predicate(rows[index]))
             { return index; }
