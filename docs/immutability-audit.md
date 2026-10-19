@@ -3545,3 +3545,10 @@ populated in ordinary and region initializers; remove duplicate mutable context 
 and frame copy. Preserve null-session false and opaque-call widening behavior. Validate
 metadata nominal/IL/stack and recursive-requires controls via the Release semantic gate.
 Status: open before edits.
+IMM-M128 verified: 30 baseline/current controls pass after adding missing positional
+and null-argument probes. Main preserved the original object-array staging contract in
+PlugAndPlay with an object builder; string conversion remains at ArgumentList.Add,
+avoiding earlier null normalization. All seven scripts parse clean, independent review
+confirms order/comparer/XML identity/Windows variants and duplicate heading anchors.
+Canonical formatting checks 87 PowerShell and 19 shell files. Existing scalar counters
+and native/SUT mutations remain separate reviewed state; other map construction is open.

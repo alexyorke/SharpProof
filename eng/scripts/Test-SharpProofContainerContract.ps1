@@ -380,7 +380,7 @@ function Assert-ComposeAuthority {
         }
     }
 
-    $serviceNames = @()
+    $serviceNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $currentServiceName = $null
     $currentServiceStart = -1
     for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
@@ -396,13 +396,14 @@ function Assert-ComposeAuthority {
                 & $assertService $currentServiceName $currentServiceStart $index
             }
             $currentServiceName = $Matches[1]
-            $serviceNames += $currentServiceName
+            [void]$serviceNameBuilder.Add($currentServiceName)
             $currentServiceStart = $index
         }
     }
     if ($currentServiceStart -ge 0) {
         & $assertService $currentServiceName $currentServiceStart $lines.Count
     }
+    $serviceNames = $serviceNameBuilder.ToImmutable()
     if ($serviceNames -cnotcontains 'tooling') {
         throw 'Compose must define the canonical tooling service.'
     }

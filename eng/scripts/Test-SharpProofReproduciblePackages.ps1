@@ -158,8 +158,10 @@ try {
                     'src/SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj', 'src/SharpProof.Host/SharpProof.Host.csproj')) {
                 $label = [IO.Path]::GetFileNameWithoutExtension($project)
                 $null = Invoke-ReproCommand dotnet @('restore', $project, '--locked-mode', '-p:ContinuousIntegrationBuild=true') $clone "run-$index-$label-restore"
-                $arguments = @('build', $project, '-c', 'Release', '--no-restore', '-p:ContinuousIntegrationBuild=true', ('-p:RepositoryCommit=' + $commit))
-                if ($label -eq 'DefensiveCodingAnalyzer') { $arguments += '-p:RunAnalyzersDuringBuild=false' }
+                $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+                [void]$argumentBuilder.AddRange([string[]]@('build', $project, '-c', 'Release', '--no-restore', '-p:ContinuousIntegrationBuild=true', ('-p:RepositoryCommit=' + $commit)))
+                if ($label -eq 'DefensiveCodingAnalyzer') { [void]$argumentBuilder.Add('-p:RunAnalyzersDuringBuild=false') }
+                $arguments = [string[]]@($argumentBuilder.ToImmutable())
                 $null = Invoke-ReproCommand dotnet $arguments $clone "run-$index-$label-build"
             }
             $null = Invoke-ReproCommand pwsh @('-NoLogo', '-NoProfile', '-File',

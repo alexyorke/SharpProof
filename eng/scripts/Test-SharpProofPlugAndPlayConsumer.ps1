@@ -64,7 +64,8 @@ $encoding = [Text.UTF8Encoding]::new($false)
 
 function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory = $consumer) {
     $commandFile = $dotnet
-    $commandArguments = @($Arguments)
+    $commandArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments))
     if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
         $commandFile = $MSBuildPath
         $verb = $Arguments[0]
@@ -72,30 +73,33 @@ function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory 
             # Execute the already-built application, not the modern worker CLR.
             $commandFile = Join-Path $WorkingDirectory "bin/Release/$TargetFramework/Application.exe"
             if (-not (Test-Path -LiteralPath $commandFile -PathType Leaf)) { throw 'The downstream executable is missing.' }
-            $commandArguments = @()
+            $commandArgumentBuilder.Clear()
         }
         elseif ($verb -ceq 'query-host') {
-            $commandArguments = @($Arguments[1], '-nologo', '-verbosity:quiet',
-                '-getProperty:MSBuildRuntimeType,MSBuildVersion,NETCoreSdkVersion,_SharpProofVerifierHostSupported')
+            $commandArgumentBuilder.Clear()
+            [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments[1], '-nologo', '-verbosity:quiet',
+                    '-getProperty:MSBuildRuntimeType,MSBuildVersion,NETCoreSdkVersion,_SharpProofVerifierHostSupported'))
         }
         else {
             if ($verb -cnotin @('restore', 'build', 'pack', 'clean')) { throw "Unexpected Visual Studio command: $verb" }
             $target = if ($verb -ceq 'build' -and $Arguments -ccontains '-t:Rebuild') { 'Rebuild' } else { $verb }
-            $commandArguments = @($Arguments[1], "-t:$target", '-nologo')
+            $commandArgumentBuilder.Clear()
+            [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments[1], "-t:$target", '-nologo'))
             for ($index = 2; $index -lt $Arguments.Count; $index++) {
                 $argument = $Arguments[$index]
                 switch -CaseSensitive ($argument) {
-                    '-c' { $commandArguments += '-p:Configuration=' + $Arguments[++$index] }
-                    '-o' { $commandArguments += '-p:PackageOutputPath=' + $Arguments[++$index] }
-                    '--configfile' { $commandArguments += '-p:RestoreConfigFile=' + (Join-Path $WorkingDirectory $Arguments[++$index]) }
+                    '-c' { [void]$commandArgumentBuilder.Add('-p:Configuration=' + $Arguments[++$index]) }
+                    '-o' { [void]$commandArgumentBuilder.Add('-p:PackageOutputPath=' + $Arguments[++$index]) }
+                    '--configfile' { [void]$commandArgumentBuilder.Add('-p:RestoreConfigFile=' + (Join-Path $WorkingDirectory $Arguments[++$index])) }
                     '--nologo' { }
                     '--no-restore' { }
                     '-t:Rebuild' { }
-                    default { $commandArguments += $argument }
+                    default { [void]$commandArgumentBuilder.Add($argument) }
                 }
             }
         }
     }
+    $commandArguments = $commandArgumentBuilder.ToImmutable()
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $commandFile
     $start.WorkingDirectory = $WorkingDirectory

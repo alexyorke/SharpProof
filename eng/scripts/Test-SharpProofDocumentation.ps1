@@ -9,12 +9,12 @@ function Get-Anchors([string]$Content) {
     $counts = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::OrdinalIgnoreCase)
     $withoutCode = [regex]::Replace($Content, '(?ms)^\s*(```|~~~).*?^\s*\1[^\r\n]*$', '')
     foreach ($match in [regex]::Matches($withoutCode, '(?m)^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$')) {
-        $slug = $match.Groups[1].Value.ToLowerInvariant()
-        $slug = [regex]::Replace($slug, '<[^>]+>', '')
-        $slug = [regex]::Replace($slug, '[^\p{L}\p{N}_\-\s]', '') -replace '\s', '-'
-        if ($counts.ContainsKey($slug)) { $counts[$slug]++; $slug += '-' + $counts[$slug] }
-        else { $counts[$slug] = 0 }
-        [void]$anchors.Add($slug)
+        $heading = $match.Groups[1].Value.ToLowerInvariant()
+        $withoutMarkup = [regex]::Replace($heading, '<[^>]+>', '')
+        $slug = [regex]::Replace($withoutMarkup, '[^\p{L}\p{N}_\-\s]', '') -replace '\s', '-'
+        $anchor = if ($counts.ContainsKey($slug)) { $counts[$slug]++; $slug + '-' + $counts[$slug] }
+        else { $counts[$slug] = 0; $slug }
+        [void]$anchors.Add($anchor)
     }
     foreach ($match in [regex]::Matches($withoutCode, '(?i)\b(?:id|name)=["'']([^"'']+)["'']')) {
         [void]$anchors.Add($match.Groups[1].Value)

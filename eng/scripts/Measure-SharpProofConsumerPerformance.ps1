@@ -107,8 +107,10 @@ try {
                 if ($scenario -eq 'small-edit') {
                     [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 2), [Text.UTF8Encoding]::new($false))
                 }
-                $arguments = @('build', 'Consumer.csproj', '--configuration', 'Release', '--no-restore', '--nologo')
-                if ($scenario -eq 'warm-rebuild') { $arguments += '-t:Rebuild' }
+                $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+                [void]$argumentBuilder.AddRange([string[]]@('build', 'Consumer.csproj', '--configuration', 'Release', '--no-restore', '--nologo'))
+                if ($scenario -eq 'warm-rebuild') { [void]$argumentBuilder.Add('-t:Rebuild') }
+                $arguments = [string[]]@($argumentBuilder.ToImmutable())
                 $elapsed = Invoke-MeasuredDotnet "$iteration-$variant-$scenario" $arguments
                 $claims = 0
                 $proven = 0

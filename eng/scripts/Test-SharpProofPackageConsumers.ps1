@@ -132,31 +132,34 @@ function New-FrameworkPackageSource {
             '-getItem:KnownFrameworkReference') -Quiet) | ConvertFrom-Json
     $frameworkReferences = @($frameworkEvaluation.Items.KnownFrameworkReference |
             Where-Object { $_.TargetFramework -eq 'net8.0' })
-    $targetingPacks = @(
-        'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref')
-    if ($IsWindows) { $targetingPacks += 'Microsoft.WindowsDesktop.App.Ref' }
-    $frameworkPackages = @(
-        [pscustomobject]@{
-            Id      = 'netstandard.library'
-            Version = '2.0.3'
-            Pattern = 'NETStandard.Library'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netcore.platforms'
-            Version = '1.1.0'
-            Pattern = 'Microsoft.NETCore.Platforms'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netframework.referenceassemblies'
-            Version = '1.0.3'
-            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netframework.referenceassemblies.net472'
-            Version = '1.0.3'
-            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
-        }
-    )
+    $targetingPackBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$targetingPackBuilder.AddRange([string[]]@(
+            'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref'))
+    if ($IsWindows) { [void]$targetingPackBuilder.Add('Microsoft.WindowsDesktop.App.Ref') }
+    $targetingPacks = $targetingPackBuilder.ToImmutable()
+    $frameworkPackageBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    [void]$frameworkPackageBuilder.AddRange([object[]]@(
+            [pscustomobject]@{
+                Id      = 'netstandard.library'
+                Version = '2.0.3'
+                Pattern = 'NETStandard.Library'
+            }
+            [pscustomobject]@{
+                Id      = 'microsoft.netcore.platforms'
+                Version = '1.1.0'
+                Pattern = 'Microsoft.NETCore.Platforms'
+            }
+            [pscustomobject]@{
+                Id      = 'microsoft.netframework.referenceassemblies'
+                Version = '1.0.3'
+                Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+            }
+            [pscustomobject]@{
+                Id      = 'microsoft.netframework.referenceassemblies.net472'
+                Version = '1.0.3'
+                Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+            }
+        ))
     foreach ($targetingPack in $targetingPacks) {
         $packVersions = @($frameworkReferences |
                 Where-Object { $_.TargetingPackName -eq $targetingPack } |
@@ -166,12 +169,13 @@ function New-FrameworkPackageSource {
             throw "The selected consumer SDK did not declare one net8.0 targeting-pack version for '$targetingPack'."
         }
         Write-Host "Consumer SDK requires $targetingPack $($packVersions[0])."
-        $frameworkPackages += [pscustomobject]@{
-            Id      = $targetingPack.ToLowerInvariant()
-            Version = [string]$packVersions[0]
-            Pattern = $targetingPack
-        }
+        [void]$frameworkPackageBuilder.Add([pscustomobject]@{
+                Id      = $targetingPack.ToLowerInvariant()
+                Version = [string]$packVersions[0]
+                Pattern = $targetingPack
+            })
     }
+    $frameworkPackages = $frameworkPackageBuilder.ToImmutable()
     foreach ($package in $frameworkPackages) {
         $fileName = "$($package.Id).$($package.Version).nupkg"
         $source = [IO.Path]::Combine(
@@ -608,14 +612,15 @@ if ($null -ne $resolvedPackageSource) {
 
 Push-Location $repositoryRoot
 try {
-    $packageTestArguments = @(
-        'test',
-        $testProject,
-        '--configuration',
-        $Configuration,
-        '--no-restore',
-        '--logger',
-        'console;verbosity=minimal')
+    $packageTestArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$packageTestArgumentBuilder.AddRange([string[]]@(
+            'test',
+            $testProject,
+            '--configuration',
+            $Configuration,
+            '--no-restore',
+            '--logger',
+            'console;verbosity=minimal'))
     if ($null -ne $resolvedPackageSource) {
         # Framework compatibility is exercised above. Re-run only the exact
         # package graph, analyzer discovery, and real verifier proof here;
@@ -625,8 +630,9 @@ try {
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
-        $packageTestArguments += @('--filter', $focusedPackageFilter)
+        [void]$packageTestArgumentBuilder.AddRange([string[]]@('--filter', $focusedPackageFilter))
     }
+    $packageTestArguments = [string[]]@($packageTestArgumentBuilder.ToImmutable())
     & dotnet @packageTestArguments
     if ($LASTEXITCODE -ne 0) {
         throw "SharpProof package consumer tests failed with exit code $LASTEXITCODE."

@@ -175,9 +175,8 @@ function Test-SampleProjectInventory {
         throw "The sample inventory must contain exactly 8 projects."
     }
 
-    $allowedPackages = [Collections.Generic.HashSet[string]]::new(
-        [string[]]$SharpProofPackageIds,
-        [StringComparer]::Ordinal)
+    $allowedPackages = [Collections.Immutable.ImmutableHashSet]::CreateRange[string](
+        [StringComparer]::Ordinal, [string[]]$SharpProofPackageIds)
     [xml]$sharedProject = Get-Content -LiteralPath (
         Join-Path $samplesRoot 'Directory.Build.props') -Raw
     $sharedReferences = @($sharedProject.SelectNodes('//PackageReference'))
@@ -186,8 +185,10 @@ function Test-SampleProjectInventory {
         if ($project.SelectNodes('//ProjectReference').Count -ne 0) {
             throw "Sample project references are forbidden: $($projectFile.FullName)"
         }
-        $references = @($project.SelectNodes('//PackageReference'))
-        $references += $sharedReferences
+        $referenceBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        [void]$referenceBuilder.AddRange([object[]]@($project.SelectNodes('//PackageReference')))
+        [void]$referenceBuilder.AddRange([object[]]$sharedReferences)
+        $references = $referenceBuilder.ToImmutable()
         if ($references.Count -ne 1 -or [string]$references[0].Include -cne 'SharpProof' -or
             $references[0].HasAttribute('PrivateAssets')) {
             throw "Every sample must consume one public SharpProof package reference: $($projectFile.FullName)"
