@@ -86,4 +86,20 @@ public sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 17); var data = new System.Collections.Generic.Stack<int>(); data.Push(17); Mutator.Change(data); return data.Pop();", WorkerClaimOutcome.Unknown,
             members: "static class Mutator { [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.InternalCall)] public static extern void Change(object value); }");
     }
+
+    [Test]
+    public async Task DistinctClosedGenericStacksDoNotShareCountAfterPop()
+    {
+        await CheckInterfaceArrayContract("System.Collections.Generic.Stack<int> first, System.Collections.Generic.Stack<string> second",
+            "Contract.Requires(first != null && second != null && first.Count > 0); Contract.Ensures(Contract.Result<int>() == 0); var before = second.Count; first.Pop(); return second.Count - before;", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task IncompatibleClosedGenericStackFieldsCannotRefuteCountAfterPop()
+    {
+        await CheckInterfaceArrayContract("Holder holder",
+            "Contract.Requires(holder != null && holder.First != null && holder.Second != null && holder.First.Count > 0); Contract.Ensures(Contract.Result<int>() == 0); var before = holder.Second.Count; holder.First.Pop(); return holder.Second.Count - before;", WorkerClaimOutcome.Unknown,
+            members: "public sealed class Holder { public System.Collections.Generic.Stack<int> First; public System.Collections.Generic.Stack<string> Second; }");
+    }
+
 }
