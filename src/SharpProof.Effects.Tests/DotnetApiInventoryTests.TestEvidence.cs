@@ -45,6 +45,14 @@ public sealed partial class DotnetApiInventoryTests
                         genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true));
             }
 
+            if (row.Evidence.Contains("intrinsic=concrete-stack-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled CLR/IR default/capacity construction, incoming and aliased LIFO Count/Push/Pop; generic opaque decimal payload identity and source helper; normal growth choices retain approximation",
+                    () => CheckStackStateIntrinsic(compilation, false) && CheckStackStateIntrinsic(compilation, false, incoming: true) && CheckStackStateIntrinsic(compilation, false, opaque: true),
+                    () => CheckStackStateIntrinsic(compilation, true) || CheckStackStateIntrinsic(compilation, true, incoming: true) || CheckStackStateIntrinsic(compilation, true, opaque: true));
+            }
+
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
             {
                 var arrays = row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal);

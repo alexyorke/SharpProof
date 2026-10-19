@@ -66,10 +66,10 @@ internal sealed partial class BvEncoder
                 using var value = model.Evaluate(application, true);
                 if (decode(member.ReturnType, value) is { } decoded)
                 {
-                    // List witnesses must describe a materializable finite size.
+                    // Collection witnesses must describe a materializable finite size.
                     // Charging the logical Count rejects oversized SAT witnesses,
                     // without narrowing the SMT domain used for universal proofs.
-                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) == IrFieldSites.Prefix + "list:count")
+                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) is "field:list:count" or "field:stack:count")
                     { meter.Consume((long)(decoded.IntegerBits & int.MaxValue) + 1L); }
                     state.Fields[field.Key] = decoded;
                 }

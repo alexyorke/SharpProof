@@ -122,6 +122,9 @@ internal static class DotnetApiInventory
             { evidence.Add("intrinsic=concrete-list-state"); }
         }
 
+        if (CSharpOperationSemantics.IsStackStateDeclaration(symbol))
+        { evidence.Add("intrinsic=concrete-stack-state"); }
+
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
             evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");

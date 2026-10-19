@@ -186,12 +186,13 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         graph = null;
         if (!Spend(method.Parameters.Length + 1))
         { return false; }
-        // Scalar, reference and opaque element specialization belongs to the List helper
+        // Scalar, reference and opaque element specialization belongs to collection helper
         // boundary. Other generic source calls retain their existing scalar domain.
-        var listElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type));
+        var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsStackReceiverType(parameter.Type));
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
-        { return listElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
+        { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
             KnownSourceValue(method.ReturnType) != null;
         if (!contractOnly && IsActive(method) ||
@@ -316,7 +317,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) != null ||
-            TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
+            TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
+            TotalLoweringContext.IsStackReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -338,7 +340,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 frame.SpecializeScalarParameter(parameter, scalar);
                 continue;
             }
-            if (TotalLoweringContext.IsListReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredList &&
+            if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type)) && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }
