@@ -3225,3 +3225,15 @@ Inventory checkpoint after IMM-M090-M100: 1,870 C# files yield 2,553 syntax cand
 PowerShell scripts parse with zero errors and 1,093 candidates; 18 M095 argv-builder
 rows are classified. Pending M101/M102 implementation and semantic gaps remain open
 in this audit; syntax candidate removal alone does not close their validation.
+
+IMM-M103: Main traced the semantic runner's fifteen remaining += sites: build argv,
+checksum exclusion text, ordered worker descriptors, retained-results assembly/discovery
+argv and per-task direct/coverage argv. Use scoped immutable builders and freeze before
+native/process/task publication. Preserve descriptor order/process slots, duplicate
+assemblies, discovery dump order, cohort filtering, settings property presence, isolated
+output placement and coverage suffix order. Replace string append with Concat. Freeze
+the coverage helper's native result immediately; leave scheduler/task lifecycle mutation
+and process environment adapters separate. Compare extracted baseline/current build,
+filter/descriptor and prepare blocks without launching builds/tests, then real semantic
+workflow after existing project jobs finish. No concurrent project test runs.
+Status: open before edits.
