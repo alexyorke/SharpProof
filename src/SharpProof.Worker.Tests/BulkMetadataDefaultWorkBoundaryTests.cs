@@ -169,9 +169,10 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static TotalIlBody Resolve(MetadataTestSubject subject, IReadOnlyList<CompilerReferenceSnapshot> references)
+    private static TotalIlBody Resolve(MetadataTestSubject subject, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
@@ -196,18 +197,20 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot> references)
+    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
     }
 
-    private static void AssertRejected(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot> references)
+    private static void AssertRejected(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = Prepare(compilation, references);
         Assert.That(batch.Callers, Is.Empty);

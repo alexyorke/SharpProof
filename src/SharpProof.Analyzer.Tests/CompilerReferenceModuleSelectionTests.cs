@@ -41,7 +41,7 @@ public sealed class CompilerReferenceModuleSelectionTests
         using var files = new ModuleFiles();
         var first = files.Add("A.dll", _firstImage);
         var second = files.Add("B.dll", _firstImage);
-        CompilerMetadataResolution.ReferenceModule[] matches = reverse ? [second, first] : [first, second];
+        ImmutableArray<CompilerMetadataResolution.ReferenceModule> matches = reverse ? [second, first] : [first, second];
         var selected = CompilerMetadataResolution.SelectReferenceModules(matches, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {

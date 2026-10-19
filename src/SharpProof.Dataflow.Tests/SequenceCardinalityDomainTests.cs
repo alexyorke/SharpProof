@@ -14,7 +14,7 @@ public sealed class SequenceCardinalityDomainTests
     }
     private readonly SequenceCardinalityDomain _domain = SequenceCardinalityDomain.Instance;
 
-    private static readonly IReadOnlyList<SequenceCardinalityValue> Samples = [
+    private static readonly ImmutableArray<SequenceCardinalityValue> Samples = [
         SequenceCardinalityValue.Bottom,
         SequenceCardinalityValue.Empty,
         SequenceCardinalityValue.KnownLength(1),

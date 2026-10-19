@@ -938,11 +938,12 @@ public sealed class IrFactory
     }
 
     internal void ValidateCallShape(
-        IrMemberInfo member, IrTerm? receiver, IReadOnlyList<IrTerm> arguments,
+        IrMemberInfo member, IrTerm? receiver, ImmutableArray<IrTerm> arguments,
         string parameterName)
     {
         ArgumentNullGuard.NotNull(member, nameof(member));
-        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         lock (_gate)
         {
             IrTermServices.ValidateCallShape(

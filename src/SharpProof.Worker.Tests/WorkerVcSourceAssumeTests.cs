@@ -172,8 +172,10 @@ public sealed class WorkerVcSourceAssumeTests
             case "swap-ids":
                 {
                     var changedFixture = (clauses[1].AssumptionId, clauses[0].AssumptionId);
-                    clauses = clauses.SetItem(0, clauses[0] with { AssumptionId = changedFixture.Item1 });
-                    clauses = clauses.SetItem(1, clauses[1] with { AssumptionId = changedFixture.Item2 });
+                    var clauseBuilder = clauses.ToBuilder();
+                    clauseBuilder[0] = clauseBuilder[0] with { AssumptionId = changedFixture.Item1 };
+                    clauseBuilder[1] = clauseBuilder[1] with { AssumptionId = changedFixture.Item2 };
+                    clauses = clauseBuilder.ToImmutable();
                 }
                 break;
             case "site":

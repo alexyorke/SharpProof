@@ -181,7 +181,7 @@ foreach ($property in $baseline.projects.PSObject.Properties) {
     }
 }
 $declarationOnlyTcbFiles =
-[Collections.Generic.HashSet[string]]::new(
+[Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::Ordinal)
 foreach ($value in @($baseline.declarationOnlyTcbFiles)) {
     $path = [string]$value
@@ -196,6 +196,7 @@ foreach ($value in @($baseline.declarationOnlyTcbFiles)) {
         throw "Invalid declaration-only TCB coverage path '$path'."
     }
 }
+$declarationOnlyTcbFiles = $declarationOnlyTcbFiles.ToImmutable()
 $reports = @(
     Get-ChildItem `
         -LiteralPath $resolvedCoverageRoot `
@@ -275,8 +276,7 @@ if (($authorityProjectNames -join [Environment]::NewLine) -cne
         'Coverage baseline project floors do not match the independently ' +
         'evaluated production inventory.')
 }
-$authorityProjectsByName = [Collections.Generic.Dictionary[string,
-object]]::new([StringComparer]::Ordinal)
+$authorityProjectsByName = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($authorityProject in $recomputedAuthority.projects) {
     $authorityProjectName = [string]$authorityProject.name
     if ($authorityProjectsByName.ContainsKey($authorityProjectName)) {
@@ -284,6 +284,7 @@ foreach ($authorityProject in $recomputedAuthority.projects) {
     }
     $authorityProjectsByName.Add($authorityProjectName, $authorityProject)
 }
+$authorityProjectsByName = $authorityProjectsByName.ToImmutable()
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
 $expectedModuleIdentities = @(
     $expectedAuthorityModules |
@@ -293,48 +294,46 @@ $expectedModuleIdentities = @(
         } |
         Sort-Object)
 $expectedModuleIdentityText = $expectedModuleIdentities -join ','
-$expectedAssemblyNames = [Collections.Generic.HashSet[string]]::new(
+$expectedAssemblyNames = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::Ordinal)
 foreach ($module in $expectedAuthorityModules) {
     if (-not $expectedAssemblyNames.Add([string]$module.assemblyName)) {
         throw "Coverage authority has a duplicate assembly name '$($module.assemblyName)'."
     }
 }
+$expectedAssemblyNames = $expectedAssemblyNames.ToImmutable()
 # Each production compilation owns distinct runtime obligations, even when
 # another assembly compiles the same physical source. Keep report MAX and PDB
 # ranges inside that ownership boundary throughout ordinary and changed coverage.
-$modulesByProject = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-$projectModuleKeys = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-$compileModuleKeys = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+$modulesByProject = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$projectModuleKeys = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$compileModuleKeys = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($module in $expectedAuthorityModules) {
     $project = $null
     if (-not $authorityProjectsByName.TryGetValue([string]$module.project, [ref]$project) -or
         [string]$project.assemblyName -cne [string]$module.assemblyName -or
-        -not $modulesByProject.TryAdd([string]$module.project, $module)) {
+        $modulesByProject.ContainsKey([string]$module.project)) {
         throw "Coverage authority has inconsistent production module ownership: '$($module.assemblyName)'."
     }
-    $projectModuleKeys[[string]$module.project] = [Collections.Generic.List[string]]::new()
+    $modulesByProject.Add([string]$module.project, $module)
+    $projectModuleKeys[[string]$module.project] = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($file in @($project.compile)) {
         $compilePath = [string]$file.path
         if (-not $compileModuleKeys.ContainsKey($compilePath)) {
-            $compileModuleKeys[$compilePath] = [Collections.Generic.List[string]]::new()
+            $compileModuleKeys[$compilePath] = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
         }
         $compileModuleKeys[$compilePath].Add([string]$module.assemblyName + ':' + $compilePath)
     }
 }
+$modulesByProject = $modulesByProject.ToImmutable()
 if ($modulesByProject.Count -ne $authorityProjectsByName.Count) {
     throw 'Coverage authority does not bind every production project to exactly one module.'
 }
-$expectedLineHits = [Collections.Generic.Dictionary[string,
-Collections.Generic.Dictionary[int, int]]]::new(
-    [StringComparer]::Ordinal)
-$permittedLineRanges = [Collections.Generic.Dictionary[string,
-Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
-$permittedLineCredits = [Collections.Generic.Dictionary[string,
-Collections.Generic.Dictionary[int, int[]]]]::new([StringComparer]::Ordinal)
+$expectedLineHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$permittedLineRanges = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$permittedLineCredits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 # Preserve authenticated direct collector records separately from the ordinary universe.
-$reportedLineHits = [Collections.Generic.Dictionary[string,
-Collections.Generic.Dictionary[int, int]]]::new([StringComparer]::Ordinal)
+$reportedLineHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 $expectedSequencePointCount = 0
 foreach ($module in $expectedAuthorityModules) {
     foreach ($document in @($module.documents | Sort-Object path)) {
@@ -346,22 +345,22 @@ foreach ($module in $expectedAuthorityModules) {
         }
         $projectModuleKeys[[string]$module.project].Add($sourceKey)
         if (-not $reportedLineHits.ContainsKey($sourceKey)) {
-            $reportedLineHits[$sourceKey] = [Collections.Generic.Dictionary[int, int]]::new()
+            $reportedLineHits[$sourceKey] = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, int]()
         }
         if ($expectedLineHits.ContainsKey($sourceKey)) {
             $fileLines = $expectedLineHits[$sourceKey]
         }
         else {
-            $fileLines = [Collections.Generic.Dictionary[int, int]]::new()
+            $fileLines = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, int]()
             $expectedLineHits[$sourceKey] = $fileLines
         }
         if (-not $permittedLineRanges.ContainsKey($sourceKey)) {
-            $permittedLineRanges[$sourceKey] = [Collections.Generic.List[object]]::new()
+            $permittedLineRanges[$sourceKey] = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
             $permittedLineCredits[$sourceKey] =
-            [Collections.Generic.Dictionary[int, int[]]]::new()
+            [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, object]()
         }
         $documentSequencePoints =
-        [Collections.Generic.HashSet[int]]::new()
+        [Collections.Immutable.ImmutableHashSet]::CreateBuilder[int]()
         foreach ($value in @($document.sequencePoints | Sort-Object)) {
             $number = [int]$value
             if ($number -le 0) {
@@ -375,6 +374,7 @@ foreach ($module in $expectedAuthorityModules) {
                 $expectedSequencePointCount++
             }
         }
+        $documentSequencePoints = $documentSequencePoints.ToImmutable()
         foreach ($range in @($document.sequencePointRanges)) {
             $startLine = [int]$range.startLine
             $endLine = [int]$range.endLine
@@ -383,17 +383,17 @@ foreach ($module in $expectedAuthorityModules) {
                     "Coverage authority has an invalid sequence-point range " +
                     "'${path}:$startLine-$endLine'.")
             }
-            $permittedLineRanges[$sourceKey].Add(
-                [pscustomobject]@{
-                    startLine  = $startLine
-                    endLine    = $endLine
-                    creditLine = if ($documentSequencePoints.Contains($startLine)) {
-                        $startLine
-                    }
-                    else {
-                        0
-                    }
-                })
+            $permittedLineRanges[$sourceKey].Add((
+                    [ordered]@{
+                        startLine  = $startLine
+                        endLine    = $endLine
+                        creditLine = if ($documentSequencePoints.Contains($startLine)) {
+                            $startLine
+                        }
+                        else {
+                            0
+                        }
+                    }).AsReadOnly())
         }
     }
 }
@@ -401,8 +401,25 @@ if ($expectedLineHits.Count -eq 0 -or $expectedSequencePointCount -eq 0) {
     throw 'Coverage authority contains no production sequence points.'
 }
 
+$frozenProjectModuleKeys = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $projectModuleKeys.GetEnumerator()) {
+    $frozenProjectModuleKeys.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$projectModuleKeys = $frozenProjectModuleKeys.ToImmutable()
+$frozenCompileModuleKeys = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $compileModuleKeys.GetEnumerator()) {
+    $frozenCompileModuleKeys.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$compileModuleKeys = $frozenCompileModuleKeys.ToImmutable()
+
+$frozenRanges = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $permittedLineRanges.GetEnumerator()) {
+    $frozenRanges.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$permittedLineRanges = $frozenRanges.ToImmutable()
+
 $lineHits = $expectedLineHits
-$reportedModuleDocuments = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$reportedModuleDocuments = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
 function Resolve-CoverageSourcePath {
     param(
         [Parameter(Mandatory = $true)]
@@ -417,14 +434,14 @@ function Resolve-CoverageSourcePath {
         -DocumentPath $FileName -SourceRoots $SourceRoots
 }
 
-$reportFiles = [Collections.Generic.List[object]]::new()
+$reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($report in $reports) {
-    $reportFiles.Add([pscustomobject][ordered]@{
-            path  = [IO.Path]::GetRelativePath(
-                $resolvedCoverageRoot,
-                $report.FullName).Replace('\', '/')
-            bytes = [int64]$report.Length
-        })
+    $reportFiles.Add(([ordered]@{
+                path  = [IO.Path]::GetRelativePath(
+                    $resolvedCoverageRoot,
+                    $report.FullName).Replace('\', '/')
+                bytes = [int64]$report.Length
+            }).AsReadOnly())
     [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
     $authorityNodes = @(
         $document.SelectNodes('/coverage/sharpProofAuthority'))
@@ -448,7 +465,7 @@ foreach ($report in $reports) {
     # Classes in one report repeatedly name the same source documents. Scope
     # this cache to that report's fixed source roots; each distinct filename
     # still passes the full physical-path and repository-boundary validation.
-    $sourcePathCache = [Collections.Generic.Dictionary[string, string]]::new(
+    $sourcePathCache = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string](
         [StringComparer]::Ordinal)
     $classes = @($document.SelectNodes('//class'))
     if ($classes.Count -eq 0) {
@@ -526,11 +543,12 @@ foreach ($report in $reports) {
             # Reports repeat the same source lines across test projects. Resolve
             # each module/source/line against its authenticated PDB ranges
             # once per validation, then merge hits for every overlapping start.
-            [int[]]$credits = $null
+            [object]$credits = $null
             if (-not $fileCredits.TryGetValue($number, [ref]$credits)) {
-                $credits = Resolve-SharpProofCoverageLineCredits `
+                $nativeCredits = Resolve-SharpProofCoverageLineCredits `
                     -Ranges $permittedLineRanges[$sourceKey] `
                     -Number $number -SourcePath $sourceKey
+                $credits = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]$nativeCredits)
                 $fileCredits.Add($number, $credits)
             }
             # Only store direct hits after the same source and PDB-range validation.
@@ -550,6 +568,25 @@ foreach ($report in $reports) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
 }
+
+$frozenHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $lineHits.GetEnumerator()) {
+    $frozenHits.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$lineHits = $frozenHits.ToImmutable()
+$expectedLineHits = $lineHits
+$frozenReportedHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $reportedLineHits.GetEnumerator()) {
+    $frozenReportedHits.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$reportedLineHits = $frozenReportedHits.ToImmutable()
+$frozenCredits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+foreach ($entry in $permittedLineCredits.GetEnumerator()) {
+    $frozenCredits.Add($entry.Key, $entry.Value.ToImmutable())
+}
+$permittedLineCredits = $frozenCredits.ToImmutable()
+$reportedModuleDocuments = $reportedModuleDocuments.ToImmutable()
+$reportFiles = $reportFiles.ToImmutable()
 
 function Test-QualifiedDeclarationDocument {
     param(
@@ -588,7 +625,7 @@ function Get-QualifiedDeclarationQueries {
         [Parameter(Mandatory = $true)] $Projects,
         [Parameter(Mandatory = $true)] $ReportedModuleDocuments
     )
-    $queries = [Collections.Generic.List[object]]::new()
+    $queries = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($module in $Modules) {
         $project = $Projects[[string]$module.project]
         if (@($project.compile | Where-Object { $_.path -ceq $Path }).Count -eq 0) { continue }
@@ -605,13 +642,13 @@ function Get-QualifiedDeclarationQueries {
             -not (Test-QualifiedDeclarationDocument -Document $document -RecordedDocument $recordedDocuments[0] `
                     -AssemblyName ([string]$module.assemblyName) -ReportedModuleDocuments $ReportedModuleDocuments `
                     -SourcePath $SourcePath)) { return }
-        $queries.Add([pscustomobject]@{
-                path = $Path; sourcePath = $SourcePath
-                languageVersion     = [string]$project.parseOptions.languageVersion
-                preprocessorSymbols = @($project.parseOptions.preprocessorSymbols)
-            })
+        $queries.Add(([ordered]@{
+                    path = $Path; sourcePath = $SourcePath
+                    languageVersion     = [string]$project.parseOptions.languageVersion
+                    preprocessorSymbols = @($project.parseOptions.preprocessorSymbols)
+                }).AsReadOnly())
     }
-    return @($queries)
+    return @($queries.ToImmutable())
 }
 
 function Test-OmitDeclarationLine {
@@ -638,7 +675,7 @@ function Measure-Coverage {
 
     $covered = 0
     $coverable = 0
-    $uncovered = [Collections.Generic.List[string]]::new()
+    $uncovered = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($path in $Paths) {
         foreach ($entry in $lineHits[$path].GetEnumerator()) {
             $coverable++
@@ -656,15 +693,15 @@ function Measure-Coverage {
     else {
         100.0 * $covered / $coverable
     }
-    return [pscustomobject][ordered]@{
-        coveredLines   = $covered
-        coverableLines = $coverable
-        linePercent    = [Math]::Round($percent, 2)
-        uncoveredLines = @(Get-OrdinalSortedUniqueStrings -Values @($uncovered))
-    }
+    return ([ordered]@{
+            coveredLines   = $covered
+            coverableLines = $coverable
+            linePercent    = [Math]::Round($percent, 2)
+            uncoveredLines = @(Get-OrdinalSortedUniqueStrings -Values @($uncovered.ToImmutable()))
+        }).AsReadOnly()
 }
 
-$projects = [Collections.Generic.List[object]]::new()
+$projects = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $aggregateCovered = 0
 $aggregateCoverable = 0
 foreach ($property in $baseline.projects.PSObject.Properties |
@@ -691,32 +728,33 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     $aggregateCovered += $measurement.coveredLines
     $aggregateCoverable += $measurement.coverableLines
     $minimum = [double]$property.Value
-    $projects.Add([pscustomobject][ordered]@{
-            name               = $projectName
-            coveredLines       = $measurement.coveredLines
-            coverableLines     = $measurement.coverableLines
-            linePercent        = $measurement.linePercent
-            minimumLinePercent = $minimum
-            uncoveredLines     = $measurement.uncoveredLines
-            passed             = Test-CoverageFloor `
-                -CoveredLines $measurement.coveredLines `
-                -CoverableLines $measurement.coverableLines `
-                -LinePercent $measurement.linePercent `
-                -Minimum $minimum
-        })
+    $projects.Add(([ordered]@{
+                name               = $projectName
+                coveredLines       = $measurement.coveredLines
+                coverableLines     = $measurement.coverableLines
+                linePercent        = $measurement.linePercent
+                minimumLinePercent = $minimum
+                uncoveredLines     = $measurement.uncoveredLines
+                passed             = Test-CoverageFloor `
+                    -CoveredLines $measurement.coveredLines `
+                    -CoverableLines $measurement.coverableLines `
+                    -LinePercent $measurement.linePercent `
+                    -Minimum $minimum
+            }).AsReadOnly())
 }
 
+$projects = $projects.ToImmutable()
 $aggregatePercent = if ($aggregateCoverable -eq 0) {
     100.0
 }
 else {
     100.0 * $aggregateCovered / $aggregateCoverable
 }
-$aggregate = [pscustomobject][ordered]@{
-    coveredLines   = $aggregateCovered
-    coverableLines = $aggregateCoverable
-    linePercent    = [Math]::Round($aggregatePercent, 2)
-}
+$aggregate = ([ordered]@{
+        coveredLines   = $aggregateCovered
+        coverableLines = $aggregateCoverable
+        linePercent    = [Math]::Round($aggregatePercent, 2)
+    }).AsReadOnly()
 $aggregateMinimum = [double]$baseline.minimumAggregateLinePercent
 $aggregatePassed =
 Test-CoverageFloor `
@@ -725,24 +763,24 @@ Test-CoverageFloor `
     -LinePercent $aggregate.linePercent `
     -Minimum $aggregateMinimum
 
-$changedTcb = [pscustomobject][ordered]@{
-    comparisonRef           = $comparisonCommit
-    canonicalFiles          = 0
-    changedFiles            = 0
-    coverageFiles           = 0
-    metadataFiles           = 0
-    changedMetadataFiles    = @()
-    coveredLines            = 0
-    omittedDeclarationLines = @()
-    unmappedLines           = @()
-    coverableLines          = 0
-    linePercent             = 100.0
-    minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
-    declarationOnlyFiles    = @()
-    nonCoverableFiles       = @()
-    uncoveredLines          = @()
-    passed                  = $true
-}
+$changedTcb = ([ordered]@{
+        comparisonRef           = $comparisonCommit
+        canonicalFiles          = 0
+        changedFiles            = 0
+        coverageFiles           = 0
+        metadataFiles           = 0
+        changedMetadataFiles    = @()
+        coveredLines            = 0
+        omittedDeclarationLines = @()
+        unmappedLines           = @()
+        coverableLines          = 0
+        linePercent             = 100.0
+        minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
+        declarationOnlyFiles    = @()
+        nonCoverableFiles       = @()
+        uncoveredLines          = @()
+        passed                  = $true
+    }).AsReadOnly()
 if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
@@ -753,7 +791,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             Where-Object {
                 $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
             })
-    $coverageTcbFiles = [Collections.Generic.HashSet[string]]::new(
+    $coverageTcbFiles = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
     foreach ($coveragePath in $coverageTcbPaths) {
         [void]$coverageTcbFiles.Add($coveragePath)
@@ -765,6 +803,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             throw "Declaration-only TCB coverage path is not canonical: '$declarationOnlyPath'."
         }
     }
+    $coverageTcbFiles = $coverageTcbFiles.ToImmutable()
     $diffTarget = "$comparisonCommit...HEAD"
     if ($IncludeWorkingTree) {
         $mergeBaseOutput = Invoke-SharpProofGitText `
@@ -780,7 +819,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         }
         $diffTarget = $mergeBase
     }
-    $changedTcbFiles = [Collections.Generic.HashSet[string]]::new(
+    $changedTcbFiles = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
     $changedFileArguments = @(
         'diff',
@@ -803,9 +842,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             [void]$changedTcbFiles.Add($normalized)
         }
     }
-    $changedLines = [Collections.Generic.Dictionary[string,
-    Collections.Generic.HashSet[int]]]::new(
-        [StringComparer]::Ordinal)
+    $changedTcbFiles = $changedTcbFiles.ToImmutable()
+    $changedLines = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
     $patch = if ($changedTcbFiles.Count -eq 0) {
         ''
     }
@@ -857,7 +895,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         }
         if (-not $changedLines.ContainsKey($currentPath)) {
             $changedLines[$currentPath] =
-            [Collections.Generic.HashSet[int]]::new()
+            [Collections.Immutable.ImmutableHashSet]::CreateBuilder[int]()
         }
         for ($number = $start;
             $number -lt $start + $count;
@@ -865,19 +903,24 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             [void]$changedLines[$currentPath].Add($number)
         }
     }
+    $frozenChangedLines = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+    foreach ($entry in $changedLines.GetEnumerator()) {
+        $frozenChangedLines.Add($entry.Key, $entry.Value.ToImmutable())
+    }
+    $changedLines = $frozenChangedLines.ToImmutable()
     $changedCovered = 0
     $changedCoverable = 0
     $changedMetadataFiles = @(Get-OrdinalSortedUniqueStrings -Values @(
             $changedTcbFiles |
                 Where-Object { -not $coverageTcbFiles.Contains($_) }))
     $nonCoverableChangedFiles =
-    [Collections.Generic.List[string]]::new()
+    [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $declarationOnlyChangedFiles =
-    [Collections.Generic.List[string]]::new()
-    $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
-    $omittedDeclarationLines = [Collections.Generic.List[string]]::new()
-    $unmappedLines = [Collections.Generic.List[string]]::new()
-    $declarationQueries = [Collections.Generic.List[object]]::new()
+    [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $uncoveredChangedLines = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $omittedDeclarationLines = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $unmappedLines = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $declarationQueries = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($path in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($path)) { continue }
         $sourcePath = Join-Path $repositoryRoot $path
@@ -887,16 +930,17 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 -Projects $authorityProjectsByName -ReportedModuleDocuments $reportedModuleDocuments)
         foreach ($query in $queries) { $declarationQueries.Add($query) }
     }
-    $declarationLinesByPath = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    $declarationQueries = $declarationQueries.ToImmutable()
+    $declarationLinesByPath = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
     $classifications = @(& (Join-Path $PSScriptRoot 'Read-SharpProofDeclarationLines.ps1') `
             -RepositoryRoot $repositoryRoot -Documents @($declarationQueries))
-    $qualifiedUnmappedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $invalidSyntaxPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $qualifiedUnmappedPaths = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    $invalidSyntaxPaths = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     foreach ($classification in $classifications) {
         $path = [string]$classification.path
         if ($classification.validSyntax) { [void]$qualifiedUnmappedPaths.Add($path) }
         else { [void]$invalidSyntaxPaths.Add($path) }
-        $numbers = [Collections.Generic.HashSet[int]]::new()
+        $numbers = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[int]()
         foreach ($number in $classification.declarationLines) { [void]$numbers.Add([int]$number) }
         if ($declarationLinesByPath.ContainsKey($path)) {
             $declarationLinesByPath[$path].IntersectWith($numbers)
@@ -906,6 +950,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     # Every owning compilation must qualify; invalid syntax in any parse context
     # also prevents a path from being treated as unmeasurable.
     $qualifiedUnmappedPaths.ExceptWith($invalidSyntaxPaths)
+    $frozenDeclarationLines = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+    foreach ($entry in $declarationLinesByPath.GetEnumerator()) {
+        $frozenDeclarationLines.Add($entry.Key, $entry.Value.ToImmutable())
+    }
+    $declarationLinesByPath = $frozenDeclarationLines.ToImmutable()
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -1043,6 +1092,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             }
         }
     }
+    $nonCoverableChangedFiles = $nonCoverableChangedFiles.ToImmutable()
+    $declarationOnlyChangedFiles = $declarationOnlyChangedFiles.ToImmutable()
+    $uncoveredChangedLines = $uncoveredChangedLines.ToImmutable()
+    $omittedDeclarationLines = $omittedDeclarationLines.ToImmutable()
+    $unmappedLines = $unmappedLines.ToImmutable()
     $changedPercent = if ($changedCoverable -eq 0) {
         100.0
     }
@@ -1050,62 +1104,62 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         100.0 * $changedCovered / $changedCoverable
     }
     $changedPercent = [Math]::Round($changedPercent, 2)
-    $changedTcb = [pscustomobject][ordered]@{
-        comparisonRef           = $comparisonCommit
-        canonicalFiles          = $canonicalTcbPaths.Count
-        changedFiles            = $changedTcbFiles.Count
-        coverageFiles           = $coverageTcbPaths.Count
-        metadataFiles           = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
-        changedMetadataFiles    = $changedMetadataFiles
-        coveredLines            = $changedCovered
-        omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
-        unmappedLines           = @(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))
-        coverableLines          = $changedCoverable
-        linePercent             = $changedPercent
-        minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
-        declarationOnlyFiles    = @(Get-OrdinalSortedUniqueStrings `
-                -Values @($declarationOnlyChangedFiles))
-        nonCoverableFiles       = @(Get-OrdinalSortedUniqueStrings `
-                -Values @($nonCoverableChangedFiles))
-        uncoveredLines          = @(Get-OrdinalSortedUniqueStrings `
-                -Values @($uncoveredChangedLines))
-        passed                  = $nonCoverableChangedFiles.Count -eq 0 -and
-        (Test-CoverageFloor `
-            -CoveredLines $changedCovered `
-            -CoverableLines $changedCoverable `
-            -LinePercent $changedPercent `
-            -Minimum ([double]$baseline.minimumChangedTcbLinePercent))
-    }
+    $changedTcb = ([ordered]@{
+            comparisonRef           = $comparisonCommit
+            canonicalFiles          = $canonicalTcbPaths.Count
+            changedFiles            = $changedTcbFiles.Count
+            coverageFiles           = $coverageTcbPaths.Count
+            metadataFiles           = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
+            changedMetadataFiles    = $changedMetadataFiles
+            coveredLines            = $changedCovered
+            omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
+            unmappedLines           = @(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))
+            coverableLines          = $changedCoverable
+            linePercent             = $changedPercent
+            minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
+            declarationOnlyFiles    = @(Get-OrdinalSortedUniqueStrings `
+                    -Values @($declarationOnlyChangedFiles))
+            nonCoverableFiles       = @(Get-OrdinalSortedUniqueStrings `
+                    -Values @($nonCoverableChangedFiles))
+            uncoveredLines          = @(Get-OrdinalSortedUniqueStrings `
+                    -Values @($uncoveredChangedLines))
+            passed                  = $nonCoverableChangedFiles.Count -eq 0 -and
+            (Test-CoverageFloor `
+                -CoveredLines $changedCovered `
+                -CoverableLines $changedCoverable `
+                -LinePercent $changedPercent `
+                -Minimum ([double]$baseline.minimumChangedTcbLinePercent))
+        }).AsReadOnly()
 }
 
-$summary = [pscustomobject][ordered]@{
-    schemaVersion = 1
-    commit        = Invoke-SharpProofGitText `
-        -RepositoryRoot $repositoryRoot `
-        -Arguments @('rev-parse', 'HEAD') `
-        -FailureMessage 'Could not resolve the current repository commit.' `
-        -TrimOutput
-    reportCount   = $reports.Count
-    reportFiles   = @($reportFiles | Sort-Object path)
-    authority     = [pscustomobject][ordered]@{
-        schemaVersion      = 1
-        commit             = [string]$recomputedAuthority.commit
-        moduleCount        = $expectedAuthorityModules.Count
-        sequencePointCount = $expectedSequencePointCount
-    }
-    aggregate     = [pscustomobject][ordered]@{
-        coveredLines       = $aggregate.coveredLines
-        coverableLines     = $aggregate.coverableLines
-        linePercent        = $aggregate.linePercent
-        minimumLinePercent = $aggregateMinimum
-        passed             = $aggregatePassed
-    }
-    projects      = @($projects)
-    changedTcb    = $changedTcb
-    passed        = $aggregatePassed -and
-    @($projects | Where-Object { -not $_.passed }).Count -eq 0 -and
-    $changedTcb.passed
-}
+$summary = ([ordered]@{
+        schemaVersion = 1
+        commit        = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
+            -Arguments @('rev-parse', 'HEAD') `
+            -FailureMessage 'Could not resolve the current repository commit.' `
+            -TrimOutput
+        reportCount   = $reports.Count
+        reportFiles   = @($reportFiles | Sort-Object path)
+        authority     = ([ordered]@{
+                schemaVersion      = 1
+                commit             = [string]$recomputedAuthority.commit
+                moduleCount        = $expectedAuthorityModules.Count
+                sequencePointCount = $expectedSequencePointCount
+            }).AsReadOnly()
+        aggregate     = ([ordered]@{
+                coveredLines       = $aggregate.coveredLines
+                coverableLines     = $aggregate.coverableLines
+                linePercent        = $aggregate.linePercent
+                minimumLinePercent = $aggregateMinimum
+                passed             = $aggregatePassed
+            }).AsReadOnly()
+        projects      = @($projects)
+        changedTcb    = $changedTcb
+        passed        = $aggregatePassed -and
+        @($projects | Where-Object { -not $_.passed }).Count -eq 0 -and
+        $changedTcb.passed
+    }).AsReadOnly()
 if (-not [string]::IsNullOrWhiteSpace($SummaryPath)) {
     $fullSummaryPath = [IO.Path]::GetFullPath($SummaryPath)
     $summaryDirectory = [IO.Path]::GetDirectoryName($fullSummaryPath)

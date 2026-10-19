@@ -413,10 +413,10 @@ public sealed partial class TotalLoweringContext
                     definition = actualOwner.GetTypeMembers(named.Name, named.Arity).Single(candidate =>
                         candidate is null ? throw new ArgumentNullException(nameof(candidate)) : SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, named.OriginalDefinition));
                 }
-                var arguments = named.TypeArguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : Substitute(argument, depth + 1)!).ToArray();
+                var arguments = named.TypeArguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : Substitute(argument, depth + 1)!).ToImmutableArray();
                 if (!SymbolEqualityComparer.Default.Equals(definition, named.ConstructedFrom) ||
                     arguments.Where((argument, index) => argument is null ? throw new ArgumentNullException(nameof(argument)) : !SymbolEqualityComparer.Default.Equals(argument, named.TypeArguments[index])).Any())
-                { return arguments.Length == 0 ? definition : definition.Construct(arguments); }
+                { return arguments.Length == 0 ? definition : definition.Construct(arguments.ToArray()); }
             }
             return value;
         }

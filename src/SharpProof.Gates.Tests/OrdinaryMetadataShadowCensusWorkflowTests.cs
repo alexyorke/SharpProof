@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -60,10 +61,8 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
 
         Assert.That(coverage.Expected, Is.Zero);
         Assert.That(coverage.Matched, Is.Zero);
-        Assert.That(coverage.Failures, Is.EqualTo(new[]
-        {
+        Assert.That(coverage.Failures, Is.EqualTo(ImmutableArray.Create(
             "UnsupportedClauseOwner:" + owner.CallableId,
-            "NativeSourceSpanMissing:" + body.CallableId
-        }));
+            "NativeSourceSpanMissing:" + body.CallableId)));
     }
 }

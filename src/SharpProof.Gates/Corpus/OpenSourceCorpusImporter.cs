@@ -431,17 +431,18 @@ SOFTWARE.
 
     internal static async Task<string> ReadGitAsync(
         string workingDirectory,
-        IReadOnlyList<string> arguments,
+        ImmutableArray<string> arguments,
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        System.ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(gitExecutable);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = GateProcess.CreateCaptured(
             gitExecutable,
             workingDirectory);
-        var capturedArguments = arguments.ToImmutableArray();
+        var capturedArguments = arguments;
         foreach (var argument in capturedArguments)
         {
             startInfo.ArgumentList.Add(argument);

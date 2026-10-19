@@ -26,7 +26,7 @@ public static class IrSemanticTerms
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(terms, nameof(terms));
-        return Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
+        return Combine(factory, terms.ToImmutableArray(), IrBinaryOperator.AndAlso, identity: true);
     }
 
     public static IrTerm Disjoin(
@@ -35,22 +35,22 @@ public static class IrSemanticTerms
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(terms, nameof(terms));
-        return Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
+        return Combine(factory, terms.ToImmutableArray(), IrBinaryOperator.OrElse, identity: false);
     }
 
     private static IrTerm Combine(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms,
+        ImmutableArray<IrTerm> terms,
         IrBinaryOperator @operator,
         bool identity)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        if (terms.Count == 0)
+        if (terms.Length == 0)
         {
             return factory.Boolean(identity);
         }
 
-        return Visit(0, terms.Count);
+        return Visit(0, terms.Length);
 
         IrTerm Visit(int start, int count)
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -47,7 +48,7 @@ public sealed class OrdinaryContractCensusWorkflowTests
             Assert.That(original.Failures, Is.Empty);
             Assert.That(repeated.Expected, Is.EqualTo(1));
             Assert.That(repeated.Matched, Is.EqualTo(1));
-            Assert.That(repeated.Failures, Is.EqualTo(new[] { "DuplicateNativeObligation:" + sourceKey }));
+            Assert.That(repeated.Failures, Is.EqualTo(ImmutableArray.Create("DuplicateNativeObligation:" + sourceKey)));
         }
     }
 
@@ -83,10 +84,10 @@ public sealed class OrdinaryContractCensusWorkflowTests
             Assert.That(census.Complete, Is.True);
             Assert.That(census.Unpublished, Is.True);
             Assert.That(census.ManifestUnchanged, Is.True);
-            Assert.That(census.Failures, Is.EqualTo(new[] { expectedFailure }));
+            Assert.That(census.Failures, Is.EqualTo(ImmutableArray.Create(expectedFailure)));
             Assert.That(coverage.Expected, Is.Zero);
             Assert.That(coverage.Matched, Is.Zero);
-            Assert.That(coverage.Failures, Is.EqualTo(new[] { "RequiresBindingFailed:" + expectedFailure }));
+            Assert.That(coverage.Failures, Is.EqualTo(ImmutableArray.Create("RequiresBindingFailed:" + expectedFailure)));
         }
     }
 }

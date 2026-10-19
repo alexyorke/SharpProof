@@ -53,9 +53,10 @@ internal sealed class MetadataSourceCompilation : IDisposable
     private MemoryStream? libraryImage;
     private MemoryStream? sourceImage;
 
-    internal MetadataSourceCompilation(IReadOnlyList<MetadataProgramSourceCase> cases)
+    internal MetadataSourceCompilation(ImmutableArray<MetadataProgramSourceCase> cases)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
         libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
         sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
     }
@@ -124,11 +125,12 @@ internal sealed class MetadataProgramSourceReplay
     internal MetadataProgramSourceResult Result => new(totalCases, agreements, proofs,
         refutations, failures.ToImmutable());
 
-    internal async Task CompareBatchAsync(IReadOnlyList<MetadataProgramSourceCase> cases,
+    internal async Task CompareBatchAsync(ImmutableArray<MetadataProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        var count = cases.Count;
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
+        var count = cases.Length;
         var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
         var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
         var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToImmutableArray();

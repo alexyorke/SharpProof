@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -41,7 +42,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
         private readonly CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
         internal int RecordCount { get; private set; }
 
-        internal AnalyzerSemanticOutcome[] Snapshot()
+        internal ImmutableArray<AnalyzerSemanticOutcome> Snapshot()
         {
             return [.. Outcomes.Values];
         }

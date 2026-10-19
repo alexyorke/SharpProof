@@ -89,7 +89,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         relation = RepositoryParameterGuard.NotNull(relation, nameof(relation));
-        var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToArray();
+        var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToImmutableArray();
         var relations = _relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         if (!relations.TryGetValue(relation.Member, out var declaration))
         {
@@ -98,7 +98,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             relations.Add(relation.Member, declaration);
             _relationDeclarations.Add(new(relation.Member, declaration));
         }
-        return owner.Own(context.MkApp(declaration, arguments));
+        return owner.Own(context.MkApp(declaration, arguments.ToArray()));
     }
 
     private Expr EncodeOperator(IrTerm term, SmtQueryResourceMeter meter)

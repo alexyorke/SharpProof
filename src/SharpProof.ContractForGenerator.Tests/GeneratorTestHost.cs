@@ -15,28 +15,31 @@ internal static class GeneratorTestHost
                 typeof(ContractForAttribute).Assembly.Location)];
 
     internal static CSharpCompilation CreateCompilation(
-        params (string Path, string Source)[] sources)
+        ImmutableArray<(string Path, string Source)> sources)
     {
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         return CreateCompilation(References, sources);
     }
 
     internal static CSharpCompilation CreateCompilationWithoutAttributes(
-        params (string Path, string Source)[] sources)
+        ImmutableArray<(string Path, string Source)> sources)
     {
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         return CreateCompilation(TestMetadataReferences.SortedPlatform, sources);
     }
 
     internal static CSharpCompilation CreateCompilationWithReference(
         string referenceSource,
-        params (string Path, string Source)[] sources)
+        ImmutableArray<(string Path, string Source)> sources)
     {
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         System.ArgumentNullException.ThrowIfNull(referenceSource);
         var reference = CreateCompilation(
             References,
-            ("ReferencedContracts.cs", referenceSource));
+            [("ReferencedContracts.cs", referenceSource)]);
         return CreateCompilation(
             References.Add(reference.ToMetadataReference()),
             sources);
@@ -44,10 +47,11 @@ internal static class GeneratorTestHost
 
     private static CSharpCompilation CreateCompilation(
         ImmutableArray<MetadataReference> references,
-        params (string Path, string Source)[] sources)
+        ImmutableArray<(string Path, string Source)> sources)
     {
 
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         if (references.IsDefault)
         {
             throw new System.ArgumentException("Array must be initialized.", nameof(references));
@@ -73,7 +77,7 @@ internal static class GeneratorTestHost
 
     internal static AnalyzerRun RunAnalyzer(
         CSharpCompilation compilation,
-        Dictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return new AnalyzerRun(CollectDiagnostics(
@@ -86,7 +90,7 @@ internal static class GeneratorTestHost
     internal static AnalyzerRun RunWithAnalyzer(
         CSharpCompilation compilation,
         DiagnosticAnalyzer analyzer,
-        Dictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(analyzer);
@@ -100,7 +104,7 @@ internal static class GeneratorTestHost
     internal static GeneratorRun RunWithDefaultGenerator(
         CSharpCompilation compilation,
         GeneratorDriver? previousDriver = null,
-        Dictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var driver = previousDriver ?? CreateDriver(globalOptions);
@@ -110,7 +114,7 @@ internal static class GeneratorTestHost
     internal static GeneratorRun RunWithGenerator(
         CSharpCompilation compilation,
         IIncrementalGenerator generator,
-        Dictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(generator);
@@ -123,7 +127,7 @@ internal static class GeneratorTestHost
     private static GeneratorRun RunCore(
         CSharpCompilation compilation,
         GeneratorDriver driver,
-        Dictionary<string, string>? globalOptions)
+        ImmutableDictionary<string, string>? globalOptions)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(driver);
@@ -145,7 +149,7 @@ internal static class GeneratorTestHost
 
     private static ImmutableArray<Diagnostic> CollectDiagnostics(
         CSharpCompilation compilation,
-        Dictionary<string, string>? globalOptions,
+        ImmutableDictionary<string, string>? globalOptions,
         DiagnosticAnalyzer? analyzer,
         IEnumerable<Diagnostic> existing)
     {
@@ -172,7 +176,7 @@ internal static class GeneratorTestHost
 
     private static ImmutableArray<Diagnostic> AnalyzeFinalCompilation(
         CSharpCompilation compilation,
-        Dictionary<string, string>? globalOptions,
+        ImmutableDictionary<string, string>? globalOptions,
         DiagnosticAnalyzer? analyzer)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -180,7 +184,7 @@ internal static class GeneratorTestHost
             [],
             new DictionaryAnalyzerConfigOptionsProvider(
                 globalOptions ??
-                new Dictionary<string, string>(StringComparer.Ordinal)));
+                ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)));
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
             new CompilationWithAnalyzersOptions(
@@ -209,7 +213,7 @@ internal static class GeneratorTestHost
     }
 
     private static CSharpGeneratorDriver CreateDriver(
-        Dictionary<string, string>? globalOptions)
+        ImmutableDictionary<string, string>? globalOptions)
     {
         return CreateDriver(
             new ContractForValidatorGenerator(),
@@ -218,7 +222,7 @@ internal static class GeneratorTestHost
 
     private static CSharpGeneratorDriver CreateDriver(
         IIncrementalGenerator generator,
-        Dictionary<string, string>? globalOptions)
+        ImmutableDictionary<string, string>? globalOptions)
     {
         System.ArgumentNullException.ThrowIfNull(generator);
         return CSharpGeneratorDriver.Create(

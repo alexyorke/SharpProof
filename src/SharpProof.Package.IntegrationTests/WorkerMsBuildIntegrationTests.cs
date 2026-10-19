@@ -873,7 +873,7 @@ public sealed class WorkerMsBuildIntegrationTests
         void AssertFrameworkScopedSarif(string output)
         {
             System.ArgumentNullException.ThrowIfNull(output);
-            var markerIdentities = new List<string>();
+            var markerIdentities = ImmutableArray.CreateBuilder<string>();
             foreach (var framework in ImmutableArray.Create("net9.0", "net8.0", "netstandard2.0"))
             {
                 var sarif = Path.Combine(
@@ -886,7 +886,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Assert.That(document.RootElement.GetProperty("runs").GetArrayLength(), Is.EqualTo(1), sarif);
                 markerIdentities.Add(sarif);
             }
-            Assert.That(markerIdentities, Is.Unique);
+            Assert.That(markerIdentities.ToImmutable(), Is.Unique);
         }
     }
 
@@ -3460,7 +3460,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 _defaultRestoreCompleted &&
                 !restoreSensitive &&
                 File.Exists(Path.Combine(_root, "obj", "project.assets.json"));
-            var arguments = new List<string> {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange((ImmutableArray<string>)[
                 "build",
                 ProjectPath,
                 "-c",
@@ -3469,7 +3470,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 buildInParallel == true ? "/m:3" : "/m:1",
                 "/nodeReuse:false",
                 "-p:GeneratePackageOnBuild=false"
-            };
+            ]);
             if (buildInParallel.HasValue)
             {
                 arguments.Add(
@@ -3497,7 +3498,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            var result = await RunDotNetAsync(arguments);
+            var result = await RunDotNetAsync(arguments.ToImmutable());
             if (result.ExitCode == 0 && !restoreSensitive)
             {
                 _defaultRestoreCompleted = true;
@@ -3515,18 +3516,18 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 _defaultRestoreCompleted = false;
             }
-            var arguments = new List<string>
-            {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange((ImmutableArray<string>)[
                 "restore",
                 ProjectPath,
                 "--nologo",
                 "/nodeReuse:false",
                 "-p:SharpProofVerify=false",
                 "-p:NuGetAudit=false"
-            };
+            ]);
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            var result = await RunDotNetAsync(arguments);
+            var result = await RunDotNetAsync(arguments.ToImmutable());
             if (result.ExitCode == 0 && !restoreSensitive)
             {
                 _defaultRestoreCompleted = true;
@@ -3572,8 +3573,8 @@ public sealed class WorkerMsBuildIntegrationTests
             (string Name, string Value)[] properties)
         {
             System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
-            var arguments = new List<string>
-            {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange((ImmutableArray<string>)[
                 "build",
                 ProjectPath,
                 "-t:Rebuild",
@@ -3584,7 +3585,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 buildInParallel == true ? "/m:3" : "/m:1",
                 "/nodeReuse:false",
                 "-p:GeneratePackageOnBuild=false"
-            };
+            ]);
             if (buildInParallel.HasValue)
             {
                 arguments.Add(
@@ -3599,7 +3600,7 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            return RunDotNetAsync(arguments);
+            return RunDotNetAsync(arguments.ToImmutable());
         }
 
         internal async Task<IReadOnlyDictionary<string, string>>
@@ -3659,7 +3660,8 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             System.ArgumentNullException.ThrowIfNull(invocationId);
-            var arguments = new List<string> {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange((ImmutableArray<string>)[
                 "msbuild",
                 ProjectPath,
                 "/t:_SharpProofVerifyCore",
@@ -3679,10 +3681,10 @@ public sealed class WorkerMsBuildIntegrationTests
                         "SharpProof",
                         "cache"),
                 "-p:_SharpProofInvocationId=" + invocationId
-            };
+            ]);
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
-            return RunDotNetAsync(arguments);
+            return RunDotNetAsync(arguments.ToImmutable());
         }
 
         internal Task<BuildResult> RunCleanupTargetAsync(
@@ -3690,7 +3692,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string? invocationDirectory = null)
         {
             System.ArgumentNullException.ThrowIfNull(invocationId);
-            var arguments = new List<string> {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange((ImmutableArray<string>)[
                 "msbuild",
                 ProjectPath,
                 "/t:_SharpProofCleanupInvocation",
@@ -3699,13 +3702,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 "-p:Configuration=Release",
                 "-p:TargetFramework=net8.0",
                 "-p:_SharpProofInvocationId=" + invocationId
-            };
+            ]);
             if (!string.IsNullOrEmpty(invocationDirectory))
             {
                 arguments.Add(
                     "-p:_SharpProofInvocationDirectory=" + invocationDirectory);
             }
-            return RunDotNetAsync(arguments);
+            return RunDotNetAsync(arguments.ToImmutable());
         }
 
         internal Task<BuildResult> RunNonBuildingInitializationAsync(

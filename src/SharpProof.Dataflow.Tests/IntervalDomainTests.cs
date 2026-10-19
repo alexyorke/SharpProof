@@ -111,7 +111,7 @@ public sealed class IntervalDomainTests
     {
         var span = (BigInteger)ulong.MaxValue;
         var hugeModulus = BigInteger.One << 128;
-        (BigInteger Modulus, BigInteger Remainder, long[] Carrier)[] cases = [
+        ImmutableArray<(BigInteger Modulus, BigInteger Remainder, ImmutableArray<long> Carrier)> cases = [
             (span, long.MinValue, [long.MinValue, long.MaxValue]),
             (span + 1, long.MinValue, [long.MinValue]),
             (span + 1, long.MaxValue, [long.MaxValue]),
@@ -123,7 +123,7 @@ public sealed class IntervalDomainTests
             (long.MaxValue, 0, [-long.MaxValue, 0, long.MaxValue]),
             ((BigInteger)long.MaxValue + 1, 0, [long.MinValue, 0])
         ];
-        (long? Lower, long? Upper)[] bounds = [
+        ImmutableArray<(long? Lower, long? Upper)> bounds = [
             (null, null), (long.MinValue, long.MaxValue),
             (long.MinValue, null), (null, long.MaxValue),
             (long.MinValue + 1, null), (null, long.MaxValue - 1),
@@ -134,11 +134,11 @@ public sealed class IntervalDomainTests
         {
             foreach (var (lower, upper) in bounds)
             {
-                foreach (var shift in new[] { -1, 0, 1 })
+                foreach (var shift in ImmutableArray.Create(-1, 0, 1))
                 {
                     var expected = carrier.Where(value =>
                         (!lower.HasValue || value >= lower.Value) &&
-                        (!upper.HasValue || value <= upper.Value)).ToArray();
+                        (!upper.HasValue || value <= upper.Value)).ToImmutableArray();
                     var actual = _domain.Create(lower, upper, modulus, remainder + shift * modulus);
                     var context = $"modulus={modulus}, remainder={remainder}, lower={lower}, upper={upper}, shift={shift}";
 

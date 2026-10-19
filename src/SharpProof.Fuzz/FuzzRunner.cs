@@ -343,10 +343,11 @@ public static class FuzzRunner
     }
 
     internal static async Task<FuzzSourceCampaignResult> ReplaySourceCasesAsync(
-        IReadOnlyList<FuzzSourceCampaignCase> sourceCases,
+        ImmutableArray<FuzzSourceCampaignCase> sourceCases,
         CancellationToken cancellationToken, int seed = FuzzOptions.DefaultSeed)
     {
-        ArgumentNullException.ThrowIfNull(sourceCases);
+        if (sourceCases.IsDefault)
+        { throw new ArgumentNullException(nameof(sourceCases)); }
         var sources = sourceCases.Select(source => source is null ? throw new ArgumentNullException(nameof(source)) : new FuzzSourceCampaignCase(
             source.Frontend, source.FiniteMembers, source.FiniteArguments,
             source.PartialMembers, source.PartialScenarios)).ToImmutableArray();
@@ -475,11 +476,17 @@ public static class FuzzRunner
     }
 
     internal static ImmutableArray<FuzzFailureKey> SelectFailureKeys(
-        IReadOnlyList<FuzzOracleStatus> frontend,
-        IReadOnlyList<FuzzOracleStatus> smt,
-        IReadOnlyList<FuzzOracleStatus> partial)
+        ImmutableArray<FuzzOracleStatus> frontend,
+        ImmutableArray<FuzzOracleStatus> smt,
+        ImmutableArray<FuzzOracleStatus> partial)
     {
-        if (frontend.Count != smt.Count || smt.Count != partial.Count)
+        if (frontend.IsDefault)
+        { throw new ArgumentNullException(nameof(frontend)); }
+        if (smt.IsDefault)
+        { throw new ArgumentNullException(nameof(smt)); }
+        if (partial.IsDefault)
+        { throw new ArgumentNullException(nameof(partial)); }
+        if (frontend.Length != smt.Length || smt.Length != partial.Length)
         {
             throw new ArgumentException(
                 "Fuzz oracle status collections must have equal lengths.");
@@ -487,7 +494,7 @@ public static class FuzzRunner
 
         var keys = ImmutableArray.CreateBuilder<FuzzFailureKey>(
             MaximumRetainedFailures);
-        for (var index = 0; index < frontend.Count; index++)
+        for (var index = 0; index < frontend.Length; index++)
         {
             Add(index, "finite-domain-smt", smt[index] != FuzzOracleStatus.Agreement);
             Add(index, "frontend", frontend[index] != FuzzOracleStatus.Agreement);
@@ -544,11 +551,13 @@ public static class FuzzRunner
     }
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(
-        IReadOnlyList<GeneratedCSharpCase> cases,
-        IReadOnlyList<FrontendDifferentialResult> results)
+        ImmutableArray<GeneratedCSharpCase> cases,
+        ImmutableArray<FrontendDifferentialResult> results)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        results = RepositoryParameterGuard.NotNull(results, nameof(results));
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
+        if (results.IsDefault)
+        { throw new ArgumentNullException(nameof(results)); }
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;

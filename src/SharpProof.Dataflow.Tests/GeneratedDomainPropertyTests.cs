@@ -7,11 +7,12 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertLatticeAndBottomLaws<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values,
+        ImmutableArray<T> values,
         int seed)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
         var comparer = EqualityComparer<T>.Default;
@@ -112,15 +113,18 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertTransfersAreMonotone<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values,
+        ImmutableArray<T> values,
         int seed,
-        IReadOnlyList<(string Name, Func<T, T> Transfer)> unaryTransfers,
-        IReadOnlyList<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
+        ImmutableArray<(string Name, Func<T, T> Transfer)> unaryTransfers,
+        ImmutableArray<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
     {
-        System.ArgumentNullException.ThrowIfNull(binaryTransfers);
+        if (binaryTransfers.IsDefault)
+        { throw new ArgumentNullException(nameof(binaryTransfers)); }
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(unaryTransfers);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (unaryTransfers.IsDefault)
+        { throw new ArgumentNullException(nameof(unaryTransfers)); }
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
 
@@ -159,10 +163,11 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertWideningTerminates<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> ascendingChain,
+        ImmutableArray<T> ascendingChain,
         int maximumChanges)
     {
-        System.ArgumentNullException.ThrowIfNull(ascendingChain);
+        if (ascendingChain.IsDefault)
+        { throw new ArgumentNullException(nameof(ascendingChain)); }
         System.ArgumentNullException.ThrowIfNull(domain);
         Assert.That(ascendingChain, Is.Not.Empty);
         var previousChainValue = domain.Bottom;
@@ -211,10 +216,11 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertHavocIsConservative<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values)
+        ImmutableArray<T> values)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         foreach (var value in values)
         {
             var havoced = domain.Havoc(value);
@@ -237,11 +243,12 @@ internal static class GeneratedDomainLawAssertions
         }
     }
 
-    private static T Pick<T>(IReadOnlyList<T> values, Random random)
+    private static T Pick<T>(ImmutableArray<T> values, Random random)
     {
         System.ArgumentNullException.ThrowIfNull(random);
-        System.ArgumentNullException.ThrowIfNull(values);
-        return values[random.Next(values.Count)];
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
+        return values[random.Next(values.Length)];
     }
 }
 

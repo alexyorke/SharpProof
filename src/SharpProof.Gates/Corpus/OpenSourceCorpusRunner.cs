@@ -108,10 +108,11 @@ internal static class OpenSourceCorpusRunner
 
     internal static void RequireCompleteDiagnosticAssignment(
         ImmutableArray<Diagnostic> diagnostics,
-        IReadOnlyList<int> assignmentCounts)
+        ImmutableArray<int> assignmentCounts)
     {
-        ArgumentNullException.ThrowIfNull(assignmentCounts);
-        if (assignmentCounts.Count != diagnostics.Length)
+        if (assignmentCounts.IsDefault)
+        { throw new ArgumentNullException(nameof(assignmentCounts)); }
+        if (assignmentCounts.Length != diagnostics.Length)
         {
             throw new ArgumentException(
                 "Diagnostic assignment counts do not match the diagnostics.",

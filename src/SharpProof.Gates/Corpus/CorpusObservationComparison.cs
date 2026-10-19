@@ -24,7 +24,7 @@ internal static class CorpusObservationComparison
     }
 
     internal static ImmutableArray<string> CompareConcurrent(
-        IReadOnlyDictionary<string, CorpusObservation> expected,
+        ImmutableDictionary<string, CorpusObservation> expected,
         IEnumerable<CorpusObservation> observations)
     {
         System.ArgumentNullException.ThrowIfNull(expected);

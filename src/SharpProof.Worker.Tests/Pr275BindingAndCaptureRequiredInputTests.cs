@@ -73,7 +73,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
 
-        var result = CompilerReachableSourceCollector.Collect(compilation, targets, trees, packs, default);
+        var result = CompilerReachableSourceCollector.Collect(compilation, targets, trees.ToImmutableArray(), packs, default);
 
         Assert.That(result.CollectionComplete, Is.True);
         Assert.That(result.Roots, Has.Length.EqualTo(1));

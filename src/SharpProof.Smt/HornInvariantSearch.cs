@@ -85,11 +85,11 @@ public static class HornInvariantSearch
                 if (state.Length != domain.Length)
                 { throw new ArgumentException("An invariant state must match its relation's arity."); }
                 var arguments = state.Select((term, ordinal) =>
-                    ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToArray();
+                    ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToImmutableArray();
                 for (var ordinal = 0; ordinal < state.Length; ordinal++)
                 { _names[arguments[ordinal].FuncDecl.Name.ToString()] = state[ordinal]; }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
-                if (Translate(Own(cover.SubstituteVars(arguments))) is { } invariant && invariant.Type == factory.BooleanType)
+                if (Translate(Own(cover.SubstituteVars(arguments.ToArray()))) is { } invariant && invariant.Type == factory.BooleanType)
                 { proposals[relation.Key] = invariant; }
             }
             return proposals.ToImmutable();
@@ -159,14 +159,14 @@ public static class HornInvariantSearch
             if (IsRelation(expression))
             {
                 var name = expression.FuncDecl.Name.ToString();
-                var arguments = expression.Args.Select(Integer).ToArray();
+                var arguments = expression.Args.Select(Integer).ToImmutableArray();
                 if (!_relations.TryGetValue(name, out var relation))
                 {
                     relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
                     _relations.AddUnique(name, relation);
                     _relationOrder.Add(relation);
                 }
-                return Own(context.MkApp(relation, arguments));
+                return Own(context.MkApp(relation, arguments.ToArray()));
             }
             if (expression.IsConst && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
@@ -182,7 +182,7 @@ public static class HornInvariantSearch
             }
             // Source rules contain only encoder-authored applications;
             // quantification and native cover retrieval happen after conversion.
-            var operands = expression.Args.Select(Integer).ToArray();
+            var operands = expression.Args.Select(Integer).ToImmutableArray();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
                 var function = expression.FuncDecl.Name.ToString();
@@ -192,13 +192,13 @@ public static class HornInvariantSearch
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
                     application = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
                     _applications.AddUnique(key, application);
-                    _applied.AddUnique(name, (function, operands.ToImmutableArray(), expression.Sort is BitVecSort sort ? sort.Size : 0));
+                    _applied.AddUnique(name, (function, operands, expression.Sort is BitVecSort sort ? sort.Size : 0));
                 }
                 return application;
             }
             // Completed recursive conversions have Bool/Int result sorts;
             // equality therefore compares those converted values directly.
-            var numbers = operands.OfType<ArithExpr>().ToArray();
+            var numbers = operands.OfType<ArithExpr>().ToImmutableArray();
             var arithmetic = numbers.Length == operands.Length && operands.Length != 0;
             Expr? result = expression.FuncDecl.DeclKind switch
             {
@@ -209,9 +209,9 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_IMPLIES => context.MkImplies((BoolExpr)operands[0], (BoolExpr)operands[1]),
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
-                Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers),
-                Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers),
-                Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers),
+                Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers.ToArray()),
+                Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers.ToArray()),
+                Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers.ToArray()),
                 Z3_decl_kind.Z3_OP_BNEG when arithmetic => context.MkUnaryMinus(numbers[0]),
                 Z3_decl_kind.Z3_OP_SIGN_EXT when arithmetic => operands[0],
                 // The signed reading of the extended value, read unsigned.

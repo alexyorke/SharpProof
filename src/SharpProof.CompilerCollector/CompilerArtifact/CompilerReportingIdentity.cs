@@ -11,9 +11,10 @@ internal static class CompilerReportingIdentity
     private const int SourceLineMapVersion = 2;
 
     internal static string ComputeLineMapSha256(
-        IReadOnlyList<CompilerSourceLineMapEntry> entries)
+        ImmutableArray<CompilerSourceLineMapEntry> entries)
     {
-        entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
+        if (entries.IsDefault)
+        { throw new ArgumentNullException(nameof(entries)); }
 
         using var hash = new CanonicalHashWriter();
         hash.Add(SourceLineMapDomain)

@@ -10,7 +10,7 @@ internal static class IrTermServices
         IrFactory factory,
         IrMemberInfo member,
         IrTerm? receiver,
-        IReadOnlyList<IrTerm> arguments,
+        ImmutableArray<IrTerm> arguments,
         string parameterName,
         bool opaque)
     {
@@ -45,14 +45,16 @@ internal static class IrTermServices
             }
         }
 
-        if (arguments.Count != member.ParameterTypes.Length)
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
+        if (arguments.Length != member.ParameterTypes.Length)
         {
             throw new ArgumentException(
                 "The argument count does not match the member signature.",
                 parameterName);
         }
 
-        for (var index = 0; index < arguments.Count; index++)
+        for (var index = 0; index < arguments.Length; index++)
         {
             var argument = arguments[index] ??
                 throw new ArgumentException(

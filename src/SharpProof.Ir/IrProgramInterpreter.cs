@@ -264,11 +264,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
     }
     internal IrEvaluationResult? EvaluateCallOperands(
-        IrTerm? receiver, IReadOnlyList<IrTerm> arguments, IrTerm? storedValue,
+        IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrTerm? storedValue,
         ReplayValues values, string nullReceiverDetail,
         CancellationToken cancellationToken)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         nullReceiverDetail = RepositoryParameterGuard.NotNull(nullReceiverDetail, nameof(nullReceiverDetail));
         IrValue? receiverValue = null;
         if (receiver != null)
@@ -382,20 +383,20 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     internal sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
     {
-        private ImmutableDictionary<IrVarId, IrValue> _values = ImmutableDictionary<IrVarId, IrValue>.Empty;
-        private ImmutableHashSet<IrVarId> _approximations = ImmutableHashSet<IrVarId>.Empty;
+        private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        private readonly ImmutableHashSet<IrVarId>.Builder _approximations = ImmutableHashSet.CreateBuilder<IrVarId>();
         private bool _consumedApproximation;
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
-        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations;
+        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutable();
         internal IrHeap Heap { get; } = new();
         internal ImmutableHashSet<IrVarId> Snapshots { get; } = (snapshots ?? throw new System.ArgumentNullException(nameof(snapshots)));
-        internal ImmutableDictionary<IrVarId, IrValue> Current => _values;
+        internal ImmutableDictionary<IrVarId, IrValue> Current => _values.ToImmutable();
         internal IrValue this[IrVarId key]
         {
             set
             {
-                _values = _values.SetItem(key, value);
-                _approximations = _approximations.Remove(key);
+                _values[key] = value;
+                _approximations.Remove(key);
             }
         }
         internal void ObserveRead(IrVarId key)
@@ -410,13 +411,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         {
             RepositoryParameterGuard.ThrowIfInvalid(key.IsDefault, nameof(key));
             value = RepositoryParameterGuard.NotNull(value, nameof(value));
-            _values = _values.Add(key, value);
+            _values.Add(key, value);
         }
         internal void Remove(IrVarId key)
         {
             RepositoryParameterGuard.ThrowIfInvalid(key.IsDefault, nameof(key));
-            _values = _values.Remove(key);
-            _approximations = _approximations.Remove(key);
+            _values.Remove(key);
+            _approximations.Remove(key);
         }
         internal void SetHavocValue(IrVarId key, IrValue value, IrHavocOrigin origin)
         {
@@ -425,12 +426,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             this[key] = value;
             if (origin == IrHavocOrigin.Approximation)
             {
-                _approximations = _approximations.Add(key);
+                _approximations.Add(key);
             }
         }
         internal ImmutableDictionary<IrVarId, IrValue> ToImmutable()
         {
-            return _values;
+            return _values.ToImmutable();
         }
     }
 }

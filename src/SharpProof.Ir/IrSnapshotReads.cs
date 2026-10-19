@@ -14,21 +14,22 @@ internal static class IrSnapshotReads
         ArgumentNullGuard.NotNull(rewriteGuard, nameof(rewriteGuard));
         ArgumentNullGuard.NotNull(spend, nameof(spend));
         ArgumentNullGuard.NotNull(memo, nameof(memo));
+        var memoBuilder = memo.ToBuilder();
         var pending = ImmutableStack<(IrTerm Term, bool Expanded)>.Empty;
         pending = pending.Push((owner, false));
         while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!spend())
-            { return (false, null, memo); }
+            { return (false, null, memoBuilder.ToImmutable()); }
             var (term, expanded) = pending.Peek();
             pending = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+            if (memoBuilder.ContainsKey(term.Id))
             { continue; }
             if (term is IrVariableTerm variable)
-            { memo = memo.Add(term.Id, factory.Boolean(snapshot(variable.Variable))); continue; }
+            { memoBuilder.Add(term.Id, factory.Boolean(snapshot(variable.Variable))); continue; }
             if (term is IrNullTerm or IrStringTerm or IrEmptyArrayTerm)
-            { memo = memo.Add(term.Id, factory.Boolean(false)); continue; }
+            { memoBuilder.Add(term.Id, factory.Boolean(false)); continue; }
             IrTerm? child = term switch
             {
                 IrCastTerm cast => cast.Operand,
@@ -37,7 +38,7 @@ internal static class IrSnapshotReads
                 _ => null
             };
             if (term is not IrConditionalTerm && child == null)
-            { return (false, null, memo); }
+            { return (false, null, memoBuilder.ToImmutable()); }
             if (!expanded)
             {
                 pending = pending.Push((term, true));
@@ -52,14 +53,14 @@ internal static class IrSnapshotReads
             }
             if (term is IrConditionalTerm conditional)
             {
-                var whenTrue = memo[conditional.WhenTrue.Id];
-                var whenFalse = memo[conditional.WhenFalse.Id];
-                memo = memo.Add(term.Id, whenTrue.Id == whenFalse.Id ? whenTrue
+                var whenTrue = memoBuilder[conditional.WhenTrue.Id];
+                var whenFalse = memoBuilder[conditional.WhenFalse.Id];
+                memoBuilder.Add(term.Id, whenTrue.Id == whenFalse.Id ? whenTrue
                     : factory.Conditional(rewriteGuard(conditional.Condition), whenTrue, whenFalse));
             }
             else
-            { memo = memo.Add(term.Id, memo[child!.Id]); }
+            { memoBuilder.Add(term.Id, memoBuilder[child!.Id]); }
         }
-        return (true, memo[owner.Id], memo);
+        return (true, memoBuilder[owner.Id], memoBuilder.ToImmutable());
     }
 }

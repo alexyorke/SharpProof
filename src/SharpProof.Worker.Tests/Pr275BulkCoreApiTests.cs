@@ -41,16 +41,16 @@ public sealed class Pr275BulkCoreApiTests
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var operation = model.GetOperation(invocationSyntax)!;
-        var expected = new List<IOperation>();
+        var expectedBuilder = ImmutableArray.CreateBuilder<IOperation>();
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
         {
-            expected.Add(parent);
+            expectedBuilder.Add(parent);
         }
 
         AssertArgumentNull(
             "operation",
             () => OperationAncestors.Of(null!));
-        Assert.That(OperationAncestors.Of(operation), Is.EqualTo(expected));
+        Assert.That(OperationAncestors.Of(operation), Is.EqualTo(expectedBuilder.ToImmutable()));
     }
 
     [Test]
@@ -304,7 +304,7 @@ public sealed class Pr275BulkCoreApiTests
         var noClaimMethod = GetMethod(compilation, "NoClaim");
         var noClaimDeclaration = noClaimMethod.DeclaringSyntaxReferences.Single()
             .GetSyntax(TestContext.CurrentContext.CancellationToken);
-        var nullInputDiagnostics = new List<Diagnostic>();
+        var nullInputDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         AssertArgumentNull(
             "method",
             () => EffectContractDiagnostics.Analyze(
@@ -410,7 +410,7 @@ public sealed class Pr275BulkCoreApiTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var session = NewSession(compilation);
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         var root = tree.GetRoot();
         var localFunction = root.DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
@@ -426,22 +426,23 @@ public sealed class Pr275BulkCoreApiTests
             localFunction,
             model,
             session,
-            diagnostics.Add,
+            diagnosticBuilder.Add,
             TestContext.CurrentContext.CancellationToken);
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             lambda,
             model,
             session,
-            diagnostics.Add,
+            diagnosticBuilder.Add,
             TestContext.CurrentContext.CancellationToken);
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             ordinaryMethod,
             model,
             session,
-            diagnostics.Add,
+            diagnosticBuilder.Add,
             TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(diagnostics, Has.Count.EqualTo(2));
+        var diagnostics = diagnosticBuilder.ToImmutable();
+        Assert.That(diagnostics, Has.Length.EqualTo(2));
         Assert.That(
             diagnostics.All(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")),
             Is.True);
@@ -475,19 +476,20 @@ public sealed class Pr275BulkCoreApiTests
             .OfType<IMethodSymbol>()
             .Single();
         var session = NewSession(consumer);
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
         var suppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method,
             session,
-            diagnostics.Add,
+            diagnosticBuilder.Add,
             TestContext.CurrentContext.CancellationToken);
 
+        var diagnostics = diagnosticBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(suppressed, Is.False);
             Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
-            Assert.That(diagnostics, Has.Count.EqualTo(1));
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
             Assert.That(diagnostics[0].Id, Is.EqualTo("SP0024"));
             Assert.That(diagnostics.Single().Location.IsInSource, Is.False);
         }
@@ -502,7 +504,7 @@ public sealed class Pr275BulkCoreApiTests
             TestContext.CurrentContext.CancellationToken);
     }
 
-    private static (CSharpCompilation Compilation, byte[] Image) Compile(
+    private static (CSharpCompilation Compilation, ImmutableArray<byte> Image) Compile(
         string assemblyName,
         string source,
         MetadataReference? additionalReference = null)
@@ -522,7 +524,7 @@ public sealed class Pr275BulkCoreApiTests
             emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
             Is.Empty);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
-        return (compilation, stream.ToArray());
+        return (compilation, ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
     }
 
     private static (AnalyzerSemanticOutcome Outcome, ImmutableArray<Diagnostic> Diagnostics)
@@ -534,14 +536,14 @@ public sealed class Pr275BulkCoreApiTests
         var method = GetMethod(compilation, methodName);
         var declaration = method.DeclaringSyntaxReferences.Single()
             .GetSyntax(TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         var outcome = EffectContractDiagnostics.Analyze(
             method,
             declaration,
             session,
-            diagnostics.Add,
+            diagnosticBuilder.Add,
             TestContext.CurrentContext.CancellationToken);
-        return (outcome, diagnostics.ToImmutableArray());
+        return (outcome, diagnosticBuilder.ToImmutable());
     }
 
     private static IMethodSymbol GetMethod(CSharpCompilation compilation, string methodName)

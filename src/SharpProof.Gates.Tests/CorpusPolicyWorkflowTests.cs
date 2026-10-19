@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -65,10 +66,10 @@ public sealed class CorpusPolicyWorkflowTests
             File.Copy(file, target);
         }
         var snapshotPath = Path.Combine(destination, "expected.canonical.snapshot");
-        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
+        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToBuilder();
         var repeatedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
         rows.Add(repeatedRow);
-        var contents = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
+        var contents = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
         File.WriteAllText(snapshotPath, contents);
 
         var error = Assert.ThrowsAsync<InvalidDataException>(

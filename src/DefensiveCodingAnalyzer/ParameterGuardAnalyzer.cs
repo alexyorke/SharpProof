@@ -230,7 +230,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         var nullable = parameter.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
         var array = parameter.Type is INamedTypeSymbol named &&
             named.Name == "ImmutableArray" &&
-            HasNamespace(named.ContainingNamespace, "System", "Collections", "Immutable");
+            HasNamespace(named.ContainingNamespace, ["System", "Collections", "Immutable"]);
         if (!nullable && !array)
         {
             return false;
@@ -285,7 +285,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
 
         return body.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().Any(invocation =>
             model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.ContainingType.Name == "Assert" && HasNamespace(method.ContainingType.ContainingNamespace, "NUnit", "Framework") &&
+            method.ContainingType.Name == "Assert" && HasNamespace(method.ContainingType.ContainingNamespace, ["NUnit", "Framework"]) &&
             method.Name is "That" or "AreEqual" or "AreNotEqual" or "Throws" or "ThrowsAsync" &&
             invocation.ArgumentList.Arguments.Any(argument =>
                 Mentions(argument.Expression, parameter, model, cancellationToken)));
@@ -352,8 +352,8 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
     {
         return parameter.GetAttributes().Any(attribute => attribute.AttributeClass is { } type &&
             (type.Name is "PositiveAttribute" or "InRangeAttribute" or "RangeAttribute" ||
-             type.Name == "NotNullAttribute" && HasNamespace(type.ContainingNamespace, "SharpProof", "Attributes") ||
-             type.Name == "DisallowNullAttribute" && HasNamespace(type.ContainingNamespace, "System", "Diagnostics", "CodeAnalysis")));
+             type.Name == "NotNullAttribute" && HasNamespace(type.ContainingNamespace, ["SharpProof", "Attributes"]) ||
+             type.Name == "DisallowNullAttribute" && HasNamespace(type.ContainingNamespace, ["System", "Diagnostics", "CodeAnalysis"])));
     }
     private static bool AcceptsEveryNullableReferenceValue(
         SyntaxNode body,
@@ -553,7 +553,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         return symbol is IPropertySymbol property &&
             (property.GetMethod?.GetAttributes().Any(attribute =>
                 attribute.AttributeClass is { Name: "CompilerGeneratedAttribute" } attributeType &&
-                    HasNamespace(attributeType.ContainingNamespace, "System", "Runtime", "CompilerServices")) == true ||
+                    HasNamespace(attributeType.ContainingNamespace, ["System", "Runtime", "CompilerServices"])) == true ||
              property.DeclaringSyntaxReferences.Any(reference =>
             reference.GetSyntax(cancellationToken) is ParameterSyntax ||
             reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax declaration &&
@@ -582,12 +582,13 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         }
 
         var ns = named.ContainingNamespace;
-        return ((named.Name is "ValueTuple" or "Guid") && HasNamespace(ns, "System")) ||
-            (named.Name == "KeyValuePair" && HasNamespace(ns, "System", "Collections", "Generic"));
+        return ((named.Name is "ValueTuple" or "Guid") && HasNamespace(ns, ["System"])) ||
+            (named.Name == "KeyValuePair" && HasNamespace(ns, ["System", "Collections", "Generic"]));
     }
-    private static bool HasNamespace(INamespaceSymbol? symbol, params string[] parts)
+    private static bool HasNamespace(INamespaceSymbol? symbol, ImmutableArray<string> parts)
     {
-        parts = RepositoryParameterGuard.NotNull(parts, nameof(parts));
+        if (parts.IsDefault)
+        { throw new ArgumentNullException(nameof(parts)); }
 
         for (var index = parts.Length - 1; index >= 0; index--)
         {
@@ -604,7 +605,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
     private static bool IsNumericPrimitive(ITypeSymbol type)
     {
         return type.TypeKind == TypeKind.Enum ||
-            (type.Name == "BigInteger" && HasNamespace(type.ContainingNamespace, "System", "Numerics")) ||
+            (type.Name == "BigInteger" && HasNamespace(type.ContainingNamespace, ["System", "Numerics"])) ||
             type.SpecialType is SpecialType.System_IntPtr or SpecialType.System_UIntPtr or
             SpecialType.System_Byte or SpecialType.System_SByte or
             SpecialType.System_Int16 or SpecialType.System_UInt16 or

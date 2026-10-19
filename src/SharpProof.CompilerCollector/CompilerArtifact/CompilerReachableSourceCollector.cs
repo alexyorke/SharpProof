@@ -5,15 +5,16 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerReachableSourceCollector
 {
     internal static CompilerReachableSourceArtifact Collect(CSharpCompilation compilation,
-        IEnumerable<ManifestCallableTarget> targets, IReadOnlyList<CompilerSyntaxTreeSnapshot> trees,
+        IEnumerable<ManifestCallableTarget> targets, ImmutableArray<CompilerSyntaxTreeSnapshot> trees,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(targets, nameof(targets));
-        ArgumentNullGuard.NotNull(trees, nameof(trees));
-        var capturedTrees = trees.ToImmutableArray();
+        if (trees.IsDefault)
+        { throw new ArgumentNullException(nameof(trees)); }
+        var capturedTrees = trees;
         if (capturedTrees.Length < compilation.SyntaxTrees.Length)
         { throw new ArgumentException("Snapshot array must cover every compilation syntax tree.", nameof(trees)); }
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))

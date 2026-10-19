@@ -142,7 +142,7 @@ public sealed class OpenSourceCorpusImporterTests
             Path.Combine(upstream.FullName, "fixture.txt"), "untrusted\n");
         await File.WriteAllTextAsync(
             Path.Combine(approved.FullName, "fixture.txt"), "trusted\n");
-        foreach (var repository in new[] { upstream.FullName, approved.FullName })
+        foreach (var repository in ImmutableArray.Create(upstream.FullName, approved.FullName))
         {
             await GitAsync(repository, ["add", "."]);
             await GitAsync(repository, ["commit", "--quiet", "-m", "fixture"]);

@@ -134,11 +134,12 @@ internal static class CompilerMetadataResolution
     }
 
     internal static ImmutableArray<ReferenceModule> SelectReferenceModules(
-        IReadOnlyList<ReferenceModule> matches,
+        ImmutableArray<ReferenceModule> matches,
         CancellationToken cancellationToken)
     {
-        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
-        if (matches.Count > 1)
+        if (matches.IsDefault)
+        { throw new ArgumentNullException(nameof(matches)); }
+        if (matches.Length > 1)
         {
             // Roslyn can expose several references for the same assembly
             // when aliases or duplicate paths are present.  Preserve the
@@ -170,9 +171,9 @@ internal static class CompilerMetadataResolution
             }
         }
 
-        return matches.Count > 1
+        return matches.Length > 1
             ? matches.Take(2).ToImmutableArray()
-            : matches.ToImmutableArray();
+            : matches;
     }
 
     private static bool TryHashReferenceModule(

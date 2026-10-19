@@ -129,9 +129,10 @@ internal static class ContractForCompanionValidator
         void Diagnose(
             DiagnosticDescriptor descriptor,
             ISymbol symbol,
-            params object?[] arguments)
+            ImmutableArray<object?> arguments)
         {
-            arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+            if (arguments.IsDefault)
+            { throw new ArgumentNullException(nameof(arguments)); }
             descriptor = RepositoryParameterGuard.NotNull(descriptor, nameof(descriptor));
             symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             diagnostics(Diagnostic.Create(
@@ -140,7 +141,7 @@ internal static class ContractForCompanionValidator
                     symbol,
                     compilation,
                     companion.AttributeLocation),
-                arguments));
+                arguments.ToArray()));
         }
 
         foreach (var target in targets)
@@ -149,10 +150,7 @@ internal static class ContractForCompanionValidator
             var matches = byTarget[target];
             if (matches.Length > 1)
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.AmbiguousMember,
-                    target,
-                    target.Name);
+                Diagnose(ContractForDiagnosticDescriptors.AmbiguousMember, target, [target.Name]);
                 diagnosed.UnionWith(matches);
                 continue;
             }
@@ -171,11 +169,7 @@ internal static class ContractForCompanionValidator
                 .ToImmutableArray();
             if (mismatches.IsDefaultOrEmpty)
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.MissingMember,
-                    target,
-                    target.Name,
-                    companion.Companion.Name);
+                Diagnose(ContractForDiagnosticDescriptors.MissingMember, target, [target.Name, companion.Companion.Name]);
                 continue;
             }
 
@@ -183,10 +177,7 @@ internal static class ContractForCompanionValidator
             {
                 if (diagnosed.Add(mismatch))
                 {
-                    Diagnose(
-                        ContractForDiagnosticDescriptors.SignatureMismatch,
-                        mismatch,
-                        mismatch.Name);
+                    Diagnose(ContractForDiagnosticDescriptors.SignatureMismatch, mismatch, [mismatch.Name]);
                 }
             }
         }
@@ -197,19 +188,13 @@ internal static class ContractForCompanionValidator
             var matches = byCandidate[candidate];
             if (matches.Length > 1 && diagnosed.Add(candidate))
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.AmbiguousMember,
-                    candidate,
-                    candidate.Name);
+                Diagnose(ContractForDiagnosticDescriptors.AmbiguousMember, candidate, [candidate.Name]);
             }
             else if (targetSurfaceIsComplete &&
                      matches.IsDefaultOrEmpty &&
                      diagnosed.Add(candidate))
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.SignatureMismatch,
-                    candidate,
-                    candidate.Name);
+                Diagnose(ContractForDiagnosticDescriptors.SignatureMismatch, candidate, [candidate.Name]);
             }
         }
 

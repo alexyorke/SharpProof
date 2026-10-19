@@ -140,6 +140,7 @@ internal static class IrTraversal
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));
         ArgumentNullGuard.NotNull(combine, nameof(combine));
+        var memoBuilder = memo.ToBuilder();
         var pending = ImmutableStack<(
             IrTerm Term,
             bool ChildrenReady,
@@ -149,7 +150,7 @@ internal static class IrTraversal
         {
             var (term, childrenReady, children) = pending.Peek();
             pending = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+            if (memoBuilder.ContainsKey(term.Id))
             {
                 continue;
             }
@@ -158,7 +159,7 @@ internal static class IrTraversal
             {
                 if (shortCircuit?.Invoke(term) is (true, var value))
                 {
-                    memo = memo.Add(term.Id, value);
+                    memoBuilder.Add(term.Id, value);
                     continue;
                 }
 
@@ -168,7 +169,7 @@ internal static class IrTraversal
                     pending = pending.Push((term, true, children));
                     foreach (var child in children)
                     {
-                        if (!memo.ContainsKey(child.Id))
+                        if (!memoBuilder.ContainsKey(child.Id))
                         {
                             pending = pending.Push((child, false, []));
                         }
@@ -178,9 +179,9 @@ internal static class IrTraversal
                 }
             }
 
-            memo = memo.Add(term.Id, combine(term, children, memo));
+            memoBuilder.Add(term.Id, combine(term, children, memoBuilder.ToImmutable()));
         }
 
-        return (memo[root.Id], memo);
+        return (memoBuilder[root.Id], memoBuilder.ToImmutable());
     }
 }

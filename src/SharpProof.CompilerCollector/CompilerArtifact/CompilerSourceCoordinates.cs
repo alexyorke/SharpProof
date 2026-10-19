@@ -148,7 +148,7 @@ internal static class CompilerSourceCoordinates
 
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
-        IReadOnlyList<CompilerSyntaxTreeSnapshot>? syntaxTrees,
+        ImmutableArray<CompilerSyntaxTreeSnapshot>? syntaxTrees,
         CancellationToken cancellationToken)
     {
         if (location == null || syntaxTrees == null)
@@ -156,20 +156,23 @@ internal static class CompilerSourceCoordinates
             return -1;
         }
 
+        var capturedTrees = syntaxTrees.Value;
+        if (capturedTrees.IsDefault)
+        { throw new ArgumentNullException(nameof(syntaxTrees)); }
         var ordinal = -1;
         var remembered = RememberedTree(location);
-        if (remembered >= 0 && remembered < syntaxTrees.Count &&
+        if (remembered >= 0 && remembered < capturedTrees.Length &&
             HasValidLocationGeometry(
                 location,
-                syntaxTrees[remembered],
+                capturedTrees[remembered],
                 cancellationToken: cancellationToken))
         {
             return remembered;
         }
-        for (var index = 0; index < syntaxTrees.Count; index++)
+        for (var index = 0; index < capturedTrees.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var tree = syntaxTrees[index];
+            var tree = capturedTrees[index];
             if (tree == null || !HasValidLocationGeometry(
                     location,
                     tree,

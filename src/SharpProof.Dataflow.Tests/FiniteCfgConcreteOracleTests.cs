@@ -14,13 +14,13 @@ public sealed class FiniteCfgConcreteOracleTests
             var blockCount = random.Next(2, 8);
             var transfers = Enumerable.Range(0, blockCount)
                 .Select(_ => (TransferKind)random.Next(4))
-                .ToArray();
+                .ToImmutableArray();
             var blocks = transfers
                 .Select((transfer, blockId) =>
                     new DataflowBlock<NullnessValue>(
                         blockId,
                         value => ApplyAbstract(transfer, value)))
-                .ToArray();
+                .ToImmutableArray();
             var edges = ImmutableHashSet.CreateBuilder<DataflowEdge>();
             for (var blockId = 1; blockId < blockCount; blockId++)
             {
@@ -125,24 +125,26 @@ public sealed class FiniteCfgConcreteOracleTests
     }
 
     private static void VerifyFinitePowersetCase(
-        IReadOnlyList<DataflowEdge> edges,
+        ImmutableArray<DataflowEdge> edges,
         int entryBlockId,
         FiniteSet initial,
-        IReadOnlyList<FiniteTransfer> transfers,
+        ImmutableArray<FiniteTransfer> transfers,
         int edgeMask)
     {
-        System.ArgumentNullException.ThrowIfNull(edges);
-        System.ArgumentNullException.ThrowIfNull(transfers);
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
+        if (transfers.IsDefault)
+        { throw new ArgumentNullException(nameof(transfers)); }
         var blocks = transfers
             .Select((transfer, blockId) =>
                 transfer is null ? throw new System.ArgumentNullException(nameof(transfer)) : (new DataflowBlock<FiniteSet>(blockId, transfer.Apply)))
-            .ToArray();
+            .ToImmutableArray();
         var graph = new DataflowGraph<FiniteSet>(
             blocks,
             edges,
             entryBlockId);
         var expected = ExecuteFinitePowersetFixpoint(
-            transfers.Count,
+            transfers.Length,
             edges,
             entryBlockId,
             initial,
@@ -156,12 +158,12 @@ public sealed class FiniteCfgConcreteOracleTests
             initial,
             options);
 
-        for (var blockId = 0; blockId < transfers.Count; blockId++)
+        for (var blockId = 0; blockId < transfers.Length; blockId++)
         {
             if (actual.GetInputState(blockId) != expected.Inputs[blockId])
             {
                 Assert.Fail(
-                    $"Input mismatch for blocks={transfers.Count}, " +
+                    $"Input mismatch for blocks={transfers.Length}, " +
                     $"edges=0x{edgeMask:X}, entry={entryBlockId}, " +
                     $"initial={initial}, transfers={FormatTransfers(transfers)}, " +
                     $"block={blockId}: " +
@@ -172,7 +174,7 @@ public sealed class FiniteCfgConcreteOracleTests
             if (actual.GetOutputState(blockId) != expected.Outputs[blockId])
             {
                 Assert.Fail(
-                    $"Output mismatch for blocks={transfers.Count}, " +
+                    $"Output mismatch for blocks={transfers.Length}, " +
                     $"edges=0x{edgeMask:X}, entry={entryBlockId}, " +
                     $"initial={initial}, transfers={FormatTransfers(transfers)}, " +
                     $"block={blockId}: " +
@@ -184,18 +186,20 @@ public sealed class FiniteCfgConcreteOracleTests
 
     private static FinitePowersetFixpoint ExecuteFinitePowersetFixpoint(
         int blockCount,
-        IReadOnlyList<DataflowEdge> edges,
+        ImmutableArray<DataflowEdge> edges,
         int entryBlockId,
         FiniteSet initial,
-        IReadOnlyList<FiniteTransfer> transfers)
+        ImmutableArray<FiniteTransfer> transfers)
     {
         if (blockCount < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(blockCount)); }
         if (entryBlockId < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(entryBlockId)); }
 
-        System.ArgumentNullException.ThrowIfNull(edges);
-        System.ArgumentNullException.ThrowIfNull(transfers);
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
+        if (transfers.IsDefault)
+        { throw new ArgumentNullException(nameof(transfers)); }
         var inputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray().ToBuilder();
         var outputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray().ToBuilder();
         inputs[entryBlockId] = initial;
@@ -313,18 +317,20 @@ public sealed class FiniteCfgConcreteOracleTests
         return (lower & upper) == lower;
     }
 
-    private static string FormatTransfers(IReadOnlyList<FiniteTransfer> transfers)
+    private static string FormatTransfers(ImmutableArray<FiniteTransfer> transfers)
     {
-        System.ArgumentNullException.ThrowIfNull(transfers);
+        if (transfers.IsDefault)
+        { throw new ArgumentNullException(nameof(transfers)); }
         return string.Join("/", transfers.Select(static transfer => transfer is null ? throw new System.ArgumentNullException(nameof(transfer)) : (transfer.Encoded)));
     }
 
     private static ConcreteFixpoint ExecuteConcreteFixpoint(
         DataflowGraph<NullnessValue> graph,
-        IReadOnlyList<TransferKind> transfers)
+        ImmutableArray<TransferKind> transfers)
     {
         System.ArgumentNullException.ThrowIfNull(graph);
-        System.ArgumentNullException.ThrowIfNull(transfers);
+        if (transfers.IsDefault)
+        { throw new ArgumentNullException(nameof(transfers)); }
         var inputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray().ToBuilder();
         var outputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray().ToBuilder();
         inputs[graph.EntryBlockId] = ConcreteNullness.MaybeNull;

@@ -27,10 +27,10 @@ internal static class IrSequenceReads
         // A fresh variable only ever holds a sequence this body allocated or
         // a literal.
         var fresh = writes.Where(pair => pair.Value.All(writer =>
-            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key).ToImmutableHashSet();
+            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key).ToImmutableHashSet().ToBuilder();
         while (true)
         {
-            var previous = fresh;
+            var previous = fresh.ToImmutable();
             foreach (var variable in previous)
             {
                 if (variable.IsDefault)
@@ -39,7 +39,7 @@ internal static class IrSequenceReads
                     writer is null ? throw new ArgumentNullException(nameof(writer)) :
                     writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh)))
                 {
-                    fresh = fresh.Remove(variable);
+                    fresh.Remove(variable);
                 }
             }
             if (fresh.Count == previous.Count)
@@ -68,7 +68,7 @@ internal static class IrSequenceReads
         return readers.ToImmutable();
     }
 
-    private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId> fresh)
+    private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId>.Builder fresh)
     {
         fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
         sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));

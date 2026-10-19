@@ -112,8 +112,8 @@ public static partial class WorkerProtocolJson
 
     public static string ComputeRequestHash(WorkerVerifyRequest request)
     {
-        return ComputeSha256(SerializeBoundedUtf8(
-            ArgumentNullGuard.NotNull(request, nameof(request))));
+        return ComputeBoundedUtf8Hash(
+            ArgumentNullGuard.NotNull(request, nameof(request)));
     }
 
     private static StreamReader OpenJsonReader(string path)
@@ -258,7 +258,7 @@ public static partial class WorkerProtocolJson
         return json;
     }
 
-    private static byte[] SerializeBoundedUtf8<T>(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
+    private static string ComputeBoundedUtf8Hash<T>(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(value, TypeInfo<T>());
         if (json.Length > MaximumJsonBytes)
@@ -267,7 +267,7 @@ public static partial class WorkerProtocolJson
                 $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        return json;
+        return ComputeSha256(json);
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)

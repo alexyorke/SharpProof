@@ -305,7 +305,7 @@ internal static class CompilerTotalCallableLowerer
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
         return TotalBodyLowering.Lower(compilation, graph, context, cancellationToken,
-            new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, specificationPacks.ResolveTotal,
+            new CompilerTotalIlBodyProvider(compilation, capturedReferences?.ToImmutableArray()).Resolve, specificationPacks.ResolveTotal,
             initializationFree, enableMetadataRequires ? (frame, body) => body is null ? throw new System.ArgumentNullException(nameof(body)) : frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (PrepareMetadataRequires(compilation, frame, body, cancellationToken)) : null,
             opaqueCalls);
     }

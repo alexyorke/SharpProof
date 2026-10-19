@@ -8,12 +8,12 @@ using System.Reflection.PortableExecutable;
 #pragma warning disable RS1035
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot>? references)
+internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot>? references)
 {
     private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     private readonly ImmutableDictionary<string, ImmutableArray<byte>>.Builder _images = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
     private readonly ImmutableDictionary<string, TotalIlBody?>.Builder _bodies = ImmutableDictionary.CreateBuilder<string, TotalIlBody?>(StringComparer.Ordinal);
-    private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references?.ToImmutableArray() ?? default;
+    private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references is { IsDefault: true } ? throw new ArgumentNullException(nameof(references)) : references ?? default;
 
     internal TotalIlBody? Resolve(IMethodSymbol method, CancellationToken cancellationToken)
     {

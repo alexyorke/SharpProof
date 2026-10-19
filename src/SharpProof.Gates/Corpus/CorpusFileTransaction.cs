@@ -19,12 +19,13 @@ internal static class CorpusFileTransaction
 
     internal static async Task WriteAllAsync(
         string transactionRoot,
-        IReadOnlyList<CorpusFileUpdate> updates,
+        ImmutableArray<CorpusFileUpdate> updates,
         CancellationToken cancellationToken,
         Action<int>? beforePublish = null)
     {
-        ArgumentNullException.ThrowIfNull(updates);
-        var capturedUpdates = updates.ToImmutableArray();
+        if (updates.IsDefault)
+        { throw new ArgumentNullException(nameof(updates)); }
+        var capturedUpdates = updates;
         transactionRoot = Path.GetFullPath(transactionRoot);
         Directory.CreateDirectory(transactionRoot);
         Recover(transactionRoot);

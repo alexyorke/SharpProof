@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -42,7 +43,7 @@ public sealed class NativeIntegerConversionWorkflowTests
         {
             var owner = context.LoadFromStream(image).GetType("C", throwOnError: true)!;
             var runtimeType = owner.GetMethod("Target")!.GetParameters().Single().ParameterType;
-            foreach (var (numeric, member) in new[] { (minimum, "Lower"), (maximum, "Upper") })
+            foreach (var (numeric, member) in ImmutableArray.Create((minimum, "Lower"), (maximum, "Upper")))
             {
                 var expected = owner.GetMethod(member)!.Invoke(null, null);
                 using (Assert.EnterMultipleScope())
@@ -55,7 +56,7 @@ public sealed class NativeIntegerConversionWorkflowTests
                     Assert.That(compilerValue, Is.EqualTo(expected));
                 }
             }
-            foreach (var numeric in new[] { minimum - 1, maximum + 1 })
+            foreach (var numeric in ImmutableArray.Create(minimum - 1, maximum + 1))
             {
                 using (Assert.EnterMultipleScope())
                 {
