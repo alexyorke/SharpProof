@@ -3463,3 +3463,14 @@ substitution overwrite and runtime/native subject preservation. Shared internal 
 helper is reused; no public helper was added. Friend metadata layout validation remains
 pending. Latest literal checkpoint: 3,231 raw/interpolated text tokens across 750 changed
 C# files match master 16063804e. M118/M119 Worker batches remain under validation.
+
+IMM-M120: Review DotnetApiInventory.Compare's private Index construction. Replace
+immutable root reassignment with an ordinal immutable dictionary builder, keeping the
+explicit duplicate guard/message and freezing at return. Validate existing inventory
+and duplicate-identity controls. Status: open before edits.
+
+IMM-M121: Freeze recursive Fuzz test input families using ordered immutable array
+builders and immutable helper return values. Preserve candidate/source order, native
+runtime Values subjects, batch outcomes and the missing-index sentinel. Freeze before
+CompareBatch and assertions; update array length assertions and census counts only.
+Status: open before edits.
