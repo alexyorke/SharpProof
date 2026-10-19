@@ -32,7 +32,7 @@ The built CLI accepts:
 
 | Arguments | Behavior |
 | --- | --- |
-| `<source.cs> [...]` | Analyze supplied files together as a library |
+| `[--unsafe] <source.cs> [...]` | Analyze supplied files together as a library; opt into unsafe compilation |
 | `--project <project.csproj>` | Load the MSBuild project and its source project references |
 | `--solution <solution.sln/slnx/slnf>` | Load the selected solution graph |
 | `--framework <tfm> --configuration <name> --property <Name=Value>` | Set MSBuild properties for project/solution loading |
@@ -412,3 +412,14 @@ block inference. Candidate validation retains per-file diagnostic severity and
 generated-code settings when replacing a syntax tree. A candidate that adds compiler
 warnings or promoted style errors is rejected, including imports made unused by
 the generated signature.
+
+Data pointer shapes support dereference, indexing/stores, address-taking, updates,
+arithmetic, nested pointers and pointer arrays. Generic pointer elements acquire
+required unmanaged constraints, including constraints on actual struct storage.
+Unused generic struct arguments remain free. Explicit pointer locals and fixed
+initializers retain their storage types. Stack allocation infers implicit elements
+and preserves explicit element types and conversions; pointer and span targets are
+supported. Applied IDE-fix runtime checks cover aliases, stores, element stride,
+byte/struct payloads and stack allocation. Function pointers and full pinning-pattern
+validation remain open. Project mode uses the project's unsafe setting; loose files
+require --unsafe.

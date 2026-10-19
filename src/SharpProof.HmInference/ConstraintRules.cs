@@ -77,6 +77,13 @@ public static partial class Inference
                 ImportConstructedConstraints(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), inferred.Arguments[0]);
                 return;
             }
+            if (declared is IPointerTypeSymbol pointer && inferred.Name == CSharpTypes.Pointer)
+            {
+                if (pointer.PointedAtType.IsUnmanagedType)
+                { RequireUnmanaged(inferred.Arguments[0], pointer.PointedAtType); }
+                ImportConstructedConstraints(pointer.PointedAtType, inferred.Arguments[0]);
+                return;
+            }
             if (declared is IArrayTypeSymbol array && inferred.Name.StartsWith("[", StringComparison.Ordinal))
             {
                 ImportConstructedConstraints(array.ElementType, inferred.Arguments[0]);

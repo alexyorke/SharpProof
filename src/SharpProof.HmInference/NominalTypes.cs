@@ -90,6 +90,8 @@ internal static partial class CSharpTypes
         { return false; }
         if (left is IArrayTypeSymbol a && right is IArrayTypeSymbol b)
         { return a.Rank == b.Rank && a.IsSZArray == b.IsSZArray && SameSignatureType(a.ElementType, b.ElementType); }
+        if (left is IPointerTypeSymbol pointerLeft && right is IPointerTypeSymbol pointerRight)
+        { return SameSignatureType(pointerLeft.PointedAtType, pointerRight.PointedAtType); }
         if (ConstructorIdentity(left) != ConstructorIdentity(right))
         { return false; }
         if (left is INamedTypeSymbol x && right is INamedTypeSymbol y)

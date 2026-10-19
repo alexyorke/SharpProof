@@ -54,14 +54,20 @@ internal static class Program
 
         if (args.Length == 0 || args is ["--help"])
         {
-            Program.Log.Info("HM inference: <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore --no-build\nDependencies are restored and declared tool projects are built by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
+            Program.Log.Info("HM inference: [--unsafe] <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore --no-build\nDependencies are restored and declared tool projects are built by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
             return 0;
         }
 
         if (args[0] is "--project" or "--solution" || ProjectLoading.IsProjectInput(args[0]))
         { return await ProjectLoading.Run(args, cancellationToken).ConfigureAwait(false); }
 
-        var files = args is ["--samples"] ? Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Samples"), "*.cs.txt").Order().ToArray() : args;
+        var unsafeOptions = args.Count(argument => { ArgumentNullException.ThrowIfNull(argument); return argument == "--unsafe"; });
+        if (unsafeOptions > 1)
+        { Program.Log.Error("Duplicate --unsafe option."); return 2; }
+        var sourceArguments = unsafeOptions == 0 ? args : args.Where(argument => { ArgumentNullException.ThrowIfNull(argument); return argument != "--unsafe"; }).ToArray();
+        if (sourceArguments.Length == 0)
+        { Program.Log.Error("Expected source files after --unsafe."); return 2; }
+        var files = sourceArguments is ["--samples"] ? Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Samples"), "*.cs.txt").Order().ToArray() : sourceArguments;
         foreach (var file in files)
         {
             if (!File.Exists(file))
@@ -76,6 +82,8 @@ internal static class Program
             global::System.ArgumentNullException.ThrowIfNull(file);
             return CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file, cancellationToken: cancellationToken);
         }));
+        if (unsafeOptions != 0)
+        { compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true)); }
         return await AnalyzeCompilationAsync(compilation, null, diagnosticsOnly: false, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
@@ -344,6 +352,7 @@ internal static class Program
         Program.Log.Info("PASS PolymorphicRuntime");
         passed += await CompilerPolicyChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await TypeShapeChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await UnsafeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await NominalIdentityChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await LocalFunctionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ReferenceChecks.Run(cancellationToken).ConfigureAwait(false);

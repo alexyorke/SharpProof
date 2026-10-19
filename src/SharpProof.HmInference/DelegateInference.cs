@@ -116,6 +116,8 @@ public static partial class Inference
             AddNamedArguments(owner, mapping);
             if (receiver is null)
             { return mapping; }
+            if (model.GetTypeInfo(receiver, cancellationToken).Type is IPointerTypeSymbol pointer)
+            { return PatternOwnerMapping(owner, PointerElement(receiver), pointer.PointedAtType); }
             if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol { IsGenericType: true } declared)
             { Anchor(receiver); return mapping; }
             var shape = Expression(receiver).Root;

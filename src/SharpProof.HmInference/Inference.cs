@@ -559,6 +559,12 @@ public static partial class Inference
                             return Branch(resource.Statement);
                         });
                         break;
+                    case UnsafeStatementSyntax unsafeBlock:
+                        flow = Branch(unsafeBlock.Block);
+                        break;
+                    case FixedStatementSyntax pinned:
+                        flow = Scoped(() => { Declare(pinned.Declaration); return Branch(pinned.Statement); });
+                        break;
                     case LockStatementSyntax locked:
                         // Retain Monitor versus System.Threading.Lock lowering and receiver conversions.
                         Anchor(locked.Expression);
@@ -788,6 +794,14 @@ public static partial class Inference
             { return MethodGroup(expression, group, target); }
             switch (expression)
             {
+                case PrefixUnaryExpressionSyntax pointerRead when pointerRead.IsKind(SyntaxKind.PointerIndirectionExpression):
+                    return PointerElement(pointerRead.Operand);
+                case PrefixUnaryExpressionSyntax address when address.IsKind(SyntaxKind.AddressOfExpression):
+                    return AddressOf(address);
+                case StackAllocArrayCreationExpressionSyntax or ImplicitStackAllocArrayCreationExpressionSyntax:
+                    return StackAllocation(expression);
+                case SizeOfExpressionSyntax:
+                    return new("int");
                 case RefExpressionSyntax reference:
                     return Expression(reference.Expression);
                 case RangeExpressionSyntax range:
@@ -848,6 +862,8 @@ public static partial class Inference
                         throw new InferenceException("User-defined and coalescing assignments are unsupported.");
                     }
 
+                    if (model.GetTypeInfo(assignment.Left, cancellationToken).Type is IPointerTypeSymbol)
+                    { Anchor(assignment.Right); return AssignmentTarget(assignment.Left); }
                     AssignmentTarget(assignment.Left);
                     Anchor(assignment.Left);
                     Anchor(assignment.Right);
@@ -982,6 +998,12 @@ public static partial class Inference
                     Anchor(unary.Operand);
                     return CSharpTypes.Rigid(model.GetTypeInfo(unary, cancellationToken).Type!);
                 case ElementAccessExpressionSyntax element:
+                    if (model.GetTypeInfo(element.Expression, cancellationToken).Type is IPointerTypeSymbol)
+                    {
+                        foreach (var index in element.ArgumentList.Arguments)
+                        { Anchor(index.Expression); }
+                        return PointerElement(element.Expression);
+                    }
                     if (model.GetOperation(element, cancellationToken) is IPropertyReferenceOperation indexer)
                     {
                         return IndexedProperty(element, indexer);
@@ -1141,6 +1163,8 @@ public static partial class Inference
         {
             if (target is InvocationExpressionSyntax invocation && model.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true })
             { return Expression(invocation); }
+            if (target is PrefixUnaryExpressionSyntax pointerTarget && pointerTarget.IsKind(SyntaxKind.PointerIndirectionExpression))
+            { return Expression(target); }
             if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax and not MemberAccessExpressionSyntax)
             {
                 throw new InferenceException("Unsupported assignment target.");
@@ -1193,6 +1217,8 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(operand));
             }
 
+            if (model.GetTypeInfo(operand, cancellationToken).Type is IPointerTypeSymbol)
+            { return AssignmentTarget(operand); }
             if (model.GetOperation(expression, cancellationToken) is IIncrementOrDecrementOperation { OperatorMethod: not null } userIncrement)
             {
                 var result = UserOperator(userIncrement.OperatorMethod, [userIncrement.Target], userIncrement.Type!, userIncrement.IsLifted);
@@ -1334,6 +1360,9 @@ public static partial class Inference
 
         private HmType Binary(BinaryExpressionSyntax binary)
         {
+            if (model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol
+                || model.GetTypeInfo(binary.Right, cancellationToken).Type is IPointerTypeSymbol)
+            { return PointerBinary(binary); }
             if (binary.IsKind(SyntaxKind.CoalesceExpression))
             {
                 return Coalesced(binary);
@@ -1401,7 +1430,9 @@ public static partial class Inference
 
             if (selected is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false })
             {
-                return PatternSymbolType(selected, Expression(member.Expression), receiverType ?? throw new InferenceException("Unresolved member receiver."));
+                return receiverType is IPointerTypeSymbol pointer
+                    ? PatternSymbolType(selected, PointerElement(member.Expression), pointer.PointedAtType)
+                    : PatternSymbolType(selected, Expression(member.Expression), receiverType ?? throw new InferenceException("Unresolved member receiver."));
             }
 
             return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);

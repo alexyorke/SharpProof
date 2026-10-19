@@ -6,6 +6,7 @@ namespace SharpProof.HmInference;
 
 internal static partial class CSharpTypes
 {
+    internal const string Pointer = "@pointer";
     internal const string NullableParameter = "@nullable-parameter";
     internal const string NullableReference = "@nullable-reference";
     internal const string NullableValue = "global::System.Nullable";
@@ -74,6 +75,13 @@ internal static partial class CSharpTypes
             return new(Display(type));
         }
 
+        if (type is IPointerTypeSymbol pointer)
+        {
+            // Managed pointees are a warning-bearing C# extension. Retain their
+            // existing domain rather than adding an invalid unmanaged constraint.
+            return new(Pointer, Convert(pointer.PointedAtType,
+                erase && pointer.PointedAtType.IsUnmanagedType, variables, allowRefLike));
+        }
         if (type is IArrayTypeSymbol array)
         {
             return new("[" + new string(',', array.Rank - 1) + "]", Convert(array.ElementType, erase, variables, allowRefLike));
@@ -211,6 +219,11 @@ internal static partial class CSharpTypes
             })) + ")";
         }
 
+        if (inferred.Name == Pointer && declared is IPointerTypeSymbol pointer)
+        {
+            return Render(inferred.Arguments[0], pointer.PointedAtType, variables,
+                nullableAnnotations, model, position, preserveDeclaredAnnotations) + "*";
+        }
         if (inferred.Name.StartsWith("[", StringComparison.Ordinal) && declared is IArrayTypeSymbol array)
         {
             return Render(inferred.Arguments[0], array.ElementType, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations) + inferred.Name;
