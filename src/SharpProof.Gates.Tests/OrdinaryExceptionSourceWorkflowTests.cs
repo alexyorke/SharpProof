@@ -19,10 +19,12 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("ulong", "return (int)(10UL / value);")]
     [TestCase("bool", "if (value) throw new System.DivideByZeroException(); return 1;")]
     [TestCase("string", "if (value == \"ordinary\") throw new System.DivideByZeroException(); return 1;")]
-    [TestCase("object", "if (value == null) throw new System.NullReferenceException(); return 1;")]
-    [TestCase("int[]", "if (value == null) throw new System.NullReferenceException(); return 1;")]
+    [TestCase("object", "if (value == null) throw new System.NullReferenceException(); return 1;", false)]
+    [TestCase("int[]", "if (value == null) throw new System.NullReferenceException(); return 1;", false)]
+    [TestCase("object", "if (value == null) throw new System.NullReferenceException(\"message\"); return 1;")]
+    [TestCase("int[]", "if (value == null) throw new System.NullReferenceException(\"message\"); return 1;")]
     [TestCase("int", "System.Exception exception = new System.DivideByZeroException(); throw exception;")]
-    public async Task RealSourceRefutationsReplayWithTheDeclaredParameterType(string parameterType, string body)
+    public async Task RealSourceRefutationsReplayWithTheDeclaredParameterType(string parameterType, string body, bool concrete = true)
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(parameterType);
@@ -31,10 +33,10 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(report.NativeRefuted, Is.EqualTo(1));
-            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
-            Assert.That(report.RuntimeWitnesses, Is.EqualTo(1));
+            Assert.That(report.NativeRefuted, Is.EqualTo(concrete ? 1 : 0));
+            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(concrete ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown));
+            Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(concrete ? "Confirmed" : "NotRun"));
+            Assert.That(report.RuntimeWitnesses, Is.EqualTo(concrete ? 1 : 0));
             Assert.That(report.RuntimeContradictions, Is.Zero);
             Assert.That(report.Passed, Is.True);
         }
@@ -45,8 +47,9 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("public static class C { public static int Target<T>(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C<T> { public static int Target(int value) => 10 / value; }", "UnboundGenericOwner")]
     [TestCase("public static class C { static C() { } public static int Target(int value) => 10 / value; }", "StaticInitializationNotModeled")]
-    [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
-    public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected)
+    [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NotRun", false)]
+    [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(\"message\"); return 1; } }", "NonConcreteInput")]
+    public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected, bool concrete = true)
     {
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(source);
@@ -54,8 +57,8 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(report.NativeRefuted, Is.EqualTo(1));
-            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(report.NativeRefuted, Is.EqualTo(concrete ? 1 : 0));
+            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(concrete ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown));
             Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expected));
             Assert.That(report.RuntimeWitnesses, Is.Zero);
             Assert.That(report.RuntimeContradictions, Is.Zero);

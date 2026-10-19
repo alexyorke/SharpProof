@@ -17,62 +17,29 @@ block: b3 cfg:2
   i7 op4 Assign v6:string[width=0,signed=False] = "failed" source=total-explicit-throw.cs:tokens["\"failed\""]#1
   i8 op5 Assign v7:string[width=0,signed=False] = v6 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
   i9 op6 Allocate t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.InvalidOperationException -> v8:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.InvalidOperationException[width=0,signed=False] source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i10 op7 Branch (v7 == (("string"#t2)null)) ? b8 : b9 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
+  i12 op7 Throw Explicit -> b8 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
 block: b4 cfg:3
-  i29 op17 Assign v13:int[width=32,signed=True] = 1 source=total-explicit-throw.cs:tokens["1"]#1
-  i30 op16 Assign v3:int[width=32,signed=True] = v13 source=total-explicit-throw.cs:tokens["1"]#1
-  i31 op16 Return v3 source=total-explicit-throw.cs:tokens["1"]#1
+  i13 op9 Assign v9:int[width=32,signed=True] = 1 source=total-explicit-throw.cs:tokens["1"]#1
+  i14 op8 Assign v3:int[width=32,signed=True] = v9 source=total-explicit-throw.cs:tokens["1"]#1
+  i15 op8 Return v3 source=total-explicit-throw.cs:tokens["1"]#1
 block: b5 cfg:4
-  i32 op19 Assign v14:int[width=32,signed=True] = 0 source=total-explicit-throw.cs:tokens["0"]#1
-  i33 op18 Assign v3:int[width=32,signed=True] = v14 source=total-explicit-throw.cs:tokens["0"]#1
-  i34 op18 Return v3 source=total-explicit-throw.cs:tokens["0"]#1
+  i16 op11 Assign v10:int[width=32,signed=True] = 0 source=total-explicit-throw.cs:tokens["0"]#1
+  i17 op10 Assign v3:int[width=32,signed=True] = v10 source=total-explicit-throw.cs:tokens["0"]#1
+  i18 op10 Return v3 source=total-explicit-throw.cs:tokens["0"]#1
 block: b6 cfg:5
-  i35 op0 Return void source=none
+  i19 op0 Return void source=none
 block: b7 exceptional:exit
   i2 op0 ExceptionalExit source=none
-block: b8 exception:resource-message
-  i11 op9 Havoc Variables/Approximation [v9:bool[width=0,signed=False]] source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i12 op9 Branch v9 ? b10 : b11 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b9 exception:initialized
-  i28 op15 Throw Explicit -> b18 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b10 exception:ambient-initialization
-  i13 op11 Call void member=m0 receiver=none args=[v7] source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i14 op10 Havoc Variables/Approximation [v10:bool[width=0,signed=False]] source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i15 op12 Branch v10 ? b12 : b13 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b11 exception:ready
-  i25 op14 Goto b9 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b12 throw
-  i22 op12 Throw Unknown -> b17 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b13 normal
-  i23 op13 Assign v12:bool[width=0,signed=False] = false source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i24 op9 Goto b11 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b14 exception:searched
-  i16 op12 Throw Unknown -> b7 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b15 catch:entry
-  i17 op12 Assign v4:int[width=32,signed=True] = 0 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i18 op12 Goto b5 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b16 exception:searched
-  i19 op12 Throw Unknown -> b15 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b17 catch:uncertain
-  i20 op12 Havoc Variables/Approximation [v11:bool[width=0,signed=False]] source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i21 op12 Branch v11 ? b16 : b14 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-block: b18 catch:entry
-  i26 op15 Assign v4:int[width=32,signed=True] = 1 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
-  i27 op15 Goto b5 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
+block: b8 catch:entry
+  i10 op7 Assign v4:int[width=32,signed=True] = 0 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
+  i11 op7 Goto b5 source=total-explicit-throw.cs:tokens["new","System",".","InvalidOperationException","(","\"failed\"",")"]#1
 term: ir0 Variable type=t0:bool width=0 signed=False value=v0
 term: ir1 Variable type=t0:bool width=0 signed=False value=v1
 term: ir2 Variable type=t0:bool width=0 signed=False value=v5
 term: ir3 String type=t2:string width=0 signed=False value="failed"
 term: ir4 Variable type=t2:string width=0 signed=False value=v6
-term: ir5 Variable type=t2:string width=0 signed=False value=v7
-term: ir7 Null type=t2:string width=0 signed=False value=(("string"#t2)null)
-term: ir8 Binary type=t0:bool width=0 signed=False value=(v7 == (("string"#t2)null))
-term: ir9 Variable type=t0:bool width=0 signed=False value=v9
-term: ir10 Variable type=t0:bool width=0 signed=False value=v10
-term: ir11 Boolean type=t0:bool width=0 signed=False value=false
-term: ir12 Integer type=t1:int width=32 signed=True bits=0 value=0
-term: ir13 Variable type=t0:bool width=0 signed=False value=v11
-term: ir15 Integer type=t1:int width=32 signed=True bits=1 value=1
-term: ir16 Variable type=t1:int width=32 signed=True value=v13
-term: ir17 Variable type=t1:int width=32 signed=True value=v3
-term: ir18 Variable type=t1:int width=32 signed=True value=v14
+term: ir7 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir8 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir9 Variable type=t1:int width=32 signed=True value=v9
+term: ir10 Variable type=t1:int width=32 signed=True value=v3
+term: ir11 Variable type=t1:int width=32 signed=True value=v10

@@ -962,6 +962,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return block; }
         if (guard is not { } ordinal)
         { return ExceptionResourceEffects(operation, values, block); }
+        // Arguments have already been evaluated and pinned. A compiler-known
+        // nonnull message cannot take the resource path; omit that unreachable
+        // effect site so syntactic advisory summaries retain the same boundary.
+        var message = operation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == ordinal).Value;
+        if (message.ConstantValue is { HasValue: true, Value: string })
+        { return block; }
         var runtime = _builder!.CreateBlock("exception:resource-message");
         var done = _builder.CreateBlock("exception:initialized");
         _builder.Branch(block, _context.Site(operation),
@@ -982,6 +988,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         var constructor = operation.Constructor!;
         if (CSharpOperationSemantics.ExceptionInitializationKind(constructor) is not { } kind)
         { return EmitOpaqueCall(operation, constructor, values, block, null, IrOpaqueCallEffects.All).Continuation; }
+        if (CSharpOperationSemantics.IsExceptionResourceLockDeclaration(constructor))
+        {
+            var lockSite = _factory.CreateOperation(IrOpaqueCallSite.ExceptionResourceLock(kind),
+                _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
+            var certifiedLock = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(block, lockSite, IrHavocKind.Variables, IrHavocOrigin.Approximation, certifiedLock);
+            var synchronization = _builder.CreateBlock("exception:resource-lock");
+            var afterSynchronization = _builder.CreateBlock("exception:after-resource-lock");
+            _builder.Branch(block, lockSite, _factory.Variable(certifiedLock), synchronization, afterSynchronization);
+            var resourceLock = _context.Temporary(_factory.ObjectType);
+            _builder.Havoc(synchronization, lockSite, IrHavocKind.Variables, IrHavocOrigin.Approximation, resourceLock);
+            _builder.Lock(synchronization, lockSite, _factory.Variable(resourceLock));
+            _builder.Goto(synchronization, lockSite, afterSynchronization);
+            block = afterSynchronization;
+        }
         var site = _factory.CreateOperation(IrOpaqueCallSite.ExceptionInitialization(kind),
             _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
         var initialize = _context.Temporary(_factory.BooleanType);

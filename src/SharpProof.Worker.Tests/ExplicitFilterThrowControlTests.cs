@@ -11,6 +11,7 @@ public sealed class ExplicitFilterThrowControlTests
     [TestCase("[DoesNotThrow]", "true", "throw null;", false)]
     [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", null)]
     [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", true, true, true)]
+    [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException(\"filter\") : false", "", true, true, true)]
     [TestCase("[EnforcePure]", "(State = 1) == 1 ? throw new System.ArgumentException() : false", "", false)]
     [TestCase("[DoesNotThrow]", "true ? throw new System.ArgumentException() : false", "", false, false)]
     public async Task FilterWritesAndEscapingOriginalExceptionsRemainObservable(

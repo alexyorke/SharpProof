@@ -77,10 +77,17 @@ probe covers the exact KeyNotFoundException(string), ArgumentException(string), 
 ArgumentException(string,string) declarations with null/empty/nonempty messages,
 argument-order side effects and CLR/IR normal-path agreement. Choosing a normal
 resource path in this probe consumes approximation; it supplies no native replay authority.
-Separate worker tests preserve ambient callback effects, require nonnull-message
+Separate worker tests preserve ambient callback effects, require non-null-message
 preconditions where needed and check runtime culture/inner-exception boundaries.
 The constructor guards' 1,756 finite runtime cases are evidence, not a claim that
 all constructor behavior or every caller is covered. See [the open exception work](gaps.md#exception-message-construction-slice).
+Thirteen additional resource-constructor probes retain allocation and conditional
+synchronization in the IR. Native replay certifies the actual shared resource lock
+only for the audited .NET 10.0.13 Linux amd64 runtime, approved overloads and
+resource mode. Unknown preceding effects, unsupported modules and failed
+observations cannot certify a witness. Independent CLR tests inspect helper IL
+hashes and lock ownership during culture callbacks; they do not grant worker
+authority. Runtime-specific lock results bypass the response cache.
 Conversion probes cover the nine
 integer/Char domains and Boolean 0/1, signed Int64 result width, and the UInt64
 overflow boundary. Native tests retain argument and class-initialization effects

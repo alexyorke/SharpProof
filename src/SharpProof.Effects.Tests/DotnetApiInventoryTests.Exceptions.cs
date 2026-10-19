@@ -7,13 +7,13 @@ namespace SharpProof.Effects.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {
-    private static bool CheckExceptionMessageIntrinsic(CSharpCompilation references, string id, bool wrongClaim)
+    private static bool CheckExceptionMessageIntrinsic(CSharpCompilation references, string id, bool wrongClaim, bool resourceOnly = false)
     {
         ArgumentNullException.ThrowIfNull(references);
         ArgumentNullException.ThrowIfNull(id);
-        foreach (var message in new[] { "(string)null", "\"\"", "\"message\"" })
+        foreach (var message in resourceOnly ? new[] { "(string)null" } : new[] { "(string)null", "\"\"", "\"message\"" })
         {
-            var expression = id switch
+            var expression = resourceOnly ? ResourceConstructorExpression(id) : id switch
             {
                 "M:System.ArgumentException.#ctor(System.String)" => "new System.ArgumentException((marker = 1) == 1 ? " + message + " : \"unreachable\")",
                 "M:System.ArgumentException.#ctor(System.String,System.String)" => "new System.ArgumentException(paramName: (marker = 1) == 1 ? \"parameter\" : \"unreachable\", message: (marker = 2) == 2 ? " + message + " : \"unreachable\")",
@@ -32,6 +32,8 @@ public sealed partial class DotnetApiInventoryTests
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
                 static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
             if (!lowered.IsExact)
+            { return false; }
+            if (resourceOnly && lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).OfType<IrLockInstruction>().Count() != 1)
             { return false; }
             // Select a normal constructor path only for this differential probe.
             // This approximation is not native replay authority or a proof premise.
@@ -54,7 +56,7 @@ public sealed partial class DotnetApiInventoryTests
             {
                 image.Position = 0;
                 var actual = (int)runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, null)!;
-                var resourceMessage = id == "M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String)" && message == "(string)null";
+                var resourceMessage = resourceOnly || id == "M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String)" && message == "(string)null";
                 if (replay.Status != IrProgramExecutionStatus.Returned || replay.ConsumedApproximation != resourceMessage || allocations != 1 ||
                     replay.ReturnValue!.Integer != actual + (wrongClaim ? 1 : 0))
                 { return false; }
@@ -62,5 +64,27 @@ public sealed partial class DotnetApiInventoryTests
             finally { runtime.Unload(); }
         }
         return true;
+    }
+
+    private static string ResourceConstructorExpression(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return id switch
+        {
+            "M:System.ArgumentException.#ctor" => "new System.ArgumentException()",
+            "M:System.ArgumentNullException.#ctor" => "new System.ArgumentNullException()",
+            "M:System.ArgumentNullException.#ctor(System.String)" => "new System.ArgumentNullException(\"parameter\")",
+            "M:System.ArgumentOutOfRangeException.#ctor" => "new System.ArgumentOutOfRangeException()",
+            "M:System.ArgumentOutOfRangeException.#ctor(System.String)" => "new System.ArgumentOutOfRangeException(\"parameter\")",
+            "M:System.InvalidOperationException.#ctor" => "new System.InvalidOperationException()",
+            "M:System.InvalidOperationException.#ctor(System.String)" => "new System.InvalidOperationException((string)null)",
+            "M:System.DivideByZeroException.#ctor" => "new System.DivideByZeroException()",
+            "M:System.IO.IOException.#ctor" => "new System.IO.IOException()",
+            "M:System.ObjectDisposedException.#ctor(System.String)" => "new System.ObjectDisposedException(\"object\")",
+            "M:System.AggregateException.#ctor" => "new System.AggregateException()",
+            "M:System.AggregateException.#ctor(System.String)" => "new System.AggregateException((string)null)",
+            "M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String)" => "new System.Collections.Generic.KeyNotFoundException((string)null)",
+            _ => throw new ArgumentOutOfRangeException(nameof(id))
+        };
     }
 }

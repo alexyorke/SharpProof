@@ -9,9 +9,11 @@ namespace SharpProof.Worker.Test;
 public sealed class ExplicitFilterThrowTests
 {
     [TestCase("new System.ArgumentException()", false)]
+    [TestCase("new System.ArgumentException(\"filter\")", false)]
     [TestCase("new System.InvalidOperationException(\"filter\")", false)]
     [TestCase("null", false)]
     [TestCase("new System.ArgumentException()", true)]
+    [TestCase("new System.ArgumentException(\"filter\")", true)]
     [TestCase("new System.InvalidOperationException(\"filter\")", true)]
     [TestCase("null", true)]
     public async Task ThrowingFilterRejectsHandlerAndPreservesOriginalException(string exception, bool explicitOriginal)

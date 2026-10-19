@@ -48,12 +48,14 @@ public sealed class ExceptionInitializationReplayTests
         var previous = CultureInfo.CurrentCulture;
         var culture = new ThrowingCulture();
         bool observed;
+        PassiveCallableVcPlan.ResourceLockObservation? resourceLock;
         try
         {
             CultureInfo.CurrentUICulture = ui ? culture : CultureInfo.InvariantCulture;
             CultureInfo.CurrentCulture = ui ? CultureInfo.InvariantCulture : culture;
             culture.Armed = true;
             observed = PassiveCallableVcPlan.WarmExceptionConstructor("ArgumentNull");
+            resourceLock = PassiveCallableVcPlan.ProbeExceptionResourceLock("ArgumentNull");
         }
         finally
         {
@@ -62,6 +64,7 @@ public sealed class ExceptionInitializationReplayTests
             CultureInfo.CurrentCulture = previous;
         }
         Assert.That(observed, Is.False);
+        Assert.That(resourceLock, Is.Null);
         Assert.That(culture.Reads, Is.Zero);
     }
 

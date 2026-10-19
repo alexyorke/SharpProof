@@ -26,7 +26,9 @@ public sealed class NativeExplicitThrowTests
     [TestCase("catch (System.InvalidOperationException) { }", null)]
     [TestCase("catch (System.InvalidOperationException) { }", typeof(ProvenOutcome), true)]
     [TestCase("catch (System.Exception) { }", typeof(ProvenOutcome))]
+    [TestCase("catch (System.Exception) { }", typeof(ProvenOutcome), true)]
     [TestCase("catch { }", typeof(ProvenOutcome))]
+    [TestCase("catch { }", typeof(ProvenOutcome), true)]
     [TestCase("catch (System.ArgumentException) { }", typeof(RefutedOutcome))]
     public async Task HandlersMatchTheThrownType(string handler, Type? outcome, bool explicitMessage = false)
     {

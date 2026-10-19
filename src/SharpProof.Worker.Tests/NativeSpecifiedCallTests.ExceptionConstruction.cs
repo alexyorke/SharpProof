@@ -1,9 +1,70 @@
 using NUnit.Framework;
+using SharpProof.Verify;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeSpecifiedCallTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task ResourceEventsPreserveNormalReturnProofsAndConcreteRefutations(bool correct)
+    {
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == " + (correct ? "1" : "2") +
+            "); _ = new System.ArgumentOutOfRangeException(\"parameter\"); return 1;",
+            correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted);
+    }
+
+    [Test]
+    public async Task OrdinarySourceLocksStillBlockProofsPastSynchronization()
+    {
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 1); lock (new object()) { } return 1;",
+            WorkerClaimOutcome.Unknown);
+    }
+
+    [TestCase("new System.ArgumentOutOfRangeException(\"Queue is empty.\")")]
+    [TestCase("new System.InvalidOperationException()")]
+    [TestCase("new System.Collections.Generic.KeyNotFoundException((string)null)")]
+    [TestCase("new System.ArgumentException()")]
+    [TestCase("new System.ArgumentNullException()")]
+    [TestCase("new System.ArgumentNullException(\"parameter\")")]
+    [TestCase("new System.ArgumentOutOfRangeException()")]
+    [TestCase("new System.InvalidOperationException((string)null)")]
+    [TestCase("new System.DivideByZeroException()")]
+    [TestCase("new System.IO.IOException()")]
+    [TestCase("new System.ObjectDisposedException(\"object\")")]
+    [TestCase("new System.AggregateException()")]
+    [TestCase("new System.AggregateException((string)null)")]
+    public async Task ResourceConstructionRefutesPurityWithAnObservedFrameworkLock(string expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var preparation = Prepare("[EnforcePure] public static void Target() { _ = " + expression + "; }");
+        var verified = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
+        Assert.That(verified.LockWitness, Is.Not.Null);
+        Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task ResourceLockWitnessesRespectUnknownCallPrefixes(bool unknownFirst)
+    {
+        const string construction = "_ = new System.ArgumentOutOfRangeException(\"parameter\");";
+        var body = unknownFirst ? "operation(); " + construction : construction + " operation();";
+        var preparation = Prepare("[EnforcePure] public static void Target(System.Action operation) { " + body + " }");
+        var verified = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
+        if (unknownFirst)
+        {
+            Assert.That(verified.Outcome, Is.Null);
+            Assert.That(verified.LockWitness, Is.Null);
+        }
+        else
+        {
+            Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
+            Assert.That(verified.LockWitness, Is.Not.Null);
+        }
+    }
+
     [TestCase("System.InvalidOperationException")]
     [TestCase("System.Collections.Generic.KeyNotFoundException")]
     public async Task ConstructorMessagePreconditionsSelectOnlyTheCallbackFreePath(string type)

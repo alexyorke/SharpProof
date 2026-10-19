@@ -50,6 +50,26 @@ internal static class IrOpaqueCallSite
     private const string DictionaryInitializationPrefix = "framework-scalar-dictionary-ready:";
 
     private const string ExceptionInitializationPrefix = "framework-invariant-exception-ready:";
+    internal const string ExceptionResourceLockPrefix = "framework-exception-resource-lock:";
+
+    internal static string ExceptionResourceLock(string kind)
+    {
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        if (!IsExceptionInitializationKind(kind))
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        return ExceptionResourceLockPrefix + kind;
+    }
+
+    internal static string? ExceptionResourceLockKind(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        if (!description.StartsWith(ExceptionResourceLockPrefix, StringComparison.Ordinal))
+        { return null; }
+        var kind = description.Substring(ExceptionResourceLockPrefix.Length);
+        return IsExceptionInitializationKind(kind) ? kind : null;
+    }
 
     internal static bool IsExceptionInitializationKind(string kind)
     {

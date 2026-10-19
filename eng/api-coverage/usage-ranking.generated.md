@@ -38,14 +38,14 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | 2 | 0 | 5 | 0 | unmodeled |
 | P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | 4 | 0 | 5 | 0 | unmodeled |
 | P:System.Collections.Generic.Queue`1.Count | read | 5 | 5 | 0 | 5 | 0 | partially-modeled |
-| M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | 4 | 0 | 4 | 0 | unmodeled |
+| M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | 4 | 0 | 4 | 0 | partially-modeled |
 | M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | call | 4 | 1 | 0 | 4 | 0 | partially-modeled |
 | M:System.Console.WriteLine(System.String) | call | 4 | 1 | 0 | 4 | 0 | unmodeled |
 | M:System.InvalidOperationException.#ctor(System.String) | call | 4 | 4 | 0 | 4 | 0 | partially-modeled |
 | M:System.Math.Abs(System.Int32) | call | 4 | 2 | 0 | 4 | 0 | partially-modeled |
 | M:System.Math.Max(System.Int32,System.Int32) | call | 4 | 4 | 0 | 4 | 0 | partially-modeled |
-| M:System.ArgumentNullException.#ctor | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
-| M:System.ArgumentNullException.#ctor(System.String) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
+| M:System.ArgumentNullException.#ctor | call | 3 | 3 | 0 | 3 | 0 | partially-modeled |
+| M:System.ArgumentNullException.#ctor(System.String) | call | 3 | 3 | 0 | 3 | 0 | partially-modeled |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | 2 | 0 | 3 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | 3 | 0 | 3 | 0 | partially-modeled |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | 1 | 0 | 3 | 0 | partially-modeled |

@@ -135,6 +135,8 @@ internal static class DotnetApiInventory
         { evidence.Add("intrinsic=default-primitive-hash-set-state"); }
         if (CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(symbol))
         { evidence.Add("intrinsic=guarded-exception-message-construction"); }
+        if (CSharpOperationSemantics.IsExceptionResourceLockDeclaration(symbol))
+        { evidence.Add("intrinsic=guarded-exception-resource-synchronization"); }
 
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {

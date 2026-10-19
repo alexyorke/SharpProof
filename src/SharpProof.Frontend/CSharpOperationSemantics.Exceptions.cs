@@ -107,6 +107,13 @@ internal static partial class CSharpOperationSemantics
                 "M:System.ArgumentException.#ctor(System.String)" or "M:System.ArgumentException.#ctor(System.String,System.String)";
     }
 
+    internal static bool IsExceptionResourceLockDeclaration(ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        return symbol is IMethodSymbol constructor && constructor.ContainingAssembly.Identity.Version == new Version(10, 0, 0, 0) &&
+            ExceptionInitializationKind(constructor) != null;
+    }
+
     // -1 is callback-free for the audited inputs; a nonnegative ordinal requires
     // a nonnull message. Unlisted signatures retain full runtime effects.
     // The pinned .NET 10.0.13 profiles are checked against actual CLR culture

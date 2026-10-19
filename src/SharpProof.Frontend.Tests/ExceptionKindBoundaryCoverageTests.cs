@@ -39,14 +39,17 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         var creation = (IObjectCreationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(creation.Constructor!), Is.False);
+        Assert.That(CSharpOperationSemantics.IsExceptionResourceLockDeclaration(creation.Constructor!), Is.False);
         Assert.That(CSharpOperationSemantics.ExceptionConstructorMessageGuard(creation.Constructor!), Is.Null);
         Assert.That(CSharpOperationSemantics.ExceptionInitializationKind(creation.Constructor!), Is.Null);
         var ordinary = compilation.GetSpecialType(SpecialType.System_String).GetMembers("ToString").OfType<IMethodSymbol>().First();
         Assert.That(CSharpOperationSemantics.ExceptionConstructorMessageGuard(ordinary), Is.Null);
         Assert.That(CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(ordinary), Is.False);
+        Assert.That(CSharpOperationSemantics.IsExceptionResourceLockDeclaration(ordinary), Is.False);
         Assert.That(CSharpOperationSemantics.ExceptionInitializationKind(ordinary), Is.Null);
         Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.ExceptionConstructorMessageGuard(null!)));
         Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(null!)));
+        Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.IsExceptionResourceLockDeclaration(null!)));
         Assert.Throws<ArgumentNullException>((Action)(() => CSharpOperationSemantics.ExceptionInitializationKind(null!)));
     }
 
