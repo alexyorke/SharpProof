@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.Z3;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using Goal = SharpProof.Verify.Goal;
@@ -431,6 +432,24 @@ public sealed class ReferenceCallableSolverTests
         }
         finally
         { encoder.DisposeReferences(); }
+    }
+    [Test]
+    public async Task BuiltinOnlyOptionalPreferenceKeepsTheOriginalSessionDomain()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var array = factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType));
+        var variables = ImmutableArray.Create(factory.CreateVariable("text", factory.StringType),
+            factory.CreateVariable("object", factory.ObjectType), array);
+        var assumptions = ImmutableArray.Create(NotNull(factory, array),
+            Assume(factory, Equal(factory, factory.Length(factory.Variable(array)), factory.Integer(2))));
+        var query = Query(factory, assumptions, factory.Boolean(false), variables);
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var preference = typeof(CallableSolverSession).GetMethod("NominalReferenceWitnesses", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.That(preference.Invoke(session, [query, new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken)]), Is.Null);
+        var kernel = new ProofKernel(session);
+        Assert.That(await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+        var invariant = Query(factory, assumptions, assumptions[1].Predicate, variables);
+        Assert.That(await kernel.VerifyAsync(invariant, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
     private static Assumption NotNull(IrFactory factory, IrVarId variable)
     {
