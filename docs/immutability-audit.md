@@ -2918,3 +2918,7 @@ metadata body admission, scalar IL decoding and source-image-mutation cache iden
 A separate scan found 42 other production map/set rebindings needing ownership/fork
 review; immutable stack/queue traversal rebindings are separate legitimate operations.
 Status: open before edits.
+
+IMM-M082 verified: all 150 ordinary Specs tests pass, zero failures/skips and zero
+warnings/errors. Main traced the sole instantiation constructor and immutable bySlot
+callers; public input capture, guards and reference comparer behavior are preserved.

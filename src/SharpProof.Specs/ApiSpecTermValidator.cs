@@ -11,7 +11,7 @@ internal static partial class ApiSpecTermValidator
 
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
         ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm>.Builder validatedTerms,
         bool allowResult = true)
@@ -91,7 +91,7 @@ internal static partial class ApiSpecTermValidator
     internal sealed partial class ValidatedSpecTerm
     {
         private sealed class ValidationContext(
-            IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+            ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
             ApiSpecFacets facets,
             ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm>.Builder validatedTerms,
             bool allowResult)
