@@ -174,10 +174,14 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         await File.WriteAllTextAsync(Path.Combine(output, "source.cs.txt"), Source, new UTF8Encoding(false));
         await File.WriteAllTextAsync(Path.Combine(output, "artifact.json"), artifactJson, new UTF8Encoding(false));
         await File.WriteAllBytesAsync(Path.Combine(output, "native-image.dll"), imageBytes);
-        var checks = new List<TotalCallableClaimCheck>();
-        var reads = new List<long>();
-        var budgetReads = new List<BudgetRead>();
+        var checks = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
+        var reads = ImmutableArray.CreateBuilder<long>();
+        var budgetReads = ImmutableArray.CreateBuilder<BudgetRead>();
         var recorder = new QueryRecords();
+        ImmutableArray<TotalCallableClaimCheck> checkSnapshot = default;
+        ImmutableArray<long> readSnapshot = default;
+        ImmutableArray<BudgetRead> budgetSnapshot = default;
+        ImmutableArray<QueryRecord> querySnapshot = default;
         long? baseline = null;
         long? finalConsumed = null;
         var droppedReads = 0;
@@ -186,17 +190,17 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         var projectCanceled = false;
         string? failureType = null;
         var sourceRoot = TestRepository.FindRoot();
-        var solverSource = await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
-            "src/SharpProof.Worker", "Vc", "PassiveCallableSolver.cs"), TestContext.CurrentContext.CancellationToken);
-        var budgetSource = await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
-            "src/SharpProof.Worker", "MethodResourceBudget.cs"), TestContext.CurrentContext.CancellationToken);
-        var firstPassLine = Array.IndexOf(solverSource,
+        var solverSource = (await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
+            "src/SharpProof.Worker", "Vc", "PassiveCallableSolver.cs"), TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        var budgetSource = (await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
+            "src/SharpProof.Worker", "MethodResourceBudget.cs"), TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        var firstPassLine = solverSource.IndexOf(
             "                var evidence = await VerifyAsync(query, null, cancellationToken, plan).ConfigureAwait(false);") + 1;
-        var combinedRecheckLine = Array.IndexOf(solverSource,
+        var combinedRecheckLine = solverSource.IndexOf(
             "                var together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);") + 1;
-        var verifyQueryLine = Array.IndexOf(solverSource,
+        var verifyQueryLine = solverSource.IndexOf(
             "        if (!_budget.TryStartQuery())") + 1;
-        var budgetReadLine = Array.IndexOf(budgetSource,
+        var budgetReadLine = budgetSource.IndexOf(
             "        var current = _readConsumedResourceCount();") + 1;
         Assert.That(firstPassLine, Is.GreaterThan(0));
         Assert.That(combinedRecheckLine, Is.GreaterThan(0));
@@ -261,6 +265,10 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         }
         finally
         {
+            checkSnapshot = checks.ToImmutable();
+            readSnapshot = reads.ToImmutable();
+            budgetSnapshot = budgetReads.ToImmutable();
+            querySnapshot = recorder.Values.ToImmutable();
             // One post-session-disposal file. No per-query console or file writes.
             var payload = new
             {
@@ -277,16 +285,16 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 finalConsumed,
                 completed,
                 failureType,
-                meterReads = reads,
-                budgetReads,
+                meterReads = readSnapshot,
+                budgetReads = budgetSnapshot,
                 methodCanceled,
                 projectCanceled,
                 droppedReads,
                 startedQueries = recorder.Started,
                 droppedQueryRecords = recorder.Dropped,
                 nativeDelta = recorder.NativeDelta,
-                queries = recorder.Values,
-                published = checks.Select(check =>
+                queries = querySnapshot,
+                published = checkSnapshot.Select(check =>
                 {
                     System.ArgumentNullException.ThrowIfNull(check);
                     return new
@@ -311,7 +319,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
                 JsonSerializer.Serialize(payload, JsonOptions), new UTF8Encoding(false));
         }
-        var final = checks.Last(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId == ownedClaim));
+        var final = checkSnapshot.Last(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId == ownedClaim));
         Assert.That(completed, Is.True);
         Assert.That(methodCanceled, Is.False);
         Assert.That(projectCanceled, Is.False);
@@ -329,27 +337,27 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Assert.That(droppedReads, Is.Zero);
         Assert.That(recorder.NativeDelta, Is.EqualTo(finalConsumed - baseline));
         Assert.That(recorder.Started, Is.EqualTo(15), "Five real prelude checks and ten first-pass checks; no later supplied-session reservation fits.");
-        Assert.That(recorder.Values, Has.Count.EqualTo(15));
-        Assert.That(recorder.Values.Take(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
-            "Satisfiable,Satisfiable,Satisfiable,Satisfiable,Unsatisfiable".Split(',')));
-        Assert.That(recorder.Values.Skip(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
-            "Unsatisfiable,Satisfiable,Satisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable".Split(',')));
-        Assert.That(recorder.Values.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Reason == "None" && query.FailureType == null)), Is.True);
+        Assert.That(querySnapshot, Has.Length.EqualTo(15));
+        Assert.That(querySnapshot.Take(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
+            "Satisfiable,Satisfiable,Satisfiable,Satisfiable,Unsatisfiable".Split(',').ToImmutableArray()));
+        Assert.That(querySnapshot.Skip(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
+            "Unsatisfiable,Satisfiable,Satisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable".Split(',').ToImmutableArray()));
+        Assert.That(querySnapshot.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Reason == "None" && query.FailureType == null)), Is.True);
 
-        Assert.That(recorder.Values.Skip(5).All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Frames.Any(frame =>
+        Assert.That(querySnapshot.Skip(5).All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Frames.Any(frame =>
             frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == firstPassLine)))), Is.True);
-        Assert.That(recorder.Values.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (!query.Frames.Any(frame =>
+        Assert.That(querySnapshot.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (!query.Frames.Any(frame =>
             frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == combinedRecheckLine)))), Is.True);
-        var denied = budgetReads.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery &&
+        var denied = budgetSnapshot.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery &&
             budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit)).ToImmutableArray();
         Assert.That(denied, Is.Not.Empty, "Actual reader evidence of reservation denial is required.");
         var firstDenied = denied[0];
         Assert.That(firstDenied.InCombinedRecheck, Is.True);
         Assert.That(firstDenied.CompletedNativeQueries, Is.EqualTo(15));
-        Assert.That(firstDenied.Actual, Is.EqualTo(recorder.Values[^1].After));
+        Assert.That(firstDenied.Actual, Is.EqualTo(querySnapshot[^1].After));
         Assert.That(firstDenied.Actual - baseline!.Value, Is.LessThanOrEqualTo(budgets.MethodRlimit));
         Assert.That(budgets.MethodRlimit - (firstDenied.Actual - baseline!.Value), Is.LessThan(budgets.QueryRlimit));
-        Assert.That(budgetReads.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery)).TakeWhile(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (!ReferenceEquals(read, firstDenied)))
+        Assert.That(budgetSnapshot.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery)).TakeWhile(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (!ReferenceEquals(read, firstDenied)))
             .All(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (budgets.MethodRlimit - (read.Actual - baseline!.Value) >= budgets.QueryRlimit)), Is.True);
         Assert.That(denied.All(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.Actual == firstDenied.Actual)), Is.True);
         Assert.That(finalConsumed, Is.EqualTo(firstDenied.Actual));
@@ -360,7 +368,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         internal int Started { get; set; }
         internal int Dropped { get; set; }
         internal long NativeDelta { get; set; }
-        internal List<QueryRecord> Values { get; } = [];
+        internal ImmutableArray<QueryRecord>.Builder Values { get; } = ImmutableArray.CreateBuilder<QueryRecord>();
     }
 
     private sealed record BudgetRead(long Actual, int CompletedNativeQueries,
