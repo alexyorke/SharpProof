@@ -122,6 +122,8 @@ internal static class DotnetApiInventory
             { evidence.Add("intrinsic=concrete-list-state"); }
         }
 
+        if (CSharpOperationSemantics.IsStackStateDeclaration(symbol))
+        { evidence.Add("intrinsic=concrete-stack-state"); }
         if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
         { evidence.Add("intrinsic=concrete-queue-state"); }
 

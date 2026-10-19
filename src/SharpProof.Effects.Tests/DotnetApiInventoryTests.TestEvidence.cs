@@ -62,6 +62,13 @@ public sealed partial class DotnetApiInventoryTests
                         opaqueStorage && (CheckOpaqueDictionaryStorageIntrinsic(compilation, true) || CheckOpaqueDictionaryStorageIntrinsic(compilation, true, direct: true)));
             }
 
+            if (row.Evidence.Contains("intrinsic=concrete-stack-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled CLR/IR default/capacity construction, incoming and aliased LIFO Count/Push/Pop; generic opaque decimal payload identity and source helper; normal growth choices retain approximation",
+                    () => CheckStackStateIntrinsic(compilation, false) && CheckStackStateIntrinsic(compilation, false, incoming: true) && CheckStackStateIntrinsic(compilation, false, opaque: true),
+                    () => CheckStackStateIntrinsic(compilation, true) || CheckStackStateIntrinsic(compilation, true, incoming: true) || CheckStackStateIntrinsic(compilation, true, opaque: true));
+            }
             if (row.Evidence.Contains("intrinsic=concrete-queue-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));

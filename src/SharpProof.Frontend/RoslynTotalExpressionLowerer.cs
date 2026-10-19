@@ -74,6 +74,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && operation is IPropertyReferenceOperation stackProperty &&
+            StackClause(stackProperty, state, depth) is { } stackClause)
+        { return stackClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation queueProperty &&
             QueueClause(queueProperty, state, depth) is { } queueClause)
         { return queueClause; }
@@ -257,6 +260,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && StackBody(operation, block, depth) is { } stack)
+        { return Capture(operation, stack); }
         if (depth < 256 && QueueBody(operation, block, depth) is { } queue)
         { return Capture(operation, queue); }
         if (depth < 256 && ListBody(operation, block, depth) is { } list)
