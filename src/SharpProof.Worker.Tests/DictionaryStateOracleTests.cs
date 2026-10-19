@@ -12,6 +12,22 @@ namespace SharpProof.Worker.Test;
 
 public sealed class DictionaryStateOracleTests
 {
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    public void CapacityKeyBoundariesAgreeWithCompiledClr(string type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        Compare("var data = new System.Collections.Generic.Dictionary<" + type + ", int>(3); " +
+            "var alias = data; data.Add(" + type + ".MinValue, 23); alias[" + type + ".MaxValue] = 29; " +
+            "return data.Count * 1000 + data[" + type + ".MinValue] * 10 + alias[" + type + ".MaxValue];", true);
+    }
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(3)]
