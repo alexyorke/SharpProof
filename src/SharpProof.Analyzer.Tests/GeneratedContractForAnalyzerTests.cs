@@ -225,27 +225,24 @@ public sealed class GeneratedContractForAnalyzerTests
     public async Task GeneratedFinalValidationRejectsConflictingAliases()
     {
         const string malformed = EmptyServiceContractsSource;
+        var conflictingOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        conflictingOptions["sharpproof_profile"] = " advisory ";
+        conflictingOptions["build_property.SharpProofProfile"] = "off";
         var conflicting = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = " advisory ",
-                ["build_property.SharpProofProfile"] = "off"
-            });
+            globalOptions: conflictingOptions.ToImmutable());
+        var invalidOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        invalidOptions["sharpproof_profile"] = "invalid";
+        invalidOptions["build_property.SharpProofProfile"] = "advisory";
         var invalid = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = "invalid",
-                ["build_property.SharpProofProfile"] = "advisory"
-            });
+            globalOptions: invalidOptions.ToImmutable());
+        var matchingOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        matchingOptions["sharpproof_profile"] = " advisory ";
+        matchingOptions["build_property.SharpProofProfile"] = "ADVISORY";
         var matching = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = " advisory ",
-                ["build_property.SharpProofProfile"] = "ADVISORY"
-            });
+            globalOptions: matchingOptions.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
@@ -353,7 +350,7 @@ public sealed class GeneratedContractForAnalyzerTests
         string features = "contracts",
         string hintName = "GeneratedContracts.g.cs",
         IEnumerable<string>? additionalDiagnosticIds = null,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(features);
         System.ArgumentNullException.ThrowIfNull(generatedSource);
@@ -379,14 +376,11 @@ public sealed class GeneratedContractForAnalyzerTests
 
         if (globalOptions != null)
         {
-            var options = globalOptions.ToDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value,
-                StringComparer.Ordinal);
+            var options = globalOptions.ToBuilder();
             options["build_property.SharpProofFeatures"] = features;
             return await AnalyzerTestHost.AnalyzeAsync(
                 (CSharpCompilation)output,
-                options);
+                options.ToImmutable());
         }
         return await AnalyzerTestHost.AnalyzeAsync(
             (CSharpCompilation)output,

@@ -263,19 +263,17 @@ public sealed class CompilerMetadataAliasWorkflowTests
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(source);
         var path = Path.Combine(directory, name + ".json");
-        var options = new Dictionary<string, string>
-        {
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow",
-            ["build_property._SharpProofCompilerManifestPath"] = path,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net8.0",
-            ["build_property._SharpProofProjectDirectory"] = directory,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64"
-        };
+        var options = ImmutableDictionary.CreateBuilder<string, string>();
+        options["build_property.SharpProofProfile"] = "advisory";
+        options["build_property.SharpProofFeatures"] = "all";
+        options["build_property.SharpProofVerifyPolicy"] = "advisory";
+        options["build_property.SharpProofAssumptionPolicy"] = "allow";
+        options["build_property._SharpProofCompilerManifestPath"] = path;
+        options["build_property._SharpProofCompilationTargetFramework"] = "net8.0";
+        options["build_property._SharpProofProjectDirectory"] = directory;
+        options["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            AnalyzerTestHost.CreateCompilation(source, [], references), options,
+            AnalyzerTestHost.CreateCompilation(source, [], references), options.ToImmutable(),
             analyzer: new FinalCompilationCollectorAnalyzer());
         Assert.That(diagnostics, Is.Empty);
         return await File.ReadAllTextAsync(path);

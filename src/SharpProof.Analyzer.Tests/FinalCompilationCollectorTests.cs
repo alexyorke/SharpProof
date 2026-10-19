@@ -1281,12 +1281,12 @@ public sealed class FinalCompilationCollectorTests
         System.ArgumentNullException.ThrowIfNull(value);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("blank-specification-pack");
-        var options = Options(path);
+        var options = Options(path).ToBuilder();
         options[SpecificationPacksKey] = value;
 
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
-            options);
+            options.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
@@ -1304,7 +1304,7 @@ public sealed class FinalCompilationCollectorTests
         for (var index = 0; index < values.Length; index++)
         {
             var path = workspace.SealPath("no-specification-packs-" + index);
-            var options = Options(path);
+            var options = Options(path).ToBuilder();
             if (values[index] != null)
             {
                 options[SpecificationPacksKey] = values[index]!;
@@ -1312,7 +1312,7 @@ public sealed class FinalCompilationCollectorTests
 
             var diagnostics = await AnalyzeCollectorAsync(
                 CreateCompilation(),
-                options);
+                options.ToImmutable());
 
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
@@ -1663,14 +1663,13 @@ public sealed class FinalCompilationCollectorTests
     {
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("tree-configuration");
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_profile"] = "strict";
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
             new TreeOptionsProvider(
                 Options(path),
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["sharpproof_profile"] = "strict"
-                }));
+                optionValues.ToImmutable()));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1688,12 +1687,12 @@ public sealed class FinalCompilationCollectorTests
             path,
             profile: "strict",
             verifyPolicy: "require-proven",
-            assumptionPolicy: "error");
+            assumptionPolicy: "error").ToBuilder();
         options["build_property._SharpProofProfileWasDefaulted"] = "false";
         options["build_property._SharpProofFeaturesWasDefaulted"] = "true";
         options["sharpproof_profile"] = "strict";
         options["sharpproof_features"] = "effects";
-        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options.ToImmutable());
         Assert.That(diagnostics, Is.Empty);
         Assert.That(File.Exists(path), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(
@@ -1739,10 +1738,10 @@ public sealed class FinalCompilationCollectorTests
         var options = Options(
             path,
             profile: buildProfile,
-            features: features);
+            features: features).ToBuilder();
         options["sharpproof_profile"] = rawProfile;
 
-        _ = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        _ = await AnalyzeCollectorAsync(CreateCompilation(), options.ToImmutable());
 
         Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
     }
@@ -1785,7 +1784,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
-        Dictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
         bool allowCompilationErrors = false)
     {
@@ -1879,7 +1878,7 @@ public sealed class FinalCompilationCollectorTests
         return patched;
     }
 
-    private static Dictionary<string, string> Options(
+    private static ImmutableDictionary<string, string> Options(
         string? path,
         string profile = "advisory",
         string features = "all",
@@ -1892,23 +1891,20 @@ public sealed class FinalCompilationCollectorTests
         System.ArgumentNullException.ThrowIfNull(maximumExpressionDepth);
         System.ArgumentNullException.ThrowIfNull(profile);
         System.ArgumentNullException.ThrowIfNull(verifyPolicy);
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            [TargetFrameworkKey] = "net9.0",
-            [ProjectDirectoryKey] = Environment.CurrentDirectory,
-            [MaximumExpressionDepthKey] = maximumExpressionDepth,
-            ["build_property.SharpProofProfile"] = profile,
-            ["build_property.SharpProofFeatures"] = features,
-            ["build_property.SharpProofVerifyPolicy"] = verifyPolicy,
-            ["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy
-        };
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        values[TargetFrameworkKey] = "net9.0";
+        values[ProjectDirectoryKey] = Environment.CurrentDirectory;
+        values[MaximumExpressionDepthKey] = maximumExpressionDepth;
+        values["build_property.SharpProofProfile"] = profile;
+        values["build_property.SharpProofFeatures"] = features;
+        values["build_property.SharpProofVerifyPolicy"] = verifyPolicy;
+        values["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy;
         if (path != null)
         {
             values[OutputKey] = path;
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
     private sealed class MemoryAdditionalText(
@@ -1951,8 +1947,8 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class TreeOptionsProvider(
-        Dictionary<string, string> globalValues,
-        Dictionary<string, string> treeValues)
+        ImmutableDictionary<string, string> globalValues,
+        ImmutableDictionary<string, string> treeValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
@@ -1976,7 +1972,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class ThrowingTreeOptionsProvider(
-        Dictionary<string, string> globalValues)
+        ImmutableDictionary<string, string> globalValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =

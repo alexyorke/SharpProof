@@ -232,12 +232,11 @@ public sealed class AnalyzerModeAndEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(retiredMode);
         var compilation = RetiredModeCompilation;
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_mode"] = retiredMode;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_mode"] = retiredMode
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
@@ -252,12 +251,11 @@ public sealed class AnalyzerModeAndEffectTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             ModeFixture,
             ["SP0025"]);
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        optionValues["build_property.sharpproof_mode"] = "everything";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["build_property.sharpproof_mode"] = "everything"
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
@@ -273,13 +271,12 @@ public sealed class AnalyzerModeAndEffectTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             ModeFixture,
             ["SP0025"]);
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_mode"] = "  ";
+        optionValues["build_property.SharpProofMode"] = "strict";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_mode"] = "  ",
-                ["build_property.SharpProofMode"] = "strict"
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {

@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using SharpProof.Ir;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -166,8 +167,7 @@ internal static class AnalyzerTestHost
         bool allowCompilationErrors = false)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
         if (mode != null)
         {
             switch (mode.ToUpperInvariant())
@@ -183,24 +183,24 @@ internal static class AnalyzerTestHost
                     features ??= "all";
                     break;
                 default:
-                    values.Add("sharpproof_mode", mode);
+                    values.AddUnique("sharpproof_mode", mode);
                     break;
             }
         }
 
         if (profile != null)
         {
-            values.Add("build_property.SharpProofProfile", profile);
+            values.AddUnique("build_property.SharpProofProfile", profile);
         }
 
         if (features != null)
         {
-            values.Add("build_property.SharpProofFeatures", features);
+            values.AddUnique("build_property.SharpProofFeatures", features);
         }
 
         return await AnalyzeAsync(
                 compilation,
-                values,
+                values.ToImmutable(),
                 analyzer: analyzer,
                 allowCompilationErrors: allowCompilationErrors,
                 cancellationToken: cancellationToken)
@@ -209,7 +209,7 @@ internal static class AnalyzerTestHost
 
     internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        Dictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
@@ -222,7 +222,7 @@ internal static class AnalyzerTestHost
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        Dictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         CancellationToken cancellationToken,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
