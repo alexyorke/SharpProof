@@ -3275,3 +3275,11 @@ Cache indexers preserve SetItem overwrite semantics and partial classification t
 Session configuration properties and mutable budget/result flags remain separate scope.
 Validate source-session reentry, source/IL recursion, budgets and initialization coverage.
 Status: open before edits.
+IMM-M107: Main reviewed all declaration classifier collection construction. Use array
+builders for ordered results, safe/unsafe spans and per-line tokens, and an integer map
+builder while accumulating. Freeze spans and each nested token value before filtering;
+retain the valid-syntax short circuit, sorted unique output line numbers, duplicate
+request paths and request order. Publish immutable result/line arrays to JSON. Compare
+baseline/current classifier outputs through the canonical PS helper, including invalid
+syntax, primary constructors, executable initializers and duplicate ordered requests.
+Status: open before edits.
