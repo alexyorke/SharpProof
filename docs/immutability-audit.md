@@ -3183,3 +3183,15 @@ failures/skips/warnings/errors. Main and independent review checked ordinal dupl
 diagnostics, frozen parsed-file publication, round-robin selection guards, and static
 write replay overwrites. The first build caught a redundant Contains/Add guard in the
 concurrent M098 binder edit; using Add's boolean result preserved first-seen order.
+
+IMM-M101: Package integration materialization universe contains 47 ToArray nodes:
+select 39 read-only projections across eight files, retaining eight native mutable
+publication/ITaskItem/reflection/hash byte adapters (two start from immutable bytes).
+Main traced ZIP/JSON lifetime, argument pre-mutation expectations and probe helper
+couplings. Narrow private probe constructor and canonical/path/item/project helper
+results to immutable vectors; preserve initialized-input guards and direct publication.
+Freeze adjacent fixed SARIF/project vectors and two assertion-only XML lists. Archive
+expected-entry inputs are immutable vectors with a default guard. Preserve ordering,
+wire text, eager materialization before disposal and mutable Prepare(string[]) subjects.
+Validate package integration/real MSBuild workflow and compare source literal tokens.
+Status: open before edits.
