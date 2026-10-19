@@ -16,16 +16,16 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,605 declarations have no catalog/audited-intrinsic evidence, and 68 have partial
+55,599 declarations have no catalog/audited-intrinsic evidence, and 74 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,605 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,599 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
 
 The source-use universe is all 200 selected original OSS targets, 28 original
 synthetic targets and 10 sample files: 641 resolved sites, zero unresolved sites,
-114 API/access/status rows. Every one is listed below, including partial models
+117 API/access/status rows. Every one is listed below, including partial models
 that still have gaps. Dependency-only methods, metamorphic duplicates, repository
 implementation code, dynamic/reflection calls and unexecuted workloads do not
 contribute to this ranking. The CI JSON has source hashes and exact locations;
@@ -74,7 +74,7 @@ access kind and value domains satisfy the production guard.
 | D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key scalar/reference/opaque storage also flows through proven immutable source-helper parameters; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add, Insert, GetRange and scalar/reference/opaque get/set share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
-| S: HashSet / Queue / Stack | Queue default/capacity construction, Enqueue, Dequeue and Count share FIFO state; Stack default/capacity construction, Push, Pop and Count share LIFO state | Both slices support concrete incoming and aliased receivers with scalar/reference/opaque values. Retain null/negative capacity/empty removal, growth, allocation and unknown-writer effects. Other Queue/Stack operations and exact resource/fault behavior, plus HashSet membership and comparer callbacks, remain open. |
+| S: HashSet / Queue / Stack | HashSet default/capacity construction and signed Count are modeled; default-origin Boolean and nine integer/character key domains have shared Add/Contains/Remove state. Queue and Stack retain their FIFO/LIFO slices | Keep generic/custom equality and hashing callbacks, arbitrary incoming HashSet membership, contents outside primitive domains, ISet/ICollection dispatch, enumeration, set algebra, precise initializer/growth/fault behavior and pure membership clauses open. Comparer callbacks that reenter collection methods can make HashSet and Dictionary Count negative; nonnegativity must follow from modeled state, never a blanket getter assumption. Other Queue/Stack operations and precise resource behavior remain open. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Typed SZ-array Clear now models valid scalar ranges and reference null stores, with valid-call effects for opaque values. Remaining: general Array/multidimensional/nonzero-lower-bound Clear, opaque default atoms and reference-content proofs, Copy/Resize, allocation/ref replacement and precise failure/callback semantics. Safe direct covariant Clear upcasts are covered; general covariant array assignments and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
 | N: Numeric / conversion | Convert.ToInt64 body arithmetic is partial; initialization/clauses, other conversions, floating operations and formatting remain open | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
@@ -680,6 +680,42 @@ conversions, floating and decimal rounding, formatting, nullable boxing, string
 parsing, provider/culture semantics, initialization and logical-clause support
 remain open.
 
+## Verified default primitive HashSet state and signed callback Counts
+
+Default and capacity construction establish empty HashSet state on normal return.
+Add, Contains and Remove share membership and Count for proven default-constructor
+origins with Boolean and all nine integer/character key domains. Duplicate adds and
+absent removals preserve Count and return false; successful mutations return true.
+Aliases and immutable generic source-helper parameters share the caller's storage.
+Boolean keys use a one-to-one false/true representation; no heap-key validation is
+relaxed. Receiver and argument evaluation order, rebinding and independent sets are
+tested against compiled CLR executions and native proof controls.
+
+The complete API inventory gains six partial declarations. The source ranking
+credits nine default constructions and one primitive site each for Add, Contains
+and Remove: twelve newly partial static sites. Fifteen Contains, eleven Add and
+two Remove sites remain outside the approved equality domain. The ranking now has
+117 API/access/status rows at the unchanged 641 sites, with no unresolved sites.
+This does not establish proofs for every enclosing graph or permutation method.
+
+CLR regressions demonstrate that reentrant equality callbacks can make HashSet
+Count -1, -2, -8 and -64 and can also make a default-comparer Dictionary Count negative.
+The former unsigned masks incorrectly proved nonnegative claims after such opaque
+mutations. Both getters now preserve the signed observable value, including in
+logical Count expressions and on incoming concrete receivers. Native regressions
+reject those former false proofs. Exact fresh primitive transitions still establish
+their own Count facts. Counterexample preferences and decoding charge signed Count
+magnitude under the existing budget; they add no restriction to universal proofs.
+
+Generic HashSet initialization outside primitive domains retains arbitrary caller-heap effects;
+empty Count is established only after normal construction. Primitive initialization,
+allocation, growth and failure uncertainty remain explicit. Runtime/IR comparisons
+select bounded normal paths and retain approximation; they grant no new concrete
+framework replay authority. Custom comparer construction, unknown writers and
+unproven incoming origins do not gain primitive membership semantics. Floating,
+decimal, string, reference and generic key callbacks, interface dispatch, other set
+operations, exact invalid-path semantics and pure Contains clauses remain backlog.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -808,15 +844,15 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Exception.#ctor(System.String) | call | 18 | partially-modeled | T |
 | P:System.Collections.Generic.List`1.Count | read | 18 | partially-modeled | L |
 | P:System.String.Chars(System.Int32) | read | 18 | partially-modeled | T |
-| M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 16 | unmodeled | S |
 | P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | partially-modeled | L |
+| M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 15 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.Add(`0) | call | 13 | partially-modeled | L |
 | P:System.Collections.Generic.Comparer`1.Default | read | 13 | unmodeled | C |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | unmodeled-dispatch | A |
-| M:System.Collections.Generic.HashSet`1.Add(`0) | call | 12 | unmodeled | S |
+| M:System.Collections.Generic.HashSet`1.Add(`0) | call | 11 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | partially-modeled | L |
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | partially-modeled | S |
-| M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | unmodeled | S |
+| M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | partially-modeled | S |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | unmodeled | C |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | partially-modeled | D |
 | M:System.Action`1.Invoke(`0) | call | 7 | unmodeled | F |
@@ -838,7 +874,6 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.ArgumentNullException.#ctor | call | 3 | unmodeled | E |
 | M:System.ArgumentNullException.#ctor(System.String) | call | 3 | unmodeled | T |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | partially-modeled | R |
-| M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | unmodeled | S |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | partially-modeled | S |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | partially-modeled | N |
 | M:System.Convert.ToInt64(System.Int32) | call | 3 | partially-modeled | N |
@@ -849,6 +884,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Object.#ctor | call | 3 | partially-modeled | O |
 | M:System.Object.Equals(System.Object) | call | 3 | unmodeled | O |
 | P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | unmodeled | O |
+| M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 2 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | partially-modeled | L |
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | partially-modeled | S |
 | M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | partially-modeled | S |
@@ -872,7 +908,10 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.EqualityComparer`1.Equals(`0,`0) | call | 1 | unmodeled | C |
 | M:System.Collections.Generic.EqualityComparer`1.GetHashCode(`0) | call | 1 | unmodeled | C |
 | M:System.Collections.Generic.HashSet`1.#ctor(System.Collections.Generic.IEnumerable{`0}) | call | 1 | unmodeled | S |
+| M:System.Collections.Generic.HashSet`1.Add(`0) | call | 1 | partially-modeled | S |
+| M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 1 | partially-modeled | S |
 | M:System.Collections.Generic.HashSet`1.IsSupersetOf(System.Collections.Generic.IEnumerable{`0}) | call | 1 | unmodeled | S |
+| M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 1 | partially-modeled | S |
 | M:System.Collections.Generic.ICollection`1.Remove(`0) | call | 1 | unmodeled | A |
 | M:System.Collections.Generic.KeyValuePair`2.#ctor(`0,`1) | call | 1 | unmodeled | O |
 | M:System.Collections.Generic.List`1.#ctor(System.Int32) | call | 1 | unmodeled | L |
@@ -914,7 +953,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 68 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 74 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -927,6 +966,11 @@ These 68 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state |
+| M:System.Collections.Generic.HashSet`1.#ctor | intrinsic=default-primitive-hash-set-state |
+| M:System.Collections.Generic.HashSet`1.#ctor(System.Int32) | intrinsic=default-primitive-hash-set-state |
+| M:System.Collections.Generic.HashSet`1.Add(`0) | intrinsic=default-primitive-hash-set-state |
+| M:System.Collections.Generic.HashSet`1.Contains(`0) | intrinsic=default-primitive-hash-set-state |
+| M:System.Collections.Generic.HashSet`1.Remove(`0) | intrinsic=default-primitive-hash-set-state |
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | M:System.Collections.Generic.IList`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
@@ -974,8 +1018,9 @@ These 68 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
-| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
+| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
+| P:System.Collections.Generic.HashSet`1.Count | intrinsic=default-primitive-hash-set-state |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state;intrinsic=concrete-list-state |

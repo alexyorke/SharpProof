@@ -60,7 +60,7 @@ internal static partial class CSharpOperationSemantics
         return !method.IsStatic && !method.IsVirtual && method.Parameters.IsEmpty &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 && IsFrameworkCollectionMember(method) &&
             method.OriginalDefinition.AssociatedSymbol?.GetDocumentationCommentId() is
-                "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.Dictionary`2.Count" or
+                "P:System.Collections.Generic.List`1.Count" or
                 "P:System.Collections.Generic.Queue`1.Count" or "P:System.Collections.Generic.Stack`1.Count";
     }
 
