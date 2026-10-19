@@ -2685,3 +2685,14 @@ input guards, order, duplicates and all embedded source text. Leave mutable List
 Queue/Stack SUT probes and runtime reflection arrays unchanged. Validate the entire
 ordinary Effects test project, including new opaque List/generic storage controls.
 Status: open before edits.
+
+IMM-M073: Coordinator traced 13 readonly IR/Specs query snapshots identified by the
+read-only audit, plus the coupled evidence publication. Immutable snapshots cover task
+publication handles (WhenAll accepts IEnumerable), assertion/query results, reflection
+field-value observations and enumerable collection-constructor inputs. Preserve actual
+mutable runtime subjects, byte/native/params and concurrent Volatile buffers. Evidence
+rows use a scoped immutable builder and ToImmutable (capacity is not proven), with an
+immutable helper return; nullable witness query fallbacks become typed immutable Empty.
+Use checked source nodes/IDs and validate the full ordinary IR and Specs projects,
+including missing evidence controls and runtime collection probes.
+Status: open before edits.
