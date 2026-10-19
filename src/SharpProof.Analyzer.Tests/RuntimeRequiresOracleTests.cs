@@ -19,8 +19,9 @@ public sealed class RuntimeRequiresOracleTests
                 random.Next(-100, 101),
                 random.Next(-100, 101),
                 random.Next(-100, 101)))
-            .ToArray();
-        var lines = new List<string> {
+            .ToImmutableArray();
+        var lines = ImmutableArray.CreateBuilder<string>();
+        lines.AddRange(ImmutableArray.Create(
             "using System;",
             "using SharpProof.Attributes;",
             "public static class RuntimeRequiresFixture {",
@@ -29,8 +30,7 @@ public sealed class RuntimeRequiresOracleTests
             "        return value >= minimum && value <= maximum;",
             "    }",
             "    private static int Throwing() =>",
-            "        throw new InvalidOperationException();"
-        };
+            "        throw new InvalidOperationException();"));
         foreach (var item in cases)
         {
             lines.Add($"    public static void Case{item.Index:D3}() {{");
@@ -49,7 +49,7 @@ public sealed class RuntimeRequiresOracleTests
         var throwingPrefixLine = lines.Count - 1;
         lines.Add("    }");
         lines.Add("}");
-        var source = string.Join("\n", lines);
+        var source = string.Join("\n", lines.ToImmutable());
         var compilation = AnalyzerTestHost.CreateCompilation(
             source,
             ["SP0027"]);

@@ -3729,3 +3729,16 @@ failures/skips/build warnings/errors; 88 exact embedded PDB outputs. Main and
 independent review cover all 33 rows across eighteen files, both DFS stack orders,
 strict maps, region IDs, declaration ordinals and native/mutable subjects. Canonical
 formatting applied; long mutation/fixture vectors retain separate readable rows.
+
+IMM-M142 verified: all 1,134 ordinary Release Analyzer tests pass, zero failures/
+skips/build warnings/errors; 64 exact embedded PDB outputs. Main and independent
+review confirm eighteen sites across eleven files, synchronous callback publication,
+late-write/cancellation assertion strength, all nine initial source lines and preserved
+mutable RangeCase identities. Canonical whitespace check requires zero changes.
+All 87 PowerShell and 19 shell files are format-clean; 713 documentation local links
+and the container contract pass after M137/M138. Draft MR #323 is mergeable.
+Inventory refresh records 1,878 C# units / 2,253 candidates and 84 PowerShell units /
+1,091 candidates, zero parse failures. Main traced 37 additional Frontend scoped
+builders/grouping pairs/text builders and nine current PS snapshot/seed rows; those
+are verified construction, not violations. Pending M142 builder rows were excluded
+from automatic verified classification until their clean gate completed.

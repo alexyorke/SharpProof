@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -50,9 +51,10 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         {
             Assert.That(inventory.Clauses.Single().Placement, Is.EqualTo(placement));
         }
-        var reported = new List<Diagnostic>();
-        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reported.Add);
-        Assert.That(reported, Has.Count.EqualTo(count));
+        var reportedBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reportedBuilder.Add);
+        var reported = reportedBuilder.ToImmutable();
+        Assert.That(reported, Has.Length.EqualTo(count));
         if (count != 0)
         {
             var diagnostic = reported.Single();
@@ -74,15 +76,17 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, _, inventory) = Compile(shape, "requires");
         var policy = new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken);
-        var reported = new List<Diagnostic>();
-        policy.ReportAnonymousRequires(inventory, reported.Add);
-        policy.ReportAnonymousRequires(inventory, reported.Add);
-        policy.Report(inventory, reported.Add);
-        Assert.That(reported, Has.Count.EqualTo(count));
-        var independent = new List<Diagnostic>();
+        var reportedBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        policy.ReportAnonymousRequires(inventory, reportedBuilder.Add);
+        policy.ReportAnonymousRequires(inventory, reportedBuilder.Add);
+        policy.Report(inventory, reportedBuilder.Add);
+        var reported = reportedBuilder.ToImmutable();
+        Assert.That(reported, Has.Length.EqualTo(count));
+        var independentBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken)
-            .ReportAnonymousRequires(inventory, independent.Add);
-        Assert.That(independent, Has.Count.EqualTo(count));
+            .ReportAnonymousRequires(inventory, independentBuilder.Add);
+        var independent = independentBuilder.ToImmutable();
+        Assert.That(independent, Has.Length.EqualTo(count));
         if (count != 0)
         {
             Assert.That(reported.Single().Location, Is.EqualTo(inventory.Clauses.Single().Location));
@@ -112,9 +116,10 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         var inventory = new ContractClauseInventoryBuilder(compilation).Create(outer);
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
         Assert.That(inventory.Clauses.Single().Placement, Is.EqualTo(ContractClausePlacement.NestedCallable));
-        var reported = new List<Diagnostic>();
-        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reported.Add);
-        Assert.That(reported, Has.Count.EqualTo(count));
+        var reportedBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reportedBuilder.Add);
+        var reported = reportedBuilder.ToImmutable();
+        Assert.That(reported, Has.Length.EqualTo(count));
         if (count != 0)
         {
             Assert.That(reported.Single().Id, Is.EqualTo("SP0024"));
@@ -140,10 +145,11 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         using var cancellation = new CancellationTokenSource();
         var policy = new ContractClausePlacementDiagnostics(compilation, cancellation.Token);
         await cancellation.CancelAsync();
-        var reported = new List<Diagnostic>();
-        Action validate = () => policy.Report(inventory, reported.Add);
+        var reportedBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        Action validate = () => policy.Report(inventory, reportedBuilder.Add);
         var exception = Assert.Throws<OperationCanceledException>(validate);
         Assert.That(exception!.CancellationToken, Is.EqualTo(cancellation.Token));
+        var reported = reportedBuilder.ToImmutable();
         Assert.That(reported, Is.Empty);
     }
 

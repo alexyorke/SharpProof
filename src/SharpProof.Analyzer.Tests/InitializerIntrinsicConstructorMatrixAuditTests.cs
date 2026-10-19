@@ -46,9 +46,10 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
         var model = compilation.GetSemanticModel(tree);
         var bodySyntax = (SyntaxNode?)constructor.Body ?? constructor.ExpressionBody!.Expression;
         var bodyOperation = model.GetOperation(bodySyntax)!;
-        var ancestors = new List<string>();
+        var ancestorsBuilder = ImmutableArray.CreateBuilder<string>();
         for (var operation = bodyOperation; operation != null; operation = operation.Parent)
-        { ancestors.Add(operation.Kind.ToString()); }
+        { ancestorsBuilder.Add(operation.Kind.ToString()); }
+        var ancestors = ancestorsBuilder.ToImmutable();
         var invocation = constructor.Initializer!.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var runtime = new AssemblyLoadContext("InitializerIntrinsicConstructorMatrixAudit", isCollectible: true);
         try

@@ -155,10 +155,10 @@ public sealed class CompilerCaptureRequestWorkflowTests
         var directory = CreateDirectory();
         try
         {
-            var identities = new List<string>();
+            var identitiesBuilder = ImmutableArray.CreateBuilder<string>();
             foreach (var (name, captured) in ImmutableArray.Create(("left", "left"), ("renamed", "renamed"), ("left", "right")))
             {
-                var path = Path.Combine(directory, "manifest-" + identities.Count + ".json");
+                var path = Path.Combine(directory, "manifest-" + identitiesBuilder.Count + ".json");
                 var request = path + ".request";
                 await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
                 var diagnostics = await AnalyzeAsync(path, request, source:
@@ -178,8 +178,9 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 var artifact = CompilerManifestArtifactJson.Deserialize(
                     await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
-                identities.Add(artifact.Manifest.Claims.Single().ClaimId);
+                identitiesBuilder.Add(artifact.Manifest.Claims.Single().ClaimId);
             }
+            var identities = identitiesBuilder.ToImmutable();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(identities[1], Is.EqualTo(identities[0]));

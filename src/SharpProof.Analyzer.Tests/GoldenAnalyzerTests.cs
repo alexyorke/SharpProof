@@ -35,7 +35,7 @@ public sealed class GoldenAnalyzerTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var rows = new List<string>();
+        var rows = ImmutableArray.CreateBuilder<string>();
         foreach (var syntax in tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
                      .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal))
         {
@@ -56,7 +56,7 @@ public sealed class GoldenAnalyzerTests
             var gaps = result.Gaps.IsEmpty ? "none" : string.Join(",", result.Gaps);
             rows.Add($"{syntax.Identifier.ValueText} accepted={(result.Accepted ? "true" : "false")} gaps={gaps} return=[{bounds.LowerBound},{bounds.UpperBound}]");
         }
-        return string.Join('\n', rows);
+        return string.Join('\n', rows.ToImmutable());
     }
     internal static string FormatDiagnostics(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {

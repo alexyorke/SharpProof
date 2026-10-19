@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -18,8 +19,9 @@ public sealed class AnalyzerCoreEffectCoverageTests
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
-        var outcome = EffectContractDiagnostics.Analyze(method, declaration, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var outcome = EffectContractDiagnostics.Analyze(method, declaration, session, diagnosticsBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnostics = diagnosticsBuilder.ToImmutable();
         Assert.That(outcome, Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
         Assert.That(diagnostics, Is.Empty);
     }

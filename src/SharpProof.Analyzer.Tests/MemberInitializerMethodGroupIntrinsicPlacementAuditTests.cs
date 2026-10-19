@@ -61,8 +61,8 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
         var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
             .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToImmutableArray();
         Assert.That(variables, Has.Length.EqualTo(2));
-        var expectedDiagnostics = new List<string>();
-        var bindings = new List<string>();
+        var expectedDiagnosticsBuilder = ImmutableArray.CreateBuilder<string>();
+        var bindingsBuilder = ImmutableArray.CreateBuilder<string>();
         foreach (var variable in variables)
         {
             var field = model.GetDeclaredSymbol(variable) as IFieldSymbol;
@@ -119,15 +119,17 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(((GenericNameSyntax)member.Name).TypeArgumentList.Arguments.Single().ToString(), Is.EqualTo("int"));
             Assert.That(member.SyntaxTree, Is.SameAs(tree));
             Assert.That(methodReference.Syntax.Span, Is.EqualTo(variable.Initializer!.Value.Span));
-            bindings.Add($"{field.Name}|owner={field}|root={initializer.Kind}|operation={methodReference.Kind}|" +
+            bindingsBuilder.Add($"{field.Name}|owner={field}|root={initializer.Kind}|operation={methodReference.Kind}|" +
                 $"delegate={creation.Type}|method={method}|apiAssembly={method.ContainingAssembly.Identity}|span={member.Span}");
             if (intrinsic)
             {
-                expectedDiagnostics.Add($"SP0024|Error|{filePath}|{member.Span}|" +
+                expectedDiagnosticsBuilder.Add($"SP0024|Error|{filePath}|{member.Span}|" +
                     $"SharpProof contract 'Contract.{expectedName}' has invalid argument '<placement>': " +
                     "expected use inside Contract.Ensures");
             }
         }
+        var expectedDiagnostics = expectedDiagnosticsBuilder.ToImmutable();
+        var bindings = bindingsBuilder.ToImmutable();
         var image = AnalyzerTestHost.EmitImage(compilation);
         var runtimeBinding = VerifyConstructionAndDelegates(image, intrinsic);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");

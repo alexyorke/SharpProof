@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -82,13 +83,13 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = GetIntrinsicInvocations(root, model, compilation);
         Assert.That(invocations, Has.Length.EqualTo(4));
-        var owners = new List<IMethodSymbol>();
+        var ownersBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
         foreach (var invocation in invocations)
         {
             var operation = GetInvocationFromFieldInitializer(invocation, model);
             var owner = AssertIntrinsicCallableAndFieldOwner(
                 invocation, operation!, model, compilation);
-            owners.Add(owner);
+            ownersBuilder.Add(owner);
             Assert.That(GetOwnEnsuresContexts(operation!, owner, model, compilation),
                 Has.Length.EqualTo(1));
             var callable = GetNearestCallable(operation!);
@@ -101,6 +102,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
             Assert.That(body, Is.Not.Null);
             AssertDirectEnsuresPrologue(body!, owner, model, compilation);
         }
+        var owners = ownersBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(owners.Count(static owner =>
