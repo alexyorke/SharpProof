@@ -23,11 +23,11 @@ $created = $Timestamp.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalizatio
 $scope = 'Shipped package payload only: reviewed third-party components, archive hashes, and packaged binary hashes. Excludes SDK/build tools and dependencies not redistributed in these archives; no claim of a complete source/dependency SBOM.'
 $artifacts = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($identitySet.Identities | ForEach-Object {
             if ($_.File.Name -cnotmatch '^[A-Za-z0-9_.+-]+\.(?:nupkg|snupkg)$') { throw 'Unsafe release package filename.' }
-            [ordered]@{
+            ([ordered]@{
                 fileName = $_.File.Name; packageId = $_.Identity.Id; version = $_.Identity.Version
                 kind = $_.File.Extension.TrimStart('.'); bytes = $_.File.Length
                 sha256 = (Get-FileHash -LiteralPath $_.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            }
+            }).AsReadOnly()
         }))
 $namespaceInput = $RepositoryCommit + $inventoryDigest + $created + (($artifacts | ForEach-Object sha256) -join '')
 $namespaceDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($namespaceInput))).ToLowerInvariant()
@@ -40,13 +40,13 @@ $archiveIdBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[s
 for ($index = 0; $index -lt $artifacts.Count; $index++) {
     $artifact = $artifacts[$index]
     $id = "SPDXRef-Artifact-$index"
-    $packages.Add([ordered]@{
-            SPDXID = $id; name = $artifact.fileName; versionInfo = $artifact.version
-            downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
-            licenseConcluded = 'NOASSERTION'; licenseDeclared = 'NOASSERTION'; copyrightText = 'NOASSERTION'
-            checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $artifact.sha256 })
-        })
-    $relationships.Add([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $id })
+    $packages.Add(([ordered]@{
+                SPDXID = $id; name = $artifact.fileName; versionInfo = $artifact.version
+                downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
+                licenseConcluded = 'NOASSERTION'; licenseDeclared = 'NOASSERTION'; copyrightText = 'NOASSERTION'
+                checksums = [Collections.Immutable.ImmutableArray]::Create[object](([ordered]@{ algorithm = 'SHA256'; checksumValue = $artifact.sha256 }).AsReadOnly())
+            }).AsReadOnly())
+    $relationships.Add(([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $id }).AsReadOnly())
     if ($artifact.kind -ceq 'nupkg') { $archiveIdBuilder[$artifact.packageId] = $id }
 }
 $archiveIds = $archiveIdBuilder.ToImmutable()
@@ -61,20 +61,20 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
             $componentId = "SPDXRef-Component-$componentIndex"
             $componentIndex++
             $license = [string]$component.license
-            $packages.Add([ordered]@{
-                    SPDXID = $componentId; name = [string]$component.id; versionInfo = [string]$component.version
-                    downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
-                    licenseConcluded = 'NOASSERTION'; licenseDeclared = $license; copyrightText = 'NOASSERTION'
-                    sourceInfo = if ($component.Contains('source')) { [string]$component.source } else { 'Source and version as recorded in the reviewed third-party inventory.' }
-                })
+            $packages.Add(([ordered]@{
+                        SPDXID = $componentId; name = [string]$component.id; versionInfo = [string]$component.version
+                        downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
+                        licenseConcluded = 'NOASSERTION'; licenseDeclared = $license; copyrightText = 'NOASSERTION'
+                        sourceInfo = if ($component.Contains('source')) { [string]$component.source } else { 'Source and version as recorded in the reviewed third-party inventory.' }
+                    }).AsReadOnly())
             if ($license.StartsWith('LicenseRef-', [StringComparison]::Ordinal)) {
                 if (-not $extractedLicenseBuilder.ContainsKey($license)) { $extractedLicenseOrder.Add($license) }
-                $extractedLicenseBuilder[$license] = [ordered]@{
-                    licenseId = $license; name = 'Complete distributed third-party notice bundle'
-                    extractedText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../../THIRD-PARTY-NOTICES.txt'))
-                }
+                $extractedLicenseBuilder[$license] = ([ordered]@{
+                        licenseId = $license; name = 'Complete distributed third-party notice bundle'
+                        extractedText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../../THIRD-PARTY-NOTICES.txt'))
+                    }).AsReadOnly()
             }
-            $relationships.Add([ordered]@{ spdxElementId = $archiveIds[$packageId]; relationshipType = 'CONTAINS'; relatedSpdxElement = $componentId })
+            $relationships.Add(([ordered]@{ spdxElementId = $archiveIds[$packageId]; relationshipType = 'CONTAINS'; relatedSpdxElement = $componentId }).AsReadOnly())
             foreach ($entryPath in @($component.entries | Sort-Object -CaseSensitive)) {
                 if (-not $entryIds.ContainsKey($entryPath)) {
                     $stream = $archive.GetEntry($entryPath).Open()
@@ -82,16 +82,16 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
                     finally { $stream.Dispose() }
                     $entryId = "SPDXRef-File-$($binaryFiles.Count)"
                     $entryIds[$entryPath] = $entryId
-                    $binaryFiles.Add([ordered]@{
-                            SPDXID = $entryId; fileName = "./$packageId/$entryPath"
-                            checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $digest })
-                            licenseConcluded = 'NOASSERTION'; copyrightText = 'NOASSERTION'
-                        })
-                    $relationships.Add([ordered]@{ spdxElementId = $archiveIds[$packageId]; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryId })
+                    $binaryFiles.Add(([ordered]@{
+                                SPDXID = $entryId; fileName = "./$packageId/$entryPath"
+                                checksums = [Collections.Immutable.ImmutableArray]::Create[object](([ordered]@{ algorithm = 'SHA256'; checksumValue = $digest }).AsReadOnly())
+                                licenseConcluded = 'NOASSERTION'; copyrightText = 'NOASSERTION'
+                            }).AsReadOnly())
+                    $relationships.Add(([ordered]@{ spdxElementId = $archiveIds[$packageId]; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryId }).AsReadOnly())
                 }
-                $relationships.Add([ordered]@{ spdxElementId = $componentId; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryIds[$entryPath] })
+                $relationships.Add(([ordered]@{ spdxElementId = $componentId; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryIds[$entryPath] }).AsReadOnly())
                 if ($component.Contains('linkage') -and $component.linkage -ceq 'static') {
-                    $relationships.Add([ordered]@{ spdxElementId = $entryIds[$entryPath]; relationshipType = 'STATIC_LINK'; relatedSpdxElement = $componentId })
+                    $relationships.Add(([ordered]@{ spdxElementId = $entryIds[$entryPath]; relationshipType = 'STATIC_LINK'; relatedSpdxElement = $componentId }).AsReadOnly())
                 }
             }
         }
@@ -101,24 +101,25 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
 $extractedLicenseSnapshot = $extractedLicenseBuilder.ToImmutable()
 $extractedLicenses = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($license in $extractedLicenseOrder.ToImmutable()) { $extractedLicenses.Add($extractedLicenseSnapshot[$license]) }
-$sbom = [ordered]@{
+$sbomBuilder = [ordered]@{
     spdxVersion = 'SPDX-2.3'; dataLicense = 'CC0-1.0'; SPDXID = 'SPDXRef-DOCUMENT'
     name              = "SharpProof $($identitySet.Version) shipped payload"
     documentNamespace = "https://github.com/alexyorke/SharpProof/sbom/$RepositoryCommit/$namespaceDigest"
-    creationInfo      = [ordered]@{ created = $created; creators = @('Tool: SharpProof release evidence exporter') }
-    comment = $scope; packages = @($packages.ToImmutable()); files = @($binaryFiles.ToImmutable())
-    relationships     = @($relationships.ToImmutable())
+    creationInfo      = ([ordered]@{ created = $created; creators = [Collections.Immutable.ImmutableArray]::Create[string]('Tool: SharpProof release evidence exporter') }).AsReadOnly()
+    comment = $scope; packages = $packages.ToImmutable(); files = $binaryFiles.ToImmutable()
+    relationships     = $relationships.ToImmutable()
 }
-if ($extractedLicenses.Count -gt 0) { $sbom.hasExtractedLicensingInfos = @($extractedLicenses.ToImmutable()) }
+if ($extractedLicenses.Count -gt 0) { $sbomBuilder.hasExtractedLicensingInfos = $extractedLicenses.ToImmutable() }
+$sbom = $sbomBuilder.AsReadOnly()
 [IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($OutputDirectory)) | Out-Null
 $sbomPath = Join-Path $OutputDirectory 'sbom.spdx.json'
 $sbom | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $sbomPath -Encoding utf8NoBOM
-$manifest = [ordered]@{
-    schemaVersion = 1; repository = 'alexyorke/SharpProof'; repositoryCommit = $RepositoryCommit
-    packageVersion = $identitySet.Version; createdUtc = $created; scope = $scope
-    inventorySha256 = $inventoryDigest; artifacts = @($artifacts)
-    sbom = [ordered]@{ fileName = 'sbom.spdx.json'; sha256 = (Get-FileHash -LiteralPath $sbomPath -Algorithm SHA256).Hash.ToLowerInvariant() }
-}
+$manifest = ([ordered]@{
+        schemaVersion = 1; repository = 'alexyorke/SharpProof'; repositoryCommit = $RepositoryCommit
+        packageVersion = $identitySet.Version; createdUtc = $created; scope = $scope
+        inventorySha256 = $inventoryDigest; artifacts = $artifacts
+        sbom = ([ordered]@{ fileName = 'sbom.spdx.json'; sha256 = (Get-FileHash -LiteralPath $sbomPath -Algorithm SHA256).Hash.ToLowerInvariant() }).AsReadOnly()
+    }).AsReadOnly()
 $manifestPath = Join-Path $OutputDirectory 'release-manifest.json'
 $manifest | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
 $checksumBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
