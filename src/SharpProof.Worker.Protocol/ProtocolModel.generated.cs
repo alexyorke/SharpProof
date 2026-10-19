@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "16";
+    public const string Current = "17";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 18;
+    public const int Current = 19;
 }
 
 public static class WorkerManifestVersions
@@ -169,7 +169,7 @@ public static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 1;
+    public const int Program = 2;
     public const int MaximumExpressionBytes = 1024 * 1024;
 }
 
@@ -205,8 +205,27 @@ public sealed class WorkerResourceBoundEvidence
     public string? ObservedLowerBound { get; set; }
     [JsonRequired]
     public string? EvaluatedUpperBound { get; set; }
+    [JsonRequired]
+    public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; set; } = [];
 }
 
+public sealed class WorkerResourceMetadataAssumption
+{
+    [JsonRequired]
+    public string AssumptionId { get; set; } = string.Empty;
+    [JsonRequired]
+    public string WitnessIdentifier { get; set; } = string.Empty;
+    [JsonRequired]
+    public string CatalogSha256 { get; set; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceAssembly { get; set; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceSha256 { get; set; } = string.Empty;
+    [JsonRequired]
+    public string RuntimeModel { get; set; } = string.Empty;
+    [JsonRequired]
+    public string EvidenceSource { get; set; } = string.Empty;
+}
 public sealed class WorkerSourceLocation
 {
     [JsonRequired]

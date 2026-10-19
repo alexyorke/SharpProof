@@ -18,11 +18,18 @@ public sealed class NativeResourceContractTests
         return "using SharpProof.Attributes; public static class C { " + attributes + " public static void Target(int n, int[] values) { " + body + " } }";
     }
 
-    private static CompilerManifestArtifact CreateArtifact(string source)
+    private static CompilerManifestArtifact CreateArtifact(string source, bool reviewedRuntime = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var initial = TestCompilation.Create("ResourceContract", ("Subject.cs", source));
+        if (reviewedRuntime)
+        {
+            const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
+            initial = initial.WithReferences(Directory.GetFiles(references, "*.dll")
+                .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
+                .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)));
+        }
         var trees = initial.SyntaxTrees.Select(tree => tree is null ? throw new ArgumentNullException(nameof(tree)) :
             CSharpSyntaxTree.ParseText(tree.GetText(cancellation), ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>()), tree.FilePath, cancellationToken: cancellation));
         var compilation = initial.RemoveAllSyntaxTrees().AddSyntaxTrees(trees);
@@ -334,5 +341,132 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
         Assert.That(result.EffectWitness, Is.Null);
+    }
+    [TestCase("Min")]
+    [TestCase("Max")]
+    public async Task ReviewedMetadataCostsRequireDeclaredOwnedReferenceEvidence(string method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
+            $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true));
+        Assert.That(preparation.Compilation.References, Is.Empty);
+        Assert.That(preparation.Compilation.ResourceMetadataReferences, Has.Length.EqualTo(1));
+        Assert.That(preparation.Compilation.ResourceMetadataReferences[0].Identity, Is.EqualTo(preparation.ResourceProgram!.Metadata!.AssemblyIdentity));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var metadata = result.ResourceBound!.MetadataAssumptions.Single();
+        Assert.That(metadata.WitnessIdentifier, Is.EqualTo(method == "Min" ? "bcl.math.min.int32-int32" : "bcl.math.max.int32-int32"));
+        Assert.That(metadata.RuntimeModel, Is.EqualTo("net8.0.32"));
+        Assert.That(metadata.EvidenceSource, Does.Contain("b9a49e4a6d3a444a3685e318c74a7892d01873f7"));
+        Assert.That(metadata.CatalogSha256, Has.Length.EqualTo(64));
+        Assert.That(metadata.ReferenceSha256, Has.Length.EqualTo(64));
+        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == metadata.AssumptionId).Used, Is.True);
+    }
+
+    [Test]
+    public async Task RefutedResourceClaimsRetainReviewedMetadataDependencies()
+    {
+        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
+            "var values2=new int[1]; int value=System.Math.Max(n,0);"), reviewedRuntime: true));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("1"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("0"));
+        var dependency = result.ResourceBound.MetadataAssumptions.Single();
+        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId).Used, Is.True);
+    }
+    [Test]
+    public async Task MetadataCostSummaryDoesNotSupplyAnExactExecutionValue()
+    {
+        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
+            "int value=System.Math.Max(n,0); var values2=new int[1];"), reviewedRuntime: true));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
+    [TestCase("undeclared")]
+    [TestCase("foreign-owner")]
+    [TestCase("missing-reference")]
+    [TestCase("invalid-reference-hash")]
+    [TestCase("conflicting-reference")]
+    [TestCase("wrong-target-framework")]
+    [TestCase("null-references")]
+    [TestCase("null-reference")]
+    [TestCase("missing-module")]
+    [TestCase("unreviewed-catalog")]
+    [TestCase("unreviewed-method")]
+    [TestCase("wrong-runtime")]
+    public async Task UnboundMetadataCannotSupplyNativeNumericEvidence(string corruption)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]", "int value=System.Math.Max(n,0);"), reviewedRuntime: true));
+        var reference = preparation.ResourceProgram!.Metadata!;
+        switch (corruption)
+        {
+            case "undeclared":
+                preparation.Entry.Assumptions = [];
+                break;
+            case "foreign-owner":
+                preparation.Entry.Assumptions.Single().Id = "foreign";
+                break;
+            case "missing-reference":
+                preparation = preparation with { Compilation = new CompilerCompilationSnapshot() };
+                break;
+            case "wrong-target-framework":
+                preparation.Compilation.TargetFramework = "net10.0";
+                break;
+            case "null-references":
+                preparation.Compilation.ResourceMetadataReferences = null!;
+                break;
+            case "null-reference":
+                preparation.Compilation.ResourceMetadataReferences = [null!];
+                break;
+            case "missing-module":
+                preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity).Modules = [];
+                break;
+            case "conflicting-reference":
+                preparation.Compilation.ResourceMetadataReferences = [.. preparation.Compilation.ResourceMetadataReferences, new CompilerReferenceSnapshot {
+                    Kind = "Assembly", Identity = reference.AssemblyIdentity,
+                    Modules = [new CompilerReferenceModuleSnapshot { Sha256 = new string('0',64) }]
+                }];
+                break;
+            case "invalid-reference-hash":
+                preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity).Modules[0].Sha256 = "invalid";
+                break;
+            default:
+                preparation = preparation with
+                {
+                    ResourceProgram = ResourceProgram.MetadataCall(new ResourceMetadataReference(
+                        corruption == "unreviewed-method" ? "bcl.math.abs.int32" : reference.WitnessIdentifier,
+                        corruption == "unreviewed-catalog" ? new string('0', 64) : reference.CatalogSha256,
+                        corruption == "wrong-runtime" ? reference.AssemblyIdentity.Replace("8.0.0.0", "10.0.0.0", StringComparison.Ordinal) : reference.AssemblyIdentity))
+                };
+                break;
+        }
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+    }
+
+    [Test]
+    public async Task MetadataDependenciesInSourceCalleesBindToTheRootCallable()
+    {
+        var preparation = Read(CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0)]
+                public static void Target(int n) { int value=Leaf(n); }
+                static int Leaf(int n) => System.Math.Min(n,0)+System.Math.Max(n,0);
+            }
+            """, reviewedRuntime: true));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.MetadataAssumptions, Has.Length.EqualTo(2));
+        Assert.That(result.Assumptions.Count(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used), Is.EqualTo(2));
     }
 }

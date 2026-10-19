@@ -20,6 +20,8 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(first.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
+            first.ClaimResults.Single().Reason + ": " + first.ClaimResults.Single().ResourceBound?.UnknownReason);
         AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
         AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
         Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
@@ -90,6 +92,60 @@ public sealed partial class WorkerTests
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
         claim.EffectWitness.Kind = "resource-bound-exceeded";
         claim.ResourceBound = null;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+    }
+    [Test]
+    public async Task ReviewedResourceMetadataReachesValidatedCacheAndSarifConsumers()
+    {
+        using var project = TestProject.Create("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0)]
+                public static void Target(int n) { int value=System.Math.Max(n,0); }
+            }
+            """);
+        project.UseNetCoreReferencePack(8);
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(first.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
+            first.ClaimResults.Single().Reason + ": " + first.ClaimResults.Single().ResourceBound?.UnknownReason);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+            second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
+        var result = second.ClaimResults.Single();
+        var metadata = result.ResourceBound!.MetadataAssumptions.Single();
+        Assert.That(metadata.WitnessIdentifier, Is.EqualTo("bcl.math.max.int32-int32"));
+        Assert.That(metadata.RuntimeModel, Is.EqualTo("net8.0.32"));
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
+        var witness = metadata.WitnessIdentifier;
+        metadata.WitnessIdentifier = "bcl.math.abs.int32";
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        metadata.WitnessIdentifier = witness;
+        var runtime = metadata.RuntimeModel;
+        metadata.RuntimeModel = "net10.0";
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        metadata.RuntimeModel = runtime;
+        var assembly = metadata.ReferenceAssembly;
+        metadata.ReferenceAssembly = "foreign";
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        metadata.ReferenceAssembly = assembly;
+        var hash = metadata.ReferenceSha256;
+        metadata.ReferenceSha256 = "invalid";
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        metadata.ReferenceSha256 = hash;
+        var assumption = result.Assumptions.Single(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == metadata.AssumptionId);
+        assumption.Used = false;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        assumption.Used = true;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+        result.ResourceBound.MetadataAssumptions = [];
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
     }
 }

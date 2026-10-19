@@ -15,7 +15,15 @@ internal static class NativeResourceContractVerifier
         {
             var limit = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
                 target.Entry.CallableId, target.Total!, cancellation);
-            return await NativeResourceViolationReplay.FindAsync(target, claim, limit, budgets, cancellation).ConfigureAwait(false) ?? result;
+            var violation = await NativeResourceViolationReplay.FindAsync(target, claim, limit, budgets, cancellation).ConfigureAwait(false);
+            if (violation is null)
+            { return result; }
+            var metadata = new NativeResourceMetadataBinding(target);
+            var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, cancellation);
+            if (!check.Verified)
+            { return result; }
+            metadata.Project(violation);
+            return violation;
         }
         catch (ResourceExpressionLimitException)
         {
@@ -46,7 +54,8 @@ internal static class NativeResourceContractVerifier
         try
         {
             var limit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, owner, cancellation);
-            var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, cancellation);
+            var metadata = new NativeResourceMetadataBinding(target);
+            var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, metadata.Bind, cancellation);
             if (!check.Verified)
             { return Unknown(check.UnknownReason ?? "ResourceProofUnavailable", WorkerClaimReason.UnsupportedBody); }
             var upper = constraint.Metric switch
@@ -64,6 +73,7 @@ internal static class NativeResourceContractVerifier
             result.ProofCore = ["native-resource:" + claim.ClaimId,
                 "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram, cancellation))];
             result.ResourceBound = Evidence(upper.ToDisplayString(), null);
+            metadata.Project(result);
             return result;
         }
         catch (InvalidDataException) { return Unknown("MalformedResourceEvidence", WorkerClaimReason.UnsupportedContract); }

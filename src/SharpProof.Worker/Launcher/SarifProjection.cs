@@ -140,6 +140,11 @@ internal static class SarifProjection
                     ? " [" + bound.Metric + " observed prefix: " + observed + " > " + bound.EvaluatedUpperBound + "; " + bound.CostModel + "]"
                     : " [resource: " + bound.UnknownReason + "]"
             : string.Empty;
+        if (result.ResourceBound?.MetadataAssumptions is { Length: > 0 } metadata)
+        {
+            resource += " [conditional resource metadata: " + string.Join(", ", metadata.Select(static item =>
+                item is null ? throw new ArgumentNullException(nameof(item)) : item.RuntimeModel + "/" + item.WitnessIdentifier)) + "]";
+        }
         var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
         return Result(
             "SharpProof." + outcome,

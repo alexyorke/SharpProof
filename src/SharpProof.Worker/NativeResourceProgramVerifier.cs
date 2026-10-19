@@ -26,11 +26,20 @@ internal static class NativeResourceProgramVerifier
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
         owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        return Verify(program, callableId, owner, null, cancellation);
+    }
+
+    internal static NativeResourceProgramCheck Verify(ResourceProgram program, string callableId,
+        CompilerTotalCallablePreparation owner, Func<ResourceMetadataReference, bool>? bindMetadata, CancellationToken cancellation)
+    {
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
         cancellation.ThrowIfCancellationRequested();
         try
         {
             ResourceExpressionOwnership.Validate(ResourceExpression.Zero, callableId, owner, cancellation);
-            return new(Visit(program, callableId, owner, cancellation), null);
+            return new(Visit(program, callableId, owner, bindMetadata, cancellation), null);
         }
         catch (InvalidDataException exception)
         { return new(null, exception.Message); }
@@ -39,7 +48,7 @@ internal static class NativeResourceProgramVerifier
     }
 
     private static NativeResourceCost Visit(ResourceProgram program, string callableId,
-        CompilerTotalCallablePreparation owner, CancellationToken cancellation)
+        CompilerTotalCallablePreparation owner, Func<ResourceMetadataReference, bool>? bindMetadata, CancellationToken cancellation)
     {
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
@@ -49,6 +58,10 @@ internal static class NativeResourceProgramVerifier
         {
             case ResourceProgramKind.MetadataBoundary:
                 throw new InvalidDataException("ResourceMetadataAssumptionsNotBound");
+            case ResourceProgramKind.MetadataCall:
+                if (program.Metadata is not { } metadata || bindMetadata?.Invoke(metadata) != true)
+                { throw new InvalidDataException("ResourceMetadataAssumptionsNotBound"); }
+                return Zero;
             case ResourceProgramKind.Zero:
                 return Zero;
             case ResourceProgramKind.AllocateArray:
@@ -57,8 +70,8 @@ internal static class NativeResourceProgramVerifier
                 return new(ResourceExpression.Zero, ResourceExpression.One, length);
             case ResourceProgramKind.Sequence:
             case ResourceProgramKind.Choice:
-                var left = Visit(program.Children[0], callableId, owner, cancellation);
-                var right = Visit(program.Children[1], callableId, owner, cancellation);
+                var left = Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
+                var right = Visit(program.Children[1], callableId, owner, bindMetadata, cancellation);
                 return program.Kind == ResourceProgramKind.Sequence
                     ? new(ResourceExpression.Add(left.LoopEntries, right.LoopEntries), ResourceExpression.Add(left.Arrays, right.Arrays), ResourceExpression.Add(left.Elements, right.Elements))
                     : new(ResourceExpression.Max(left.LoopEntries, right.LoopEntries), ResourceExpression.Max(left.Arrays, right.Arrays), ResourceExpression.Max(left.Elements, right.Elements));
@@ -71,7 +84,7 @@ internal static class NativeResourceProgramVerifier
                     (rank.Kind is not (ResourceLoopKind.DecreasingSubtract or ResourceLoopKind.DecreasingDivide) || rank.Limit.Constant != 0))
                 { throw new InvalidDataException("UnsupportedResourceRecurrence"); }
                 var count = CheckRank(rank, cancellation);
-                var body = Visit(program.Children[0], callableId, owner, cancellation);
+                var body = Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
                 var entries = program.RepeatKind == ResourceRepeatKind.Loop ? ResourceExpression.Add(ResourceExpression.One, body.LoopEntries) : body.LoopEntries;
                 return new(ResourceExpression.Multiply(count, entries), ResourceExpression.Multiply(count, body.Arrays), ResourceExpression.Multiply(count, body.Elements));
             default:

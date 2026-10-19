@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
 
@@ -32,10 +32,11 @@ internal sealed class ResourceLoopRank
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 1;
+    internal const int ModelVersion = 2;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceLoopRank? Rank { get; }
+    internal ResourceMetadataReference? Metadata { get; }
     internal ResourceRepeatKind RepeatKind { get; }
     internal ImmutableArray<ResourceProgram> Children { get; }
     internal int NodeCount { get; }
@@ -44,13 +45,14 @@ internal sealed class ResourceProgram
     internal static ResourceProgram MetadataBoundary { get; } = new(ResourceProgramKind.MetadataBoundary, null, null, default, []);
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
-        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children)
+        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
         Kind = kind;
         Length = length;
         Rank = rank;
+        Metadata = metadata;
         RepeatKind = repeatKind;
         Children = children;
         var nodes = 1 + (length?.NodeCount ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
@@ -67,6 +69,12 @@ internal sealed class ResourceProgram
         { throw new ResourceExpressionLimitException(); }
         NodeCount = nodes;
         Depth = depth;
+    }
+
+    internal static ResourceProgram MetadataCall(ResourceMetadataReference metadata)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        return new(ResourceProgramKind.MetadataCall, null, null, default, [], metadata);
     }
 
     internal static ResourceProgram Array(ResourceExpression length)

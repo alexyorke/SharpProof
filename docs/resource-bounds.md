@@ -119,8 +119,18 @@ catalog digest. The digest binds the resource declarations, cost model, reviewed
 runtime, source identity, and approved API-specification content. Conditional
 diagnostics explicitly say "under recorded metadata assumptions". This is an
 assumption about the target implementation, not a claim that the analyzer has
-inspected the consumer's eventual deployment runtime. Native runtime compatibility
-checking remains part of the full roadmap.
+inspected the consumer's eventual deployment runtime. The native worker binds
+these declarations to the owning callable, its declared trusted assumptions,
+the .NET 8 target framework, and the captured reference assembly identity and
+SHA-256 digest. Native result records expose the witness, catalog digest,
+reference identity/hash, reviewed runtime model, and pinned source URL; SARIF
+labels the result as conditional on resource metadata. Missing, conflicting,
+or incompatible reference evidence produces Unknown. Deployment compatibility
+with the declared implementation remains an explicit assumption. The existing
+strict profile reports these trusted dependencies as SP0048 errors even when
+all resource claims are Proven. With native verification explicitly enabled
+(`SharpProofVerify=true`), the advisory profile records the assumption without
+failing the build.
 
 Results are conservative structural proofs over compiler-bound operations, not
 pattern guesses, benchmarks, Z3 worker results, or native-worker claim records.

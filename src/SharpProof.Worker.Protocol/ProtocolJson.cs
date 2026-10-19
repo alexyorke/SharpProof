@@ -748,6 +748,8 @@ public static partial class WorkerProtocolJson
             evidence.ExpressionModel != WorkerResourceModels.Expression || evidence.ProgramModel != WorkerResourceModels.Program ||
             evidence.DeclaredBoundSha256 != ComputeSha256(resource.UpperBound))
         { return false; }
+        if (!HasValidResourceMetadata(claim!, value, evidence))
+        { return false; }
         return value.Outcome switch
         {
             WorkerClaimOutcome.Proven => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
@@ -758,6 +760,49 @@ public static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceMetadata(WorkerClaimManifestEntry claim, WorkerClaimResult result, WorkerResourceBoundEvidence evidence)
+    {
+        claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
+        result = ArgumentNullGuard.NotNull(result, nameof(result));
+        evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
+        if (evidence.MetadataAssumptions is not { Length: <= 16 } metadata || result.Assumptions is null)
+        { return false; }
+        var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used &&
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary && assumption.Id.StartsWith("resource-metadata-", StringComparison.Ordinal))
+            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id)
+            , StringComparer.Ordinal);
+        if (metadata.Length != used.Count || result.Outcome == WorkerClaimOutcome.Unknown && metadata.Length != 0)
+        { return false; }
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var dependency in metadata)
+        {
+            if (dependency is null || !IsResourceCatalogSha256(dependency.CatalogSha256) || !IsSha256(dependency.ReferenceSha256) ||
+                !ResourceMetadataText(dependency.WitnessIdentifier, 128) || !ResourceMetadataText(dependency.ReferenceAssembly, 512) ||
+                !ResourceMetadataText(dependency.RuntimeModel, 64) || !ResourceMetadataText(dependency.EvidenceSource, 1024) ||
+                !Uri.TryCreate(dependency.EvidenceSource, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length != 0)
+            { return false; }
+            var owner = ComputeSha256(Encoding.UTF8.GetBytes(claim.CallableId + "\n" + dependency.ReferenceAssembly)).ToUpperInvariant();
+            var expected = "resource-metadata-" + dependency.RuntimeModel + ":" + dependency.CatalogSha256 + ":" +
+                dependency.WitnessIdentifier + ":" + dependency.EvidenceSource + ":owner:" + owner;
+            if (dependency.AssumptionId != expected || !seen.Add(expected) || !used.Contains(expected))
+            { return false; }
+        }
+        return true;
+    }
+
+    // Resource catalog identities predate native evidence and use uppercase hex.
+    // Reference-image and other protocol digests keep their lowercase encoding.
+    private static bool IsResourceCatalogSha256(string? value)
+    {
+        return value is { Length: 64 } && value.All(static character => character is >= '0' and <= '9' or >= 'A' and <= 'F');
+    }
+    private static bool ResourceMetadataText(string? value, int maximum)
+    {
+        if (value is null)
+        { return false; }
+        return !string.IsNullOrWhiteSpace(value) && value.Length <= maximum && !value.Any(static character => char.IsControl(character));
+    }
+
     private static bool HasValidResourceViolation(WorkerResourceBoundEvidence evidence)
     {
         evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));

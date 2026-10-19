@@ -14,6 +14,36 @@ public sealed class ResourceExpressionBoundaryTests
         return ResourceExpression.InputSize(new ResourceInput(ordinal, ResourceInputKind.NonNegativeScalar, name, 1000));
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void MetadataIdentityRequiresEveryBoundedPrintableComponent(int component)
+    {
+        foreach (var invalid in new[] { "", " ", "bad\nidentity", new string('x', 513) })
+        {
+            Action construct = () => _ = new ResourceMetadataReference(component == 0 ? invalid : "witness",
+                component == 1 ? invalid : "catalog", component == 2 ? invalid : "assembly");
+            Assert.Throws<ArgumentException>(construct);
+        }
+        Action absent = () => _ = new ResourceMetadataReference(component == 0 ? null! : "witness",
+            component == 1 ? null! : "catalog", component == 2 ? null! : "assembly");
+        Assert.Throws<ArgumentNullException>(absent);
+    }
+
+    [Test]
+    public void MetadataLeafPreservesItsReferenceAndRejectsNull()
+    {
+        var reference = new ResourceMetadataReference("witness", "catalog", "assembly");
+        var program = ResourceProgram.MetadataCall(reference);
+        Assert.That(program.Kind, Is.EqualTo(ResourceProgramKind.MetadataCall));
+        Assert.That(program.Metadata, Is.SameAs(reference));
+        Assert.That(program.Children, Is.Empty);
+        Assert.That(reference.WitnessIdentifier, Is.EqualTo("witness"));
+        Assert.That(reference.CatalogSha256, Is.EqualTo("catalog"));
+        Assert.That(reference.AssemblyIdentity, Is.EqualTo("assembly"));
+        Action absent = () => ResourceProgram.MetadataCall(null!);
+        Assert.Throws<ArgumentNullException>(absent);
+    }
     [Test]
     public void InputDomainsAndLabelsHaveFiniteConstructionBudgets()
     {
@@ -97,8 +127,8 @@ public sealed class ResourceExpressionBoundaryTests
     public void DetachedProgramRecordsMustHaveInitializedNonNullChildren()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
-        Action missing = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, default(ImmutableArray<ResourceProgram>)]);
-        Action nullChild = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, ImmutableArray<ResourceProgram>.Empty.Add(null!)]);
+        Action missing = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, default(ImmutableArray<ResourceProgram>), null]);
+        Action nullChild = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, ImmutableArray<ResourceProgram>.Empty.Add(null!), null]);
         Assert.That(Assert.Throws<TargetInvocationException>(missing)!.InnerException, Is.TypeOf<ArgumentException>());
         Assert.That(Assert.Throws<TargetInvocationException>(nullChild)!.InnerException, Is.TypeOf<ArgumentException>());
     }

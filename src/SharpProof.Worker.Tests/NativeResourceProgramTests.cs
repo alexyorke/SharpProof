@@ -162,17 +162,17 @@ public sealed class NativeResourceProgramTests
         Assert.Throws<InvalidDataException>(decode);
     }
 
-    [TestCase("{\"kind\":99,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[]}")]
-    [TestCase("{\"kind\":0,\"kind\":0,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[]}")]
-    [TestCase("{\"kind\":0,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[],\"count\":0}")]
-    [TestCase("{\"kind\":0,\"length\":null,\"rank\":null,\"repeatKind\":1,\"children\":[]}")]
-    [TestCase("{\"kind\":0,\"length\":\"x\",\"rank\":null,\"repeatKind\":0,\"children\":[]}")]
-    [TestCase("{\"kind\":1,\"length\":\"!\",\"rank\":null,\"repeatKind\":0,\"children\":[]}")]
-    [TestCase("{\"kind\":2,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[]}")]
+    [TestCase("{\"kind\":99,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}")]
+    [TestCase("{\"kind\":0,\"kind\":0,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}")]
+    [TestCase("{\"kind\":0,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[],\"count\":0}")]
+    [TestCase("{\"kind\":0,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":1,\"children\":[]}")]
+    [TestCase("{\"kind\":0,\"length\":\"x\",\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}")]
+    [TestCase("{\"kind\":1,\"length\":\"!\",\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}")]
+    [TestCase("{\"kind\":2,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}")]
     public void MalformedTransportCannotSupplyAProducerVerdict(string node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        var payload = "{\"version\":1,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}";
+        var payload = "{\"version\":2,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}";
         Action decode = () => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(payload), TestContext.CurrentContext.CancellationToken);
         Assert.Throws<InvalidDataException>(decode);
     }
@@ -188,11 +188,11 @@ public sealed class NativeResourceProgramTests
     [Test]
     public void RawTransportBudgetIsCheckedBeforeZeroSequencesCollapse()
     {
-        const string zero = "{\"kind\":0,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[]}";
+        const string zero = "{\"kind\":0,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[]}";
         var node = zero;
         for (int level = 0; level < 12; level++)
-        { node = "{\"kind\":2,\"length\":null,\"rank\":null,\"repeatKind\":0,\"children\":[" + node + "," + node + "]}"; }
-        var payload = Encoding.UTF8.GetBytes("{\"version\":1,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}");
+        { node = "{\"kind\":2,\"length\":null,\"rank\":null,\"metadata\":null,\"repeatKind\":0,\"children\":[" + node + "," + node + "]}"; }
+        var payload = Encoding.UTF8.GetBytes("{\"version\":2,\"expressionModel\":1,\"costModel\":\"" + ResourceProgramCodec.CostModel + "\",\"program\":" + node + "}");
         Assert.That(payload.Length, Is.LessThan(ResourceProgramCodec.MaximumPayloadBytes));
         Action decode = () => ResourceProgramCodec.Decode(payload, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<InvalidDataException>(decode);
@@ -216,6 +216,34 @@ public sealed class NativeResourceProgramTests
         Action decode = () => ResourceProgramCodec.Decode(payload, new CancellationToken(true));
         Assert.Throws<OperationCanceledException>(encode);
         Assert.Throws<OperationCanceledException>(decode);
+    }
+    [TestCase("witness", "")]
+    [TestCase("catalog", " ")]
+    [TestCase("assembly", "")]
+    [TestCase("witness", "bad\nidentifier")]
+    [TestCase("extra", "unknown")]
+    public void MetadataTransportRejectsMalformedReferenceRecords(string field, string value)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(value);
+        var program = ResourceProgram.MetadataCall(new ResourceMetadataReference("reviewed", "digest", "assembly"));
+        var payload = ResourceProgramCodec.Encode(program, TestContext.CurrentContext.CancellationToken);
+        var root = JsonNode.Parse(payload)!.AsObject();
+        root["program"]!["metadata"]![field] = value;
+        Action decode = () => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(root.ToJsonString()), TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
+    [Test]
+    public void StructuredMetadataStillRequiresAnExplicitBindingAuthority()
+    {
+        var program = ResourceProgram.MetadataCall(new ResourceMetadataReference("reviewed", "digest", "assembly"));
+        var decoded = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, TestContext.CurrentContext.CancellationToken), TestContext.CurrentContext.CancellationToken);
+        Assert.That(decoded.Metadata!.AssemblyIdentity, Is.EqualTo("assembly"));
+        var result = Check(decoded);
+        Assert.That(result.Verified, Is.False);
+        Assert.That(result.Cost, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
     }
     [Test]
     public void ConditionalMetadataCannotSilentlyBecomeAnUnconditionalNativeProof()
@@ -298,7 +326,7 @@ public sealed class NativeResourceProgramTests
     public void UnknownDetachedProgramKindsCannotProducePartialCosts()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
-        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty]);
+        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null]);
         var result = Check(program);
         Assert.That(result.Verified, Is.False);
         Assert.That(result.Cost, Is.Null);

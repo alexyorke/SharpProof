@@ -72,6 +72,29 @@ internal static class CompilerManifestArtifactProducer
                 return artifact.AttachEffectEvidence(item);
             })];
         }
+        // Preserve only reference evidence actually needed by resource metadata
+        // leaves. General compiler reference snapshots remain build-time data.
+        var resourceAssemblies = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var callable in callables)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (callable.ResourceProgram is { } payload)
+            {
+                var pending = new Stack<ResourceProgram>();
+                pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken));
+                while (pending.Count > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var program = pending.Pop();
+                    if (program.Metadata is { } reference)
+                    { resourceAssemblies.Add(reference.AssemblyIdentity); }
+                    foreach (var child in program.Children)
+                    { pending.Push(child); }
+                }
+            }
+        }
+        snapshot.ResourceMetadataReferences = snapshot.References.Where(reference =>
+            reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToArray();
         var artifact = new CompilerManifestArtifact
         {
             SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],

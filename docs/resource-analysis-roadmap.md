@@ -50,7 +50,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] Native-worker derivation and checking of cumulative resource upper bounds.
 - [x] Exact-prefix numeric violations for array allocations and allocated elements.
 - [x] Exact source-loop-entry numeric violation evidence.
-- [ ] Bind native metadata cost assumptions and their provenance.
+- [x] Bind native metadata cost assumptions and their provenance.
 - [x] Protocol, manifest, schema and cache-identity integration.
 - [x] SARIF/result projection with independent claim outcomes and Unknown reasons.
 - [x] Reject malformed/unowned proof records; verify packaged consumer behavior.
@@ -442,3 +442,31 @@ pre-merge checkpoint; the remote merge is preserved in the published history.
 
 Integrated layout also passed: 2648 source files, 59 projects and 151 pinned
 common files.
+
+The completed coverage run for published `62aef3a092` changes the earlier CI
+status: all four coverage shards passed, but the aggregate gate failed. Changed
+trusted-code coverage was 1597/1660 lines (96.2%) against the unchanged 100%
+requirement, leaving 63 uncovered lines. This is an actual coverage gap, unlike
+the earlier cancelled aggregate runs. Coverage qualification remains open.
+
+The next implementation phase binds native metadata cost assumptions. Its closed
+program representation now carries catalog/method/reference identities; the
+compiler manifest declares callable-owned dependencies, and native results
+project the reviewed runtime/source and captured reference hash. The compiler
+artifact must preserve target-framework and reference-snapshot evidence across
+serialization. General compiler references remain excluded; only the subset
+used by resource metadata calls crosses the boundary. Protocol admission distinguishes the catalog's established
+uppercase digest encoding from lowercase reference-image hashes. Focused native/protocol/cache/SARIF/artifact checks passed 285 cases, the
+analyzer/collector checks passed 241 cases, and IR resource checks passed 40
+cases. The actual NuGet consumer passed three conditional Proven results,
+strict SP0048 rejection and explicitly enabled advisory verification, with
+provenance in JSON/SARIF. Exact execution replay still abstains after an
+unsupported metadata call; a cost summary does not supply concrete values.
+
+Metadata-phase quality categories, 10 architecture tests, documentation drift
+and 722 local links passed. Layout evaluated 2651 source files, 59 projects and
+151 pinned common files. Final spelling checked all 71 configured files with
+zero findings. A broad worker run caught the general-reference transport
+regression; the producer now emits only the resource-used reference subset,
+leaving general references excluded. The corrected full worker gate is running.
+All other unchecked roadmap items and final 100% coverage remain required.

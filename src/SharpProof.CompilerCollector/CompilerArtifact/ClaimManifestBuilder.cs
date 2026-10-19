@@ -390,6 +390,25 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
+        if (effects.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+            seed.Declaration is MethodDeclarationSyntax resourceDeclaration && seed.Model is { } resourceModel)
+        {
+            var body = resourceDeclaration.Body is { } block ? resourceModel.GetOperation(block, cancellationToken) :
+                resourceDeclaration.ExpressionBody is { } arrow ? resourceModel.GetOperation(arrow.Expression, cancellationToken) : null;
+            var resource = ResourceBoundsAnalysis.Analyze(target, body, cancellationToken);
+            if (resource.Bounds is { } bounds)
+            {
+                var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
+                CollectResourceAssumptions(bounds.Program, callableId, metadataIds);
+                assumptions = assumptions.AddRange(metadataIds.Select(static id => new WorkerAssumptionEvidence
+                {
+                    Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
+                    Kind = WorkerAssumptionKind.TrustedBoundary,
+                    Used = false
+                }));
+            }
+        }
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty)
         {
@@ -429,6 +448,17 @@ internal sealed partial class ClaimManifestBuilder(
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);
+    }
+
+    private static void CollectResourceAssumptions(ResourceProgram program, string callableId, SortedSet<string> ids)
+    {
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        ids = ArgumentNullGuard.NotNull(ids, nameof(ids));
+        if (program.Metadata is { } reference)
+        { ids.Add(ResourceMetadataCatalog.AssumptionId(callableId, reference)); }
+        foreach (var child in program.Children)
+        { CollectResourceAssumptions(child, callableId, ids); }
     }
 
     private ImmutableArray<ManifestClaim> CreatePostconditions(

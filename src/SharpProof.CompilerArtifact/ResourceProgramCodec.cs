@@ -60,6 +60,17 @@ internal static class ResourceProgramCodec
         }
         else
         { writer.WriteNullValue(); }
+        writer.WritePropertyName("metadata");
+        if (program.Metadata is { } metadata)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("witness", metadata.WitnessIdentifier);
+            writer.WriteString("catalog", metadata.CatalogSha256);
+            writer.WriteString("assembly", metadata.AssemblyIdentity);
+            writer.WriteEndObject();
+        }
+        else
+        { writer.WriteNullValue(); }
         writer.WriteNumber("repeatKind", (int)program.RepeatKind);
         writer.WriteStartArray("children");
         foreach (var child in program.Children)
@@ -98,7 +109,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "rank", "repeatKind", "children");
+        Fields(node, "kind", "length", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -106,14 +117,22 @@ internal static class ResourceProgramCodec
         if (!Enum.IsDefined(typeof(ResourceRepeatKind), repeat) || kind != ResourceProgramKind.Repeat && repeat != ResourceRepeatKind.Loop)
         { throw new InvalidDataException("Resource repeat kind is invalid."); }
         var children = node.GetProperty("children");
-        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.MetadataBoundary ? 0 : kind == ResourceProgramKind.Repeat ? 1 : 2;
+        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind == ResourceProgramKind.Repeat ? 1 : 2;
         if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() != arity)
         { throw new InvalidDataException("Resource program arity is invalid."); }
         var length = node.GetProperty("length");
         var rank = node.GetProperty("rank");
+        var metadataNode = node.GetProperty("metadata");
         if (kind != ResourceProgramKind.AllocateArray && length.ValueKind != JsonValueKind.Null ||
-            kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null)
+            kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
+            kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
+        if (kind == ResourceProgramKind.MetadataCall)
+        {
+            Fields(metadataNode, "witness", "catalog", "assembly");
+            return ResourceProgram.MetadataCall(new ResourceMetadataReference(Text(metadataNode.GetProperty("witness")),
+                Text(metadataNode.GetProperty("catalog")), Text(metadataNode.GetProperty("assembly"))));
+        }
         if (kind == ResourceProgramKind.MetadataBoundary)
         { return ResourceProgram.MetadataBoundary; }
         if (kind == ResourceProgramKind.Zero)

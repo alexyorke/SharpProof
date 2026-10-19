@@ -3579,4 +3579,49 @@ public sealed class PackageLayoutSmokeTests
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Refuted");
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("LoopBodyEntries observed prefix: 3 > 2"));
     }
+    [Test]
+    public async Task MainPackageProvesReviewedMetadataCostsWithExplicitAssumptionProvenance()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0)]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]
+                public static void Target(int n) { int value=System.Math.Max(n,0); }
+            }
+            """, "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SP0048"));
+        Assert.That(build.Output, Does.Contain("Proven=3"));
+        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
+        Assert.That(advisory.Output, Does.Contain("Proven=3"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            var metadata = claim.GetProperty("resourceBound").GetProperty("metadataAssumptions").EnumerateArray().Single();
+            JsonAssert.Equal(metadata, "witnessIdentifier", "bcl.math.max.int32-int32");
+            JsonAssert.Equal(metadata, "runtimeModel", "net8.0.32");
+            Assert.That(metadata.GetProperty("referenceSha256").GetString(), Has.Length.EqualTo(64));
+            Assert.That(metadata.GetProperty("catalogSha256").GetString(), Has.Length.EqualTo(64));
+            Assert.That(metadata.GetProperty("evidenceSource").GetString(), Does.Contain("b9a49e4a6d3a444a3685e318c74a7892d01873f7"));
+            Assert.That(claim.GetProperty("assumptions").EnumerateArray().Any(item =>
+                item.GetProperty("id").GetString() == metadata.GetProperty("assumptionId").GetString() && item.GetProperty("used").GetBoolean()), Is.True);
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(item => item.GetProperty("message").GetProperty("text").GetString()!.Contains("conditional resource metadata", StringComparison.Ordinal)), Is.EqualTo(3));
+    }
 }

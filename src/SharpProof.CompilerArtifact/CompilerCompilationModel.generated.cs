@@ -22,7 +22,6 @@ internal sealed class CompilerCompilationSnapshot
     public string AssemblyName { get; set; } = string.Empty;
     [JsonIgnore]
     public string AssemblyIdentity { get; set; } = string.Empty;
-    [JsonIgnore]
     public string TargetFramework { get; set; } = string.Empty;
     [JsonIgnore]
     public string CompilerVersion { get; set; } = string.Empty;
@@ -44,6 +43,7 @@ internal sealed class CompilerCompilationSnapshot
     public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
     [JsonIgnore]
     public CompilerReferenceSnapshot[] References { get; set; } = [];
+    public CompilerReferenceSnapshot[] ResourceMetadataReferences { get; set; } = [];
     [JsonIgnore]
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
 }

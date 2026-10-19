@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 16,
+    "protocolVersion": 17,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 33,
+    "compilerArtifactSchemaVersion": 34,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 18,
+    "schemaVersion": 19,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -275,6 +275,7 @@
         "name": "apiSpecificationCatalog",
         "paths": [
           "src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
+          "src/SharpProof.Specs/ResourceMetadataCatalog.cs",
           "src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
       },
@@ -374,7 +375,8 @@
           "src/SharpProof.Ir/ResourceExpression.cs",
           "src/SharpProof.Ir/ResourceBoundOrder.cs",
           "src/SharpProof.Ir/ResourceBoundConstraint.cs",
-          "src/SharpProof.Ir/ResourceProgram.cs"
+          "src/SharpProof.Ir/ResourceProgram.cs",
+          "src/SharpProof.Ir/ResourceMetadataReference.cs"
         ]
       },
       {
@@ -724,6 +726,7 @@
           "src/SharpProof.Worker/NativeEffectClaims.cs",
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",
           "src/SharpProof.Worker/NativeResourceViolationReplay.cs",
           "src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs",
           "eng/CompilerAdditionalTextStability.cs",

@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-
 namespace SharpProof.Compiler.Semantics;
 
 // Explicit assumption boundary, independent of effect/termination facets.
@@ -8,24 +5,15 @@ namespace SharpProof.Compiler.Semantics;
 // and runtime families receive no resource summary from this catalog.
 internal static class ResourceMetadataCostCatalog
 {
-    internal const string Version = "1";
-    internal const string EvidenceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Math.cs";
-    internal static string ContentSha256 { get; } = ComputeDigest();
-
-    private static string ComputeDigest()
-    {
-        var declaration = "resource-metadata-v" + Version + "\n" + ApiSpecTable.Default.ContentSha256 + "\n" +
-            EvidenceSource + "\nnet8.0.32\nloop-entries-and-primitive-array-elements-v3\n" +
-            "bcl.math.max.int32-int32:0,0,0\nbcl.math.min.int32-int32:0,0,0\n";
-        using var hash = SHA256.Create();
-        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(declaration))).Replace("-", string.Empty);
-    }
+    internal const string Version = ResourceMetadataCatalog.Version;
+    internal const string EvidenceSource = ResourceMetadataCatalog.EvidenceSource;
+    internal static string ContentSha256 => ResourceMetadataCatalog.ContentSha256;
 
     internal static bool Contains(ResolvedApiSpec spec)
     {
         spec = ArgumentNullGuard.NotNull(spec, nameof(spec));
-        return spec.Symbol.ContainingAssembly.Identity.Version.Major == 8 &&
-            spec.Template.Target.WitnessIdentifier is "bcl.math.max.int32-int32" or "bcl.math.min.int32-int32";
+        return ResourceMetadataCatalog.IsReviewed(new ResourceMetadataReference(spec.Template.Target.WitnessIdentifier,
+            ContentSha256, spec.Symbol.ContainingAssembly.Identity.ToString()));
     }
 }
 
@@ -49,6 +37,7 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         _assumptions.Add("resource-metadata-net8.0.32:" + ResourceMetadataCostCatalog.ContentSha256 + ":" +
             spec.Template.Target.WitnessIdentifier + ":" + ResourceMetadataCostCatalog.EvidenceSource);
-        return arguments.Add(new Cost(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.MetadataBoundary));
+        return arguments.Add(new Cost(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.MetadataCall(new ResourceMetadataReference(spec.Template.Target.WitnessIdentifier,
+            ResourceMetadataCostCatalog.ContentSha256, spec.Symbol.ContainingAssembly.Identity.ToString()))));
     }
 }
