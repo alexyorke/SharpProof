@@ -624,14 +624,14 @@ public sealed class ParameterGuardAnalyzerTests
         Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'text' has no explicit guard", "Parameter 'value' has no explicit guard")));
     }
 
-    private static string[] Messages(IEnumerable<Diagnostic> diagnostics)
+    private static ImmutableArray<string> Messages(IEnumerable<Diagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         return diagnostics.Select(static diagnostic =>
-            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)).ToArray();
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
     }
 
-    private static async Task<Diagnostic[]> Analyze(string source, string path = "input.cs", bool testAssembly = false)
+    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source, string path = "input.cs", bool testAssembly = false)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         System.ArgumentNullException.ThrowIfNull(source);
@@ -643,7 +643,7 @@ public sealed class ParameterGuardAnalyzerTests
             compilation = compilation.WithAssemblyName("AnalyzerFixture.Test");
         }
         var analyzers = compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
-        return (await analyzers.GetAnalyzerDiagnosticsAsync()).ToArray();
+        return await analyzers.GetAnalyzerDiagnosticsAsync();
     }
 
 }

@@ -208,7 +208,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         Assert.That(actual, Is.EqualTo(expectedDiagnostics), observation);
     }
 
-    private static InvocationExpressionSyntax[] GetIntrinsicInvocations(
+    private static ImmutableArray<InvocationExpressionSyntax> GetIntrinsicInvocations(
         SyntaxNode root, SemanticModel model, CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -220,7 +220,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
             .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
                 (method.Name == "Result" || method.Name == "Old") &&
                 SymbolEqualityComparer.Default.Equals(method.ContainingType, api)))
-            .ToArray();
+            .ToImmutableArray();
     }
 
     private static IInvocationOperation GetInvocationFromFieldInitializer(
@@ -298,7 +298,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         return current!;
     }
 
-    private static IInvocationOperation[] GetOwnEnsuresContexts(
+    private static ImmutableArray<IInvocationOperation> GetOwnEnsuresContexts(
         IOperation operation,
         IMethodSymbol owner,
         SemanticModel model,
@@ -308,7 +308,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         System.ArgumentNullException.ThrowIfNull(model);
         System.ArgumentNullException.ThrowIfNull(operation);
         System.ArgumentNullException.ThrowIfNull(owner);
-        var contexts = new List<IInvocationOperation>();
+        var contexts = ImmutableArray.CreateBuilder<IInvocationOperation>();
         var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
         for (var current = operation.Parent; current != null; current = current.Parent)
         {
@@ -325,7 +325,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
                 contexts.Add(invocation);
             }
         }
-        return contexts.ToArray();
+        return contexts.ToImmutable();
     }
 
     private static void AssertDirectEnsuresPrologue(

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -105,11 +106,11 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
         Assert.That(actual, Is.EqualTo(expected));
     }
 
-    private static async Task<IReadOnlyList<ISymbol>> AssertBoundInitializerOwnersAsync(
+    private static async Task<ImmutableArray<ISymbol>> AssertBoundInitializerOwnersAsync(
         CSharpCompilation compilation, int expectedCalls)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var owners = new List<ISymbol>();
+        var ownersBuilder = ImmutableArray.CreateBuilder<ISymbol>();
         var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
         Assert.That(api, Is.Not.Null);
         foreach (var tree in compilation.SyntaxTrees)
@@ -170,10 +171,11 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
                     tree.FilePath + invocation.Span + ": real API=" + target +
                     "; raw owner=" + rawOwner + "; declared owner=" + declaredOwner +
                     "; initializer root=" + root.Kind);
-                owners.Add(owner!);
+                ownersBuilder.Add(owner!);
             }
         }
-        Assert.That(owners, Has.Count.EqualTo(expectedCalls));
+        var owners = ownersBuilder.ToImmutable();
+        Assert.That(owners, Has.Length.EqualTo(expectedCalls));
         return owners;
     }
 
