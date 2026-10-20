@@ -188,7 +188,7 @@ public sealed class NativeResourceAllocationTests
         var length = mutation == 1 ? ResourceExpression.Literal(2) : ResourceExpression.One;
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
         var program = (ResourceProgram)constructor.Invoke([kind, length, null, ResourceRepeatKind.Loop,
-            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, null]);
+            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, null, kind == ResourceProgramKind.AllocateArray ? ResourceExpression.Zero : null]);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var counts = NativeResourceProgramVerifier.Verify(program, "owned", Owner(), cancellation);
         Assert.That(counts.Cost, Is.Null);
@@ -259,7 +259,7 @@ public sealed class NativeResourceAllocationTests
         var length = mutation == 3 ? ResourceExpression.One : null;
         var shape = mutation == 3 ? ResourceAllocationShape.Object([]) : null;
         var program = (ResourceProgram)constructor.Invoke([kind, length, null, ResourceRepeatKind.Loop,
-            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, activation]);
+            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, activation, null]);
         var token = TestContext.CurrentContext.CancellationToken;
         var counts = NativeResourceProgramVerifier.Verify(program, "owned", Owner(), token);
         Assert.That(counts.Verified, Is.False);

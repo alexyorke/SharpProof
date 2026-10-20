@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 35,
+    "protocolVersion": 36,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 49,
+    "compilerArtifactSchemaVersion": 50,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 37,
+    "schemaVersion": 38,
     "enabledByDefault": true,
     "maximumMiB": 512
   },

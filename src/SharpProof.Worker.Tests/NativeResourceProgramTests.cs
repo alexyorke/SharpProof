@@ -23,7 +23,8 @@ public sealed class NativeResourceProgramTests
 
     private static ResourceLoopRank Rank(int kind, int start, int limit, long step, bool checkedStep = false, int width = 32)
     {
-        return new((ResourceLoopKind)kind, ResourceExpression.Literal(start), ResourceExpression.Literal(limit), step, width, checkedStep);
+        return new((ResourceLoopKind)kind, ResourceExpression.Literal(start), ResourceExpression.Literal(limit), step, width, checkedStep,
+            ResourceExpression.Literal(start), ResourceExpression.Literal(limit));
     }
 
     private static NativeResourceProgramCheck Check(ResourceProgram program)
@@ -43,7 +44,7 @@ public sealed class NativeResourceProgramTests
     public void RankBoundsMatchIndependentSmallExecutions(int kind, int start, int limit, long step, int expected)
     {
         var result = Check(ResourceProgram.Repeat(Rank(kind, start, limit, step), ResourceRepeatKind.Loop,
-            ResourceProgram.Array(ResourceExpression.Literal(3))));
+            ResourceProgram.Array(ResourceExpression.Literal(3), ResourceExpression.Literal(3))));
         Assert.That(result.Verified, Is.True, result.UnknownReason);
         int observed = 0;
         var counter = new BigInteger(start);
@@ -56,6 +57,56 @@ public sealed class NativeResourceProgramTests
         Assert.That(result.Cost!.LoopEntries.Constant, Is.EqualTo(new BigInteger(observed)));
         Assert.That(result.Cost.Arrays.Constant, Is.EqualTo(new BigInteger(observed)));
         Assert.That(result.Cost.Elements.Constant, Is.EqualTo(new BigInteger(observed * 3)));
+        Assert.That(result.LowerCost, Is.EqualTo(result.Cost));
+    }
+
+    [Test]
+    public void LowerEnvelopesComposeWithoutPromotingUpperSizesToExactCosts()
+    {
+        var rank = new ResourceLoopRank(ResourceLoopKind.IncreasingAdd, ResourceExpression.Zero, ResourceExpression.Literal(10),
+            1, 32, false, ResourceExpression.Zero, ResourceExpression.Literal(3));
+        var allocation = ResourceProgram.Array(ResourceExpression.Literal(4), ResourceExpression.Literal(2));
+        var check = Check(ResourceProgram.Repeat(rank, ResourceRepeatKind.Loop, allocation));
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.Cost!.LoopEntries.Constant, Is.EqualTo(new BigInteger(10)));
+        Assert.That(check.Cost.Elements.Constant, Is.EqualTo(new BigInteger(40)));
+        Assert.That(check.LowerCost!.LoopEntries.Constant, Is.EqualTo(new BigInteger(3)));
+        Assert.That(check.LowerCost.Arrays.Constant, Is.EqualTo(new BigInteger(3)));
+        Assert.That(check.LowerCost.Elements.Constant, Is.EqualTo(new BigInteger(6)));
+        var choice = Check(ResourceProgram.Choice(allocation, ResourceProgram.Zero));
+        Assert.That(choice.LowerCost, Is.EqualTo(new NativeResourceCost(ResourceExpression.Zero, ResourceExpression.Zero, ResourceExpression.Zero)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ContradictoryLowerEnvelopesRejectTheWholeCertificate(bool rank)
+    {
+        var program = rank ? ResourceProgram.Repeat(new ResourceLoopRank(ResourceLoopKind.IncreasingAdd,
+            ResourceExpression.Zero, ResourceExpression.Literal(3), 1, 32, false,
+            ResourceExpression.Zero, ResourceExpression.Literal(4)), ResourceRepeatKind.Loop, ResourceProgram.Zero) :
+            ResourceProgram.Array(ResourceExpression.One, ResourceExpression.Literal(2));
+        var check = Check(program);
+        Assert.That(check.Cost, Is.Null);
+        Assert.That(check.LowerCost, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(rank ? "ResourceLowerRankUnproved" : "ResourceLowerExtentUnproved"));
+    }
+
+    [Test]
+    public void LowerEnvelopeTransportPreservesIntervalsAndRequiresEveryField()
+    {
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var rank = new ResourceLoopRank(ResourceLoopKind.DecreasingSubtract, ResourceExpression.Literal(10), ResourceExpression.Zero,
+            2, 32, false, ResourceExpression.Literal(4), ResourceExpression.Zero);
+        var program = ResourceProgram.Repeat(rank, ResourceRepeatKind.Loop,
+            ResourceProgram.Array(ResourceExpression.Literal(3), ResourceExpression.One));
+        var bytes = ResourceProgramCodec.Encode(program, cancellation);
+        var decoded = ResourceProgramCodec.Decode(bytes, cancellation);
+        Assert.That(ResourceProgramCodec.Encode(decoded, cancellation), Is.EqualTo(bytes));
+        Assert.That(Check(decoded).LowerCost!.Elements.Constant, Is.EqualTo(new BigInteger(2)));
+        var node = JsonNode.Parse(bytes)!;
+        node["program"]!["rank"]!.AsObject().Remove("lowerInitial");
+        Action decode = () => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(node.ToJsonString()), cancellation);
+        Assert.Throws<InvalidDataException>(decode);
     }
 
     [Test]
@@ -326,7 +377,7 @@ public sealed class NativeResourceProgramTests
     public void UnknownDetachedProgramKindsCannotProducePartialCosts()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
-        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null, null]);
+        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null, null, null]);
         var result = Check(program);
         Assert.That(result.Verified, Is.False);
         Assert.That(result.Cost, Is.Null);

@@ -649,12 +649,31 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 35 and cache schema 37 invalidate older responses without this evidence.
+Protocol 36 and cache schema 38 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
-to numeric refutations or Unknown claims. Compiler artifact 49, manifest 6,
-resource program/evidence 5 and expression model 1 remain unchanged.
+to numeric refutations or Unknown claims. Compiler artifact 50, manifest 6,
+resource program/evidence 6 and expression model 1 identify the current certificate.
+
+### Lower size envelopes
+
+Resource program 6 carries lower array extents and lower loop-rank initial/limit
+expressions separately from upper size envelopes. The compiler uses exact input
+sizes outside repeated regions and a conservative zero lower envelope for
+repeated counters. Source-call substitution preserves both envelopes. The native
+checker validates ownership and lower-to-upper ordering before deriving loop
+entries, array counts and element counts. Sequence adds lower costs; a choice
+contributes only a bound valid on both arms. Contradictory or missing certificate
+fields reject the whole proof without partial numeric evidence.
+
+These lower costs are conditional on normal completion. They do not prove that
+normal completion is feasible, that an unbounded family of completing inputs
+exists, or that an upper bound is tight. Early-return bodies and short-circuit
+regions use an explicit upper-only envelope. Recursive prefixes retain a zero
+lower cost until their per-activation size environment is modeled. Consumer
+Omega/Theta evidence is not yet published by this foundation; upper asymptotic
+reporting remains unchanged while the remaining proof obligations are implemented.
 
 Intrinsic string lengths are admitted as size inputs and as contract sizes such
 as text.Length. Their identity is bound through the compiler's intrinsic sequence

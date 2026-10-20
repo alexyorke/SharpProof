@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "35";
+    public const string Current = "36";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 37;
+    public const int Current = 38;
 }
 
 internal static class WorkerManifestVersions
@@ -174,7 +174,7 @@ internal static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 5;
+    public const int Program = 6;
     public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
     public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
     public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";

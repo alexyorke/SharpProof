@@ -9,12 +9,14 @@ internal sealed partial class ResourceBoundsAnalysis
     internal sealed record Bound
     {
         internal ResourceExpression Expression { get; }
+        internal ResourceExpression Lower { get; }
         internal string Text => Expression.ToDisplayString();
         internal BigInteger? Constant => Expression.Constant;
         internal BigInteger? Maximum => Expression.Maximum;
-        internal Bound(ResourceExpression expression)
+        internal Bound(ResourceExpression expression, ResourceExpression? lower = null)
         {
             Expression = ArgumentNullGuard.NotNull(expression, nameof(expression));
+            Lower = lower ?? expression;
         }
         internal static readonly Bound Zero = Number(0);
         internal static readonly Bound One = Number(1);
@@ -33,19 +35,19 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return new(ResourceExpression.Add(left.Expression, right.Expression));
+            return new(ResourceExpression.Add(left.Expression, right.Expression), ResourceExpression.Add(left.Lower, right.Lower));
         }
         internal static Bound Multiply(Bound left, Bound right)
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return new(ResourceExpression.Multiply(left.Expression, right.Expression));
+            return new(ResourceExpression.Multiply(left.Expression, right.Expression), ResourceExpression.Multiply(left.Lower, right.Lower));
         }
         internal static Bound Max(Bound left, Bound right)
         {
             left = ArgumentNullGuard.NotNull(left, nameof(left));
             right = ArgumentNullGuard.NotNull(right, nameof(right));
-            return new(ResourceExpression.Max(left.Expression, right.Expression));
+            return new(ResourceExpression.Max(left.Expression, right.Expression), ResourceExpression.Max(left.Lower, right.Lower));
         }
     }
 
@@ -259,7 +261,7 @@ internal sealed partial class ResourceBoundsAnalysis
             case IArrayCreationOperation array when array.Type is IArrayTypeSymbol type &&
                 type is { Rank: 1, IsSZArray: true } && Primitive(type.ElementType) && array.DimensionSizes.Length == 1 && array.Initializer is null:
                 var size = Size(array.DimensionSizes[0]);
-                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.TypedArray(ResourceAllocationShape.Array(Storage(type.ElementType), size.Expression)));
+                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.TypedArray(ResourceAllocationShape.Array(Storage(type.ElementType), size.Expression), size.Lower));
                 break;
             case ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } discarded:
                 result = Visit(discarded.Value, depth + 1);
@@ -280,6 +282,8 @@ internal sealed partial class ResourceBoundsAnalysis
                 break;
             case IBinaryOperation binary when binary.OperatorMethod is null && Primitive(binary.Type):
                 result = Visit(binary.LeftOperand, depth + 1).Add(Visit(binary.RightOperand, depth + 1));
+                if (binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr)
+                { result = new(result.LoopIterations, result.Arrays, result.Elements, ResourceProgram.UpperEnvelope(result.Program)); }
                 break;
             case IUnaryOperation unary when unary.OperatorMethod is null && Primitive(unary.Type):
                 result = Visit(unary.Operand, depth + 1);

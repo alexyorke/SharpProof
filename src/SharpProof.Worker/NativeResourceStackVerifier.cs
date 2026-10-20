@@ -41,6 +41,8 @@ internal static class NativeResourceStackVerifier
             case ResourceProgramKind.AllocateArray:
             case ResourceProgramKind.AllocateManaged:
                 return Zero;
+            case ResourceProgramKind.UpperEnvelope:
+                return Visit(program.Children[0], active, cancellation);
             case ResourceProgramKind.Activation:
                 if (program.Activation is not { } frame || program.Children.Length != 1)
                 { throw new InvalidDataException("ResourceStackFrameStorageUnavailable"); }

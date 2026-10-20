@@ -47,6 +47,11 @@ internal static class ResourceProgramCodec
         { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(length, cancellation)); }
         else
         { writer.WriteNullValue(); }
+        writer.WritePropertyName("lowerLength");
+        if (program.LowerLength is { } lowerLength)
+        { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(lowerLength, cancellation)); }
+        else
+        { writer.WriteNullValue(); }
         writer.WritePropertyName("activation");
         if (program.Activation is { } activation)
         {
@@ -73,6 +78,8 @@ internal static class ResourceProgramCodec
             writer.WriteNumber("kind", (int)rank.Kind);
             writer.WriteBase64String("initial", ResourceExpressionCodec.Encode(rank.Initial, cancellation));
             writer.WriteBase64String("limit", ResourceExpressionCodec.Encode(rank.Limit, cancellation));
+            writer.WriteBase64String("lowerInitial", ResourceExpressionCodec.Encode(rank.LowerInitial, cancellation));
+            writer.WriteBase64String("lowerLimit", ResourceExpressionCodec.Encode(rank.LowerLimit, cancellation));
             writer.WriteString("step", rank.Step.ToString(CultureInfo.InvariantCulture));
             writer.WriteNumber("width", rank.CounterWidth);
             writer.WriteBoolean("checked", rank.CheckedStep);
@@ -129,7 +136,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
+        Fields(node, "kind", "length", "lowerLength", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -137,15 +144,16 @@ internal static class ResourceProgramCodec
         if (!Enum.IsDefined(typeof(ResourceRepeatKind), repeat) || kind != ResourceProgramKind.Repeat && repeat != ResourceRepeatKind.Loop)
         { throw new InvalidDataException("Resource repeat kind is invalid."); }
         var children = node.GetProperty("children");
-        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind is ResourceProgramKind.Repeat or ResourceProgramKind.Activation ? 1 : 2;
+        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind is ResourceProgramKind.Repeat or ResourceProgramKind.Activation or ResourceProgramKind.UpperEnvelope ? 1 : 2;
         if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() != arity)
         { throw new InvalidDataException("Resource program arity is invalid."); }
         var length = node.GetProperty("length");
+        var lowerLength = node.GetProperty("lowerLength");
         var allocationNode = node.GetProperty("allocation");
         var rank = node.GetProperty("rank");
         var metadataNode = node.GetProperty("metadata");
         var activationNode = node.GetProperty("activation");
-        if (kind != ResourceProgramKind.AllocateArray && length.ValueKind != JsonValueKind.Null ||
+        if (kind != ResourceProgramKind.AllocateArray && (length.ValueKind != JsonValueKind.Null || lowerLength.ValueKind != JsonValueKind.Null) ||
             kind is not (ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged) && allocationNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null ||
@@ -171,6 +179,8 @@ internal static class ResourceProgramCodec
             }
             return ResourceProgram.Activate(shape, Read(children[0], depth + 1, ref remaining, cancellation));
         }
+        if (kind == ResourceProgramKind.UpperEnvelope)
+        { return ResourceProgram.UpperEnvelope(Read(children[0], depth + 1, ref remaining, cancellation)); }
         if (kind == ResourceProgramKind.MetadataCall)
         {
             Fields(metadataNode, "witness", "catalog", "assembly");
@@ -192,8 +202,9 @@ internal static class ResourceProgramCodec
         if (kind == ResourceProgramKind.AllocateArray)
         {
             var decodedLength = Expression(length, cancellation);
+            var decodedLowerLength = Expression(lowerLength, cancellation);
             if (allocationNode.ValueKind == JsonValueKind.Null)
-            { return ResourceProgram.Array(decodedLength); }
+            { return ResourceProgram.Array(decodedLength, decodedLowerLength); }
             var encoded = Text(allocationNode);
             var bytes = Convert.FromBase64String(encoded);
             if (Convert.ToBase64String(bytes) != encoded)
@@ -201,11 +212,11 @@ internal static class ResourceProgramCodec
             var allocation = ResourceAllocationShapeCodec.Decode(bytes, cancellation);
             if (allocation.Kind != ResourceAllocationKind.Array || !allocation.Extent.Equals(decodedLength))
             { throw new InvalidDataException("Resource allocation shape disagrees with its array program."); }
-            return ResourceProgram.TypedArray(allocation);
+            return ResourceProgram.TypedArray(allocation, decodedLowerLength);
         }
         if (kind == ResourceProgramKind.Repeat)
         {
-            Fields(rank, "kind", "initial", "limit", "step", "width", "checked");
+            Fields(rank, "kind", "initial", "limit", "lowerInitial", "lowerLimit", "step", "width", "checked");
             var rankKind = (ResourceLoopKind)Integer(rank.GetProperty("kind"));
             var width = Integer(rank.GetProperty("width"));
             var stepText = Text(rank.GetProperty("step"));
@@ -217,7 +228,8 @@ internal static class ResourceProgramCodec
             if (checkedNode.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
             { throw new InvalidDataException("Resource rank overflow mode is invalid."); }
             var decodedRank = new ResourceLoopRank(rankKind, Expression(rank.GetProperty("initial"), cancellation),
-                Expression(rank.GetProperty("limit"), cancellation), new BigInteger(step), width, checkedNode.GetBoolean());
+                Expression(rank.GetProperty("limit"), cancellation), new BigInteger(step), width, checkedNode.GetBoolean(),
+                Expression(rank.GetProperty("lowerInitial"), cancellation), Expression(rank.GetProperty("lowerLimit"), cancellation));
             return ResourceProgram.Repeat(decodedRank, repeat, Read(children[0], depth + 1, ref remaining, cancellation));
         }
         var left = Read(children[0], depth + 1, ref remaining, cancellation);

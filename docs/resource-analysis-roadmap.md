@@ -89,6 +89,29 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+The lower-bound foundation is implemented: program model 6 adds separate lower array extents
+and loop-rank size envelopes. Native derivation validates ownership and ordering
+and composes conditional normal-completion lower costs. Upper-only regions retain
+their numeric upper proofs without contributing guaranteed work. Early returns,
+short-circuit evaluation, dependent counters and source-call substitutions have
+adversarial controls. Protocol 36, cache 38 and compiler artifact 50 invalidate
+older certificates. Verification passed 542 native/protocol cases before one
+reflective fixture repair, all 96 program/allocation cases after that repair,
+1450 analyzer tests, 756 IR tests, 81 worker golden cases and six package workflows.
+Formatting, API/quality checks and 726 documentation links passed; the quality
+run's spelling finding was corrected and verified with targeted documentation
+lint. Consumer lower/tightness
+evidence, feasible input-domain admission, amortized and expected-cost proofs remain
+required; none of the phase E checkboxes is complete yet.
+
+CI for local-capture checkpoint 7c6e0c9a6 passed package, docs and security, but
+canonical and semantic-worker coverage failed on two stale artifact-schema golden
+headers (48 instead of 49). Those fixtures now expect schema 50 and all 81 worker
+goldens pass. No new aggregate coverage percentage is available for that failed
+shard; 8b3561e76 remains the last numerical qualification result. Master
+1b292a43f (cached default comparer values) was fetched during verification and
+will be integrated before publishing this foundation.
+
 Root closure lifetime composition now includes initialized, read-only locals.
 Entry frame allocation and ordered default stores precede initializer updates,
 preserving allocation order. Extraction and replay check updates independently

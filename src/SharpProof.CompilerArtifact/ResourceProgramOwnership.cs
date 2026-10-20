@@ -26,7 +26,12 @@ internal static class ResourceProgramOwnership
         cancellation.ThrowIfCancellationRequested();
         if (program.Length is { } length)
         { ResourceExpressionOwnership.Validate(length, callableId, owner, cancellation); }
-        if (program.Kind == ResourceProgramKind.Activation ? program.Children.Length != 1 : program.Activation is not null)
+        if (program.Kind == ResourceProgramKind.AllocateArray ? program.LowerLength is null : program.LowerLength is not null)
+        { throw new InvalidDataException("MalformedResourceLowerExtent"); }
+        if (program.LowerLength is { } lowerLength)
+        { ResourceExpressionOwnership.Validate(lowerLength, callableId, owner, cancellation); }
+        if (program.Kind is ResourceProgramKind.Activation or ResourceProgramKind.UpperEnvelope && program.Children.Length != 1 ||
+            program.Kind != ResourceProgramKind.Activation && program.Activation is not null)
         { throw new InvalidDataException("MalformedResourceActivation"); }
         if (program.Kind == ResourceProgramKind.AllocateManaged && (program.Allocation is null || program.Length is not null))
         { throw new InvalidDataException("MalformedResourceAllocation"); }
@@ -43,6 +48,8 @@ internal static class ResourceProgramOwnership
         {
             ResourceExpressionOwnership.Validate(rank.Initial, callableId, owner, cancellation);
             ResourceExpressionOwnership.Validate(rank.Limit, callableId, owner, cancellation);
+            ResourceExpressionOwnership.Validate(rank.LowerInitial, callableId, owner, cancellation);
+            ResourceExpressionOwnership.Validate(rank.LowerLimit, callableId, owner, cancellation);
         }
         foreach (var child in program.Children)
         { Visit(child, callableId, owner, cancellation); }

@@ -13,7 +13,32 @@ internal sealed partial class ResourceBoundsAnalysis
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cost = ArgumentNullGuard.NotNull(cost, nameof(cost));
-        return new(cost.LoopIterations, cost.Arrays, cost.Elements, ResourceProgram.Activate(ActivationShape(method, body), cost.Program));
+        var program = HasFullCostFlow(body) ? cost.Program : ResourceProgram.UpperEnvelope(cost.Program);
+        return new(cost.LoopIterations, cost.Arrays, cost.Elements, ResourceProgram.Activate(ActivationShape(method, body), program));
+    }
+
+    private bool HasFullCostFlow(IOperation? body)
+    {
+        if (body == null)
+        { return true; }
+        var finalReturn = body is IBlockOperation { Operations.IsEmpty: false } block ? block.Operations[block.Operations.Length - 1] as IReturnOperation : body as IReturnOperation;
+        var pending = new Stack<IOperation>();
+        pending.Push(body);
+        var remaining = ResourceExpression.MaximumNodes;
+        while (pending.Count != 0)
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            if (--remaining < 0)
+            { return false; }
+            var operation = pending.Pop();
+            if (operation is IAnonymousFunctionOperation or ILocalFunctionOperation)
+            { continue; }
+            if (operation is IReturnOperation && !ReferenceEquals(operation, finalReturn))
+            { return false; }
+            foreach (var child in operation.ChildOperations)
+            { pending.Push(child); }
+        }
+        return true;
     }
 
     private ResourceActivationShape? ActivationShape(IMethodSymbol method, IOperation? body)

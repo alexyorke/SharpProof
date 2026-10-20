@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
 
@@ -34,15 +34,20 @@ internal sealed class ResourceLoopRank
     internal ResourceLoopKind Kind { get; }
     internal ResourceExpression Initial { get; }
     internal ResourceExpression Limit { get; }
+    internal ResourceExpression LowerInitial { get; }
+    internal ResourceExpression LowerLimit { get; }
     internal BigInteger Step { get; }
     internal int CounterWidth { get; }
     internal bool CheckedStep { get; }
 
     internal ResourceLoopRank(ResourceLoopKind kind, ResourceExpression initial,
-        ResourceExpression limit, BigInteger step, int counterWidth, bool checkedStep)
+        ResourceExpression limit, BigInteger step, int counterWidth, bool checkedStep,
+        ResourceExpression? lowerInitial = null, ResourceExpression? lowerLimit = null)
     {
         Initial = ArgumentNullGuard.NotNull(initial, nameof(initial));
         Limit = ArgumentNullGuard.NotNull(limit, nameof(limit));
+        LowerInitial = lowerInitial ?? ResourceExpression.Zero;
+        LowerLimit = lowerLimit ?? ResourceExpression.Zero;
         Kind = kind;
         Step = step;
         CounterWidth = counterWidth;
@@ -52,9 +57,10 @@ internal sealed class ResourceLoopRank
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 5;
+    internal const int ModelVersion = 6;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
+    internal ResourceExpression? LowerLength { get; }
     internal ResourceLoopRank? Rank { get; }
     internal ResourceMetadataReference? Metadata { get; }
     internal ResourceAllocationShape? Allocation { get; }
@@ -68,20 +74,22 @@ internal sealed class ResourceProgram
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
         ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null,
-        ResourceActivationShape? activation = null)
+        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
         Kind = kind;
         Length = length;
+        LowerLength = lowerLength;
         Rank = rank;
         Metadata = metadata;
         Allocation = allocation;
         Activation = activation;
         RepeatKind = repeatKind;
         Children = children;
-        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
+        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (lowerLength?.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount + rank.LowerInitial.NodeCount + rank.LowerLimit.NodeCount);
         var depth = 1 + Math.Max(length?.Depth ?? allocation?.Extent.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
+        depth = Math.Max(depth, 1 + Math.Max(lowerLength?.Depth ?? 0, rank is null ? 0 : Math.Max(rank.LowerInitial.Depth, rank.LowerLimit.Depth)));
         foreach (var child in children)
         {
             if (child is null)
@@ -102,18 +110,18 @@ internal sealed class ResourceProgram
         return new(ResourceProgramKind.MetadataCall, null, null, default, [], metadata);
     }
 
-    internal static ResourceProgram Array(ResourceExpression length)
+    internal static ResourceProgram Array(ResourceExpression length, ResourceExpression? lowerLength = null)
     {
         length = ArgumentNullGuard.NotNull(length, nameof(length));
-        return new(ResourceProgramKind.AllocateArray, length, null, default, []);
+        return new(ResourceProgramKind.AllocateArray, length, null, default, [], lowerLength: lowerLength ?? ResourceExpression.Zero);
     }
 
-    internal static ResourceProgram TypedArray(ResourceAllocationShape allocation)
+    internal static ResourceProgram TypedArray(ResourceAllocationShape allocation, ResourceExpression? lowerLength = null)
     {
         allocation = ArgumentNullGuard.NotNull(allocation, nameof(allocation));
         if (allocation.Kind != ResourceAllocationKind.Array)
         { throw new ArgumentException("An array program requires an array storage shape.", nameof(allocation)); }
-        return new(ResourceProgramKind.AllocateArray, allocation.Extent, null, default, [], allocation: allocation);
+        return new(ResourceProgramKind.AllocateArray, allocation.Extent, null, default, [], allocation: allocation, lowerLength: lowerLength ?? ResourceExpression.Zero);
     }
 
     internal static ResourceProgram Managed(ResourceAllocationShape allocation)
@@ -156,5 +164,11 @@ internal sealed class ResourceProgram
     {
         body = ArgumentNullGuard.NotNull(body, nameof(body));
         return new(ResourceProgramKind.Activation, null, null, default, [body], activation: shape);
+    }
+
+    internal static ResourceProgram UpperEnvelope(ResourceProgram body)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        return new(ResourceProgramKind.UpperEnvelope, null, null, default, [body]);
     }
 }

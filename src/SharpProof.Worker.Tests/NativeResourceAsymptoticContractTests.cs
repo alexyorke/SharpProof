@@ -6,6 +6,33 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase("for(int i=0;i<n;i++) { for(int j=0;j<n;j++) { var a=new int[1]; } }", 20, 16, 16)]
+    [TestCase("for(int i=0;i<n;i++) { for(int j=0;j<i;j++) { var a=new int[1]; } }", 4, 0, 0)]
+    [TestCase("for(int i=0;i<n;i++) { Walk(i); }", 4, 0, 0)]
+    [TestCase("for(int i=0;i<n;i++) { var a=new int[i]; }", 4, 4, 0)]
+    [TestCase("checked { for(int i=0;i<n;i+=2) { var a=new int[1]; } }", 2, 2, 2)]
+    [TestCase("for(int i=n;i>0;i/=2) { var a=new int[i]; }", 3, 3, 0)]
+    [TestCase("if(n>0) { var a=new int[3]; } else { var b=new int[2]; }", 0, 1, 2)]
+    [TestCase("if(n>0) return; for(int i=0;i<n;i++) {}", 0, 0, 0)]
+    [TestCase("for(int i=0;i<n;i++) { return; }", 0, 0, 0)]
+    [TestCase("bool value=n>0 || Allocate();", 0, 0, 0)]
+    [TestCase("bool value=n>0 && Allocate();", 0, 0, 0)]
+    public void NativeLowerCostsRespectCounterEnvelopesAndActualControlFlow(string body, int loops, int arrays, int elements)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,long.MaxValue)] public static void Target(int n) { " + body + " } " +
+            "private static void Walk(int count) { for(int j=0;j<count;j++) { var a=new int[1]; } } " +
+            "private static bool Allocate() { var a=new int[1]; return true; } }";
+        var target = Read(CreateArtifact(source));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, cancellation);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.LowerCost!.LoopEntries.Evaluate(static _ => 4, cancellation).ToString(System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo(loops.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(check.LowerCost.Arrays.Evaluate(static _ => 4, cancellation).ToString(System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo(arrays.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(check.LowerCost.Elements.Evaluate(static _ => 4, cancellation).ToString(System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo(elements.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
     [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) {}", "O(n)", 1, 0)]
     [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }", "O(n^2)", 2, 0)]
     [TestCase("LoopBodyEntries", "checked { for(int i=1;i<n;i*=2) {} }", "O(log(n))", 0, 1)]

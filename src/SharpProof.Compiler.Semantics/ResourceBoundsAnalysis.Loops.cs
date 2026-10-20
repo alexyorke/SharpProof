@@ -90,13 +90,13 @@ internal sealed partial class ResourceBoundsAnalysis
         // visitor rejects other counter writes, aliases, jumps and continues.
         _localProgress.Remove(counter.Local);
         _localInitialConstants.Remove(counter.Local);
-        _counters.Add(counter.Local, envelope);
+        _counters.Add(counter.Local, new Bound(envelope.Expression, ResourceExpression.Zero));
         var body = Sequence(operations.Take(operations.Length - 1), depth + 1);
         _counters.Remove(counter.Local);
         _localProgress.Remove(counter.Local);
         _localInitialConstants.Remove(counter.Local);
         var rank = new ResourceLoopRank(rankKind, initial.Expression, comparison.Expression, amount,
-            counter.Local.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep);
+            counter.Local.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep, initial.Lower, comparison.Lower);
         return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
 
@@ -124,8 +124,8 @@ internal sealed partial class ResourceBoundsAnalysis
         _localProgress.Remove(right);
         _localInitialConstants.Remove(left);
         _localInitialConstants.Remove(right);
-        _counters.Add(left, leftInitial);
-        _counters.Add(right, rightInitial);
+        _counters.Add(left, new Bound(leftInitial.Expression, ResourceExpression.Zero));
+        _counters.Add(right, new Bound(rightInitial.Expression, ResourceExpression.Zero));
         try
         {
             var leftCost = Sequence(leftPhase.Value.Prefix, depth + 1);
@@ -198,7 +198,7 @@ internal sealed partial class ResourceBoundsAnalysis
             amount > (BigInteger.One << (width - 1)) - 1 || divide && amount <= 1)
         { return null; }
         var rank = new ResourceLoopRank(divide ? ResourceLoopKind.DecreasingDivide : ResourceLoopKind.DecreasingSubtract,
-            initial.Expression, ResourceExpression.Zero, amount, width, checkedStep);
+            initial.Expression, ResourceExpression.Zero, amount, width, checkedStep, initial.Lower, ResourceExpression.Zero);
         var count = divide ? GeometricCount(initial, amount, descending: true) : DivideCeiling(initial, amount);
         return (operations.Take(operations.Length - 1).ToImmutableArray(), rank, count);
     }
@@ -215,19 +215,19 @@ internal sealed partial class ResourceBoundsAnalysis
     private static Bound Difference(Bound upper, BigInteger lower)
     {
         upper = ArgumentNullGuard.NotNull(upper, nameof(upper));
-        return new(ResourceExpression.Difference(upper.Expression, lower));
+        return new(ResourceExpression.Difference(upper.Expression, lower), ResourceExpression.Difference(upper.Lower, lower));
     }
 
     private static Bound DivideCeiling(Bound numerator, BigInteger denominator)
     {
         numerator = ArgumentNullGuard.NotNull(numerator, nameof(numerator));
-        return new(ResourceExpression.DivideCeiling(numerator.Expression, denominator));
+        return new(ResourceExpression.DivideCeiling(numerator.Expression, denominator), ResourceExpression.DivideCeiling(numerator.Lower, denominator));
     }
 
     private Bound GeometricCount(Bound size, BigInteger factor, bool descending)
     {
         size = ArgumentNullGuard.NotNull(size, nameof(size));
-        return new(ResourceExpression.Geometric(size.Expression, factor, descending, _cancellation));
+        return new(ResourceExpression.Geometric(size.Expression, factor, descending, _cancellation), ResourceExpression.Geometric(size.Lower, factor, descending, _cancellation));
     }
 
     private Cost For(IForLoopOperation loop, int depth)
@@ -318,7 +318,7 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         else
         { return Unknown("UnprovedLoopProgress"); }
-        _counters.Add(declaration.Symbol, envelope);
+        _counters.Add(declaration.Symbol, new Bound(envelope.Expression, ResourceExpression.Zero));
         var body = Visit(loop.Body, depth + 1);
         _counters.Remove(declaration.Symbol);
         var rankKind = kind switch
@@ -329,7 +329,7 @@ internal sealed partial class ResourceBoundsAnalysis
             _ => ResourceLoopKind.DecreasingDivide
         };
         var rank = new ResourceLoopRank(rankKind, initial.Expression, comparison.Expression, amount,
-            declaration.Symbol.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep);
+            declaration.Symbol.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep, initial.Lower, comparison.Lower);
         return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
 }

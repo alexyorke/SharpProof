@@ -12,6 +12,7 @@ internal sealed record NativeResourceCost(ResourceExpression LoopEntries, Resour
 internal sealed record NativeResourceProgramCheck(NativeResourceCost? Cost, string? UnknownReason)
 {
     internal bool Verified => Cost is not null;
+    internal NativeResourceCost? LowerCost { get; init; }
 }
 
 // This checks the closed resource semantics, not producer-computed bounds.
@@ -39,7 +40,8 @@ internal static class NativeResourceProgramVerifier
         try
         {
             ResourceProgramOwnership.Validate(program, callableId, owner, cancellation);
-            return new(Visit(program, callableId, owner, bindMetadata, cancellation), null);
+            var upper = Visit(program, callableId, owner, bindMetadata, cancellation);
+            return new(upper, null) { LowerCost = VisitLower(program, cancellation) };
         }
         catch (InvalidDataException exception)
         { return new(null, exception.Message); }
@@ -59,6 +61,7 @@ internal static class NativeResourceProgramVerifier
             case ResourceProgramKind.MetadataBoundary:
                 throw new InvalidDataException("ResourceMetadataAssumptionsNotBound");
             case ResourceProgramKind.Activation:
+            case ResourceProgramKind.UpperEnvelope:
                 return Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
             case ResourceProgramKind.MetadataCall:
                 if (program.Metadata is not { } metadata || bindMetadata?.Invoke(metadata) != true)
@@ -93,6 +96,74 @@ internal static class NativeResourceProgramVerifier
             default:
                 throw new InvalidDataException("MalformedResourceProgram");
         }
+    }
+
+    // Lower envelopes are source-size ranges, not verdicts. Validate their
+    // ownership above and ordering here, then derive the least guaranteed work.
+    // A branch contributes only a bound valid on both arms. Counter envelopes
+    // and recursive prefixes therefore cannot inherit a parent's upper cost.
+    private static NativeResourceCost VisitLower(ResourceProgram program, CancellationToken cancellation)
+    {
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
+        cancellation.ThrowIfCancellationRequested();
+        switch (program.Kind)
+        {
+            case ResourceProgramKind.Activation:
+                return VisitLower(program.Children[0], cancellation);
+            case ResourceProgramKind.Zero:
+            case ResourceProgramKind.MetadataCall:
+            case ResourceProgramKind.AllocateManaged:
+                return Zero;
+            case ResourceProgramKind.UpperEnvelope:
+                _ = VisitLower(program.Children[0], cancellation);
+                return Zero;
+            case ResourceProgramKind.AllocateArray:
+                if (program.LowerLength is not { } lower || program.Length is not { } upper || !ResourceBoundOrder.Proves(lower, upper, cancellation))
+                { throw new InvalidDataException("ResourceLowerExtentUnproved"); }
+                return new(ResourceExpression.Zero, ResourceExpression.One, lower);
+            case ResourceProgramKind.Sequence:
+            case ResourceProgramKind.Choice:
+                var left = VisitLower(program.Children[0], cancellation);
+                var right = VisitLower(program.Children[1], cancellation);
+                if (program.Kind == ResourceProgramKind.Sequence)
+                {
+                    return new(ResourceExpression.Add(left.LoopEntries, right.LoopEntries),
+                        ResourceExpression.Add(left.Arrays, right.Arrays), ResourceExpression.Add(left.Elements, right.Elements));
+                }
+                return new(CommonLower(left.LoopEntries, right.LoopEntries, cancellation),
+                    CommonLower(left.Arrays, right.Arrays, cancellation), CommonLower(left.Elements, right.Elements, cancellation));
+            case ResourceProgramKind.Repeat:
+                var rank = program.Rank ?? throw new InvalidDataException("MalformedResourceProgram");
+                if (!ResourceBoundOrder.Proves(rank.LowerInitial, rank.Initial, cancellation) ||
+                    !ResourceBoundOrder.Proves(rank.LowerLimit, rank.Limit, cancellation))
+                { throw new InvalidDataException("ResourceLowerRankUnproved"); }
+                var body = VisitLower(program.Children[0], cancellation);
+                // Recurrence prefixes still use the entry-size upper environment.
+                // Until a per-activation lower environment is certified, retain zero.
+                if (program.RepeatKind == ResourceRepeatKind.TailRecurrence)
+                { return Zero; }
+                var count = rank.Kind switch
+                {
+                    ResourceLoopKind.IncreasingAdd => ResourceExpression.DivideCeiling(ResourceExpression.Difference(rank.LowerLimit, rank.Initial.Constant!.Value), rank.Step),
+                    ResourceLoopKind.IncreasingMultiply => ResourceExpression.Geometric(rank.LowerLimit, rank.Step, false, cancellation),
+                    ResourceLoopKind.DecreasingSubtract => ResourceExpression.DivideCeiling(ResourceExpression.Difference(rank.LowerInitial, rank.Limit.Constant!.Value), rank.Step),
+                    ResourceLoopKind.DecreasingDivide => ResourceExpression.Geometric(rank.LowerInitial, rank.Step, true, cancellation),
+                    _ => throw new InvalidDataException("MalformedResourceRank")
+                };
+                return new(ResourceExpression.Multiply(count, ResourceExpression.Add(ResourceExpression.One, body.LoopEntries)),
+                    ResourceExpression.Multiply(count, body.Arrays), ResourceExpression.Multiply(count, body.Elements));
+            default:
+                throw new InvalidDataException("MalformedResourceProgram");
+        }
+    }
+
+    private static ResourceExpression CommonLower(ResourceExpression left, ResourceExpression right, CancellationToken cancellation)
+    {
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
+        if (ResourceBoundOrder.Proves(left, right, cancellation))
+        { return left; }
+        return ResourceBoundOrder.Proves(right, left, cancellation) ? right : ResourceExpression.Zero;
     }
 
     internal static ResourceExpression CheckRank(ResourceLoopRank rank, CancellationToken cancellation)
