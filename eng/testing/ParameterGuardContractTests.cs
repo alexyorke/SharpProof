@@ -27,6 +27,9 @@ public sealed class ParameterGuardContractTests
             Assert.That(Invoke(type, "ValidateInitialized", [value, false, "input", null]), Is.SameAs(value));
             Assert.That(Invoke(type, "ValidateInitialized", [null, false, "input", null]), Is.Null);
             AssertFailure(type, "ValidateInitialized", [value, true, "input", "detail"], typeof(ArgumentException), "input", "detail");
+            Assert.That(Invoke(type, "RequireUniqueKey", [false, "entry"]), Is.Null);
+            AssertFailure(type, "RequireUniqueKey", [true, "entry"], typeof(ArgumentException), null,
+                "An item with the same key has already been added. Key: entry");
             foreach (var invalidName in ImmutableArray.Create<string?>(null, ""))
             {
                 AssertFailure(type, "ValidateInitialized", [value, false, invalidName, null], typeof(ArgumentException), "parameterName");
@@ -71,14 +74,13 @@ public sealed class ParameterGuardContractTests
     }
 
     private static void AssertFailure(Type type, string name, ImmutableArray<object?> arguments,
-        Type expectedType, string parameterName, string? detail = null)
+        Type expectedType, string? parameterName, string? detail = null)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(name);
         if (arguments.IsDefault)
         { throw new ArgumentNullException(nameof(arguments)); }
         ArgumentNullException.ThrowIfNull(expectedType);
-        ArgumentNullException.ThrowIfNull(parameterName);
         var wrapper = Assert.Throws<TargetInvocationException>((Action)(() => Invoke(type, name, arguments)));
         Assert.That(wrapper!.InnerException, Is.TypeOf(expectedType));
         var exception = (ArgumentException)wrapper.InnerException!;

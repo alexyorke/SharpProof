@@ -33,8 +33,7 @@ internal static class IrSequenceReads
             var previous = fresh.ToImmutable();
             foreach (var variable in previous)
             {
-                if (variable.IsDefault)
-                { RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable)); }
+                RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
                 if (writes[variable].Any(writer =>
                     writer is null ? throw new ArgumentNullException(nameof(writer)) :
                     writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh)))

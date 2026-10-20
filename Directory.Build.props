@@ -132,6 +132,7 @@
                         '$(SharpProofProjectName)' == 'SharpProof.Smt' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Specs' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Testing' OR
+                        '$(SharpProofProjectName)' == 'SharpProof.Tool' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Verify' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker.Protocol'">

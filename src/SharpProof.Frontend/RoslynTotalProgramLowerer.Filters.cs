@@ -135,8 +135,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrBlockId Unwind(ImmutableArray<ControlFlowRegion> prefix, IrBlockId target)
         {
             RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-            if (prefix.IsDefault)
-            { throw new ArgumentNullException(nameof(prefix)); }
+            RepositoryParameterGuard.ThrowIfMissing(prefix.IsDefault, nameof(prefix));
             target = EnterRegionFinallyChain(prefix, target, token.Site, token, preserveResult);
             return innerUnwind == null ? target : innerUnwind(target);
         }

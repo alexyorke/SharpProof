@@ -608,8 +608,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId EnterRegionFinallyChain(ImmutableArray<ControlFlowRegion> regions, IrBlockId target,
         OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
-        if (regions.IsDefault)
-        { throw new ArgumentNullException(nameof(regions)); }
+        RepositoryParameterGuard.ThrowIfMissing(regions.IsDefault, nameof(regions));
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         for (var ordinal = regions.Length - 1; ordinal >= 0; ordinal--)

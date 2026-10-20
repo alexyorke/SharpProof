@@ -234,9 +234,7 @@ internal static class CompilerReachableSourceCollector
                     CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType))
                 };
             }
-            if (bodies.ContainsKey(id))
-            { throw new ArgumentException("An item with the same key has already been added. Key: " + id); }
-            bodies.Add(id, body);
+            bodies.AddUnique(id, body);
             pending = pending.Enqueue(method);
             return body;
         }

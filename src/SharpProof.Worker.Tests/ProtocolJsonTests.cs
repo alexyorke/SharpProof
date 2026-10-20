@@ -16,6 +16,29 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class ProtocolJsonTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ImmutableWireArrayRejectsNonArrayAndIncompleteReaderTokens(bool incomplete)
+    {
+        var options = WorkerProtocolJson.SharedOptions;
+        var converter = (System.Text.Json.Serialization.JsonConverter<ImmutableArray<int>>)
+            new ProtocolArrayJsonConverter().CreateConverter(typeof(ImmutableArray<int>), options);
+        Assert.Throws<JsonException>((Action)(() =>
+        {
+            var input = incomplete ? "["u8 : "0"u8;
+            var reader = new Utf8JsonReader(input, isFinalBlock: !incomplete, state: default);
+            Assert.That(reader.Read(), Is.True);
+            _ = converter.Read(ref reader, typeof(ImmutableArray<int>), options);
+        }));
+    }
+
+    [Test]
+    public void ImmutableIdentitySnapshotsRejectRepeatedNonblankValues()
+    {
+        Assert.That(WorkerProtocolJson.AreDistinctNonblank(["entry", "entry"]), Is.False);
+        Assert.That(WorkerProtocolJson.AreDistinctNonblank(["entry", "other"]), Is.True);
+    }
+
     [Test]
     public void ImmutableHashInputsRejectDefaultAndRetainTheEmptyPayloadDigest()
     {

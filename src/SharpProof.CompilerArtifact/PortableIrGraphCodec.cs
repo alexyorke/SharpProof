@@ -399,9 +399,7 @@ internal static partial class PortableIrGraphCodec
         var result = ImmutableDictionary.CreateBuilder<T, int>();
         foreach (var value in values)
         {
-            if (result.ContainsKey(value))
-            { throw new ArgumentException("An item with the same key has already been added. Key: " + value); }
-            result.Add(value, result.Count);
+            result.AddUnique(value, result.Count);
         }
 
         return result.ToImmutable();
@@ -1052,8 +1050,7 @@ internal static partial class PortableIrGraphCodec
 
         private void RequireCanonicalVariableIndices(ImmutableArray<int> indices)
         {
-            if (indices.IsDefault)
-            { throw new ArgumentException("Array must be initialized.", nameof(indices)); }
+            RepositoryParameterGuard.RequireInitialized(indices.IsDefault, nameof(indices), "Array must be initialized.");
             var previous = -1;
             foreach (var index in indices)
             {

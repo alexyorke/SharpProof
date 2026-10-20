@@ -131,8 +131,7 @@ internal static class ContractForCompanionValidator
             ISymbol symbol,
             ImmutableArray<object?> arguments)
         {
-            if (arguments.IsDefault)
-            { throw new ArgumentNullException(nameof(arguments)); }
+            RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
             descriptor = RepositoryParameterGuard.NotNull(descriptor, nameof(descriptor));
             symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             diagnostics(Diagnostic.Create(

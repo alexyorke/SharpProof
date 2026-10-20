@@ -587,8 +587,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
     }
     private static bool HasNamespace(INamespaceSymbol? symbol, ImmutableArray<string> parts)
     {
-        if (parts.IsDefault)
-        { throw new ArgumentNullException(nameof(parts)); }
+        RepositoryParameterGuard.ThrowIfMissing(parts.IsDefault, nameof(parts));
 
         for (var index = parts.Length - 1; index >= 0; index--)
         {

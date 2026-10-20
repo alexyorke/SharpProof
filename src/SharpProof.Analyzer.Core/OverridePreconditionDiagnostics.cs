@@ -94,9 +94,7 @@ internal static class OverridePreconditionDiagnostics
                 continue;
             }
             var value = factory.Variable(identity);
-            if (variables.ContainsKey(variable.Variable))
-            { throw new ArgumentException("An item with the same key has already been added. Key: " + variable.Variable); }
-            variables.Add(variable.Variable, value);
+            variables.AddUnique(variable.Variable, value);
         }
         var substitutions = variables.ToImmutable();
         return [.. contracts.Clauses

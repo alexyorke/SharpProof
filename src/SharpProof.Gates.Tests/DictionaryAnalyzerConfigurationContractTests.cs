@@ -29,15 +29,22 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
         }
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void ExplicitComparerSnapshotsAnOpaqueReadOnlyDictionary(bool ignoreCase)
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void ExplicitComparerSnapshotsAnOpaqueReadOnlyDictionary(bool ignoreCase, bool opaqueInput)
     {
         var comparer = ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         var producer = new Dictionary<string, string>(comparer) { ["CaseKey"] = "captured" };
         IReadOnlyDictionary<string, string> opaque =
             new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(producer);
-        var options = new DictionaryAnalyzerConfigOptions(opaque, comparer);
+        var options = opaqueInput
+            ? new DictionaryAnalyzerConfigOptions(opaque, comparer)
+            : new DictionaryAnalyzerConfigOptions(producer);
+        var provider = opaqueInput
+            ? new DictionaryAnalyzerConfigOptionsProvider(opaque, comparer)
+            : new DictionaryAnalyzerConfigOptionsProvider(producer);
         producer["CaseKey"] = "changed";
         producer["added"] = "later";
 
@@ -47,6 +54,12 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
             Assert.That(captured, Is.EqualTo("captured"));
             Assert.That(options.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
             Assert.That(options.TryGetValue("added", out _), Is.False);
+            Assert.That(provider.GlobalOptions.TryGetValue("CaseKey", out var global), Is.True);
+            Assert.That(global, Is.EqualTo("captured"));
+            Assert.That(provider.GlobalOptions.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
+            Assert.That(provider.GlobalOptions.TryGetValue("added", out _), Is.False);
+            Assert.That(provider.GetOptions(CSharpSyntaxTree.ParseText("class C { }")),
+                Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
         }
     }
 

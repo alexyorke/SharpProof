@@ -9,8 +9,7 @@ internal static partial class LauncherPresentation
         string callableId, ImmutableArray<WorkerAssumptionEvidence> assumptions)
     {
         System.ArgumentNullException.ThrowIfNull(callableId);
-        if (assumptions.IsDefault)
-        { throw new ArgumentNullException(nameof(assumptions)); }
+        RepositoryParameterGuard.ThrowIfMissing(assumptions.IsDefault, nameof(assumptions));
         var user = assumptions
             .Where(static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume))

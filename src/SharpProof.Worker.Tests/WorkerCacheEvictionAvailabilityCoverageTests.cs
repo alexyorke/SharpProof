@@ -6,6 +6,31 @@ namespace SharpProof.Worker.Test;
 internal sealed partial class WorkerTests
 {
     [Test]
+    public async Task EvictionCanFinishAfterSkippingTheProtectedOldestEntry()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(response, WorkerClaimOutcome.Refuted);
+        var original = CacheFiles(project).Single();
+        var capacity = new FileInfo(original).Length;
+        Assert.That(capacity, Is.GreaterThan(0));
+        File.SetLastWriteTimeUtc(original, DateTime.UtcNow.AddDays(1));
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
+        var protectedHash = new string(response.InputHash[0] == 'a' ? 'b' : 'a', 64);
+        var cache = new VerificationCache(project.CacheDirectory, capacity);
+        Assert.That(await cache.TryWriteAsync(response, protectedHash, snapshot.CompilerManifest.Manifest,
+            TestContext.CurrentContext.CancellationToken), Is.True);
+        Assert.That(File.Exists(original), Is.False);
+        Assert.That(CacheFiles(project).Length, Is.EqualTo(1));
+        var cached = await cache.TryReadAsync(protectedHash, snapshot.CompilerManifest.Manifest,
+            request.Budgets, TestContext.CurrentContext.CancellationToken);
+        Assert.That(cached, Is.Not.Null);
+        AssertClaimVerdict(cached!, WorkerClaimOutcome.Refuted);
+    }
+
+    [Test]
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     public async Task ReadOnlyCacheEvictionPreservesTheNativeRefutation()
     {

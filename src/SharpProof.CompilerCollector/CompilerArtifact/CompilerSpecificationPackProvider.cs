@@ -50,11 +50,7 @@ internal sealed class CompilerSpecificationPackProvider
                 var definition = new CompilerSpecificationMethodEvidence(
                     method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
                     method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
-                if (methods.ContainsKey(method.DocumentationCommentId))
-                {
-                    throw new ArgumentException("An item with the same key has already been added. Key: " + method.DocumentationCommentId);
-                }
-                methods.Add(method.DocumentationCommentId, definition);
+                methods.AddUnique(method.DocumentationCommentId, definition);
             }
         }
 

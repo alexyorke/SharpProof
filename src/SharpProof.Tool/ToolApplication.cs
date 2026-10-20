@@ -26,8 +26,7 @@ internal static class ToolApplication
         ImmutableArray<string> args, TextWriter output, TextWriter error, Func<CancellationToken, Task<string>> discoverSdk,
         CancellationToken cancellationToken)
     {
-        if (args.IsDefault)
-        { throw new ArgumentNullException(nameof(args)); }
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(discoverSdk);
@@ -77,8 +76,7 @@ internal static class ToolApplication
 
     private static async Task<int> ExplainAsync(ImmutableArray<string> args, TextWriter output, CancellationToken cancellationToken)
     {
-        if (args.IsDefault)
-        { throw new ArgumentNullException(nameof(args)); }
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         ArgumentNullException.ThrowIfNull(output);
         string? file = null;
         int? line = null;
@@ -128,16 +126,14 @@ internal static class ToolApplication
         foreach (var claim in response.Manifest.Claims)
         {
             ArgumentNullException.ThrowIfNull(claim);
-            if (claimBuffer.ContainsKey(claim.ClaimId))
-            { throw new ArgumentException("An item with the same key has already been added. Key: " + claim.ClaimId); }
+            RepositoryParameterGuard.RequireUniqueKey(claimBuffer.ContainsKey(claim.ClaimId), claim.ClaimId);
             claimBuffer.Add(claim.ClaimId, claim);
         }
         var callableBuffer = ImmutableDictionary.CreateBuilder<string, WorkerCallableManifestEntry>(StringComparer.Ordinal);
         foreach (var callable in response.Manifest.Callables)
         {
             ArgumentNullException.ThrowIfNull(callable);
-            if (callableBuffer.ContainsKey(callable.CallableId))
-            { throw new ArgumentException("An item with the same key has already been added. Key: " + callable.CallableId); }
+            RepositoryParameterGuard.RequireUniqueKey(callableBuffer.ContainsKey(callable.CallableId), callable.CallableId);
             callableBuffer.Add(callable.CallableId, callable);
         }
         var claims = claimBuffer.ToImmutable();

@@ -186,8 +186,7 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
     {
         System.ArgumentNullException.ThrowIfNull(claimId);
         ArgumentNullGuard.NotNull(target, nameof(target));
-        if (proofCore.IsDefault)
-        { throw new ArgumentNullException(nameof(proofCore)); }
+        RepositoryParameterGuard.ThrowIfMissing(proofCore.IsDefault, nameof(proofCore));
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         var record = Create(
             target,

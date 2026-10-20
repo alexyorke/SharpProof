@@ -144,8 +144,7 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
     private Status Check(ImmutableArray<BoolExpr> selectors, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        if (selectors.IsDefault)
-        { throw new ArgumentException("Array must be initialized.", nameof(selectors)); }
+        RepositoryParameterGuard.RequireInitialized(selectors.IsDefault, nameof(selectors), "Array must be initialized.");
         using var parameters = _runner.Context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
         // The host owns SIGINT and forwards cancellation through Context.Interrupt().

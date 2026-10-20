@@ -38,6 +38,8 @@ namespace SharpProof.Internal.SharpProofSmt;
 namespace SharpProof.Internal.SharpProofSpecs;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_TESTING
 namespace SharpProof.Internal.SharpProofTesting;
+#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_TOOL
+namespace SharpProof.Internal.SharpProofTool;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_VERIFY
 namespace SharpProof.Internal.SharpProofVerify;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_WORKER
@@ -93,6 +95,16 @@ internal static class ParameterGuard
     {
         RequireInitialized(invalid, parameterName, message);
         return value;
+    }
+
+    internal static void RequireUniqueKey<T>(
+        bool duplicate,
+        T /* SPINT001: all values valid - the caller supplies duplicate membership and formatting is deferred until failure */ key)
+    {
+        if (duplicate)
+        {
+            throw new System.ArgumentException("An item with the same key has already been added. Key: " + key);
+        }
     }
 
     private static void ValidateName(string parameterName)

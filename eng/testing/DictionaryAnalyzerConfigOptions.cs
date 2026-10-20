@@ -15,6 +15,11 @@ internal sealed class DictionaryAnalyzerConfigOptions(
         ImmutableArray<(string Key, string Value)> values)
         : this(Capture(values))
     {
+        RequireInitialized(values);
+    }
+
+    private static void RequireInitialized(ImmutableArray<(string Key, string Value)> values)
+    {
         if (values.IsDefault)
         { throw new ArgumentNullException(nameof(values)); }
     }
@@ -22,8 +27,7 @@ internal sealed class DictionaryAnalyzerConfigOptions(
     private static ImmutableDictionary<string, string> Capture(
         ImmutableArray<(string Key, string Value)> values)
     {
-        if (values.IsDefault)
-        { throw new ArgumentNullException(nameof(values)); }
+        RequireInitialized(values);
         var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in values)
         {
