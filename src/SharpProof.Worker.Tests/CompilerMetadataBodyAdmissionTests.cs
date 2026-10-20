@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -41,8 +42,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
         var compilation = CreateGuardCompilation();
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees, TestContext.CurrentContext.CancellationToken);
-        var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees, null,
+        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees.ToImmutableArray(), TestContext.CurrentContext.CancellationToken);
+        var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees.ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(entry, Is.Not.Null);
         Assert.That(body, Is.Not.Null);
@@ -83,13 +84,13 @@ public sealed class CompilerMetadataBodyAdmissionTests
         try
         {
             var dependency = CreatePlatformCompilation(
-                "public static class Dependency { public static int Identity(int value) => value; }")
+                "public static class Dependency { public static int Identity(int value) => value; }", ImmutableArray<MetadataReference>.Empty)
                 .WithAssemblyName("PlainMetadataDependency");
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, EmitImage(dependency));
+            File.WriteAllBytes(path, EmitImage(dependency).AsSpan());
             var compilation = CreatePlatformCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
-                MetadataReference.CreateFromFile(path));
+                [MetadataReference.CreateFromFile(path)]);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!.GetMembers("Identity").Single();
@@ -130,24 +131,24 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var dependency = CreateCompilation(
                 "[System.AttributeUsage(System.AttributeTargets.Parameter, AllowMultiple=true)] " +
                 "public sealed class TagAttribute : System.Attribute { } " +
-                $"public static class AnnotationSubject {{ public static int Identity({parameterSource}) => value0; }}")
+                $"public static class AnnotationSubject {{ public static int Identity({parameterSource}) => value0; }}", ImmutableArray<MetadataReference>.Empty)
                 .WithAssemblyName("OrdinaryAnnotationDependency");
             var image = EmitImage(dependency);
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, image.AsSpan());
             var arguments = string.Join(",", Enumerable.Range(0, parameters).Select(_ => "1"));
             var compilation = CreateCompilation(
                 $"internal static class Caller {{ internal static int Invoke() => AnnotationSubject.Identity({arguments}); }}",
-                MetadataReference.CreateFromFile(path));
+                [MetadataReference.CreateFromFile(path)]);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("AnnotationSubject")!
                 .GetMembers("Identity").Single();
             Assert.That(method.Parameters[0].GetAttributes(), Has.Length.EqualTo(annotations));
             Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.Name == "TagAttribute")), Is.True);
-            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
-            var rows = definition.GetParameters().Select(handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetParameter(handle)))).ToArray();
+            var rows = definition.GetParameters().Select(handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetParameter(handle)))).ToImmutableArray();
             var attributeRows = rows.Sum(row => ((row.Equals(default(Parameter))) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetCustomAttributes().Count)));
             using (Assert.EnterMultipleScope())
             {
@@ -190,23 +191,23 @@ public sealed class CompilerMetadataBodyAdmissionTests
         Directory.CreateDirectory(directory);
         try
         {
-            var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToArray();
+            var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToImmutableArray();
             var source = string.Concat(names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ($"public class {name} {{\n"))) +
                 "public static int Identity([SharpProof.Attributes.Positive] int value) { return value; }\n" +
                 new string('}', owners);
-            var dependency = CreateCompilation(source).WithAssemblyName("OwnerAncestryDependency");
+            var dependency = CreateCompilation(source, ImmutableArray<MetadataReference>.Empty).WithAssemblyName("OwnerAncestryDependency");
             dependency = dependency.WithOptions(dependency.Options.WithOptimizationLevel(OptimizationLevel.Debug));
             var image = EmitImage(dependency);
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, image.AsSpan());
             var compilation = CreateCompilation(
                 $"internal static class Subject {{ internal static int Identity(int value) => {string.Join('.', names)}.Identity(value); }}",
-                MetadataReference.CreateFromFile(path));
+                [MetadataReference.CreateFromFile(path)]);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName(string.Join('+', names))!
                 .GetMembers("Identity").Single();
             Assert.That(method.ContainingType.IsGenericType, Is.False);
-            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
             var ancestry = 0;
@@ -262,13 +263,13 @@ public sealed class CompilerMetadataBodyAdmissionTests
                         {{statements}}
                     }
                 }
-                """).WithAssemblyName("MetadataAdmissionDependency");
+                """, ImmutableArray<MetadataReference>.Empty).WithAssemblyName("MetadataAdmissionDependency");
             dependency = dependency.WithOptions(dependency.Options.WithOptimizationLevel(OptimizationLevel.Debug));
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, EmitImage(dependency));
+            File.WriteAllBytes(path, EmitImage(dependency).AsSpan());
             var compilation = CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
-                MetadataReference.CreateFromFile(path));
+                [MetadataReference.CreateFromFile(path)]);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
@@ -302,9 +303,10 @@ public sealed class CompilerMetadataBodyAdmissionTests
         }
     }
 
-    private static CSharpCompilation CreateCompilation(string source, params MetadataReference[] additionalReferences)
+    private static CSharpCompilation CreateCompilation(string source, ImmutableArray<MetadataReference> additionalReferences)
     {
-        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        if (additionalReferences.IsDefault)
+        { throw new ArgumentNullException(nameof(additionalReferences)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
@@ -312,9 +314,10 @@ public sealed class CompilerMetadataBodyAdmissionTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static CSharpCompilation CreatePlatformCompilation(string source, params MetadataReference[] additionalReferences)
+    private static CSharpCompilation CreatePlatformCompilation(string source, ImmutableArray<MetadataReference> additionalReferences)
     {
-        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        if (additionalReferences.IsDefault)
+        { throw new ArgumentNullException(nameof(additionalReferences)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
@@ -324,19 +327,19 @@ public sealed class CompilerMetadataBodyAdmissionTests
 
     private static CSharpCompilation CreateGuardCompilation()
     {
-        var compilation = TestCompilation.Create("DefensiveGuardControl", ("Subject.cs", """
+        var compilation = TestCompilation.CreateExact("DefensiveGuardControl", [("Subject.cs", """
             using SharpProof.Attributes;
             public static class Subject
             {
                 [ZeroAllocations]
                 public static int Root() => 1;
             }
-            """));
+            """)]);
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }
 
-    private static byte[] EmitImage(CSharpCompilation compilation)
+    private static ImmutableArray<byte> EmitImage(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
@@ -346,6 +349,6 @@ public sealed class CompilerMetadataBodyAdmissionTests
             throw new InvalidOperationException(string.Join(Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 }

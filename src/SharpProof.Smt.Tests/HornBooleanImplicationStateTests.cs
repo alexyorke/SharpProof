@@ -21,8 +21,10 @@ public sealed class HornBooleanImplicationStateTests
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:commitment", factory.BooleanType, isStatic: true, factory.BooleanType, factory.BooleanType);
         var atom = factory.PureOpaque(relation, null, ready, committed);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [ready, committed] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [ready, committed];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [safety], atom),
             Query(factory, [atom], factory.PureOpaque(relation, null, nextReady, nextCommitted)),

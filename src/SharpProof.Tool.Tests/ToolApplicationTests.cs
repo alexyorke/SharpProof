@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -10,6 +11,43 @@ namespace SharpProof.Tool.Test;
 [TestFixture]
 public sealed class ToolApplicationTests
 {
+    [Test]
+    public void EntrypointRejectsDefaultArgumentsBeforeDispatch()
+    {
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await Program.RunMainAsync(default, TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("args"));
+    }
+
+    [Test]
+    public void ApplicationRejectsDefaultArgumentsBeforeOutputOrDiscovery()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await ToolApplication.RunAsync(default, output, error,
+                static _ => throw new AssertionException("Discovery must not start."),
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("args"));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
+    [Test]
+    public void SdkProbeRejectsDefaultArgumentsBeforeStartingProcess()
+    {
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await SdkProbe.RunAsync("must-not-start", default, TimeSpan.FromSeconds(5),
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+    }
+
     [Test]
     public async Task ActualEntrypointDocumentsSupportedCommands()
     {
@@ -90,7 +128,7 @@ public sealed class ToolApplicationTests
         ArgumentNullException.ThrowIfNull(command);
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.That(await ToolApplication.RunAsync(command.Split(' '), output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
+        Assert.That(await ToolApplication.RunAsync(command.Split(' ').ToImmutableArray(), output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
         Assert.That(output.ToString(), Is.Empty);
         Assert.That(error.ToString(), Does.StartWith("SharpProof: "));
     }
@@ -190,14 +228,16 @@ public sealed class ToolApplicationTests
     [Test]
     public async Task ExplainReportsRecordedInfrastructureFailureWithoutSemanticSuccess()
     {
-        var response = CreateResponse();
-        response.Manifest = new();
+        var response = CreateResponse() with
+        {
+            Manifest = new(),
+            CallableResults = [],
+            ClaimResults = [],
+            RunStatus = WorkerRunStatus.Failed,
+            FailureReason = WorkerRunFailureReason.InputUnavailable,
+            Errors = [new() { Code = "input.unavailable", Message = "fixture failure" }]
+        };
         WorkerProtocolJson.SealManifest(response.Manifest);
-        response.CallableResults = [];
-        response.ClaimResults = [];
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = WorkerRunFailureReason.InputUnavailable;
-        response.Errors = [new() { Code = "input.unavailable", Message = "fixture failure" }];
         var path = Path.GetTempFileName();
         try
         {

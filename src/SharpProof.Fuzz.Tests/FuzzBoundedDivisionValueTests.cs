@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -15,7 +16,7 @@ public sealed class FuzzBoundedDivisionValueTests
         var second = factory.CreateVariable("second", integer);
         var third = factory.CreateVariable("third", integer);
         IrTerm quotient = factory.Integer(integer, long.MaxValue);
-        foreach (var variable in new[] { first, second, third })
+        foreach (var variable in ImmutableArray.Create(first, second, third))
         {
             var value = factory.Variable(variable);
             var denominator = factory.Binary(IrBinaryOperator.Add,

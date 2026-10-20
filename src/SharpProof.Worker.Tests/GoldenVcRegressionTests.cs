@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -27,6 +28,7 @@ public sealed class GoldenVcRegressionTests
             AssertDiamondJoinArtifact(artifact);
         }
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         if (depthLimited || entryDepthLimited)
         {
             project.Request.Budgets.MaximumExpressionDepth = maximumDepth;
@@ -44,7 +46,7 @@ public sealed class GoldenVcRegressionTests
         else if (depthLimited)
         {
             Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
             Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.DeepPostcondition));
         }
         else
@@ -66,7 +68,7 @@ public sealed class GoldenVcRegressionTests
         var callable = CompilerManifestArtifactJson.DecodeCallables(
             artifact, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         var program = callable.Total!.Program;
-        var instructions = program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).ToArray();
+        var instructions = program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).ToImmutableArray();
         var diagnostic = string.Join(Environment.NewLine, program.Blocks.Select(block =>
             block is null ? throw new ArgumentNullException(nameof(block)) : $"{block.Id}: {string.Join("; ", block.Instructions.Select(instruction =>
                 instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction switch
@@ -83,7 +85,7 @@ public sealed class GoldenVcRegressionTests
             .Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : IntegerLiteral(instruction.Value))
             .Where(value => value.HasValue)
             .Select(value => value ?? throw new ArgumentNullException(nameof(value)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(assignedLiterals, Does.Contain(3).And.Contain(7),
             "The typed body must assign both diamond values." + Environment.NewLine + diagnostic);
     }

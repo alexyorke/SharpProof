@@ -72,7 +72,7 @@ public sealed class ContractNestedShortCircuitRegressionTests
             "private static bool Need(int divisor) { Contract.Requires(" + clause + "); return true; } " +
             "public static bool Caller() { return Need(" + divisor + "); } }",
             "contracts", ["SP0027"]);
-        var expected = "Call to 'Need' violates precondition '" + clause + "'";
+        const string expected = "Call to 'Need' violates precondition '" + clause + "'";
         Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             violation ? Is.EqualTo([expected]) : Is.Empty);
     }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -123,8 +124,8 @@ internal sealed class WorkerVcStringEqualityTests
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
             callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal)));
-        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId))).ToArray();
-        Assert.That(claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)).ToArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
+        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId))).ToImmutableArray();
+        Assert.That(claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)).ToImmutableArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
             string.Join(", ", claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason))));
     }
 

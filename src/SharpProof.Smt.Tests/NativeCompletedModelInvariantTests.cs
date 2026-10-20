@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Z3;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using IrTypeId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrTypeTag>;
@@ -10,11 +11,11 @@ public sealed class NativeCompletedModelInvariantTests
 {
     private static IEnumerable<TestCaseData> IntegerCases()
     {
-        foreach (var width in new[] { 8, 16, 32, 64 })
+        foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
-            foreach (var signedness in new[] { false, true })
+            foreach (var signedness in ImmutableArray.Create(false, true))
             {
-                foreach (var mode in new[] { "free", "zero", "high", "ones" })
+                foreach (var mode in ImmutableArray.Create("free", "zero", "high", "ones"))
                 {
                     yield return new TestCaseData(width, signedness, mode);
                 }
@@ -31,7 +32,7 @@ public sealed class NativeCompletedModelInvariantTests
         var variable = factory.CreateVariable("input", type);
         var bits = mode == "high" ? 1UL << (width - 1)
             : mode == "ones" ? width == 64 ? ulong.MaxValue : (1UL << width) - 1 : 0;
-        IrTerm[] predicates = mode == "free" ? []
+        ImmutableArray<IrTerm> predicates = mode == "free" ? []
             : [Equal(factory, factory.Variable(variable), factory.IntegerBits(type, bits))];
         WithNativeModel(factory, variable, predicates, (encoder, model, meter, values) =>
         {
@@ -59,7 +60,7 @@ public sealed class NativeCompletedModelInvariantTests
         System.ArgumentNullException.ThrowIfNull(mode);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("flag", factory.BooleanType);
-        IrTerm[] predicates = mode == "free" ? []
+        ImmutableArray<IrTerm> predicates = mode == "free" ? []
             : [Equal(factory, factory.Variable(variable), factory.Boolean(expected))];
         WithNativeModel(factory, variable, predicates, (encoder, model, meter, values) =>
         {
@@ -134,7 +135,7 @@ public sealed class NativeCompletedModelInvariantTests
                 var equality = encoder.EncodeBoolean(Equal(factory, factory.Length(term), factory.Integer(int.MaxValue)), meter);
                 Assert.That(equality.FuncDecl.DeclKind, Is.EqualTo(Z3_decl_kind.Z3_OP_EQ));
                 Assert.That(equality.NumArgs, Is.EqualTo(2U));
-                var children = equality.Args;
+                var children = equality.Args.ToImmutableArray();
                 try
                 {
                     using var evaluated = model.Evaluate(children[0], true);
@@ -151,10 +152,11 @@ public sealed class NativeCompletedModelInvariantTests
             }, decode: false);
     }
 
-    private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,
-        Action<BvEncoder, Model, SmtQueryResourceMeter, Dictionary<IrVarId, IrValue>> inspect, bool decode = true)
+    private static void WithNativeModel(IrFactory factory, IrVarId variable, ImmutableArray<IrTerm> predicates,
+        Action<BvEncoder, Model, SmtQueryResourceMeter, ImmutableDictionary<IrVarId, IrValue>> inspect, bool decode = true)
     {
-        System.ArgumentNullException.ThrowIfNull(predicates, nameof(predicates));
+        if (predicates.IsDefault)
+        { throw new ArgumentNullException(nameof(predicates)); }
         if (variable.IsDefault)
         {
             throw new System.ArgumentOutOfRangeException(nameof(variable));
@@ -185,9 +187,9 @@ public sealed class NativeCompletedModelInvariantTests
             Assert.That(SmtNativeCheck.Run(solver, [goalSelector], meter), Is.EqualTo(Status.SATISFIABLE));
             using var model = solver.Model;
             Assert.That(model, Is.Not.Null);
-            var values = decode ? encoder.DecodeModel(query, model, meter)! : new Dictionary<IrVarId, IrValue>();
+            var values = decode ? encoder.DecodeModel(query, model, meter)! : ImmutableDictionary<IrVarId, IrValue>.Empty;
             if (decode)
-            { Assert.That(values.Keys, Is.EquivalentTo(new[] { variable })); }
+            { Assert.That(values.Keys, Is.EquivalentTo(ImmutableArray.Create(variable))); }
             inspect(encoder, model, meter, values);
         }
         finally

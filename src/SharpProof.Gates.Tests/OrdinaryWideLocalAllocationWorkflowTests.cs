@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -31,7 +32,7 @@ public sealed class OrdinaryWideLocalAllocationWorkflowTests
             var method = assembly.GetType("ScalarBody", throwOnError: true)!.GetMethod("Read")!;
             var body = method.GetMethodBody()!;
             var runtimeSeed = declaredLocals % 11 + 1;
-            var arguments = new object[] { runtimeSeed };
+            ImmutableArray<object> arguments = [runtimeSeed];
 
             using (Assert.EnterMultipleScope())
             {
@@ -42,7 +43,7 @@ public sealed class OrdinaryWideLocalAllocationWorkflowTests
                 Assert.That(body.LocalVariables.Any(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalIndex >= 256)), Is.EqualTo(expectedWideLocal));
                 Assert.That(body.GetILAsByteArray(), Is.Not.Null.And.Not.Empty);
                 Assert.That(body.GetILAsByteArray()!.Length, Is.LessThan(65536));
-                Assert.That(method.Invoke(null, arguments), Is.EqualTo(runtimeSeed * declaredLocals));
+                Assert.That(method.Invoke(null, arguments.ToArray()), Is.EqualTo(runtimeSeed * declaredLocals));
                 Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.False);
             }
         }

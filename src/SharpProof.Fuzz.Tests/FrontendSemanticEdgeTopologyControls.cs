@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,16 +11,16 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FrontendSemanticEdgeTopologyControls
 {
-    private static readonly string[] OverloadedNames = ["EdgeTarget0", "EdgeTarget0"];
-    private static readonly int[] OverloadedParameterCounts = [0, 1];
+    private static readonly ImmutableArray<string> OverloadedNames = ["EdgeTarget0", "EdgeTarget0"];
+    private static readonly ImmutableArray<int> OverloadedParameterCounts = [0, 1];
 
     [Test]
     public void ActualSameNamedNamespaceSubjectIsRejected()
     {
-        FrontendSemanticEdgeCase[] cases =
+        ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
             Exact("long", "0L; } namespace Other { public static class SharpProofGeneratedFrontendEdges { " +
-                "public static long Other() => 0L; } } public static class Tail { public static long Value => 0L")
+                "public static long Other() => 0L; } } public static class Tail { public static long Value => 0L", [])
         ];
         var root = CompileActual(cases);
         Assert.That(root.DescendantNodes().OfType<ClassDeclarationSyntax>().Count(type =>
@@ -32,14 +33,14 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualOverloadedNamesKeepBothIsolatedCohorts()
     {
-        FrontendSemanticEdgeCase[] cases =
+        ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
-            Exact("long", "0L"),
-            Exact("/*", "*/ long EdgeTarget0(long value) => value", 7L)
+            Exact("long", "0L", []),
+            Exact("/*", "*/ long EdgeTarget0(long value) => value", [7L])
         ];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
-        var methods = subject.Members.OfType<MethodDeclarationSyntax>().ToArray();
+        var methods = subject.Members.OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(methods.Length, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
@@ -53,7 +54,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualAbsentExpectedMethodIsRejected()
     {
-        FrontendSemanticEdgeCase[] cases = [Exact("/*", "*/ long EdgeTarget1() => 0L")];
+        ImmutableArray<FrontendSemanticEdgeCase> cases = [Exact("/*", "*/ long EdgeTarget1() => 0L", [])];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
@@ -64,17 +65,19 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge method shape."));
     }
 
-    private static FrontendSemanticEdgeCase Exact(string returnType, string expression, params object?[] arguments)
+    private static FrontendSemanticEdgeCase Exact(string returnType, string expression, ImmutableArray<object?> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expression);
         System.ArgumentNullException.ThrowIfNull(returnType);
         return new(returnType, "", expression, arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
     }
 
-    private static CompilationUnitSyntax CompileActual(FrontendSemanticEdgeCase[] cases)
+    private static CompilationUnitSyntax CompileActual(ImmutableArray<FrontendSemanticEdgeCase> cases)
     {
-        System.ArgumentNullException.ThrowIfNull(cases, nameof(cases));
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
         var source = new StringBuilder();
         source.AppendLine("#nullable enable");
         source.AppendLine("public enum SharpProofGeneratedEdgeEnum { One = 1 }");

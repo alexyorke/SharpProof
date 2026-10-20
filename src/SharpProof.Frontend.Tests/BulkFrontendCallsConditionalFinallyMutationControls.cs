@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -47,26 +48,27 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             // Establish both compiled outcomes before asserting CFG geometry.
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             { Assert.That(method.Invoke(null, [flag]), Is.EqualTo(enabled ? flag ? 60 : 54 : 57)); }
 
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             Assert.That(context.HasScalarSignature, Is.True);
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-            var regions = new List<ControlFlowRegion>();
-            var pending = new Stack<ControlFlowRegion>();
-            pending.Push(graph.Root);
-            while (pending.Count != 0)
+            var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+            var pending = ImmutableStack<ControlFlowRegion>.Empty;
+            pending = pending.Push(graph.Root);
+            while (!pending.IsEmpty)
             {
-                var region = pending.Pop();
-                regions.Add(region);
+                pending = pending.Pop(out var region);
+                regionsBuilder.Add(region);
                 foreach (var child in region.NestedRegions)
-                { pending.Push(child); }
+                { pending = pending.Push(child); }
             }
+            var regions = regionsBuilder.ToImmutable();
             Assert.That(regions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.True);
-            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
+            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
                 .Any(edge => edge != null && !edge.FinallyRegions.IsEmpty), Is.True);
-            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
+            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
                 .Any(edge => edge?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow), Is.False);
             var ownerSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
             var owner = (IInvocationOperation)model.GetOperation(ownerSyntax)!;
@@ -87,7 +89,7 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             Assert.That(conditionalOwner, Is.Not.Null);
             Assert.That(conditionalOwner!.Syntax.SyntaxTree, Is.SameAs(tree));
             Assert.That(conditionalOwner.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
-            var mutations = syntax.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>().ToArray();
+            var mutations = syntax.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>().ToImmutableArray();
             Assert.That(mutations, Has.Length.EqualTo(2));
             foreach (var mutation in mutations)
             {
@@ -99,7 +101,7 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
                 Assert.That(actual.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
                 Assert.That(emission.IsElided(operation!), Is.EqualTo(!enabled));
             }
-            var assignments = syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>().ToArray();
+            var assignments = syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>().ToImmutableArray();
             Assert.That(assignments, Has.Length.EqualTo(2));
             foreach (var assignment in assignments)
             {
@@ -119,10 +121,10 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             }
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(flag)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(enabled ? flag ? 60 : 54 : 57)));
                 Assert.That(replay.ConsumedApproximation, Is.False);

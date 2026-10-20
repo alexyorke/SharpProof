@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorEmptyConcatenationApiTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS1010"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS1010"];
 
     [Test]
     public void ActualNewlineRecoveryKeepsEmptyLeavesWithoutFoldingTheirBinary()
@@ -23,7 +24,7 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         var errors = compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
@@ -59,14 +60,14 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         var observation = new RoslynTotalExpressionLowerer(observationContext, observationBuilder)
             .LowerBodyValue(binary, observationEntry);
         observationBuilder.Return(observation.Continuation, observationContext.Site(binary), observation.Value);
-        var observationInstructions = observationBuilder.Build().Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var observationInstructions = observationBuilder.Build().Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         TestContext.WriteLine($"Recovery expression API: exact={observation.Classification.IsExact}, reason={observation.Classification.Abstention}, sameEntry={observation.Continuation.Equals(observationEntry)}, value={observation.Value.GetType().Name}, type={observationFactory.GetTypeInfo(observation.Value.Type).Kind}, havocs={observationInstructions.OfType<IrHavocInstruction>().Count()}, assigns={observationInstructions.OfType<IrAssignInstruction>().Count()}");
         Assert.That(binary.Type, Is.InstanceOf<IErrorTypeSymbol>());
         Assert.That(binary.Type!.TypeKind, Is.EqualTo(TypeKind.Error));
         Assert.That(binary.Type.SpecialType, Is.EqualTo(SpecialType.None));
         Assert.That(binary.ConstantValue.HasValue, Is.False);
         Assert.That(CSharpOperationSemantics.IsStringConcatenation(binary), Is.False);
-        foreach (var operand in new[] { binary.LeftOperand, binary.RightOperand })
+        foreach (var operand in ImmutableArray.Create(binary.LeftOperand, binary.RightOperand))
         {
             Assert.That(operand, Is.InstanceOf<ILiteralOperation>());
             Assert.That(operand.Parent, Is.SameAs(binary));
@@ -96,7 +97,7 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         var expressionOutput = builder.Build();
         Assert.That(expressionOutput.Blocks, Has.Length.EqualTo(1));
         var instructions = expressionOutput.Blocks.Single().Instructions;
-        var havocs = instructions.OfType<IrHavocInstruction>().ToArray();
+        var havocs = instructions.OfType<IrHavocInstruction>().ToImmutableArray();
         Assert.That(havocs, Has.Length.EqualTo(1));
         Assert.That(havocs[0].HavocKind, Is.EqualTo(IrHavocKind.Variables));
         Assert.That(havocs[0].Origin, Is.EqualTo(IrHavocOrigin.Approximation));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -85,7 +86,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
             TestContext.CurrentContext.CancellationToken, out var prepared), Is.True);
         Assert.That(prepared, Is.Not.Null);
         Assert.That(prepared!.Formula, Is.SameAs(formula));
-        Assert.That(prepared.Variables, Is.EqualTo(new[] { value }));
+        Assert.That(prepared.Variables, Is.EqualTo(ImmutableArray.Create(value)));
         Assert.That(prepared.AssignmentCount, Is.EqualTo(FiniteDomainSmtDifferentialOracle.IntegerDomain.Length));
         Assert.That(prepared.AnyTrue, Is.True);
         var atZero = new IrInterpreter(factory).Evaluate(factory.Binary(IrBinaryOperator.Divide,
@@ -121,7 +122,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
             TestContext.CurrentContext.CancellationToken, out var prepared), Is.True);
         Assert.That(prepared, Is.Not.Null);
         Assert.That(prepared!.Formula, Is.SameAs(formula));
-        Assert.That(prepared.Variables, Is.EqualTo(new[] { value }));
+        Assert.That(prepared.Variables, Is.EqualTo(ImmutableArray.Create(value)));
         Assert.That(prepared.AssignmentCount, Is.EqualTo(FiniteDomainSmtDifferentialOracle.IntegerDomain.Length));
         Assert.That(prepared.AnyTrue, Is.True);
         var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken).ConfigureAwait(false);

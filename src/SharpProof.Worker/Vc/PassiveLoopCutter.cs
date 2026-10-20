@@ -8,17 +8,20 @@ internal sealed partial class PassiveLoopCutter
     private readonly PassiveCallableCandidate _candidate;
     private readonly CancellationToken _cancellation;
     private int _work = PassiveCallableVcBuilder.MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
-    private readonly Dictionary<IrBlockId, List<IrBlockId>> _predecessors = [];
-    private readonly HashSet<(IrBlockId From, IrBlockId To)> _backEdges = [];
-    private readonly Dictionary<IrBlockId, HashSet<IrBlockId>> _loops = [];
-    private readonly HashSet<IrBlockId> _reachable = [];
-    private readonly List<IrBlockId> _finished = [];
-    private readonly Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc = [];
+    private readonly ImmutableDictionary<IrBlockId, ImmutableArray<IrBlockId>.Builder>.Builder _predecessors = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableArray<IrBlockId>.Builder>();
+    private readonly ImmutableHashSet<(IrBlockId From, IrBlockId To)>.Builder _backEdges = ImmutableHashSet.CreateBuilder<(IrBlockId From, IrBlockId To)>();
+    private readonly ImmutableDictionary<IrBlockId, ImmutableHashSet<IrBlockId>.Builder>.Builder _loops = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableHashSet<IrBlockId>.Builder>();
+    private readonly ImmutableDictionary<IrBlockId, ImmutableArray<IrBlockId>.Builder>.Builder _loopOrders = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableArray<IrBlockId>.Builder>();
+    private readonly ImmutableArray<IrBlockId>.Builder _loopHeaderOrder = ImmutableArray.CreateBuilder<IrBlockId>();
+    private readonly ImmutableArray<IrBlockId>.Builder _reachableOrder = ImmutableArray.CreateBuilder<IrBlockId>();
+    private readonly ImmutableHashSet<IrBlockId>.Builder _reachable = ImmutableHashSet.CreateBuilder<IrBlockId>();
+    private readonly ImmutableArray<IrBlockId>.Builder _finished = ImmutableArray.CreateBuilder<IrBlockId>();
+    private readonly ImmutableDictionary<IrBlockId, ImmutableArray<IrVarId>>.Builder _havoc = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableArray<IrVarId>>();
     // The field stores of each loop whose every heap store is one of them,
     // through a receiver over inputs, or an element store; any other heap
     // store forgets the heap.
-    private readonly Dictionary<IrBlockId, ImmutableArray<Cell>?> _cells = [];
-    private readonly HashSet<IrBlockId> _storesElements = [];
+    private readonly ImmutableDictionary<IrBlockId, ImmutableArray<Cell>?>.Builder _cells = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableArray<Cell>?>();
+    private readonly ImmutableHashSet<IrBlockId>.Builder _storesElements = ImmutableHashSet.CreateBuilder<IrBlockId>();
 
     // A location a loop stores to: its receiver over inputs the loop does not
     // write, the field, and a store that writes it.
@@ -28,7 +31,7 @@ internal sealed partial class PassiveLoopCutter
         public IrTerm Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
         public IrWriteInstruction Store { get; init; } = Store ?? throw new System.ArgumentNullException(nameof(Store));
     }
-    private readonly Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents = [];
+    private readonly ImmutableDictionary<IrBlockId, ExceptionComponent>.Builder _exceptionComponents = ImmutableDictionary.CreateBuilder<IrBlockId, ExceptionComponent>();
     private ImmutableArray<Invariant> _invariants = [];
 
     internal sealed record Encoding(IrProgram Program, ImmutableHashSet<IrInstructionId> Stops)
@@ -96,7 +99,7 @@ internal sealed partial class PassiveLoopCutter
         {
             return cutter.FindLoops()
                 ? [.. cutter._loops.OrderBy(loop => loop.Key.Value).Select(loop =>
-                    new Loop(loop.Key, [.. loop.Value], cutter._havoc[loop.Key], cutter._cells[loop.Key] is { } cells
+                    new Loop(loop.Key, loop.Value.ToImmutable(), cutter._havoc[loop.Key], cutter._cells[loop.Key] is { } cells
                         ? [.. cells.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : ((IrTerm)candidate.Factory.PureOpaque(cell.Field, cell.Target)))]
                         : []))]
                 : [];
@@ -126,34 +129,36 @@ internal sealed partial class PassiveLoopCutter
         if (_candidate.Program.Blocks.Length > PassiveCallableVcBuilder.MaximumSteps ||
             _candidate.Parameters.Length > PassiveCallableVcBuilder.MaximumSteps)
         { throw new ConstructionLimitException(); }
-        var active = new HashSet<IrBlockId>();
-        var stack = new Stack<(IrBlockId Block, bool Exit)>();
-        stack.Push((_candidate.Program.Entry, false));
-        while (stack.Count != 0)
+        var active = ImmutableHashSet.CreateBuilder<IrBlockId>();
+        var stack = ImmutableStack<(IrBlockId Block, bool Exit)>.Empty;
+        stack = stack.Push((_candidate.Program.Entry, false));
+        while (!stack.IsEmpty)
         {
             Spend();
-            var (block, exit) = stack.Pop();
+            stack = stack.Pop(out var frame);
+            var (block, exit) = frame;
             if (exit)
             { active.Remove(block); _finished.Add(block); continue; }
             if (!_reachable.Add(block))
             { continue; }
+            _reachableOrder.Add(block);
             active.Add(block);
-            stack.Push((block, true));
+            stack = stack.Push((block, true));
             foreach (var target in Targets(_candidate.Program.GetBlock(block).Terminator))
             {
                 Spend();
                 if (!_predecessors.TryGetValue(target, out var predecessors))
-                { _predecessors.Add(target, predecessors = []); }
+                { _predecessors.AddUnique(target, predecessors = ImmutableArray.CreateBuilder<IrBlockId>()); }
                 predecessors.Add(block);
                 if (active.Contains(target))
                 { _backEdges.Add((block, target)); }
                 else
-                { stack.Push((target, false)); }
+                { stack = stack.Push((target, false)); }
             }
         }
         if (_backEdges.Count == 0)
         { return false; }
-        foreach (var block in _reachable)
+        foreach (var block in _reachableOrder)
         {
             foreach (var instruction in _candidate.Program.GetBlock(block).Instructions)
             {
@@ -172,57 +177,69 @@ internal sealed partial class PassiveLoopCutter
             { continue; }
             // A natural header must dominate its latch. Bounded reachability
             // with that header removed detects an irreducible entry.
-            var seen = new HashSet<IrBlockId>();
-            var pending = new Stack<IrBlockId>();
-            pending.Push(_candidate.Program.Entry);
-            while (pending.Count != 0)
+            var seen = ImmutableHashSet.CreateBuilder<IrBlockId>();
+            var pending = ImmutableStack<IrBlockId>.Empty;
+            pending = pending.Push(_candidate.Program.Entry);
+            while (!pending.IsEmpty)
             {
                 Spend();
-                var block = pending.Pop();
+                pending = pending.Pop(out var block);
                 if (block == header || !seen.Add(block))
                 { continue; }
                 if (block == latch)
                 { return false; }
                 foreach (var target in Targets(_candidate.Program.GetBlock(block).Terminator))
-                { Spend(); pending.Push(target); }
+                { Spend(); pending = pending.Push(target); }
             }
             if (!_loops.TryGetValue(header, out var nodes))
-            { _loops.Add(header, nodes = [header]); }
-            pending.Push(latch);
-            while (pending.Count != 0)
+            {
+                nodes = ImmutableHashSet.CreateBuilder<IrBlockId>();
+                nodes.Add(header);
+                _loops.AddUnique(header, nodes);
+                var order = ImmutableArray.CreateBuilder<IrBlockId>();
+                order.Add(header);
+                _loopOrders.AddUnique(header, order);
+                _loopHeaderOrder.Add(header);
+            }
+            var nodeOrder = _loopOrders[header];
+            pending = pending.Push(latch);
+            while (!pending.IsEmpty)
             {
                 Spend();
-                var block = pending.Pop();
+                pending = pending.Pop(out var block);
                 if (block == header || !nodes.Add(block))
                 { continue; }
+                nodeOrder.Add(block);
                 foreach (var predecessor in _predecessors[block])
-                { Spend(); pending.Push(predecessor); }
+                { Spend(); pending = pending.Push(predecessor); }
             }
         }
-        var inputs = _candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))).ToHashSet();
-        foreach (var (header, nodes) in _loops)
+        var inputs = _candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old)))).ToImmutableHashSet();
+        foreach (var header in _loopHeaderOrder)
         {
+            var nodeOrder = _loopOrders[header];
             Spend();
-            var written = WrittenVariables(nodes);
-            _havoc.Add(header, written);
-            var instructions = nodes.SelectMany(node => node.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(node)) : (_candidate.Program.GetBlock(node).Instructions)).ToArray();
+            var written = WrittenVariables(nodeOrder);
+            _havoc.AddUnique(header, written);
+            var instructions = nodeOrder.SelectMany(node => node.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(node)) : (_candidate.Program.GetBlock(node).Instructions)).ToImmutableArray();
             Spend(instructions.Length);
             // A variable the loop only ever sets to one unwritten input is that
             // input wherever the loop reads it.
-            var copies = new Dictionary<IrVarId, IrTerm>();
+            var copyBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             foreach (var group in instructions.SelectMany(IrInstructionFacts.WrittenVariables).Distinct()
-                .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (IrInstructionFacts.WrittenVariables(instruction).Contains(variable))).ToArray()))))
+                .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (IrInstructionFacts.WrittenVariables(instruction).Contains(variable))).ToImmutableArray()))))
             {
                 Spend(group.Writers.Length);
                 if (group.Writers.All(writer => writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction { Value: IrVariableTerm source } &&
                         inputs.Contains(source.Variable) && !written.Contains(source.Variable))) &&
                     group.Writers.Select(writer => writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable)).Distinct().Count() == 1)
-                { copies.Add(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
+                { copyBuilder.AddUnique(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
+            var copies = copyBuilder.ToImmutable();
             // Calls and memory havocs can change every cell. A fixed cell's
             // address must also remain stable when a guard selects its owner.
-            List<Cell>? cells = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction ||
-                instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory })) ? null : [];
+            ImmutableArray<Cell>.Builder? cells = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction ||
+                instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory })) ? null : ImmutableArray.CreateBuilder<Cell>();
             bool StableAddress(IrTerm target)
             {
                 System.ArgumentNullException.ThrowIfNull(target);
@@ -249,7 +266,7 @@ internal sealed partial class PassiveLoopCutter
                 if (!cells!.Any(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (cell.Target.Id == target.Id && cell.Field == write.Field!.Value)))
                 { cells!.Add(new(target, write.Field!.Value, write)); }
             }
-            _cells.Add(header, cells == null ? null : [.. cells]);
+            _cells.AddUnique(header, cells == null ? null : cells.ToImmutable());
         }
         return true;
     }
@@ -257,13 +274,13 @@ internal sealed partial class PassiveLoopCutter
     private Encoding Encode(bool unroll)
     {
         var builder = new IrProgramBuilder(_candidate.Factory);
-        var blocks = new Dictionary<(IrBlockId Block, int Layer), IrBlockId>();
-        var pending = new Queue<(IrBlockId Block, int Layer)>();
+        var blocks = ImmutableDictionary.CreateBuilder<(IrBlockId Block, int Layer), IrBlockId>();
+        var pending = ImmutableQueue<(IrBlockId Block, int Layer)>.Empty;
         var stops = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         var callMarkers = ImmutableDictionary.CreateBuilder<IrInstructionId, IrInstructionId>();
         var checkpoints = ImmutableDictionary.CreateBuilder<IrInstructionId, int>();
         var pendingThrows = ImmutableDictionary.CreateBuilder<IrInstructionId, ImmutableArray<IrThrowInstruction>>();
-        var originalMarkers = _candidate.CallPreconditions.Select(clause => clause.Marker).ToHashSet();
+        var originalMarkers = _candidate.CallPreconditions.Select(clause => clause.Marker).ToImmutableHashSet();
         var instructions = 0;
         var allocatedBlocks = 0;
         IrBlockId CreateBlock(string name)
@@ -282,8 +299,8 @@ internal sealed partial class PassiveLoopCutter
             if (!blocks.TryGetValue(key, out var encoded))
             {
                 encoded = CreateBlock("loop:" + original.Value.ToString(CultureInfo.InvariantCulture) + ":" + layer.ToString(CultureInfo.InvariantCulture));
-                blocks.Add(key, encoded);
-                pending.Enqueue(key);
+                blocks.AddUnique(key, encoded);
+                pending = pending.Enqueue(key);
             }
             return encoded;
         }
@@ -292,10 +309,11 @@ internal sealed partial class PassiveLoopCutter
         builder.SetEntry(!unroll && _exceptionComponents.TryGetValue(originalEntry, out var entryComponent)
             ? Router(entryComponent, entrySite)
             : Checked(originalEntry, entrySite, Block(originalEntry, 0)));
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             Spend();
-            var (original, layer) = pending.Dequeue();
+            pending = pending.Dequeue(out var frame);
+            var (original, layer) = frame;
             var encoded = blocks[(original, layer)];
             var source = _candidate.Program.GetBlock(original);
             if (!unroll && _havoc.TryGetValue(original, out var writes))
@@ -303,10 +321,11 @@ internal sealed partial class PassiveLoopCutter
                 // A loop that stores only to fixed fields and to elements
                 // forgets those; any other heap store forgets all heap contents.
                 var cells = _cells[original];
-                var memory = cells == null;
+                RepositoryParameterGuard.ThrowIfMissing(cells is { IsDefault: true }, nameof(cells));
+                var memory = cells is null;
                 var values = cells is { } stored
-                    ? [.. stored.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (_candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type)))]
-                    : Array.Empty<IrVarId>();
+                    ? stored.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (_candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type))).ToImmutableArray()
+                    : ImmutableArray<IrVarId>.Empty;
                 if (writes.Length != 0 || memory || values.Length != 0)
                 {
                     Spend(writes.Length + values.Length);
@@ -351,7 +370,7 @@ internal sealed partial class PassiveLoopCutter
                         builder.Lock(encoded, synchronization.Operation, synchronization.Receiver);
                         break;
                     case IrCallInstruction call:
-                        builder.Call(encoded, call.Operation, call.Target, call.Member, call.Receiver, [.. call.Arguments]);
+                        builder.CallSnapshot(encoded, call.Operation, call.Target, call.Member, call.Receiver, call.Arguments);
                         break;
                     case IrWriteInstruction { Target: { } stored, Field: null, Index: { } index, Value: { } value } write:
                         builder.ElementStore(encoded, write.Operation, stored, index, value, write.Length);

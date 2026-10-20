@@ -6,8 +6,8 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer = static type => type;
-    private readonly Dictionary<ITypeSymbol, bool> _closedSealedTypes = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<ITypeSymbol> _classTypesChecked = new(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<ITypeSymbol, bool>.Builder _closedSealedTypes = ImmutableDictionary.CreateBuilder<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<ITypeSymbol>.Builder _classTypesChecked = ImmutableHashSet.CreateBuilder<ITypeSymbol>(SymbolEqualityComparer.Default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
@@ -60,7 +60,8 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             if (!_closedSealedTypes.TryGetValue(type, out var certified))
             {
                 using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
-                _closedSealedTypes.Add(type, certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type, cancellation.Token));
+                certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type, cancellation.Token);
+                _closedSealedTypes.AddUnique(type, certified);
             }
             if (certified)
             { _factory.RegisterClosedSealedReferenceType(mapped); }
@@ -87,16 +88,17 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         if (!CompilerIdentityBridge.IsClosedReferenceType(type, cancellation.Token))
         { return; }
-        var chain = new List<INamedTypeSymbol>();
+        var chainBuilder = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (var current = (INamedTypeSymbol)type; current.SpecialType != SpecialType.System_Object; current = current.BaseType!)
         {
             cancellation.Token.ThrowIfCancellationRequested();
-            if (chain.Count == 64 || current.BaseType == null || current.SpecialType != SpecialType.None)
+            if (chainBuilder.Count == 64 || current.BaseType == null || current.SpecialType != SpecialType.None)
             { return; }
-            chain.Add(current);
+            chainBuilder.Add(current);
         }
+        var chain = chainBuilder.ToImmutable();
         IrTypeId? parent = null;
-        for (var index = chain.Count - 1; index >= 0; index--)
+        for (var index = chain.Length - 1; index >= 0; index--)
         {
             var symbol = chain[index];
             var id = _factory.GetOrCreateReferenceType(CompilerIdentityBridge.InternType(_factory, symbol), CompilerIdentityBridge.CreateTypeDisplay(symbol));

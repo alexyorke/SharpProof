@@ -63,7 +63,7 @@ internal sealed class DataflowGraph<T>
             Blocks.Length,
             nameof(entryBlockId));
 
-        var distinctEdges = new HashSet<DataflowEdge>();
+        var distinctEdges = ImmutableHashSet.CreateBuilder<DataflowEdge>();
         foreach (var edge in edges)
         {
             if (edge.SourceId >= Blocks.Length || edge.TargetId >= Blocks.Length)
@@ -140,28 +140,19 @@ internal sealed class DataflowGraph<T>
             nameof(blockId));
     }
 
-    private static List<int>[] CreateAdjacency(int count)
+    private static ImmutableArray<ImmutableArray<int>.Builder> CreateAdjacency(int count)
     {
         RepositoryParameterGuard.RequireInitialized(count < 0, nameof(count), "Value must be initialized.");
-
-        var result = new List<int>[count];
-        for (var index = 0; index < count; index++)
-        {
-            result[index] = [];
-        }
-
-        return result;
+        return Enumerable.Range(0, count).Select(static _ => ImmutableArray.CreateBuilder<int>()).ToImmutableArray();
     }
 
-    private static ImmutableArray<ImmutableArray<int>> Freeze(List<int>[] adjacency)
+    private static ImmutableArray<ImmutableArray<int>> Freeze(
+        ImmutableArray<ImmutableArray<int>.Builder> adjacency)
     {
-        adjacency = RepositoryParameterGuard.NotNull(adjacency, nameof(adjacency));
-        var result = ImmutableArray.CreateBuilder<ImmutableArray<int>>(adjacency.Length);
-        foreach (var neighbors in adjacency)
-        {
-            result.Add([.. neighbors]);
-        }
-        return result.MoveToImmutable();
+        RepositoryParameterGuard.RequireInitialized(adjacency.IsDefault, nameof(adjacency), "Array must be initialized.");
+        return adjacency.Select(static neighbors => neighbors is null
+            ? throw new ArgumentNullException(nameof(neighbors))
+            : neighbors.ToImmutable()).ToImmutableArray();
     }
 
     private static ImmutableArray<bool> FindCyclicBlocks(
@@ -169,17 +160,17 @@ internal sealed class DataflowGraph<T>
     {
 
         RepositoryParameterGuard.RequireInitialized(successors.IsDefault, nameof(successors), "Array must be initialized.");
-        var discovery = new int[successors.Length];
-        var lowLink = new int[successors.Length];
-        var onStack = new bool[successors.Length];
-        for (var blockId = 0; blockId < discovery.Length; blockId++)
+        var discovery = Enumerable.Repeat(0, successors.Length).ToImmutableArray().ToBuilder();
+        var lowLink = Enumerable.Repeat(0, successors.Length).ToImmutableArray().ToBuilder();
+        var onStack = Enumerable.Repeat(false, successors.Length).ToImmutableArray().ToBuilder();
+        for (var blockId = 0; blockId < discovery.Count; blockId++)
         {
             discovery[blockId] = -1;
         }
 
-        var active = new Stack<int>(successors.Length);
-        var pending = new Stack<(int BlockId, int NextSuccessor)>();
-        var result = new bool[successors.Length];
+        var active = ImmutableStack<int>.Empty;
+        var pending = ImmutableStack<(int BlockId, int NextSuccessor)>.Empty;
+        var result = Enumerable.Repeat(false, successors.Length).ToImmutableArray().ToBuilder();
         var nextDiscovery = 0;
         for (var start = 0; start < successors.Length; start++)
         {
@@ -190,23 +181,24 @@ internal sealed class DataflowGraph<T>
 
             discovery[start] = nextDiscovery;
             lowLink[start] = nextDiscovery++;
-            active.Push(start);
+            active = active.Push(start);
             onStack[start] = true;
-            pending.Push((start, 0));
-            while (pending.Count != 0)
+            pending = pending.Push((start, 0));
+            while (!pending.IsEmpty)
             {
-                var (current, nextSuccessor) = pending.Pop();
+                var (current, nextSuccessor) = pending.Peek();
+                pending = pending.Pop();
                 if (nextSuccessor < successors[current].Length)
                 {
-                    pending.Push((current, nextSuccessor + 1));
+                    pending = pending.Push((current, nextSuccessor + 1));
                     var next = successors[current][nextSuccessor];
                     if (discovery[next] < 0)
                     {
                         discovery[next] = nextDiscovery;
                         lowLink[next] = nextDiscovery++;
-                        active.Push(next);
+                        active = active.Push(next);
                         onStack[next] = true;
-                        pending.Push((next, 0));
+                        pending = pending.Push((next, 0));
                     }
                     else if (onStack[next] && discovery[next] < lowLink[current])
                     {
@@ -222,7 +214,8 @@ internal sealed class DataflowGraph<T>
                     int member;
                     do
                     {
-                        member = active.Pop();
+                        member = active.Peek();
+                        active = active.Pop();
                         onStack[member] = false;
                         cyclic |= member != current;
                         if (member != current)
@@ -236,7 +229,7 @@ internal sealed class DataflowGraph<T>
                         successors[current].Contains(current);
                 }
 
-                if (pending.Count != 0)
+                if (!pending.IsEmpty)
                 {
                     var parent = pending.Peek().BlockId;
                     if (lowLink[current] < lowLink[parent])
@@ -247,6 +240,6 @@ internal sealed class DataflowGraph<T>
             }
         }
 
-        return [.. result];
+        return result.ToImmutable();
     }
 }

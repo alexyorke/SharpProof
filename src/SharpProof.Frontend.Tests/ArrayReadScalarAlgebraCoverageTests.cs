@@ -30,7 +30,7 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
             $"int Target(int[] values, {type} index) => values[index];");
         int[]? values = nullArray ? null : [17];
         var native = subject.Invoke([values!, index]);
-        var bindings = subject.Context.Parameters.ToArray();
+        var bindings = subject.Context.Parameters;
         var receiver = subject.Factory.Variable(bindings[0].Current);
         var position = subject.Factory.Variable(bindings[1].Current);
         var arrayType = receiver.Type;
@@ -38,11 +38,7 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
         var arrayValue = nullArray ? subject.Factory.CreateNullValue(arrayType)
             : subject.Factory.CreateSequenceValue(arrayType, [subject.Factory.CreateIntegerValue(elementType, 17L)]);
         var indexValue = subject.Value(bindings[1].Current, index);
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [bindings[0].Current] = arrayValue,
-            [bindings[1].Current] = indexValue
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(bindings[0].Current, arrayValue).SetItem(bindings[1].Current, indexValue);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
         var access = (IArrayElementReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
@@ -91,11 +87,7 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [bindings[0].Entry] = arrayValue,
-                [bindings[1].Entry] = indexValue
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(bindings[0].Entry, arrayValue).SetItem(bindings[1].Entry, indexValue));
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (native is Exception exception)
         {
@@ -121,7 +113,7 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
         int[] values = [17];
         var native = subject.Invoke([values, input]);
         Assert.That(native, Is.EqualTo(input is bool ? true : (object)17));
-        var parameters = subject.Context.Parameters.ToArray();
+        var parameters = subject.Context.Parameters;
         var rule = CSharpOperationSemantics.ArrayReadScalar(subject.Factory,
             subject.Factory.Variable(parameters[0].Current), subject.Factory.Variable(parameters[1].Current));
         Assert.That(rule.Classification.IsExact, Is.False);
@@ -137,18 +129,14 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(int[] values, uint index) => values[index];");
         int[] values = [17];
         var native = subject.Invoke([values, index]);
-        var bindings = subject.Context.Parameters.ToArray();
+        var bindings = subject.Context.Parameters;
         var receiver = subject.Factory.Variable(bindings[0].Current);
         var position = subject.Factory.Variable(bindings[1].Current);
         var elementType = subject.Factory.GetTypeInfo(receiver.Type).ElementType!.Value;
         var arrayValue = subject.Factory.CreateSequenceValue(receiver.Type,
             [subject.Factory.CreateIntegerValue(elementType, 17L)]);
         var indexValue = subject.Value(bindings[1].Current, index);
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [bindings[0].Current] = arrayValue,
-            [bindings[1].Current] = indexValue
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(bindings[0].Current, arrayValue).SetItem(bindings[1].Current, indexValue);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
         var access = (IArrayElementReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
@@ -186,11 +174,7 @@ internal sealed class ArrayReadScalarAlgebraCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [bindings[0].Entry] = arrayValue,
-                [bindings[1].Entry] = indexValue
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(bindings[0].Entry, arrayValue).SetItem(bindings[1].Entry, indexValue));
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (boundsFault)
         {

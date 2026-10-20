@@ -11,6 +11,25 @@ namespace SharpProof.Frontend.Test;
 public sealed class ContractApiIdentityResolverTests
 {
     [Test]
+    public async Task ConcurrentResolutionRetainsOneCompilationOwnerAndAllAttributeResults()
+    {
+        var compilation = CreateConsumer(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location));
+        var names = ContractApiMetadata.AttributeMetadataNames;
+        var results = (await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
+        {
+            var resolver = ContractApiIdentityResolver.ForCompilation(compilation);
+            return (Resolver: resolver, Symbols: names.Select(name =>
+                name is null ? throw new ArgumentNullException(nameof(name)) : resolver.ResolveAttribute(name)).ToImmutableArray());
+        }, TestContext.CurrentContext.CancellationToken)))).ToImmutableArray();
+        var owner = ContractApiIdentityResolver.ForCompilation(compilation);
+        var expected = names.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : owner.ResolveAttribute(name)).ToImmutableArray();
+        foreach (var result in results)
+        {
+            Assert.That(result.Resolver, Is.SameAs(owner));
+            Assert.That(result.Symbols, Is.EqualTo(expected));
+        }
+    }
+    [Test]
     public void ExactStrongNamedPackagePayloadIsAccepted()
     {
         var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
@@ -109,7 +128,7 @@ public sealed class ContractApiIdentityResolverTests
             "SharpProof.Attributes.dll");
         File.WriteAllBytes(
             path,
-            EmitContractImage(validContractShape));
+            EmitContractImage(validContractShape).ToArray());
         var reference = MetadataReference.CreateFromFile(path);
         var compilation = CreateConsumer(reference);
         var resolver =
@@ -156,15 +175,14 @@ public sealed class ContractApiIdentityResolverTests
         });
         Assert.That(
             rejected,
-            Is.EquivalentTo(new[]
-            {
+            Is.EquivalentTo(ImmutableArray.Create(
                 ContractApiMetadata.Trusted,
                 ContractApiMetadata.EffectContract,
                 ContractApiMetadata.NotNull,
                 ContractApiMetadata.Positive,
                 ContractApiMetadata.InRange,
                 ContractApiMetadata.NotNull
-            }));
+            )));
     }
 
     private static CSharpCompilation CreateConsumer(
@@ -203,7 +221,7 @@ public sealed class ContractApiIdentityResolverTests
         return compilation;
     }
 
-    private static byte[] EmitContractImage(bool validContractShape)
+    private static ImmutableArray<byte> EmitContractImage(bool validContractShape)
     {
         var version =
             typeof(ContractApiIdentityResolver).Assembly
@@ -310,7 +328,7 @@ public sealed class ContractApiIdentityResolverTests
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 
     private static void AssertNoErrors(Compilation compilation)

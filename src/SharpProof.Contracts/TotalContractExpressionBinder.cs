@@ -154,7 +154,12 @@ internal sealed partial class ContractBinder
             return Fail(materialized.Failure);
         }
         var clauses = materialized.Clauses.ToBuilder();
-        var attributeFailure = BindTotalAttributes(context, requiresOnly, clauses);
+        void AppendClause(BoundTotalContractClause clause)
+        {
+            clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
+            clauses.Add(clause);
+        }
+        var attributeFailure = BindTotalAttributes(context, requiresOnly, AppendClause);
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
         var ordinal = 0;
@@ -163,7 +168,7 @@ internal sealed partial class ContractBinder
             context.ExcludeSpecificationCall(occurrence.Invocation);
             if (requiresOnly)
             { continue; }
-            var clause = clauses[ordinal++];
+            var clause = materialized.Clauses[ordinal++];
             if (clause.Kind == BoundContractKind.Assume)
             {
                 context.RegisterSpecificationAssumption(occurrence.Invocation,
@@ -179,7 +184,7 @@ internal sealed partial class ContractBinder
     }
 
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
-        ImmutableArray<BoundTotalContractClause>.Builder clauses)
+        Action<BoundTotalContractClause> clauses)
     {
         clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
@@ -199,7 +204,7 @@ internal sealed partial class ContractBinder
             }
             foreach (var clause in bound.Clauses)
             {
-                clauses.Add(new(clause.Kind,
+                clauses(new(clause.Kind,
                     new GuardedExpression(clause.Condition, clause.SafeCondition!, FrontendSubsetClassification.Exact),
                     clause.SourceOperation, clause.DiagnosticText, BoundContractEvidence.ClosedAttribute, clause.SourceSyntax));
             }

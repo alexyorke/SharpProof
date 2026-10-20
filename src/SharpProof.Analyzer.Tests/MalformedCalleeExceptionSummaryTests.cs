@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -46,11 +47,7 @@ public sealed class MalformedCalleeExceptionSummaryTests
         {
             _ = CompilerExceptionTypeIdentity.Encode(anonymousType);
         }));
-        var expected = string.Join(",", new[]
-            {
-                "<error-type>",
-                CompilerExceptionTypeIdentity.Encode(validType)
-            }
+        var expected = string.Join(",", ImmutableArray.Create("<error-type>", CompilerExceptionTypeIdentity.Encode(validType))
             .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
         Assert.That(
             EffectContractDiagnostics.FormatTypes(

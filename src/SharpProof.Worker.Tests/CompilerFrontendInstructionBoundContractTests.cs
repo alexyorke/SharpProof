@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -73,10 +74,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
         var parameter = total.Parameters.Single();
         var factory = total.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(4)));
@@ -100,7 +98,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").Single();
         var identity = SemanticClaimIdentity.CreateCallableId(method);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps, Is.Empty);
         var body = batch.Callers.Single(caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.CallableId == identity)).Body;
@@ -183,7 +181,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
     private static CSharpCompilation Compile(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("InstructionBoundContract", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("InstructionBoundContract", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }

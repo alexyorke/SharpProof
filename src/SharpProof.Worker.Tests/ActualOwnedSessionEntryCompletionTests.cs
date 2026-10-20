@@ -19,7 +19,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ActualOwnedSessionEntryCompletionTests
 {
-    private static readonly object[] RuntimeControlArguments = [2L, 3L];
+    private static readonly ImmutableArray<object> RuntimeControlArguments = [2L, 3L];
     [Test]
     public async Task EntryCompletionReadsActualOverdrawnRawNativeSession()
     {
@@ -36,7 +36,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSessionEntryCompletion", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSessionEntryCompletion", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -51,7 +51,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         using var runtimeImage = new MemoryStream();
         Assert.That(runtimeCompilation.Emit(runtimeImage).Success, Is.True);
         var runtimeTarget = Assembly.Load(runtimeImage.ToArray()).GetType("Subject")!.GetMethod("Target")!;
-        Assert.That(runtimeTarget.Invoke(null, RuntimeControlArguments), Is.EqualTo(2L));
+        Assert.That(runtimeTarget.Invoke(null, RuntimeControlArguments.ToArray()), Is.EqualTo(2L));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
@@ -76,8 +76,8 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(factory.GetTypeInfo(x.Type).Width, Is.EqualTo(64));
         Assert.That(factory.GetTypeInfo(x.Type).Signed, Is.True);
         Assert.That(y.Type, Is.EqualTo(x.Type));
-        var labels = new Dictionary<ProofJustification, string>();
-        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
+        var labels = ImmutableDictionary.CreateBuilder<ProofJustification, string>();
+        var ids = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         var domainBuilder = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length);
         foreach (var clause in entry.Clauses)
         {
@@ -85,8 +85,8 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             var assumption = new Assumption(factory, factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value),
                 new LoweredJustification(clause.Operation));
             domainBuilder.Add(assumption);
-            labels.Add(assumption.Justification, label);
-            ids.Add(label, clause.AssumptionId!);
+            labels.AddUnique(assumption.Justification, label);
+            ids.AddUnique(label, clause.AssumptionId!);
         }
         var domain = domainBuilder.MoveToImmutable();
         var entryQuery = new VerificationQuery(factory, domain, Goal.CreateInternalConsistency(factory),
@@ -95,12 +95,12 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         var controlMeter = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         var controlOutcome = await kernel.VerifyAsync(entryQuery, TestContext.CurrentContext.CancellationToken);
         Assert.That(controlOutcome, Is.TypeOf<RefutedOutcome>());
-        var control = TotalCallableVerifier.CompleteEntry(controlOutcome, controlMeter, labels, ids);
+        var control = TotalCallableVerifier.CompleteEntry(controlOutcome, controlMeter, labels.ToImmutable(), ids.ToImmutable());
         Assert.That(control.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(control.Reason, Is.EqualTo(WorkerClaimReason.None));
         var batchStart = session.ConsumedResourceCount;
         var meter = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        long[] primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
+        ImmutableArray<long> primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
         const long maximumInput = 1000000033L;
         foreach (var prime in primes)
         {
@@ -111,7 +111,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(maximumProduct, Is.LessThanOrEqualTo(new BigInteger(long.MaxValue)));
         var startedQueries = 0;
         long observedBatchDelta = 0;
-        (int First, int Second)[] lemmaPairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), (0, 0), (1, 1)];
+        ImmutableArray<(int First, int Second)> lemmaPairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), (0, 0), (1, 1)];
         Assert.That(lemmaPairs.Distinct().Count(), Is.EqualTo(8));
         // Eight distinct mathematical API obligations: six semiprimes and two
         // prime squares. This raw session API has only per-query native caps;
@@ -123,18 +123,16 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             var product = checked(p * q);
             Assert.That((BigInteger)p * q, Is.EqualTo(new BigInteger(product)));
             Assert.That(new BigInteger(product), Is.InRange(new BigInteger(4), maximumProduct));
-            var constraints = new List<IrTerm>
-            {
-                factory.Binary(IrBinaryOperator.Equal,
-                    factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)),
-                factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p))
-            };
+            var constraints = ImmutableArray.CreateBuilder<IrTerm>();
+            constraints.Add(factory.Binary(IrBinaryOperator.Equal,
+                factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)));
+            constraints.Add(factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p)));
             if (p != q)
             { constraints.Add(factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, q))); }
             Assert.That(runtimeTarget.Invoke(null, [p, 2L]), Is.EqualTo(p));
             // Manually constructed IR/Smt API lemmas use compiler-decoded
             // bindings. They are not compiler-produced contract clauses.
-            var assumptions = domain.AddRange(constraints.Select(predicate =>
+            var assumptions = domain.AddRange(constraints.ToImmutable().Select(predicate =>
                 predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))));
             var query = new VerificationQuery(factory, assumptions,
                 Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
@@ -160,7 +158,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 q,
                 outcome = outcome.GetType().Name,
                 reason = outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : "None",
-                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToArray() : [],
+                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToImmutableArray() : [],
                 delta,
                 consumed = session.ConsumedResourceCount
             }));
@@ -177,7 +175,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(afterEntry, Is.GreaterThan(beforeEntry));
         var exceeded = checked(afterEntry - batchStart) > budgets.MethodRlimit;
         Assert.That(meter.IsExceeded, Is.EqualTo(exceeded));
-        var result = TotalCallableVerifier.CompleteEntry(finalOutcome, meter, labels, ids);
+        var result = TotalCallableVerifier.CompleteEntry(finalOutcome, meter, labels.ToImmutable(), ids.ToImmutable());
         Assert.That(result.Kind, Is.EqualTo(exceeded ? CallableEntryFeasibilityKind.Unknown : CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(exceeded ? WorkerClaimReason.ResourceLimit : WorkerClaimReason.None));
         Assert.That(result.ProofCore, Is.Empty);
@@ -187,7 +185,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         {
             sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             artifactSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(artifactJson))),
-            imageSha256 = Convert.ToHexString(SHA256.HashData(image.ToArray())),
+            imageSha256 = Convert.ToHexString(SHA256.HashData(image.GetBuffer().AsSpan(0, checked((int)image.Length)))),
             controlKind = control.Kind.ToString(),
             controlReason = control.Reason.ToString(),
             algorithm = "Manually constructed IR/Smt API lemmas over compiler-decoded bindings",
@@ -195,7 +193,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             {
                 prime,
                 isPrime = IsPrime(prime)
-            }).ToArray(),
+            }).ToImmutableArray(),
             maximumProduct = maximumProduct.ToString(System.Globalization.CultureInfo.InvariantCulture),
             startedQueries,
             observedBatchDelta,
@@ -207,7 +205,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             beforeEntry,
             afterEntry,
             finalOutcome = finalOutcome.GetType().Name,
-            runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeImage.ToArray()))
+            runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length))))
         }));
     }
 

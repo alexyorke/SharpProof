@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,8 +11,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class BulkSourceApiDomainCoverageTests
 {
-    private static readonly string[] EnabledSymbols = ["ENABLED"];
-    private static readonly string[] ConditionalNullErrors = ["CS0633"];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ENABLED"];
+    private static readonly ImmutableArray<string> ConditionalNullErrors = ["CS0633"];
 
     [Test]
     public void RealRejectedConditionalAttributeCannotElideTheOwnedInvocation()

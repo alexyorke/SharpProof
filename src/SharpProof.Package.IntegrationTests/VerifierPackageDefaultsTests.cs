@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -52,7 +53,7 @@ public sealed class VerifierPackageDefaultsTests
         await WriteConsumerAsync(directory.FullName, framework, profile: null, Source, packageId);
         await RestoreAsync(directory.FullName);
         await AssertPropertiesAsync(directory.FullName, "strict", verify: true, packageId);
-        var build = await RunDotNetAsync(directory.FullName, "build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo");
+        var build = await RunDotNetAsync(directory.FullName, ["build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo"]);
         Assert.That(build.ExitCode, Is.Zero, build.CombinedOutput);
         var resultPath = Path.Combine(directory.FullName, "obj", "Release", framework, "SharpProof", "result.json");
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(resultPath));
@@ -74,7 +75,7 @@ public sealed class VerifierPackageDefaultsTests
         await WriteConsumerAsync(directory.FullName, "net10.0", profile, Source, packageId);
         await RestoreAsync(directory.FullName);
         await AssertPropertiesAsync(directory.FullName, profile, verify: false, packageId);
-        var build = await RunDotNetAsync(directory.FullName, "build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo");
+        var build = await RunDotNetAsync(directory.FullName, ["build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo"]);
         Assert.That(build.ExitCode, Is.Zero, build.CombinedOutput);
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")), Is.False);
     }
@@ -94,7 +95,7 @@ public sealed class VerifierPackageDefaultsTests
         await WriteConsumerAsync(directory.FullName, framework, profile: null,
             Source.Replace("return value;", "return 0;", StringComparison.Ordinal), packageId);
         await RestoreAsync(directory.FullName);
-        var build = await RunDotNetAsync(directory.FullName, "build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo");
+        var build = await RunDotNetAsync(directory.FullName, ["build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo"]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.CombinedOutput);
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", framework, "SharpProof", "result.json")),
             Is.True, build.CombinedOutput);
@@ -118,8 +119,7 @@ public sealed class VerifierPackageDefaultsTests
             new XElement("SharpProofAssumptionPolicy", "allow"));
         await File.WriteAllTextAsync(path, project.ToString(), new UTF8Encoding(false));
         await RestoreAsync(directory.FullName);
-        var evaluation = await RunDotNetAsync(directory.FullName, "msbuild", "Consumer.csproj", "--nologo",
-            "-getProperty:SharpProofProfile,SharpProofVerify,SharpProofVerifyPolicy,SharpProofAssumptionPolicy");
+        var evaluation = await RunDotNetAsync(directory.FullName, ["msbuild", "Consumer.csproj", "--nologo", "-getProperty:SharpProofProfile,SharpProofVerify,SharpProofVerifyPolicy,SharpProofAssumptionPolicy"]);
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.CombinedOutput);
         using var document = JsonDocument.Parse(evaluation.Output);
         var properties = document.RootElement.GetProperty("Properties");
@@ -127,7 +127,7 @@ public sealed class VerifierPackageDefaultsTests
         Assert.That(properties.GetProperty("SharpProofVerify").GetString(), Is.EqualTo("false"));
         Assert.That(properties.GetProperty("SharpProofVerifyPolicy").GetString(), Is.EqualTo("advisory"));
         Assert.That(properties.GetProperty("SharpProofAssumptionPolicy").GetString(), Is.EqualTo("allow"));
-        var build = await RunDotNetAsync(directory.FullName, "build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo");
+        var build = await RunDotNetAsync(directory.FullName, ["build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo"]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.CombinedOutput);
         Assert.That(build.CombinedOutput, Does.Contain("SharpProofProfile=strict requires SharpProofVerify=true"));
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")), Is.False);
@@ -158,7 +158,7 @@ public sealed class VerifierPackageDefaultsTests
         ArgumentNullException.ThrowIfNull(root);
         // The compiler server may load dependencies lazily. Keep this cache
         // alive for every build sharing its server, then dispose it with the fixture.
-        var restore = await RunDotNetAsync(root, "restore", "Consumer.csproj", "--packages", s_packageCache.FullName, "--nologo");
+        var restore = await RunDotNetAsync(root, ["restore", "Consumer.csproj", "--packages", s_packageCache.FullName, "--nologo"]);
         Assert.That(restore.ExitCode, Is.Zero, restore.CombinedOutput);
     }
 
@@ -167,8 +167,7 @@ public sealed class VerifierPackageDefaultsTests
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(packageId);
-        var evaluation = await RunDotNetAsync(root, "msbuild", "Consumer.csproj", "--nologo",
-            "-getProperty:SharpProofProfile,SharpProofVerify,SharpProofVerifyPolicy,SharpProofAssumptionPolicy", "-getItem:PackageReference");
+        var evaluation = await RunDotNetAsync(root, ["msbuild", "Consumer.csproj", "--nologo", "-getProperty:SharpProofProfile,SharpProofVerify,SharpProofVerifyPolicy,SharpProofAssumptionPolicy", "-getItem:PackageReference"]);
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.CombinedOutput);
         using var document = JsonDocument.Parse(evaluation.Output);
         var properties = document.RootElement.GetProperty("Properties");
@@ -184,21 +183,23 @@ public sealed class VerifierPackageDefaultsTests
         var references = document.RootElement.GetProperty("Items").GetProperty("PackageReference").EnumerateArray()
             .Where(static reference => !reference.TryGetProperty("IsImplicitlyDefined", out var implicitReference) ||
                 !string.Equals(implicitReference.GetString(), "true", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(1));
         Assert.That(references[0].GetProperty("Identity").GetString(), Is.EqualTo(packageId));
     }
 
-    private static Task<ProcessRunnerResult> RunDotNetAsync(string root, params string[] arguments)
+    private static Task<ProcessRunnerResult> RunDotNetAsync(string root, ImmutableArray<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(root);
-        ArgumentNullException.ThrowIfNull(arguments);
-        var effectiveArguments = arguments.ToList();
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
+        var effectiveArguments = ImmutableArray.CreateBuilder<string>();
+        effectiveArguments.AddRange(arguments);
         if (arguments.FirstOrDefault() == "build")
         {
             effectiveArguments.Add("-p:ReportAnalyzer=true");
         }
-        var startInfo = ProcessRunner.CreateStartInfo(root, "dotnet", effectiveArguments);
+        var startInfo = ProcessRunner.CreateStartInfo(root, "dotnet", effectiveArguments.ToImmutable());
         startInfo.Environment["SharedCompilationId"] = s_sharedCompilationServerId;
         return ProcessRunner.RunCapturedAsync(startInfo, TestContext.CurrentContext.CancellationToken);
     }

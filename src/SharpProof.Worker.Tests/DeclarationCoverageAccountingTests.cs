@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
@@ -39,17 +40,18 @@ public sealed class DeclarationCoverageAccountingTests
         symbols.Position = 0;
         using var provider = MetadataReaderProvider.FromPortablePdbStream(symbols);
         var reader = provider.GetMetadataReader();
-        var executableLines = new HashSet<int>();
+        var executableLinesBuilder = ImmutableHashSet.CreateBuilder<int>();
         foreach (var handle in reader.MethodDebugInformation)
         {
             foreach (var point in reader.GetMethodDebugInformation(handle).GetSequencePoints())
             {
                 if (!point.IsHidden)
                 {
-                    executableLines.Add(point.StartLine);
+                    executableLinesBuilder.Add(point.StartLine);
                 }
             }
         }
+        var executableLines = executableLinesBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(executableLines, Does.Not.Contain(3), "A literal constant has no runtime initializer.");
@@ -62,8 +64,7 @@ public sealed class DeclarationCoverageAccountingTests
     [Test]
     public async Task ClassifiesOnlyDeclarationTokensAndRetainsExecutableOrUnknownRows()
     {
-        var cases = new (string Name, string Declaration, bool Omit)[]
-        {
+        var cases = ImmutableArray.Create<(string Name, string Declaration, bool Omit)>(
             ("method header", "public int M(int value)\n { return value; }", true),
             ("abstract slot", "public abstract int M(int value);", true),
             ("uninitialized field", "private readonly int value;", true),
@@ -88,8 +89,7 @@ public sealed class DeclarationCoverageAccountingTests
             ("invalid syntax", "public int M(\n { return 1; }", false),
             ("multiline string", "public string M() => \"\"\"\n text\n \"\"\";", false),
             ("primary constructor base", "public class Derived(int value) : Subject(Compute())\n { private static int Compute() => 1; }", false),
-            ("multiline primary constructor base", "public class Derived(int value) :\n Subject(Compute())\n { private static int Compute() => 1; }", false)
-        };
+            ("multiline primary constructor base", "public class Derived(int value) :\n Subject(Compute())\n { private static int Compute() => 1; }", false));
         var root = TestRepository.FindRoot();
         var temporary = Path.Combine(Path.GetTempPath(), "SharpProofDeclarationsTest." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
@@ -99,8 +99,8 @@ public sealed class DeclarationCoverageAccountingTests
             {
                 var path = Path.Combine(temporary, index + ".cs");
                 File.WriteAllText(path, "public abstract class Subject\n{\n" + item.Declaration + "\n}\n");
-                return new { path = item.Name, sourcePath = path, languageVersion = "preview", preprocessorSymbols = Array.Empty<string>() };
-            }).ToArray();
+                return new { path = item.Name, sourcePath = path, languageVersion = "preview", preprocessorSymbols = ImmutableArray<string>.Empty };
+            }).ToImmutableArray();
             var request = Path.Combine(temporary, "request.json");
             await File.WriteAllTextAsync(request, JsonSerializer.Serialize(documents));
             const string script = """

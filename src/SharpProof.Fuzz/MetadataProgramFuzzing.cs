@@ -54,9 +54,12 @@ internal static class MetadataProgramDifferentialOracle
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(CompilationBatchSize, cases - offset);
-            var libraryMembers = new string[count];
-            var sourceMembers = new string[count];
-            var inputs = new object[count];
+            var libraryMembersBuilder = ImmutableArray.CreateBuilder<string>(count);
+            libraryMembersBuilder.Count = count;
+            var sourceMembersBuilder = ImmutableArray.CreateBuilder<string>(count);
+            sourceMembersBuilder.Count = count;
+            var inputsBuilder = ImmutableArray.CreateBuilder<object>(count);
+            inputsBuilder.Count = count;
             for (var index = 0; index < count; index++)
             {
                 var ordinal = offset + index;
@@ -66,7 +69,7 @@ internal static class MetadataProgramDifferentialOracle
                 var recipe = ordinal / TotalProgramDifferentialOracle.Types.Length % 7;
                 typeMask |= 1 << typeIndex;
                 recipeMask |= 1 << recipe;
-                inputs[index] = TotalProgramDifferentialOracle.Input(type, random.NextInt64(), ordinal);
+                inputsBuilder[index] = TotalProgramDifferentialOracle.Input(type, random.NextInt64(), ordinal);
                 var expression = type == "bool" ? recipe == 4 ? $"Again{name}(value)" : recipe % 2 == 0 ? "!value" : "value == false" : recipe switch
                 {
                     0 => $"unchecked(({type})(value + 1))",
@@ -77,15 +80,18 @@ internal static class MetadataProgramDifferentialOracle
                     5 => $"unchecked(({type})(value / (value - value)))",
                     _ => $"unchecked(({type})(value % (value - value)))"
                 };
-                libraryMembers[index] = $"public static {type} M{name}({type} value) {{ return {expression}; }} " +
+                libraryMembersBuilder[index] = $"public static {type} M{name}({type} value) {{ return {expression}; }} " +
                     $"private static {type} Again{name}({type} value) {{ return " +
                     (type == "bool" ? "!value" : $"checked(({type})(value + 1))") + "; }";
-                sourceMembers[index] = $"public static {type} Target{name}({type} x) {{ Contract.Ensures(true); " +
+                sourceMembersBuilder[index] = $"public static {type} Target{name}({type} x) {{ Contract.Ensures(true); " +
                     $"try {{ return MetadataLibrary.M{name}(x); }} catch (System.OverflowException) {{ return x; }} " +
                     "catch (System.DivideByZeroException) { return x; } }";
             }
+            var libraryMembers = libraryMembersBuilder.ToImmutable();
+            var sourceMembers = sourceMembersBuilder.ToImmutable();
+            var inputs = inputsBuilder.ToImmutable();
             var batch = libraryMembers.Select((member, index) =>
-                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new MetadataProgramSourceCase(member, sourceMembers[index], inputs[index]))))).ToArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new MetadataProgramSourceCase(member, sourceMembers[index], inputs[index]))))).ToImmutableArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;

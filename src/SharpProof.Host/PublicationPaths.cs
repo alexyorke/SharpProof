@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Host;
 
 internal static class PublicationPaths
@@ -21,10 +22,10 @@ internal static class PublicationPaths
         }
         var workerFile = new FileInfo(worker);
         var workerTarget = workerFile.LinkTarget == null ? null : workerFile.ResolveLinkTarget(returnFinalTarget: true);
-        var directories = new[] { Path.GetDirectoryName(worker)!,
+        var directories = ImmutableArray.Create(Path.GetDirectoryName(worker)!,
             Path.GetDirectoryName(PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker)) ??
-                throw new InvalidDataException("The worker runtime link target must name a file.") }
-            .Distinct(Comparer).ToArray();
+                throw new InvalidDataException("The worker runtime link target must name a file."))
+            .Distinct(Comparer).ToImmutableArray();
         foreach (var path in paths)
         {
             var member = PublicationLease.CanonicalMember(path);

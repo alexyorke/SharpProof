@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Compiler.Semantics;
 
 internal static class PrimaryConstructorCallableInventory
@@ -27,7 +28,7 @@ internal static class PrimaryConstructorCallableInventory
                     reference.GetSyntax(cancellationToken) is
                         TypeDeclarationSyntax owner &&
                     owner.Span == declaration.Span))))
-            .ToArray();
+            .ToImmutableArray();
         return TrySingle(matches, out constructor);
     }
 
@@ -55,15 +56,15 @@ internal static class PrimaryConstructorCallableInventory
             .Where(static candidate =>
                 candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsImplicitlyDeclared &&
                 candidate.Parameters.IsEmpty))
-            .ToArray();
+            .ToImmutableArray();
         return TrySingle(matches, out constructor);
     }
 
     private static bool TrySingle(
-        IMethodSymbol[] matches,
+        ImmutableArray<IMethodSymbol> matches,
         out IMethodSymbol constructor)
     {
-        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
+        RepositoryParameterGuard.RequireInitialized(matches.IsDefault, nameof(matches), "Array must be initialized.");
         constructor = matches.Length == 1
             ? ContractClauseInventoryBuilder.NormalizeCallable(matches[0])
             : null!;

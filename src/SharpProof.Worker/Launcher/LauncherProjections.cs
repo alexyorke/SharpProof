@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;
@@ -5,20 +6,20 @@ namespace SharpProof.Worker.Launcher;
 internal static partial class LauncherPresentation
 {
     internal static string AssumptionsDeclaredMessage(
-        string callableId, IReadOnlyList<WorkerAssumptionEvidence> assumptions)
+        string callableId, ImmutableArray<WorkerAssumptionEvidence> assumptions)
     {
         System.ArgumentNullException.ThrowIfNull(callableId);
-        ArgumentNullException.ThrowIfNull(assumptions);
+        RepositoryParameterGuard.ThrowIfMissing(assumptions.IsDefault, nameof(assumptions));
         var user = assumptions
             .Where(static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume))
             .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
-            .ToArray();
+            .ToImmutableArray();
         var trusted = assumptions
             .Where(static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
             .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
-            .ToArray();
+            .ToImmutableArray();
         var userIds = string.Join(", ", user);
         var trustedIds = string.Join(", ", trusted);
         return FormattableString.Invariant(

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -11,43 +12,40 @@ public sealed class CSharpScalarOperatorSemanticsTests
     [Test]
     public void BinaryMappingsAndArithmeticCategoriesAreExhaustive()
     {
-        var mappings = new Dictionary<BinaryOperatorKind, IrBinaryOperator>
-        {
-            [BinaryOperatorKind.Add] = IrBinaryOperator.Add,
-            [BinaryOperatorKind.Subtract] = IrBinaryOperator.Subtract,
-            [BinaryOperatorKind.Multiply] = IrBinaryOperator.Multiply,
-            [BinaryOperatorKind.Divide] = IrBinaryOperator.Divide,
-            [BinaryOperatorKind.Remainder] = IrBinaryOperator.Remainder,
-            [BinaryOperatorKind.And] = IrBinaryOperator.BitwiseAnd,
-            [BinaryOperatorKind.Or] = IrBinaryOperator.BitwiseOr,
-            [BinaryOperatorKind.ExclusiveOr] = IrBinaryOperator.BitwiseXor,
-            [BinaryOperatorKind.ConditionalAnd] = IrBinaryOperator.AndAlso,
-            [BinaryOperatorKind.ConditionalOr] = IrBinaryOperator.OrElse,
-            [BinaryOperatorKind.Equals] = IrBinaryOperator.Equal,
-            [BinaryOperatorKind.NotEquals] = IrBinaryOperator.NotEqual,
-            [BinaryOperatorKind.LessThan] = IrBinaryOperator.LessThan,
-            [BinaryOperatorKind.LessThanOrEqual] =
-                IrBinaryOperator.LessThanOrEqual,
-            [BinaryOperatorKind.GreaterThan] = IrBinaryOperator.GreaterThan,
-            [BinaryOperatorKind.GreaterThanOrEqual] =
-                IrBinaryOperator.GreaterThanOrEqual
-        };
-        var arithmetic = new HashSet<BinaryOperatorKind> {
+        var mappingsBuilder = ImmutableDictionary.CreateBuilder<BinaryOperatorKind, IrBinaryOperator>();
+        mappingsBuilder[BinaryOperatorKind.Add] = IrBinaryOperator.Add;
+        mappingsBuilder[BinaryOperatorKind.Subtract] = IrBinaryOperator.Subtract;
+        mappingsBuilder[BinaryOperatorKind.Multiply] = IrBinaryOperator.Multiply;
+        mappingsBuilder[BinaryOperatorKind.Divide] = IrBinaryOperator.Divide;
+        mappingsBuilder[BinaryOperatorKind.Remainder] = IrBinaryOperator.Remainder;
+        mappingsBuilder[BinaryOperatorKind.And] = IrBinaryOperator.BitwiseAnd;
+        mappingsBuilder[BinaryOperatorKind.Or] = IrBinaryOperator.BitwiseOr;
+        mappingsBuilder[BinaryOperatorKind.ExclusiveOr] = IrBinaryOperator.BitwiseXor;
+        mappingsBuilder[BinaryOperatorKind.ConditionalAnd] = IrBinaryOperator.AndAlso;
+        mappingsBuilder[BinaryOperatorKind.ConditionalOr] = IrBinaryOperator.OrElse;
+        mappingsBuilder[BinaryOperatorKind.Equals] = IrBinaryOperator.Equal;
+        mappingsBuilder[BinaryOperatorKind.NotEquals] = IrBinaryOperator.NotEqual;
+        mappingsBuilder[BinaryOperatorKind.LessThan] = IrBinaryOperator.LessThan;
+        mappingsBuilder[BinaryOperatorKind.LessThanOrEqual] = IrBinaryOperator.LessThanOrEqual;
+        mappingsBuilder[BinaryOperatorKind.GreaterThan] = IrBinaryOperator.GreaterThan;
+        mappingsBuilder[BinaryOperatorKind.GreaterThanOrEqual] = IrBinaryOperator.GreaterThanOrEqual;
+        var mappings = mappingsBuilder.ToImmutable();
+        var arithmetic = ImmutableHashSet.Create<BinaryOperatorKind>(
             BinaryOperatorKind.Add,
             BinaryOperatorKind.Subtract,
             BinaryOperatorKind.Multiply,
             BinaryOperatorKind.Divide,
             BinaryOperatorKind.Remainder
-        };
-        var checkedArithmetic = new HashSet<BinaryOperatorKind> {
+        );
+        var checkedArithmetic = ImmutableHashSet.Create<BinaryOperatorKind>(
             BinaryOperatorKind.Add,
             BinaryOperatorKind.Subtract,
             BinaryOperatorKind.Multiply
-        };
+        );
 
         var supportedKinds = CSharpOperationSemantics.SupportedBinaryOperators
             .Select(static semantics => semantics.Kind)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(supportedKinds, Is.EquivalentTo(mappings.Keys));
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
@@ -88,36 +86,24 @@ public sealed class CSharpScalarOperatorSemanticsTests
     [Test]
     public void BinaryReverseAndNegationRelationsAreExactAndInvolutive()
     {
-        var reversed = new Dictionary<
+        var reversedBuilder = ImmutableDictionary.CreateBuilder<
             BinaryOperatorKind,
-            BinaryOperatorKind>
-        {
-            [BinaryOperatorKind.LessThan] =
-                BinaryOperatorKind.GreaterThan,
-            [BinaryOperatorKind.LessThanOrEqual] =
-                BinaryOperatorKind.GreaterThanOrEqual,
-            [BinaryOperatorKind.GreaterThan] =
-                BinaryOperatorKind.LessThan,
-            [BinaryOperatorKind.GreaterThanOrEqual] =
-                BinaryOperatorKind.LessThanOrEqual
-        };
-        var negated = new Dictionary<
+            BinaryOperatorKind>();
+        reversedBuilder[BinaryOperatorKind.LessThan] = BinaryOperatorKind.GreaterThan;
+        reversedBuilder[BinaryOperatorKind.LessThanOrEqual] = BinaryOperatorKind.GreaterThanOrEqual;
+        reversedBuilder[BinaryOperatorKind.GreaterThan] = BinaryOperatorKind.LessThan;
+        reversedBuilder[BinaryOperatorKind.GreaterThanOrEqual] = BinaryOperatorKind.LessThanOrEqual;
+        var reversed = reversedBuilder.ToImmutable();
+        var negatedBuilder = ImmutableDictionary.CreateBuilder<
             BinaryOperatorKind,
-            BinaryOperatorKind>
-        {
-            [BinaryOperatorKind.Equals] =
-                BinaryOperatorKind.NotEquals,
-            [BinaryOperatorKind.NotEquals] =
-                BinaryOperatorKind.Equals,
-            [BinaryOperatorKind.LessThan] =
-                BinaryOperatorKind.GreaterThanOrEqual,
-            [BinaryOperatorKind.LessThanOrEqual] =
-                BinaryOperatorKind.GreaterThan,
-            [BinaryOperatorKind.GreaterThan] =
-                BinaryOperatorKind.LessThanOrEqual,
-            [BinaryOperatorKind.GreaterThanOrEqual] =
-                BinaryOperatorKind.LessThan
-        };
+            BinaryOperatorKind>();
+        negatedBuilder[BinaryOperatorKind.Equals] = BinaryOperatorKind.NotEquals;
+        negatedBuilder[BinaryOperatorKind.NotEquals] = BinaryOperatorKind.Equals;
+        negatedBuilder[BinaryOperatorKind.LessThan] = BinaryOperatorKind.GreaterThanOrEqual;
+        negatedBuilder[BinaryOperatorKind.LessThanOrEqual] = BinaryOperatorKind.GreaterThan;
+        negatedBuilder[BinaryOperatorKind.GreaterThan] = BinaryOperatorKind.LessThanOrEqual;
+        negatedBuilder[BinaryOperatorKind.GreaterThanOrEqual] = BinaryOperatorKind.LessThan;
+        var negated = negatedBuilder.ToImmutable();
 
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
@@ -151,7 +137,7 @@ public sealed class CSharpScalarOperatorSemanticsTests
     [Test]
     public void IntegerConversionRangesAreExhaustive()
     {
-        SpecialType[] integers = [
+        ImmutableArray<SpecialType> integers = [
             SpecialType.System_SByte,
             SpecialType.System_Byte,
             SpecialType.System_Int16,
@@ -161,17 +147,16 @@ public sealed class CSharpScalarOperatorSemanticsTests
             SpecialType.System_UInt32,
             SpecialType.System_Int64
         ];
-        var ranges = new Dictionary<SpecialType, (long Minimum, long Maximum)>
-        {
-            [SpecialType.System_SByte] = (sbyte.MinValue, sbyte.MaxValue),
-            [SpecialType.System_Byte] = (byte.MinValue, byte.MaxValue),
-            [SpecialType.System_Int16] = (short.MinValue, short.MaxValue),
-            [SpecialType.System_UInt16] = (ushort.MinValue, ushort.MaxValue),
-            [SpecialType.System_Char] = (char.MinValue, char.MaxValue),
-            [SpecialType.System_Int32] = (int.MinValue, int.MaxValue),
-            [SpecialType.System_UInt32] = (uint.MinValue, uint.MaxValue),
-            [SpecialType.System_Int64] = (long.MinValue, long.MaxValue)
-        };
+        var rangesBuilder = ImmutableDictionary.CreateBuilder<SpecialType, (long Minimum, long Maximum)>();
+        rangesBuilder[SpecialType.System_SByte] = (sbyte.MinValue, sbyte.MaxValue);
+        rangesBuilder[SpecialType.System_Byte] = (byte.MinValue, byte.MaxValue);
+        rangesBuilder[SpecialType.System_Int16] = (short.MinValue, short.MaxValue);
+        rangesBuilder[SpecialType.System_UInt16] = (ushort.MinValue, ushort.MaxValue);
+        rangesBuilder[SpecialType.System_Char] = (char.MinValue, char.MaxValue);
+        rangesBuilder[SpecialType.System_Int32] = (int.MinValue, int.MaxValue);
+        rangesBuilder[SpecialType.System_UInt32] = (uint.MinValue, uint.MaxValue);
+        rangesBuilder[SpecialType.System_Int64] = (long.MinValue, long.MaxValue);
+        var ranges = rangesBuilder.ToImmutable();
 
         Assert.That(
             CSharpOperationSemantics.SupportedIntegerConversions.Select(
@@ -213,21 +198,17 @@ public sealed class CSharpScalarOperatorSemanticsTests
     [Test]
     public void UnaryMappingsAndCheckedPoliciesAreExhaustive()
     {
-        var expected = new Dictionary<
+        var expectedBuilder = ImmutableDictionary.CreateBuilder<
             UnaryOperatorKind,
-            (IrUnaryOperator? Ir, bool Identity, bool Checked, bool ExactInteger)>
-        {
-            [UnaryOperatorKind.Not] =
-                    (IrUnaryOperator.Not, false, false, false),
-            [UnaryOperatorKind.Plus] =
-                    (null, true, false, false),
-            [UnaryOperatorKind.Minus] =
-                    (IrUnaryOperator.Negate, false, true, true)
-        };
+            (IrUnaryOperator? Ir, bool Identity, bool Checked, bool ExactInteger)>();
+        expectedBuilder[UnaryOperatorKind.Not] = (IrUnaryOperator.Not, false, false, false);
+        expectedBuilder[UnaryOperatorKind.Plus] = (null, true, false, false);
+        expectedBuilder[UnaryOperatorKind.Minus] = (IrUnaryOperator.Negate, false, true, true);
+        var expected = expectedBuilder.ToImmutable();
 
         var supportedKinds = CSharpOperationSemantics.SupportedUnaryOperators
             .Select(static semantics => semantics.Kind)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(supportedKinds, Is.EquivalentTo(expected.Keys));
         foreach (var kind in Enum.GetValues<UnaryOperatorKind>())
         {

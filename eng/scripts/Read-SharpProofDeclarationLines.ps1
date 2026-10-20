@@ -28,27 +28,39 @@ $roslynPath = Join-Path $sdkPath 'Roslyn/bincore'
 $temporaryPath = Join-Path ([IO.Path]::GetTempPath()) ('SharpProofDeclarations.' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
 try {
-    $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
-            Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
-    foreach ($name in @('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
+    $referenceBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $referenceBuilder.AddRange([string[]]@(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
+                Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName }))
+    foreach ($name in [Collections.Immutable.ImmutableArray]::Create[string]('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
         $assemblyPath = Join-Path $roslynPath $name
-        $references += '-reference:' + $assemblyPath
+        $referenceBuilder.Add('-reference:' + $assemblyPath)
         Copy-Item -LiteralPath $assemblyPath -Destination (Join-Path $temporaryPath $name)
     }
     $hostPath = Join-Path $temporaryPath 'SharpProof.DeclarationLines.dll'
-    $compilerArguments = @((Join-Path $roslynPath 'csc.dll'), '-nologo', '-noconfig', '-nostdlib+',
-        '-target:exe', ('-out:' + $hostPath)) + $references + @(
+    $references = $referenceBuilder.ToImmutable()
+    $compilerArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $compilerArgumentBuilder.AddRange([string[]]@((Join-Path $roslynPath 'csc.dll'), '-nologo', '-noconfig', '-nostdlib+',
+            '-target:exe', ('-out:' + $hostPath)))
+    $compilerArgumentBuilder.AddRange($references)
+    $compilerArgumentBuilder.Add(
         (Join-Path $PSScriptRoot 'SharpProof.DeclarationLines.cs'))
-    $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    [string[]]$compilerArguments = @($compilerArgumentBuilder.ToImmutable())
+    $compilerOutputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & $dotnetPath @compilerArguments 2>&1 | ForEach-Object { $compilerOutputBuilder.Add([string]$_) }
+    $compilerExitCode = $LASTEXITCODE
+    $compilerOutput = $compilerOutputBuilder.ToImmutable()
+    if ($compilerExitCode -ne 0) {
         throw ('Declaration classifier compilation failed: ' + ($compilerOutput -join [Environment]::NewLine))
     }
     $requestPath = Join-Path $temporaryPath 'request.json'
     $responsePath = Join-Path $temporaryPath 'response.json'
     [IO.File]::WriteAllText($requestPath, (ConvertTo-Json -InputObject @($Documents) -Depth 8),
         [Text.UTF8Encoding]::new($false))
-    $hostOutput = @(& $dotnetPath exec --runtimeconfig $runtimeConfigPath $hostPath $requestPath $responsePath 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $hostOutputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & $dotnetPath exec --runtimeconfig $runtimeConfigPath $hostPath $requestPath $responsePath 2>&1 | ForEach-Object { $hostOutputBuilder.Add([string]$_) }
+    $hostExitCode = $LASTEXITCODE
+    $hostOutput = $hostOutputBuilder.ToImmutable()
+    if ($hostExitCode -ne 0) {
         throw ('Declaration classification failed: ' + ($hostOutput -join [Environment]::NewLine))
     }
     Get-Content -LiteralPath $responsePath -Raw | ConvertFrom-Json

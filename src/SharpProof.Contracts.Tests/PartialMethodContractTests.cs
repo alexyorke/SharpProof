@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,15 +14,13 @@ public sealed class PartialMethodContractTests
     [Test]
     public void DirectContractsBindFromTheImplementationAcrossSyntaxTrees()
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public static partial class Subject {
                     public static partial long Identity(long value);
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -33,7 +32,7 @@ public sealed class PartialMethodContractTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var definition = GetMethod(compilation, "Subject", "Identity");
 
         var result = new ContractBinder(compilation, new IrFactory())
@@ -48,15 +47,13 @@ public sealed class PartialMethodContractTests
     [Test]
     public void ClauseInventoryNormalizesDefinitionToImplementation()
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public static partial class Subject {
                     public static partial long Identity(long value);
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -66,7 +63,7 @@ public sealed class PartialMethodContractTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var definition = GetMethod(compilation, "Subject", "Identity");
 
         var inventory = new ContractClauseInventoryBuilder(compilation)
@@ -80,8 +77,7 @@ public sealed class PartialMethodContractTests
     [Test]
     public void ParameterClosedAttributesBindFromEitherPartialPart()
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 using SharpProof.Attributes;
@@ -89,14 +85,13 @@ public sealed class PartialMethodContractTests
                     public static partial long Identity(
                         [Positive] long value);
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 public static partial class Subject {
                     public static partial long Identity(long value) => value;
                 }
-                """));
+                """)]);
         var definition = GetMethod(compilation, "Subject", "Identity");
         var implementation = definition.PartialImplementationPart!;
 
@@ -112,15 +107,13 @@ public sealed class PartialMethodContractTests
     [Test]
     public void ReturnClosedAttributesBindFromEitherPartialPart()
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public static partial class Subject {
                     public static partial string Identity(string value);
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -128,7 +121,7 @@ public sealed class PartialMethodContractTests
                     [return: NotNull]
                     public static partial string Identity(string value) => value;
                 }
-                """));
+                """)]);
         var definition = GetMethod(compilation, "Subject", "Identity");
         var implementation = definition.PartialImplementationPart!;
 
@@ -146,15 +139,13 @@ public sealed class PartialMethodContractTests
     public void PartialPropertyAccessorsUseImplementationBodies(
         MethodKind accessorKind)
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public partial class Subject {
                     public partial int Value { get; set; }
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -169,7 +160,7 @@ public sealed class PartialMethodContractTests
                         }
                     }
                 }
-                """));
+                """)]);
         var property = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Value")
             .OfType<IPropertySymbol>()
@@ -195,15 +186,13 @@ public sealed class PartialMethodContractTests
     public void ConstructedPartialPropertyAccessorsKeepSpecialization(
         MethodKind accessorKind)
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public partial class Subject<T> where T : class {
                     public partial T Value { get; set; }
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -218,7 +207,7 @@ public sealed class PartialMethodContractTests
                         }
                     }
                 }
-                """));
+                """)]);
         var generic = compilation.GetTypeByMetadataName("Subject`1")!;
         var constructed = generic.Construct(
             compilation.GetSpecialType(SpecialType.System_String));
@@ -248,15 +237,13 @@ public sealed class PartialMethodContractTests
     public void ReferencedPartialEventAccessorsUseImplementationBodies(
         MethodKind accessorKind)
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Definition.cs",
                 """
                 public partial class Subject {
                     public partial event System.Action Changed;
                 }
-                """),
-            (
+                """), (
                 "Implementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -271,8 +258,7 @@ public sealed class PartialMethodContractTests
                         }
                     }
                 }
-                """),
-            (
+                """), (
                 "Consumer.cs",
                 """
                 public static class Consumer {
@@ -288,7 +274,7 @@ public sealed class PartialMethodContractTests
                         subject.Changed -= handler;
                     }
                 }
-                """));
+                """)]);
         var definition = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Changed")
             .OfType<IEventSymbol>()
@@ -363,15 +349,13 @@ public sealed class PartialMethodContractTests
     [Test]
     public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees()
     {
-        var compilation = CreateCompilation(
-            (
+        var compilation = CreateCompilation([(
                 "Target.cs",
                 """
                 public interface ISubject {
                     long Identity(long value);
                 }
-                """),
-            (
+                """), (
                 "CompanionDefinition.cs",
                 """
                 using SharpProof.Attributes;
@@ -381,8 +365,7 @@ public sealed class PartialMethodContractTests
                         ISubject receiver,
                         long value);
                 }
-                """),
-            (
+                """), (
                 "CompanionImplementation.cs",
                 """
                 using SharpProof.Attributes;
@@ -396,7 +379,7 @@ public sealed class PartialMethodContractTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var target = GetMethod(compilation, "ISubject", "Identity");
 
         var result = new ContractBinder(compilation, new IrFactory())
@@ -465,9 +448,10 @@ public sealed class PartialMethodContractTests
     }
 
     private static CSharpCompilation CreateCompilation(
-        params (string FileName, string Source)[] sources)
+        ImmutableArray<(string FileName, string Source)> sources)
     {
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         return TestCompilation.Create(
             "PartialContracts",
             sources,

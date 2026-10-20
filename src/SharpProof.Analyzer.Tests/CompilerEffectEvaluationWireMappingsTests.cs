@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -26,35 +27,15 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
         AssertClosedMapping(
             Enum.GetValues<CoreEffectEvaluationOutcome>(),
             value => CompilerEffectEvaluationWireMappings.ToWorker(value),
-            new[]
-            {
-                WorkerClaimOutcome.Proven,
-                WorkerClaimOutcome.Refuted,
-                WorkerClaimOutcome.Unknown
-            });
+            ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown));
         AssertClosedMapping(
             Enum.GetValues<CoreEffectEvaluationReason>(),
             value => CompilerEffectEvaluationWireMappings.ToWorker(value),
-            new[]
-            {
-                WorkerClaimReason.None,
-                WorkerClaimReason.UnsupportedContract,
-                WorkerClaimReason.EffectContractNotEstablished,
-                WorkerClaimReason.EffectSummaryIncomplete,
-                WorkerClaimReason.ResourceLimit,
-                WorkerClaimReason.UnsupportedBody
-            });
+            ImmutableArray.Create(WorkerClaimReason.None, WorkerClaimReason.UnsupportedContract, WorkerClaimReason.EffectContractNotEstablished, WorkerClaimReason.EffectSummaryIncomplete, WorkerClaimReason.ResourceLimit, WorkerClaimReason.UnsupportedBody));
         AssertClosedMapping(
             Enum.GetValues<CoreEffectEvaluationCertainty>(),
             value => CompilerEffectEvaluationWireMappings.ToWorker(value),
-            new[]
-            {
-                WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary,
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary,
-                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary,
-                WorkerEffectEvidenceCertainty.DefiniteViolation,
-                WorkerEffectEvidenceCertainty.Unavailable
-            });
+            ImmutableArray.Create(WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerEffectEvidenceCertainty.Unavailable));
     }
 
     [Test]

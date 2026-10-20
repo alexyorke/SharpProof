@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -65,7 +66,7 @@ public sealed class CompilerOptionWireMappingsTests
         where TEnum : struct, Enum
     {
         System.ArgumentNullException.ThrowIfNull(map);
-        var values = Enum.GetValues<TEnum>();
+        var values = Enum.GetValues<TEnum>().ToImmutableArray();
         Assert.That(
             values.Select(value /* SPINT001: all values valid - enum formatting and mapping tests intentionally include every underlying value */ => map(value).ToString()),
             Is.EqualTo(values.Select(static value /* SPINT001: all values valid - enum formatting and mapping tests intentionally include every underlying value */ => value.ToString())));

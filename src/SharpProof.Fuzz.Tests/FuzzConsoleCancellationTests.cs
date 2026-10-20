@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using NUnit.Framework;
@@ -35,9 +36,9 @@ public sealed class FuzzConsoleCancellationTests
         {
             var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
             Assert.That(entryPoint, Is.Not.Null);
-            string[] arguments = ["--cases", "1000", "--seed", "12345",
+            ImmutableArray<string> arguments = ["--cases", "1000", "--seed", "12345",
                 "--max-parallelism", "1"];
-            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments]));
+            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments.ToArray()]));
             var exitCode = result switch
             {
                 Task<int> task => await task,

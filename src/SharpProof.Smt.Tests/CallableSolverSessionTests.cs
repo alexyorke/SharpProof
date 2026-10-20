@@ -69,14 +69,14 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var contradictory = await session.CheckAsync(Query(factory, [positive, negative], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(contradictory.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-        int[] contradictoryIndices = [0, 1];
+        ImmutableArray<int> contradictoryIndices = [0, 1];
         Assert.That(contradictory.UnsatCore, Is.EquivalentTo(contradictoryIndices));
         var feasible = await session.CheckAsync(Query(factory, [positive], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(feasible.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(feasible.Model!.Assignments[flag].Boolean, Is.True);
         var first = Query(factory, [], factory.Variable(flag));
         var second = Query(factory, [], factory.Unary(IrUnaryOperator.Not, factory.Variable(flag)));
-        foreach (var query in new[] { first, second, first })
+        foreach (var query in ImmutableArray.Create(first, second, first))
         {
             var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
             Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
@@ -94,8 +94,8 @@ public sealed class CallableSolverSessionTests
         var irrelevant = Assume(factory, factory.Boolean(true));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var first = await session.CheckAsync(Query(factory, [irrelevant, positive], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken);
-        int[] secondIndex = [1];
-        int[] firstIndex = [0];
+        ImmutableArray<int> secondIndex = [1];
+        ImmutableArray<int> firstIndex = [0];
         Assert.That(first.UnsatCore, Is.EqualTo(secondIndex));
         var reordered = await session.CheckAsync(Query(factory, [positive, irrelevant], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken);
         Assert.That(reordered.UnsatCore, Is.EqualTo(firstIndex));
@@ -117,7 +117,7 @@ public sealed class CallableSolverSessionTests
         await session.CheckAsync(Query(factory, [], factory.Variable(old)), TestContext.CurrentContext.CancellationToken);
         var result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [current, unusedBoolean]), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
-        Assert.That(result.Model!.Assignments.Keys, Is.EquivalentTo(new[] { current, unusedBoolean }));
+        Assert.That(result.Model!.Assignments.Keys, Is.EquivalentTo(ImmutableArray.Create(current, unusedBoolean)));
         Assert.That(result.Model.Assignments[current].Type, Is.EqualTo(factory.GetVariableInfo(current).Type));
         Assert.That(result.Model.Assignments[unusedBoolean].Kind, Is.EqualTo(IrValueKind.Boolean));
     }
@@ -198,16 +198,22 @@ public sealed class CallableSolverSessionTests
     [Test]
     public void CoreDecoderRejectsInactiveSelectorsAndDisposesEveryWrapper()
     {
-        var active = new Dictionary<string, int>(StringComparer.Ordinal) { ["a0"] = 2 };
-        var valid = new[] { new CoreLabel("g-current"), new CoreLabel("a0") };
+        var activeBuilder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+        activeBuilder["a0"] = 2;
+        var active = activeBuilder.ToImmutable();
+        using var currentLabel = new CoreLabel("g-current");
+        using var activeLabel = new CoreLabel("a0");
+        var valid = ImmutableArray.Create(currentLabel, activeLabel);
         var result = CallableSolverSession.DecodeCore(valid, active, "g-current",
             new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         Assert.That(result.UnsatCore.Single(), Is.EqualTo(2));
         Assert.That(valid.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
-        foreach (var inactive in new[] { "a-inactive", "g-previous" })
+        foreach (var inactive in ImmutableArray.Create("a-inactive", "g-previous"))
         {
-            var malformed = new[] { new CoreLabel(inactive), new CoreLabel("a0") };
+            using var inactiveLabel = new CoreLabel(inactive);
+            using var selectedLabel = new CoreLabel("a0");
+            var malformed = ImmutableArray.Create(inactiveLabel, selectedLabel);
             result = CallableSolverSession.DecodeCore(malformed, active, "g-current",
                 new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
             Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.MalformedResult));
@@ -389,7 +395,7 @@ public sealed class CallableSolverSessionTests
             TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var solver = (Solver)typeof(CallableSolverSession).GetField("_solver", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
         var owner = (Z3ExpressionOwner)typeof(CallableSolverSession).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
-        var expressions = ((List<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToArray();
+        var expressions = ((IEnumerable<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToImmutableArray();
         Assert.That(expressions, Is.Not.Empty);
         Assert.That(NativeObject(solver), Is.Not.EqualTo(IntPtr.Zero));
         Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) != IntPtr.Zero)), Is.True);
@@ -403,7 +409,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task NativeFailureAfterAnAssertionRetiresTheSessionButKeepsNonRetiringRunnerReusable()
     {
-        foreach (var candidate in new[] { true, false })
+        foreach (var candidate in ImmutableArray.Create(true, false))
         {
             using var runner = new SmtNativeRunner(static () => new Context(), retireAfterFailure: candidate);
             using var solver = runner.Context.MkSolver();
@@ -464,7 +470,7 @@ public sealed class CallableSolverSessionTests
 
     private sealed class CoreLabel(string name) : IDisposable
     {
-        private string _guarded_name = name ?? throw new System.ArgumentNullException(nameof(name));
+        private readonly string _guarded_name = name ?? throw new System.ArgumentNullException(nameof(name));
         internal bool IsDisposed { get; private set; }
         public override string ToString() { return _guarded_name; }
         public void Dispose() { IsDisposed = true; }

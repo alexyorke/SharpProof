@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class InitializerIntrinsicConstructorMatrixAuditTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0024"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0024"];
 
     [TestCase(false, false, false)]
     [TestCase(false, false, true)]
@@ -45,14 +46,15 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
         var model = compilation.GetSemanticModel(tree);
         var bodySyntax = (SyntaxNode?)constructor.Body ?? constructor.ExpressionBody!.Expression;
         var bodyOperation = model.GetOperation(bodySyntax)!;
-        var ancestors = new List<string>();
+        var ancestorsBuilder = ImmutableArray.CreateBuilder<string>();
         for (var operation = bodyOperation; operation != null; operation = operation.Parent)
-        { ancestors.Add(operation.Kind.ToString()); }
+        { ancestorsBuilder.Add(operation.Kind.ToString()); }
+        var ancestors = ancestorsBuilder.ToImmutable();
         var invocation = constructor.Initializer!.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var runtime = new AssemblyLoadContext("InitializerIntrinsicConstructorMatrixAudit", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>((Action)(() => Activator.CreateInstance(subject)))!;
             Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
@@ -85,7 +87,7 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
                 public Subject() : base(1) => _ = Contract.Result<int>();
             }
             """, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result").And.Contain("<placement>"));
     }
@@ -105,7 +107,7 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
             }
             """;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(source, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(source.Substring(diagnostics[0].Location.SourceSpan.Start, diagnostics[0].Location.SourceSpan.Length),

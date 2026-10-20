@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -5,13 +6,14 @@ internal static class RuntimeAssemblyTestHost
 {
     internal static void WithRuntimeAssembly(
         string contextName,
-        byte[] image,
+        ImmutableArray<byte> image,
         Action<Assembly> action)
     {
-        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        if (image.IsDefault)
+        { throw new ArgumentNullException(nameof(image)); }
         System.ArgumentNullException.ThrowIfNull(action);
         System.ArgumentNullException.ThrowIfNull(contextName);
-        using var stream = new MemoryStream(image, writable: false);
+        using var stream = new MemoryStream(image.ToArray(), writable: false);
         WithRuntimeAssembly(contextName, stream, action);
     }
 

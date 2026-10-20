@@ -34,33 +34,39 @@ internal sealed record MetadataCallablePremise(string CallableId, bool HasTotal,
     public string CallableId { get; init; } = CallableId ?? throw new System.ArgumentNullException(nameof(CallableId));
 }
 
-internal sealed class MetadataSourceCompilation : IDisposable
+internal sealed record MetadataSourceCompilationResult(Type Subject,
+    ImmutableArray<CompilerCallablePreparation> Preparations, long ArtifactStartTimestamp)
 {
-    private readonly DirectoryInfo directory = Directory.CreateTempSubdirectory("sharpproof-metadata-fuzz-");
-    private readonly AssemblyLoadContext runtime = new("MetadataProgramFuzz", isCollectible: true);
-    private readonly string[] libraryMembers;
-    private readonly string[] sourceMembers;
-    private MemoryStream? libraryImage;
-    private MemoryStream? sourceImage;
-
-    internal MetadataSourceCompilation(IReadOnlyList<MetadataProgramSourceCase> cases)
-    {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
-        sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
-    }
-
-    internal Type Subject { get; private set; } = null!;
-    internal Stopwatch Stage { get; private set; } = null!;
-    internal ImmutableArray<CompilerCallablePreparation> Preparations { get; private set; }
+    public Type Subject { get; init; } = Subject ?? throw new ArgumentNullException(nameof(Subject));
+    public ImmutableArray<CompilerCallablePreparation> Preparations { get; init; } = Preparations.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Preparations)) : Preparations;
     internal ImmutableArray<MetadataCallablePremise> Premises =>
         [.. Preparations.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new MetadataCallablePremise(item.Entry.CallableId,
             item.Total != null, item.Total?.Result != null)))];
+}
 
-    internal async Task CompileAsync(CancellationToken cancellationToken,
+internal sealed class MetadataSourceCompilation : IDisposable
+{
+    private readonly DirectoryInfo directory;
+    private readonly AssemblyLoadContext runtime;
+    private readonly ImmutableArray<string> libraryMembers;
+    private readonly ImmutableArray<string> sourceMembers;
+    private MemoryStream? libraryImage;
+    private MemoryStream? sourceImage;
+
+    internal MetadataSourceCompilation(ImmutableArray<MetadataProgramSourceCase> cases)
+    {
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
+        libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
+        sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
+        directory = Directory.CreateTempSubdirectory("sharpproof-metadata-fuzz-");
+        runtime = new("MetadataProgramFuzz", isCollectible: true);
+    }
+
+    internal async Task<MetadataSourceCompilationResult> CompileAsync(CancellationToken cancellationToken,
         Action<string, long>? timingSink = null)
     {
-        Stage = Stopwatch.StartNew();
+        var stage = Stopwatch.StartNew();
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
             optimizationLevel: OptimizationLevel.Release, deterministic: true);
         var librarySource = "public static class MetadataLibrary { " + string.Join("\n", libraryMembers) + " }";
@@ -68,21 +74,21 @@ internal sealed class MetadataSourceCompilation : IDisposable
             TestMetadataReferences.SortedDistinctPlatform, options);
         libraryImage = MetadataProgramDifferentialOracle.Emit(library, cancellationToken);
         var imagePath = Path.Combine(directory.FullName, "MetadataLibrary.dll");
-        await File.WriteAllBytesAsync(imagePath, libraryImage.ToArray(), cancellationToken);
+        await File.WriteAllBytesAsync(imagePath, libraryImage.GetBuffer().AsMemory(0, checked((int)libraryImage.Length)), cancellationToken);
         runtime.LoadFromStream(libraryImage);
         var source = "using SharpProof.Attributes; public static class MetadataSubject { " + string.Join("\n", sourceMembers) + " }";
         var compilation = CSharpCompilation.Create("MetadataSubject", [Parse(source, Path.Combine(directory.FullName, "Subject.cs"))],
             TestMetadataReferences.WithAdditionalPaths([typeof(SharpProof.Attributes.Contract).Assembly.Location], sort: true)
                 .Add(MetadataReference.CreateFromFile(imagePath)), options);
         sourceImage = MetadataProgramDifferentialOracle.Emit(compilation, cancellationToken);
-        Subject = runtime.LoadFromStream(sourceImage).GetType("MetadataSubject")!;
-        timingSink?.Invoke("compile", Stage.ElapsedMilliseconds);
-        Stage.Restart();
+        var subject = runtime.LoadFromStream(sourceImage).GetType("MetadataSubject")!;
+        timingSink?.Invoke("compile", stage.ElapsedMilliseconds);
+        var artifactStartTimestamp = Stopwatch.GetTimestamp();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken), out var preparations, cancellationToken);
-        Preparations = preparations;
+        return new(subject, preparations, artifactStartTimestamp);
         SyntaxTree Parse(string text, string path)
         {
             path = RepositoryParameterGuard.NotNull(path, nameof(path));
@@ -121,25 +127,25 @@ internal sealed class MetadataProgramSourceReplay
     internal MetadataProgramSourceResult Result => new(totalCases, agreements, proofs,
         refutations, failures.ToImmutable());
 
-    internal async Task CompareBatchAsync(IReadOnlyList<MetadataProgramSourceCase> cases,
+    internal async Task CompareBatchAsync(ImmutableArray<MetadataProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        var count = cases.Count;
-        var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
-        var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
-        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToArray();
+        if (cases.IsDefault)
+        { throw new ArgumentNullException(nameof(cases)); }
+        var count = cases.Length;
+        var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
+        var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
+        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToImmutableArray();
         totalCases += count;
         using var actual = new MetadataSourceCompilation(cases);
-        await actual.CompileAsync(cancellationToken, timingSink);
-        var subject = actual.Subject;
-        var stage = actual.Stage;
-        var preparations = actual.Preparations;
+        var compiled = await actual.CompileAsync(cancellationToken, timingSink);
+        var subject = compiled.Subject;
+        var preparations = compiled.Preparations;
         if (preparations.Length != count)
         { throw new InvalidOperationException("Metadata case universe does not match collected callables."); }
-        var owned = preparations.ToDictionary(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
-        timingSink?.Invoke("artifact", stage.ElapsedMilliseconds);
-        stage.Restart();
+        var owned = ImmutableDictionaryCapture.Create(preparations, item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+        timingSink?.Invoke("artifact", (long)Stopwatch.GetElapsedTime(compiled.ArtifactStartTimestamp).TotalMilliseconds);
+        var stage = Stopwatch.StartNew();
         for (var index = 0; index < count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -165,11 +171,10 @@ internal sealed class MetadataProgramSourceReplay
             { Fail(name + ": unexpected compiled fault " + exception.InnerException?.GetType().Name); continue; }
             var factory = total.Program.Factory;
             var parameter = total.Parameters.Single();
-            var entries = new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], [])
-            };
-            var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, []);
+            var entriesBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+            entriesBuilder[parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], TotalProgramDifferentialOracle.CreateAliases());
+            var entries = entriesBuilder.ToImmutable();
+            var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, TotalProgramDifferentialOracle.CreateAliases());
             var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||
                 !TotalProgramDifferentialOracle.Equal(execution.ReturnValue!, expected))

@@ -34,7 +34,7 @@ public sealed class WorkerBinaryIdentityTests
         var wrongExtension = Path.Combine(temporaryWorkspace.FullName, "worker.exe");
         File.WriteAllBytes(wrongExtension, [1, 2, 3]);
 
-        foreach (var path in new[] { missing, wrongExtension })
+        foreach (var path in ImmutableArray.Create(missing, wrongExtension))
         {
             var failure = Assert.Throws<FileNotFoundException>((Action)(() =>
                 WorkerBinaryIdentity.ComputeSha256(path)));
@@ -66,7 +66,7 @@ public sealed class WorkerBinaryIdentityTests
         using (var exact = File.OpenRead(path))
         {
             Assert.That(CompilerManifestArtifactFile.ReadExact(
-                exact, 3, changedMessage, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(new byte[] { 1, 2, 3 }));
+                exact, 3, changedMessage, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(ImmutableArray.Create<byte>(1, 2, 3)));
         }
         using (var shortened = File.OpenRead(path))
         {
@@ -115,7 +115,20 @@ public sealed class WorkerBinaryIdentityTests
         observed.Refresh();
 
         Assert.That(CompilerManifestArtifactFile.ReadAllBytes(observed, CompilerManifestArtifactFile.MaximumBytes, TestContext.CurrentContext.CancellationToken),
-            Is.EqualTo(new byte[] { 1, 2, 3 }));
+            Is.EqualTo(ImmutableArray.Create<byte>(1, 2, 3)));
     }
 
+    [Test]
+    public void ExactZeroLengthReadReturnsInitializedEmptyBytes()
+    {
+        using var temporaryWorkspace = new TempDirectory("SharpProof.ManifestEmpty.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, []);
+        using var stream = File.OpenRead(path);
+        var bytes = CompilerManifestArtifactFile.ReadExact(stream, 0, "changed",
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(bytes.IsDefault, Is.False);
+        Assert.That(bytes.IsEmpty, Is.True);
+        Assert.That(stream.Position, Is.Zero);
+    }
 }

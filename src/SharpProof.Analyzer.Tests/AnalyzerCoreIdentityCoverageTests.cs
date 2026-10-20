@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -33,7 +34,7 @@ public sealed class AnalyzerCoreIdentityCoverageTests
             Assert.That(encoded, Does.Contain(compilation.GetSpecialType(SpecialType.System_String).ContainingAssembly.Identity.ToString()));
             Assert.That(hierarchy, Does.Contain(encoded));
             Assert.That(hierarchy, Does.Contain(CompilerExceptionTypeIdentity.Encode(compilation.GetTypeByMetadataName("System.Exception")!)));
-            Assert.That(hierarchy, Is.EqualTo(hierarchy.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal).ToArray()));
+            Assert.That(hierarchy, Is.EqualTo(hierarchy.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal).ToImmutableArray()));
         }
     }
 
@@ -64,7 +65,7 @@ public sealed class AnalyzerCoreIdentityCoverageTests
         var tree = compilation.SyntaxTrees.Single();
         var binary = tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
         var operation = compilation.GetSemanticModel(tree).GetOperation(binary)!;
-        var ancestors = OperationAncestors.Of(operation).ToArray();
+        var ancestors = OperationAncestors.Of(operation).ToImmutableArray();
         Assert.That(ancestors, Is.Not.Empty);
         Assert.That(ancestors[0], Is.SameAs(operation.Parent));
         for (var index = 1; index < ancestors.Length; index++)

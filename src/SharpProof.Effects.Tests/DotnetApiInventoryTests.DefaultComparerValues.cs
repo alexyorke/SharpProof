@@ -38,14 +38,14 @@ public sealed partial class DotnetApiInventoryTests
             ArgumentNullException.ThrowIfNull(request);
             var type = factory.GetVariableInfo(request.Variable).Type;
             return type == factory.BooleanType ? factory.CreateBooleanValue(false) : factory.CreateReferenceValue(type, Comparer<int>.Default);
-        });
-        Func<IrOpaqueTerm, IrValue?> observe = term =>
+        })
+        { ConcreteOpaqueValueProvider = Observe };
+        IrValue? Observe(IrOpaqueTerm term)
         {
             ArgumentNullException.ThrowIfNull(term);
             return IrOpaqueCallSite.DefaultComparerValuePrimitive(factory, term) == "System_Int32"
                 ? factory.CreateReferenceValue(term.Type, Comparer<int>.Default) : null;
-        };
-        options.ConcreteOpaqueValueProvider = observe;
+        }
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, null, 5000, options);
         var runtime = new AssemblyLoadContext("DefaultComparerValueOracle", isCollectible: true);
         try

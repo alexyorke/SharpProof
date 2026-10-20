@@ -33,13 +33,17 @@ public sealed class PartialSourceCompletionControls
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
-        var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal);
+        var methods = ImmutableDictionaryCapture.Create(
+            (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory();
-        var bindings = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+        var bindingBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         var formula = LowerActual("Target");
         var completion = LowerActual("NormalCompletion");
+        var bindings = bindingBuilder.ToImmutable();
         Assert.That(formula.IsExact, Is.True);
         Assert.That(completion.IsExact, Is.EqualTo(!opaque));
         Assert.That(completion.Variables, Is.Empty);
@@ -56,16 +60,16 @@ public sealed class PartialSourceCompletionControls
             image.Position = 0;
             var runtime = context.LoadFromStream(image).GetType("PartialCompletionSourcePremise");
             Assert.That(runtime, Is.Not.Null);
-            object?[] arguments = [fault ? (object)7L : true];
+            ImmutableArray<object?> arguments = [fault ? (object)7L : true];
             try
             {
-                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments)!;
+                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments.ToArray())!;
             }
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             {
                 actualFault = exception.InnerException;
             }
-            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments)!;
+            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments.ToArray())!;
         }
         finally
         {
@@ -121,7 +125,7 @@ public sealed class PartialSourceCompletionControls
                 var parameter = (IParameterSymbol)binding.Symbol;
                 Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, symbol), Is.True);
                 Assert.That(parameter.Ordinal, Is.Zero);
-                bindings = bindings.Add(binding.Variable, fault
+                bindingBuilder.Add(binding.Variable, fault
                     ? factory.CreateIntegerValue(factory.GetVariableInfo(binding.Variable).Type, 7L)
                     : factory.CreateBooleanValue(true));
             }

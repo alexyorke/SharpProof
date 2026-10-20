@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.VisualBasic;
@@ -37,7 +38,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, target);
             var lowerer = new RoslynTotalExpressionLowerer(context);
-            var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+            var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
             Assert.That(children, Has.Length.EqualTo(2));
             Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
             var rule = CSharpOperationSemantics.Apply(factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]);
@@ -61,7 +62,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             var add = new RoslynTotalExpressionLowerer(addContext, builder, exceptionalExit).LowerBodyValue(addOperation, entry);
             Assert.That(add.Classification.IsExact, Is.True);
             builder.Return(add.Continuation, addContext.Site(addOperation), add.Value);
-            var environment = addContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2)));
+            var environment = ImmutableDictionaryCapture.Create(addContext.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2)));
             var replay = new IrProgramInterpreter(factory).Execute(builder.Build(), environment);
             Assert.That(type.GetMethod("Add")!.Invoke(null, [7, 2]), Is.EqualTo(9));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -17,7 +18,7 @@ internal sealed class ScalarPatternFlowTests
 {
     private const string Prelude = "using SharpProof.Attributes; public static class C { public static int State; ";
 
-    private static readonly int[] Inputs = [int.MinValue, int.MinValue + 1, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 97, 122, 123, int.MaxValue - 1, int.MaxValue];
+    private static readonly ImmutableArray<int> Inputs = [int.MinValue, int.MinValue + 1, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 97, 122, 123, int.MaxValue - 1, int.MaxValue];
 
     [TestCase("switch (x) { case 1: return 10 / (x - 1); case 2 when x > 0: return 9; default: return 2; }", WorkerClaimOutcome.Refuted)]
     [TestCase("switch (x) { case 1: return 10 / x; case 2 when x > 0: return 9; default: return 2; }", WorkerClaimOutcome.Proven)]
@@ -108,7 +109,7 @@ internal sealed class ScalarPatternFlowTests
         return claim.Outcome;
     }
 
-    private static List<(int X, string? Exception, int State)> Execute(string source)
+    private static ImmutableArray<(int X, string? Exception, int State)> Execute(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]));
@@ -120,7 +121,7 @@ internal sealed class ScalarPatternFlowTests
         var type = Assembly.Load(stream.ToArray()).GetType("C")!;
         var method = type.GetMethod("Target")!;
         var state = type.GetField("State")!;
-        var runs = new List<(int X, string? Exception, int State)>();
+        var runs = ImmutableArray.CreateBuilder<(int X, string? Exception, int State)>();
         foreach (var x in Inputs)
         {
             state.SetValue(null, 0);
@@ -131,6 +132,6 @@ internal sealed class ScalarPatternFlowTests
             { exception = invocation.InnerException!.GetType().Name; }
             runs.Add((x, exception, (int)state.GetValue(null)!));
         }
-        return runs;
+        return runs.ToImmutable();
     }
 }

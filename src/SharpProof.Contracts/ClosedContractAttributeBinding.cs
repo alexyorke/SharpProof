@@ -99,7 +99,7 @@ internal static class ClosedContractAttributeBinding
             var refKind = parameter.RefKind;
             var attributes = parameter.GetAttributes();
             cancellationToken.ThrowIfCancellationRequested();
-            var kinds = new HashSet<ClosedContractAttributeKind>();
+            var kinds = ImmutableHashSet.CreateBuilder<ClosedContractAttributeKind>();
             foreach (var attribute in attributes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -111,7 +111,9 @@ internal static class ClosedContractAttributeBinding
                 { continue; }
                 var constructor = attribute.AttributeConstructor;
                 var expectedArguments = validation.Kind == ClosedContractAttributeKind.InRange ? 2 : 0;
-                if (!validation.IsValid || !kinds.Add(validation.Kind) || constructor == null ||
+                if (!validation.IsValid || !kinds.Add(validation.Kind))
+                { return new([], ContractBindingFailure.InvalidClosedAttribute); }
+                if (constructor == null ||
                     constructor.MethodKind != MethodKind.Constructor || constructor.IsStatic ||
                     !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attribute.AttributeClass) ||
                     constructor.Parameters.Length != expectedArguments ||

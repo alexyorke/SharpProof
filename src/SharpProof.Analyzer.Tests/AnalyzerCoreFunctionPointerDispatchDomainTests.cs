@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
 {
-    private static readonly (string TypeName, int Expected)[] DispatchControls = [("Conflicting", 1), ("Matching", 0)];
+    private static readonly ImmutableArray<(string TypeName, int Expected)> DispatchControls = [("Conflicting", 1), ("Matching", 0)];
 
     private const string Source = """
         using SharpProof.Attributes;
@@ -36,7 +37,7 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
 
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", analyzer: new SharpProofAnalyzer(factory));
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
         Assert.That(factory.Session, Is.Not.Null);
         var session = factory.Session!;
@@ -54,9 +55,9 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
         Assert.That(signature.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(signature.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
 
-        var reports = new List<Diagnostic>();
-        OverridePreconditionDiagnostics.Validate(signature, session, reports.Add, TestContext.CurrentContext.CancellationToken);
-        Assert.That(reports, Is.Empty);
+        var reportsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        OverridePreconditionDiagnostics.Validate(signature, session, reportsBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        Assert.That(reportsBuilder.Count, Is.Zero);
         foreach (var (typeName, expected) in DispatchControls)
         {
             var method = actual.GetTypeByMetadataName(typeName)!.GetMembers("Run").OfType<IMethodSymbol>().Single();
@@ -66,15 +67,17 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
             Assert.That(bound.IsSuccess, Is.True);
             Assert.That(bound.Contracts, Is.Not.Null);
             Assert.That(bound.Contracts!.Clauses, Is.Not.Empty);
-            var result = new List<Diagnostic>();
-            OverridePreconditionDiagnostics.Validate(method, session, result.Add, TestContext.CurrentContext.CancellationToken);
-            Assert.That(result, Has.Count.EqualTo(expected));
+            var resultBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+            OverridePreconditionDiagnostics.Validate(method, session, resultBuilder.Add, TestContext.CurrentContext.CancellationToken);
+            var result = resultBuilder.ToImmutable();
+            Assert.That(result, Has.Length.EqualTo(expected));
             if (expected != 0)
             {
                 Assert.That(result.Single().Id, Is.EqualTo("SP0024"));
                 AnalyzerTestHost.AssertMessageContains(result.Single(), "not visible through base or interface dispatch");
             }
         }
+        var reports = reportsBuilder.ToImmutable();
         Assert.That(reports, Is.Empty);
     }
 }

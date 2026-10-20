@@ -2,8 +2,10 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder
 {
-    private readonly Dictionary<IrTypeId, FuncDecl> _elements = [];
-    private readonly HashSet<IrSequenceAccessTerm> _arrayAccesses = [];
+    private readonly ImmutableDictionary<IrTypeId, FuncDecl>.Builder _elements = ImmutableDictionary.CreateBuilder<IrTypeId, FuncDecl>();
+    private readonly ImmutableList<FuncDecl>.Builder _elementOrder = ImmutableList.CreateBuilder<FuncDecl>();
+    private readonly ImmutableHashSet<IrSequenceAccessTerm>.Builder _arrayAccesses = ImmutableHashSet.CreateBuilder<IrSequenceAccessTerm>();
+    private readonly ImmutableList<IrSequenceAccessTerm>.Builder _arrayAccessOrder = ImmutableList.CreateBuilder<IrSequenceAccessTerm>();
 
     private Expr EncodeArrayAccess(IrSequenceAccessTerm access, SmtQueryResourceMeter meter)
     {
@@ -20,22 +22,26 @@ internal sealed partial class BvEncoder
             using var indexSort = context.MkBitVecSort(32);
             using Sort valueSort = info.Kind == IrTypeKind.Boolean ? context.MkBoolSort() : context.MkBitVecSort((uint)info.Width);
             element = context.MkFuncDecl("element" + _elements.Count.ToString(CultureInfo.InvariantCulture), [ReferenceSort, indexSort], valueSort);
-            _elements.Add(storageType, element);
+            _elements.AddUnique(storageType, element);
+            _elementOrder.Add(element);
         }
         var length = (BitVecExpr)EncodeLength(array, meter);
         var valid = owner.Own(context.MkAnd(owner.Own(context.MkNot(owner.Own(context.MkEq(array, NullReference)))),
             owner.Own(context.MkBVSGE(index, owner.Own(context.MkBV(0, 32)))), owner.Own(context.MkBVSLT(index, length))));
         Expr empty = info.Kind == IrTypeKind.Boolean ? owner.Own(context.MkFalse()) : owner.Own(context.MkBV(0, (uint)info.Width));
-        _arrayAccesses.Add(access);
+        if (_arrayAccesses.Add(access))
+        {
+            _arrayAccessOrder.Add(access);
+        }
         return owner.Own(context.MkITE(valid, owner.Own(context.MkApp(element, array, index)), empty));
     }
 
-    private Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
+    private ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        var observations = new Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>>();
-        foreach (var access in _arrayAccesses)
+        var observations = ImmutableDictionary.CreateBuilder<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>.Builder>();
+        foreach (var access in _arrayAccessOrder.ToImmutable())
         {
             meter.Consume();
             using var array = model.Evaluate(Encode(access.Sequence, meter), true);
@@ -48,10 +54,13 @@ internal sealed partial class BvEncoder
             var decoded = CreateValue(factory, access.Type, value) ?? throw new UnsupportedIrEncodingException();
             var key = (ArrayStorageType(access.Type), array.ToString());
             if (!observations.TryGetValue(key, out var elements))
-            { observations.Add(key, elements = []); }
+            {
+                elements = ImmutableDictionary.CreateBuilder<int, IrValue>();
+                observations[key] = elements;
+            }
             elements[(int)number.UInt64] = decoded;
         }
-        return observations;
+        return observations.ToImmutableDictionary(static entry => entry.Key, static entry => entry.Value.ToImmutable());
     }
 
     // Signedness changes the numeric interpretation, not the array's bits.
@@ -63,16 +72,16 @@ internal sealed partial class BvEncoder
     }
 
     private IrValue DecodeArrayWitness(IrTypeId type, int count, string token,
-        Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> observations)
+        ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> observations)
     {
         observations = RepositoryParameterGuard.NotNull(observations, nameof(observations));
         token = RepositoryParameterGuard.NotNull(token, nameof(token));
         var elementType = factory.GetTypeInfo(type).ElementType
             ?? throw new UnsupportedIrEncodingException();
-        var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToArray();
+        var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToImmutableArray();
         if (observations.TryGetValue((ArrayStorageType(elementType), token), out var observed))
         {
-            SmtNativeUtilities.ApplyArrayObservations(factory, elementType, elements, observed);
+            elements = SmtNativeUtilities.WithArrayObservations(factory, elementType, elements, observed);
         }
         return factory.CreateSequenceValue(type, elements);
     }

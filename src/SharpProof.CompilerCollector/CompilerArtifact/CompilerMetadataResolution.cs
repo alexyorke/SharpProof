@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
@@ -21,12 +22,12 @@ internal static class CompilerMetadataResolution
     {
         private readonly CSharpCompilation _compilation =
             ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        private readonly Dictionary<PortableExecutableReference, ISymbol?> _symbols =
-            new(ReferenceComparer<PortableExecutableReference>.Instance);
+        private readonly ImmutableDictionary<PortableExecutableReference, ISymbol?>.Builder _symbols =
+            ImmutableDictionary.CreateBuilder<PortableExecutableReference, ISymbol?>(ReferenceComparer<PortableExecutableReference>.Instance);
         private CSharpCompilation? _metadataCompilation;
-        private Dictionary<
+        private readonly ImmutableDictionary<
             (AssemblyIdentity Identity, string ModuleName),
-            ReferenceModule[]>? _referenceModules;
+            ImmutableArray<ReferenceModule>>.Builder _referenceModules = ImmutableDictionary.CreateBuilder<(AssemblyIdentity Identity, string ModuleName), ImmutableArray<ReferenceModule>>();
 
         internal ISymbol? Resolve(PortableExecutableReference reference)
         {
@@ -72,23 +73,20 @@ internal static class CompilerMetadataResolution
             return true;
         }
 
-        private ReferenceModule[] GetReferenceModules(
+        private ImmutableArray<ReferenceModule> GetReferenceModules(
             AssemblyIdentity assemblyIdentity,
             string moduleName,
             CancellationToken cancellationToken)
         {
             assemblyIdentity = RepositoryParameterGuard.NotNull(assemblyIdentity, nameof(assemblyIdentity));
             moduleName = RepositoryParameterGuard.NotNull(moduleName, nameof(moduleName));
-            _referenceModules ??= new Dictionary<
-                (AssemblyIdentity Identity, string ModuleName),
-                ReferenceModule[]>();
             var key = (assemblyIdentity, moduleName);
             if (_referenceModules.TryGetValue(key, out var cached))
             {
                 return cached;
             }
 
-            var matches = new List<ReferenceModule>();
+            var matches = ImmutableArray.CreateBuilder<ReferenceModule>();
             foreach (var candidate in _compilation.References
                          .OfType<PortableExecutableReference>())
             {
@@ -130,25 +128,25 @@ internal static class CompilerMetadataResolution
                 }
             }
 
-            cached = SelectReferenceModules(matches, cancellationToken);
+            cached = SelectReferenceModules(matches.ToImmutable(), cancellationToken);
             _referenceModules.Add(key, cached);
             return cached;
         }
     }
 
-    internal static ReferenceModule[] SelectReferenceModules(
-        IReadOnlyList<ReferenceModule> matches,
+    internal static ImmutableArray<ReferenceModule> SelectReferenceModules(
+        ImmutableArray<ReferenceModule> matches,
         CancellationToken cancellationToken)
     {
-        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
-        if (matches.Count > 1)
+        if (matches.IsDefault)
+        { throw new ArgumentNullException(nameof(matches)); }
+        if (matches.Length > 1)
         {
             // Roslyn can expose several references for the same assembly
             // when aliases or duplicate paths are present.  Preserve the
             // fail-closed behavior for different images, but collapse
             // byte-identical images to one deterministic representative.
-            var hashes = new Dictionary<string, ReferenceModule>(
-                StringComparer.Ordinal);
+            var hashes = ImmutableDictionary.CreateBuilder<string, ReferenceModule>(StringComparer.Ordinal);
             foreach (var match in matches)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -157,7 +155,7 @@ internal static class CompilerMetadataResolution
                         cancellationToken,
                         out var hash))
                 {
-                    return matches.Take(2).ToArray();
+                    return matches.Take(2).ToImmutableArray();
                 }
 
                 if (!hashes.ContainsKey(hash))
@@ -174,9 +172,9 @@ internal static class CompilerMetadataResolution
             }
         }
 
-        return matches.Count > 1
-            ? matches.Take(2).ToArray()
-            : matches.ToArray();
+        return matches.Length > 1
+            ? matches.Take(2).ToImmutableArray()
+            : matches;
     }
 
     private static bool TryHashReferenceModule(
@@ -218,15 +216,15 @@ internal static class CompilerMetadataResolution
             } &&
             HasNamespace(
                 containingNamespace,
-                "System",
-                "Runtime",
-                "CompilerServices")));
+                ["System", "Runtime", "CompilerServices"])));
     }
 
     internal static bool HasNamespace(
         INamespaceSymbol value,
-        params string[] segments)
+        ImmutableArray<string> segments)
     {
+        if (segments.IsDefault)
+        { throw new ArgumentNullException(nameof(segments)); }
         for (var index = segments.Length - 1; index >= 0; index--)
         {
             if (value.IsGlobalNamespace ||

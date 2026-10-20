@@ -132,6 +132,7 @@
                         '$(SharpProofProjectName)' == 'SharpProof.Smt' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Specs' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Testing' OR
+                        '$(SharpProofProjectName)' == 'SharpProof.Tool' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Verify' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker.Protocol'">
@@ -149,6 +150,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ParameterGuardContractTests.cs" Link="ParameterGuardContractTests.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Worker.Test' OR '$(SharpProofProjectName)' == 'SharpProof.Package.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ImmutableFixtureRows.cs" Link="ImmutableFixtureRows.cs" />
+  </ItemGroup>
   <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />

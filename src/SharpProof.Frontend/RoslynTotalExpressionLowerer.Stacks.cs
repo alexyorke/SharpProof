@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
-    private readonly Dictionary<(string Name, IrTypeId Value), IrMemberId> _stackFields = [];
+    private readonly ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId>.Builder _stackFields = ImmutableDictionary.CreateBuilder<(string Name, IrTypeId Value), IrMemberId>();
 
     private IrMemberId StackField(string name, IrTypeId value)
     {
@@ -12,9 +12,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (_stackFields.TryGetValue(storage, out var field))
         { return field; }
         var identity = _factory.InternExternalIdentity(("stack", name, value), EqualityComparer<(string, string, IrTypeId)>.Default);
-        field = _factory.GetOrCreateMember(identity, _factory.ObjectType, IrFieldSites.Prefix + "stack:" + name, value,
+        field = _factory.GetOrCreateMemberSnapshot(identity, _factory.ObjectType, IrFieldSites.Prefix + "stack:" + name, value,
             false, name == "count" ? [] : [_factory.IntegerType]);
-        _stackFields.Add(storage, field);
+        _stackFields.AddUnique(storage, field);
         return field;
     }
 
@@ -47,24 +47,25 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (operation is IObjectCreationOperation { Constructor: { } constructor } creation &&
             CSharpOperationSemantics.IsStackStateMember(constructor))
         {
-            var values = new List<IrTerm>();
+            var valueBuilder = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
             foreach (var argument in creation.Arguments)
             {
                 var value = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!value.Classification.IsExact)
                 { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
                 value = Pin(operation, value);
-                values.Add(value.Value);
+                valueBuilder.Add(value.Value);
                 block = value.Continuation;
             }
-            if (values.Count != 0)
+            var values = valueBuilder.MoveToImmutable();
+            if (values.Length != 0)
             {
-                block = StackExceptionalPath(operation, constructor, values.ToArray(),
+                block = StackExceptionalPath(operation, constructor, values,
                     _factory.Binary(IrBinaryOperator.LessThan, values[0], _factory.Integer(0)), block);
             }
             // Runtime initialization and backing storage may allocate or fail;
             // successful copying never invokes element callbacks.
-            block = ListRuntimeEffects(operation, constructor, values.ToArray(), _factory.Boolean(false), block, initialization: true);
+            block = ListRuntimeEffects(operation, constructor, values, _factory.Boolean(false), block, initialization: true);
             return AllocateValue(operation, block);
         }
         var invocation = operation as IInvocationOperation;
@@ -118,11 +119,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
         return popped;
     }
 
-    private IrBlockId StackExceptionalPath(IOperation operation, IMethodSymbol method, IrTerm[] values, IrTerm invalid, IrBlockId block)
+    private IrBlockId StackExceptionalPath(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrTerm invalid, IrBlockId block)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         invalid = RepositoryParameterGuard.NotNull(invalid, nameof(invalid));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var failure = _builder!.CreateBlock("stack:invalid");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -8,10 +9,10 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerIlStreamFillTests
 {
-    private static readonly (int Offset, int Count)[] ExpectedPartialReads = [(0, 81920), (50000, 31921)];
-    private static readonly byte[] ExpectedUntouchedDestination = [0xcc, 0xcc];
-    private static readonly byte[] TwoByteSource = [10, 20];
-    private static readonly byte[] OneByteSource = [10];
+    private static readonly ImmutableArray<(int Offset, int Count)> ExpectedPartialReads = [(0, 81920), (50000, 31921)];
+    private static readonly ImmutableArray<byte> ExpectedUntouchedDestination = [0xcc, 0xcc];
+    private static readonly ImmutableArray<byte> TwoByteSource = [10, 20];
+    private static readonly ImmutableArray<byte> OneByteSource = [10];
 
     [Test]
     public void GenuineCapturedScalarDependencyStillUsesTheProviderAndBodyMemoization()
@@ -30,7 +31,7 @@ public sealed class CompilerIlStreamFillTests
         Assert.That(body!.Method, Is.SameAs(method));
         Assert.That(body.Instructions, Is.Not.Empty);
         Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(body));
-        foreach (var value in new[] { -2, 0, 7 })
+        foreach (var value in ImmutableArray.Create(-2, 0, 7))
         {
             Assert.That(subject.Method.Invoke(null, [value]), Is.EqualTo(value));
             Assert.That(subject.RootMethod.Invoke(null, [value]), Is.EqualTo(value));
@@ -43,14 +44,14 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(163841)]
     public void ExactFillCopiesFromCurrentPositionWithoutReadingBeyondDestination(int length)
     {
-        var source = Enumerable.Range(0, length + 3).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var stream = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, length + 3).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var stream = new MemoryStream(source.ToArray(), writable: false);
         stream.Position = 1;
         var destination = new byte[length];
 
         CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(destination, Is.EqualTo(source.Skip(1).Take(length).ToArray()));
+        Assert.That(destination, Is.EqualTo(source.Skip(1).Take(length).ToImmutableArray()));
         Assert.That(stream.Position, Is.EqualTo(length + 1));
         Assert.That(stream.ReadByte(), Is.EqualTo((int)source[length + 1]));
     }
@@ -59,14 +60,14 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(81920)]
     public void PrematureEofThrowsAfterKeepingTheAvailablePrefix(int available)
     {
-        var source = Enumerable.Range(0, available).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var stream = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, available).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var stream = new MemoryStream(source.ToArray(), writable: false);
         var destination = Enumerable.Repeat((byte)0xcc, available + 1).ToArray();
 
         Assert.Throws<EndOfStreamException>((Action)(() =>
             CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken)));
 
-        Assert.That(destination.Take(available).ToArray(), Is.EqualTo(source));
+        Assert.That(destination.Take(available).ToImmutableArray(), Is.EqualTo(source));
         Assert.That(destination[available], Is.EqualTo((byte)0xcc));
         Assert.That(stream.Position, Is.EqualTo(available));
         Assert.That(stream.CanRead, Is.True);
@@ -75,8 +76,8 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void PositivePartialReadsContinueUsingTheOriginalChunkBound()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var inner = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var inner = new MemoryStream(source.ToArray(), writable: false);
         using var stream = new PartialReadStream(inner, 50000);
         var destination = new byte[source.Length];
 
@@ -91,7 +92,7 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void CancellationPrecedesReadingAndLeavesTheDestinationUntouched()
     {
-        using var stream = new MemoryStream(TwoByteSource, writable: false);
+        using var stream = new MemoryStream(TwoByteSource.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var destination = new byte[] { 0xcc, 0xcc };
@@ -108,8 +109,8 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void CancellationBetweenPartialReadsKeepsTheUnreadDestinationUntouched()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var inner = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var inner = new MemoryStream(source.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         using var stream = new PartialReadStream(inner, 50000, cancellation);
         var destination = Enumerable.Repeat((byte)0xcc, source.Length).ToArray();
@@ -119,10 +120,10 @@ public sealed class CompilerIlStreamFillTests
 
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token));
         Assert.That(cancellation.IsCancellationRequested, Is.True);
-        Assert.That(stream.Reads, Has.Count.EqualTo(1));
+        Assert.That(stream.Reads, Has.Length.EqualTo(1));
         Assert.That(stream.Reads[0], Is.EqualTo((Offset: 0, Count: 81920)));
         Assert.That(inner.Position, Is.EqualTo(50000));
-        Assert.That(destination.Take(50000).ToArray(), Is.EqualTo(source.Take(50000).ToArray()));
+        Assert.That(destination.Take(50000).ToImmutableArray(), Is.EqualTo(source.Take(50000).ToImmutableArray()));
         Assert.That(destination.Skip(50000).All(value => value == 0xcc), Is.True);
     }
 
@@ -130,7 +131,7 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(true)]
     public void EmptyDestinationDoesNotReadOrObserveCancellation(bool canceled)
     {
-        using var stream = new MemoryStream(OneByteSource, writable: false);
+        using var stream = new MemoryStream(OneByteSource.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         if (canceled)
         { cancellation.Cancel(); }
@@ -145,7 +146,9 @@ public sealed class CompilerIlStreamFillTests
     // short reads; no compiler object, PE image, authority or provider hook.
     private sealed class PartialReadStream(Stream inner, int maximumRead, CancellationTokenSource? cancellation = null) : Stream
     {
-        internal List<(int Offset, int Count)> Reads { get; } = (inner is null ? throw new System.ArgumentNullException(nameof(inner)) : []);
+        private readonly ImmutableArray<(int Offset, int Count)>.Builder _reads = (inner is null ? throw new System.ArgumentNullException(nameof(inner)) : ImmutableArray.CreateBuilder<(int Offset, int Count)>());
+
+        internal ImmutableArray<(int Offset, int Count)> Reads => _reads.ToImmutable();
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
@@ -159,9 +162,9 @@ public sealed class CompilerIlStreamFillTests
         public override int Read(byte[] buffer, int offset, int count)
         {
             System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer));
-            Reads.Add((offset, count));
+            _reads.Add((offset, count));
             var read = inner.Read(buffer, offset, Math.Min(count, maximumRead));
-            if (read > 0 && Reads.Count == 1)
+            if (read > 0 && _reads.Count == 1)
             { cancellation?.Cancel(); }
             return read;
         }

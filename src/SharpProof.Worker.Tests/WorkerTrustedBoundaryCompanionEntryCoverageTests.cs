@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -47,7 +48,7 @@ internal sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(response, WorkerClaimOutcome.Proven, WorkerClaimReason.None,
             contradictory ? WorkerVacuityKind.ContradictoryPreconditions : WorkerVacuityKind.None);
-        var usedPreconditions = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToArray();
+        var usedPreconditions = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
         var trust = result.Assumptions.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.TrustedBoundary));
         using (Assert.EnterMultipleScope())
         {

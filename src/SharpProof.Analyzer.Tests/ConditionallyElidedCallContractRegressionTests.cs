@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 using System.Globalization;
@@ -30,7 +31,7 @@ public sealed class ConditionallyElidedCallContractRegressionTests
             "effects",
             ["SP0046"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0046"]);
         Assert.That(
             diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Scale"));

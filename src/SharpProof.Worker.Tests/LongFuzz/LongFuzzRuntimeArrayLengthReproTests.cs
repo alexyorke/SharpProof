@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
@@ -73,10 +74,10 @@ public sealed class LongFuzzRuntimeArrayLengthReproTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [0, 0, new int[9], null];
+            ImmutableArray<object?> arguments = [0, 0, new int[9], null];
             Assert.That((int)type.GetField("State")!.GetValue(null)!, Is.Zero);
-            Assert.That((bool)type.GetMethod("Pre")!.Invoke(null, arguments)!, Is.True);
-            Assert.That((int)type.GetMethod("Target")!.Invoke(null, arguments)!, Is.Zero);
+            Assert.That((bool)type.GetMethod("Pre")!.Invoke(null, arguments.ToArray())!, Is.True);
+            Assert.That((int)type.GetMethod("Target")!.Invoke(null, arguments.ToArray())!, Is.Zero);
             Assert.That((int)type.GetField("State")!.GetValue(null)!, Is.EqualTo(1));
             TestContext.WriteLine("CLR Release witness: x=0 y=0 a=new int[9] s=null; Pre=true return=0 State=1");
         }
@@ -85,9 +86,10 @@ public sealed class LongFuzzRuntimeArrayLengthReproTests
             context.Unload();
         }
 
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var countsBuilder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         var result = await AnalyzerPipelineLongFuzzTests.RunCase(source, mode,
-            key => { System.ArgumentNullException.ThrowIfNull(key); counts[key] = counts.GetValueOrDefault(key) + 1; });
+            key => { System.ArgumentNullException.ThrowIfNull(key); countsBuilder[key] = countsBuilder.GetValueOrDefault(key) + 1; });
+        var counts = countsBuilder.ToImmutable();
         TestContext.WriteLine($"Native: {result.Outcome} {result.Reason}; default runtime: {result.Runtime}");
         TestContext.WriteLine(string.Join("\n", result.Problems.Select(problem => problem.Kind + ": " + problem.Details)));
         Assert.That(counts.GetValueOrDefault("compiled"), Is.EqualTo(1));

@@ -17,7 +17,7 @@ internal sealed class WorkerVcAllocationIdentityProbeTests
         System.ArgumentNullException.ThrowIfNull(first);
         System.ArgumentNullException.ThrowIfNull(second);
         var body = "object first = " + first + "; object second = " + second + "; return first == second;";
-        var declaration = "public static class Subject { public static bool Target() { ";
+        const string declaration = "public static class Subject { public static bool Target() { ";
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("AllocationIdentityRuntime", declaration + body + " } }")
             .Emit(image).Success, Is.True);

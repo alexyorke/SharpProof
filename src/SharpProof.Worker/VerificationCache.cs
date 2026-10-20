@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Worker;
 
 // A content-addressed store of complete worker responses. The key is the
@@ -49,6 +50,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     CallableResults: { } callables,
                     ClaimResults: { } claims
                 } ||
+                callables.IsDefault || claims.IsDefault ||
                 !string.Equals(entry.InputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(entry.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
                 callables.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)) ||
@@ -67,7 +69,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             // Validate stored evidence before normalization can repair malformed fields.
-            WorkerProtocolJson.Canonicalize(response);
+            response = WorkerProtocolJson.CanonicalizeCopy(response);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             return response;
         }
@@ -133,13 +135,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         string expectedInputHash,
         WorkerClaimManifest expectedManifest)
     {
-        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
+        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is not null && !response.Errors.IsDefault && response is
         {
             RunStatus: WorkerRunStatus.Complete,
             FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
-            CallableResults: not null,
-            ClaimResults: not null
+            CallableResults.IsDefault: false,
+            ClaimResults.IsDefault: false
         } &&
         expectedManifest != null &&
         WorkerProtocolJson.ValidateKnownInputHash(
@@ -158,7 +160,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.LastWriteTimeUtc))
             .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Name), StringComparer.Ordinal)
-            .ToList();
+            .ToImmutableArray();
         var total = entries.Sum(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Length));
         foreach (var file in entries)
         {

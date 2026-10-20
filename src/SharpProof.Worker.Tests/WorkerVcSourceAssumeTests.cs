@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -160,34 +161,63 @@ internal sealed class WorkerVcSourceAssumeTests
             } }
             """);
         var total = artifact.Callables.Single().Total!;
-        var clauses = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)).ToArray();
-        var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToArray();
+        var originalClauses = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)).ToImmutableArray();
+        var clauseBuilder = originalClauses.ToBuilder();
+        var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToImmutableArray();
         switch (mutation)
         {
             case "id":
-                clauses[0].AssumptionId = "foreign";
+                { clauseBuilder[0] = clauseBuilder[0] with { AssumptionId = "foreign" }; }
                 break;
             case "swap-ids":
-                (clauses[0].AssumptionId, clauses[1].AssumptionId) = (clauses[1].AssumptionId, clauses[0].AssumptionId);
+                {
+                    var changedFixture = (clauseBuilder[1].AssumptionId, clauseBuilder[0].AssumptionId);
+                    clauseBuilder[0] = clauseBuilder[0] with { AssumptionId = changedFixture.Item1 };
+                    clauseBuilder[1] = clauseBuilder[1] with { AssumptionId = changedFixture.Item2 };
+                }
                 break;
             case "site":
-                clauses[0].Operation = clauses[1].Operation;
+                { clauseBuilder[0] = clauseBuilder[0] with { Operation = clauseBuilder[1].Operation }; }
                 break;
             case "predicate":
-                points[0].A = points[1].A;
+                {
+                    total = total with { Graph = total.Graph.ReplaceRow(points[0], points[0] with { A = points[1].A }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-point":
-                points[0].Kind = IrInstructionKind.Assert;
+                {
+                    total = total with { Graph = total.Graph.ReplaceRow(points[0], points[0] with { Kind = IrInstructionKind.Assert }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "duplicate-point":
-                points[1].Operation = points[0].Operation;
+                {
+                    total = total with { Graph = total.Graph.ReplaceRow(points[1], points[1] with { Operation = points[0].Operation }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "canonical-role":
                 var current = total.Parameters[0].Current;
                 foreach (var term in total.Graph.Terms.Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Variable && term.A == current)))
-                { term.A = total.Parameters[0].Entry; }
+                {
+                    {
+                        total = total with { Graph = total.Graph.ReplaceRow(term, term with { A = total.Parameters[0].Entry }) };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
         }
+        var clauses = clauseBuilder.ToImmutable();
+        for (var index = 0; index < clauses.Length; index++)
+        {
+            total = total with { Clauses = total.Clauses.ReplaceReference(originalClauses[index], clauses[index]) };
+        }
+        artifact = artifact with
+        {
+            Callables = artifact.Callables.ReplaceReference(
+                artifact.Callables.Single(), artifact.Callables.Single() with { Total = total })
+        };
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -212,7 +242,10 @@ internal sealed class WorkerVcSourceAssumeTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
-        var blocks = total.Program.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
+        var blocks = ImmutableDictionaryCapture.Create(
+            total.Program.Blocks,
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id),
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
         builder.SetEntry(blocks[total.Program.Entry]);
         var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
         var moved = false;
@@ -266,7 +299,7 @@ internal sealed class WorkerVcSourceAssumeTests
             moved = true;
         }
         Assert.That(moved, Is.True);
-        artifact.Callables.Single().Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() }) }) }; }
         // Re-encoding keeps the graph canonical: this must reject placement,
         // rather than relying on a stale operation or term index.
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);

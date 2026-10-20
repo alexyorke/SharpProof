@@ -101,8 +101,8 @@ internal sealed partial class ClaimManifestBuilder(
         published = RepositoryParameterGuard.NotNull(published, nameof(published));
         var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
         var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var guarded = new List<(SyntaxTree Tree, ImmutableArray<SyntaxNode> Nodes)>();
+        var seen = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var guarded = ImmutableArray.CreateBuilder<(SyntaxTree Tree, ImmutableArray<SyntaxNode> Nodes)>();
         var remainingSyntaxNodes = 1_048_576;
         var treeOrdinal = 0;
         foreach (var tree in _compilation.SyntaxTrees)
@@ -130,7 +130,7 @@ internal sealed partial class ClaimManifestBuilder(
             return new([], gaps.ToImmutable());
         }
         treeOrdinal = 0;
-        foreach (var (tree, nodes) in guarded)
+        foreach (var (tree, nodes) in guarded.ToImmutable())
         {
             SemanticModel? model = null;
             foreach (var node in nodes)
@@ -235,19 +235,21 @@ internal sealed partial class ClaimManifestBuilder(
 
     private CompilerPotentialCallGap? GuardReferencedPotentialSyntax(ref int remainingNodes)
     {
-        var pending = new Stack<Compilation>();
-        var visited = new HashSet<Compilation> { _compilation };
-        var treeOwners = new Dictionary<SyntaxTree, Compilation>();
+        var pending = ImmutableArray.CreateBuilder<Compilation>();
+        var visited = ImmutableHashSet.CreateBuilder<Compilation>();
+        visited.Add(_compilation);
+        var treeOwners = ImmutableDictionary.CreateBuilder<SyntaxTree, Compilation>();
         foreach (var tree in _compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            treeOwners.Add(tree, _compilation);
+            treeOwners.AddUnique(tree, _compilation);
         }
-        pending.Push(_compilation);
+        pending.Add(_compilation);
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var current = pending.Pop();
+            var current = pending[pending.Count - 1];
+            pending.RemoveAt(pending.Count - 1);
             foreach (var reference in current.References)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -280,7 +282,7 @@ internal sealed partial class ClaimManifestBuilder(
                     }
                     ordinal++;
                 }
-                pending.Push(source.Compilation);
+                pending.Add(source.Compilation);
             }
         }
         return null;
@@ -291,13 +293,14 @@ internal sealed partial class ClaimManifestBuilder(
     {
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
         const int maximumNodes = 65_536;
-        var pending = new Stack<(SyntaxNode Node, int Depth)>();
+        var pending = ImmutableArray.CreateBuilder<(SyntaxNode Node, int Depth)>();
         var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
-        pending.Push((root, 0));
+        pending.Add((root, 0));
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (node, depth) = pending.Pop();
+            var (node, depth) = pending[pending.Count - 1];
+            pending.RemoveAt(pending.Count - 1);
             if (depth > 128 || collected.Count >= maximumNodes || --remainingNodes < 0)
             {
                 nodes = [];
@@ -312,7 +315,7 @@ internal sealed partial class ClaimManifestBuilder(
                     nodes = [];
                     return false;
                 }
-                pending.Push((child, depth + 1));
+                pending.Add((child, depth + 1));
             }
         }
         nodes = collected.OrderBy(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.SpanStart)).ToImmutableArray();
@@ -390,7 +393,7 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
-        var features = new HashSet<WorkerSelectedFeature>(selected);
+        var features = selected.ToImmutableHashSet().ToBuilder();
         if (!postconditions.IsDefaultOrEmpty)
         {
             features.Add(WorkerSelectedFeature.Contracts);
@@ -415,8 +418,8 @@ internal sealed partial class ClaimManifestBuilder(
         var entry = new WorkerCallableManifestEntry
         {
             CallableId = callableId,
-            SelectedFeatures = [.. features.OrderBy(static feature => feature)],
-            SelectionReasons = reasons.ToArray(),
+            SelectedFeatures = [.. features.ToImmutable().OrderBy(static feature => feature)],
+            SelectionReasons = reasons.ToImmutable(),
             Location = location.IsInSource
                 ? ToSourceLocation(location)
                 : postconditions.FirstOrDefault()?.Entry.Location ??
@@ -425,7 +428,7 @@ internal sealed partial class ClaimManifestBuilder(
                         : new WorkerSourceLocation()),
             ClaimIds = [.. postconditions.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId)),
                 .. effects.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId))],
-            Assumptions = assumptions.ToArray()
+            Assumptions = assumptions
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);
@@ -474,7 +477,7 @@ internal sealed partial class ClaimManifestBuilder(
                     WorkerClaimEvidence.ReturnAttribute,
                     null, attribute, null))))
             .ToImmutableArray();
-        var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+        var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         var claims = ImmutableArray.CreateBuilder<ManifestClaim>(candidates.Length);
         for (var ordinal = 0; ordinal < candidates.Length; ordinal++)
         {
@@ -565,7 +568,7 @@ internal sealed partial class ClaimManifestBuilder(
                 SemanticClaimIdentity.CreateTrustedFingerprint(attribute, scope, target)));
         }
 
-        var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+        var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         return [.. candidates.Select(candidate => {
 candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fingerprint is null, nameof(candidate), "Value must be initialized.");
 
@@ -624,7 +627,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
-        var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+        var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Kind)))
         {
             var attributes = evaluation.Attributes
@@ -695,7 +698,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         bool isSupported,
         AttributeData attribute,
         string fingerprint,
-        Dictionary<string, int> ranks,
+        ImmutableDictionary<string, int>.Builder ranks,
         Location companionLocation,
         Location? locationOverride = null)
     {
@@ -761,9 +764,12 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         };
         if (!isSupported)
         {
-            evidence.Outcome = WorkerClaimOutcome.Unknown;
-            evidence.Reason = WorkerClaimReason.UnsupportedContract;
-            evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
+            evidence = evidence with
+            {
+                Outcome = WorkerClaimOutcome.Unknown,
+                Reason = WorkerClaimReason.UnsupportedContract,
+                Certainty = WorkerEffectEvidenceCertainty.Unavailable
+            };
         }
         return evidence;
     }
@@ -942,15 +948,16 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             _attributes.IsRejectedControlAttribute(attribute);
     }
 
-    private HashSet<SyntaxTree> SelectedScopeTrees()
+    private ImmutableHashSet<SyntaxTree> SelectedScopeTrees()
     {
-        var trees = new HashSet<SyntaxTree>();
-        var pending = new Stack<(INamespaceOrTypeSymbol Scope, bool Selected)>();
-        pending.Push((_compilation.Assembly.GlobalNamespace, false));
+        var trees = ImmutableHashSet.CreateBuilder<SyntaxTree>();
+        var pending = ImmutableArray.CreateBuilder<(INamespaceOrTypeSymbol Scope, bool Selected)>();
+        pending.Add((_compilation.Assembly.GlobalNamespace, false));
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (scope, inheritedSelection) = pending.Pop();
+            var (scope, inheritedSelection) = pending[pending.Count - 1];
+            pending.RemoveAt(pending.Count - 1);
             var selected = inheritedSelection;
             if (scope is INamedTypeSymbol type)
             {
@@ -964,12 +971,12 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             if (scope is INamespaceSymbol @namespace)
             {
                 foreach (var child in @namespace.GetNamespaceMembers())
-                { pending.Push((child, selected)); }
+                { pending.Add((child, selected)); }
             }
             foreach (var child in scope.GetTypeMembers())
-            { pending.Push((child, selected)); }
+            { pending.Add((child, selected)); }
         }
-        return trees;
+        return trees.ToImmutable();
     }
 
     private CallableSeed CreateSeed(IMethodSymbol method)
@@ -993,29 +1000,34 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         // Keep its membership separate from callable publication.
 
         RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
-        var required = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var pending = new Stack<IMethodSymbol>();
+        var required = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var requiredOrder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+        var pending = ImmutableArray.CreateBuilder<IMethodSymbol>();
         foreach (var seed in callables)
         {
             if (HasManifestIdentity(seed) || TrustedAttributes(seed.Method).Any())
             {
-                required.Add(seed.Method);
-                pending.Push(seed.Method);
+                if (required.Add(seed.Method))
+                { requiredOrder.Add(seed.Method); }
+                pending.Add(seed.Method);
             }
         }
         while (pending.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (pending.Pop().ContainingSymbol is IMethodSymbol containing)
+            var method = pending[pending.Count - 1];
+            pending.RemoveAt(pending.Count - 1);
+            if (method.ContainingSymbol is IMethodSymbol containing)
             {
                 var parent = ContractClauseInventoryBuilder.NormalizeCallable(containing);
                 if (required.Add(parent))
                 {
-                    pending.Push(parent);
+                    requiredOrder.Add(parent);
+                    pending.Add(parent);
                 }
             }
         }
-        var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
+        var ordinals = ImmutableDictionary.CreateBuilder<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         // Callables without contract or effect claims do not
         // participate in the manifest identity. Excluding them
         // keeps an unrelated sibling from renumbering the
@@ -1036,13 +1048,13 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                          .ThenBy(static seed => ((seed.Method is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(seed)) : (seed.Declaration?.SpanStart ?? int.MaxValue)))
                          .Select(static (seed, ordinal) => ((seed.Method is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(seed)) : ((seed, ordinal)))))
             {
-                ordinals.Add(item.seed.Method, item.ordinal);
+                ordinals.AddUnique(item.seed.Method, item.ordinal);
             }
         }
 
         // Preserve all existing selected-sibling slots. Append the required
         // plain ancestors and trust-only siblings; unrelated siblings use none.
-        foreach (var group in required
+        foreach (var group in requiredOrder.ToImmutable()
                      .Where(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction))
                      .Select(CreateSeed)
@@ -1055,17 +1067,18 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                          .ThenBy(static seed => ((seed.Method is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(seed)) : (seed.Declaration?.SpanStart ?? int.MaxValue))))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ordinals.Add(seed.Method, ordinal++);
+                ordinals.AddUnique(seed.Method, ordinal++);
             }
         }
 
-        var ids = new Dictionary<IMethodSymbol, string>(SymbolEqualityComparer.Default);
+        var ordinalMap = ordinals.ToImmutable();
+        var ids = ImmutableDictionary.CreateBuilder<IMethodSymbol, string>(SymbolEqualityComparer.Default);
         foreach (var seed in callables)
         {
             Resolve(seed.Method);
         }
 
-        return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
+        return ids.ToImmutable();
 
         bool HasManifestIdentity(CallableSeed seed)
         {
@@ -1082,22 +1095,23 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         void Resolve(IMethodSymbol method)
         {
             method = RepositoryParameterGuard.NotNull(method, nameof(method));
-            var unresolved = new Stack<IMethodSymbol>();
+            var unresolved = ImmutableArray.CreateBuilder<IMethodSymbol>();
             string parentId;
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 method = ContractClauseInventoryBuilder.NormalizeCallable(
                     method);
-                if (ids.TryGetValue(method, out parentId))
+                if (ids.TryGetValue(method, out var existingId))
                 {
+                    parentId = existingId;
                     break;
                 }
 
                 if (method.MethodKind is
                     MethodKind.AnonymousFunction or MethodKind.LocalFunction)
                 {
-                    unresolved.Push(method);
+                    unresolved.Add(method);
                     if (method.ContainingSymbol is IMethodSymbol parentMethod)
                     {
                         method = parentMethod;
@@ -1110,24 +1124,25 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                 }
 
                 parentId = SemanticClaimIdentity.CreateCallableId(method);
-                ids.Add(method, parentId);
+                ids.AddUnique(method, parentId);
                 break;
             }
 
             while (unresolved.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var nested = unresolved.Pop();
+                var nested = unresolved[unresolved.Count - 1];
+                unresolved.RemoveAt(unresolved.Count - 1);
                 // Unneeded clause-free callables do not participate in published
                 // identity. Required ancestors already have distinct ordinals.
-                var ordinal = ordinals.TryGetValue(nested, out var value)
+                var ordinal = ordinalMap.TryGetValue(nested, out var value)
                     ? value
                     : 0;
                 parentId = SemanticClaimIdentity.CreateNestedCallableId(
                     parentId,
                     nested,
                     ordinal);
-                ids.Add(nested, parentId);
+                ids.AddUnique(nested, parentId);
             }
         }
     }
@@ -1144,7 +1159,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         public ImmutableArray<ContractClauseOccurrence> Assumptions { get; init; } = Assumptions.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Assumptions)) : Assumptions;
     }
 
-    private static int NextRank(Dictionary<string, int> ranks, string key)
+    private static int NextRank(ImmutableDictionary<string, int>.Builder ranks, string key)
     {
         key = RepositoryParameterGuard.NotNull(key, nameof(key));
         ranks = RepositoryParameterGuard.NotNull(ranks, nameof(ranks));

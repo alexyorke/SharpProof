@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -6,7 +7,7 @@ namespace SharpProof.Effects.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {
-    private static readonly (string Type, string[] Values)[] IntegerComparisonEdges =
+    private static readonly ImmutableArray<(string Type, ImmutableArray<string> Values)> IntegerComparisonEdges =
     [
         ("sbyte", ["sbyte.MinValue", "(sbyte)-1", "(sbyte)0", "(sbyte)1", "sbyte.MaxValue"]),
         ("byte", ["byte.MinValue", "(byte)1", "byte.MaxValue"]),
@@ -93,9 +94,10 @@ public sealed partial class DotnetApiInventoryTests
         };
     }
 
-    private static int CompareRuntimeValues<T>(T[] values, int left, int right, bool comparer) where T : IComparable<T>
+    private static int CompareRuntimeValues<T>(ImmutableArray<T> values, int left, int right, bool comparer) where T : IComparable<T>
     {
-        ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         var first = values[left];
         var second = values[right];
         ArgumentNullException.ThrowIfNull(first);
@@ -105,16 +107,15 @@ public sealed partial class DotnetApiInventoryTests
 
     private static bool CheckCountInvariant(string api, bool wrongClaim)
     {
-        foreach (var size in new[]
-        {
+        foreach (var size in ImmutableArray.Create(
             0,
             1,
             65
-        }
+        )
 
         )
         {
-            var values = Enumerable.Range(0, size).ToArray();
+            var values = Enumerable.Range(0, size).ToImmutableArray();
             var observed = api switch
             {
                 "P:System.Collections.Generic.List`1.Count" => new List<int>(values).Count,

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -50,7 +51,7 @@ internal sealed class NativeInstanceCallTests
             Assert.That(purity.Outcome, Is.TypeOf<ProvenOutcome>(), purity.Reason.ToString());
             // The downcast may fail, allocating its exception, but whether it
             // does is not concrete.
-            foreach (var result in new[] { allocations, exceptions })
+            foreach (var result in ImmutableArray.Create(allocations, exceptions))
             {
                 Assert.That(result.Outcome, Is.Null);
                 Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
@@ -78,9 +79,10 @@ internal sealed class NativeInstanceCallTests
         var preparation = Prepare("public static class C { public static int Target(Counter counter, int value) { " +
             "Contract.Requires(counter != null && value > -1000 && value < 1000); " +
             "Contract.Ensures(Contract.Result<int>() == value + value); return counter.Twice(value); } }", effects: false);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         Assert.That(results[^1].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), results[^1].Reason.ToString());
     }
 
@@ -108,9 +110,10 @@ internal sealed class NativeInstanceCallTests
         var preparation = Prepare("public static class C { public static int Target(Counter counter, int value) { " +
             "Contract.Requires(counter != null && value > -1000 && value < 1000); " +
             "Contract.Ensures(Contract.Result<int>() == " + result + "); " + body + " } }", effects: false);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         Assert.That(results[^1].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), results[^1].Reason.ToString());
     }
 
@@ -178,9 +181,10 @@ internal sealed class NativeInstanceCallTests
             "public static class C { public static bool Target(Box<int> box, Holder<int> value) { Contract.Requires(box != null && value != null); " +
             "Contract.Ensures(Contract.Result<bool>() == " + expected + "); return object.ReferenceEquals(box.Echo(value), value); } }", effects: false);
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+            check => { ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         Assert.That(results, Is.Not.Empty);
         Assert.That(results[^1].Outcome, Is.EqualTo(outcome), results[^1].Reason.ToString());
     }

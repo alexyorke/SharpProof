@@ -35,7 +35,7 @@ public sealed class GoldenAnalyzerTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var rows = new List<string>();
+        var rows = ImmutableArray.CreateBuilder<string>();
         foreach (var syntax in tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
                      .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal))
         {
@@ -45,7 +45,7 @@ public sealed class GoldenAnalyzerTests
             var lowering = new SharpProof.Frontend.RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True);
             Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
-            var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.PreState }))
+            var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
                 .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
                 .Append(context.Result!.Value).Distinct().ToImmutableArray();
             var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(
@@ -56,7 +56,7 @@ public sealed class GoldenAnalyzerTests
             var gaps = result.Gaps.IsEmpty ? "none" : string.Join(",", result.Gaps);
             rows.Add($"{syntax.Identifier.ValueText} accepted={(result.Accepted ? "true" : "false")} gaps={gaps} return=[{bounds.LowerBound},{bounds.UpperBound}]");
         }
-        return string.Join('\n', rows);
+        return string.Join('\n', rows.ToImmutable());
     }
     internal static string FormatDiagnostics(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {

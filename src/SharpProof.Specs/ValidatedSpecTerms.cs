@@ -25,9 +25,9 @@ internal static partial class ApiSpecTermValidator
 
         internal static TermFacts ValidateAndCompile(
             SpecTermDeclaration declaration,
-            IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+            ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
             ApiSpecFacets facets,
-            IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
+            ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm>.Builder validatedTerms,
             bool allowResult)
         {
             facets = RepositoryParameterGuard.NotNull(facets, nameof(facets));

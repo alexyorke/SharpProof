@@ -21,7 +21,7 @@ public sealed class AnalyzerCoreNestedSuppressionCoverageTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
         var kind = localFunction ? MethodKind.LocalFunction : MethodKind.AnonymousFunction;
-        Assert.That(factory.GetOutcomes(kind).Count(), Is.EqualTo(1));
+        Assert.That(factory.GetOutcomes(kind).Length, Is.EqualTo(1));
         Assert.That(factory.GetOutcomes(kind).Single(), Is.EqualTo(AnalyzerSemanticOutcome.Suppressed));
     }
 }

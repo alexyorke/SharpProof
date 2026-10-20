@@ -22,7 +22,7 @@ internal static class ConditionalMethodIdentityPolicy
     {
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         csharp = RepositoryParameterGuard.NotNull(csharp, nameof(csharp));
-        var matches = candidates.Where(Matches).ToArray();
+        var matches = candidates.Where(Matches).ToImmutableArray();
         if (matches.Length != 1)
         { throw new InvalidOperationException("Native conditional method declaration is not unique."); }
         return matches[0].OriginalDefinition;

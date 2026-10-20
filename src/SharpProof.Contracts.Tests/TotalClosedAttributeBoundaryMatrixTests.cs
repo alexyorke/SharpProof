@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -14,15 +15,12 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TotalClosedAttributeBoundaryMatrixTests
 {
-    private static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
+    private static readonly ImmutableArray<string> Types = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
 
     private static IEnumerable<TestCaseData> NumericCases()
     {
-        var ranges = new (long Minimum, long Maximum)[]
-        {
-            (long.MinValue, long.MaxValue), (-129, 128), (-1, 1), (0, 0), (0, 1), (127, 129),
-            (255, 257), (65535, 65537), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue)
-        };
+        var ranges = ImmutableArray.Create<(long Minimum, long Maximum)>((long.MinValue, long.MaxValue), (-129, 128), (-1, 1), (0, 0), (0, 1), (127, 129),
+            (255, 257), (65535, 65537), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue));
         foreach (var type in Types)
         {
             yield return new TestCaseData(type, true, 0L, 0L);
@@ -67,9 +65,9 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         Assert.That(factory.GetVariableInfo(result).Type, Is.EqualTo(type));
         var domainMinimum = signed ? -(BigInteger.One << (width - 1)) : BigInteger.Zero;
         var domainMaximum = (BigInteger.One << (signed ? width - 1 : width)) - 1;
-        var values = new BigInteger[] { domainMinimum, domainMaximum, -1, 0, 1, minimum, maximum,
-            (BigInteger)minimum - 1, (BigInteger)minimum + 1, (BigInteger)maximum - 1, (BigInteger)maximum + 1 }
-            .Where(value => value >= domainMinimum && value <= domainMaximum).Distinct().ToArray();
+        var values = ImmutableArray.Create<BigInteger>(domainMinimum, domainMaximum, -1, 0, 1, minimum, maximum,
+            (BigInteger)minimum - 1, (BigInteger)minimum + 1, (BigInteger)maximum - 1, (BigInteger)maximum + 1)
+            .Where(value => value >= domainMinimum && value <= domainMaximum).Distinct().ToImmutableArray();
         var legacyFactory = new IrFactory();
         var legacy = new ContractBinder(compilation, legacyFactory).Bind(target);
         Assert.That(legacy.IsSuccess, Is.EqualTo(typeName != "ulong"));
@@ -92,11 +90,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                     BigInteger.Parse(Convert.ToString(actual, CultureInfo.InvariantCulture)!, CultureInfo.InvariantCulture);
                 Assert.That(returned, Is.EqualTo(value));
                 var expected = positive ? value > 0 : value >= minimum && value <= maximum;
-                var supplied = new Dictionary<IrVarId, IrValue>
-                {
-                    [entry] = signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value),
-                    [result] = signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value)
-                };
+                var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value)).SetItem(result, signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value));
                 foreach (var clause in bound.Clauses)
                 {
                     var evaluation = new IrInterpreter(factory).Evaluate(clause.Value, supplied);
@@ -105,8 +99,10 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                 }
                 if (legacy.IsSuccess)
                 {
-                    var legacyValues = legacy.Contracts!.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result))
-                        .ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable), variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (legacyFactory.CreateIntegerValue(
+                    var legacyValues = ImmutableDictionaryCapture.Create(
+                        legacy.Contracts!.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result)),
+                        variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
+                        variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (legacyFactory.CreateIntegerValue(
                             legacyFactory.GetVariableInfo(variable.Variable).Type, (long)value)));
                     Assert.That(legacy.Contracts.Clauses, Has.Length.EqualTo(2));
                     foreach (var clause in legacy.Contracts.Clauses)
@@ -142,7 +138,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         {
             using var image = Emit(compilation);
             var runtime = loadContext.LoadFromStream(image).GetType("Target")!.GetMethod("Read")!;
-            foreach (var input in new object?[] { null, nonNull })
+            foreach (var input in ImmutableArray.Create<object?>(null, nonNull))
             {
                 Assert.That(runtime.Invoke(null, [input]), Is.SameAs(input));
                 var value = input == null ? factory.CreateNullValue(type) : typeName switch
@@ -151,11 +147,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                     "int[]?" => factory.CreateSequenceValue(type, [factory.CreateIntegerValue(factory.GetTypeInfo(type).ElementType!.Value, 1L)]),
                     _ => factory.CreateReferenceValue(type, input)
                 };
-                var supplied = new Dictionary<IrVarId, IrValue>
-                {
-                    [context.Parameters[0].Entry] = value,
-                    [context.Result!.Value] = value
-                };
+                var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[0].Entry, value).SetItem(context.Result!.Value, value);
                 foreach (var clause in bound.Clauses)
                 {
                     Assert.That(clause.Evidence, Is.EqualTo(BoundContractEvidence.ClosedAttribute));

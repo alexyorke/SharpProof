@@ -47,7 +47,7 @@ try {
         $repositoryRoot 'eng\fuzz\retained-seeds.json'
     $retained = Read-SharpProofRetainedFuzzSeedManifest `
         -Path $retainedManifestPath
-    $retainedSeeds = @($retained.Seeds)
+    $retainedSeeds = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]@($retained.Seeds))
     if (-not $PSBoundParameters.ContainsKey('RotatingSeed')) {
         # FuzzRunner advances each case seed by 397.  A calendar-shaped seed
         # (yyyyMMdd) therefore causes dates 397 days apart to replay the same
@@ -72,7 +72,7 @@ try {
         -Name 'contract.fuzz.maximumCampaignCases'
     $schedule = Get-SharpProofFuzzCampaignSchedule `
         -RotatingSeed $RotatingSeed `
-        -RetainedSeeds ([int[]]$retainedSeeds) `
+        -RetainedSeeds ([int[]]@($retainedSeeds)) `
         -RotatingCases $effectiveRotatingCases `
         -RetainedCases $effectiveRetainedCases `
         -MaximumCases $maximumCampaignCases
@@ -80,18 +80,13 @@ try {
     $fuzzProject = Join-Path `
         $repositoryRoot 'src\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
 
+    $buildArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'build', $fuzzProject, '-c', 'Release', '--no-restore', '--no-incremental', '--nologo'))
     $buildProcess = Start-SharpProofEncodedPowerShell `
         -WrapperPath $dotnetWrapper `
         -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
         -WorkingDirectory $repositoryRoot `
-        -Arguments @(
-        'build',
-        $fuzzProject,
-        '-c',
-        'Release',
-        '--no-restore',
-        '--no-incremental',
-        '--nologo')
+        -ImmutableArguments $buildArguments
     if ($buildProcess.ExitCode -ne 0) {
         throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
     }
@@ -123,20 +118,20 @@ try {
 
         $standardOutput = Join-Path $resolvedOutput "$Name.stdout.json"
         $standardError = Join-Path $resolvedOutput "$Name.stderr.txt"
-        $dotnetArguments = @(
-            $runnerAssembly,
-            '--cases',
-            [string]$Cases,
-            '--seed',
-            [string]$Seed,
-            '--max-parallelism',
-            [string]$contract.fuzz.maximumParallelism
-        )
+        $dotnetArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                $runnerAssembly,
+                '--cases',
+                [string]$Cases,
+                '--seed',
+                [string]$Seed,
+                '--max-parallelism',
+                [string]$contract.fuzz.maximumParallelism
+            ))
         $process = Start-SharpProofEncodedPowerShell `
             -WrapperPath $dotnetWrapper `
             -TimeoutSeconds $TimeoutSeconds `
             -WorkingDirectory $repositoryRoot `
-            -Arguments $dotnetArguments `
+            -ImmutableArguments $dotnetArguments `
             -StandardOutput $standardOutput `
             -StandardError $standardError
         $validationError = $null
@@ -166,24 +161,24 @@ try {
         catch {
             $validationError = $_.Exception.Message
         }
-        return [pscustomobject][ordered]@{
-            name                = $Name
-            requestedCases      = $Cases
-            observedCases       = $observedCases
-            seed                = $Seed
-            exitCode            = $process.ExitCode
-            runnerSchemaVersion = $runnerSchemaVersion
-            agreements          = $agreements
-            abstentions         = $abstentions
-            runnerPassed        = $runnerPassed
-            validationPassed    = $null -eq $validationError
-            validationError     = $validationError
-            standardOutput      = "$logicalOutput/$Name.stdout.json"
-            standardError       = "$logicalOutput/$Name.stderr.txt"
-        }
+        return ([ordered]@{
+                name                = $Name
+                requestedCases      = $Cases
+                observedCases       = $observedCases
+                seed                = $Seed
+                exitCode            = $process.ExitCode
+                runnerSchemaVersion = $runnerSchemaVersion
+                agreements          = $agreements
+                abstentions         = $abstentions
+                runnerPassed        = $runnerPassed
+                validationPassed    = $null -eq $validationError
+                validationError     = $validationError
+                standardOutput      = "$logicalOutput/$Name.stdout.json"
+                standardError       = "$logicalOutput/$Name.stderr.txt"
+            }).AsReadOnly()
     }
 
-    $runs = [Collections.Generic.List[object]]::new()
+    $runs = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $runs.Add((Invoke-FuzzRun `
                 -Name "rotating-$RotatingSeed" `
                 -Cases $schedule.RotatingCases `
@@ -201,25 +196,26 @@ try {
     if ($completedCommit -cne $sourceCommit) {
         throw 'Fuzz source changed during the campaign.'
     }
-    $failedRuns = @($runs | Where-Object {
-            $_.exitCode -ne 0 -or -not $_.validationPassed
-        })
-    $campaignPassed = $failedRuns.Count -eq 0
-    $summary = [pscustomobject][ordered]@{
-        schemaVersion          = 5
-        status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
-        commit                 = $sourceCommit
-        rotatingSeed           = $RotatingSeed
-        rotatingCases          = $schedule.RotatingCases
-        requestedRotatingCases = $schedule.RequestedRotatingCases
-        retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
-        retainedSeeds          = $schedule.RetainedSeeds
-        requestedCases         = $schedule.RequestedCases
-        totalCases             = [int](@($runs |
-                    Measure-Object -Property observedCases -Sum).Sum)
-        runs                   = @($runs)
-        passed                 = $campaignPassed
-    }
+    $runSnapshot = $runs.ToImmutable()
+    $failedRuns = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($runSnapshot | Where-Object {
+                $_.exitCode -ne 0 -or -not $_.validationPassed
+            }))
+    $campaignPassed = $failedRuns.Length -eq 0
+    $summary = ([ordered]@{
+            schemaVersion          = 5
+            status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
+            commit                 = $sourceCommit
+            rotatingSeed           = $RotatingSeed
+            rotatingCases          = $schedule.RotatingCases
+            requestedRotatingCases = $schedule.RequestedRotatingCases
+            retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
+            retainedSeeds          = $schedule.RetainedSeeds
+            requestedCases         = $schedule.RequestedCases
+            totalCases             = [int](@($runSnapshot |
+                        Measure-Object -Property { $_.observedCases } -Sum).Sum)
+            runs                   = $runSnapshot
+            passed                 = $campaignPassed
+        }).AsReadOnly()
     Complete-SharpProofFuzzEvidence `
         -OutputDirectory $resolvedOutput `
         -Summary $summary

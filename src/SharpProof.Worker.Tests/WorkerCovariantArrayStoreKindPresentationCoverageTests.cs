@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -24,9 +25,9 @@ internal sealed partial class WorkerTests
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;
-        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         var faults = instructions.OfType<IrThrowInstruction>()
-            .Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.ExceptionKind == IrExceptionKind.Unknown)).ToArray();
+            .Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.ExceptionKind == IrExceptionKind.Unknown)).ToImmutableArray();
         Assert.That(faults, Has.Length.EqualTo(1));
         var kind = faults[0].ExceptionKind;
         using (Assert.EnterMultipleScope())

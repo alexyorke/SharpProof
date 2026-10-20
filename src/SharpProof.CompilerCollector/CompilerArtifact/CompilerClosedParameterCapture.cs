@@ -15,7 +15,7 @@ internal static class CompilerClosedParameterCapture
         attributes = [];
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
-        var sequences = new HashSet<int>();
+        var sequences = ImmutableHashSet.CreateBuilder<int>();
         var remainingRows = 1024;
         foreach (var parameterHandle in parameters)
         {
@@ -25,8 +25,9 @@ internal static class CompilerClosedParameterCapture
             var parameter = reader.GetParameter(parameterHandle);
             if (parameter.SequenceNumber == 0)
             { continue; }
-            if (parameter.SequenceNumber > method.Parameters.Length || !sequences.Add(parameter.SequenceNumber))
+            if (parameter.SequenceNumber > method.Parameters.Length || sequences.Contains(parameter.SequenceNumber))
             { return false; }
+            sequences.Add(parameter.SequenceNumber);
             foreach (var attributeHandle in parameter.GetCustomAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();

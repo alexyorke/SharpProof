@@ -69,19 +69,17 @@ public sealed class GeneratedContractForAnalyzerTests
             {
                 public static int Check(Service receiver, int value) => value;
             }
-            """,
-            ("""
+            """, [("""
              public partial class Service
              {
                  public partial int Check(int value);
              }
-             """, "Service.Definition.cs"),
-            ("""
+             """, "Service.Definition.cs"), ("""
              public partial class Service
              {
                  public partial int Check(int value) => value;
              }
-             """, "Service.Implementation.cs"));
+             """, "Service.Implementation.cs")]);
 
         Assert.That(diagnostics, Is.Empty);
     }
@@ -107,7 +105,7 @@ public sealed class GeneratedContractForAnalyzerTests
             }
             """);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0001"]);
     }
 
     [TestCase("advisory", "contracts", true)]
@@ -143,7 +141,7 @@ public sealed class GeneratedContractForAnalyzerTests
             RejectedContractForSource,
             hintName: "PeerContracts.cs");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0001"]);
     }
 
     [Test]
@@ -153,7 +151,7 @@ public sealed class GeneratedContractForAnalyzerTests
             EmptyServiceContractsSource,
             hintName: "PeerContracts.cs");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0004");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0004"]);
     }
 
     [Test]
@@ -203,7 +201,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             handwritten);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0002", "SPCF0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0002", "SPCF0002"]);
         Assert.That(
             diagnostics.Select(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (Path.GetFileName(diagnostic.Location.SourceTree?.FilePath))),
@@ -225,27 +223,24 @@ public sealed class GeneratedContractForAnalyzerTests
     public async Task GeneratedFinalValidationRejectsConflictingAliases()
     {
         const string malformed = EmptyServiceContractsSource;
+        var conflictingOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        conflictingOptions["sharpproof_profile"] = " advisory ";
+        conflictingOptions["build_property.SharpProofProfile"] = "off";
         var conflicting = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = " advisory ",
-                ["build_property.SharpProofProfile"] = "off"
-            });
+            globalOptions: conflictingOptions.ToImmutable());
+        var invalidOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        invalidOptions["sharpproof_profile"] = "invalid";
+        invalidOptions["build_property.SharpProofProfile"] = "advisory";
         var invalid = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = "invalid",
-                ["build_property.SharpProofProfile"] = "advisory"
-            });
+            globalOptions: invalidOptions.ToImmutable());
+        var matchingOptions = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        matchingOptions["sharpproof_profile"] = " advisory ";
+        matchingOptions["build_property.SharpProofProfile"] = "ADVISORY";
         var matching = await AnalyzeGeneratedAsync(
             malformed,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["sharpproof_profile"] = " advisory ",
-                ["build_property.SharpProofProfile"] = "ADVISORY"
-            });
+            globalOptions: matchingOptions.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
@@ -301,7 +296,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             additionalDiagnosticIds: ["SP0024"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -353,7 +348,7 @@ public sealed class GeneratedContractForAnalyzerTests
         string features = "contracts",
         string hintName = "GeneratedContracts.g.cs",
         IEnumerable<string>? additionalDiagnosticIds = null,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        ImmutableDictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(features);
         System.ArgumentNullException.ThrowIfNull(generatedSource);
@@ -363,7 +358,7 @@ public sealed class GeneratedContractForAnalyzerTests
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
             .Concat(additionalDiagnosticIds ?? [])
-            .ToArray();
+            .ToImmutableArray();
         var compilation = AnalyzerTestHost.CreateCompilation(
             inputSource,
             diagnosticIds);
@@ -379,14 +374,11 @@ public sealed class GeneratedContractForAnalyzerTests
 
         if (globalOptions != null)
         {
-            var options = globalOptions.ToDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value,
-                StringComparer.Ordinal);
+            var options = globalOptions.ToBuilder();
             options["build_property.SharpProofFeatures"] = features;
             return await AnalyzerTestHost.AnalyzeAsync(
                 (CSharpCompilation)output,
-                options);
+                options.ToImmutable());
         }
         return await AnalyzerTestHost.AnalyzeAsync(
             (CSharpCompilation)output,
@@ -398,13 +390,16 @@ public sealed class GeneratedContractForAnalyzerTests
     private static async Task<ImmutableArray<Diagnostic>>
         AnalyzeGeneratedAcrossInputFilesAsync(
             string generatedSource,
-            params (string Source, string FilePath)[] inputFiles)
+            ImmutableArray<(string Source, string FilePath)> inputFiles)
     {
-        System.ArgumentNullException.ThrowIfNull(inputFiles, nameof(inputFiles));
+        if (inputFiles.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(inputFiles));
+        }
         System.ArgumentNullException.ThrowIfNull(generatedSource);
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
-            .ToArray();
+            .ToImmutableArray();
         var compilation = AnalyzerTestHost.CreateCompilation(
             inputFiles[0].Source,
             diagnosticIds,
@@ -440,7 +435,7 @@ public sealed class GeneratedContractForAnalyzerTests
             Target,
             Enumerable.Range(1, 8)
                 .Select(static index => $"SPCF{index:D4}")
-                .ToArray());
+                .ToImmutableArray());
         ISourceGenerator companion = new GeneratedCompanionSourceGenerator(
             generatedSource,
             "PeerContracts.cs").AsSourceGenerator();
@@ -448,8 +443,8 @@ public sealed class GeneratedContractForAnalyzerTests
             "namespace Peer { internal sealed class Marker { } }",
             "PeerMarker.cs").AsSourceGenerator();
         var generators = reverse
-            ? new[] { decoy, companion }
-            : new[] { companion, decoy };
+            ? ImmutableArray.Create(decoy, companion)
+            : ImmutableArray.Create(companion, decoy);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators,
             parseOptions: (CSharpParseOptions)compilation.SyntaxTrees[0].Options);
@@ -488,8 +483,8 @@ public sealed class GeneratedContractForAnalyzerTests
         string hintName) :
         IIncrementalGenerator
     {
-        private string _guarded_hintName = hintName ?? throw new System.ArgumentNullException(nameof(hintName));
-        private string _guarded_source = source ?? throw new System.ArgumentNullException(nameof(source));
+        private readonly string _guarded_hintName = hintName ?? throw new System.ArgumentNullException(nameof(hintName));
+        private readonly string _guarded_source = source ?? throw new System.ArgumentNullException(nameof(source));
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             if (context.Equals(default(IncrementalGeneratorInitializationContext)))

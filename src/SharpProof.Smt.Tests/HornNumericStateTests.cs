@@ -25,8 +25,10 @@ public sealed class HornNumericStateTests
         var next = factory.Binary(IrBinaryOperator.Subtract, current, factory.Integer(type, 1));
         var safety = factory.Binary(IrBinaryOperator.LessThanOrEqual,
             factory.Unary(IrUnaryOperator.Negate, current), factory.Integer(type, 0));
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [initial], atom),
             Query(factory, [atom, guard], factory.PureOpaque(relation, null, next)),

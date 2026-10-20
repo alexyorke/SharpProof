@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -122,7 +123,7 @@ internal sealed class ArrayInitializerFinallyPurityTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols),
             "/project/Subject.cs");
@@ -177,6 +178,7 @@ internal sealed class ArrayInitializerFinallyPurityTests
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth,
             TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

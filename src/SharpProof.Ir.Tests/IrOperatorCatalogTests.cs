@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -8,17 +9,16 @@ public sealed class IrOperatorCatalogTests
     [Test]
     public void TypeKindVocabularyIsExactAndNumericallyStable()
     {
-        var expected = new Dictionary<IrTypeKind, int>
-        {
-            [IrTypeKind.Boolean] = 0,
-            [IrTypeKind.Integer] = 1,
-            [IrTypeKind.String] = 2,
-            [IrTypeKind.Reference] = 3,
-            [IrTypeKind.Sequence] = 4
-        };
+        var expectedBuilder = ImmutableDictionary.CreateBuilder<IrTypeKind, int>();
+        expectedBuilder[IrTypeKind.Boolean] = 0;
+        expectedBuilder[IrTypeKind.Integer] = 1;
+        expectedBuilder[IrTypeKind.String] = 2;
+        expectedBuilder[IrTypeKind.Reference] = 3;
+        expectedBuilder[IrTypeKind.Sequence] = 4;
+        var expected = expectedBuilder.ToImmutable();
 
         Assert.That(
-            Enum.GetValues<IrTypeKind>(),
+            Enum.GetValues<IrTypeKind>().ToImmutableArray(),
             Is.EquivalentTo(expected.Keys));
         Assert.That(
             expected.Keys.Select(static kind => (int)kind),
@@ -68,19 +68,15 @@ public sealed class IrOperatorCatalogTests
     [Test]
     public void UnaryMetadataIsExactAndExhaustive()
     {
-        var expected = new Dictionary<
-            IrUnaryOperator,
-            (int Key, IrTypeKind Operand, string Token)>
-        {
-            [IrUnaryOperator.Not] =
-                (0, IrTypeKind.Boolean, "!"),
-            [IrUnaryOperator.Negate] =
-                (1, IrTypeKind.Integer, "-")
-        };
+        var expectedBuilder = ImmutableDictionary.CreateBuilder<IrUnaryOperator,
+            (int Key, IrTypeKind Operand, string Token)>();
+        expectedBuilder[IrUnaryOperator.Not] = (0, IrTypeKind.Boolean, "!");
+        expectedBuilder[IrUnaryOperator.Negate] = (1, IrTypeKind.Integer, "-");
+        var expected = expectedBuilder.ToImmutable();
 
         AssertOperatorMetadata(
             expected,
-            Enum.GetValues<IrUnaryOperator>(),
+            Enum.GetValues<IrUnaryOperator>().ToImmutableArray(),
             static @operator => (int)@operator,
             static metadata => metadata.Key,
             static @operator => IrOperatorCatalog.Get(@operator),
@@ -90,59 +86,37 @@ public sealed class IrOperatorCatalogTests
     [Test]
     public void BinaryMetadataIsExactAndExhaustive()
     {
-        var expected = new Dictionary<
-            IrBinaryOperator,
+        var expectedBuilder = ImmutableDictionary.CreateBuilder<IrBinaryOperator,
             (
                 int Key,
                 IrTypeKind? Operand,
                 IrTypeKind Result,
-                string Token)>
-        {
-            [IrBinaryOperator.Add] =
-                (0, IrTypeKind.Integer, IrTypeKind.Integer, "+"),
-            [IrBinaryOperator.Subtract] =
-                (1, IrTypeKind.Integer, IrTypeKind.Integer, "-"),
-            [IrBinaryOperator.Multiply] =
-                (2, IrTypeKind.Integer, IrTypeKind.Integer, "*"),
-            [IrBinaryOperator.Divide] =
-                (3, IrTypeKind.Integer, IrTypeKind.Integer, "/"),
-            [IrBinaryOperator.Remainder] =
-                (4, IrTypeKind.Integer, IrTypeKind.Integer, "%"),
-            [IrBinaryOperator.AndAlso] =
-                (5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&"),
-            [IrBinaryOperator.OrElse] =
-                (6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||"),
-            [IrBinaryOperator.Equal] =
-                (7, null, IrTypeKind.Boolean, "=="),
-            [IrBinaryOperator.NotEqual] =
-                (8, null, IrTypeKind.Boolean, "!="),
-            [IrBinaryOperator.LessThan] =
-                (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"),
-            [IrBinaryOperator.LessThanOrEqual] =
-                (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<="),
-            [IrBinaryOperator.GreaterThan] =
-                (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">"),
-            [IrBinaryOperator.GreaterThanOrEqual] =
-                (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="),
-            [IrBinaryOperator.StringConcat] =
-                (13, IrTypeKind.String, IrTypeKind.String, "++"),
-            [IrBinaryOperator.StringEquals] =
-                (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
-            [IrBinaryOperator.BitwiseAnd] =
-                (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
-            [IrBinaryOperator.ShiftLeft] =
-                (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
-            [IrBinaryOperator.ShiftRight] =
-                (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"),
-            [IrBinaryOperator.BitwiseOr] =
-                (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"),
-            [IrBinaryOperator.BitwiseXor] =
-                (19, IrTypeKind.Integer, IrTypeKind.Integer, "^")
-        };
+                string Token)>();
+        expectedBuilder[IrBinaryOperator.Add] = (0, IrTypeKind.Integer, IrTypeKind.Integer, "+");
+        expectedBuilder[IrBinaryOperator.Subtract] = (1, IrTypeKind.Integer, IrTypeKind.Integer, "-");
+        expectedBuilder[IrBinaryOperator.Multiply] = (2, IrTypeKind.Integer, IrTypeKind.Integer, "*");
+        expectedBuilder[IrBinaryOperator.Divide] = (3, IrTypeKind.Integer, IrTypeKind.Integer, "/");
+        expectedBuilder[IrBinaryOperator.Remainder] = (4, IrTypeKind.Integer, IrTypeKind.Integer, "%");
+        expectedBuilder[IrBinaryOperator.AndAlso] = (5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&");
+        expectedBuilder[IrBinaryOperator.OrElse] = (6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||");
+        expectedBuilder[IrBinaryOperator.Equal] = (7, null, IrTypeKind.Boolean, "==");
+        expectedBuilder[IrBinaryOperator.NotEqual] = (8, null, IrTypeKind.Boolean, "!=");
+        expectedBuilder[IrBinaryOperator.LessThan] = (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<");
+        expectedBuilder[IrBinaryOperator.LessThanOrEqual] = (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<=");
+        expectedBuilder[IrBinaryOperator.GreaterThan] = (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">");
+        expectedBuilder[IrBinaryOperator.GreaterThanOrEqual] = (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">=");
+        expectedBuilder[IrBinaryOperator.StringConcat] = (13, IrTypeKind.String, IrTypeKind.String, "++");
+        expectedBuilder[IrBinaryOperator.StringEquals] = (14, IrTypeKind.String, IrTypeKind.Boolean, "string==");
+        expectedBuilder[IrBinaryOperator.BitwiseAnd] = (15, IrTypeKind.Integer, IrTypeKind.Integer, "&");
+        expectedBuilder[IrBinaryOperator.ShiftLeft] = (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<");
+        expectedBuilder[IrBinaryOperator.ShiftRight] = (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>");
+        expectedBuilder[IrBinaryOperator.BitwiseOr] = (18, IrTypeKind.Integer, IrTypeKind.Integer, "|");
+        expectedBuilder[IrBinaryOperator.BitwiseXor] = (19, IrTypeKind.Integer, IrTypeKind.Integer, "^");
+        var expected = expectedBuilder.ToImmutable();
 
         AssertOperatorMetadata(
             expected,
-            Enum.GetValues<IrBinaryOperator>(),
+            Enum.GetValues<IrBinaryOperator>().ToImmutableArray(),
             static @operator => (int)@operator,
             static metadata => metadata.Key,
             static @operator => IrOperatorCatalog.Get(@operator),
@@ -150,15 +124,16 @@ public sealed class IrOperatorCatalogTests
     }
 
     private static void AssertOperatorMetadata<TEnum, TMetadata>(
-        IReadOnlyDictionary<TEnum, TMetadata> expected,
-        TEnum[] values,
+        ImmutableDictionary<TEnum, TMetadata> expected,
+        ImmutableArray<TEnum> values,
         Func<TEnum, int> numericValue,
         Func<TMetadata, int> expectedNumericValue,
         Func<TEnum, TMetadata> getMetadata,
         TEnum invalidValue)
         where TEnum : struct, Enum
     {
-        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(expectedNumericValue);
         System.ArgumentNullException.ThrowIfNull(getMetadata);

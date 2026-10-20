@@ -14,8 +14,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerClosedParameterCaptureBoundaryTests
 {
-    private static readonly int[] ExpectedParameterOrdinals = [0, 1];
-    private static readonly string[] ExpectedAttributeKinds = ["Positive", "InRange"];
+    private static readonly ImmutableArray<int> ExpectedParameterOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> ExpectedAttributeKinds = ["Positive", "InRange"];
     private const string Subject = """
         using SharpProof.Attributes;
         public sealed class RowAttribute : System.Attribute { }
@@ -32,14 +32,14 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void RepeatedRealParameterRowRefusesPartialEvidence()
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "One");
         var row = Definition(reader, method).GetParameters().Single();
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(1));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row, row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row, row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -47,7 +47,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void RealSecondParameterRowRefusesOneParameterSymbol()
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, one) = Import(image, "One");
         var (_, two) = Import(image, "Two");
@@ -57,7 +57,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(2));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, one,
-            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -74,7 +74,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
                 public static int One([SharpProof.Attributes.Positive] int value) => value;
             }
             """, shipped: false);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (_, local) = Import(image, "One", shipped: false);
         var compilation = CSharpCompilation.Create("ShippedCaptureSelections",
@@ -98,11 +98,11 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetString(type.Namespace), Is.EqualTo("SharpProof.Attributes"));
         Assert.That(reader.GetString(type.Name), Is.EqualTo("PositiveAttribute"));
         Assert.That(reader.GetString(constructor.Name), Is.EqualTo(".ctor"));
-        Assert.That(reader.GetBlobBytes(constructor.Signature), Is.EqualTo(new byte[] { 0x20, 0, 1 }));
+        Assert.That(reader.GetBlobBytes(constructor.Signature), Is.EqualTo(ImmutableArray.Create<byte>(0x20, 0, 1)));
         Assert.That(MetadataTokens.GetToken(attribute.Constructor), Is.Not.EqualTo(expectedConstructor.MetadataToken));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -111,22 +111,19 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void ShippedMemberReferencesPairInContractOrder(bool reverseRows)
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "Two");
-        var rows = Definition(reader, method).GetParameters().ToArray();
+        var rows = Definition(reader, method).GetParameters().ToImmutableArray();
         foreach (var row in rows)
         {
             var attribute = reader.GetCustomAttribute(reader.GetParameter(row).GetCustomAttributes().Single());
             Assert.That(attribute.Constructor.Kind, Is.EqualTo(HandleKind.MemberReference));
         }
-        if (reverseRows)
-        {
-            Array.Reverse(rows);
-        }
+        var orderedRows = reverseRows ? rows.AsEnumerable().Reverse().ToImmutableArray() : rows;
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            rows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
+            orderedRows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
         Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ParameterOrdinal)), Is.EqualTo(ExpectedParameterOrdinals));
         Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Kind)), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
@@ -138,14 +135,14 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void ReturnRowsUseTheOriginalRowLimit(int count, bool accepted)
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "Zero");
         var row = Definition(reader, method).GetParameters().Single();
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.Zero);
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            Enumerable.Repeat(row, count).ToArray(), TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
+            Enumerable.Repeat(row, count).ToImmutableArray(), TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
         Assert.That(attributes, Is.Empty);
     }
 
@@ -154,13 +151,13 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void ParameterAndAttributeRowsShareTheOriginalRowLimit(int returns, bool accepted)
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "One");
         var (_, zero) = Import(image, "Zero");
         var returnRow = Definition(reader, zero).GetParameters().Single();
         var parameterRow = Definition(reader, method).GetParameters().Single();
-        var rows = Enumerable.Repeat(returnRow, returns).Append(parameterRow).ToArray();
+        var rows = Enumerable.Repeat(returnRow, returns).Append(parameterRow).ToImmutableArray();
         Assert.That(reader.GetParameter(returnRow).SequenceNumber, Is.Zero);
         Assert.That(reader.GetParameter(parameterRow).GetCustomAttributes().Count, Is.EqualTo(1));
 
@@ -173,7 +170,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     public void CancellationBeforeTheFirstRealRowPropagates()
     {
         var image = Emit(Subject);
-        using var pe = new PEReader(new MemoryStream(image, writable: false));
+        using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var (compilation, method) = Import(image, "One");
         using var cancellation = new CancellationTokenSource();
@@ -193,7 +190,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         return reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(method.MetadataToken));
     }
 
-    private static byte[] Emit(string source, bool shipped = true)
+    private static ImmutableArray<byte> Emit(string source, bool shipped = true)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CSharpCompilation.Create("CaptureRows",
@@ -205,14 +202,15 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         var result = compilation.Emit(image);
         Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
         Assert.That(image.Length, Is.GreaterThan(0));
-        return image.ToArray();
+        return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 
     private static (CSharpCompilation Compilation, IMethodSymbol Method) Import(
-        byte[] image, string name, bool shipped = true)
+        ImmutableArray<byte> image, string name, bool shipped = true)
     {
         System.ArgumentNullException.ThrowIfNull(name);
-        System.ArgumentNullException.ThrowIfNull(image);
+        if (image.IsDefault)
+        { throw new ArgumentNullException(nameof(image)); }
         var reference = MetadataReference.CreateFromImage(image);
         var compilation = CSharpCompilation.Create("CaptureRowsConsumer", references:
             (shipped ? TestMetadataReferences.WithSharpProof : TestMetadataReferences.WithoutSharpProof).Add(reference),

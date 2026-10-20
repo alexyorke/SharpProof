@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -78,9 +79,9 @@ public sealed class BulkFrontendCoreElisionTerminalTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var input in new string?[] { null, "", "word" })
+            foreach (var input in ImmutableArray.Create<string?>(null, "", "word"))
             {
-                foreach (var flag in new[] { false, true })
+                foreach (var flag in ImmutableArray.Create(false, true))
                 {
                     if (enabled)
                     {
@@ -94,7 +95,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
 
             var emission = new CSharpInvocationEmissionPolicy(compilation);
             var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetOperation(invocation))).OfType<IInvocationOperation>().ToArray();
+                .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetOperation(invocation))).OfType<IInvocationOperation>().ToImmutableArray();
             Assert.That(invocations, Has.Length.EqualTo(shape == "consecutive-both-terminal" ? 2 : 1));
             foreach (var invocation in invocations)
             {
@@ -104,7 +105,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Assert.That(emission.IsElided(invocation, requireOwningInvocation: true), Is.EqualTo(!enabled));
             }
             var thrown = graph.Blocks.Where(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
             Assert.That(thrown.Length, Is.GreaterThanOrEqualTo(2));
             foreach (var block in thrown)
             {
@@ -125,20 +126,16 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 : lowerer.LowerCandidate(graph, context);
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-            foreach (var input in new string?[] { null, "", "word" })
+            foreach (var input in ImmutableArray.Create<string?>(null, "", "word"))
             {
-                foreach (var flag in new[] { false, true })
+                foreach (var flag in ImmutableArray.Create(false, true))
                 {
                     var valueParameter = context.Parameters[0].Entry;
                     var flagParameter = context.Parameters[1].Entry;
                     var type = factory.GetVariableInfo(valueParameter).Type;
                     var value = input == null ? factory.CreateNullValue(type) : factory.CreateStringValue(input);
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        new Dictionary<IrVarId, IrValue>
-                        {
-                            [valueParameter] = value,
-                            [flagParameter] = factory.CreateBooleanValue(flag)
-                        }, maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
+                        global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueParameter, value).SetItem(flagParameter, factory.CreateBooleanValue(flag)), maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
                     Assert.That(replay.Status, Is.EqualTo(enabled
                         ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                     if (enabled)
@@ -165,17 +162,18 @@ public sealed class BulkFrontendCoreElisionTerminalTests
         System.ArgumentNullException.ThrowIfNull(owningInvocations);
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
-        var regions = new List<ControlFlowRegion>();
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
+        var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(graph.Root);
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
-            regions.Add(region);
+            pending = pending.Pop(out var region);
+            regionsBuilder.Add(region);
             foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
+            { pending = pending.Push(nested); }
         }
-        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToDictionary(item => item.region, item => item.id);
+        var regions = regionsBuilder.ToImmutable();
+        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToImmutableDictionary(item => item.region, item => item.id);
         var evidence = new
         {
             Source = source,
@@ -196,7 +194,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Length = invocation.Syntax.Span.Length,
                 Syntax = invocation.Syntax.ToString(),
                 Target = invocation.TargetMethod.ToDisplayString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Regions = regions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (new
             {
                 Id = regionIds[region],
@@ -204,7 +202,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Kind = region.Kind.ToString(),
                 First = region.FirstBlockOrdinal,
                 Last = region.LastBlockOrdinal
-            })).ToArray(),
+            })).ToImmutableArray(),
             Blocks = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
             {
                 block.Ordinal,
@@ -220,7 +218,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     Start = operation.Syntax.SpanStart,
                     Length = operation.Syntax.Span.Length,
                     Syntax = operation.Syntax.ToString()
-                })).ToArray(),
+                })).ToImmutableArray(),
                 BranchValue = block.BranchValue?.DescendantsAndSelf().Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (new
                 {
                     Kind = operation.Kind.ToString(),
@@ -229,20 +227,20 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     Start = operation.Syntax.SpanStart,
                     Length = operation.Syntax.Span.Length,
                     Syntax = operation.Syntax.ToString()
-                })).ToArray(),
+                })).ToImmutableArray(),
                 Fall = block.FallThroughSuccessor == null ? null : new
                 {
                     Semantics = block.FallThroughSuccessor.Semantics.ToString(),
                     Destination = block.FallThroughSuccessor.Destination?.Ordinal,
-                    Finally = block.FallThroughSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToArray()
+                    Finally = block.FallThroughSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 },
                 Alternative = block.ConditionalSuccessor == null ? null : new
                 {
                     Semantics = block.ConditionalSuccessor.Semantics.ToString(),
                     Destination = block.ConditionalSuccessor.Destination?.Ordinal,
-                    Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToArray()
+                    Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 }
-            })).ToArray()
+            })).ToImmutableArray()
         };
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ?? TestContext.CurrentContext.WorkDirectory;
         var directory = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "conditional-elision-cfg");

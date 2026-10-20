@@ -21,7 +21,7 @@ internal static class LoopInvariantCandidates
         foreach (var loop in loops)
         {
             var (tracked, anchors) = State(candidate, loop, cancellationToken);
-            var conditions = new List<IrTerm>();
+            var conditions = ImmutableArray.CreateBuilder<IrTerm>();
             for (var ordinal = 0; ordinal < tracked.Length; ordinal++)
             {
                 var value = tracked[ordinal];
@@ -42,7 +42,7 @@ internal static class LoopInvariantCandidates
                     conditions.Add(factory.Binary(IrBinaryOperator.Equal, value, other));
                 }
             }
-            invariants.AddRange(conditions.Where(condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (condition is not IrBooleanTerm)).Distinct()
+            invariants.AddRange(conditions.ToImmutable().Where(condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (condition is not IrBooleanTerm)).Distinct()
                 .Take(MaximumPerLoop).Select(condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new PassiveLoopCutter.Invariant(loop.Header, condition))));
         }
         return invariants.ToImmutable();
@@ -52,17 +52,17 @@ internal static class LoopInvariantCandidates
     // the fields it stores to) and its anchors (what it reads but does not
     // write, those fields as the callable entered, and its conditions'
     // constants).
-    internal static (IrTerm[] Tracked, IrTerm[] Anchors) State(PassiveCallableCandidate candidate,
+    internal static (ImmutableArray<IrTerm> Tracked, ImmutableArray<IrTerm> Anchors) State(PassiveCallableCandidate candidate,
         PassiveLoopCutter.Loop loop, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(loop);
         var factory = candidate.Factory;
-        var written = loop.Writes.ToHashSet();
-        var read = new HashSet<IrVarId>();
-        var constants = new HashSet<IrTerm>();
-        var lengths = new List<IrTerm>();
-        var copies = new Dictionary<IrVarId, IrTerm?>();
+        var written = loop.Writes.ToImmutableHashSet();
+        var read = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var constants = ImmutableHashSet.CreateBuilder<IrTerm>();
+        var lengths = ImmutableArray.CreateBuilder<IrTerm>();
+        var copies = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm?>();
         foreach (var block in loop.Blocks.OrderBy(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)))
         {
             foreach (var instruction in candidate.Program.GetBlock(block).Instructions)
@@ -110,29 +110,29 @@ internal static class LoopInvariantCandidates
         }
         // Only state that enters the loop can be checked on its entry edges:
         // a variable the loop writes must also be set before it.
-        var entering = new HashSet<IrVarId>(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Current, parameter.Old }))));
+        var enteringBuilder = ImmutableHashSet.CreateBuilder<IrVarId>();
+        enteringBuilder.UnionWith(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create(parameter.Current, parameter.Old)))));
         foreach (var block in candidate.Program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (!loop.Blocks.Contains(block.Id))))
         {
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (instruction is IrAssignInstruction assign)
-                { entering.Add(assign.Target); }
+                { enteringBuilder.Add(assign.Target); }
             }
         }
+        var entering = enteringBuilder.ToImmutable();
         // A field read through an input's Old snapshot is its entry value.
-        var snapshots = candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[]
-        {
-            (parameter.Entry, (IrTerm)factory.Variable(parameter.Old)), (parameter.Current, factory.Variable(parameter.Old))
-        }))).ToDictionary(pair => pair.Item1, pair => pair.Item2);
+        var snapshots = ImmutableDictionaryCapture.Create(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create<(IrVarId, IrTerm)>(
+            (parameter.Entry, factory.Variable(parameter.Old)), (parameter.Current, factory.Variable(parameter.Old)))))), pair => pair.Item1, pair => pair.Item2);
         var entered = loop.Fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (IrSubstitution.Substitute(factory, field, snapshots))).Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (!loop.Fields.Contains(field)));
         // The length of an array the loop does not replace is fixed.
-        var resolved = copies.Where(pair => pair.Value != null).ToDictionary(pair => pair.Key, pair => pair.Value!);
-        var fixedLengths = lengths.Select(length => length is null ? throw new System.ArgumentNullException(nameof(length)) : (IrSubstitution.Substitute(factory, length, resolved)))
+        var resolved = ImmutableDictionaryCapture.Create(copies.Where(pair => pair.Value != null), pair => pair.Key, pair => pair.Value!);
+        var fixedLengths = lengths.ToImmutable().Select(length => length is null ? throw new System.ArgumentNullException(nameof(length)) : (IrSubstitution.Substitute(factory, length, resolved)))
             .Where(length => length is null ? throw new System.ArgumentNullException(nameof(length)) : (IrTraversal.CollectVariables(length).All(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!written.Contains(variable))))).Distinct();
         var anchors = read.Where(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!written.Contains(variable))).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
             .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((IrTerm)factory.Variable(variable))).Concat(entered).Concat(fixedLengths)
-            .Concat(constants.OrderBy(constant => constant is null ? throw new System.ArgumentNullException(nameof(constant)) : (constant.Id.Value))).ToArray();
+            .Concat(constants.OrderBy(constant => constant is null ? throw new System.ArgumentNullException(nameof(constant)) : (constant.Id.Value))).ToImmutableArray();
         return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
             .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((IrTerm)factory.Variable(variable))).Concat(loop.Fields)], anchors);
     }

@@ -40,11 +40,11 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         using var image = new MemoryStream();
         var emitted = producer.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllTextAsync(Path.Combine(directory, "producer-source.cs"), OrdinarySource);
-        await File.WriteAllBytesAsync(Path.Combine(directory, "emitted-producer.dll"), imageBytes);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "emitted-producer.dll"), imageBytes.ToArray());
 
-        using var ownedModule = ModuleMetadata.CreateFromImage(ImmutableArray.CreateRange(imageBytes));
+        using var ownedModule = ModuleMetadata.CreateFromImage(imageBytes);
         using var ownedAssembly = AssemblyMetadata.Create(ownedModule);
         var reference = ownedAssembly.GetReference();
         var consumer = CreateCompilation("OwnedStorageConsumer", "public sealed class Consumer { }\n",
@@ -108,7 +108,7 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         await Save(directory, "live-metadata-binding.json", new
         {
             SourceSHA256 = Hash(OrdinarySource),
-            PESHA256 = Convert.ToHexString(SHA256.HashData(imageBytes)),
+            PESHA256 = Convert.ToHexString(SHA256.HashData(imageBytes.AsSpan())),
             OwnerToken = ownerToken,
             FieldToken = fieldToken,
             Mvid = mvid,
@@ -167,7 +167,7 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<AttributeSyntax>().Single();
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1), string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         var error = errors.Single();
         using (Assert.EnterMultipleScope())
@@ -269,7 +269,7 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
     private static void AssertNoErrors(Compilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 

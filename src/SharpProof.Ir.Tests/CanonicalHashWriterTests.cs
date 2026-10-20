@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -17,7 +18,7 @@ public sealed class CanonicalHashWriterTests
             .Add(42)
             .Add(uint.MaxValue)
             .Add(long.MinValue)
-            .Add(new byte[] { 0, 1, 255 });
+            .Add(ImmutableArray.Create<byte>(0, 1, 255));
 
         Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
     }
@@ -32,7 +33,7 @@ public sealed class CanonicalHashWriterTests
         }
 
         Assert.That(
-            new[] {
+            ImmutableArray.Create(
                 Hash(null),
                 Hash(string.Empty),
                 Hash("1"),
@@ -42,7 +43,7 @@ public sealed class CanonicalHashWriterTests
                 Hash(true),
                 Hash(TestEnum.One),
                 Hash(new byte[] { 1 })
-            },
+            ),
             Is.Unique);
     }
 
@@ -93,10 +94,10 @@ public sealed class CanonicalHashWriterTests
     [Test]
     public void StreamFramesPreserveByteArrayIdentity()
     {
-        byte[] bytes = [0, 1, 2, 3];
+        ImmutableArray<byte> bytes = [0, 1, 2, 3];
         using var arrayWriter = new CanonicalHashWriter();
         using var streamWriter = new CanonicalHashWriter();
-        using var stream = new MemoryStream(bytes, writable: false);
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         var expected = arrayWriter.Add(bytes).Finish();
 
         Assert.That(
@@ -116,9 +117,10 @@ public sealed class CanonicalHashWriterTests
         AssertStreamGrowthFails([]);
     }
 
-    private static void AssertStreamGrowthFails(byte[] initial)
+    private static void AssertStreamGrowthFails(ImmutableArray<byte> initial)
     {
-        System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
+        if (initial.IsDefault)
+        { throw new ArgumentNullException(nameof(initial)); }
         using var writer = new CanonicalHashWriter();
         using var stream = new GrowingStream(initial);
 
@@ -143,6 +145,28 @@ public sealed class CanonicalHashWriterTests
         }
     }
 
+    [Test]
+    public void ImmutableByteFramesRejectDefaultAndRetainInitializedEmpty()
+    {
+        using var writer = new CanonicalHashWriter();
+        var failure = Assert.Throws<ArgumentNullException>(
+            (Action)(() => writer.Add(default(ImmutableArray<byte>))));
+        Assert.That(failure!.ParamName, Is.EqualTo("bytes"));
+        using var streamWriter = new CanonicalHashWriter();
+        using var emptyStream = new MemoryStream();
+        Assert.That(writer.Add(ImmutableArray<byte>.Empty).Finish(),
+            Is.EqualTo(streamWriter.Add(emptyStream).Finish()));
+    }
+
+    [Test]
+    public void BoxedImmutableAndNativeByteFramesRetainTheSameEncoding()
+    {
+        using var immutableWriter = new CanonicalHashWriter();
+        using var nativeWriter = new CanonicalHashWriter();
+        Assert.That(immutableWriter.Add((object)ImmutableArray.Create<byte>(0, 1, 255)).Finish(),
+            Is.EqualTo(nativeWriter.Add((object)new byte[] { 0, 1, 255 }).Finish()));
+    }
+
     private enum TestEnum
     {
         One = 1
@@ -152,10 +176,11 @@ public sealed class CanonicalHashWriterTests
     {
         private bool _grown;
 
-        internal GrowingStream(byte[] initial)
+        internal GrowingStream(ImmutableArray<byte> initial)
         {
-            System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
-            Write(initial);
+            if (initial.IsDefault)
+            { throw new ArgumentNullException(nameof(initial)); }
+            Write(initial.AsSpan());
             Position = 0;
         }
 

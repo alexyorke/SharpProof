@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.Json;
 using NUnit.Framework;
@@ -29,8 +30,8 @@ public sealed class WorkerVcDivisionPrecisionTests
         var source = kind == "constant"
             ? WorkerVcShadowSourceGateTests.Universe.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name == "general-division-budget")).Source
             : VariableSource;
-        var trials = new List<DivisionTrial>();
-        string[] structure = [];
+        var trialBuilder = ImmutableArray.CreateBuilder<DivisionTrial>();
+        ImmutableArray<string> structure = [];
         for (var trial = 0; trial < 3; trial++)
         {
             var endToEnd = Stopwatch.StartNew();
@@ -66,7 +67,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             Assert.That(ensures.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-            trials.Add(new(entry, normal, ensures, solver.ConsumedResourceCount, query.Assumptions.Length, query.ModelVariables.Length,
+            trialBuilder.Add(new(entry, normal, ensures, solver.ConsumedResourceCount, query.Assumptions.Length, query.ModelVariables.Length,
                 standaloneMilliseconds, workerWatch.Elapsed.TotalMilliseconds - workerSetupMilliseconds, workerWatch.Elapsed.TotalMilliseconds,
                 result.Outcome, result.Reason));
 
@@ -80,6 +81,7 @@ public sealed class WorkerVcDivisionPrecisionTests
                     solver.ConsumedResourceCount - startResources, watch.Elapsed.TotalMilliseconds);
             }
         }
+        var trials = trialBuilder.ToImmutable();
         var capture = Environment.GetEnvironmentVariable("SHARPPROOF_DIVISION_CAPTURE");
         if (capture is "baseline" or "improved")
         {
@@ -122,12 +124,12 @@ public sealed class WorkerVcDivisionPrecisionTests
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(WorkerClaimReason.None));
     }
 
-    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
+    private static ImmutableArray<WorkerClaimResult> Postconditions(WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
         var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
     }
 
     private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds)

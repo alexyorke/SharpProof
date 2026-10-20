@@ -1,8 +1,27 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
 public sealed class ArrayValueOverlayTests
 {
+    [TestCase(-1)]
+    [TestCase(1)]
+    public void ImmutableOverlayRejectsOutOfRangeObservationsWithoutChangingInput(int index)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var initial = factory.CreateBooleanValue(false);
+        ImmutableArray<IrValue> elements = [initial];
+        var observations = ImmutableDictionary<int, IrValue>.Empty.Add(index, factory.CreateBooleanValue(true));
+        Assert.Throws<UnsupportedIrEncodingException>((Action)(() =>
+        {
+            _ = SmtNativeUtilities.WithArrayObservations(
+                factory, factory.BooleanType, elements, observations);
+        }));
+        Assert.That(elements, Has.Length.EqualTo(1));
+        Assert.That(elements[0], Is.SameAs(initial));
+    }
+
     [Test]
     public void EmptyEntriesLeaveAnEmptyBufferEmpty()
     {
@@ -13,12 +32,24 @@ public sealed class ArrayValueOverlayTests
     }
 
     [Test]
+    public void DefaultObservationsRejectBeforeWritingTheBuffer()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var initial = factory.CreateBooleanValue(false);
+        IrValue[] buffer = [initial];
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, default)));
+        Assert.That(exception!.ParamName, Is.EqualTo("observed"));
+        Assert.That(buffer[0], Is.SameAs(initial));
+    }
+
+    [Test]
     public void AOneElementBooleanBufferRetainsTheExactObservedValue()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateBooleanValue(true);
         IrValue[] buffer = [factory.CreateBooleanValue(false)];
-        SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, new() { [0] = value });
+        SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, [new(0, value)]);
         Assert.That(buffer[0], Is.SameAs(value));
         Assert.That(buffer[0].Boolean, Is.True);
     }
@@ -31,7 +62,7 @@ public sealed class ArrayValueOverlayTests
         var first = factory.CreateIntegerValueFromBits(type, 128UL);
         var second = factory.CreateIntegerValueFromBits(type, 255UL);
         IrValue[] buffer = [factory.CreateIntegerValueFromBits(type, 0), factory.CreateIntegerValueFromBits(type, 0)];
-        var entries = new Dictionary<int, IrValue> { [1] = second, [0] = first };
+        ImmutableArray<KeyValuePair<int, IrValue>> entries = [new(1, second), new(0, first)];
         SmtNativeUtilities.ApplyArrayObservations(factory, type, buffer, entries);
         using (Assert.EnterMultipleScope())
         {
@@ -53,7 +84,7 @@ public sealed class ArrayValueOverlayTests
         var unchanged = factory.CreateIntegerValueFromBits(targetType, 0UL);
         var value = factory.CreateIntegerValueFromBits(sourceType, 255UL);
         IrValue[] buffer = [unchanged, factory.CreateIntegerValueFromBits(targetType, 0UL)];
-        SmtNativeUtilities.ApplyArrayObservations(factory, targetType, buffer, new() { [1] = value });
+        SmtNativeUtilities.ApplyArrayObservations(factory, targetType, buffer, [new(1, value)]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(buffer[0], Is.SameAs(unchanged));
@@ -75,7 +106,7 @@ public sealed class ArrayValueOverlayTests
         var buffer = Enumerable.Repeat(initial, count).ToArray();
         var value = factory.CreateBooleanValue(true);
         Assert.Throws<UnsupportedIrEncodingException>((Action)(() =>
-            SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, new() { [index] = value })));
+            SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, [new(index, value)])));
         Assert.That(buffer.All(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (ReferenceEquals(element, initial))), Is.True);
     }
 
@@ -85,7 +116,7 @@ public sealed class ArrayValueOverlayTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var first = factory.CreateBooleanValue(true);
         IrValue[] buffer = [factory.CreateBooleanValue(false)];
-        var entries = new Dictionary<int, IrValue> { [0] = first, [1] = factory.CreateBooleanValue(false) };
+        ImmutableArray<KeyValuePair<int, IrValue>> entries = [new(0, first), new(1, factory.CreateBooleanValue(false))];
         Assert.That(entries.First().Key, Is.EqualTo(0));
         Assert.Throws<UnsupportedIrEncodingException>((Action)(() =>
             SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, entries)));

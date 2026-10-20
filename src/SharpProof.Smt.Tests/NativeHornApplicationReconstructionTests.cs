@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Z3;
 
 namespace SharpProof.Smt.Test;
@@ -57,7 +58,7 @@ public sealed class NativeHornApplicationReconstructionTests
             "ugt" => context.MkBVUGT(minusOne, one),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
-        Expr[] expectedArguments = operation switch
+        ImmutableArray<Expr> expectedArguments = operation switch
         {
             "and" => [yes, no, yes],
             "or" => [no, yes, no],
@@ -114,7 +115,7 @@ public sealed class NativeHornApplicationReconstructionTests
             "nested" => context.MkMul(sum, three),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
-        Expr[] expectedArguments = operation switch
+        ImmutableArray<Expr> expectedArguments = operation switch
         {
             "add" or "multiply" => [two, three, five],
             "subtract" => [five, two],
@@ -194,10 +195,10 @@ public sealed class NativeHornApplicationReconstructionTests
         { return factory.Boolean(false); }
         if (literal is not null || kind is Z3_decl_kind.Z3_OP_ANUM or Z3_decl_kind.Z3_OP_BNUM)
         { return literal; }
-        var arguments = expression.IsApp ? expression.Args : [];
+        var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
         try
         {
-            IrTerm?[] operands = [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (DecodeGround(factory, argument)))];
+            ImmutableArray<IrTerm?> operands = [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (DecodeGround(factory, argument)))];
             return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
         finally
@@ -208,12 +209,13 @@ public sealed class NativeHornApplicationReconstructionTests
     }
 
     private static void AssertApplication(Expr expression, Z3_decl_kind expectedKind, int expectedArity,
-        Expr[] expectedArguments)
+        ImmutableArray<Expr> expectedArguments)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedArguments, nameof(expectedArguments));
+        if (expectedArguments.IsDefault)
+        { throw new ArgumentNullException(nameof(expectedArguments)); }
         System.ArgumentNullException.ThrowIfNull(expression);
         using var declaration = expression.FuncDecl;
-        var arguments = expression.Args;
+        var arguments = expression.Args.ToImmutableArray();
         try
         {
             using (Assert.EnterMultipleScope())

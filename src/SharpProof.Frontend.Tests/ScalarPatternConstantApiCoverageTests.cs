@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,7 +12,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ScalarPatternConstantApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0031"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0031"];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -46,7 +47,7 @@ public sealed class ScalarPatternConstantApiCoverageTests
 
         using var control = TypedProgramSubject.Create("bool Target(byte value) => value is " +
             (relational ? "> 0" : "0") + ";");
-        object[] inputs = [relational ? (byte)1 : (byte)0];
+        ImmutableArray<object> inputs = [relational ? (byte)1 : (byte)0];
         Assert.That(control.Invoke(inputs), Is.EqualTo(true));
         var controlTree = control.Compilation.SyntaxTrees.Single();
         var controlSyntax = controlTree.GetRoot().DescendantNodes().OfType<IsPatternExpressionSyntax>().Single();

@@ -6,10 +6,36 @@ namespace SharpProof.ContractForValidation;
 /// </summary>
 internal static class ContractForCompanionValidator
 {
+    // Sink adapters retain guard order while callers own diagnostic collection.
     internal static bool ValidateRelationship(
         ResolvedCompanion companion,
         ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
-        List<Diagnostic> diagnostics)
+        Action<Diagnostic> diagnostics)
+    {
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
+        relationships = RepositoryParameterGuard.NotNull(relationships, nameof(relationships));
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
+        return ReportRelationship(companion, relationships, diagnostics);
+    }
+
+    internal static void Validate(
+        ResolvedCompanion companion,
+        Compilation compilation,
+        ContractClauseInventoryBuilder clauses,
+        Action<Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
+        ReportValidation(companion, compilation, clauses, diagnostics, cancellationToken);
+    }
+
+    internal static bool ReportRelationship(
+        ResolvedCompanion companion,
+        ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
+        Action<Diagnostic> diagnostics)
     {
         companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
 
@@ -23,13 +49,13 @@ internal static class ContractForCompanionValidator
             case ContractForSymbolMatcher.CompanionRelationshipIssue.None:
                 return true;
             case ContractForSymbolMatcher.CompanionRelationshipIssue.SelfTarget:
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.SelfTarget,
                     companion.AttributeLocation,
                     companion.Companion.Name));
                 return false;
             default:
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.CyclicRelationship,
                     companion.AttributeLocation,
                     companion.Companion.Name,
@@ -38,11 +64,11 @@ internal static class ContractForCompanionValidator
         }
     }
 
-    internal static void Validate(
+    internal static void ReportValidation(
         ResolvedCompanion companion,
         Compilation compilation,
         ContractClauseInventoryBuilder clauses,
-        List<Diagnostic> diagnostics,
+        Action<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
         companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
@@ -57,7 +83,7 @@ internal static class ContractForCompanionValidator
                 companion.Companion,
                 (companion.Target, companion.IsOpenTarget)))
         {
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.InvalidCompanionType,
                 companion.AttributeLocation,
                 companion.Companion.Name,
@@ -69,11 +95,11 @@ internal static class ContractForCompanionValidator
         var candidates = GetLogicalMethods(companion.Companion);
         var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
-        var targetMatches = targets.ToDictionary(
+        var targetMatches = ImmutableDictionaryCapture.Create(targets,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target),
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
-        var candidateMatches = candidates.ToDictionary(
+        var candidateMatches = ImmutableDictionaryCapture.Create(candidates,
             static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate),
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
@@ -90,36 +116,31 @@ internal static class ContractForCompanionValidator
                     candidateMatches[candidate].Add(target);
                 }
             }
+
         }
 
-        var byTarget = targetMatches.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value.ToImmutable(),
-            comparer);
-        var byCandidate = candidateMatches.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value.ToImmutable(),
-            comparer);
+        var byTarget = ImmutableDictionaryCapture.Create(targetMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
+        var byCandidate = ImmutableDictionaryCapture.Create(candidateMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
         var targetSurfaceIsComplete = targets.All(target =>
             target is null ? throw new System.ArgumentNullException(nameof(target)) : (byTarget[target] is { Length: 1 } matches &&
             byCandidate[matches[0]].Length == 1));
-        var diagnosed = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var diagnosed = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Diagnose(
             DiagnosticDescriptor descriptor,
             ISymbol symbol,
-            params object?[] arguments)
+            ImmutableArray<object?> arguments)
         {
-            arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+            RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
             descriptor = RepositoryParameterGuard.NotNull(descriptor, nameof(descriptor));
             symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
                     symbol,
                     compilation,
                     companion.AttributeLocation),
-                arguments));
+                arguments.ToArray()));
         }
 
         foreach (var target in targets)
@@ -128,10 +149,7 @@ internal static class ContractForCompanionValidator
             var matches = byTarget[target];
             if (matches.Length > 1)
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.AmbiguousMember,
-                    target,
-                    target.Name);
+                Diagnose(ContractForDiagnosticDescriptors.AmbiguousMember, target, [target.Name]);
                 diagnosed.UnionWith(matches);
                 continue;
             }
@@ -150,11 +168,7 @@ internal static class ContractForCompanionValidator
                 .ToImmutableArray();
             if (mismatches.IsDefaultOrEmpty)
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.MissingMember,
-                    target,
-                    target.Name,
-                    companion.Companion.Name);
+                Diagnose(ContractForDiagnosticDescriptors.MissingMember, target, [target.Name, companion.Companion.Name]);
                 continue;
             }
 
@@ -162,10 +176,7 @@ internal static class ContractForCompanionValidator
             {
                 if (diagnosed.Add(mismatch))
                 {
-                    Diagnose(
-                        ContractForDiagnosticDescriptors.SignatureMismatch,
-                        mismatch,
-                        mismatch.Name);
+                    Diagnose(ContractForDiagnosticDescriptors.SignatureMismatch, mismatch, [mismatch.Name]);
                 }
             }
         }
@@ -176,19 +187,13 @@ internal static class ContractForCompanionValidator
             var matches = byCandidate[candidate];
             if (matches.Length > 1 && diagnosed.Add(candidate))
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.AmbiguousMember,
-                    candidate,
-                    candidate.Name);
+                Diagnose(ContractForDiagnosticDescriptors.AmbiguousMember, candidate, [candidate.Name]);
             }
             else if (targetSurfaceIsComplete &&
                      matches.IsDefaultOrEmpty &&
                      diagnosed.Add(candidate))
             {
-                Diagnose(
-                    ContractForDiagnosticDescriptors.SignatureMismatch,
-                    candidate,
-                    candidate.Name);
+                Diagnose(ContractForDiagnosticDescriptors.SignatureMismatch, candidate, [candidate.Name]);
             }
         }
 
@@ -224,7 +229,7 @@ internal static class ContractForCompanionValidator
         IMethodSymbol method,
         ContractClauseInventoryBuilder clauses,
         ContractIntrinsicValidator intrinsics,
-        List<Diagnostic> diagnostics,
+        Action<Diagnostic> diagnostics,
         Compilation compilation,
         Location fallback,
         CancellationToken cancellationToken)
@@ -243,12 +248,12 @@ internal static class ContractForCompanionValidator
             SharpProof.Analyzer.SharpProofControlAttributePolicy.ReportRejectedContractApi(
                 method.Name,
                 GetSourceLocation(method, compilation, fallback),
-                diagnostics.Add);
+                diagnostics);
         }
 
         if (inventory.ImplementationBody == null)
         {
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.BodyRequired,
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
@@ -261,7 +266,7 @@ internal static class ContractForCompanionValidator
                      includeNestedCallables: true))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            diagnostics.Add(
+            diagnostics(
                 SharpProof.Analyzer.InvalidContractArgumentDiagnostics.Create(
                     violation));
         }
@@ -272,7 +277,7 @@ internal static class ContractForCompanionValidator
             if (!clause.IsValid &&
                 clause.Placement != ContractClausePlacement.NestedCallable)
             {
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidClausePlacement,
                     clause.Location,
                     clause.Kind,

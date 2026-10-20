@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryCorpusDiagnosticWorkflowTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0002", "SP0045"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0002", "SP0045"];
 
     [Test]
     public async Task ActualAllocationAndStaticWriteProduceTwoOrderedCorpusDiagnostics()
@@ -51,7 +52,7 @@ public sealed class OrdinaryCorpusDiagnosticWorkflowTests
                 Is.EqualTo(observation.Diagnostics.OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic), StringComparer.Ordinal)));
             foreach (var diagnostic in observation.Diagnostics)
             {
-                var fields = diagnostic.Split('@');
+                var fields = diagnostic.Split('@').ToImmutableArray();
                 Assert.That(fields, Has.Length.EqualTo(4));
                 Assert.That(fields[1], Is.EqualTo("Warning"));
                 Assert.That(fields[2], Does.StartWith(file.Path + ":"));

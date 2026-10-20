@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -125,7 +126,7 @@ public sealed class LinuxHostContractTests
     [Test]
     public void LoaderUsesTheVerifiedDescriptorEvenIfThePathIsReplaced()
     {
-        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()),
+        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()).ToImmutableArray(),
             loadVerified: static stream =>
             {
                 ArgumentNullException.ThrowIfNull(stream);
@@ -148,7 +149,7 @@ public sealed class LinuxHostContractTests
     [Test]
     public void DefaultLoaderLoadsTheValidatedNativePayload()
     {
-        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()));
+        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()).ToImmutableArray());
         var handle = payload.Contract.LoadZ3LibraryRequired();
         try
         {
@@ -192,20 +193,22 @@ public sealed class LinuxHostContractTests
         internal string Catalog;
         internal LinuxHostContract Contract { get; }
 
-        internal Payload(Architecture architecture = Architecture.X64, byte[]? nativeBytes = null,
+        internal Payload(Architecture architecture = Architecture.X64, ImmutableArray<byte>? nativeBytes = null,
             Func<FileStream, IntPtr>? loadVerified = null)
         {
-            nativeBytes ??= Encoding.UTF8.GetBytes("native payload");
-            var managedBytes = Encoding.UTF8.GetBytes("managed payload");
+            var nativeImage = nativeBytes ?? Encoding.UTF8.GetBytes("native payload").ToImmutableArray();
+            if (nativeImage.IsDefault)
+            { throw new ArgumentNullException(nameof(nativeBytes)); }
+            var managedBytes = Encoding.UTF8.GetBytes("managed payload").ToImmutableArray();
             var rid = architecture == Architecture.Arm64 ? "linux-arm64" : "linux-x64";
             NativePath = Path.Combine(root, "tools", "native", rid, "libz3.so");
             ManagedPath = Path.Combine(root, "tools", "net10", "Microsoft.Z3.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(NativePath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(ManagedPath)!);
-            File.WriteAllBytes(NativePath, nativeBytes);
-            File.WriteAllBytes(ManagedPath, managedBytes);
-            NativeDigest = Convert.ToHexStringLower(SHA256.HashData(nativeBytes));
-            var pin = new { libraryBytes = nativeBytes.Length, librarySha256 = NativeDigest };
+            File.WriteAllBytes(NativePath, nativeImage.AsSpan());
+            File.WriteAllBytes(ManagedPath, managedBytes.AsSpan());
+            NativeDigest = Convert.ToHexStringLower(SHA256.HashData(nativeImage.AsSpan()));
+            var pin = new { libraryBytes = nativeImage.Length, librarySha256 = NativeDigest };
             Catalog = JsonSerializer.Serialize(new
             {
                 z3 = new
@@ -214,7 +217,7 @@ public sealed class LinuxHostContractTests
                     libraryBytes = pin.libraryBytes,
                     librarySha256 = pin.librarySha256,
                     managedAssemblyBytes = managedBytes.Length,
-                    managedAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(managedBytes)),
+                    managedAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(managedBytes.AsSpan())),
                     linuxArm64 = pin
                 },
                 support = new { verifierPackageId = "SharpProof.Verifier" }

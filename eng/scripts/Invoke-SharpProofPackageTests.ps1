@@ -79,8 +79,30 @@ else {
 }
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
+function ConvertTo-SharpProofTimingHistory {
+    param([AllowNull()][object]$Value)
+    $items = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($item in @($Value)) { $items.Add($item) }
+    return , $items.ToImmutable()
+}
+
+function Set-SharpProofTimingEstimate {
+    param(
+        [Parameter(Mandatory = $true)][Collections.Generic.IDictionary[string, long]]$Estimates,
+        [AllowEmptyString()][string]$Name,
+        [long]$Milliseconds
+    )
+    $storedKey = [string]::Empty
+    if ($Estimates.TryGetKey($Name, [ref]$storedKey)) {
+        $Estimates[$storedKey] = $Milliseconds
+    }
+    else {
+        $Estimates.Add($Name, $Milliseconds)
+    }
+}
+
 function Invoke-RequiredBuilds {
-    param([Parameter(Mandatory = $true)][object[]]$Builds)
+    param([Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Builds)
 
     Invoke-SharpProofParallelDotnetBuilds `
         -Builds $Builds `
@@ -92,53 +114,59 @@ function Invoke-RequiredBuilds {
 
 function New-SharpProofWeightedBuckets {
     param(
-        [Parameter(Mandatory = $true)][object[]]$Methods,
-        [Parameter(Mandatory = $true)][hashtable]$HistoricalMilliseconds,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Methods,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds,
         [Parameter(Mandatory = $true)][int]$BucketCount
     )
 
-    $buckets = @(
-        for ($index = 0; $index -lt $BucketCount; $index++) {
-            [pscustomobject]@{
-                Index                 = $index
-                Methods               = [Collections.Generic.List[string]]::new()
-                EstimatedMilliseconds = 0L
-            }
-        })
-    $orderedMethods = @($Methods | Sort-Object `
-        @{ Expression     = {
-                if ($HistoricalMilliseconds.ContainsKey($_)) {
-                    [long]$HistoricalMilliseconds[$_]
-                }
-                else {
-                    $DefaultMilliseconds
-                }
-            }; Descending = $true
-        }, `
-        @{ Expression = { $_ }; Descending = $false })
+    $bucketBuilders = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $estimatedMilliseconds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, long]()
+    for ($index = 0; $index -lt $BucketCount; $index++) {
+        $bucketBuilders.Add(([ordered]@{
+                    Index   = $index
+                    Methods = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+                }).AsReadOnly())
+        $estimatedMilliseconds.Add($index, 0L)
+    }
+    $orderedMethods = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            $Methods | Sort-Object -Property @(
+                @{ Expression     = {
+                        if ($HistoricalMilliseconds.ContainsKey($_)) {
+                            [long]$HistoricalMilliseconds[$_]
+                        }
+                        else { $DefaultMilliseconds }
+                    }; Descending = $true
+                },
+                @{ Expression = { $_ }; Descending = $false })))
     foreach ($method in $orderedMethods) {
-        $bucket = $buckets | Sort-Object `
-            EstimatedMilliseconds, `
-        @{ Expression = { $_.Methods.Count } }, `
-            Index | Select-Object -First 1
+        $bucket = $bucketBuilders | Sort-Object -Property @(
+            @{ Expression = { $estimatedMilliseconds[$_.Index] } },
+            @{ Expression = { $_.Methods.Count } },
+            @{ Expression = { $_.Index } }) | Select-Object -First 1
         $bucket.Methods.Add($method)
-        $bucket.EstimatedMilliseconds +=
+        $estimatedMilliseconds[$bucket.Index] +=
         $(if ($HistoricalMilliseconds.ContainsKey($method)) {
                 [long]$HistoricalMilliseconds[$method]
             }
-            else {
-                $DefaultMilliseconds
-            })
+            else { $DefaultMilliseconds })
     }
 
-    return $buckets
+    $buckets = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($bucket in $bucketBuilders) {
+        $buckets.Add(([ordered]@{
+                    Index                 = $bucket.Index
+                    Methods               = $bucket.Methods.ToImmutable()
+                    EstimatedMilliseconds = $estimatedMilliseconds[$bucket.Index]
+                }).AsReadOnly())
+    }
+    return , $buckets.ToImmutable()
 }
 
 function Get-SharpProofBucketMaximum {
     param(
-        [Parameter(Mandatory = $true)][object[]]$Buckets,
-        [Parameter(Mandatory = $true)][hashtable]$HistoricalMilliseconds,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Buckets,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds
     )
 
@@ -160,7 +188,9 @@ function Get-SharpProofBucketMaximum {
     return $maximum
 }
 
-$script:SharpProofTrxTimingRowsCache = @{}
+$script:SharpProofTrxTimingRowsCache =
+[Collections.Immutable.ImmutableDictionary]::Create[string, object](
+    [StringComparer]::OrdinalIgnoreCase)
 
 function Get-TestMethodTimings {
     param(
@@ -169,8 +199,8 @@ function Get-TestMethodTimings {
     )
 
     if (-not $script:SharpProofTrxTimingRowsCache.ContainsKey($ResultsRoot)) {
-        $rowsByClass = [Collections.Generic.Dictionary[string,
-        Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+        $rowBuilders = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+            [StringComparer]::Ordinal)
         foreach ($trx in Get-ChildItem `
                 -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
             [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
@@ -178,18 +208,20 @@ function Get-TestMethodTimings {
             $namespace.AddNamespace(
                 'trx',
                 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
-            $definitions = @{}
+            $definitionBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+                [StringComparer]::OrdinalIgnoreCase)
             foreach ($definition in @($document.SelectNodes(
                         '//trx:UnitTest', $namespace))) {
                 $method = $definition.SelectSingleNode(
                     'trx:TestMethod', $namespace)
                 if ($null -ne $method) {
-                    $definitions[[string]$definition.id] = [pscustomobject]@{
-                        ClassName  = [string]$method.className
-                        MethodName = [string]$method.name
-                    }
+                    $definitionBuilder[[string]$definition.id] = ([ordered]@{
+                            ClassName  = [string]$method.className
+                            MethodName = [string]$method.name
+                        }).AsReadOnly()
                 }
             }
+            $definitions = $definitionBuilder.ToImmutable()
             foreach ($result in @($document.SelectNodes(
                         '//trx:UnitTestResult', $namespace))) {
                 $testId = [string]$result.testId
@@ -198,30 +230,38 @@ function Get-TestMethodTimings {
                 }
                 $definition = $definitions[$testId]
                 $classRows = $null
-                if (-not $rowsByClass.TryGetValue(
+                if (-not $rowBuilders.TryGetValue(
                         $definition.ClassName,
                         [ref]$classRows)) {
-                    $classRows = [Collections.Generic.List[object]]::new()
-                    $rowsByClass.Add(
+                    $classRows = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                    $rowBuilders.Add(
                         $definition.ClassName,
                         $classRows)
                 }
-                $classRows.Add([pscustomobject]@{
-                        ClassName  = $definition.ClassName
-                        MethodName = $definition.MethodName
-                        Duration   = [string]$result.duration
-                    })
+                $classRows.Add(([ordered]@{
+                            ClassName  = $definition.ClassName
+                            MethodName = $definition.MethodName
+                            Duration   = [string]$result.duration
+                        }).AsReadOnly())
             }
         }
-        $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rowsByClass
+        $rowsByClassBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+            [StringComparer]::Ordinal)
+        foreach ($entry in $rowBuilders.GetEnumerator()) {
+            $rowsByClassBuilder.Add($entry.Key, $entry.Value.ToImmutable())
+        }
+        $cacheBuilder = $script:SharpProofTrxTimingRowsCache.ToBuilder()
+        $cacheBuilder[$ResultsRoot] = $rowsByClassBuilder.ToImmutable()
+        $script:SharpProofTrxTimingRowsCache = $cacheBuilder.ToImmutable()
     }
 
     $rowsByClass = $script:SharpProofTrxTimingRowsCache[$ResultsRoot]
     $rows = $null
     if (-not $rowsByClass.TryGetValue($ClassName, [ref]$rows)) {
-        return @()
+        return [Collections.Immutable.ImmutableArray[object]]::Empty
     }
-    $milliseconds = @{}
+    $milliseconds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long](
+        [StringComparer]::OrdinalIgnoreCase)
     foreach ($row in $rows) {
         $match = [regex]::Match(
             $row.MethodName,
@@ -233,26 +273,30 @@ function Get-TestMethodTimings {
         $elapsed = [TimeSpan]::Parse(
             $row.Duration,
             [Globalization.CultureInfo]::InvariantCulture)
-        if (-not $milliseconds.ContainsKey($name)) {
+        $canonicalName = $null
+        if ($milliseconds.TryGetKey($name, [ref]$canonicalName)) {
+            $name = $canonicalName
+        }
+        else {
             $milliseconds[$name] = 0L
         }
         $milliseconds[$name] += [long][Math]::Ceiling(
             $elapsed.TotalMilliseconds)
     }
-    return @($milliseconds.GetEnumerator() | ForEach-Object {
-            [pscustomobject]@{
-                name                = [string]$_.Key
-                elapsedMilliseconds = [long]$_.Value
-            }
-        } | Sort-Object name)
+    return [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($milliseconds.ToImmutable().GetEnumerator() | ForEach-Object {
+                ([ordered]@{
+                    name                = [string]$_.Key
+                    elapsedMilliseconds = [long]$_.Value
+                }).AsReadOnly()
+            } | Sort-Object { $_.name }))
 }
 
 function Get-DiscoveredTestMethods {
     param(
         [Parameter(Mandatory = $true)][string]$Assembly,
         [Parameter(Mandatory = $true)][string[]]$ClassNames,
-        [Parameter(Mandatory = $true)][hashtable]$MinimumCounts,
-        [Parameter(Mandatory = $true)][hashtable]$Descriptions
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$MinimumCounts,
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$Descriptions
     )
 
     # Discovery must execute in the assembly's dotnet testhost. PowerShell may
@@ -298,7 +342,7 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 }
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
-$phaseTimings = [Collections.Generic.List[object]]::new()
+$phaseTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $canonicalPackageFilter =
@@ -313,9 +357,9 @@ $timingOutput = Join-Path $timingDirectory (
     $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
     $(if ($useDefaultShardPlan) { '' } else { '-selected' }) +
     $timingSuffix + '.json')
-$priorMethodMilliseconds = @{}
-$priorPackageLayoutMethodMilliseconds = @{}
-$priorFilterMilliseconds = @{}
+$priorMethodMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
+$priorPackageLayoutMethodMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
+$priorFilterMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
 foreach ($priorTimingPath in $(if ($Fast) {
             @($canonicalTimingOutput, $timingOutput)
         }
@@ -340,42 +384,41 @@ foreach ($priorTimingPath in $(if ($Fast) {
         $hasScheduler =
         $priorTiming.PSObject.Properties.Name -contains 'scheduler'
         $methodHistory = if ($hasScheduler) {
-            @($priorTiming.scheduler.workerMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.workerMethods)
         }
         else {
-            @($priorTiming.workerMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.workerMethods)
         }
         foreach ($method in $methodHistory) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorMethodMilliseconds[[string]$method.name] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorMethodMillisecondsBuilder -Name ([string]$method.name) -Milliseconds $elapsed
             }
         }
         $packageLayoutMethodHistory = if ($hasScheduler -and
             $priorTiming.scheduler.PSObject.Properties.Name -contains
             'packageLayoutMethods') {
-            @($priorTiming.scheduler.packageLayoutMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.packageLayoutMethods)
         }
         else {
-            @()
+            ([Collections.Immutable.ImmutableArray[object]]::Empty)
         }
         foreach ($method in $packageLayoutMethodHistory) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorPackageLayoutMethodMilliseconds[
-                [string]$method.name] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorPackageLayoutMethodMillisecondsBuilder -Name ([string]$method.name) -Milliseconds $elapsed
             }
         }
         $filterHistory = if ($hasScheduler) {
-            @($priorTiming.scheduler.filters)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.filters)
         }
         else {
-            @($priorTiming.shards)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.shards)
         }
         foreach ($shard in $filterHistory) {
             $elapsed = [long]$shard.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorFilterMilliseconds[[string]$shard.filter] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorFilterMillisecondsBuilder -Name ([string]$shard.filter) -Milliseconds $elapsed
             }
         }
     }
@@ -385,6 +428,10 @@ foreach ($priorTimingPath in $(if ($Fast) {
             $_.Exception.Message)
     }
 }
+
+$priorMethodMilliseconds = $priorMethodMillisecondsBuilder.ToImmutable()
+$priorPackageLayoutMethodMilliseconds = $priorPackageLayoutMethodMillisecondsBuilder.ToImmutable()
+$priorFilterMilliseconds = $priorFilterMillisecondsBuilder.ToImmutable()
 
 try {
     if (-not $NoBuild -and -not $ReuseTestHarness) {
@@ -399,19 +446,19 @@ try {
         }
     }
 
-    $builds = [Collections.Generic.List[object]]::new()
+    $buildBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if (-not $NoBuild -and -not $ReuseTestHarness) {
-        $testHarnessBuildArguments = @(
-            'build', $testProject, '-c', $Configuration,
-            '--no-restore')
+        $testHarnessBuildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $testHarnessBuildArgumentBuilder.AddRange([string[]]@(
+                'build', $testProject, '-c', $Configuration,
+                '--no-restore'))
         if ($Fast) {
-            $testHarnessBuildArguments +=
-            '-p:RunAnalyzersDuringBuild=false'
+            $testHarnessBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $builds.Add([pscustomobject]@{
-                Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
-                Arguments = $testHarnessBuildArguments
-            })
+        $buildBuilder.Add(([ordered]@{
+                    Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
+                    Arguments = $testHarnessBuildArgumentBuilder.ToImmutable()
+                }).AsReadOnly())
     }
     # The Release test-harness project references Verifier with no output
     # assembly, so its build already materializes the complete package
@@ -419,34 +466,39 @@ try {
     # the harness is not built in the package's Release configuration.
     if ([string]::IsNullOrWhiteSpace($PackageSource) -and -not $NoBuild -and
         $Configuration -cne 'Release') {
-        $packageProductBuildArguments = @(
-            'build',
-            'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
-            '-c', 'Release', '--no-restore',
-            '-p:GeneratePackageOnBuild=false')
+        $packageProductBuildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $packageProductBuildArgumentBuilder.AddRange([string[]]@(
+                'build',
+                'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
+                '-c', 'Release', '--no-restore',
+                '-p:GeneratePackageOnBuild=false'))
         if ($Fast) {
-            $packageProductBuildArguments +=
-            '-p:RunAnalyzersDuringBuild=false'
+            $packageProductBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $builds.Add([pscustomobject]@{
-                Name      = 'package-products-release'
-                Arguments = $packageProductBuildArguments
-            })
+        $buildBuilder.Add(([ordered]@{
+                    Name      = 'package-products-release'
+                    Arguments = $packageProductBuildArgumentBuilder.ToImmutable()
+                }).AsReadOnly())
     }
-    if ($builds.Count -gt 0) {
+    $builds = $buildBuilder.ToImmutable()
+    if ($builds.Length -gt 0) {
         Invoke-SharpProofTimedPhase -Name 'build-prerequisites' `
             -Timings $phaseTimings -RecordOnFailure -Action {
-            if ($Configuration -ceq 'Release' -and $builds.Count -eq 2) {
+            if ($Configuration -ceq 'Release' -and $builds.Length -eq 2) {
                 # The test harness builds the complete Release dependency
                 # closure. Wait for it before building the empty Verifier
                 # root, whose package payload consumes those outputs.
-                Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -EQ 'test-harness-release')
-                Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -EQ 'package-products-release')
+                $harnessBuilds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                $productBuilds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                foreach ($build in $builds) {
+                    if ($build.Name -eq 'test-harness-release') { $harnessBuilds.Add($build) }
+                    if ($build.Name -eq 'package-products-release') { $productBuilds.Add($build) }
+                }
+                Invoke-RequiredBuilds -Builds ($harnessBuilds.ToImmutable())
+                Invoke-RequiredBuilds -Builds ($productBuilds.ToImmutable())
             }
             else {
-                Invoke-RequiredBuilds -Builds @($builds)
+                Invoke-RequiredBuilds -Builds $builds
             }
         }
     }
@@ -476,13 +528,13 @@ try {
     $verifierDefaultsClass =
     'SharpProof.Package.Test.VerifierPackageDefaultsTests'
     function Get-SharpProofHistoricalFilterMilliseconds {
-        param([Parameter(Mandatory = $true)][string]$Filter)
+        param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Filter)
 
         $historyFilters = if ($TestFilter -ceq $canonicalPackageFilter) {
-            @("($TestFilter)&($Filter)", $Filter)
+            , [Collections.Immutable.ImmutableArray]::Create[string]("($TestFilter)&($Filter)", $Filter)
         }
         else {
-            @($Filter)
+            , [Collections.Immutable.ImmutableArray]::Create[string]($Filter)
         }
         foreach ($historyFilter in $historyFilters) {
             if ($priorFilterMilliseconds.ContainsKey($historyFilter)) {
@@ -492,19 +544,28 @@ try {
         return $null
     }
 
-    $shards = [Collections.Generic.List[object]]::new()
+    function Get-SharpProofPackageShardFilter {
+        param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Filter)
+
+        if ($TestFilter -ceq $canonicalPackageFilter) {
+            return "($TestFilter)&($Filter)"
+        }
+        return $Filter
+    }
+
+    $shardBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if (-not $useDefaultShardPlan) {
-        $shards.Add([pscustomobject]@{
-                Name                  = 'selected'
-                Filter                = $TestFilter
-                EstimatedMilliseconds =
-                $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
-                        [long]$priorFilterMilliseconds[$TestFilter]
-                    }
-                    else {
-                        1L
-                    })
-            })
+        $shardBuilder.Add(([ordered]@{
+                    Name                  = 'selected'
+                    Filter                = Get-SharpProofPackageShardFilter ($TestFilter)
+                    EstimatedMilliseconds =
+                    $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
+                            [long]$priorFilterMilliseconds[$TestFilter]
+                        }
+                        else {
+                            1L
+                        })
+                }).AsReadOnly())
     }
     else {
         if ([string]::IsNullOrWhiteSpace($testAssembly)) {
@@ -515,22 +576,23 @@ try {
         $discoveredMethods = Get-DiscoveredTestMethods `
             -Assembly $testAssembly `
             -ClassNames @($workerClass, $packageLayoutClass, $verifierDefaultsClass) `
-            -MinimumCounts @{
-            $workerClass           = 40
-            $packageLayoutClass    = 15
-            $verifierDefaultsClass = 4
-        } `
-            -Descriptions @{
-            $workerClass           = 'Worker MSBuild integration'
-            $packageLayoutClass    = 'package-layout'
-            $verifierDefaultsClass = 'verifier-package defaults'
-        }
-        $workerMethods = @($discoveredMethods[$workerClass])
+            -MinimumCounts ([ordered]@{
+                $workerClass           = 40
+                $packageLayoutClass    = 15
+                $verifierDefaultsClass = 4
+            }).AsReadOnly() `
+            -Descriptions ([ordered]@{
+                $workerClass           = 'Worker MSBuild integration'
+                $packageLayoutClass    = 'package-layout'
+                $verifierDefaultsClass = 'verifier-package defaults'
+            }).AsReadOnly()
+        $workerMethods = $discoveredMethods[$workerClass]
         $threeTargetWorkerMethod =
         'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
-        $threeTargetWorkerHistoryNames = @(
-            $threeTargetWorkerMethod,
-            'ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds')
+        New-Variable -Name threeTargetWorkerHistoryNames -Option Constant -Value (
+            [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    $threeTargetWorkerMethod,
+                    'ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds')))
         # This test performs one serial initial build followed by parallel
         # incremental and clean builds. At the normal wide package wave,
         # keeping it in a worker bucket lets its analyzer CPU compete with
@@ -540,14 +602,13 @@ try {
         $isolateThreeTargetWorker =
         $parallelism -ge 4 -and
         $workerMethods -contains $threeTargetWorkerMethod
-        $bucketWorkerMethods = if ($isolateThreeTargetWorker) {
-            @($workerMethods | Where-Object {
-                    $_ -cne $threeTargetWorkerMethod
-                })
+        $bucketWorkerMethodBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        foreach ($method in $workerMethods) {
+            if (-not $isolateThreeTargetWorker -or $method -cne $threeTargetWorkerMethod) {
+                $bucketWorkerMethodBuilder.Add($method)
+            }
         }
-        else {
-            $workerMethods
-        }
+        $bucketWorkerMethods = $bucketWorkerMethodBuilder.ToImmutable()
         # Keep one worker bucket per available lane. Nested fixture workers
         # are charged separately through each shard's Slots reservation, so
         # reducing the bucket count only makes the heavy integration methods
@@ -562,16 +623,16 @@ try {
         # only when it predicts a materially shorter worker tail.  Wider
         # containers retain the historical plan because their extra lanes make
         # those samples useful and the existing wide-wave tuning depends on it.
-        $countBalancedBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $bucketWorkerMethods `
-                -HistoricalMilliseconds @{} `
-                -DefaultMilliseconds 1L `
-                -BucketCount $workerShardCount)
-        $weightedBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $bucketWorkerMethods `
-                -HistoricalMilliseconds $priorMethodMilliseconds `
-                -DefaultMilliseconds 1L `
-                -BucketCount $workerShardCount)
+        $countBalancedBuckets = New-SharpProofWeightedBuckets `
+            -Methods $bucketWorkerMethods `
+            -HistoricalMilliseconds ([Collections.Immutable.ImmutableDictionary[string, long]]::Empty) `
+            -DefaultMilliseconds 1L `
+            -BucketCount $workerShardCount
+        $weightedBuckets = New-SharpProofWeightedBuckets `
+            -Methods $bucketWorkerMethods `
+            -HistoricalMilliseconds $priorMethodMilliseconds `
+            -DefaultMilliseconds 1L `
+            -BucketCount $workerShardCount
         $countMaximum = Get-SharpProofBucketMaximum `
             -Buckets $countBalancedBuckets `
             -HistoricalMilliseconds $priorMethodMilliseconds `
@@ -582,16 +643,16 @@ try {
             -DefaultMilliseconds 1L
         $workerBuckets = if ($parallelism -le 4) {
             if ($weightedMaximum + 1000L -lt $countMaximum) {
-                $weightedBuckets
+                , $weightedBuckets
             }
             else {
-                $countBalancedBuckets
+                , $countBalancedBuckets
             }
         }
         else {
-            $weightedBuckets
+            , $weightedBuckets
         }
-        $packageLayoutMethods = @($discoveredMethods[$packageLayoutClass])
+        $packageLayoutMethods = $discoveredMethods[$packageLayoutClass]
         $packageLayoutFilter = "FullyQualifiedName~$packageLayoutClass"
         $defaultPackageLayoutMethodMilliseconds =
         if ($null -ne ($packageLayoutHistoricalMilliseconds =
@@ -616,30 +677,32 @@ try {
         # four-worker NUnit pool; a four-lane wave keeps one host so it does
         # not serialize two full pools or duplicate package-cache startup.
         $packageLayoutBucketCount = if ($parallelism -ge 8) { 2 } else { 1 }
-        $packageLayoutBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $packageLayoutMethods `
-                -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
-                -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
-                -BucketCount $packageLayoutBucketCount)
-        $fixtureClasses = @(
-            'CompilerCaptureFreshnessControlTests',
-            'CompilerCaptureFreshnessRegressionTests',
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
-            'NaNPublicBuildWorkflowAuditTests',
-            'VerifierPackageDefaultsTests',
-            'VerificationPublicationNullArgumentTests',
-            'FinalCompilationProbeTests')
-        $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
+        $packageLayoutBuckets = New-SharpProofWeightedBuckets `
+            -Methods $packageLayoutMethods `
+            -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
+            -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
+            -BucketCount $packageLayoutBucketCount
+        New-Variable -Name fixtureClasses -Option Constant -Value (
+            [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'CompilerCaptureFreshnessControlTests',
+                    'CompilerCaptureFreshnessRegressionTests',
+                    'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+                    'NaNPublicBuildWorkflowAuditTests',
+                    'VerifierPackageDefaultsTests',
+                    'VerificationPublicationNullArgumentTests',
+                    'FinalCompilationProbeTests')))
+        $plannedFixtureBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
             [StringComparer]::Ordinal)
         foreach ($name in @($workerClass, $packageLayoutClass,
                 'SharpProof.Package.Test.BuildTaskTests')) {
-            [void]$plannedFixtures.Add($name)
+            [void]$plannedFixtureBuilder.Add($name)
         }
         foreach ($group in $fixtureClasses) {
             foreach ($name in ($group -split '\|')) {
-                [void]$plannedFixtures.Add("SharpProof.Package.Test.$name")
+                [void]$plannedFixtureBuilder.Add("SharpProof.Package.Test.$name")
             }
         }
+        $plannedFixtures = $plannedFixtureBuilder.ToImmutable()
         # Inspect metadata without loading fixture dependencies into PowerShell's
         # runtime. Package fixtures follow the <Name>Tests naming convention.
         $fixtureStream = [IO.File]::OpenRead($testAssembly)
@@ -664,10 +727,10 @@ try {
             $fixtureStream.Dispose()
         }
         foreach ($fixtureClass in $fixtureClasses) {
-            $classNames = $fixtureClass -split '\|'
-            $classFilters = @($classNames | ForEach-Object {
-                    "FullyQualifiedName~SharpProof.Package.Test.$_"
-                })
+            $classNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]($fixtureClass -split '\|'))
+            $classFilters = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($classNames | ForEach-Object {
+                        "FullyQualifiedName~SharpProof.Package.Test.$_"
+                    }))
             $filter = $classFilters -join '|'
             $estimatedMilliseconds =
             Get-SharpProofHistoricalFilterMilliseconds $filter
@@ -693,74 +756,74 @@ try {
             else {
                 'fixture-' + $fixtureClass.ToLowerInvariant()
             }
-            $shards.Add([pscustomobject]@{
-                    Name                  = $fixtureName
-                    Filter                = $filter
-                    EstimatedMilliseconds = $estimatedMilliseconds
-                    # FinalCompilationProbeTests runs up to four NUnit children
-                    # concurrently, each launching an MSBuild process. Charge
-                    # those internal workers to the outer wave scheduler so they
-                    # do not consume untracked CPU alongside every worker shard.
-                    Slots                 = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
-                        [Math]::Min(4, $parallelism)
-                    }
-                    else {
-                        1
-                    }
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = $fixtureName
+                        Filter                = Get-SharpProofPackageShardFilter ($filter)
+                        EstimatedMilliseconds = $estimatedMilliseconds
+                        # FinalCompilationProbeTests runs up to four NUnit children
+                        # concurrently, each launching an MSBuild process. Charge
+                        # those internal workers to the outer wave scheduler so they
+                        # do not consume untracked CPU alongside every worker shard.
+                        Slots                 = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
+                            [Math]::Min(4, $parallelism)
+                        }
+                        else {
+                            1
+                        }
+                    }).AsReadOnly())
         }
         $buildTaskFilter = 'FullyQualifiedName~SharpProof.Package.Test.BuildTaskTests'
-        $shards.Add([pscustomobject]@{
-                Name                  = 'postflight-buildtask'
-                Filter                = $buildTaskFilter
-                EstimatedMilliseconds =
-                $(if ($null -ne ($historicalMilliseconds =
-                            Get-SharpProofHistoricalFilterMilliseconds `
-                                $buildTaskFilter)) {
-                        $historicalMilliseconds
-                    }
-                    else {
-                        10000L
-                    })
-                # BuildTaskTests needs a fresh dotnet test host.
-                Slots                 = 1
-                Exclusive             = $true
-            })
+        $shardBuilder.Add(([ordered]@{
+                    Name                  = 'postflight-buildtask'
+                    Filter                = Get-SharpProofPackageShardFilter ($buildTaskFilter)
+                    EstimatedMilliseconds =
+                    $(if ($null -ne ($historicalMilliseconds =
+                                Get-SharpProofHistoricalFilterMilliseconds `
+                                    $buildTaskFilter)) {
+                            $historicalMilliseconds
+                        }
+                        else {
+                            10000L
+                        })
+                    # BuildTaskTests needs a fresh dotnet test host.
+                    Slots                 = 1
+                    Exclusive             = $true
+                }).AsReadOnly())
         foreach ($bucket in $packageLayoutBuckets) {
             $filter = @($bucket.Methods | ForEach-Object {
                     "FullyQualifiedName~$packageLayoutClass.$_"
                 }) -join '|'
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'package-layout-' + ($bucket.Index + 1).ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture)
-                    Filter                = $filter
-                    EstimatedMilliseconds =
-                    $(if ($null -ne ($historicalMilliseconds =
-                                Get-SharpProofHistoricalFilterMilliseconds $filter)) {
-                            $historicalMilliseconds
-                        }
-                        else {
-                            $bucket.EstimatedMilliseconds
-                        })
-                    # PackageLayoutSmokeTests enables NUnit child parallelism up
-                    # to four workers. Charge that nested pool to the outer
-                    # scheduler so the package-layout host does not oversubscribe
-                    # the integration-test wave alongside worker shards.
-                    Slots                 = [Math]::Min(4, $parallelism)
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'package-layout-' + ($bucket.Index + 1).ToString(
+                            'D2', [Globalization.CultureInfo]::InvariantCulture)
+                        Filter                = Get-SharpProofPackageShardFilter ($filter)
+                        EstimatedMilliseconds =
+                        $(if ($null -ne ($historicalMilliseconds =
+                                    Get-SharpProofHistoricalFilterMilliseconds $filter)) {
+                                $historicalMilliseconds
+                            }
+                            else {
+                                $bucket.EstimatedMilliseconds
+                            })
+                        # PackageLayoutSmokeTests enables NUnit child parallelism up
+                        # to four workers. Charge that nested pool to the outer
+                        # scheduler so the package-layout host does not oversubscribe
+                        # the integration-test wave alongside worker shards.
+                        Slots                 = [Math]::Min(4, $parallelism)
+                    }).AsReadOnly())
         }
         foreach ($bucket in @($workerBuckets | Where-Object {
                     $_.Methods.Count -gt 0
                 })) {
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'worker-' + ($bucket.Index + 1).ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture)
-                    Filter                = @($bucket.Methods | ForEach-Object {
-                            "FullyQualifiedName~$workerClass.$_"
-                        }) -join '|'
-                    EstimatedMilliseconds = $bucket.EstimatedMilliseconds
-                    Slots                 = 1
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'worker-' + ($bucket.Index + 1).ToString(
+                            'D2', [Globalization.CultureInfo]::InvariantCulture)
+                        Filter                = Get-SharpProofPackageShardFilter (@($bucket.Methods | ForEach-Object {
+                                    "FullyQualifiedName~$workerClass.$_"
+                                }) -join '|')
+                        EstimatedMilliseconds = $bucket.EstimatedMilliseconds
+                        Slots                 = 1
+                    }).AsReadOnly())
         }
         if ($isolateThreeTargetWorker) {
             $threeTargetEstimatedMilliseconds = 1L
@@ -771,15 +834,15 @@ try {
                     break
                 }
             }
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'worker-three-target'
-                    Filter                = "FullyQualifiedName~$workerClass.$threeTargetWorkerMethod"
-                    EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
-                    # The test performs a complete analyzer pass for each
-                    # framework. Reserve a bounded lane slice while allowing the
-                    # independent worker shards to overlap its work.
-                    Slots                 = [Math]::Min(3, $parallelism)
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'worker-three-target'
+                        Filter                = Get-SharpProofPackageShardFilter ("FullyQualifiedName~$workerClass.$threeTargetWorkerMethod")
+                        EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
+                        # The test performs a complete analyzer pass for each
+                        # framework. Reserve a bounded lane slice while allowing the
+                        # independent worker shards to overlap its work.
+                        Slots                 = [Math]::Min(3, $parallelism)
+                    }).AsReadOnly())
         }
     }
 
@@ -790,41 +853,40 @@ try {
             -Configuration $Configuration
     }
 
-    if ($TestFilter -ceq $canonicalPackageFilter) {
-        foreach ($shard in $shards) {
-            $shard.Filter = "($TestFilter)&($($shard.Filter))"
-        }
-    }
+    $shards = $shardBuilder.ToImmutable()
 
     # Start high-resource shards first so reserved lanes overlap their tails
     # instead of leaving the containment process as the final wave.
-    $orderedShards = @($shards | Sort-Object `
-        @{ Expression     = {
-                $slots = if ($_.PSObject.Properties.Name -contains 'Slots') {
-                    [long]$_.Slots
-                }
-                elseif ($_.PSObject.Properties.Name -contains 'Exclusive' -and
-                    [bool]$_.Exclusive) {
-                    [long]$parallelism
-                }
-                else {
-                    1L
-                }
-                [long]$_.EstimatedMilliseconds * $slots
-            }; Descending = $true
-        }, `
-        @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-        @{ Expression = 'Name'; Descending = $false })
+    $orderedShardBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($orderedShard in ($shards | Sort-Object `
+            @{ Expression     = {
+                    $slots = if ((($_ -is [Collections.IDictionary] -and $_.Keys -contains 'Slots') -or ($_ -isnot [Collections.IDictionary] -and $_.PSObject.Properties.Name -contains 'Slots'))) {
+                        [long]$_.Slots
+                    }
+                    elseif ((($_ -is [Collections.IDictionary] -and $_.Keys -contains 'Exclusive') -or ($_ -isnot [Collections.IDictionary] -and $_.PSObject.Properties.Name -contains 'Exclusive')) -and
+                        [bool]$_.Exclusive) {
+                        [long]$parallelism
+                    }
+                    else {
+                        1L
+                    }
+                    [long]$_.EstimatedMilliseconds * $slots
+                }; Descending = $true
+            }, `
+            @{ Expression = { [long]$_.EstimatedMilliseconds }; Descending = $true }, `
+            @{ Expression = { [string]$_.Name }; Descending = $false }) ) {
+        $orderedShardBuilder.Add($orderedShard)
+    }
+    $orderedShards = $orderedShardBuilder.ToImmutable()
     $testPhase = [Diagnostics.Stopwatch]::StartNew()
     $preparePackageTest = {
         param([object]$shard)
 
         $nextIsExclusive =
-        $shard.PSObject.Properties.Name -contains 'Exclusive' -and
+        (($shard -is [Collections.IDictionary] -and $shard.Keys -contains 'Exclusive') -or ($shard -isnot [Collections.IDictionary] -and $shard.PSObject.Properties.Name -contains 'Exclusive')) -and
         [bool]$shard.Exclusive
-        $environment = @{
-            SHARPPROOF_PACKAGE_SOURCE = $feed
-        }
+        $environmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+        $environmentBuilder.Add('SHARPPROOF_PACKAGE_SOURCE', $feed)
         $isolatedOutput = ''
         if ($coverageEnabled) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
@@ -838,42 +900,44 @@ try {
         $directVstest = -not $coverageEnabled -and
         -not $nextIsExclusive
         if ($directVstest) {
-            $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
+            $environmentBuilder.Add('DOTNET_HOST_PATH', $resolvedDotnetHost)
         }
-        $arguments = if ($directVstest) {
-            @('vstest', $testAssembly)
+        $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        if ($directVstest) {
+            $argumentBuilder.AddRange([string[]]@('vstest', $testAssembly))
         }
         else {
-            @(
-                'test', $testProject, '-c', $Configuration,
-                '--no-build', '--no-restore')
+            $argumentBuilder.AddRange([string[]]@(
+                    'test', $testProject, '-c', $Configuration,
+                    '--no-build', '--no-restore'))
         }
         if (-not $directVstest -and
             -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-            $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            $argumentBuilder.Add('-p:OutDir=' + $isolatedOutput + '/')
         }
         if ($directVstest) {
-            $arguments += '/TestCaseFilter:' + $shard.Filter
-            $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFilePrefix=$($shard.Name)"
-            $arguments += '/ResultsDirectory:' + (
-                Join-Path $results $shard.Name)
+            $argumentBuilder.Add('/TestCaseFilter:' + $shard.Filter)
+            $argumentBuilder.Add('/logger:console;verbosity=minimal')
+            $argumentBuilder.Add("/logger:trx;LogFilePrefix=$($shard.Name)")
+            $argumentBuilder.Add('/ResultsDirectory:' + (
+                    Join-Path $results $shard.Name))
         }
         else {
-            $arguments += @(
-                '--filter', $shard.Filter,
-                '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFilePrefix=$($shard.Name)",
-                '--results-directory', (Join-Path $results $shard.Name))
+            $argumentBuilder.AddRange([string[]]@(
+                    '--filter', $shard.Filter,
+                    '--logger', 'console;verbosity=minimal',
+                    '--logger', "trx;LogFilePrefix=$($shard.Name)",
+                    '--results-directory', (Join-Path $results $shard.Name)))
         }
-        $arguments = Add-SharpProofCoverageArguments `
-            -Arguments $arguments `
+        $coverageArguments = Add-SharpProofCoverageArguments `
+            -ImmutableArguments $argumentBuilder.ToImmutable() `
             -Enabled $coverageEnabled `
             -Settings $resolvedCoverageSettings
-        return [pscustomobject]@{
-            Arguments   = $arguments
-            Environment = $environment
-        }
+        $arguments = $coverageArguments
+        return ([ordered]@{
+                Arguments   = $arguments
+                Environment = $environmentBuilder.ToImmutable()
+            }).AsReadOnly()
     }.GetNewClosure()
     $testRun = Invoke-SharpProofParallelDotnetTests `
         -Tests $orderedShards `
@@ -883,31 +947,31 @@ try {
         -Prepare $preparePackageTest `
         -Label 'Package test' `
         -Quiet:$Quiet
-    $shardTimings = [Collections.Generic.List[object]]::new()
+    $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject
     }
     foreach ($result in @($testRun.Completed)) {
-        $shardTimings.Add([pscustomobject]@{
-                name                = $result.Test.Name
-                filter              = $result.Test.Filter
-                elapsedMilliseconds = $result.ElapsedMilliseconds
-                exitCode            = $result.ExitCode
-            })
+        $shardTimings.Add(([ordered]@{
+                    name                = $result.Test.Name
+                    filter              = $result.Test.Filter
+                    elapsedMilliseconds = $result.ElapsedMilliseconds
+                    exitCode            = $result.ExitCode
+                }).AsReadOnly())
     }
-    $failures = [Collections.Generic.List[string]]::new()
+    $failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0
             })) {
-        $failures.Add(
+        $failureBuilder.Add(
             "$($failure.Test.Name) exited $($failure.ExitCode): " +
             $failure.Test.Filter)
     }
     $testPhase.Stop()
-    $phaseTimings.Add([pscustomobject]@{
-            name                = 'test-shards'
-            elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
-        })
+    $phaseTimings.Add(([ordered]@{
+                name                = 'test-shards'
+                elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
+            }).AsReadOnly())
 
     $campaign.Stop()
     $workerMethodTimings = Get-TestMethodTimings `
@@ -917,61 +981,62 @@ try {
         -ResultsRoot $results `
         -ClassName $packageLayoutClass
     foreach ($entry in $workerMethodTimings) {
-        $priorMethodMilliseconds[[string]$entry.name] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorMethodMillisecondsBuilder -Name ([string]$entry.name) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
     foreach ($entry in $packageLayoutMethodTimings) {
-        $priorPackageLayoutMethodMilliseconds[[string]$entry.name] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorPackageLayoutMethodMillisecondsBuilder -Name ([string]$entry.name) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
     foreach ($entry in $shardTimings) {
-        $priorFilterMilliseconds[[string]$entry.filter] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorFilterMillisecondsBuilder -Name ([string]$entry.filter) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
+    $priorMethodMilliseconds = $priorMethodMillisecondsBuilder.ToImmutable()
+    $priorPackageLayoutMethodMilliseconds = $priorPackageLayoutMethodMillisecondsBuilder.ToImmutable()
+    $priorFilterMilliseconds = $priorFilterMillisecondsBuilder.ToImmutable()
     $temporaryTiming =
     $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    [pscustomobject]@{
+    ([ordered]@{
         schemaVersion            = 1
         command                  = 'package-tests'
         configuration            = $Configuration
         fast                     = [bool]$Fast
         parallelism              = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-        phases                   = @($phaseTimings)
-        shards                   = @($shardTimings | Sort-Object name)
+        phases                   = $phaseTimings.ToImmutable()
+        shards                   = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($shardTimings.ToImmutable() | Sort-Object { $_.name }))
         workerMethods            = $workerMethodTimings
         packageLayoutMethods     = $packageLayoutMethodTimings
-        scheduler                = [ordered]@{
-            workerMethods            = @(
-                $priorMethodMilliseconds.GetEnumerator() |
-                    ForEach-Object {
-                        [pscustomobject]@{
-                            name                = [string]$_.Key
-                            elapsedMilliseconds = [long]$_.Value
-                        }
-                    } | Sort-Object name)
-                packageLayoutMethods = @(
-                    $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
-                        ForEach-Object {
-                            [pscustomobject]@{
-                                name                = [string]$_.Key
-                                elapsedMilliseconds = [long]$_.Value
-                            }
-                        } | Sort-Object name)
-                    filters          = @(
-                        $priorFilterMilliseconds.GetEnumerator() |
+        scheduler                = ([ordered]@{
+                workerMethods            = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                        $priorMethodMilliseconds.GetEnumerator() |
                             ForEach-Object {
-                                [pscustomobject]@{
-                                    filter              = [string]$_.Key
+                                ([ordered]@{
+                                    name                = [string]$_.Key
                                     elapsedMilliseconds = [long]$_.Value
-                                }
-                            } | Sort-Object filter)
-                    }
-                } | ConvertTo-Json -Depth 5 |
+                                }).AsReadOnly()
+                            } | Sort-Object { $_.name }))
+                    packageLayoutMethods = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                            $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
+                                ForEach-Object {
+                                    ([ordered]@{
+                                        name                = [string]$_.Key
+                                        elapsedMilliseconds = [long]$_.Value
+                                    }).AsReadOnly()
+                                } | Sort-Object { $_.name }))
+                        filters          = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                                $priorFilterMilliseconds.GetEnumerator() |
+                                    ForEach-Object {
+                                        ([ordered]@{
+                                            filter              = [string]$_.Key
+                                            elapsedMilliseconds = [long]$_.Value
+                                        }).AsReadOnly()
+                                    } | Sort-Object { $_.filter }))
+                        }).AsReadOnly()
+                }).AsReadOnly() | ConvertTo-Json -Depth 5 |
                     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 
-    if ($failures.Count -ne 0) {
+    $failures = $failureBuilder.ToImmutable()
+    if ($failures.Length -ne 0) {
         throw "Package test shards failed:`n$($failures -join "`n")"
     }
     if (-not $Quiet) {

@@ -17,7 +17,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeMetadataShadowRequiresTests
 {
-    private static readonly bool[] SuccessfulObservation = [true];
+    private static readonly ImmutableArray<bool> SuccessfulObservation = [true];
     [TestCase("Positive", "int", "value + 1", "0", 1, false)]
     [TestCase("Positive", "int", "value + 1", "1", 2, true)]
     [TestCase("InRange(1, 10)", "int", "value + 1", "0", 1, false)]
@@ -55,7 +55,7 @@ public sealed class NativeMetadataShadowRequiresTests
         var (execution, observations) = Execute(native, callerType, callerInput);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(result)));
-        Assert.That(observations, Is.EqualTo(new[] { predicate }));
+        Assert.That(observations, Is.EqualTo(ImmutableArray.Create(predicate)));
         var runtimeInput = int.Parse(callerInput!, CultureInfo.InvariantCulture);
         Assert.That(subject.RootMethod.Invoke(null, [runtimeInput]), Is.EqualTo(result));
         Assert.That(JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest), Is.EqualTo(baseline));
@@ -97,7 +97,7 @@ public sealed class NativeMetadataShadowRequiresTests
         Assert.That(batch.Gaps, Is.Empty);
         var detached = Decode(batch.Callers.Single().Body, references);
         var (execution, observed) = Execute(detached.Body, "int", input);
-        Assert.That(observed, Has.Count.EqualTo(observations));
+        Assert.That(observed, Has.Length.EqualTo(observations));
         Assert.That(execution.Status, Is.EqualTo(returns ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
         if (returns)
         { Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(7))); }
@@ -137,7 +137,7 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(mode);
         using var directory = new TempDirectory("sharpproof-native-metadata-invalid-");
         var path = Path.Combine(directory.FullName, "MetadataTarget.dll");
-        File.WriteAllBytes(path, MetadataClosedAttributeEvidenceTests.CreateImage(mode));
+        File.WriteAllBytes(path, MetadataClosedAttributeEvidenceTests.CreateImage(mode).AsSpan());
         var compilation = CSharpCompilation.Create("MalformedShadowCaller",
             [CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int value) => MetadataTarget.Read(value, value); }",
                 path: "Subject.cs")],
@@ -181,28 +181,29 @@ public sealed class NativeMetadataShadowRequiresTests
             Is.EqualTo(JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(ordinary))));
     }
 
-    private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(CSharpCompilation compilation)
     { System.ArgumentNullException.ThrowIfNull(compilation, nameof(compilation)); return CompilerCompilationCapture.CaptureReferences(compilation.References, CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken); }
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation,
-        CompilerReferenceSnapshot[]? references, bool enabled)
+        ImmutableArray<CompilerReferenceSnapshot>? references, bool enabled)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enabled);
     }
 
-    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
+    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new System.ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(body);
         var artifact = CompilerTotalCallableArtifactCodec.Encode(body)!;
         var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(artifact))!;
         return CompilerDecodedShadowBody.Decode(body.CallableId, detached, TestContext.CurrentContext.CancellationToken, references);
     }
 
-    private static (IrProgramExecutionResult Execution, List<bool> Observations) Execute(
+    private static (IrProgramExecutionResult Execution, ImmutableArray<bool> Observations) Execute(
         CompilerTotalCallablePreparation body, string type, string? input)
     {
         System.ArgumentNullException.ThrowIfNull(body);
@@ -211,16 +212,16 @@ public sealed class NativeMetadataShadowRequiresTests
         var entry = body.Parameters.Single().Entry;
         var value = type == "string" ? input == null ? factory.CreateNullValue(factory.StringType) : factory.CreateStringValue(input) :
             factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, long.Parse(input!, CultureInfo.InvariantCulture));
-        var observations = new List<bool>();
-        var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToHashSet();
+        var observations = ImmutableArray.CreateBuilder<bool>();
+        var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
         var options = new IrProgramReplayOptions(static _ => null)
         {
             AssignmentObserver = (instruction, assigned, _) =>
             { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (markers.Contains(instruction.Id)) { observations.Add(assigned.Boolean); } }
         };
-        var execution = new IrProgramInterpreter(factory).Execute(body.Program, new Dictionary<IrVarId, IrValue> { [entry] = value }, 10000, options);
+        var execution = new IrProgramInterpreter(factory).Execute(body.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value), 10000, options);
         Assert.That(execution.ConsumedApproximation, Is.False);
-        return (execution, observations);
+        return (execution, observations.ToImmutable());
     }
 
     private static async Task AssertOutcome(CompilerDecodedShadowBody detached, bool proven)

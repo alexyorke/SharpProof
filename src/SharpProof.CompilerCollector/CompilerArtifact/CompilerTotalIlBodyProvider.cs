@@ -8,12 +8,12 @@ using System.Reflection.PortableExecutable;
 #pragma warning disable RS1035
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, CompilerReferenceSnapshot[]? references)
+internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot>? references)
 {
     private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
-    private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
-    private CompilerReferenceSnapshot[]? _capturedReferences = references;
+    private readonly ImmutableDictionary<string, ImmutableArray<byte>>.Builder _images = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, TotalIlBody?>.Builder _bodies = ImmutableDictionary.CreateBuilder<string, TotalIlBody?>(StringComparer.Ordinal);
+    private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references is { IsDefault: true } ? throw new ArgumentNullException(nameof(references)) : references ?? default;
 
     internal TotalIlBody? Resolve(IMethodSymbol method, CancellationToken cancellationToken)
     {
@@ -68,7 +68,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                     (method.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || method.GetDeclarativeSecurityAttributes().Count != 0)
                 { return false; }
                 var body = pe.GetMethodBody(method.RelativeVirtualAddress);
-                var code = body.GetILBytes() ?? Array.Empty<byte>();
+                var code = body.GetILBytes()?.ToImmutableArray() ?? ImmutableArray<byte>.Empty;
                 if (!body.ExceptionRegions.IsEmpty || !body.LocalSignature.IsNil || code.Length is 0 or > 4096 ||
                     code[code.Length - 1] != 0x2a || code.Take(code.Length - 1).Any(opcode => opcode != 0x00))
                 { return false; }
@@ -82,8 +82,11 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         if (!_resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name, cancellationToken,
                 out var reference, out var backing, out var path) || _resolution.Resolve(reference) is not IAssemblySymbol assembly)
         { return null; }
-        _capturedReferences ??= CompilerCompilationCapture.CaptureReferences(compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
+        if (_capturedReferences.IsDefault)
+        {
+            _capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
+        }
         var authority = _capturedReferences.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).FirstOrDefault(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path)));
         if (authority == null || authority.SizeBytes <= 0 || authority.SizeBytes > CompilerReferenceLimits.MaximumModuleBytes)
@@ -93,15 +96,15 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (stream.Length != authority.SizeBytes)
             { return null; }
-            bytes = new byte[(int)stream.Length];
-            FillExactly(stream, bytes, cancellationToken);
-            using var buffer = new MemoryStream(bytes, writable: false);
+            var input = new byte[(int)stream.Length];
+            FillExactly(stream, input, cancellationToken);
+            using var buffer = new MemoryStream(input, writable: false);
             if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
             { return null; }
+            bytes = input.ToImmutableArray();
             _images.Add(path, bytes);
         }
-        using var immutableImage = new MemoryStream(bytes, writable: false);
-        using var pe = new PEReader(immutableImage);
+        using var pe = new PEReader(bytes);
         if (!pe.HasMetadata || pe.PEHeaders.CorHeader is not { } corHeader ||
             (corHeader.Flags & CorFlags.ILOnly) == 0 ||
             (corHeader.Flags & (CorFlags.Requires32Bit | CorFlags.NativeEntryPoint)) != 0 ||
@@ -176,7 +179,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         paired = [];
         if (clauses.IsDefault || evidence.IsDefault || clauses.Length != evidence.Length || clauses.Length > 1024)
         { return false; }
-        var consumed = new HashSet<int>();
+        var consumed = ImmutableHashSet.CreateBuilder<int>();
         var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
         foreach (var clause in clauses)
         {
@@ -187,7 +190,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             var matches = evidence.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParameterOrdinal == clause.ParameterOrdinal &&
                 row.AttributeIdentity == attributeIdentity && row.ConstructorIdentity == constructorIdentity &&
                 row.Kind == kind && row.Minimum == clause.Validation.Minimum && row.Maximum == clause.Validation.Maximum))
-                .Take(2).ToArray();
+                .Take(2).ToImmutableArray();
             if (matches.Length != 1 || !consumed.Add(matches[0].AttributeToken))
             { return false; }
             result.Add(matches[0].WithClauseOrdinal(result.Count));
@@ -215,12 +218,12 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         // Reject oversized/unexpected keys before allocating a byte array.
         if (key.Length != expectedKey.Length || hasPublicKey && expectedKey.IsEmpty)
         { return false; }
-        var bytes = key.ReadBytes(key.Length);
+        var bytes = key.ReadBytes(key.Length).ToImmutableArray();
         if (!bytes.SequenceEqual(expectedKey))
         { return false; }
         identity = new(reader.GetString(assembly.Name), assembly.Version,
             assembly.Culture.IsNil ? null : reader.GetString(assembly.Culture),
-            ImmutableArray.CreateRange(bytes), hasPublicKey, isRetargetable, contentType);
+            bytes, hasPublicKey, isRetargetable, contentType);
         return true;
     }
 
@@ -235,9 +238,9 @@ internal readonly record struct CompilerIlToken(int Offset, string RawCode, long
 // Decodes scalar IL representation; provider admission remains unchanged.
 internal static class CompilerScalarIlDecoder
 {
-    private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+    private static readonly ImmutableDictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode))).Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
     internal static bool Candidate(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -251,7 +254,7 @@ internal static class CompilerScalarIlDecoder
             (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
             !CompilerMetadataResolution.IsReferenceAssembly(method.ContainingAssembly) &&
             !method.GetAttributes().Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
-                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices")));
+                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, ["System", "Runtime", "InteropServices"])));
     }
 
     internal static unsafe bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,
@@ -364,7 +367,7 @@ internal static class CompilerScalarIlDecoder
         ImmutableArray<TotalIlInstruction>.Builder decoded)
     {
         decoded = RepositoryParameterGuard.NotNull(decoded, nameof(decoded));
-        var offsets = decoded.Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Offset, index))).ToDictionary(item => item.Offset, item => item.index);
+        var offsets = ImmutableDictionaryCapture.Create(decoded.Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Offset, index))), item => item.Offset, item => item.index);
         for (var index = 0; index < decoded.Count; index++)
         {
             var instruction = decoded[index];

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -27,13 +28,13 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CapturedPrimaryConstructorStorageAuditTests
 {
-    private static readonly Dictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
 
-    private static readonly Case[] s_cases =
+    private static readonly ImmutableArray<Case> s_cases =
     [
         new("captured-simple-assignment",
             "using SharpProof.Attributes; public sealed class Counter(int value) { [EnforcePure] public void Reset() { value = 0; } public int Peek() => value; }",
@@ -88,26 +89,26 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
             Language = parseOptions.LanguageVersion.ToString(),
-            Symbols = parseOptions.PreprocessorSymbolNames.ToArray(),
+            Symbols = parseOptions.PreprocessorSymbolNames.ToImmutableArray(),
             Optimization = compilation.Options.OptimizationLevel.ToString(),
-            Diagnostics = compilerDiagnostics.Select(DiagnosticObservation).ToArray(),
-            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = compilerDiagnostics.Select(DiagnosticObservation).ToImmutableArray(),
+            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             emission.Success
         });
         Assert.That(string.Equals(sourceHash, subject.SourceHash, StringComparison.OrdinalIgnoreCase), Is.True);
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
         Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
 
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == subject.Method));
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = model.GetOperation(syntax)!;
-        var operations = Walk(operation).ToArray();
-        var parameters = operations.OfType<IParameterReferenceOperation>().ToArray();
+        var operations = Walk(operation).ToImmutableArray();
+        var parameters = operations.OfType<IParameterReferenceOperation>().ToImmutableArray();
         var canonicalAttribute = compilation.GetTypeByMetadataName("SharpProof.Attributes.EnforcePureAttribute")!;
         var attribute = target.GetAttributes().Single();
         var attributeSyntax = (AttributeSyntax)(await attribute.ApplicationSyntaxReference!.GetSyntaxAsync());
@@ -133,9 +134,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 OwnerKind = ((IMethodSymbol)reference.Parameter.ContainingSymbol).MethodKind.ToString(),
                 OwnedByTarget = SymbolEqualityComparer.Default.Equals(reference.Parameter.ContainingSymbol, target),
                 Span = new { reference.Syntax.Span.Start, reference.Syntax.Span.Length }
-            })).ToArray(),
+            })).ToImmutableArray(),
             StorageOperations = operations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item is ISimpleAssignmentOperation or ICompoundAssignmentOperation or
-                IIncrementOrDecrementOperation)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind.ToString())).ToArray()
+                IIncrementOrDecrementOperation)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind.ToString())).ToImmutableArray()
         });
         using (Assert.EnterMultipleScope())
         {
@@ -170,7 +171,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             SameReleaseCompilation = true,
             TypedCalls = caseIndex == 4 ? "Closed Action<int>; caller scalar stays unchanged" :
                 caseIndex == 3 ? "Closed Func<int> Read" : "Closed Action Reset and closed Func<int> Peek",
@@ -181,18 +182,24 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
 
         var manifestPath = Path.Combine(evidence, "public-compiler-manifest.json");
         Assert.That(File.Exists(manifestPath), Is.False);
-        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        ImmutableArray<(string Key, string Value)> optionEntries =
+        [
+            ("build_property._SharpProofCompilerManifestPath", manifestPath),
+            ("build_property._SharpProofCompilationTargetFramework", "net9.0"),
+            ("build_property._SharpProofProjectDirectory", evidence),
+            ("build_property.SharpProofVerifyMaximumExpressionDepth", WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture)),
+            ("build_property.SharpProofProfile", "advisory"),
+            ("build_property.SharpProofFeatures", "all"),
+            ("build_property.SharpProofVerifyPolicy", "advisory"),
+            ("build_property.SharpProofAssumptionPolicy", "allow")
+        ];
+        var optionsBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in optionEntries)
         {
-            ["build_property._SharpProofCompilerManifestPath"] = manifestPath,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net9.0",
-            ["build_property._SharpProofProjectDirectory"] = evidence,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture),
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow"
-        };
-        await Save(evidence, "collector-options.json", options);
+            optionsBuilder[key] = value;
+        }
+        var options = optionsBuilder.ToImmutable();
+        await SaveOptions(evidence, optionEntries);
         var analyzerOptions = new AnalyzerOptions([], new OptionsProvider(options));
         var collectorDiagnostics = await compilation.WithAnalyzers([new FinalCompilationCollectorAnalyzer()], analyzerOptions)
             .GetAnalyzerDiagnosticsAsync();
@@ -201,13 +208,13 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             FreshRequestedPath = manifestPath,
             OutputExists = outputExists,
-            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             InfrastructureFailures = collectorDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0049"))
-                .Select(DiagnosticObservation).ToArray(),
+                .Select(DiagnosticObservation).ToImmutableArray(),
             DownstreamStarted = outputExists
         });
         if (!outputExists)
@@ -222,8 +229,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
 
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes);
+        artifact = project.Artifact;
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
         var preparation = project.Snapshot.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == callableId));
         var native = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -233,14 +241,14 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var nativeWrites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToArray() ?? [];
+            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
-            ArtifactSha256 = Hash(artifactBytes),
+            ArtifactSha256 = Hash(artifactBytes.AsSpan()),
             project.Request.CompilerManifest.Sha256,
             ArtifactDigest = project.Bind().ArtifactDigest,
             CacheEnabled = project.Request.Cache.Enabled,
@@ -262,8 +270,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Receiver = write.Target?.ToString(),
                 Field = write.Field?.ToString(),
                 Value = write.Value?.ToString()
-            })).ToArray(),
-            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToArray(),
+            })).ToImmutableArray(),
+            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
@@ -274,7 +282,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
             {
                 item.ClaimId,
@@ -283,14 +291,14 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome.ToString()
         });
         using (Assert.EnterMultipleScope())
         {
             Assert.That(collectorDiagnostics, Is.Empty);
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Bind().ArtifactDigest));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Request.CompilerManifest.Sha256));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Bind().ArtifactDigest));
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(JsonSerializer.Serialize(project.Request.Budgets), Is.EqualTo(JsonSerializer.Serialize(new WorkerBudgets())));
             Assert.That(validation.IsValid, Is.True, JsonSerializer.Serialize(validation.Errors));
@@ -368,11 +376,14 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private static RuntimeObservation ObserveRuntime(byte[] bytes, string methodName, int caseIndex)
+    private static RuntimeObservation ObserveRuntime(ImmutableArray<byte> bytes, string methodName, int caseIndex)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(methodName);
-        using var stream = new MemoryStream(bytes);
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         var context = new AssemblyLoadContext("CapturedStorage_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -380,7 +391,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             var constructor = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
             var instance = constructor.Invoke(caseIndex < 4 ? [1] : []);
             var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
-            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly).ToImmutableArray();
             if (caseIndex == 5)
             { fields.Single().SetValue(instance, 1); }
             Delegate execute;
@@ -392,7 +403,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             {
                 var reset = method.CreateDelegate<Action<int>>(instance);
                 execute = reset;
-                var callerValue = 1;
+                const int callerValue = 1;
                 before = callerValue;
                 reset(callerValue);
                 after = callerValue;
@@ -416,8 +427,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 reset();
                 after = peek();
             }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var field = fields.SingleOrDefault();
             return new(before, after, returned, type.Module.ModuleVersionId, metadata.GetGuid(metadata.GetModuleDefinition().Mvid),
@@ -497,17 +507,19 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private static IlObservation DecodeIl(MethodBase method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodBase method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(method);
-        var body = method.GetMethodBody()!.GetILAsByteArray()!;
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -521,27 +533,28 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 OperandType.ShortInlineI or OperandType.ShortInlineVar or OperandType.ShortInlineBrTarget => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body.AsSpan((offset)..)),
                 _ => 4
             };
-            FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
+            FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body.AsSpan((offset)..))) : null;
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset..(offset + size))),
                 field?.MetadataToken, field?.Module.ModuleVersionId, field?.DeclaringType?.FullName, field?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), [.. instructions]);
+        return new(method.MetadataToken, Convert.ToHexStringLower(body.AsSpan()), instructions.ToImmutable());
     }
 
     private static IEnumerable<IOperation> Walk(IOperation operation)
     {
         System.ArgumentNullException.ThrowIfNull(operation);
-        var pending = new Stack<IOperation>();
-        pending.Push(operation);
-        while (pending.TryPop(out var current))
+        var pending = ImmutableStack<IOperation>.Empty.Push(operation);
+        while (!pending.IsEmpty)
         {
+            var current = pending.Peek();
+            pending = pending.Pop();
             yield return current;
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
     }
 
@@ -559,9 +572,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans hash the empty payload */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
 
@@ -573,7 +585,27 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         await File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value));
     }
 
-    private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
+    private static async Task SaveOptions(string directory, ImmutableArray<(string Key, string Value)> entries)
+    {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        if (entries.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(entries));
+        }
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var (key, value) in entries)
+            {
+                writer.WriteString(key, value);
+            }
+            writer.WriteEndObject();
+        }
+        await File.WriteAllBytesAsync(Path.Combine(directory, "collector-options.json"), stream.ToArray());
+    }
+
+    private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
         public override AnalyzerConfigOptions GlobalOptions => _options;
@@ -591,9 +623,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    private sealed class DictionaryOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))
@@ -618,10 +650,10 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, string Bytes, IlInstruction[] Instructions)
+    private sealed record IlObservation(int MethodToken, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public IlInstruction[] Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(int Before, int After, int? Returned, Guid LoadedMvid, Guid PeMvid,
         bool HasTypeInitializer, int StaticFieldCount, int InstanceFieldCount, string? FieldName, int? FieldToken,

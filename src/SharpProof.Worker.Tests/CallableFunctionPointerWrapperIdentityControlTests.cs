@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -52,7 +53,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
             """)], allowUnsafe: true);
         TestCompilation.AssertNoErrors(compilation);
         var methods = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target")
-            .OfType<IMethodSymbol>().ToArray();
+            .OfType<IMethodSymbol>().ToImmutableArray();
         foreach (var method in methods)
         {
             TestContext.Out.WriteLine($"wrapper={wrapper}; generic={generic}; parameter={method.Parameters[0].Type}; referenceId={DocumentationCommentId.CreateReferenceId(method.Parameters[0].Type)}; callableId={SemanticClaimIdentity.CreateCallableId(method)}");
@@ -70,7 +71,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
             Assert.That(WorkerProtocolJson.ValidateManifest(discovery.Manifest).IsValid, Is.True);
         }
         var expectedTotalIds = wrapperKind is 3 or 4
-            ? discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).ToHashSet(StringComparer.Ordinal)
+            ? discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).ToImmutableHashSet(StringComparer.Ordinal)
             : null;
         AssertUnsupportedArtifactRoundTrip(compilation, discovery, expectedTotalIds);
     }
@@ -140,7 +141,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
     {
         var argument = generic ? "T" : "int";
         var pointer = $"delegate*<{argument},int>";
-        string[] types = [pointer, pointer + "*", pointer + "[]", pointer + "[][]", pointer + "[,]",
+        ImmutableArray<string> types = [pointer, pointer + "*", pointer + "[]", pointer + "[][]", pointer + "[,]",
             $"System.Collections.Generic.List<{pointer}[]>", $"System.Collections.Generic.LinkedList<{pointer}[]>",
             $"Box<{pointer}[]>.Inner"];
         var genericParameters = generic ? "<T>" : string.Empty;
@@ -170,14 +171,14 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
         }
         var expectedTotalIds = discovery.Targets.Values
             .Where(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Parameters[0].Type is INamedTypeSymbol))
-            .Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId)).ToHashSet(StringComparer.Ordinal);
+            .Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId)).ToImmutableHashSet(StringComparer.Ordinal);
         Assert.That(expectedTotalIds, Has.Count.EqualTo(3));
         AssertUnsupportedArtifactRoundTrip(compilation, discovery, expectedTotalIds);
     }
 
     private static void AssertUnsupportedArtifactRoundTrip(
         CSharpCompilation compilation, ClaimManifestBuildResult discovery,
-        HashSet<string>? expectedTotalIds = null)
+        ImmutableHashSet<string>? expectedTotalIds = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(discovery);

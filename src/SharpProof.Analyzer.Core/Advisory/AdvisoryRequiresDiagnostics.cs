@@ -18,13 +18,16 @@ internal static class AdvisoryRequiresDiagnostics
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         if (session.Compilation is not CSharpCompilation compilation)
         { return AnalyzerSemanticOutcome.NotApplicable; }
-        var reported = new HashSet<(Location Location, string Message)>();
+        var reported = ImmutableHashSet.CreateBuilder<(Location Location, string Message)>();
         var report = reportDiagnostic;
         reportDiagnostic = diagnostic =>
         {
             diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
-            if (reported.Add((diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture))))
-            { report(diagnostic); }
+            var identity = (diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            if (reported.Add(identity))
+            {
+                report(diagnostic);
+            }
         };
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
         foreach (var local in declaration.DescendantNodes().OfType<LocalFunctionStatementSyntax>())
@@ -88,25 +91,26 @@ internal static class AdvisoryRequiresDiagnostics
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        var variables = new HashSet<IrVarId>();
-        var terms = new Stack<IrTerm>();
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var terms = ImmutableStack<IrTerm>.Empty;
         foreach (var instruction in program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
         {
             variables.UnionWith(IrInstructionFacts.WrittenVariables(instruction));
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))
-            { terms.Push(term); }
+            { terms = terms.Push(term); }
         }
-        var visited = new HashSet<IrId>();
-        while (terms.Count != 0)
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
+        while (!terms.IsEmpty)
         {
-            var term = terms.Pop();
+            var term = terms.Peek();
+            terms = terms.Pop();
             if (!visited.Add(term.Id))
             { continue; }
             if (term is IrVariableTerm variable)
             { variables.Add(variable.Variable); }
-            IrTraversal.PushChildren(term, terms);
+            terms = IrTraversal.PushChildren(term, terms);
         }
-        return [.. variables.OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
+        return [.. variables.ToImmutable().OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 
     // The marker names its callee by identity. The call-site syntax can bind
@@ -117,7 +121,7 @@ internal static class AdvisoryRequiresDiagnostics
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        var candidates = new List<IMethodSymbol>();
+        var candidates = ImmutableArray.CreateBuilder<IMethodSymbol>();
         if (location.SourceTree is { } tree)
         {
             var node = tree.GetRoot(cancellationToken).FindNode(location.SourceSpan, getInnermostNodeForTie: true);
@@ -140,7 +144,7 @@ internal static class AdvisoryRequiresDiagnostics
             candidates.AddRange(DocumentationCommentId.GetSymbolsForDeclarationId(identity.Substring(separator + 2), compilation)
                 .OfType<IMethodSymbol>());
         }
-        foreach (var method in candidates)
+        foreach (var method in candidates.ToImmutable())
         {
             if (string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method), identity, StringComparison.Ordinal) ||
                 string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method.OriginalDefinition), identity, StringComparison.Ordinal))

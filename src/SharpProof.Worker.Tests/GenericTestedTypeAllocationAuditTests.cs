@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -47,7 +48,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
         var evidenceDirectory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "generic-type-values-audit");
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), Source);
-        var compilation = TestCompilation.Create("GenericTestedTypeAllocationOracle", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypeAllocationOracle", [("Subject.cs", Source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -55,7 +56,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericTestedTypeAllocationOracle", isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         CaseObservation control;
         try
         {
@@ -65,8 +66,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
             var interfaceTarget = generic.MakeGenericMethod(typeof(int), typeof(IComparable)).CreateDelegate<Func<int, bool>>();
             var stringTarget = generic.MakeGenericMethod(typeof(int), typeof(string)).CreateDelegate<Func<int, bool>>();
             var controlTarget = subject.GetMethod("Control")!.CreateDelegate<Func<int, bool>>();
-            var il = generic.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = generic.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             cases =
             [
                 Measure("int/object", objectTarget, expected: true),
@@ -90,7 +91,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 NoInlining = noInlining,
                 HasBox = hasBox,
                 HasIsinst = hasIsinst,
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
                 Control = control,
@@ -119,6 +120,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await Save(evidenceDirectory, "native-observations.json", new
@@ -126,7 +128,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToImmutableArray(),
             Cases = cases,
             Control = control,
             AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.AllocatedBytes > 0)),
@@ -166,14 +168,13 @@ public sealed class GenericTestedTypeAllocationAuditTests
         return new(name, expected, actual, trueResults, allocated, allocated / (double)MeasurementCount);
     }
 
-    private static IlInstruction[] ReadIl(byte[] bytes)
+    private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
             .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-        var instructions = new List<IlInstruction>();
+            .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
             var offset = position;
@@ -189,13 +190,13 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, position),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.Slice(position, sizeof(int))),
                 _ => 4
             };
-            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.AsSpan(position, operandSize))));
+            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.Slice(position, operandSize))));
             position += operandSize;
         }
-        return [.. instructions];
+        return instructions.ToImmutable();
     }
 
     private static Task Save(string directory, string name, object value)

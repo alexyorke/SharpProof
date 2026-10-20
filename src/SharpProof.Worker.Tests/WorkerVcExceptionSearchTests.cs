@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -140,10 +141,13 @@ public sealed class WorkerVcExceptionSearchTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             Assert.That(response.Errors, Is.Empty);
-            var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-                .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            var ordinals = ImmutableDictionaryCapture.Create(
+                response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)),
+                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal),
+                StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
+            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts[1].Model, Is.Not.Empty);
             Assert.That(posts[0].Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)),
                 Is.EqualTo(kind == "assume"));
@@ -157,13 +161,13 @@ public sealed class WorkerVcExceptionSearchTests
     public void OptionalRegionEvidencePreservesLegacyGraphAndRows(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var compilation = TestCompilation.Create("RegionLegacyPreservation", ("Subject.cs", Source(kind)));
+        var compilation = TestCompilation.CreateExact("RegionLegacyPreservation", [("Subject.cs", Source(kind))]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
+        { withTotal = withTotal with { Total = null }; }
         Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }
@@ -178,11 +182,32 @@ public sealed class WorkerVcExceptionSearchTests
         var total = artifact.Callables.Single().Total!;
         var graph = total.Graph;
         if (mutation == "naked-exit")
-        { graph.Entry = Array.FindIndex(graph.Blocks, block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit)); }
+        {
+            {
+                graph = graph with { Entry = PortableGraphChanges.FindIndex(graph.Blocks, block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit)) };
+                {
+                    total = total with { Graph = graph };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
+            }
+        }
         else if (mutation == "result-role")
-        { total.Result = total.Parameters[0].Old; }
+        {
+            {
+                total = total with { Result = total.Parameters[0].Old };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         else
-        { graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).B = graph.Blocks.Length; }
+        {
+            {
+                graph = graph.ReplaceRow(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)), graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)) with { B = graph.Blocks.Length });
+                {
+                    total = total with { Graph = graph };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
+            }
+        }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -233,7 +258,7 @@ public sealed class WorkerVcExceptionSearchTests
         var factory = total.Program.Factory;
         var input = total.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 0)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(replay.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         var span = factory.GetOperationInfo(replay.Instruction!.Operation).SourceSpan!;

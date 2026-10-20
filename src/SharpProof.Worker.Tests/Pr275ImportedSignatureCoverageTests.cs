@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Contracts;
@@ -69,7 +70,7 @@ public sealed class Pr275ImportedSignatureCoverageTests
         var emission = producer.Emit(image);
         Assert.That(emission.Success, Is.True,
             string.Join(Environment.NewLine, emission.Diagnostics));
-        var reference = MetadataReference.CreateFromImage(image.ToArray());
+        var reference = MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
 
         return TestCompilation.Create("Pr275ImportedConsumer", "public sealed class Consumer { }")
             .AddReferences(reference);

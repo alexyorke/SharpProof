@@ -34,7 +34,7 @@ public sealed class ConditionalCustomModifierIdentityTests
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var consumer = TestCompilation.Create("ModifierIdentityConsumer", "public class Consumer { }",
                 includeSharpProofReference: false)
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)))));
         TestCompilation.AssertNoErrors(consumer);
         var subject = consumer.GetTypeByMetadataName("ModifierSubject")!;
         Assert.That(subject, Is.Not.Null);
@@ -50,14 +50,13 @@ public sealed class ConditionalCustomModifierIdentityTests
         AssertModifier(readOnly, false, "System.Runtime.InteropServices.InAttribute");
         AssertModifier(optional, true, "System.Runtime.CompilerServices.CallConvSuppressGCTransition");
         Assert.That(empty, Is.Empty);
-        var modifiers = new Dictionary<string, ImmutableArray<CustomModifier>>(StringComparer.Ordinal)
-        {
-            ["empty"] = empty,
-            ["init"] = init,
-            ["otherInit"] = otherInit,
-            ["readonly"] = readOnly,
-            ["optional"] = optional
-        };
+        var modifierBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<CustomModifier>>(StringComparer.Ordinal);
+        modifierBuilder["empty"] = empty;
+        modifierBuilder["init"] = init;
+        modifierBuilder["otherInit"] = otherInit;
+        modifierBuilder["readonly"] = readOnly;
+        modifierBuilder["optional"] = optional;
+        var modifiers = modifierBuilder.ToImmutable();
 
         var actual = ConditionalMethodIdentityPolicy.SameModifiers(modifiers[leftKey], modifiers[rightKey]);
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Worker.Test;
@@ -28,7 +29,7 @@ public sealed class GoldenHarnessTests
         var fixture = GoldenTest.Load("worker", "sample", copy.FullName);
         using var environment = new GoldenEnvironment("1", original.FullName);
         GoldenTest.Compare(fixture, "changed\r\n");
-        Assert.That(File.ReadAllBytes(Expected(original)), Is.EqualTo("changed\n"u8.ToArray()));
+        Assert.That(File.ReadAllBytes(Expected(original)), Is.EqualTo("changed\n"u8.ToImmutableArray()));
         Assert.That(File.ReadAllText(Expected(copy)), Is.EqualTo("old\n"));
         Assert.That(File.ReadAllText(Source(original)), Is.EqualTo("class Subject { }\n"));
         Assert.That(Directory.GetFiles(Path.GetDirectoryName(Expected(original))!), Has.Length.EqualTo(2));
@@ -86,7 +87,7 @@ public sealed class GoldenHarnessTests
     {
         using var copy = CreateRepository();
         File.WriteAllText(Path.Combine(Path.GetDirectoryName(Expected(copy))!, "orphan.expected"), "old\n");
-        Assert.Throws<InvalidDataException>((Action)(() => GoldenTest.Cases("worker", copy.FullName).ToArray()));
+        Assert.Throws<InvalidDataException>((Action)(() => GoldenTest.Cases("worker", copy.FullName).ToImmutableArray()));
     }
 
     [Test]

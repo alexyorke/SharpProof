@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -41,7 +42,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             }
         }
         """;
-    private static readonly string[] Forms = ["fixed-object", "fixed-IComparable", "fixed-IComparable-int"];
+    private static readonly ImmutableArray<string> Forms = ["fixed-object", "fixed-IComparable", "fixed-IComparable-int"];
 
     [Test]
     public async Task FixedTestedTypesMatchSampledPreservationAndAllocationImplication()
@@ -55,11 +56,12 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             "fixed-tested-type-readiness", "observations", runLabel!);
         Assert.That(Directory.Exists(evidenceDirectory), Is.False, "Preserve every previous observation run.");
         Directory.CreateDirectory(evidenceDirectory);
-        var observations = new List<BoundaryObservation>();
+        var observationBuilder = ImmutableArray.CreateBuilder<BoundaryObservation>();
         foreach (var form in Forms)
         {
-            observations.Add(await ObserveForm(form, evidenceDirectory));
+            observationBuilder.Add(await ObserveForm(form, evidenceDirectory));
         }
+        var observations = observationBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             foreach (var observation in observations)
@@ -88,7 +90,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen fixed-type subject changed.");
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, form + "-subject.cs"), source);
-        var compilation = TestCompilation.Create("GenericFixedTestedType_" + form, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericFixedTestedType_" + form, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -96,7 +98,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericFixedTestedType_" + form, isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         try
         {
             var subject = runtime.LoadFromStream(image).GetType("Subject")!;
@@ -105,8 +107,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             cases = ObserveCases(form, target, control);
             var flags = target.GetMethodImplementationFlags();
             var controlFlags = control.GetMethodImplementationFlags();
-            var il = target.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = target.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             await Save(evidenceDirectory, form + "-runtime.json", new
             {
                 Form = form,
@@ -125,7 +127,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
                 HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
                 HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
                 TieredCompilation = Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"),
@@ -156,6 +158,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await Save(evidenceDirectory, form + "-native.json", new
@@ -171,13 +174,13 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Cases = cases,
             AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0)),
             AllFourObservedZero = cases.All(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes == 0)),
@@ -194,7 +197,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         return new(form, cases, claim.Outcome, claim.Reason);
     }
 
-    private static CaseObservation[] ObserveCases(string form, MethodInfo target, MethodInfo control)
+    private static ImmutableArray<CaseObservation> ObserveCases(string form, MethodInfo target, MethodInfo control)
     {
         System.ArgumentNullException.ThrowIfNull(control);
         System.ArgumentNullException.ThrowIfNull(form);
@@ -274,14 +277,13 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         };
     }
 
-    private static IlInstruction[] ReadIl(byte[] bytes)
+    private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
             .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-        var instructions = new List<IlInstruction>();
+            .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
             var offset = position;
@@ -297,13 +299,13 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, position),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.Slice(position, sizeof(int))),
                 _ => 4
             };
-            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.AsSpan(position, operandSize))));
+            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.Slice(position, operandSize))));
             position += operandSize;
         }
-        return [.. instructions];
+        return instructions.ToImmutable();
     }
 
     private static Task Save(string directory, string name, object value)
@@ -314,10 +316,10 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
-    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
+    private sealed record BoundaryObservation(string Boundary, ImmutableArray<CaseObservation> Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
     {
         public string Boundary { get; init; } = Boundary ?? throw new System.ArgumentNullException(nameof(Boundary));
-        public CaseObservation[] Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+        public ImmutableArray<CaseObservation> Cases { get; init; } = Cases.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Cases)) : Cases;
     }
 
     private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control)

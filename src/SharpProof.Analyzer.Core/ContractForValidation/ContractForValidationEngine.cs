@@ -15,27 +15,32 @@ internal static class ContractForValidationEngine
             return [];
         }
 
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        void Report(Diagnostic diagnostic)
+        {
+            diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
+            diagnostics.Add(diagnostic);
+        }
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
             foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                diagnostics.Add(Diagnostic.Create(
+                Report(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget,
                     ContractForCompanionValidator.GetSourceLocation(
                         candidate, compilation, Location.None),
                     candidate.Name));
             }
-            return Order(diagnostics);
+            return Order(diagnostics.ToImmutable());
         }
 
         var companions = ResolveCompanions(
             contractFor,
             compilation,
             candidates,
-            diagnostics,
+            Report,
             includeTree,
             cancellationToken);
         var relationships = ContractForSymbolMatcher
@@ -48,10 +53,10 @@ internal static class ContractForValidationEngine
         foreach (var companion in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (ContractForCompanionValidator.ValidateRelationship(
+            if (ContractForCompanionValidator.ReportRelationship(
                     companion,
                     relationships,
-                    diagnostics))
+                    Report))
             {
                 accepted.Add(companion);
             }
@@ -68,22 +73,22 @@ internal static class ContractForValidationEngine
             cancellationToken.ThrowIfCancellationRequested();
             if (!overlapping.Contains(companion))
             {
-                ContractForCompanionValidator.Validate(
+                ContractForCompanionValidator.ReportValidation(
                     companion,
                     compilation,
                     clauses,
-                    diagnostics,
+                    Report,
                     cancellationToken);
                 continue;
             }
-            diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
+            Report(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
 
         // Metadata companions participate in overlap detection, but analyzer
         // diagnostics may only point into the compilation being analyzed. The
         // source participant above is the actionable location for the group.
-        return Order(diagnostics);
+        return Order(diagnostics.ToImmutable());
     }
 
     internal static ImmutableArray<INamedTypeSymbol> FindCandidates(
@@ -123,7 +128,7 @@ internal static class ContractForValidationEngine
                 }
             }
         }
-        return candidates.Distinct(
+        return candidates.ToImmutable().Distinct(
                 (IEqualityComparer<INamedTypeSymbol>)
                     SymbolEqualityComparer.Default)
             .ToImmutableArray();
@@ -144,7 +149,7 @@ internal static class ContractForValidationEngine
                 StringComparer.Ordinal)];
     }
 
-    private static HashSet<ResolvedCompanion> FindOverlappingCompanions(
+    private static ImmutableHashSet<ResolvedCompanion> FindOverlappingCompanions(
         ImmutableArray<ResolvedCompanion> companions,
         ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> discovered,
         CancellationToken cancellationToken)
@@ -153,7 +158,7 @@ internal static class ContractForValidationEngine
 
         RepositoryParameterGuard.ThrowIfInvalid(companions.IsDefault, nameof(companions));
         RepositoryParameterGuard.ThrowIfInvalid(discovered.IsDefault, nameof(discovered));
-        var overlapping = new HashSet<ResolvedCompanion>();
+        var overlapping = ImmutableHashSet.CreateBuilder<ResolvedCompanion>();
         foreach (var source in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -167,14 +172,14 @@ internal static class ContractForValidationEngine
                 overlapping.Add(source);
             }
         }
-        return overlapping;
+        return overlapping.ToImmutable();
     }
 
     private static ImmutableArray<ResolvedCompanion> ResolveCompanions(
         INamedTypeSymbol contractFor,
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
-        List<Diagnostic> diagnostics,
+        Action<Diagnostic> diagnostics,
         Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
@@ -200,7 +205,7 @@ internal static class ContractForValidationEngine
                         fallback,
                         cancellationToken)
                     : fallback;
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
@@ -213,7 +218,7 @@ internal static class ContractForValidationEngine
                 cancellationToken);
             if (!ContractForSymbolMatcher.TryGetTarget(attribute, out var target))
             {
-                diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
+                diagnostics(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
                     attributeLocation, companion.Name));
                 continue;
             }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -115,13 +116,13 @@ internal sealed class DefaultComparerValueReplayTests
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(primitive);
         var type = scenario == "wrong-type" ? factory.IntegerType : factory.ObjectType;
-        var arguments = scenario == "argument" ? new[] { factory.Integer(0) } : [];
+        ImmutableArray<IrTerm> arguments = scenario == "argument" ? [factory.Integer(0)] : [];
         var member = factory.GetOrCreateMember(factory.CreateIdentity(),
             scenario == "declaring-type" ? factory.StringType : type,
             scenario == "unowned" ? "ordinary" : IrOpaqueCallSite.DefaultComparerValuePrefix + primitive,
             type, scenario != "instance", [.. arguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Type)]);
         var receiver = scenario == "instance" ? factory.Null(type) : null;
-        return scenario == "impure" ? factory.ImpureOpaque(factory.CreateOperation("ordinary"), member, receiver, arguments) :
-            factory.PureOpaque(member, receiver, arguments);
+        return scenario == "impure" ? factory.ImpureOpaque(factory.CreateOperation("ordinary"), member, receiver, arguments.ToArray()) :
+            factory.PureOpaque(member, receiver, arguments.ToArray());
     }
 }

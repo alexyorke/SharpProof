@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -10,7 +10,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
 {
-    private static readonly string[] RefusalDiagnosticIds = ["SP0047", "SP0047", "SPCF0007"];
+    private static readonly ImmutableArray<string> RefusalDiagnosticIds = ["SP0047", "SP0047", "SPCF0007"];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -79,22 +79,22 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         Assert.That(referencedAssembly.Name, Is.EqualTo("PublicDriverTreeDependency"));
 
         var analyzer = new SharpProofAnalyzer();
-        var exceptions = new ConcurrentQueue<string>();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
             new AnalyzerOptions([], new OptionsProvider()),
-            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
+            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); lock (exceptions) { exceptions.Add(exception.ToString()); } },
             concurrentAnalysis: true, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: true));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
         var diagnostics = await driver.GetAnalyzerDiagnosticsAsync();
         TestContext.WriteLine(string.Join(Environment.NewLine, diagnostics));
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         if (sharedTree)
         {
             Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EquivalentTo(RefusalDiagnosticIds));
             var companionDiagnostics = diagnostics.Where(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree))).ToArray();
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree))).ToImmutableArray();
             Assert.That(companionDiagnostics, Has.Length.EqualTo(2));
             foreach (var diagnostic in companionDiagnostics)
             {

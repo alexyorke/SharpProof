@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -48,12 +49,12 @@ public sealed class IteratorRootAdmissionControlTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True);
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
         var context = new AssemblyLoadContext("IteratorRootControl_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var runtimeImage = new MemoryStream(bytes);
+            using var runtimeImage = new MemoryStream(bytes.ToArray(), writable: false);
             var method = context.LoadFromStream(runtimeImage).GetType("Subject")!.GetMethod("Target")!;
             Delegate target = referenceReturn ? method.CreateDelegate<Func<IEnumerable<int>?>>() : method.CreateDelegate<Func<int>>();
             for (var repeat = 0; repeat < WarmupIterations; repeat++)
@@ -68,12 +69,11 @@ public sealed class IteratorRootAdmissionControlTests
             { Assert.That(s_sequence, Is.Null); }
             else
             { Assert.That(s_integer, Is.EqualTo(7)); }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var mvid = metadata.GetGuid(metadata.GetModuleDefinition().Mvid);
             var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
-            var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
+            var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!.ToImmutableArray();
             Assert.That(method.Module.ModuleVersionId, Is.EqualTo(mvid));
             Assert.That(target.Method.Module.ModuleVersionId, Is.EqualTo(mvid));
             Assert.That(target.Method.MetadataToken, Is.EqualTo(method.MetadataToken));
@@ -89,6 +89,7 @@ public sealed class IteratorRootAdmissionControlTests
             var artifact = CompilerManifestArtifactProducer.Create(compilation, evidence, "net9.0", WorkerFeatureSet.All,
                 new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+            artifact = project.Artifact;
             var preparation = project.Snapshot.Callables.Single();
             var claim = artifact.Manifest.Claims.Single();
             var effectClaim = preparation.EffectClaims.Single();
@@ -98,10 +99,10 @@ public sealed class IteratorRootAdmissionControlTests
             {
                 ReferenceReturn = referenceReturn,
                 SourceSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
-                PeSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                PeSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan())),
                 Compiler = typeof(CSharpCompilation).Assembly.FullName,
                 CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
-                Symbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToArray(),
+                Symbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
                 CallableId = callableId,
                 CanonicalAttribute = canonicalAttribute,
                 AttributePath = attributeSyntax.SyntaxTree.FilePath,
@@ -112,11 +113,11 @@ public sealed class IteratorRootAdmissionControlTests
                 EntryClaimIds = preparation.Entry.ClaimIds,
                 PreparedEffectClaimId = effectClaim.ClaimId,
                 PreparedEffectContractKind = effectClaim.ContractKind.ToString(),
-                ValidEffectClaimIds = preparation.Total?.ValidEffectClaimIds.ToArray(),
+                ValidEffectClaimIds = preparation.Total?.ValidEffectClaimIds,
                 EntryAssumptions = preparation.Entry.Assumptions,
-                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToArray(),
+                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToImmutableArray(),
                 CallPreconditionCount = preparation.Total?.CallPreconditions.Length,
-                NativeBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())).ToArray(),
+                NativeBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())).ToImmutableArray(),
                 EmptyStatements,
                 WarmupIterations,
                 MeasuredIterations,
@@ -125,7 +126,7 @@ public sealed class IteratorRootAdmissionControlTests
                 PeMvid = mvid,
                 MethodToken = method.MetadataToken,
                 DelegateMethodToken = target.Method.MetadataToken,
-                Il = Convert.ToHexStringLower(il),
+                Il = Convert.ToHexStringLower(il.AsSpan()),
                 CacheEnabled = project.Request.Cache.Enabled,
                 project.Request.Budgets,
                 HasTotal = preparation.Total != null,
@@ -149,10 +150,10 @@ public sealed class IteratorRootAdmissionControlTests
             Assert.That(claim.Location.Length, Is.EqualTo(attributeSyntax.Span.Length));
             Assert.That(effectClaim.ContractKind, Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
             Assert.That(effectClaim.ClaimId, Is.EqualTo(claim.ClaimId));
-            Assert.That(preparation.Entry.ClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(preparation.Entry.ClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
             Assert.That(preparation.Entry.Assumptions, Is.Empty);
             Assert.That(preparation.Total, Is.Not.Null);
-            Assert.That(preparation.Total!.ValidEffectClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(preparation.Total!.ValidEffectClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
             Assert.That(preparation.Total.Clauses, Is.Empty);
             Assert.That(preparation.Total.CallPreconditions, Is.Empty);
             Assert.That(native.BodyAssumptions, Is.Empty);

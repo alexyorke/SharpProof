@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -14,7 +15,7 @@ public sealed class FloatingClauseAdmissionCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(valueType);
         using var subject = TypedProgramSubject.Create("bool Target(" + valueType + " left, " + valueType + " right) => left == right;");
-        object[] arguments = valueType == "float" ? [1f, 1f] : valueType == "double" ? [1d, 1d] : [1, 1];
+        ImmutableArray<object> arguments = valueType == "float" ? [1f, 1f] : valueType == "double" ? [1d, 1d] : [1, 1];
         Assert.That(subject.Invoke(arguments), Is.True);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>().Single();

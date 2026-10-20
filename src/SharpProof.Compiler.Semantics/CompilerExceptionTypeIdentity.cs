@@ -13,9 +13,10 @@ internal static class CompilerExceptionTypeIdentity
         }
 
         var identity = CompilerIdentityBridge.CreateTypeDisplay(type);
-        var argumentAssemblies = new List<string>();
-        AddNamedTypeArgumentAssemblies(type, argumentAssemblies);
-        if (argumentAssemblies.Count == 0)
+        var argumentAssemblyBuilder = ImmutableArray.CreateBuilder<string>();
+        AddNamedTypeArgumentAssemblies(type, argumentAssemblyBuilder);
+        var argumentAssemblies = argumentAssemblyBuilder.ToImmutable();
+        if (argumentAssemblies.IsEmpty)
         {
             return identity;
         }
@@ -26,20 +27,20 @@ internal static class CompilerExceptionTypeIdentity
                 ":" + assembly))) + "]";
     }
 
-    internal static string[] EncodeHierarchy(INamedTypeSymbol? type)
+    internal static ImmutableArray<string> EncodeHierarchy(INamedTypeSymbol? type)
     {
-        var identities = new List<string>();
+        var identities = ImmutableArray.CreateBuilder<string>();
         for (var current = type; current != null; current = current.BaseType)
         {
             identities.Add(Encode(current));
         }
 
-        return [.. identities.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)];
+        return [.. identities.ToImmutable().OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)];
     }
 
     private static void AddNamedTypeArgumentAssemblies(
         INamedTypeSymbol type,
-        ICollection<string> identities)
+        ImmutableArray<string>.Builder identities)
     {
         identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
@@ -56,7 +57,7 @@ internal static class CompilerExceptionTypeIdentity
 
     private static void AddTypeAssemblyIdentities(
         ITypeSymbol type,
-        ICollection<string> identities)
+        ImmutableArray<string>.Builder identities)
     {
         identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
         type = RepositoryParameterGuard.NotNull(type, nameof(type));

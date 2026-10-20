@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -23,7 +24,7 @@ public sealed class NativeCallableKindTests
         var write = await NativeEffectSiteVerifier.VerifyPurityAsync(setter, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
-            foreach (var result in new[] { purity, allocations, exceptions })
+            foreach (var result in ImmutableArray.Create(purity, allocations, exceptions))
             { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
             Assert.That(write.Outcome, Is.TypeOf<RefutedOutcome>(), write.Reason.ToString());
         }
@@ -126,8 +127,9 @@ public sealed class NativeCallableKindTests
             : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome;
         if (preparation.EffectClaims.Length > 1)
         {
-            foreach (var result in new[] { await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken),
-                await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken) })
+            foreach (var result in ImmutableArray.Create(
+                await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken),
+                await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)))
             { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         }
         Assert.That(outcome switch { ProvenOutcome => "proven", RefutedOutcome => "refuted", _ => "unknown" }, Is.EqualTo(expected));

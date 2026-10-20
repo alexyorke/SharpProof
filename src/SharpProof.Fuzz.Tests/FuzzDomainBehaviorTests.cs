@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Frontend;
@@ -19,10 +20,7 @@ internal sealed class FuzzDomainBehaviorTests
             factory.Binary(IrBinaryOperator.Divide, factory.Integer(1),
                 factory.Variable(divisor)), factory.Integer(1));
         var atZero = new IrInterpreter(factory).Evaluate(formula,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [divisor] = factory.CreateIntegerValue(factory.IntegerType, 0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(divisor, factory.CreateIntegerValue(factory.IntegerType, 0)));
 
         Assert.That(atZero.Status, Is.EqualTo(expectedDefined
             ? IrEvaluationStatus.Value : IrEvaluationStatus.Exception));
@@ -39,13 +37,11 @@ internal sealed class FuzzDomainBehaviorTests
     {
         var complete = new FrontendSemanticEdgeCase("long", "long value", "value",
             [7L], FrontendSubsetDecision.Exact, FrontendAbstention.None);
-        var incompleteCases = new[]
-        {
+        var incompleteCases = ImmutableArray.Create(
             complete with { ReturnType = " " },
             complete with { Parameters = null! },
             complete with { Expression = " " },
-            complete with { Arguments = null! }
-        };
+            complete with { Arguments = null! });
 
         foreach (var incomplete in incompleteCases)
         {

@@ -18,26 +18,31 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private readonly IrFactory _factory = context.Factory;
     private readonly IrProgramBuilder? _builder = builder;
     private readonly IrBlockId _exceptionalExit = exceptionalExit;
-    internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; set; }
-    internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; set; }
-    internal Action? Spend { get; set; }
-    internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
+    internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; init; }
+    internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; init; }
+    internal Action? Spend { get; init; }
+    internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; init; }
 
-    internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; set; }
-    internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; set; }
-    internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; set; }
+    internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
+    internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
+    internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
+
+    // A constructor whose body only reads and writes its own fields initializes
+    // an object no caller can observe yet.
+    internal bool FreshReceiver { get; init; }
 
     // Shadow skeletons record call edges only; they never take opaque calls.
-    internal bool AllowOpaqueCalls { get; set; }
-    internal bool ShadowCallSkeleton { get; set; }
+    internal bool AllowObjectWidening { get; init; }
+    internal bool AllowOpaqueCalls { get; init; }
+    internal bool ShadowCallSkeleton { get; init; }
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
-    internal bool ApproximateElementReads { get; set; }
-    internal bool PinElementReads { get; set; }
+    internal bool ApproximateElementReads { get; init; }
+    internal bool PinElementReads { get; init; }
 
     // An API specification narrows what an opaque call may do.
-    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
+    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; init; }
 
     // `this` (or `base`) of a reference-type instance member is never null.
     internal bool IsImplicitThis(IOperation? instance)
@@ -113,7 +118,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     var condition = LowerClause(conditional.Condition, state, depth + 1);
                     var whenTrue = LowerClause(conditional.WhenTrue, state, depth + 1);
                     var otherwise = LowerClause(whenFalse, state, depth + 1);
-                    var classification = First(condition.Classification, whenTrue.Classification, otherwise.Classification);
+                    var classification = First([condition.Classification, whenTrue.Classification, otherwise.Classification]);
                     if (!classification.IsExact)
                     {
                         return Failed(operation, classification.Abstention);
@@ -144,7 +149,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 {
                     var left = LowerClause(concatenation.LeftOperand, state, depth + 1);
                     var right = LowerClause(concatenation.RightOperand, state, depth + 1);
-                    var classification = First(left.Classification, right.Classification);
+                    var classification = First([left.Classification, right.Classification]);
                     return classification.IsExact
                         ? new(CSharpOperationSemantics.StringConcat(_factory, left.Value, right.Value).Value,
                             And(left.SafeCondition, right.SafeCondition), classification)
@@ -283,16 +288,18 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
             CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
         {
-            var values = new IrTerm[exceptionCreation.Arguments.Length];
+            var argumentValues = ImmutableArray.CreateBuilder<IrTerm>(exceptionCreation.Arguments.Length);
+            argumentValues.Count = exceptionCreation.Arguments.Length;
             foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
             {
                 var lowered = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!lowered.Classification.IsExact)
                 { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
                 lowered = Pin(operation, lowered);
-                values[argument.Parameter!.Ordinal] = lowered.Value;
+                argumentValues[argument.Parameter!.Ordinal] = lowered.Value;
                 block = lowered.Continuation;
             }
+            var values = argumentValues.MoveToImmutable();
             // newobj allocates before the constructor executes. A callback
             // failure must not erase that already observable allocation.
             var allocated = AllocateValue(operation, block);
@@ -327,7 +334,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 ? new(_factory.Null(_context.Type(operation.Type)), block, FrontendSubsetClassification.Exact)
                 : AllocateValue(operation, block);
         }
-        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
+        if (depth < 256 && (AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
                 IsTryCast: false, OperatorMethod: null, Conversion.IsImplicit: true, Type.SpecialType: SpecialType.System_Object,
                 Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.Array
@@ -339,7 +346,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 ? new(_factory.Cast(_factory.ObjectType, operand.Value), operand.Continuation, operand.Classification)
                 : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
-        if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && CSharpOperationSemantics.ReferenceUpcast(operation) is { } upcast)
+        if (depth < 256 && (AllowObjectWidening || AllowOpaqueCalls) && CSharpOperationSemantics.ReferenceUpcast(operation) is { } upcast)
         {
             var operand = LowerBodyValue(upcast.Operand, block, depth + 1);
             return operand.Classification.IsExact
@@ -695,10 +702,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (operation.Parent != null && CSharpOperationSemantics.IdentityCastConcatenation(operation.Parent) != null &&
             CSharpOperationSemantics.IsConcatenationOperand(operation.Syntax))
         { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
-        var leaves = new List<IOperation>();
+        var leaves = ImmutableArray.CreateBuilder<IOperation>();
         Collect(operation, depth);
         var operands = ImmutableArray.CreateBuilder<IrTerm>();
-        var constant = new System.Text.StringBuilder();
+        var constant = ImmutableArray.CreateBuilder<string>();
         foreach (var leaf in leaves)
         {
             var value = LowerBodyValue(leaf, block, depth + 1);
@@ -710,7 +717,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 foreach (var part in value.ConcatenationOperands)
                 {
                     if (part is IrStringTerm textPart)
-                    { constant.Append(_factory.GetString(textPart.Value)); }
+                    { constant.Add(_factory.GetString(textPart.Value)); }
                     else
                     {
                         FlushConstant();
@@ -719,7 +726,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 }
             }
             else if (leaf.ConstantValue.HasValue && leaf.ConstantValue.Value is null or string)
-            { constant.Append(leaf.ConstantValue.Value as string); }
+            { if (leaf.ConstantValue.Value is string constantText) { constant.Add(constantText); } }
             else
             {
                 FlushConstant();
@@ -753,11 +760,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
         void FlushConstant()
         {
-            if (constant.Length != 0)
+            var text = string.Concat(constant.ToImmutable());
+            if (text.Length != 0)
             {
-                operands.Add(_factory.String(constant.ToString()));
-                constant.Clear();
+                operands.Add(_factory.String(text));
             }
+            constant.Clear();
         }
 
         void Collect(IOperation current, int nesting)
@@ -886,7 +894,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
-        var values = new IrTerm[arguments.Length + (assigned != null ? 1 : 0)];
+        var values = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned != null ? 1 : 0));
+        values.Count = arguments.Length + (assigned != null ? 1 : 0);
         foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
@@ -900,14 +909,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var lowered = LowerBodyValue(assigned, block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
-            values[values.Length - 1] = lowered.Value;
+            values[values.Count - 1] = lowered.Value;
             block = lowered.Continuation;
         }
         if (receiver != null && _context.SpecializeSourceType(instance!.Type) is { } receiverType &&
             (receiverType.IsReferenceType || receiverType is ITypeParameterSymbol { IsValueType: false }))
         { block = CheckReceiver(operation, receiver, block); }
         // A dispatched call may run an override the specification does not describe.
-        return EmitOpaqueCall(operation, method, values, block, assigned != null ? values[values.Length - 1] : null,
+        return EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
     }
 
@@ -919,7 +928,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         display = CompilerIdentityBridge.CreateSymbolDisplay(method);
-        return _factory.GetOrCreateMember(
+        return _factory.GetOrCreateMemberSnapshot(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + display, resultType ?? _context.Type(method.ReturnType), true,
             [.. arguments.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type))]);
@@ -928,10 +937,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // The call itself is only an effect site; its result and whether it
     // throws are approximation havocs, so no refutation may depend on them. An
     // assignment's value is the assigned one.
-    internal TotalBodyValue EmitOpaqueCall(IOperation operation, IMethodSymbol method, IrTerm[] values, IrBlockId block,
+    internal TotalBodyValue EmitOpaqueCall(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrBlockId block,
         IrTerm? assigned, IrOpaqueCallEffects effects)
     {
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
@@ -943,7 +952,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (CSharpOperationSemantics.IsComparisonIntegerType(primitive))
         { site = _factory.CreateOperation(IrOpaqueCallSite.DefaultComparerReplay(primitive!.SpecialType.ToString()), _factory.GetOperationInfo(site).SourceSpan); }
         var member = OpaqueCallMember(method, values, resultType, out var display);
-        _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
+        _builder!.CallSnapshot(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
         {
@@ -966,10 +975,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
     }
 
-    private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, IrTerm[] values, IrBlockId block)
+    private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return block; }
@@ -997,10 +1006,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return done;
     }
 
-    private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, IrTerm[] values, IrBlockId block)
+    private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var constructor = operation.Constructor!;
         if (CSharpOperationSemantics.ExceptionInitializationKind(constructor) is not { } kind)
@@ -1046,7 +1055,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             creation.Arguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter == null ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))))
         { return null; }
-        var values = new IrTerm[creation.Arguments.Length];
+        var values = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
+        values.Count = creation.Arguments.Length;
         foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
@@ -1057,13 +1067,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         // A rejected implicit source constructor may initialize its type before
         // any instance exists. Its unknown completion precedes allocation.
+        var valueSnapshot = values.ToImmutable();
         var deferAllocation = constructor.IsImplicitlyDeclared && !constructor.ContainingType.DeclaringSyntaxReferences.IsEmpty;
         var created = deferAllocation
             ? new TotalBodyValue(_factory.Boolean(true), block, FrontendSubsetClassification.Exact)
             : AllocateValue(creation, block);
-        var member = OpaqueCallMember(constructor, values, _factory.BooleanType, out var display);
+        var member = OpaqueCallMember(constructor, valueSnapshot, _factory.BooleanType, out var display);
         var effects = deferAllocation ? IrOpaqueCallEffects.All : OpaqueEffects?.Invoke(constructor) ?? IrOpaqueCallEffects.All;
-        _builder!.Call(created.Continuation, _context.OpaqueCallSite(creation, effects, display), null, member, null, values);
+        _builder!.CallSnapshot(created.Continuation, _context.OpaqueCallSite(creation, effects, display), null, member, null, valueSnapshot);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
         {
@@ -1078,7 +1089,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // Allocation establishes CLR zeroes before instance initialization. The
         // opaque constructor already includes that initialization, so its result
         // must not acquire default-field facts from this delayed allocation.
-        _builder.Call(deferred.Continuation, _context.OpaqueCallSite(creation, IrOpaqueCallEffects.Writes, display + ":initialized-state"), null, member, null, values);
+        _builder.CallSnapshot(deferred.Continuation, _context.OpaqueCallSite(creation, IrOpaqueCallEffects.Writes, display + ":initialized-state"), null, member, null, valueSnapshot);
         return deferred;
     }
 
@@ -1113,7 +1124,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (managedReceiver)
         { array = Pin(access.ArrayReference, array); }
         block = array.Continuation;
-        var indices = new List<IrTerm>();
+        var indices = ImmutableArray.CreateBuilder<IrTerm>();
         foreach (var index in access.Indices)
         {
             var lowered = LowerBodyValue(index, block, depth + 1);
@@ -1420,7 +1431,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return _context.FreshReceiver && IsImplicitThis(instance) ||
+        return FreshReceiver && IsImplicitThis(instance) ||
             instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
             ? _context.FreshWriteSite(operation) : _context.Site(operation);
     }
@@ -1437,13 +1448,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         if (!CSharpOperationSemantics.IsStringEqualsCall(invocation.TargetMethod) || invocation.Arguments.Length != 2)
         { return null; }
-        var arguments = new GuardedExpression[2];
+        var arguments = ImmutableArray.CreateBuilder<GuardedExpression>(2);
+        arguments.Count = 2;
         foreach (var argument in invocation.Arguments)
         {
             var parameter = argument.Parameter ?? throw new InvalidOperationException("A string equality argument has no parameter.");
             arguments[parameter.Ordinal] = LowerClause(argument.Value, state, depth + 1);
         }
-        var classification = First(arguments[0].Classification, arguments[1].Classification);
+        var classification = First([arguments[0].Classification, arguments[1].Classification]);
         return classification.IsExact
             ? new(_factory.Binary(IrBinaryOperator.StringEquals, arguments[0].Value, arguments[1].Value),
                 And(arguments[0].SafeCondition, arguments[1].SafeCondition), classification)
@@ -1457,7 +1469,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
-        var classification = First(receiver.Classification, argument.Classification);
+        var classification = First([receiver.Classification, argument.Classification]);
         if (!classification.IsExact)
         { return Failed(operation, classification.Abstention); }
         var safe = And(receiver.SafeCondition, argument.SafeCondition);
@@ -1521,7 +1533,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (model.StringConcatenation && CSharpOperationSemantics.IsConcatenationOperand(invocation.Syntax))
         { return Approximate(invocation, block, FrontendAbstention.UnsupportedOperationKind); }
-        var arguments = new IrTerm[model.ParameterCount];
+        var arguments = ImmutableArray.CreateBuilder<IrTerm>(model.ParameterCount);
+        arguments.Count = model.ParameterCount;
         foreach (var argument in invocation.Arguments)
         {
             var lowered = LowerBodyValue(argument.Value, block, depth + 1);
@@ -1531,10 +1544,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             arguments[parameter.Ordinal] = lowered.Value;
             block = lowered.Continuation;
         }
-        RecordScalarEffects(invocation, invocation.TargetMethod, model, [.. arguments], block);
-        var rule = model.Apply([.. arguments]);
+        var boundArguments = arguments.ToImmutable();
+        RecordScalarEffects(invocation, invocation.TargetMethod, model, boundArguments, block);
+        var rule = model.Apply(boundArguments);
         if (model.StringConcatenation && rule.Classification.IsExact)
-        { return CaptureStringConcatenation(invocation, [.. arguments], block); }
+        { return CaptureStringConcatenation(invocation, boundArguments, block); }
         return ApplyClassifiedRule(invocation, rule, block);
     }
 
@@ -1559,7 +1573,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
 
         var member = OpaqueCallMember(method, arguments, null, out var display);
-        _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
+        _builder!.CallSnapshot(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, arguments);
     }
 
     // The runtime rejects an array longer than its maximum element count with
@@ -1686,7 +1700,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         var second = LowerBodyValue(whenFalse, falseBlock, depth + 1);
         _builder.Assign(second.Continuation, site, target, second.Value);
         _builder.Goto(second.Continuation, site, join);
-        return new(_factory.Variable(target), join, First(first.Classification, second.Classification));
+        return new(_factory.Variable(target), join, First([first.Classification, second.Classification]));
     }
 
     private TotalBodyValue Increment(IIncrementOrDecrementOperation operation, IrVarId target, IrBlockId block)
@@ -1899,9 +1913,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return _factory.Unary(IrUnaryOperator.Not, value);
     }
-    private static FrontendSubsetClassification First(params FrontendSubsetClassification[] classifications)
+    private static FrontendSubsetClassification First(ImmutableArray<FrontendSubsetClassification> classifications)
     {
-        classifications = RepositoryParameterGuard.NotNull(classifications, nameof(classifications));
+        RepositoryParameterGuard.RequireInitialized(classifications.IsDefault, nameof(classifications), "Array must be initialized.");
         return classifications.FirstOrDefault(value => !value.IsExact).Decision == FrontendSubsetDecision.ClosedAbstention
             ? classifications.First(value => !value.IsExact) : FrontendSubsetClassification.Exact;
     }

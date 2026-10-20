@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -38,10 +39,10 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
     private sealed class RecordingFactory(CSharpCompilation compilation)
         : AnalyzerSessionFactoryBase<MethodOutcomeKey>(MethodOutcomeKeyComparer.Instance)
     {
-        private CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
+        private readonly CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
         internal int RecordCount { get; private set; }
 
-        internal AnalyzerSemanticOutcome[] Snapshot()
+        internal ImmutableArray<AnalyzerSemanticOutcome> Snapshot()
         {
             return [.. Outcomes.Values];
         }

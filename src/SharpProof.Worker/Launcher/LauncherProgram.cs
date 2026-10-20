@@ -33,18 +33,19 @@ internal static class Program
             return 125;
         }
         using var cancellation = new ConsoleCancellationScope();
-        return await RunMain(args, verify: null, validatePreflight: null,
+        cancellation.Token.ThrowIfCancellationRequested();
+        return await RunMain(args.ToImmutableArray(), verify: null, validatePreflight: null,
             cancellation.Token).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
-        string[] args,
+        ImmutableArray<string> args,
         Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify,
         Action<LauncherArguments>? validatePreflight,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        args = ArgumentNullGuard.NotNull(args, nameof(args));
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Log.Error(
@@ -60,7 +61,7 @@ internal static class Program
         WorkerVerifyRequest request;
         var operationStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         CompilerManifestArtifact artifact;
-        byte[] artifactBytes;
+        ImmutableArray<byte> artifactBytes;
         WorkerInputSnapshot preparedInput;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
@@ -228,9 +229,9 @@ internal static class Program
 
     internal static string ComputeExpectedInputHash(
         WorkerVerifyRequest request,
-        byte[] artifactBytes)
+        ImmutableArray<byte> artifactBytes)
     {
-        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
+        RepositoryParameterGuard.ThrowIfMissing(artifactBytes.IsDefault, nameof(artifactBytes));
         System.ArgumentNullException.ThrowIfNull(request);
         var identity = WorkerCacheIdentity.Current;
         return CompilerArtifactInputHash.Compute(
@@ -335,8 +336,11 @@ internal static class Program
         }
         var incompleteCount = response.CallableResults.Count(
             static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete));
-        var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
+        var callablesById = ImmutableDictionaryCapture.Create(
+            response.Manifest.Callables,
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
+            StringComparer.Ordinal);
         foreach (var result in response.CallableResults)
         {
             if (result.Coverage != WorkerCallableCoverage.Incomplete)
@@ -428,8 +432,11 @@ internal static class Program
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
-        var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
+        var callablesById = ImmutableDictionaryCapture.Create(
+            response.Manifest.Callables,
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
+            StringComparer.Ordinal);
         var reported = false;
         foreach (var result in response.CallableResults)
         {
@@ -437,7 +444,7 @@ internal static class Program
                 .Where(static assumption =>
                     assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind is WorkerAssumptionKind.UserAssume or
                         WorkerAssumptionKind.TrustedBoundary))
-                .ToArray();
+                .ToImmutableArray();
             if (assumptions.Length == 0)
             {
                 continue;
@@ -487,19 +494,19 @@ internal static class Program
     // leases through invocation validation.
     internal static async Task PublishOutputsAsync(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
+        CompilerManifestArtifact artifact, ImmutableArray<byte> artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
         WorkerVerifyResponse response, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
+        RepositoryParameterGuard.ThrowIfMissing(artifactBytes.IsDefault, nameof(artifactBytes));
         if (arguments.PublishRequestPath == null)
         {
             return;
         }
         var members = PublicationLease.ValidateMembers(
-            new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
+            ImmutableArray.Create(arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath)
                 .Where(path => path != null)!);
-        if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
+        if (members.Intersect(ImmutableArray.Create(arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath)
             .Select(PublicationLease.CanonicalMember), PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
@@ -510,8 +517,8 @@ internal static class Program
             arguments.TerminationGraceMilliseconds));
         using var lease = await PublicationLease.AcquireAsync(members, publicationDeadline.Token).ConfigureAwait(false);
 
-        request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        request = request with { CompilerManifest = request.CompilerManifest with { Path = arguments.PublishCompilerManifestPath! } };
+        response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) };
         if (!WorkerProtocolJson.ValidateForRequest(
                 response, response.RequestHash, expectedInputHash,
                 artifact.Manifest, request,
@@ -604,7 +611,7 @@ internal static class Program
             return;
         }
 
-        if (response is not
+        if (response is null || response.CallableResults.IsDefault || response.ClaimResults.IsDefault || response.Errors.IsDefault || response is not
             {
                 RunStatus: WorkerRunStatus.TimedOut,
                 FailureReason: WorkerRunFailureReason.None,
@@ -674,18 +681,18 @@ internal sealed partial class LauncherArguments
     internal const int MaximumCompilerManifestBytes =
         CompilerManifestArtifactFile.MaximumBytes;
 
-    private readonly IReadOnlyDictionary<string, string> _values;
+    private readonly ImmutableDictionary<string, string> _values;
 
-    private LauncherArguments(IReadOnlyDictionary<string, string> values)
+    private LauncherArguments(ImmutableDictionary<string, string> values)
     {
         System.ArgumentNullException.ThrowIfNull(values);
         _values = values;
     }
 
-    internal static bool TryParse(string[] args, out LauncherArguments arguments)
+    internal static bool TryParse(ImmutableArray<string> args, out LauncherArguments arguments)
     {
         arguments = null!;
-        args = ArgumentNullGuard.NotNull(args, nameof(args));
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         if (args.Length < 3 ||
             !string.Equals(
                 args[0],
@@ -696,7 +703,7 @@ internal sealed partial class LauncherArguments
             return false;
         }
 
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         for (var index = 1; index < args.Length; index += 2)
         {
             var key = args[index];
@@ -724,18 +731,18 @@ internal sealed partial class LauncherArguments
             return false;
         }
 
-        arguments = new LauncherArguments(values);
+        arguments = new LauncherArguments(values.ToImmutable());
         return true;
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes, CancellationToken cancellationToken)
+        out CompilerManifestArtifact artifact, out ImmutableArray<byte> artifactBytes, CancellationToken cancellationToken)
     {
         return CreateRequest(out artifact, out artifactBytes, out _, cancellationToken);
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes,
+        out CompilerManifestArtifact artifact, out ImmutableArray<byte> artifactBytes,
         out WorkerInputSnapshot preparedInput, CancellationToken cancellationToken)
     {
         ValidateDistinctPaths(
@@ -757,10 +764,11 @@ internal sealed partial class LauncherArguments
 
     internal void ValidateDistinctPaths(string? cacheDirectory = null)
     {
-        var outputs = new string?[]
-        {
+        ImmutableArray<string?> outputCandidates =
+        [
             RequestPath, ResultPath, PublishRequestPath, PublishResultPath, PublishCompilerManifestPath, PublishSarifPath
-        }.OfType<string>().ToArray();
+        ];
+        var outputs = outputCandidates.OfType<string>().ToImmutableArray();
         PublicationPaths.ValidateWorkerRuntime(outputs, typeof(Program).Assembly.Location);
         PublicationPaths.ValidateWorkerRuntime(outputs, OptionalFullPath("worker"));
         if (Directory.Exists(ResultPath))
@@ -769,7 +777,7 @@ internal sealed partial class LauncherArguments
                 "The SharpProof result path must name a file.");
         }
 
-        string?[] candidates = [
+        ImmutableArray<string?> candidates = [
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
@@ -777,7 +785,7 @@ internal sealed partial class LauncherArguments
         // Linux reports canonical publication aliases through its structured
         // failure path; Windows rejects filesystem aliases during admission.
         var paths = candidates.OfType<string>().Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : (OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path)).ToArray();
+            path is null ? throw new System.ArgumentNullException(nameof(path)) : (OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path)).ToImmutableArray();
         if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
@@ -798,7 +806,7 @@ internal sealed partial class LauncherArguments
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
-        out ValidatedArtifact artifact, out byte[] bytes, CancellationToken cancellationToken)
+        out ValidatedArtifact artifact, out ImmutableArray<byte> bytes, CancellationToken cancellationToken)
     {
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path, cancellationToken);
@@ -806,7 +814,7 @@ internal sealed partial class LauncherArguments
         return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
-    internal static byte[] ReadCompilerManifest(string path, CancellationToken cancellationToken)
+    internal static ImmutableArray<byte> ReadCompilerManifest(string path, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, cancellationToken);

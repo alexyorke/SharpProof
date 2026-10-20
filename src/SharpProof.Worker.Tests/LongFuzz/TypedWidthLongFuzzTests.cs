@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
@@ -21,19 +22,19 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class TypedWidthLongFuzzTests
 {
     private const string Harness = "typed-width";
-    private sealed record GeneratedCase(string Name, string Source, object[][] Inputs, bool ExceptionClaim, bool ViolatedOnGrid)
+    private sealed record GeneratedCase(string Name, string Source, ImmutableArray<ImmutableArray<object>> Inputs, bool ExceptionClaim, bool ViolatedOnGrid)
     {
         public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
         public string Source { get; init; } = Source ?? throw new System.ArgumentNullException(nameof(Source));
-        public object[][] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ImmutableArray<ImmutableArray<object>> Inputs { get; init; } = Inputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
     }
     private sealed record Observation(int Normal, int Overflow, int Violations, string? Witness, string? Error);
 
     [Test]
     public async Task GeneratedWidthClaimsAgreeWithClrWitnesses()
     {
-        var core = Cases().ToArray();
-        var variableShifts = core.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.ExceptionClaim)).ToArray();
+        var core = Cases().ToImmutableArray();
+        var variableShifts = core.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.ExceptionClaim)).ToImmutableArray();
         var session = new LongFuzzSession(Harness, harnessIndex: 3, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
@@ -63,7 +64,7 @@ public sealed class TypedWidthLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(type);
         System.ArgumentNullException.ThrowIfNull(variant);
         var compilation = Compile(item.Source);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, item.Name,
@@ -97,6 +98,7 @@ public sealed class TypedWidthLongFuzzTests
         if (artifact.Callables.Single().Total is not null)
         { session.Count("admitted:" + family + ":" + type); }
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var protocol = WorkerProtocolJson.Validate(response);
@@ -109,7 +111,7 @@ public sealed class TypedWidthLongFuzzTests
             return;
         }
         var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, item.Name,
@@ -171,7 +173,7 @@ public sealed class TypedWidthLongFuzzTests
             {
                 try
                 {
-                    var result = method.Invoke(null, input);
+                    var result = method.Invoke(null, input.ToArray());
                     normal++;
                     if (!item.ExceptionClaim)
                     {
@@ -202,9 +204,10 @@ public sealed class TypedWidthLongFuzzTests
             normal + overflow == item.Inputs.Length ? null : "The CLR grid did not execute every input.");
     }
 
-    private static string FormatInput(object[] input)
+    private static string FormatInput(ImmutableArray<object> input)
     {
-        System.ArgumentNullException.ThrowIfNull(input, nameof(input));
+        if (input.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(input)); }
         return "input=" + string.Join(",", input.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value is char character
             ? ((int)character).ToString(CultureInfo.InvariantCulture)
             : Convert.ToString(value, CultureInfo.InvariantCulture))));
@@ -217,16 +220,16 @@ public sealed class TypedWidthLongFuzzTests
             var mask = type is "long" or "ulong" ? 63 : 31;
             foreach (var count in counts)
             {
-                foreach (var shift in new[] { "<<", ">>", ">>>" })
+                foreach (var shift in ImmutableArray.Create("<<", ">>", ">>>"))
                 {
                     var name = $"{type}/{shift}/{count}/masked";
                     yield return new GeneratedCase(name, ShiftSource(type, shift, count, mask, false),
-                        values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value, count })).ToArray(), false, false);
+                        values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ImmutableArray.Create<object>(value, count))).ToImmutableArray(), false, false);
                     if (count == mask)
                     {
                         name = $"{type}/{shift}/{count}/identity";
                         yield return new GeneratedCase(name, ShiftSource(type, shift, count, mask, true),
-                            values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value, count })).ToArray(), false, true);
+                            values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ImmutableArray.Create<object>(value, count))).ToImmutableArray(), false, true);
                     }
                 }
             }
@@ -236,17 +239,20 @@ public sealed class TypedWidthLongFuzzTests
         { yield return item; }
     }
 
-    private static GeneratedCase SeedCase(GeneratedCase[] core, GeneratedCase[] variableShifts, int seed)
+    private static GeneratedCase SeedCase(ImmutableArray<GeneratedCase> core, ImmutableArray<GeneratedCase> variableShifts, int seed)
     {
         // Every 302 consecutive seeds cover the 167 pinned edge/cast shapes
         // and 135 distinct shift-count variants. The latter retain the same
         // low count bits while exercising both signs and high count bits.
-        System.ArgumentNullException.ThrowIfNull(variableShifts, nameof(variableShifts));
+        if (variableShifts.IsDefault)
+        { throw new ArgumentNullException(nameof(variableShifts)); }
+        if (core.IsDefault)
+        { throw new ArgumentNullException(nameof(core)); }
         var index = (int)((uint)seed % (uint)(core.Length + variableShifts.Length));
         if (index < core.Length)
         { return core[index]; }
         var template = variableShifts[index - core.Length];
-        var parts = template.Name.Split('/');
+        var parts = template.Name.Split('/').ToImmutableArray();
         var type = parts[0];
         var shift = parts[1];
         var baseCount = int.Parse(parts[2], CultureInfo.InvariantCulture);
@@ -260,11 +266,11 @@ public sealed class TypedWidthLongFuzzTests
         {
             Name = name,
             Source = ShiftSource(type, shift, count, mask, identity),
-            Inputs = template.Inputs.Select(input => input is null ? throw new System.ArgumentNullException(nameof(input)) : (new object[] { input[0], count })).ToArray()
+            Inputs = template.Inputs.Select(input => input.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(input)) : (ImmutableArray.Create<object>(input[0], count))).ToImmutableArray()
         };
     }
 
-    private static IEnumerable<(string Type, int[] Counts, object[] Values)> ShiftTypes()
+    private static IEnumerable<(string Type, ImmutableArray<int> Counts, ImmutableArray<object> Values)> ShiftTypes()
     {
         yield return ("sbyte", [31, 32, 63, 64], [(sbyte)-128, (sbyte)-1, (sbyte)0, (sbyte)1, (sbyte)127]);
         yield return ("byte", [31, 32, 63, 64], [(byte)0, (byte)1, (byte)0x7f, (byte)0x80, byte.MaxValue]);
@@ -281,7 +287,7 @@ public sealed class TypedWidthLongFuzzTests
     {
         foreach (var (target, targetMinimum, targetMaximum) in CastTargets())
         {
-            foreach (var source in new[] { "long", "ulong" })
+            foreach (var source in ImmutableArray.Create("long", "ulong"))
             {
                 if (source == target)
                 { continue; }
@@ -289,16 +295,16 @@ public sealed class TypedWidthLongFuzzTests
                 var sourceMaximum = source == "long" ? new BigInteger(long.MaxValue) : new BigInteger(ulong.MaxValue);
                 var minimum = BigInteger.Max(sourceMinimum, targetMinimum);
                 var maximum = BigInteger.Min(sourceMaximum, targetMaximum);
-                var boundary = new[] { minimum, minimum + 1, BigInteger.Zero, BigInteger.One, maximum - 1, maximum }
-                    .Where(value => value >= minimum && value <= maximum).Distinct().ToArray();
-                var outside = new[] { minimum - 1, maximum + 1 }
-                    .Where(value => value >= sourceMinimum && value <= sourceMaximum).ToArray();
+                var boundary = ImmutableArray.Create(minimum, minimum + 1, BigInteger.Zero, BigInteger.One, maximum - 1, maximum)
+                    .Where(value => value >= minimum && value <= maximum).Distinct().ToImmutableArray();
+                var outside = ImmutableArray.Create(minimum - 1, maximum + 1)
+                    .Where(value => value >= sourceMinimum && value <= sourceMaximum).ToImmutableArray();
                 Assert.That(outside, Is.Not.Empty, $"{source}->{target} needs an overflowing witness.");
-                object[] Box(IEnumerable<BigInteger> values)
+                ImmutableArray<object> Box(IEnumerable<BigInteger> values)
                 {
                     System.ArgumentNullException.ThrowIfNull(values);
                     return values.Select(value => source == "long" ?
-                        (object)(long)value : (ulong)value).ToArray();
+                        (object)(long)value : (ulong)value).ToImmutableArray();
                 }
                 var requires = source == "long"
                     ? "value >= " + minimum.ToString(CultureInfo.InvariantCulture) + "L && value <= " +
@@ -325,10 +331,11 @@ public sealed class TypedWidthLongFuzzTests
         yield return ("ulong", ulong.MinValue, ulong.MaxValue);
     }
 
-    private static GeneratedCase CastCase(string name, string sourceType, string target, string requires, object[] values,
+    private static GeneratedCase CastCase(string name, string sourceType, string target, string requires, ImmutableArray<object> values,
         bool violated)
     {
-        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        if (values.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(values)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(requires);
         System.ArgumentNullException.ThrowIfNull(sourceType);
@@ -344,7 +351,7 @@ public sealed class TypedWidthLongFuzzTests
                 }
             }
             """;
-        return new GeneratedCase(name, source, values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value })).ToArray(), true, violated);
+        return new GeneratedCase(name, source, values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ImmutableArray.Create<object>(value))).ToImmutableArray(), true, violated);
     }
 
     private static string ShiftSource(string type, string shift, int count, int mask, bool identity)

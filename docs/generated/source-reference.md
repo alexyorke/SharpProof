@@ -271,6 +271,7 @@ Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|alloca
 [Source](../../src/SharpProof.Fuzz/FuzzOptions.cs)
 
 ```text
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace SharpProof.Fuzz;
@@ -283,9 +284,9 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
     public const int MaximumAllowedParallelism = 4;
     public const int DefaultMaximumParallelism = MaximumAllowedParallelism;
 
-    public static FuzzOptions Parse(IReadOnlyList<string> arguments)
+    public static FuzzOptions Parse(ImmutableArray<string> arguments)
     {
-        if (arguments == null)
+        if (arguments.IsDefault)
         {
             throw new ArgumentNullException(nameof(arguments));
         }
@@ -294,7 +295,7 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
         var seed = DefaultSeed;
         var maximumParallelism = DefaultMaximumParallelism;
 
-        for (var index = 0; index < arguments.Count; index++)
+        for (var index = 0; index < arguments.Length; index++)
         {
             var argument = arguments[index];
             if (argument is "--help" or "-h")
@@ -302,7 +303,7 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
                 throw new FuzzUsageException("");
             }
 
-            if (index + 1 >= arguments.Count)
+            if (index + 1 >= arguments.Length)
             {
                 throw new FuzzUsageException("Missing value for " + argument + ".");
             }

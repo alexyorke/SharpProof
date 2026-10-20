@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
+using SharpProof.Ir;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 
@@ -31,9 +32,9 @@ internal static class NativeCorpusVerifier
         {
             var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0", WorkerFeatureSet.All,
                 discovery, WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken));
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken)).ToImmutableArray();
             var path = Path.Combine(directory.FullName, "compiler-manifest.json");
-            await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(path, bytes.AsMemory(), cancellationToken).ConfigureAwait(false);
             var request = new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
@@ -44,7 +45,7 @@ internal static class NativeCorpusVerifier
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
-            var results = response.ClaimResults.ToDictionary(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
+            var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal);
             return [.. discovery.Targets.Values
                 .Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (claimsByCallable[target.Entry.CallableId].Any()))
@@ -105,18 +106,19 @@ internal static class NativeCorpusVerifier
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), cancellationToken);
-        var methods = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
+        var methodBuilder = ImmutableDictionary.CreateBuilder<string, IMethodSymbol>(StringComparer.Ordinal);
         foreach (var tree in compilation.SyntaxTrees)
         {
             var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
             foreach (var declaration in (await tree.GetRootAsync(cancellationToken).ConfigureAwait(false)).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>())
             {
                 if (model.GetDeclaredSymbol(declaration, cancellationToken) is { } method)
-                { methods[SemanticClaimIdentity.CreateCallableId(method)] = method; }
+                { methodBuilder[SemanticClaimIdentity.CreateCallableId(method)] = method; }
             }
         }
+        var methods = methodBuilder.ToImmutable();
         var verdicts = ImmutableArray.CreateBuilder<NativeCorpusVerdict>();
         foreach (var caller in batch.Callers)
         {
@@ -126,7 +128,7 @@ internal static class NativeCorpusVerifier
                 ?? throw new InvalidOperationException("The shadow caller body cannot be encoded.");
             var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(caller.Body.CallableId,
                 encoded, cancellationToken);
-            var outcomes = new List<WorkerClaimOutcome>();
+            var outcomes = ImmutableArray.CreateBuilder<WorkerClaimOutcome>();
             if (PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(detached), out var plan, out _, cancellationToken))
             {
                 using var solver = new PassiveCallableSolver(plan!);
@@ -143,7 +145,7 @@ internal static class NativeCorpusVerifier
             var syntax = method.DeclaringSyntaxReferences.FirstOrDefault() is { } reference
                 ? await reference.GetSyntaxAsync(cancellationToken).ConfigureAwait(false) : null;
             verdicts.Add(new(syntax, method,
-                outcomes.Count == 0 ? WorkerClaimOutcome.Unknown : Combine(outcomes)));
+                outcomes.Count == 0 ? WorkerClaimOutcome.Unknown : Combine(outcomes.ToImmutable())));
         }
         return verdicts.ToImmutable();
     }
@@ -153,7 +155,7 @@ internal static class NativeCorpusVerifier
     private static WorkerClaimOutcome Combine(IEnumerable<WorkerClaimOutcome> outcomes)
     {
         System.ArgumentNullException.ThrowIfNull(outcomes);
-        var all = outcomes.ToArray();
+        var all = outcomes.ToImmutableArray();
         return all.Contains(WorkerClaimOutcome.Refuted) ? WorkerClaimOutcome.Refuted
             : all.All(static outcome => outcome == WorkerClaimOutcome.Proven) ? WorkerClaimOutcome.Proven
             : WorkerClaimOutcome.Unknown;

@@ -76,7 +76,7 @@ public sealed class FinalCompilationCollectorTests
             """).WithAssemblyName(cyclic ? "CyclicInitializerFixture" : "AcyclicInitializerFixture");
         var image = AnalyzerTestHost.EmitImage(compilation);
         Assert.That(image, Is.Not.Empty);
-        var runtimeAssembly = System.Reflection.Assembly.Load(image);
+        var runtimeAssembly = System.Reflection.Assembly.Load((image).ToArray());
         var runtimeRoot = runtimeAssembly.GetType("First", throwOnError: true)!
             .GetMethod("Root", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         object? runtimeResult = null;
@@ -106,7 +106,7 @@ public sealed class FinalCompilationCollectorTests
         var originalImage = EmitImage(dependencySource, "KindDependency", originalKind);
         var replacementImage = EmitImage(dependencySource, "KindDependency", replacementKind);
         var path = Path.Combine(workspace.Path, originalAssembly ? "KindDependency.dll" : "KindDependency.netmodule");
-        await File.WriteAllBytesAsync(path, originalImage);
+        await File.WriteAllBytesAsync(path, (originalImage).ToArray());
         var properties = new MetadataReferenceProperties(originalAssembly ? MetadataImageKind.Assembly : MetadataImageKind.Module);
         var reference = MetadataReference.CreateFromImage(originalImage, properties, filePath: path);
         var compilation = CreateCompilation("internal static class Subject { internal static int Root() => Dependency.Value; }")
@@ -125,7 +125,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(originalCapture.Modules[0].Mvid, Is.EqualTo(ReadMvid(path)));
             Assert.That(originalCapture.Modules[0].SizeBytes, Is.EqualTo(originalImage.Length));
         }
-        await File.WriteAllBytesAsync(path, replacementImage);
+        await File.WriteAllBytesAsync(path, (replacementImage).ToArray());
         var exception = Assert.Throws<InvalidDataException>((Action)(() =>
         {
             _ = CompilerCompilationCapture.CaptureReferences(
@@ -205,7 +205,7 @@ public sealed class FinalCompilationCollectorTests
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
-        await File.WriteAllBytesAsync(dependencyPath, image);
+        await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataEffectLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
@@ -240,7 +240,7 @@ public sealed class FinalCompilationCollectorTests
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -280,7 +280,7 @@ public sealed class FinalCompilationCollectorTests
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
-        await File.WriteAllBytesAsync(dependencyPath, image);
+        await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
@@ -350,7 +350,7 @@ public sealed class FinalCompilationCollectorTests
             var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
             var capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
-            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
+            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees.ToImmutableArray(), capturedReferences,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken), Is.Null);
             foreach (var location in discovery.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location))
                          .Append(target.Entry.Location))
@@ -383,7 +383,7 @@ public sealed class FinalCompilationCollectorTests
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
-        await File.WriteAllBytesAsync(dependencyPath, image);
+        await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
@@ -425,7 +425,7 @@ public sealed class FinalCompilationCollectorTests
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -464,7 +464,7 @@ public sealed class FinalCompilationCollectorTests
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
-        await File.WriteAllBytesAsync(dependencyPath, image);
+        await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
@@ -504,7 +504,7 @@ public sealed class FinalCompilationCollectorTests
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-only-location"),
             captureRawArtifact: true);
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -560,7 +560,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(implementation, Is.Not.Null);
         Assert.That(implementation!.GetReturnTypeAttributes().Select(static attribute =>
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath)),
-            Is.EqualTo(new[] { definitionPath, implementationPath }));
+            Is.EqualTo(ImmutableArray.Create(definitionPath, implementationPath)));
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", image, assembly =>
         {
@@ -578,7 +578,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence)),
                 Is.All.EqualTo(WorkerClaimEvidence.ReturnAttribute));
             Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)),
-                Is.EqualTo(new[] { definitionPath, implementationPath }.Order(StringComparer.Ordinal)));
+                Is.EqualTo(ImmutableArray.Create(definitionPath, implementationPath).Order(StringComparer.Ordinal)));
             Assert.That(prepared.FailureReason, Is.EqualTo(matchingPathOrder
                 ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
         }
@@ -606,7 +606,7 @@ public sealed class FinalCompilationCollectorTests
             }
             """).WithAssemblyName("MetadataReturnAttributeDependency");
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
-        await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+        await File.WriteAllBytesAsync(dependencyPath, (AnalyzerTestHost.EmitImage(dependency)).ToArray());
         var compilation = CreateCompilation(
             """
             using SharpProof.Attributes;
@@ -763,7 +763,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "ill-formed UTF-16");
             Assert.That(File.Exists(path), Is.False);
         }
@@ -789,7 +789,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(
                 diagnostics.FirstOrDefault()?.GetMessage(
                     CultureInfo.InvariantCulture) ?? string.Empty,
@@ -804,7 +804,7 @@ public sealed class FinalCompilationCollectorTests
         using var workspace = new CollectorWorkspace();
         var pairPath = workspace.SealPath("pair");
         var replacementPath = workspace.SealPath("replacement");
-        var prefix =
+        const string prefix =
             "using SharpProof.Attributes; internal static class Subject { " +
             "internal static string Identity(string value) { " +
             "Contract.Ensures(Contract.Result<string>() == \"";
@@ -996,7 +996,7 @@ public sealed class FinalCompilationCollectorTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(collectorDiagnostics, Is.Empty);
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -1031,21 +1031,21 @@ public sealed class FinalCompilationCollectorTests
             compilation,
             Options(path),
             additional);
-        var first = await File.ReadAllBytesAsync(path);
+        var first = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
         var secondDiagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             additional);
-        var second = await File.ReadAllBytesAsync(path);
+        var second = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            Encoding.UTF8.GetString(first), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Encoding.UTF8.GetString(first.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(firstDiagnostics, Is.Empty);
             Assert.That(secondDiagnostics, Is.Empty);
             Assert.That(second, Is.EqualTo(first));
-            Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
+            Assert.That(first.Take(3).ToImmutableArray(), Is.Not.EqualTo(ImmutableArray.Create<byte>(0xEF, 0xBB, 0xBF)));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
             Assert.That(
@@ -1113,12 +1113,12 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(baseline.CompilerDiagnostics, Is.Empty);
             Assert.That(warningLevel.CompilerDiagnostics, Is.Empty);
             Assert.That(
-                new[] { generalError, specificError, providerError },
+                ImmutableArray.Create(generalError, specificError, providerError),
                 Has.All.Matches<CompilerManifestArtifact>(artifact =>
                     artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (artifact.CompilerDiagnostics.Any(diagnostic =>
                         diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS0168")))));
             Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
-            Assert.That(new[] { generalError, specificError, providerError }.Select(Digest),
+            Assert.That(ImmutableArray.Create(generalError, specificError, providerError).Select(Digest),
                 Has.All.EqualTo(Digest(generalError)));
             Assert.That(Digest(generalError), Is.Not.EqualTo(Digest(baseline)));
             Assert.That(
@@ -1195,7 +1195,7 @@ public sealed class FinalCompilationCollectorTests
                     Column = mapped.StartLinePosition.Character + 1
                 };
             })
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(expected, Is.Not.Empty);
 
         var artifact = await EmitArtifact(
@@ -1212,7 +1212,7 @@ public sealed class FinalCompilationCollectorTests
                 diagnostic.Location.Path,
                 diagnostic.Location.Line,
                 diagnostic.Location.Column
-            })).ToArray();
+            })).ToImmutableArray();
 
         Assert.That(actual, Is.EquivalentTo(expected));
     }
@@ -1226,7 +1226,7 @@ public sealed class FinalCompilationCollectorTests
             CreateCompilation(),
             Options(workspace.Path));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
         Assert.That(
             diagnostics[0].DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -1268,7 +1268,7 @@ public sealed class FinalCompilationCollectorTests
                 workspace.SealPath("invalid-depth"),
                 maximumExpressionDepth: value));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
     }
 
     [TestCase(";dotnet.scalar")]
@@ -1281,16 +1281,16 @@ public sealed class FinalCompilationCollectorTests
         System.ArgumentNullException.ThrowIfNull(value);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("blank-specification-pack");
-        var options = Options(path);
+        var options = Options(path).ToBuilder();
         options[SpecificationPacksKey] = value;
 
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
-            options);
+            options.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -1299,12 +1299,12 @@ public sealed class FinalCompilationCollectorTests
     public async Task EmptyOrUnsetSpecificationPacksRemainNoPacksDefault()
     {
         using var workspace = new CollectorWorkspace();
-        string?[] values = [null, string.Empty, "   "];
+        ImmutableArray<string?> values = [null, string.Empty, "   "];
 
         for (var index = 0; index < values.Length; index++)
         {
             var path = workspace.SealPath("no-specification-packs-" + index);
-            var options = Options(path);
+            var options = Options(path).ToBuilder();
             if (values[index] != null)
             {
                 options[SpecificationPacksKey] = values[index]!;
@@ -1312,7 +1312,7 @@ public sealed class FinalCompilationCollectorTests
 
             var diagnostics = await AnalyzeCollectorAsync(
                 CreateCompilation(),
-                options);
+                options.ToImmutable());
 
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
@@ -1333,14 +1333,14 @@ public sealed class FinalCompilationCollectorTests
         var reference = compilation.References
             .OfType<PortableExecutableReference>()
             .First();
-        var image = await File.ReadAllBytesAsync(reference.FilePath!);
+        var image = (await File.ReadAllBytesAsync(reference.FilePath!)).ToImmutableArray();
         var inMemory = MetadataReference.CreateFromImage(image);
 
         var diagnostics = await AnalyzeCollectorAsync(
             compilation.ReplaceReference(reference, inMemory),
             Options(workspace.SealPath("in-memory")));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
     }
 
     [Test]
@@ -1354,7 +1354,7 @@ public sealed class FinalCompilationCollectorTests
             "internal static class VersionB { const int Value = 2; }",
             "TwinReference");
         var backingPath = Path.Combine(workspace.Path, "TwinReference.dll");
-        await File.WriteAllBytesAsync(backingPath, imageB);
+        await File.WriteAllBytesAsync(backingPath, (imageB).ToArray());
         var mismatched = MetadataReference.CreateFromImage(
             imageA,
             filePath: backingPath);
@@ -1366,7 +1366,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -1380,7 +1380,7 @@ public sealed class FinalCompilationCollectorTests
             "PatchedReference");
         var patched = PatchAscii(image, "OriginalMarker", "XriginalMarker");
         var backingPath = Path.Combine(workspace.Path, "PatchedReference.dll");
-        await File.WriteAllBytesAsync(backingPath, patched);
+        await File.WriteAllBytesAsync(backingPath, patched.ToArray());
         var mismatched = MetadataReference.CreateFromImage(
             image,
             filePath: backingPath);
@@ -1392,7 +1392,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -1412,8 +1412,8 @@ public sealed class FinalCompilationCollectorTests
             "public static class B { public static int Value => 2; }",
             "B",
             OutputKind.NetModule);
-        await File.WriteAllBytesAsync(firstPath, firstImage);
-        await File.WriteAllBytesAsync(secondPath, secondImage);
+        await File.WriteAllBytesAsync(firstPath, (firstImage).ToArray());
+        await File.WriteAllBytesAsync(secondPath, (secondImage).ToArray());
         var moduleProperties = new MetadataReferenceProperties(
             MetadataImageKind.Module);
         var firstReference = MetadataReference.CreateFromImage(
@@ -1431,7 +1431,7 @@ public sealed class FinalCompilationCollectorTests
                 firstReference,
                 secondReference);
         var manifestImage = AnalyzerTestHost.EmitImage(manifest);
-        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        await File.WriteAllBytesAsync(manifestPath, (manifestImage).ToArray());
         using var assemblyMetadata = AssemblyMetadata.Create(
             ModuleMetadata.CreateFromImage(manifestImage),
             ModuleMetadata.CreateFromImage(firstImage),
@@ -1456,19 +1456,19 @@ public sealed class FinalCompilationCollectorTests
                 Is.EqualTo(["Linked.dll", "A.netmodule", "B.netmodule"]));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(NormalizePath)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Mvid)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(ReadMvid)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Sha256)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(ReadSha256)));
             Assert.That(
                 captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath)
                     .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new FileInfo(path).Length))));
         }
     }
@@ -1483,7 +1483,7 @@ public sealed class FinalCompilationCollectorTests
         var image = EmitImage(
             "internal static class RecursiveAlias {}",
             "RecursiveAlias");
-        await File.WriteAllBytesAsync(referencePath, image);
+        await File.WriteAllBytesAsync(referencePath, (image).ToArray());
         var withRecursiveAliases = typeof(MetadataReferenceProperties)
             .GetMethod(
                 "WithRecursiveAliases",
@@ -1519,9 +1519,9 @@ public sealed class FinalCompilationCollectorTests
             "SecondLimit");
         var firstPath = Path.Combine(workspace.Path, "FirstLimit.dll");
         var secondPath = Path.Combine(workspace.Path, "SecondLimit.dll");
-        await File.WriteAllBytesAsync(firstPath, firstImage);
-        await File.WriteAllBytesAsync(secondPath, secondImage);
-        MetadataReference[] references =
+        await File.WriteAllBytesAsync(firstPath, (firstImage).ToArray());
+        await File.WriteAllBytesAsync(secondPath, (secondImage).ToArray());
+        ImmutableArray<MetadataReference> references =
         [
             MetadataReference.CreateFromImage(
                 firstImage,
@@ -1531,9 +1531,9 @@ public sealed class FinalCompilationCollectorTests
                 filePath: secondPath)
         ];
         var maximumModule = Math.Max(
-            firstImage.LongLength,
-            secondImage.LongLength);
-        var closure = firstImage.LongLength + secondImage.LongLength;
+            ((long)firstImage.Length),
+            ((long)secondImage.Length));
+        var closure = ((long)firstImage.Length) + ((long)secondImage.Length);
 
         var captured = CompilerCompilationCapture.CaptureReferences(
             references,
@@ -1548,11 +1548,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 captured.SelectMany(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules))
                     .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                Is.EqualTo(new[]
-                {
-                    firstImage.LongLength,
-                    secondImage.LongLength
-                }));
+                Is.EqualTo(ImmutableArray.Create(((long)firstImage.Length), ((long)secondImage.Length))));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerCompilationCapture.CaptureReferences(
                     references,
@@ -1590,7 +1586,7 @@ public sealed class FinalCompilationCollectorTests
             "public static class LinkedPart { public static int Value => 1; }",
             "LinkedPart",
             OutputKind.NetModule);
-        await File.WriteAllBytesAsync(modulePath, moduleImage);
+        await File.WriteAllBytesAsync(modulePath, (moduleImage).ToArray());
         var moduleReference = MetadataReference.CreateFromImage(
             moduleImage,
             new MetadataReferenceProperties(MetadataImageKind.Module),
@@ -1600,7 +1596,7 @@ public sealed class FinalCompilationCollectorTests
             .WithAssemblyName("StaleLinked")
             .AddReferences(moduleReference);
         var manifestImage = AnalyzerTestHost.EmitImage(manifest);
-        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        await File.WriteAllBytesAsync(manifestPath, (manifestImage).ToArray());
         using var assemblyMetadata = AssemblyMetadata.Create(
             ModuleMetadata.CreateFromImage(manifestImage),
             ModuleMetadata.CreateFromImage(moduleImage));
@@ -1609,10 +1605,10 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
         await File.WriteAllBytesAsync(
             modulePath,
-            EmitImage(
+            (EmitImage(
                 "public static class LinkedPart { public static int Value => 2; }",
                 "LinkedPart",
-                OutputKind.NetModule));
+                OutputKind.NetModule)).ToArray());
         var artifactPath = workspace.SealPath("stale-linked-module");
 
         var diagnostics = await AnalyzeCollectorAsync(
@@ -1621,7 +1617,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -1667,18 +1663,17 @@ public sealed class FinalCompilationCollectorTests
     {
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("tree-configuration");
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_profile"] = "strict";
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
             new TreeOptionsProvider(
                 Options(path),
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["sharpproof_profile"] = "strict"
-                }));
+                optionValues.ToImmutable()));
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -1692,12 +1687,12 @@ public sealed class FinalCompilationCollectorTests
             path,
             profile: "strict",
             verifyPolicy: "require-proven",
-            assumptionPolicy: "error");
+            assumptionPolicy: "error").ToBuilder();
         options["build_property._SharpProofProfileWasDefaulted"] = "false";
         options["build_property._SharpProofFeaturesWasDefaulted"] = "true";
         options["sharpproof_profile"] = "strict";
         options["sharpproof_features"] = "effects";
-        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options.ToImmutable());
         Assert.That(diagnostics, Is.Empty);
         Assert.That(File.Exists(path), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(
@@ -1716,7 +1711,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -1743,10 +1738,10 @@ public sealed class FinalCompilationCollectorTests
         var options = Options(
             path,
             profile: buildProfile,
-            features: features);
+            features: features).ToBuilder();
         options["sharpproof_profile"] = rawProfile;
 
-        _ = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        _ = await AnalyzeCollectorAsync(CreateCompilation(), options.ToImmutable());
 
         Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
     }
@@ -1754,7 +1749,7 @@ public sealed class FinalCompilationCollectorTests
     private static string Digest(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        return ArtifactDigest.Compute((System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken))).ToImmutableArray());
     }
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
@@ -1789,7 +1784,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
         bool allowCompilationErrors = false)
     {
@@ -1823,7 +1818,7 @@ public sealed class FinalCompilationCollectorTests
         return AnalyzerTestHost.CreateCompilation(source, []);
     }
 
-    private static byte[] EmitImage(
+    private static ImmutableArray<byte> EmitImage(
         string source,
         string assemblyName,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
@@ -1861,29 +1856,33 @@ public sealed class FinalCompilationCollectorTests
         return SharpProof.Ir.HashEncoding.ToLowerHex(hash.ComputeHash(stream));
     }
 
-    private static byte[] PatchAscii(
-        byte[] image,
+    private static ImmutableArray<byte> PatchAscii(
+        ImmutableArray<byte> image,
         string original,
         string replacement)
     {
-        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        if (image.IsDefault)
+        { throw new ArgumentNullException(nameof(image)); }
         System.ArgumentNullException.ThrowIfNull(original);
         System.ArgumentNullException.ThrowIfNull(replacement);
-        var originalBytes = Encoding.ASCII.GetBytes(original);
-        var replacementBytes = Encoding.ASCII.GetBytes(replacement);
+        var originalBytes = Encoding.ASCII.GetBytes(original).ToImmutableArray();
+        var replacementBytes = Encoding.ASCII.GetBytes(replacement).ToImmutableArray();
         Assert.That(replacementBytes, Has.Length.EqualTo(originalBytes.Length));
         var offsets = Enumerable.Range(
                 0, image.Length - originalBytes.Length + 1)
             .Where(offset => image.AsSpan(offset, originalBytes.Length)
-                .SequenceEqual(originalBytes))
-            .ToArray();
+                .SequenceEqual(originalBytes.AsSpan()))
+            .ToImmutableArray();
         Assert.That(offsets, Has.Length.EqualTo(1));
-        var patched = (byte[])image.Clone();
-        replacementBytes.CopyTo(patched, offsets[0]);
-        return patched;
+        var patched = image.ToBuilder();
+        for (var index = 0; index < replacementBytes.Length; index++)
+        {
+            patched[offsets[0] + index] = replacementBytes[index];
+        }
+        return patched.ToImmutable();
     }
 
-    private static Dictionary<string, string> Options(
+    private static ImmutableDictionary<string, string> Options(
         string? path,
         string profile = "advisory",
         string features = "all",
@@ -1896,23 +1895,20 @@ public sealed class FinalCompilationCollectorTests
         System.ArgumentNullException.ThrowIfNull(maximumExpressionDepth);
         System.ArgumentNullException.ThrowIfNull(profile);
         System.ArgumentNullException.ThrowIfNull(verifyPolicy);
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase)
-        {
-            [TargetFrameworkKey] = "net9.0",
-            [ProjectDirectoryKey] = Environment.CurrentDirectory,
-            [MaximumExpressionDepthKey] = maximumExpressionDepth,
-            ["build_property.SharpProofProfile"] = profile,
-            ["build_property.SharpProofFeatures"] = features,
-            ["build_property.SharpProofVerifyPolicy"] = verifyPolicy,
-            ["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy
-        };
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        values[TargetFrameworkKey] = "net9.0";
+        values[ProjectDirectoryKey] = Environment.CurrentDirectory;
+        values[MaximumExpressionDepthKey] = maximumExpressionDepth;
+        values["build_property.SharpProofProfile"] = profile;
+        values["build_property.SharpProofFeatures"] = features;
+        values["build_property.SharpProofVerifyPolicy"] = verifyPolicy;
+        values["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy;
         if (path != null)
         {
             values[OutputKey] = path;
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
     private sealed class MemoryAdditionalText(
@@ -1955,8 +1951,8 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class TreeOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues,
-        IReadOnlyDictionary<string, string> treeValues)
+        ImmutableDictionary<string, string> globalValues,
+        ImmutableDictionary<string, string> treeValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
@@ -1980,7 +1976,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class ThrowingTreeOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
+        ImmutableDictionary<string, string> globalValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
@@ -2006,7 +2002,7 @@ public sealed class FinalCompilationCollectorTests
         ReportDiagnostic reportDiagnostic)
         : SyntaxTreeOptionsProvider
     {
-        private string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
+        private readonly string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
         public override GeneratedKind IsGenerated(
             SyntaxTree tree,
             CancellationToken cancellationToken)

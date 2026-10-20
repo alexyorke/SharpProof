@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -17,7 +18,7 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedSourceCalleePurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, 42];
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, 42];
     private const string SubjectTemplate = """
         using System.Runtime.CompilerServices;
         using SharpProof.Attributes;
@@ -39,7 +40,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized" : "no-inlining-control";
@@ -48,7 +49,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), source);
 
-        var compilation = TestCompilation.Create("SynchronizedSourceCalleePurity_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SynchronizedSourceCalleePurity_" + caseName, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var subjectSymbol = compilation.GetTypeByMetadataName("Subject")!;
@@ -81,11 +82,11 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedSourceCalleePurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         RuntimeObservation runtimeObservation;
@@ -97,12 +98,12 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             var method = subject.GetMethod("Helper", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var flags = method.GetMethodImplementationFlags();
             var execute = target.CreateDelegate<Func<int, int>>();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = (target.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
             Assert.That(targetIl, Has.Length.EqualTo(7), "Release Target must directly call the ordinary source helper.");
             Assert.That(targetIl[0], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Ldarg_0.Value));
             Assert.That(targetIl[1], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Call.Value));
             Assert.That(targetIl[6], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Ret.Value));
-            var callToken = BitConverter.ToInt32(targetIl, 2);
+            var callToken = BitConverter.ToInt32(targetIl.AsSpan(2..));
             var calledMethod = subject.Module.ResolveMethod(callToken)!;
             callObservation = new(
                 target.Name,
@@ -110,8 +111,8 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (int)target.GetMethodImplementationFlags(),
                 target.IsStatic,
                 target.ReturnType == typeof(int),
-                target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
-                Convert.ToHexStringLower(targetIl),
+                target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
+                Convert.ToHexStringLower(targetIl.AsSpan()),
                 method.Name,
                 method.MetadataToken,
                 method.IsPrivate,
@@ -127,10 +128,10 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 method.IsStatic,
                 method.ReturnType == typeof(int),
-                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null,
-                s_inputValues.Select(execute).ToArray(),
+                s_inputValues.Select(execute).ToImmutableArray(),
                 Convert.ToHexStringLower(method.GetMethodBody()!.GetILAsByteArray()!),
                 subject.Module.ModuleVersionId.ToString("D"));
             await Save(evidenceDirectory, "runtime-observations.json", new
@@ -189,8 +190,9 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        artifact = project.Artifact;
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -225,7 +227,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -233,7 +235,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The caller of the synchronized ordinary source helper cannot be Proven EnforcePure."
                 : "The caller of the NoInlining-only ordinary source helper remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -270,10 +272,11 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         }
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)
@@ -285,7 +288,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
     }
 
     private sealed record SourceCallObservation(string TargetName, int TargetMetadataToken, int TargetImplementationFlags,
-        bool TargetIsStatic, bool TargetReturnsInt32, string?[] TargetParameterTypes, string TargetIlHex,
+        bool TargetIsStatic, bool TargetReturnsInt32, ImmutableArray<string?> TargetParameterTypes, string TargetIlHex,
         string HelperName, int HelperMetadataToken, bool HelperIsPrivate, int CallMetadataToken,
         string CalledMethodName, string? CalledDeclaringType, int ResolvedMetadataToken, string ResolvedModuleVersionId)
     {
@@ -294,17 +297,17 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         public string HelperName { get; init; } = HelperName ?? throw new System.ArgumentNullException(nameof(HelperName));
         public string CalledMethodName { get; init; } = CalledMethodName ?? throw new System.ArgumentNullException(nameof(CalledMethodName));
         public string ResolvedModuleVersionId { get; init; } = ResolvedModuleVersionId ?? throw new System.ArgumentNullException(nameof(ResolvedModuleVersionId));
-        public string?[] TargetParameterTypes { get; init; } = TargetParameterTypes ?? throw new System.ArgumentNullException(nameof(TargetParameterTypes));
+        public ImmutableArray<string?> TargetParameterTypes { get; init; } = TargetParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(TargetParameterTypes)) : TargetParameterTypes;
     }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
-        bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+        bool Synchronized, bool IsStatic, bool ReturnsInt32, ImmutableArray<string?> ParameterTypes, int FieldCount,
+        bool HasTypeInitializer, ImmutableArray<int> ReturnValues, string IlHex, string ModuleVersionId)
     {
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
         public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
-        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
-        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+        public ImmutableArray<string?> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
+        public ImmutableArray<int> ReturnValues { get; init; } = ReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ReturnValues)) : ReturnValues;
     }
 }

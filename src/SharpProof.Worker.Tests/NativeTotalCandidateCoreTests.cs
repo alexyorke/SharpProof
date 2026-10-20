@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
@@ -11,8 +12,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTotalCandidateCoreTests
 {
-    private static readonly int[] TwoOrdinals = [0, 1];
-    private static readonly int[] InitialAndFinalOrdinals = [0, 1, 0, 1];
+    private static readonly ImmutableArray<int> TwoOrdinals = [0, 1];
+    private static readonly ImmutableArray<int> InitialAndFinalOrdinals = [0, 1, 0, 1];
 
     [TestCase("boolean", false)]
     [TestCase("boolean", true)]
@@ -68,7 +69,7 @@ public sealed class NativeTotalCandidateCoreTests
     {
         var candidate = BooleanCandidate(satisfied);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks, Has.Count.EqualTo(2));
+        Assert.That(run.Checks, Has.Length.EqualTo(2));
         var initial = run.Checks[0];
         Assert.That(initial.Enrolled, Is.True);
         Assert.That(initial.Checked, Is.False);
@@ -111,7 +112,7 @@ public sealed class NativeTotalCandidateCoreTests
             [new(factory.Boolean(exceptional), factory.Boolean(true), site)],
             [new(factory.Boolean(false), factory.Boolean(true), site)]);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks, Has.Count.EqualTo(2));
+        Assert.That(run.Checks, Has.Length.EqualTo(2));
         var final = run.Checks[1];
         Assert.That(final.Checked, Is.True);
         Assert.That(final.Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
@@ -141,7 +142,7 @@ public sealed class NativeTotalCandidateCoreTests
         var run = await RunAsync(candidate);
         if (beyond)
         {
-            Assert.That(run.Entries, Has.Count.EqualTo(1));
+            Assert.That(run.Entries, Has.Length.EqualTo(1));
             Assert.That(run.Entries[0].Outcome, Is.Null);
             Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
             Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(TwoOrdinals));
@@ -201,18 +202,19 @@ public sealed class NativeTotalCandidateCoreTests
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         using var cancellation = new CancellationTokenSource();
-        var checks = new List<TotalCandidateCheck>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCandidateCheck>();
         if (stage == "before")
         { cancellation.Cancel(); }
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, check =>
         {
             System.ArgumentNullException.ThrowIfNull(check);
-            checks.Add(check);
+            checkBuilder.Add(check);
             if (stage == "enrolled" || stage == "checked" && check.Checked)
             { cancellation.Cancel(); }
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
-        Assert.That(checks, Has.Count.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
-        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
+        var checks = checkBuilder.ToImmutable();
+        Assert.That(checks, Has.Length.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
+        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Length).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
         if (stage == "checked")
         {
@@ -233,8 +235,8 @@ public sealed class NativeTotalCandidateCoreTests
             "Contract.Ensures(Contract.Result<int>() == x / divisor); Contract.Ensures(Contract.Result<int>() >= 0); return x / divisor; } }");
         var total = preparation.Total!;
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var requires = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToArray();
-        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToArray();
+        var requires = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
+        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
         Assert.That(requires, Has.Length.EqualTo(3));
         Assert.That(ensures, Has.Length.EqualTo(2));
         Assert.That(candidate.Requires, Has.Length.EqualTo(requires.Length));
@@ -260,15 +262,16 @@ public sealed class NativeTotalCandidateCoreTests
         using var session = new CallableSolverSession(preparation.Total!.Program.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         using var cancellation = new CancellationTokenSource();
-        var checks = new List<TotalCallableClaimCheck>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
         {
             System.ArgumentNullException.ThrowIfNull(check);
-            checks.Add(check);
+            checkBuilder.Add(check);
             if (check.Checked)
             { cancellation.Cancel(); }
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
-        Assert.That(checks, Has.Count.EqualTo(3));
+        var checks = checkBuilder.ToImmutable();
+        Assert.That(checks, Has.Length.EqualTo(3));
         Assert.That(checks.Take(2).Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId)), Is.EqualTo(preparation.Entry.ClaimIds));
         Assert.That(checks.Take(2).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
@@ -328,11 +331,11 @@ public sealed class NativeTotalCandidateCoreTests
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        var checks = new List<TotalCandidateCheck>();
-        var entries = new List<PassiveCallableCheckResult>();
-        await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checks.Add, entries.Add,
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCandidateCheck>();
+        var entryBuilder = ImmutableArray.CreateBuilder<PassiveCallableCheckResult>();
+        await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checkBuilder.Add, entryBuilder.Add,
             TestContext.CurrentContext.CancellationToken, session, resource, () => session.ConsumedResourceCount);
-        return new(checks, entries, session.ConsumedResourceCount);
+        return new(checkBuilder.ToImmutable(), entryBuilder.ToImmutable(), session.ConsumedResourceCount);
     }
 
     private static void AssertInitialAndProven(CoreRun run, int count)
@@ -344,7 +347,7 @@ public sealed class NativeTotalCandidateCoreTests
         Assert.That(run.Checks.Skip(count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && check.Checked && check.ProjectAssumptions &&
             check.Evidence.Outcome is ProvenOutcome && check.Evidence.Reason == WorkerClaimReason.None &&
             check.Feasibility == PassiveCallableFeasibilityKind.Feasible && check.Vacuity == WorkerVacuityKind.None)), Is.True);
-        Assert.That(run.Entries, Has.Count.EqualTo(1));
+        Assert.That(run.Entries, Has.Length.EqualTo(1));
         Assert.That(run.Entries[0].Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.None));
     }
@@ -359,9 +362,9 @@ public sealed class NativeTotalCandidateCoreTests
         return preparation;
     }
 
-    private sealed record CoreRun(List<TotalCandidateCheck> Checks, List<PassiveCallableCheckResult> Entries, long Consumed)
+    private sealed record CoreRun(ImmutableArray<TotalCandidateCheck> Checks, ImmutableArray<PassiveCallableCheckResult> Entries, long Consumed)
     {
-        public List<TotalCandidateCheck> Checks { get; init; } = Checks ?? throw new System.ArgumentNullException(nameof(Checks));
-        public List<PassiveCallableCheckResult> Entries { get; init; } = Entries ?? throw new System.ArgumentNullException(nameof(Entries));
+        public ImmutableArray<TotalCandidateCheck> Checks { get; init; } = Checks.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Checks)) : Checks;
+        public ImmutableArray<PassiveCallableCheckResult> Entries { get; init; } = Entries.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Entries)) : Entries;
     }
 }

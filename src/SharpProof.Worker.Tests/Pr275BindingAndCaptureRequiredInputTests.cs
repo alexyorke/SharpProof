@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -10,10 +11,22 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275BindingAndCaptureRequiredInputTests
 {
+    [Test]
+    public void ReachableSourceCollectionRequiresAnInitializedTreeSnapshot()
+    {
+        var compilation = CreateCompilation();
+        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values;
+        var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerReachableSourceCollector.Collect(
+                compilation, targets, default, packs, default)));
+        Assert.That(error!.ParamName, Is.EqualTo("trees"));
+    }
+
     private static CSharpCompilation CreateCompilation()
     {
-        return TestCompilation.Create("Pr275RequiredBindingCapture",
-            ("Subject.cs", """
+        return TestCompilation.CreateExact("Pr275RequiredBindingCapture",
+            [("Subject.cs", """
                 using SharpProof.Attributes;
                 internal static class Subject {
                     internal static int Target(int value) {
@@ -22,7 +35,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
                     }
                 }
                 """),
-            ("Other.cs", "internal sealed class Other { }"));
+            ("Other.cs", "internal sealed class Other { }")]);
     }
 
     [Test]
@@ -56,7 +69,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values;
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
-        var partialTrees = trees.Take(trees.Length - 1).ToArray();
+        var partialTrees = trees.Take(trees.Count - 1).ToImmutableArray();
 
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             CompilerReachableSourceCollector.Collect(compilation, targets, partialTrees, packs, default)));
@@ -72,7 +85,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
 
-        var result = CompilerReachableSourceCollector.Collect(compilation, targets, trees, packs, default);
+        var result = CompilerReachableSourceCollector.Collect(compilation, targets, trees.ToImmutableArray(), packs, default);
 
         Assert.That(result.CollectionComplete, Is.True);
         Assert.That(result.Roots, Has.Length.EqualTo(1));

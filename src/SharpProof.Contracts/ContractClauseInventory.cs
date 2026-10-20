@@ -18,27 +18,32 @@ internal sealed partial class ContractClauseOccurrence
 
 internal sealed partial class ContractClauseInventory
 {
-    private int _hasValidClause = -1;
+    private readonly int _hasValidClause;
 
-    internal bool HasValidClause
+    internal bool HasValidClause =>
+        _hasValidClause >= 0
+            ? _hasValidClause != 0
+            : Clauses.Any(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid));
+
+    private static int ComputeHasValidClause(
+        ImmutableArray<ContractClauseOccurrence> clauses /* SPINT001: all values valid - default arrays and null entries defer the original validation failure until the property is read */)
     {
-        get
+        if (clauses.IsDefault)
         {
-            var cached = Volatile.Read(ref _hasValidClause);
-            if (cached >= 0)
-            {
-                return cached != 0;
-            }
-
-            var computed = Clauses.Any(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid))
-                ? 1
-                : 0;
-            var published = Interlocked.CompareExchange(
-                ref _hasValidClause,
-                computed,
-                comparand: -1);
-            return (published >= 0 ? published : computed) != 0;
+            return -1;
         }
+        foreach (var clause in clauses)
+        {
+            if (clause is null)
+            {
+                return -1;
+            }
+            if (clause.IsValid)
+            {
+                return 1;
+            }
+        }
+        return 0;
     }
 
     public bool HasPlacementErrors =>

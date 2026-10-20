@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -201,7 +202,7 @@ public sealed class AnalyzerModeAndEffectTests
             profile: profile,
             features: features);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], allowedValues);
         Assert.That(factory.CreateCount, Is.Zero);
     }
@@ -218,7 +219,7 @@ public sealed class AnalyzerModeAndEffectTests
             new FailingOptionsProvider(failGlobalOptions),
             new SharpProofAnalyzer(factory));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "configuration provider failed");
         Assert.That(factory.CreateCount, Is.Zero);
     }
@@ -231,16 +232,15 @@ public sealed class AnalyzerModeAndEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(retiredMode);
         var compilation = RetiredModeCompilation;
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_mode"] = retiredMode;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_mode"] = retiredMode
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "option was removed");
         }
     }
@@ -251,16 +251,15 @@ public sealed class AnalyzerModeAndEffectTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             ModeFixture,
             ["SP0025"]);
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        optionValues["build_property.sharpproof_mode"] = "everything";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["build_property.sharpproof_mode"] = "everything"
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "option was removed");
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "everything");
         }
@@ -272,17 +271,16 @@ public sealed class AnalyzerModeAndEffectTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             ModeFixture,
             ["SP0025"]);
+        var optionValues = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionValues["sharpproof_mode"] = "  ";
+        optionValues["build_property.SharpProofMode"] = "strict";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_mode"] = "  ",
-                ["build_property.SharpProofMode"] = "strict"
-            });
+            optionValues.ToImmutable());
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "option was removed");
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "strict");
         }
@@ -490,7 +488,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             ["SP0016", "SP0045", "SP0046"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0045", "SP0046");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0045", "SP0046"]);
     }
 
     [TestCase("definition")]
@@ -528,7 +526,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             allowCompilationErrors: true);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(
             factory.OutcomeCounts["Write"],
             Is.EqualTo(1));
@@ -564,7 +562,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             new SharpProofAnalyzer(factory));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(
             diagnostics[0].Location.SourceTree!.FilePath,
             Is.EqualTo("Fixture.cs"));
@@ -614,7 +612,7 @@ public sealed class AnalyzerModeAndEffectTests
             [],
             new SharpProofAnalyzer(factory));
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(factory.OutcomeCounts["get_Value"], Is.EqualTo(1));
     }
 
@@ -634,7 +632,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
     }
 
     [Test]
@@ -652,14 +650,14 @@ public sealed class AnalyzerModeAndEffectTests
             """;
         var factories = Enumerable.Range(0, 4)
             .Select(static _ => new RecordingSessionFactory())
-            .ToArray();
+            .ToImmutableArray();
 
-        var runs = await Task.WhenAll(factories.Select(factory =>
+        var runs = (await Task.WhenAll(factories.Select(factory =>
             factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (AnalyzerTestHost.AnalyzeAsync(
                 source,
                 "effects",
                 ["SP0002"],
-                new SharpProofAnalyzer(factory)))));
+                new SharpProofAnalyzer(factory)))))).ToImmutableArray();
 
         Assert.That(
             runs.Select(static diagnostics => diagnostics.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(diagnostics)) : (diagnostics.Length)),
@@ -697,7 +695,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
             Assert.That(
                 factory.Outcomes["Run"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -734,7 +732,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
             Assert.That(
                 factory.Outcomes["Run"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -795,7 +793,7 @@ public sealed class AnalyzerModeAndEffectTests
             [],
             new SharpProofAnalyzer());
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
     }
 
     [Test]
@@ -847,7 +845,7 @@ public sealed class AnalyzerModeAndEffectTests
             mode: null,
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "'Selected'");
     }
 
@@ -887,9 +885,9 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0047"],
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047", "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047", "SP0047", "SP0047"]);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -970,7 +968,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1011,7 +1009,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             ["SP0002", "SP0045", "SP0046", "SP0047"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("BodylessEffectContractNotEnforced"));
@@ -1139,7 +1137,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task ConcurrentAutoAccessorRunsReconcileExactlyOnce()
     {
-        var runs = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
+        var runs = (await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
         {
             var factory = new RecordingSessionFactory();
             var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -1153,13 +1151,13 @@ public sealed class AnalyzerModeAndEffectTests
                 [],
                 new SharpProofAnalyzer(factory));
             return (diagnostics, factory);
-        }));
+        }))).ToImmutableArray();
 
         foreach (var (diagnostics, factory) in runs)
         {
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics);
+                AnalyzerTestHost.AssertIds(diagnostics, []);
                 Assert.That(factory.OutcomeCounts["get_Value"], Is.EqualTo(1));
                 Assert.That(factory.Outcomes["get_Value"],
                     Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1220,7 +1218,7 @@ public sealed class AnalyzerModeAndEffectTests
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0047"))
             .Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             incomplete,
             Has.Length.EqualTo(4),
@@ -1256,7 +1254,7 @@ public sealed class AnalyzerModeAndEffectTests
             mode: null,
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         AnalyzerTestHost.AssertMessageContains(
             diagnostics[0],
             "could not completely analyze selected method");
@@ -1282,7 +1280,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0052");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0052"]);
         Assert.That(diagnostics[0].Severity, Is.EqualTo(DiagnosticSeverity.Warning));
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
@@ -1321,7 +1319,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0046"]);
         Assert.That(
             factory.Outcomes["RethrowBeforeSiblingCatch"],
             Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1361,7 +1359,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
             Assert.That(
                 messages,
                 Has.Some.Contain("closed System.Exception-derived types"));
@@ -1390,7 +1388,7 @@ public sealed class AnalyzerModeAndEffectTests
             [],
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "[EffectContract]");
     }
 

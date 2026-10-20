@@ -52,11 +52,12 @@ internal static class TestCompilation
             includeSharpProofReference: includeSharpProofReference);
     }
 
-    internal static CSharpCompilation Create(
+    internal static CSharpCompilation CreateExact(
         string assemblyName,
-        params (string FileName, string Source)[] sources)
+        ImmutableArray<(string FileName, string Source)> sources)
     {
-        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         System.ArgumentNullException.ThrowIfNull(assemblyName);
         return CreateCore(
             assemblyName,
@@ -64,13 +65,14 @@ internal static class TestCompilation
             appendUniqueAssemblySuffix: false);
     }
 
-    internal static CSharpCompilation Create(
+    internal static CSharpCompilation CreateExact(
         string assemblyName,
         OutputKind outputKind,
-        IEnumerable<(string FileName, string Source)> sources)
+        ImmutableArray<(string FileName, string Source)> sources)
     {
         System.ArgumentNullException.ThrowIfNull(assemblyName);
-        System.ArgumentNullException.ThrowIfNull(sources);
+        if (sources.IsDefault)
+        { throw new ArgumentNullException(nameof(sources)); }
         return CreateCore(
             assemblyName,
             sources,

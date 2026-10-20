@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -10,7 +11,7 @@ internal sealed class Wave8ProtocolEffectWitnessContractMatrixTests
 {
     private static IEnumerable<TestCaseData> ContractCases()
     {
-        (WorkerEffectContractKind Contract, WorkerEffectSet Effects, WorkerEffectCapabilitySet Capabilities, bool Valid)[] cases = [
+        ImmutableArray<(WorkerEffectContractKind Contract, WorkerEffectSet Effects, WorkerEffectCapabilitySet Capabilities, bool Valid)> cases = [
             (WorkerEffectContractKind.EnforcePure, WorkerEffectSet.Allocates, WorkerEffectCapabilitySet.None, false),
             (WorkerEffectContractKind.EnforcePure, WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None, false),
             (WorkerEffectContractKind.EnforcePure, WorkerEffectSet.ReadsReceiverState, WorkerEffectCapabilitySet.None, false),
@@ -35,7 +36,7 @@ internal sealed class Wave8ProtocolEffectWitnessContractMatrixTests
         ];
         foreach (var row in cases)
         {
-            foreach (var boundary in new[] { "validation", "launcher" })
+            foreach (var boundary in ImmutableArray.Create("validation", "launcher"))
             {
                 yield return new TestCaseData(row.Contract, row.Effects, row.Capabilities, row.Valid, boundary);
             }
@@ -55,7 +56,7 @@ internal sealed class Wave8ProtocolEffectWitnessContractMatrixTests
         };
         var response = CreateResponse(request, contract, effects, capabilities);
         var json = WorkerProtocolJson.SerializeResponse(response);
-        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} capabilities={capabilities} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(json))}");
+        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} capabilities={capabilities} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(json)).ToImmutableArray())}");
         if (boundary == "validation")
         {
             var decoded = WorkerProtocolJson.DeserializeResponse(json)!;

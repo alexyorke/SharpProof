@@ -31,7 +31,7 @@ function New-EmbeddedFixture([string]$Name, [string]$DebugType = 'embedded', [bo
     $assembly = Join-Path $directory 'bin/Release/net10.0/Fixture.dll'
     $pdb = [IO.Path]::ChangeExtension($assembly, 'pdb')
     if ($DebugType -eq 'embedded') { [IO.File]::WriteAllBytes($pdb, (Get-SharpProofEmbeddedPdb -AssemblyPath $assembly)) }
-    return [pscustomobject]@{ Assembly = $assembly; Pdb = $pdb }
+    return ([ordered]@{ Assembly = $assembly; Pdb = $pdb }).AsReadOnly()
 }
 
 function Assert-Rejected([scriptblock]$Action, [string]$Expected = '') {
@@ -62,7 +62,7 @@ try {
     try {
         $metadata = $provider.GetMetadataReader()
         $firstDocument = $metadata.GetDocument(@($metadata.Documents)[0])
-        [byte[]]$sourceHash = $metadata.GetBlobBytes($firstDocument.Hash)
+        $sourceHash = [Collections.Immutable.ImmutableArray]::CreateRange[byte]($metadata.GetBlobBytes($firstDocument.Hash))
     }
     finally { $provider.Dispose(); $pdbStream.Dispose() }
     $hashOffset = -1
@@ -75,12 +75,12 @@ try {
     }
     if ($hashOffset -lt 0) { throw 'The source-checksum negative-control fixture could not locate its document checksum.' }
     $corruptSourcePdb[$hashOffset] = $corruptSourcePdb[$hashOffset] -bxor 1
-    Assert-Rejected { Test-SharpProofEmbeddedSources -PdbBytes $corruptSourcePdb } 'PDB document SHA256'
+    Assert-Rejected { Test-SharpProofEmbeddedSources -PdbBytes ([Collections.Immutable.ImmutableArray]::CreateRange[byte]($corruptSourcePdb)) } 'PDB document SHA256'
 
     $stream = [IO.File]::OpenRead($valid.Assembly)
     $pe = [Reflection.PortableExecutable.PEReader]::new($stream)
     try {
-        $entries = @($pe.ReadDebugDirectory())
+        $entries = $pe.ReadDebugDirectory()
         $embeddedIndex = 0
         while ($entries[$embeddedIndex].Type -ne 'EmbeddedPortablePdb') { $embeddedIndex++ }
         $embedded = $entries[$embeddedIndex]
@@ -91,10 +91,10 @@ try {
         $debugOffset = $section.PointerToRawData + $debugRva - $section.VirtualAddress
     }
     finally { $pe.Dispose(); $stream.Dispose() }
-    [byte[]]$original = [IO.File]::ReadAllBytes($valid.Assembly)
+    $original = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($valid.Assembly))
     $mutated = Join-Path $root 'mutated.dll'
-    foreach ($mutation in @('signature', 'short-size', 'long-size', 'compressed', 'bounds', 'duplicate', 'no-codeview')) {
-        [byte[]]$bytes = $original.Clone()
+    foreach ($mutation in [Collections.Immutable.ImmutableArray]::Create[string]('signature', 'short-size', 'long-size', 'compressed', 'bounds', 'duplicate', 'no-codeview')) {
+        [byte[]]$bytes = @($original)
         switch ($mutation) {
             'signature' { $bytes[$embedded.DataPointer] = $bytes[$embedded.DataPointer] -bxor 255 }
             'short-size' { [BitConverter]::GetBytes([BitConverter]::ToInt32($bytes, $embedded.DataPointer + 4) - 1).CopyTo($bytes, $embedded.DataPointer + 4) }

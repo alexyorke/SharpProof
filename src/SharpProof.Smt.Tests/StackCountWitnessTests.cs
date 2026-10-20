@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Z3;
 
 namespace SharpProof.Smt.Test;
@@ -15,7 +16,7 @@ public sealed class StackCountWitnessTests
         var variable = factory.CreateVariable("stack", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:stack:count", factory.IntegerType, false);
         var read = factory.PureOpaque(field, factory.Variable(variable));
-        IrTerm[] predicates = [factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(variable), factory.Null(factory.ObjectType)),
+        ImmutableArray<IrTerm> predicates = [factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(variable), factory.Null(factory.ObjectType)),
             factory.Binary(IrBinaryOperator.Equal, read, factory.Integer(count))];
         using var context = new Context();
         using var solver = context.MkSolver();

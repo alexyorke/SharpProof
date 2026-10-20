@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -32,7 +33,7 @@ public sealed class ConditionalElisionNestedInitializerTests
         var additions = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable))
             .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
             .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
-            .OfType<IInvocationOperation>().Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Add")).ToArray();
+            .OfType<IInvocationOperation>().Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Add")).ToImmutableArray();
         Assert.That(additions.Length, Is.EqualTo(2));
         var list = subject.Compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
         Assert.That(list, Is.Not.Null);
@@ -42,11 +43,11 @@ public sealed class ConditionalElisionNestedInitializerTests
             Assert.That(emission.IsElided(addition), Is.True);
         }
         var throws = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
         Assert.That(throws.Length, Is.EqualTo(2));
         foreach (var thrown in throws)
         { Assert.That(emission.IsElided(thrown.BranchValue!), Is.True); }
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         { Assert.That(subject.Invoke([input!]), Is.EqualTo(7)); }
         var lowered = subject.Lower();
         TestContext.WriteLine($"Nested initializer lowering exact={lowered.IsExact}; constructionLimitExceeded={lowered.ConstructionLimitExceeded}; abstention={lowered.Classification.Abstention}");
@@ -54,11 +55,11 @@ public sealed class ConditionalElisionNestedInitializerTests
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = subject.Context.Parameters.Single().Entry;
         var type = subject.Factory.GetVariableInfo(parameter).Type;
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter] = value });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, value));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
             Assert.That(replay.ConsumedApproximation, Is.False);

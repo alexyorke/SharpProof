@@ -78,8 +78,15 @@ internal sealed partial class IrValue
     // Computed string values carry contents, but hash-consed terms do not
     // model distinct runtime allocations. Preserve this fact through values
     // selected by conditionals, sequence accesses, and later evaluations.
-    private bool _hasUnknownStringIdentity;
-    private IrValue? _sequenceIdentity;
+    private readonly bool _hasUnknownStringIdentity;
+    private readonly IrValue? _sequenceIdentity;
+
+    private IrValue(IrValue value, bool hasUnknownStringIdentity, IrValue? sequenceIdentity)
+        : this(ArgumentNullGuard.NotNull(value, nameof(value)).Type, value.Kind, value.Payload)
+    {
+        _hasUnknownStringIdentity = hasUnknownStringIdentity;
+        _sequenceIdentity = sequenceIdentity;
+    }
 
     internal IrValue SequenceIdentity => _sequenceIdentity ?? this;
 
@@ -87,10 +94,7 @@ internal sealed partial class IrValue
     {
         storage = RepositoryParameterGuard.NotNull(storage, nameof(storage));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return new IrValue(value.Type, value.Kind, value.Payload)
-        {
-            _sequenceIdentity = storage.SequenceIdentity
-        };
+        return new IrValue(value, hasUnknownStringIdentity: false, storage.SequenceIdentity);
     }
 
     internal static bool HasUnknownStringIdentity(IrValue value)
@@ -102,10 +106,7 @@ internal sealed partial class IrValue
     internal static IrValue WithUnknownStringIdentity(IrValue value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return new IrValue(value.Type, value.Kind, value.Payload)
-        {
-            _hasUnknownStringIdentity = true
-        };
+        return new IrValue(value, hasUnknownStringIdentity: true, sequenceIdentity: null);
     }
 
     public bool Boolean => Get<bool>(IrValueKind.Boolean, "The IR value is not boolean.");
@@ -191,7 +192,7 @@ internal sealed class IrInterpreter(IrFactory factory)
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken,
-        IReadOnlyCollection<IrVarId>? snapshots = null,
+        ImmutableHashSet<IrVarId>? snapshots = null,
         Func<IrOpaqueTerm, IrValue?>? concreteOpaqueValueProvider = null)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
@@ -199,8 +200,19 @@ internal sealed class IrInterpreter(IrFactory factory)
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(
             term,
-            new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken)
-            { Heap = heap, Snapshots = snapshots, ConcreteOpaqueValueProvider = concreteOpaqueValueProvider });
+            new(SnapshotVariables(variables), onVariableRead, snapshots, heap, concreteOpaqueValueProvider, cancellationToken));
+    }
+
+    private static ImmutableDictionary<IrVarId, IrValue> SnapshotVariables(
+        IReadOnlyDictionary<IrVarId, IrValue>? variables)
+    {
+        return variables switch
+        {
+            null => ImmutableDictionary<IrVarId, IrValue>.Empty,
+            ImmutableDictionary<IrVarId, IrValue> immutable => immutable,
+            Dictionary<IrVarId, IrValue> dictionary => dictionary.ToImmutableDictionary(dictionary.Comparer),
+            _ => variables.ToImmutableDictionary()
+        };
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -900,13 +912,15 @@ internal sealed class IrInterpreter(IrFactory factory)
         failure = null;
         if (heap == null || state.Snapshots is not { Count: > 0 } snapshots)
         { return true; }
-        if (!IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
-            () => --state.SnapshotWork >= 0, state.SnapshotSelectors, out var selector, state.CancellationToken))
+        var selection = IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
+            () => --state.SnapshotWork >= 0, state.SnapshotSelectors, state.CancellationToken);
+        state.SnapshotSelectors = selection.Memo;
+        if (!selection.Success)
         {
             failure = Unsupported(IrUnsupportedReason.UnsupportedOperation, "Snapshot receiver selection is unsupported or exceeds its work limit.");
             return false;
         }
-        var selected = EvaluateCore(selector, state);
+        var selected = EvaluateCore(selection.Selector!, state);
         if (selected.Status != IrEvaluationStatus.Value)
         { failure = selected; return false; }
         if (selected.Value!.Boolean)
@@ -915,19 +929,22 @@ internal sealed class IrInterpreter(IrFactory factory)
     }
 
     private sealed class EvaluationState(
-        IReadOnlyDictionary<IrVarId, IrValue> variables,
+        ImmutableDictionary<IrVarId, IrValue> variables,
         Action<IrVarId>? onVariableRead,
+        ImmutableHashSet<IrVarId>? snapshots,
+        IrHeap? heap,
+        Func<IrOpaqueTerm, IrValue?>? concreteOpaqueValueProvider,
         CancellationToken cancellationToken)
     {
-        internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
+        internal ImmutableDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
-        internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
+        internal ImmutableDictionary<IrId, IrEvaluationResult>.Builder Results { get; } = ImmutableDictionary.CreateBuilder<IrId, IrEvaluationResult>();
         internal int Depth { get; set; }
-        internal IrHeap? Heap { get; set; }
-        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
-        internal IReadOnlyCollection<IrVarId>? Snapshots { get; set; }
-        internal Dictionary<IrId, IrTerm> SnapshotSelectors { get; } = [];
+        internal IrHeap? Heap { get; } = heap;
+        internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots;
+        internal ImmutableDictionary<IrId, IrTerm> SnapshotSelectors { get; set; } = ImmutableDictionary<IrId, IrTerm>.Empty;
+        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; } = concreteOpaqueValueProvider;
         internal int SnapshotWork = 4096;
     }
 }

@@ -5,8 +5,9 @@ namespace SharpProof.Smt;
 // condition.
 internal sealed partial class BvEncoder
 {
-    private readonly Dictionary<IrMemberId, FuncDecl> _fields = [];
-    private readonly Dictionary<IrMemberId, Dictionary<IrId, (IrOpaqueTerm Read, Expr Owner, Expr? Key)>> _fieldReads = [];
+    private readonly ImmutableDictionary<IrMemberId, FuncDecl>.Builder _fields = ImmutableDictionary.CreateBuilder<IrMemberId, FuncDecl>();
+    private readonly ImmutableList<KeyValuePair<IrMemberId, FuncDecl>>.Builder _fieldOrder = ImmutableList.CreateBuilder<KeyValuePair<IrMemberId, FuncDecl>>();
+    private readonly ImmutableDictionary<IrMemberId, ImmutableList<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>.Builder>.Builder _fieldReads = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableList<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>.Builder>();
 
     private Expr EncodeFieldRead(IrOpaqueTerm read, SmtQueryResourceMeter meter)
     {
@@ -30,12 +31,21 @@ internal sealed partial class BvEncoder
                 using var keySort = context.MkBitVecSort((uint)key.Width);
                 field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), [ReferenceSort, keySort], result);
             }
-            _fields.Add(read.Member, field);
+            _fields.AddUnique(read.Member, field);
+            _fieldOrder.Add(new(read.Member, field));
         }
         var keyValue = read.Arguments.IsEmpty ? null : Encode(read.Arguments[0], meter);
         if (!_fieldReads.TryGetValue(read.Member, out var observations))
-        { _fieldReads.Add(read.Member, observations = []); }
-        observations[read.Id] = (read, receiver, keyValue);
+        {
+            observations = ImmutableList.CreateBuilder<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>();
+            _fieldReads.AddUnique(read.Member, observations);
+        }
+        var observationIndex = observations.FindIndex(observed => observed.Read.Id == read.Id);
+        var observation = (read, receiver, keyValue);
+        if (observationIndex < 0)
+        { observations.Add(observation); }
+        else
+        { observations[observationIndex] = observation; }
         return owner.Own(keyValue == null ? context.MkApp(field, receiver) : context.MkApp(field, receiver, keyValue));
     }
 
@@ -48,11 +58,11 @@ internal sealed partial class BvEncoder
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
         reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        foreach (var field in _fields.ToArray())
+        foreach (var field in _fieldOrder.ToImmutable())
         {
             meter.Consume();
-            var observations = new List<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>();
-            foreach (var observed in _fieldReads[field.Key].Values)
+            var observations = ImmutableArray.CreateBuilder<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>();
+            foreach (var observed in _fieldReads[field.Key].ToImmutable())
             {
                 meter.Consume();
                 using var observedOwner = model.Evaluate(observed.Owner, true);
@@ -100,7 +110,7 @@ internal sealed partial class BvEncoder
 
     private void DisposeFields()
     {
-        foreach (var field in _fields.Values)
+        foreach (var field in _fieldOrder.ToImmutable().Select(static field => field.Value))
         { field.Dispose(); }
     }
 }

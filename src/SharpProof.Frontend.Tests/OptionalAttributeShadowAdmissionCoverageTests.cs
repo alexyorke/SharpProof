@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -21,7 +22,7 @@ public sealed class OptionalAttributeShadowAdmissionCoverageTests
         Assert.That(subject.Invoke([]), Is.EqualTo(17));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var targetSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Target"));
         var helperSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Helper"));
         var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
@@ -64,7 +65,7 @@ public sealed class OptionalAttributeShadowAdmissionCoverageTests
         Assert.That(direct.IsExact, Is.True);
         Assert.That(direct.ConstructionLimitExceeded, Is.False);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(direct.Program,
-            helperContext.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry),
+            ImmutableDictionaryCapture.Create(helperContext.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry),
                 p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (subject.Factory.CreateIntegerValue(subject.Factory.GetVariableInfo(p.Entry).Type,
                     (int)argument.Value.ConstantValue.Value!))));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

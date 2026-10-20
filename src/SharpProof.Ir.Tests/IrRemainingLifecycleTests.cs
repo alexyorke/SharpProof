@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -5,6 +6,22 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrRemainingLifecycleTests
 {
+    [Test]
+    public void DefaultCallOperandsRejectBeforeReceiverEvaluation()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var interpreter = new IrProgramInterpreter(factory);
+        var values = new IrProgramInterpreter.ReplayValues(ImmutableHashSet<IrVarId>.Empty);
+        var missing = factory.Variable(factory.CreateVariable("missing-receiver", factory.ObjectType));
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = interpreter.EvaluateCallOperands(
+                missing, default, null, values, "receiver must not be evaluated",
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+    }
+
     [Test]
     public void ScalarBoundaryHelpersRejectOverflowAndUnsupportedOperatorFamilies()
     {
@@ -76,8 +93,7 @@ public sealed class IrRemainingLifecycleTests
         var program = builder.Build();
         var interpreter = new IrProgramInterpreter(factory);
         Assert.That(interpreter.Execute(program).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        var valid = interpreter.Execute(program, new Dictionary<IrVarId, IrValue>
-        { [array] = factory.CreateSequenceValue(factory.GetVariableInfo(array).Type, [factory.CreateIntegerValue(7)]) });
+        var valid = interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, factory.CreateSequenceValue(factory.GetVariableInfo(array).Type, [factory.CreateIntegerValue(7)])));
         Assert.That(valid.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(valid.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
     }
@@ -102,7 +118,7 @@ public sealed class IrRemainingLifecycleTests
         var program = conditionalBuilder.Build();
         var interpreter = new IrProgramInterpreter(factory);
         Assert.That(interpreter.Execute(program).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(interpreter.Execute(program, new Dictionary<IrVarId, IrValue> { [condition] = factory.CreateBooleanValue(true) }).Status,
+        Assert.That(interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(condition, factory.CreateBooleanValue(true))).Status,
             Is.EqualTo(IrProgramExecutionStatus.Returned));
     }
     [Test]
@@ -129,28 +145,31 @@ public sealed class IrRemainingLifecycleTests
         var heap = new IrHeap();
         heap.Fields[(value.Reference, field)] = factory.CreateIntegerValue(7);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
-        var inputs = new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(true) };
-        var leaves = new List<IrTerm>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        inputBuilder[flag] = factory.CreateBooleanValue(true);
+        var leafBuilder = ImmutableArray.CreateBuilder<IrTerm>();
         var first = factory.CreateVariable("first", factory.ObjectType);
-        inputs.Add(first, value);
-        leaves.Add(factory.Variable(first));
+        inputBuilder.Add(first, value);
+        leafBuilder.Add(factory.Variable(first));
         for (var index = 1; index < 2048; index++)
         {
             var owner = factory.CreateVariable("owner" + index, factory.ObjectType);
-            inputs.Add(owner, value);
-            leaves.Add(factory.Variable(owner));
+            inputBuilder.Add(owner, value);
+            leafBuilder.Add(factory.Variable(owner));
         }
-        while (leaves.Count > 1)
+        var leaves = leafBuilder.ToImmutable();
+        while (leaves.Length > 1)
         {
-            var next = new List<IrTerm>();
-            for (var index = 0; index < leaves.Count; index += 2)
+            var next = ImmutableArray.CreateBuilder<IrTerm>();
+            for (var index = 0; index < leaves.Length; index += 2)
             { next.Add(factory.Conditional(factory.Variable(flag), leaves[index], leaves[index + 1])); }
-            leaves = next;
+            leaves = next.ToImmutable();
         }
+        var inputs = inputBuilder.ToImmutable();
         var interpreter = new IrInterpreter(factory);
-        var valid = interpreter.Evaluate(factory.PureOpaque(field, factory.Variable(first)), inputs, null, heap, default, [first]);
+        var valid = interpreter.Evaluate(factory.PureOpaque(field, factory.Variable(first)), inputs, null, heap, default, ImmutableHashSet.Create(first));
         Assert.That(valid.Value!.Integer, Is.EqualTo(3));
-        var exhausted = interpreter.Evaluate(factory.PureOpaque(field, leaves[0]), inputs, null, heap, default, [first]);
+        var exhausted = interpreter.Evaluate(factory.PureOpaque(field, leaves[0]), inputs, null, heap, default, ImmutableHashSet.Create(first));
         Assert.That(exhausted.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(exhausted.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
         Assert.That(heap.ConsumedApproximation, Is.False);
@@ -159,15 +178,30 @@ public sealed class IrRemainingLifecycleTests
     public void FactoryInterningDistinguishesDifferentArgumentSequences()
     {
         var factory = new IrFactory();
-        var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToArray();
+        var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToImmutableArray();
         Assert.That(values[397].Id.Value - values[0].Id.Value, Is.EqualTo(397));
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Pair", factory.IntegerType, true,
             factory.IntegerType, factory.IntegerType);
         var first = factory.PureOpaque(member, null, values[0], values[397]);
         var second = factory.PureOpaque(member, null, values[1], values[0]);
         Assert.That(second, Is.Not.SameAs(first));
-        Assert.That(second.Arguments, Is.EqualTo(new[] { values[1], values[0] }));
+        Assert.That(second.Arguments, Is.EqualTo(ImmutableArray.Create(values[1], values[0])));
         Assert.That(factory.PureOpaque(member, null, values[0], values[397]), Is.SameAs(first));
+    }
+
+    [Test]
+    public void CallShapeBoundariesRejectDefaultArgumentVectors()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            "Static", factory.IntegerType, true);
+        var info = factory.GetMemberInfo(member);
+        var factoryFailure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            factory.ValidateCallShape(info, null, default, "arguments")));
+        var serviceFailure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrTermServices.ValidateCallShape(factory, info, null, default, "arguments", opaque: false)));
+        Assert.That(factoryFailure!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(serviceFailure!.ParamName, Is.EqualTo("arguments"));
     }
 
     [Test]
@@ -180,7 +214,7 @@ public sealed class IrRemainingLifecycleTests
         var parameterized = factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true, factory.BooleanType);
         Assert.That(parameterized, Is.Not.EqualTo(empty));
         Assert.That(factory.GetMemberInfo(empty).ParameterTypes, Is.Empty);
-        Assert.That(factory.GetMemberInfo(parameterized).ParameterTypes, Is.EqualTo(new[] { factory.BooleanType }));
+        Assert.That(factory.GetMemberInfo(parameterized).ParameterTypes, Is.EqualTo(ImmutableArray.Create(factory.BooleanType)));
         Assert.That(factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true), Is.EqualTo(empty));
     }
 }

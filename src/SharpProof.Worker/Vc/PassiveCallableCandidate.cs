@@ -40,8 +40,8 @@ internal sealed class PassiveCallableCandidate
         { throw new ArgumentException("A passive candidate requires Total IR.", nameof(program)); }
         if (parameters.IsDefault || requires.IsDefault || ensures.IsDefault)
         { throw new ArgumentException("Candidate arrays must be initialized."); }
-        var entries = new HashSet<IrVarId>();
-        var identities = new HashSet<IrVarId>();
+        var entries = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var identities = ImmutableHashSet.CreateBuilder<IrVarId>();
         foreach (var parameter in parameters)
         {
             var type = program.Factory.GetVariableInfo(parameter.Entry).Type;
@@ -57,9 +57,11 @@ internal sealed class PassiveCallableCandidate
             if (!identities.Add(resultVariable))
             { throw new ArgumentException("The result must have its own canonical identity.", nameof(result)); }
         }
-        var allowed = parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))).ToHashSet();
+        var allowedBuilder = ImmutableHashSet.CreateBuilder<IrVarId>();
+        allowedBuilder.UnionWith(parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old)))));
         if (result is { } allowedResult)
-        { allowed.Add(allowedResult); }
+        { allowedBuilder.Add(allowedResult); }
+        var allowed = allowedBuilder.ToImmutable();
         foreach (var clause in requires.Concat(ensures))
         {
             IrFactory.RequireBooleanTerm(program.Factory, clause.Value, nameof(requires));
@@ -103,13 +105,22 @@ internal sealed class PassiveCallableCandidate
             { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
             return;
         }
-        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToDictionary(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id));
-        var markers = new HashSet<IrInstructionId>();
-        var markerTargets = new HashSet<IrVarId>();
-        var writers = instructions.Values.SelectMany(IrInstructionFacts.WrittenVariables)
-            .GroupBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable)).ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()));
-        var reads = IrTraversal.CollectVariables(instructions.Values.SelectMany(IrInstructionFacts.ReadTerms)
-            .Concat(requires.Concat(ensures).SelectMany(clause => ((clause.Value is null || clause.Safe is null || clause.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : (new[] { clause.Value, clause.Safe })))));
+        var instructionOrder = ImmutableArray.CreateBuilder<IrInstruction>();
+        var instructions = ImmutableDictionaryCapture.Create(program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)),
+            instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : instruction.Id,
+            instruction =>
+            {
+                System.ArgumentNullException.ThrowIfNull(instruction);
+                instructionOrder.Add(instruction);
+                return instruction;
+            });
+        var instructionRows = instructionOrder.ToImmutable();
+        var markers = ImmutableHashSet.CreateBuilder<IrInstructionId>();
+        var markerTargets = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var writers = ImmutableDictionaryCapture.Create(instructionRows.SelectMany(IrInstructionFacts.WrittenVariables)
+            .GroupBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable)), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()));
+        var reads = IrTraversal.CollectVariables(instructionRows.SelectMany(IrInstructionFacts.ReadTerms)
+            .Concat(requires.Concat(ensures).SelectMany(clause => ((clause.Value is null || clause.Safe is null || clause.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : (ImmutableArray.Create(clause.Value, clause.Safe))))));
         foreach (var clause in CallPreconditions)
         {
             IrFactory.RequireBooleanTerm(program.Factory, clause.Value, nameof(callPreconditions));
@@ -120,7 +131,7 @@ internal sealed class PassiveCallableCandidate
                 marker.Value.Id != program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id)
             { throw new ArgumentException("Call preconditions must own distinct guarded assignments in the original body.", nameof(callPreconditions)); }
         }
-        if (instructions.Values.OfType<IrAssignInstruction>().Any(marker =>
+        if (instructionRows.OfType<IrAssignInstruction>().Any(marker =>
             marker is null ? throw new System.ArgumentNullException(nameof(marker)) : (IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
             !markers.Contains(marker.Id))))
         { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }

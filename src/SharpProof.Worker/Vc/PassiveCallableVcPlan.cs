@@ -24,14 +24,18 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
 
-    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
+    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder,
+        ImmutableArray<Assumption> entryAssumptions, ImmutableArray<IrTerm> goals,
+        IrTerm normalCompletion, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
         ArgumentNullGuard.NotNull(builder, nameof(builder));
+        RepositoryParameterGuard.RequireInitialized(entryAssumptions.IsDefault, nameof(entryAssumptions), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(goals.IsDefault, nameof(goals), "Array must be initialized.");
         _candidate = builder.Candidate;
-        _entry = builder.EntryAssumptions;
+        _entry = entryAssumptions;
         _body = builder.Facts;
-        _goals = builder.Goals;
-        _normalCompletion = builder.NormalCompletion;
+        _goals = goals;
+        _normalCompletion = ArgumentNullGuard.NotNull(normalCompletion, nameof(normalCompletion));
         _exceptions = builder.Exceptions;
         _explicitSites = builder.ExplicitSites;
         _allocations = builder.Allocations;
@@ -59,7 +63,7 @@ internal sealed class PassiveCallableVcPlan
     internal PassiveCallableVcPlan? LoopSearch { get; }
     internal bool IsBoundedSearch { get; }
     internal bool HasBodyAbstraction => _candidate.IsBodyAbstraction;
-    internal bool HasUnmodeledAllocations { get; private set; }
+    internal bool HasUnmodeledAllocations { get; }
 
     internal VerificationQuery EntryQuery()
     {
@@ -99,7 +103,7 @@ internal sealed class PassiveCallableVcPlan
     {
         if (ordinal < 0 || ordinal >= CallPreconditionCount)
         { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
-        var occurrences = _callPreconditions.Where(clause => clause.Ordinal == ordinal).ToArray();
+        var occurrences = _callPreconditions.Where(clause => clause.Ordinal == ordinal).ToImmutableArray();
         if (occurrences.Length == 0)
         {
             return [new(Factory, _entry, new Goal(Factory, Factory.Boolean(true),
@@ -118,20 +122,20 @@ internal sealed class PassiveCallableVcPlan
         { return null; }
         var marker = _candidate.CallPreconditions[ordinal].Marker;
         OperationId? witness = null;
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
         {
-            initial[parameter.Entry] = inputs[parameter.Entry];
-            initial[parameter.Current] = inputs[parameter.Entry];
+            initialBuffer[parameter.Entry] = inputs[parameter.Entry];
+            initialBuffer[parameter.Current] = inputs[parameter.Entry];
         }
-        var options = ReplayOptions(initial: initial);
-        options.AssignmentObserver = (assignment, value, approximation) =>
+        var initial = initialBuffer.ToImmutable();
+        var options = ReplayOptions(initial: initial, assignmentObserver: (assignment, value, approximation) =>
         {
             System.ArgumentNullException.ThrowIfNull(assignment);
             System.ArgumentNullException.ThrowIfNull(value);
             if (assignment.Id == marker && !value.Boolean && !approximation)
             { witness ??= assignment.Operation; }
-        };
+        });
         new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, options, cancellationToken);
         return witness;
@@ -212,7 +216,7 @@ internal sealed class PassiveCallableVcPlan
     internal bool IsReceiverWrite(IrInstructionId instruction)
     {
         RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
-        var matches = _writes.Where(write => write.Instruction == instruction).ToArray();
+        var matches = _writes.Where(write => write.Instruction == instruction).ToImmutableArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 
@@ -280,33 +284,34 @@ internal sealed class PassiveCallableVcPlan
         return ReplayWithOptions(inputs, initial =>
         {
             System.ArgumentNullException.ThrowIfNull(initial);
-            var options = ReplayOptions(initial: initial, lockPrefixObserver: lockObserver);
-            options.NonFreshWritePrefixObserver = writeObserver;
-            return options;
+            return ReplayOptions(initial: initial, lockPrefixObserver: lockObserver, nonFreshWritePrefixObserver: writeObserver);
         }, cancellationToken);
     }
 
     private IrProgramExecutionResult ReplayWithOptions(ImmutableDictionary<IrVarId, IrValue> inputs,
-        Func<Dictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
+        Func<ImmutableDictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(createOptions);
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
         {
-            initial[parameter.Entry] = inputs[parameter.Entry];
-            initial[parameter.Current] = inputs[parameter.Entry];
+            initialBuffer[parameter.Entry] = inputs[parameter.Entry];
+            initialBuffer[parameter.Current] = inputs[parameter.Entry];
         }
+        var initial = initialBuffer.ToImmutable();
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, createOptions(initial), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
-        Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null,
+        Action<IrLockInstruction>? lockObserver = null, ImmutableDictionary<IrVarId, IrValue>? initial = null,
         Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
-        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null,
+        Action<IrAssignInstruction, IrValue, bool>? assignmentObserver = null,
+        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null)
     {
         return new(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
@@ -331,7 +336,9 @@ internal sealed class PassiveCallableVcPlan
             LockObserver = lockObserver,
             AllocationPrefixObserver = allocationPrefixObserver,
             WritePrefixObserver = writePrefixObserver,
-            LockPrefixObserver = lockPrefixObserver
+            LockPrefixObserver = lockPrefixObserver,
+            AssignmentObserver = assignmentObserver,
+            NonFreshWritePrefixObserver = nonFreshWritePrefixObserver
         };
     }
 

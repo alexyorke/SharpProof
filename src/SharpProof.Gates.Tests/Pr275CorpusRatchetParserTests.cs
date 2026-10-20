@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,7 +19,7 @@ public sealed class Pr275CorpusRatchetParserTests
         Assert.That(actual.MinimumSupportedCases, Is.EqualTo(root.GetProperty("minimumSupportedCases").GetInt32()));
         Assert.That(actual.MinimumSupportedOpenSourceMethods, Is.EqualTo(root.GetProperty("minimumSupportedOpenSourceMethods").GetInt32()));
         Assert.That(actual.MaximumTotalUnknown, Is.EqualTo(root.GetProperty("maximumTotalUnknown").GetInt32()));
-        var reasons = root.GetProperty("maximumByReason").EnumerateObject().ToArray();
+        var reasons = root.GetProperty("maximumByReason").EnumerateObject().ToImmutableArray();
         Assert.That(actual.MaximumByReason.Count, Is.EqualTo(reasons.Length));
         foreach (var reason in reasons)
         {
@@ -141,7 +142,7 @@ public sealed class Pr275CorpusRatchetParserTests
             }
             writer.WriteEndObject();
         }
-        using var document = JsonDocument.Parse(Encoding.UTF8.GetString(stream.ToArray()));
+        using var document = JsonDocument.Parse(Encoding.UTF8.GetString(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement)));
         Assert.That(error!.Message, Is.EqualTo($"Duplicate corpus Unknown reason: {duplicate}."));

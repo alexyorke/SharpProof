@@ -6,8 +6,8 @@ internal sealed class CompilerSpecificationPackProvider
 {
     private readonly IrFactory _factory;
     private readonly ImmutableDictionary<string, CompilerSpecificationMethodEvidence> _methods;
-    private readonly Dictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
-        new(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?>.Builder _resolved =
+        ImmutableDictionary.CreateBuilder<IMethodSymbol, CompilerSpecificationMethodEvidence?>(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
@@ -24,7 +24,7 @@ internal sealed class CompilerSpecificationPackProvider
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
-        var selectedPacks = authority.SpecificationPackIds?.ToArray();
+        var selectedPacks = authority.SpecificationPackIds;
         var catalogVersion = authority.SpecificationPackCatalogVersion;
         var catalogSha256 = authority.SpecificationPackCatalogSha256;
         if (!CompilerSpecificationPackSelection.IsValid(
@@ -50,7 +50,7 @@ internal sealed class CompilerSpecificationPackProvider
                 var definition = new CompilerSpecificationMethodEvidence(
                     method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
                     method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
-                methods.Add(method.DocumentationCommentId, definition);
+                methods.AddUnique(method.DocumentationCommentId, definition);
             }
         }
 
@@ -70,12 +70,12 @@ internal sealed class CompilerSpecificationPackProvider
         };
     }
 
-    private static string[] CanonicalizeSelection(
+    private static ImmutableArray<string> CanonicalizeSelection(
         IEnumerable<string>? enabledPacks,
         RelationalSpecPackCatalog catalog)
     {
-        var values = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var values = ImmutableArray.CreateBuilder<string>();
+        var seen = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var value in enabledPacks ?? [])
         {
             var normalized = value?.Trim() ?? string.Empty;
@@ -84,12 +84,13 @@ internal sealed class CompilerSpecificationPackProvider
                 continue;
             }
 
-            if (!seen.Add(normalized))
+            if (seen.Contains(normalized))
             {
                 throw new InvalidOperationException(
                     "SharpProof specification-pack identifiers must be unique.");
             }
 
+            seen.Add(normalized);
             values.Add(normalized);
         }
 
@@ -103,7 +104,7 @@ internal sealed class CompilerSpecificationPackProvider
             }
         }
 
-        return values.ToArray();
+        return values.ToImmutable();
     }
 
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)

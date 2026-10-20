@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -151,10 +152,7 @@ internal sealed partial class NativeSpecifiedCallTests
             ConcreteHavocValueProvider = request => IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) != null &&
                 factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null
         };
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [context.Parameters[0].Entry] = isNull ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, new object())
-        };
+        var inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(context.Parameters[0].Entry, isNull ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, new object()));
         var result = new IrProgramInterpreter(factory).Execute(lowered.Program, inputs, 5000, options);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(1));

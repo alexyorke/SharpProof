@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
@@ -47,7 +48,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var diagnostics = compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(diagnostics, Is.Empty, string.Join(Environment.NewLine, diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         using var stream = new MemoryStream();
@@ -86,7 +87,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
                 Assert.That(graph.Blocks.Length, Is.LessThan(RoslynTotalProgramLowerer.MaximumRegionSteps));
                 Assert.That(lowering.IsExact, Is.True);
                 Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-                var inputs = context.Parameters.ToDictionary(
+                var inputs = ImmutableDictionaryCapture.Create(context.Parameters,
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, -1L)));
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, inputs);

@@ -21,6 +21,6 @@ public sealed class Pr275StringPrinterCoverageTests
 
         Assert.That(new IrPrinter(factory).Print(term), Is.EqualTo(expected));
         Assert.That(new IrInterpreter(factory).Evaluate(term,
-            new Dictionary<IrVarId, IrValue>()).Value!.String, Is.EqualTo(contents));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.String, Is.EqualTo(contents));
     }
 }

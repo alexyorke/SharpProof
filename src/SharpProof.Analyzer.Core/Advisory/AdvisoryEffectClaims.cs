@@ -71,7 +71,7 @@ internal static class AdvisoryEffectClaims
                 { effects &= ~EffectContractKind.Throws; }
                 var capabilities = Capabilities(site) & ~constraint.Capabilities;
                 return effects != EffectContractKind.None || capabilities != EffectContractCapabilityKind.None
-                    ? "may have undeclared effects: " + string.Join(", ", new[] { effects.ToString(), capabilities.ToString() }
+                    ? "may have undeclared effects: " + string.Join(", ", ImmutableArray.Create(effects.ToString(), capabilities.ToString())
                         .Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name != "None")))
                     : null;
         }

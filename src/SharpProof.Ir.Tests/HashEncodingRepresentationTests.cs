@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO;
 using System.Text.Json;
 using NUnit.Framework;
@@ -8,6 +9,17 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class HashEncodingRepresentationTests
 {
+    [Test]
+    public void ImmutableDigestInputsDistinguishDefaultFromInitializedEmpty()
+    {
+        RecordBinding(nameof(ImmutableDigestInputsDistinguishDefaultFromInitializedEmpty));
+        ImmutableArray<byte> bytes = default;
+        var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrHashEncoding.ComputeSha256Hex(bytes)));
+        Assert.That(exception!.ParamName, Is.EqualTo(nameof(bytes)));
+        Assert.That(IrHashEncoding.ComputeSha256Hex(ImmutableArray<byte>.Empty), Is.EqualTo(EmptyDigest));
+    }
+
     private const string AbcDigest =
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
     private const string EmptyDigest =
@@ -17,11 +29,11 @@ public sealed class HashEncodingRepresentationTests
     public void StreamDigestUsesOnlyTheRemainingBytesAndKeepsTheStreamOpen()
     {
         RecordBinding(nameof(StreamDigestUsesOnlyTheRemainingBytesAndKeepsTheStreamOpen));
-        byte[] bytes = [88, 97, 98, 99];
-        using var stream = new MemoryStream(bytes, writable: false);
+        ImmutableArray<byte> bytes = [88, 97, 98, 99];
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         stream.Position = 1;
         var actual = IrHashEncoding.ComputeSha256Hex(stream);
-        byte[] suffix = [97, 98, 99];
+        ImmutableArray<byte> suffix = [97, 98, 99];
 
         Assert.That(actual, Is.EqualTo(AbcDigest));
         Assert.That(actual, Is.EqualTo(IrHashEncoding.ComputeSha256Hex(suffix)));
@@ -36,7 +48,7 @@ public sealed class HashEncodingRepresentationTests
     public void DigestTextValidationMatchesTheCanonicalLowercaseRepresentation()
     {
         RecordBinding(nameof(DigestTextValidationMatchesTheCanonicalLowercaseRepresentation));
-        byte[] bytes = [97, 98, 99];
+        ImmutableArray<byte> bytes = [97, 98, 99];
         var actual = IrHashEncoding.ComputeSha256Hex(bytes);
 
         Assert.That(actual, Is.EqualTo(AbcDigest));

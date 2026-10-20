@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -21,7 +22,7 @@ public sealed class IrSupportedBoundaryTests
     {
         var span = new IrSourceSpan("source.cs", 4, 2);
         var hash = new string('a', 64);
-        foreach (var identity in new[] { new string('x', 4097), new string('\u0800', 1366), "\ud800" })
+        foreach (var identity in ImmutableArray.Create(new string('x', 4097), new string('\u0800', 1366), "\ud800"))
         {
             Assert.That(IrCallPreconditionMarker.TryCreateName(identity, 0, span, span, out var sourceName), Is.False);
             Assert.That(sourceName, Is.Empty);
@@ -52,10 +53,10 @@ public sealed class IrSupportedBoundaryTests
         var second = factory.CreateVariable("second", factory.IntegerType);
         var sum = factory.Binary(IrBinaryOperator.Add, factory.Variable(first), factory.Variable(second));
         Assert.That(IrSubstitution.TrySubstitute(factory, sum,
-            new Dictionary<IrVarId, IrTerm> { [first] = factory.Integer(2) }, new HashSet<IrVarId> { second }, out var valid), Is.True);
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), ImmutableHashSet.Create(second), out var valid), Is.True);
         Assert.That(IrSubstitution.TrySubstitute(factory, sum,
-            new Dictionary<IrVarId, IrTerm> { [first] = factory.Integer(2) }, new HashSet<IrVarId>(), out _), Is.False);
-        var result = new IrInterpreter(factory).Evaluate(valid, new Dictionary<IrVarId, IrValue> { [second] = factory.CreateIntegerValue(3) });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), ImmutableHashSet<IrVarId>.Empty, out _), Is.False);
+        var result = new IrInterpreter(factory).Evaluate(valid, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(second, factory.CreateIntegerValue(3)));
         Assert.That(result.Value!.Integer, Is.EqualTo(5));
     }
 
@@ -76,7 +77,7 @@ public sealed class IrSupportedBoundaryTests
         var valid = new IrProgramInterpreter(factory).Execute(program);
         Assert.That(valid.ReturnValue!.Integer, Is.EqualTo(5));
         Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(factory).Execute(program,
-            new Dictionary<IrVarId, IrValue> { [target] = factory.CreateIntegerValue(1) })));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(target, factory.CreateIntegerValue(1)))));
     }
 
     [Test]
@@ -137,7 +138,7 @@ public sealed class IrSupportedBoundaryTests
         Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(factory.IntegerType, face)));
         factory.RegisterImplementedReferenceInterface(child, face);
         factory.RegisterImplementedReferenceInterface(child, face);
-        Assert.That(factory.GetImplementedReferenceInterfaces(child), Is.EqualTo(new[] { face }));
+        Assert.That(factory.GetImplementedReferenceInterfaces(child), Is.EqualTo(ImmutableArray.Create(face)));
         Assert.That(factory.GetImplementedReferenceInterfaces(parent), Is.Empty);
         Assert.That(factory.IsInterfaceReferenceType(face), Is.True);
         Assert.That(factory.IsInterfaceReferenceType(parent), Is.False);

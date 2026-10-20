@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -23,7 +24,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
             new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, id);
+            AnalyzerTestHost.AssertIds(diagnostics, [id]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], detail);
             Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         }
@@ -48,7 +49,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             Source("[ZeroAllocations]", "dynamic value = x; return (int)value;"), "effects", ["SP0047"]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
     }
 
     [TestCase("System.Exception", "System.InvalidOperationException", false)]

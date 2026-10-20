@@ -18,43 +18,43 @@ internal static class ContractForSymbolMatcher
         internal INamedTypeSymbol Target => ContractTarget.Target;
     }
 
-    internal static IReadOnlyDictionary<INamedTypeSymbol,
+    internal static ImmutableDictionary<INamedTypeSymbol,
         ImmutableArray<CompanionDescriptor>> BuildCompanionTargetIndex(
         ImmutableArray<CompanionDescriptor> companions)
     {
 
         RepositoryParameterGuard.RequireInitialized(companions.IsDefault, nameof(companions), "Array must be initialized.");
-        var indexed = new Dictionary<INamedTypeSymbol,
-            ImmutableArray<CompanionDescriptor>.Builder>(
-            SymbolEqualityComparer.Default);
+        var buckets = ImmutableDictionary.CreateBuilder<INamedTypeSymbol,
+            ImmutableArray<CompanionDescriptor>.Builder>(SymbolEqualityComparer.Default);
         foreach (var companion in companions)
         {
             var key = companion.ContractTarget.IsOpen
                 ? companion.Target.OriginalDefinition
                 : companion.Target;
-            if (!indexed.TryGetValue(key, out var bucket))
+            if (!buckets.TryGetValue(key, out var bucket))
             {
                 bucket = ImmutableArray.CreateBuilder<CompanionDescriptor>();
-                indexed.Add(key, bucket);
+                buckets.Add(key, bucket);
             }
             bucket.Add(companion);
         }
-
-        return indexed.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value.ToImmutable(),
-            (IEqualityComparer<INamedTypeSymbol>)
-                SymbolEqualityComparer.Default);
+        var indexed = ImmutableDictionary.CreateBuilder<INamedTypeSymbol,
+            ImmutableArray<CompanionDescriptor>>(SymbolEqualityComparer.Default);
+        foreach (var pair in buckets)
+        {
+            indexed.Add(pair.Key, pair.Value.ToImmutable());
+        }
+        return indexed.ToImmutable();
     }
 
     internal sealed class CompanionRelationshipInventory(
         ImmutableArray<CompanionDescriptor> accepted,
-        HashSet<INamedTypeSymbol> selfTargeting,
-        HashSet<INamedTypeSymbol> cyclic)
+        ImmutableHashSet<INamedTypeSymbol> selfTargeting,
+        ImmutableHashSet<INamedTypeSymbol> cyclic)
     {
-        private readonly HashSet<INamedTypeSymbol> _selfTargeting =
+        private readonly ImmutableHashSet<INamedTypeSymbol> _selfTargeting =
             (selfTargeting ?? throw new System.ArgumentNullException(nameof(selfTargeting)));
-        private readonly HashSet<INamedTypeSymbol> _cyclic = (cyclic ?? throw new System.ArgumentNullException(nameof(cyclic)));
+        private readonly ImmutableHashSet<INamedTypeSymbol> _cyclic = (cyclic ?? throw new System.ArgumentNullException(nameof(cyclic)));
 
         internal ImmutableArray<CompanionDescriptor> Accepted { get; } =
             (accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(accepted)) : accepted);
@@ -293,22 +293,23 @@ internal static class ContractForSymbolMatcher
         cancellationToken.ThrowIfCancellationRequested();
         var comparer = (IEqualityComparer<INamedTypeSymbol>)
             SymbolEqualityComparer.Default;
-        var byType = new Dictionary<INamedTypeSymbol, CompanionDescriptor>(
-            comparer);
+        var byType = ImmutableDictionary.CreateBuilder<INamedTypeSymbol, CompanionDescriptor>(comparer);
+        var byTypeOrder = ImmutableArray.CreateBuilder<KeyValuePair<INamedTypeSymbol, CompanionDescriptor>>();
         foreach (var relationship in relationships)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!byType.ContainsKey(relationship.Type))
             {
-                byType.Add(relationship.Type, relationship);
+                byType.AddUnique(relationship.Type, relationship);
+                byTypeOrder.Add(new(relationship.Type, relationship));
             }
         }
 
-        var incoming = byType.Keys.ToDictionary(
+        var incoming = ImmutableDictionaryCapture.Create(byTypeOrder.Select(static pair => pair.Key),
             static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type),
             static _ => 0,
-            comparer);
-        foreach (var pair in byType)
+            comparer).ToBuilder();
+        foreach (var pair in byTypeOrder)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var source = pair.Key;
@@ -317,16 +318,15 @@ internal static class ContractForSymbolMatcher
             {
                 continue;
             }
-            incoming[relationship.Target]++;
+            incoming[relationship.Target] = incoming[relationship.Target] + 1;
         }
 
-        var pending = new Queue<INamedTypeSymbol>(
-            incoming.Where(static pair => pair.Value == 0)
-                .Select(static pair => pair.Key));
-        while (pending.Count != 0)
+        var pending = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+        pending.AddRange(byTypeOrder.Where(pair => incoming[pair.Key] == 0).Select(static pair => pair.Key));
+        for (var pendingIndex = 0; pendingIndex < pending.Count; pendingIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var source = pending.Dequeue();
+            var source = pending[pendingIndex];
             var target = byType[source].Target;
             if (!incoming.TryGetValue(target, out var targetIncoming))
             {
@@ -336,13 +336,13 @@ internal static class ContractForSymbolMatcher
             incoming[target] = targetIncoming;
             if (targetIncoming == 0)
             {
-                pending.Enqueue(target);
+                pending.Add(target);
             }
         }
 
         var accepted = ImmutableArray.CreateBuilder<CompanionDescriptor>();
-        var selfTargeting = new HashSet<INamedTypeSymbol>(comparer);
-        var cyclic = new HashSet<INamedTypeSymbol>(comparer);
+        var selfTargeting = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(comparer);
+        var cyclic = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(comparer);
         foreach (var relationship in relationships)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -366,14 +366,14 @@ internal static class ContractForSymbolMatcher
         }
         return new CompanionRelationshipInventory(
             accepted.ToImmutable(),
-            selfTargeting,
-            cyclic);
+            selfTargeting.ToImmutable(),
+            cyclic.ToImmutable());
     }
 
     internal static CompanionResolution ResolveCompanion(
         ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
+        ImmutableDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
     {
 
         RepositoryParameterGuard.RequireInitialized(companions.IsDefault, nameof(companions), "Array must be initialized.");
@@ -387,7 +387,7 @@ internal static class ContractForSymbolMatcher
 
     internal static CompanionResolution ResolveCompanion(
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol,
+        ImmutableDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
@@ -472,7 +472,7 @@ internal static class ContractForSymbolMatcher
 
     private static IEnumerable<CompanionDescriptor> GetCompanionCandidates(
         IMethodSymbol target,
-        IReadOnlyDictionary<INamedTypeSymbol,
+        ImmutableDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
@@ -586,7 +586,7 @@ internal static class ContractForSymbolMatcher
 
                 if (method.Arity != 0)
                 {
-                    method = method.Construct(state.target.TypeArguments.ToArray());
+                    method = method.Construct(state.target.TypeArguments, state.target.TypeArgumentNullableAnnotations);
                 }
 
                 return (!RequiresConstructedSignatureCheck(state.target) ||
@@ -624,10 +624,15 @@ internal static class ContractForSymbolMatcher
                             companionLayers[index].OriginalDefinition))) ??
                   throw new ArgumentException(
                       "The nested companion type could not be specialized.");
-            constructed = definition.Arity == 0
-                ? definition
-                : definition.Construct(
-                    targetLayers[targetIndex++].TypeArguments.ToArray());
+            if (definition.Arity == 0)
+            {
+                constructed = definition;
+            }
+            else
+            {
+                var targetLayer = targetLayers[targetIndex++];
+                constructed = definition.Construct(targetLayer.TypeArguments, targetLayer.TypeArgumentNullableAnnotations);
+            }
         }
 
         return constructed ?? throw new ArgumentException(
@@ -656,14 +661,14 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol type)
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        var layers = new Stack<INamedTypeSymbol>();
+        var layers = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (INamedTypeSymbol? current = type;
              current != null;
              current = current.ContainingType)
         {
-            layers.Push(current);
+            layers.Add(current);
         }
-        return [.. layers];
+        return layers.AsEnumerable().Reverse().ToImmutableArray();
     }
 
     private static bool HasUniqueTarget(IMethodSymbol target, IMethodSymbol companion)
@@ -729,8 +734,8 @@ internal static class ContractForSymbolMatcher
 
     private static bool DecimalBitsMatch(decimal left, decimal right)
     {
-        var leftBits = decimal.GetBits(left);
-        var rightBits = decimal.GetBits(right);
+        var leftBits = decimal.GetBits(left).ToImmutableArray();
+        var rightBits = decimal.GetBits(right).ToImmutableArray();
         return leftBits[0] == rightBits[0] &&
             leftBits[1] == rightBits[1] &&
             leftBits[2] == rightBits[2] &&
@@ -832,7 +837,7 @@ internal static class ContractForSymbolMatcher
             return false;
         }
 
-        var unmatched = right.ConstraintTypes.ToList();
+        var unmatched = right.ConstraintTypes.ToImmutableList().ToBuilder();
         foreach (var constraint in left.ConstraintTypes)
         {
             var index = unmatched.FindIndex(candidate =>
@@ -1045,13 +1050,13 @@ internal static class ContractForSymbolMatcher
             return false;
         }
 
-        var matched = new bool[right.Length];
+        var matched = ImmutableHashSet.CreateBuilder<int>();
         foreach (var leftType in left)
         {
             var match = -1;
             for (var index = 0; index < right.Length; index++)
             {
-                if (!matched[index] &&
+                if (!matched.Contains(index) &&
                     SymbolEqualityComparer.Default.Equals(
                         leftType,
                         right[index]))
@@ -1066,7 +1071,7 @@ internal static class ContractForSymbolMatcher
                 return false;
             }
 
-            matched[match] = true;
+            matched.Add(match);
         }
 
         return true;

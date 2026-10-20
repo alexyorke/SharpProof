@@ -36,10 +36,10 @@ try {
     $origin = & git -C $repositoryRoot remote get-url origin
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the baseline source repository.' }
     Invoke-CompatibilityNative 'git' @('-C', $baselineRoot, 'remote', 'set-url', 'origin', $origin)
-    foreach ($entry in @(
-            @{ root = $baselineRoot; project = $project; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision },
-            @{ root = $repositoryRoot; project = ('src/' + $project); output = (Join-Path $packageRoot 'current'); validation = 'true'; revision = $currentRevision }
-        )) {
+    foreach ($entry in [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                ([ordered]@{ root = $baselineRoot; project = $project; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision }).AsReadOnly(),
+                ([ordered]@{ root = $repositoryRoot; project = ('src/' + $project); output = (Join-Path $packageRoot 'current'); validation = 'true'; revision = $currentRevision }).AsReadOnly()
+            ))) {
         $entryRevision = (& git -C $entry.root rev-parse --verify 'HEAD^{commit}').Trim()
         if ($LASTEXITCODE -ne 0 -or $entryRevision -cnotmatch '\A[a-f0-9]{40}\z' -or $entryRevision -cne $entry.revision) {
             throw 'Compatibility source checkout differs from its immutable expected commit.'
@@ -57,9 +57,9 @@ try {
             throw 'Compatibility source commit changed while packing.'
         }
     }
-    $baselinePackages = @(Get-ChildItem (Join-Path $packageRoot 'baseline') -Filter '*.nupkg')
-    $currentPackages = @(Get-ChildItem (Join-Path $packageRoot 'current') -Filter '*.nupkg')
-    if ($baselinePackages.Count -ne 1 -or $currentPackages.Count -ne 1) {
+    $baselinePackages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem (Join-Path $packageRoot 'baseline') -Filter '*.nupkg'))
+    $currentPackages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem (Join-Path $packageRoot 'current') -Filter '*.nupkg'))
+    if ($baselinePackages.Length -ne 1 -or $currentPackages.Length -ne 1) {
         throw 'Expected exactly one baseline and current public API package.'
     }
     Invoke-CompatibilityNative 'apicompat' @(

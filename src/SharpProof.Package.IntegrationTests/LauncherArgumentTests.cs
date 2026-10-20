@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
@@ -20,7 +21,7 @@ internal sealed class LauncherArgumentTests
     [Test]
     public void UnknownOptionIsRejected()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--project-wall-milliseconds",
             "100"
@@ -34,7 +35,7 @@ internal sealed class LauncherArgumentTests
     [Test]
     public void SarifRequiresTheAtomicPublicationTriple()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--publish-sarif", "result.sarif"
         ];
@@ -48,7 +49,7 @@ internal sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void CompletePublicationAcceptsSarif()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--publish-request", "published-request.json",
             "--publish-result", "published-result.json",
@@ -102,7 +103,7 @@ internal sealed class LauncherArgumentTests
     [Test]
     public void CustomArgumentsProjectEveryRequestValueExactly()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--query-rlimit", "101",
             "--method-rlimit", "102",
@@ -245,7 +246,7 @@ internal sealed class LauncherArgumentTests
     [TestCase(300_001)]
     public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--termination-grace-ms",
             graceMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)
@@ -293,8 +294,8 @@ internal sealed class LauncherArgumentTests
     [Test]
     public void MaximumProjectTimeoutAndAllowedGraceUseLongPublicationTimeout()
     {
-        var graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
-        var expectedMilliseconds = (long)int.MaxValue +
+        const int graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
+        const long expectedMilliseconds = (long)int.MaxValue +
             graceMilliseconds +
             PublicationLease.TimeoutMilliseconds;
 
@@ -570,7 +571,7 @@ internal sealed class LauncherArgumentTests
         };
         if (mismatch == "input")
         {
-            response.InputHash = new('b', 64);
+            { response = response with { InputHash = new('b', 64) }; }
         }
         else if (mismatch == "budgets")
         {
@@ -578,7 +579,7 @@ internal sealed class LauncherArgumentTests
         }
         else
         {
-            response.Summary.Versions.WorkerVersion = "fabricated";
+            { response = response with { Summary = response.Summary with { Versions = response.Summary.Versions with { WorkerVersion = "fabricated" } } }; }
         }
 
         using var temporary = new TempDirectory(
@@ -792,7 +793,7 @@ internal sealed class LauncherArgumentTests
         WorkerClaimReason timeoutReason)
     {
         var request = CreateValidRequest();
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var methodId = timeoutReason == WorkerClaimReason.ProjectTimeout
             ? "C.ProjectTimeout"
             : "C.MethodTimeout";
@@ -1114,41 +1115,50 @@ internal sealed class LauncherArgumentTests
         manifest.Callables[0].SelectionReasons = [
             WorkerSelectionReason.ExplicitAnnotation
         ];
-        claim.Kind = WorkerClaimKind.Effect;
-        claim.Evidence = WorkerClaimEvidence.Attribute;
-        claim.EffectContractKind = WorkerEffectContractKind.DoesNotThrow;
+        { var originalFixtureRow42902 = claim; claim = claim with { Kind = WorkerClaimKind.Effect }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow42902, claim) }; }
+        { var originalFixtureRow42947 = claim; claim = claim with { Evidence = WorkerClaimEvidence.Attribute }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow42947, claim) }; }
+        { var originalFixtureRow43003 = claim; claim = claim with { EffectContractKind = WorkerEffectContractKind.DoesNotThrow }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow43003, claim) }; }
         WorkerProtocolJson.SealManifest(manifest);
-        response.ClaimResults[0].Vacuity = WorkerVacuityKind.None;
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+        response = response with { Manifest = manifest };
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.None }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; }
 
         using var certainty = JsonDocument.Parse(
             SarifProjection.Serialize(
                 request, response, SarifProjectDirectory));
         JsonAssert.Equal(ResultEvidence(certainty), "effectCertainty", "CompleteMayEffectSummary");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.kind", "Effect");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.evidence", "Attribute");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.effectContractKind", "DoesNotThrow");
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.DefiniteViolation;
-        response.ClaimResults[0].EffectWitness =
-            new WorkerEffectViolationWitness
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.DefiniteViolation }) }; }
+        {
+            response = response with
             {
-                Kind = "explicit-throw",
-                Detail = "T:System.InvalidOperationException",
-                Effects = WorkerEffectSet.Throws,
-                ExactExceptionTypeHierarchy = [
+                ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+                {
+                    EffectWitness = new WorkerEffectViolationWitness
+                    {
+                        Kind = "explicit-throw",
+                        Detail = "T:System.InvalidOperationException",
+                        Effects = WorkerEffectSet.Throws,
+                        ExactExceptionTypeHierarchy = [
                     "System.Private.CoreLib:T:System.InvalidOperationException",
                     "System.Private.CoreLib:T:System.Exception"
                 ],
-                Location = new WorkerSourceLocation
-                {
-                    Path = "witness.cs",
-                    Start = 20,
-                    Length = 5,
-                    Line = 9,
-                    Column = 7
-                }
+                        Location = new WorkerSourceLocation
+                        {
+                            Path = "witness.cs",
+                            Start = 20,
+                            Length = 5,
+                            Line = 9,
+                            Column = 7
+                        }
+                    }
+                })
             };
+        }
         using var refuted = JsonDocument.Parse(
             SarifProjection.Serialize(
                 request, response, SarifProjectDirectory));
@@ -1574,9 +1584,10 @@ internal sealed class LauncherArgumentTests
         };
     }
 
-    private static void AssertRequestProjectionRejects(string[] arguments)
+    private static void AssertRequestProjectionRejects(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
@@ -1585,7 +1596,7 @@ internal sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
-    private static string[] ProjectionArguments(
+    private static ImmutableArray<string> ProjectionArguments(
         string worker = "worker.dll",
         string request = "request.json",
         string result = "result.json",
@@ -1597,7 +1608,7 @@ internal sealed class LauncherArgumentTests
         System.ArgumentNullException.ThrowIfNull(request);
         System.ArgumentNullException.ThrowIfNull(result);
         System.ArgumentNullException.ThrowIfNull(worker);
-        string[] cacheArguments = cacheDirectory == null
+        ImmutableArray<string> cacheArguments = cacheDirectory == null
             ? []
             : cacheEnabled.HasValue
                 ? [
@@ -1618,7 +1629,7 @@ internal sealed class LauncherArgumentTests
         ];
     }
 
-    private static string[] ValidArguments()
+    private static ImmutableArray<string> ValidArguments()
     {
         return ProjectionArguments(compilerManifest: "compiler-manifest.json");
     }

@@ -106,7 +106,7 @@ internal static class ApiSpecContentDigest
 
     private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
-        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
+        ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
         hash = RepositoryParameterGuard.NotNull(hash, nameof(hash));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));

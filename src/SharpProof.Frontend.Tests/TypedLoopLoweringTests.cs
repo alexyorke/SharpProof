@@ -69,7 +69,7 @@ public sealed class TypedLoopLoweringTests
         using var subject = TypedProgramSubject.Create("int Target(int x) { while (true) x++; }");
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var inputs = subject.Context.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry), parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (subject.Value(parameter.Entry, 0)));
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry), parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (subject.Value(parameter.Entry, 0)));
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs, maximumSteps: 4096, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.StepLimit));
         using var cancellation = new CancellationTokenSource();

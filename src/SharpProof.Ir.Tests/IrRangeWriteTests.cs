@@ -1,10 +1,11 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
 
 public sealed class IrRangeWriteTests
 {
-    private static readonly int[] InitialValues = [3, 5, 7, 5];
+    private static readonly ImmutableArray<int> InitialValues = [3, 5, 7, 5];
     [TestCase(1, 2, 8)]
     [TestCase(4, 0, 8)]
     [TestCase(0, 4, 0)]
@@ -20,8 +21,8 @@ public sealed class IrRangeWriteTests
         var write = builder.ElementStore(entry, factory.CreateOperation(), array, factory.Integer(start), factory.Integer(0), factory.Integer(length));
         builder.Return(entry, factory.CreateOperation(), factory.Binary(IrBinaryOperator.Add,
             factory.SequenceAccess(array, factory.Integer(0)), factory.SequenceAccess(array, factory.Integer(3))));
-        var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        { [variable] = factory.CreateSequenceValue(type, InitialValues.Select(value => factory.CreateIntegerValue(value))) };
+        var arguments = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(
+            variable, factory.CreateSequenceValue(type, InitialValues.Select(value => factory.CreateIntegerValue(value))));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), arguments);
         Assert.That(write.Length, Is.Not.Null);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -44,8 +45,8 @@ public sealed class IrRangeWriteTests
         var entry = builder.CreateBlock();
         builder.ElementStore(entry, factory.CreateOperation(), factory.Variable(variable), factory.Integer(start), factory.Integer(0), factory.Integer(length));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        { [variable] = factory.CreateSequenceValue(type, InitialValues.Select(value => factory.CreateIntegerValue(value))) };
+        var arguments = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(
+            variable, factory.CreateSequenceValue(type, InitialValues.Select(value => factory.CreateIntegerValue(value))));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), arguments);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(result.Unsupported!.Detail, Does.Contain("range store was not in bounds"));
@@ -106,11 +107,10 @@ public sealed class IrRangeWriteTests
             factory.Binary(IrBinaryOperator.Equal, factory.SequenceAccess(array, factory.Integer(1)), factory.Null(factory.ObjectType))));
         // The result includes an independently bound reference identity.
         var value = factory.CreateReferenceValue(factory.ObjectType, first);
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [variable] = factory.CreateSequenceValue(type, [value, factory.CreateReferenceValue(factory.ObjectType, second)]),
-            [identity] = value
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[variable] = factory.CreateSequenceValue(type, [value, factory.CreateReferenceValue(factory.ObjectType, second)]);
+        inputBuilder[identity] = value;
+        var inputs = inputBuilder.ToImmutable();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), inputs);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Boolean, Is.True);

@@ -34,6 +34,27 @@ public sealed class SourceTypeSubstitutionTests
     }
 
     [Test]
+    public void ConstructedArgumentsKeepNullableAnnotationsAfterSubstitution()
+    {
+        var tree = CSharpSyntaxTree.ParseText("#nullable enable\npublic class Box<T> { public void Target() { } public System.Collections.Generic.Dictionary<T, string?> Value = null!; }");
+        var compilation = CSharpCompilation.Create("NullableConstructedSubstitution", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null
+            ? throw new System.ArgumentNullException(nameof(diagnostic))
+            : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(
+            tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var replacement = compilation.GetSpecialType(SpecialType.System_Int32);
+        context.SpecializeTypeParameter(target.ContainingType.TypeParameters[0], replacement);
+        var original = (INamedTypeSymbol)((IFieldSymbol)target.ContainingType.GetMembers("Value").Single()).Type;
+        var specialized = (INamedTypeSymbol)context.SpecializeSourceType(original)!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(specialized.TypeArguments[0], replacement), Is.True);
+        Assert.That(specialized.TypeArgumentNullableAnnotations[1], Is.EqualTo(NullableAnnotation.Annotated));
+        Assert.That(SymbolEqualityComparer.IncludeNullability.Equals(specialized.TypeArguments[1], original.TypeArguments[1]), Is.True);
+    }
+
+    [Test]
     public void CompoundArraySubstitutionRequiresItsAuthenticatedCompilation()
     {
         var tree = CSharpSyntaxTree.ParseText("public class Box { public static void Target<T>(T[] values) { } }");

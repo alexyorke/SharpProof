@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -22,8 +23,8 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class TypedFeatureLongFuzzTests
 {
     private const string Harness = "typed-features";
-    private static readonly int[] s_anchors = [int.MinValue, -257, -3, -1, 0, 1, 2, 3, 7, 255, 256, int.MaxValue];
-    private static readonly string[] s_families =
+    private static readonly ImmutableArray<int> s_anchors = [int.MinValue, -257, -3, -1, 0, 1, 2, 3, 7, 255, 256, int.MaxValue];
+    private static readonly ImmutableArray<string> s_families =
     [
         "checked-arithmetic", "bitwise-shifts", "checked-conversion", "lifted-nullable",
         "array-index", "string-from-end", "switch-pattern", "tuple-deconstruction",
@@ -112,7 +113,7 @@ public sealed class TypedFeatureLongFuzzTests
         session.Count("clr:" + family + (first.Exception is null ? ":value" : ":throws"));
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, claim,
@@ -124,6 +125,7 @@ public sealed class TypedFeatureLongFuzzTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
@@ -134,7 +136,7 @@ public sealed class TypedFeatureLongFuzzTests
             return;
         }
         var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
         if (claims.Length == 0)
         {
             session.RecordHit(new LongFuzzHit("NoTargetClaim", LongFuzzHit.Error, seed, claim,
@@ -162,7 +164,7 @@ public sealed class TypedFeatureLongFuzzTests
         else if (result.Outcome == WorkerClaimOutcome.Refuted && violation is null)
         {
             session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Warning, seed, claim,
-                result.Outcome.ToString(), result.Reason.ToString(), "no violation on " + runtime.Runs.Count + " inputs",
+                result.Outcome.ToString(), result.Reason.ToString(), "no violation on " + runtime.Runs.Length + " inputs",
                 "The CLR oracle did not observe the reported refutation.", source));
         }
     }
@@ -209,7 +211,7 @@ public sealed class TypedFeatureLongFuzzTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
         return CSharpCompilation.Create("TypedFuzz_" + Guid.NewGuid().ToString("N"), [tree],
@@ -219,17 +221,18 @@ public sealed class TypedFeatureLongFuzzTests
     }
 
     private sealed record ClrRun(int Input, int Value, string? Exception);
-    private sealed record ClrResult(List<ClrRun> Runs, string? Error)
+    private sealed record ClrResult(ImmutableArray<ClrRun> Runs, string? Error)
     {
-        public List<ClrRun> Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+        public ImmutableArray<ClrRun> Runs { get; init; } = Runs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Runs)) : Runs;
     }
 
-    private static ClrResult RunClr(string source, int[] inputs)
+    private static ClrResult RunClr(string source, ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
@@ -245,7 +248,7 @@ public sealed class TypedFeatureLongFuzzTests
         {
             image.Position = 0;
             var method = context.LoadFromStream(image).GetType("C")!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = new List<ClrRun>(inputs.Length);
+            var runs = ImmutableArray.CreateBuilder<ClrRun>();
             foreach (var input in inputs)
             {
                 try
@@ -257,7 +260,7 @@ public sealed class TypedFeatureLongFuzzTests
                     runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
                 }
             }
-            return new(runs, null);
+            return new(runs.ToImmutable(), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -269,9 +272,9 @@ public sealed class TypedFeatureLongFuzzTests
         }
     }
 
-    private static int[] Inputs(int anchor)
+    private static ImmutableArray<int> Inputs(int anchor)
     {
-        return new[] { anchor, int.MinValue, -1, 0, 1, 2, int.MaxValue }.Distinct().ToArray();
+        return ImmutableArray.Create(anchor, int.MinValue, -1, 0, 1, 2, int.MaxValue).Distinct().ToImmutableArray();
     }
 
     private static string Format(ClrRun? run)

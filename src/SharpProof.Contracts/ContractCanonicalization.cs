@@ -19,10 +19,8 @@ internal sealed class ContractCanonicalization(
     private sealed class TypeSpecializer
     {
         private readonly Compilation _compilation;
-        private readonly Dictionary<ITypeParameterSymbol, ITypeSymbol>
-            _substitutions = new(SymbolEqualityComparer.Default);
-        private readonly Dictionary<ITypeSymbol, ITypeSymbol> _signatureTypes =
-            new(SymbolEqualityComparer.IncludeNullability);
+        private readonly ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol> _substitutions;
+        private readonly ImmutableDictionary<ITypeSymbol, ITypeSymbol> _signatureTypes;
 
         internal TypeSpecializer(
             Compilation compilation,
@@ -31,18 +29,20 @@ internal sealed class ContractCanonicalization(
             compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             source = RepositoryParameterGuard.NotNull(source, nameof(source));
             _compilation = compilation;
-            AddParameters(
+            var substitutions = ImmutableDictionary.CreateBuilder<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+            var signatureTypes = ImmutableDictionary.CreateBuilder<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.IncludeNullability);
+            AddParameters(substitutions,
                 source.OriginalDefinition.TypeParameters,
                 source.TypeArguments);
             for (var type = source.ContainingType;
                  type != null;
                  type = type.ContainingType)
             {
-                AddParameters(
+                AddParameters(substitutions,
                     type.OriginalDefinition.TypeParameters,
                     type.TypeArguments);
             }
-            AddMethodSignature(source.OriginalDefinition, source);
+            AddMethodSignature(signatureTypes, source.OriginalDefinition, source);
             var partialCounterpart =
                 source.OriginalDefinition.PartialImplementationPart ??
                 source.OriginalDefinition.PartialDefinitionPart;
@@ -50,10 +50,10 @@ internal sealed class ContractCanonicalization(
                 partialCounterpart.TypeParameters.Length == source.TypeArguments.Length &&
                 partialCounterpart.Parameters.Length == source.Parameters.Length)
             {
-                AddParameters(
+                AddParameters(substitutions,
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
-                AddMethodSignature(partialCounterpart, source,
+                AddMethodSignature(signatureTypes, partialCounterpart, source,
                     includeReturn: ContractForSymbolMatcher.TypesMatch(
                         source.OriginalDefinition.ReturnType,
                         partialCounterpart.ReturnType,
@@ -61,32 +61,39 @@ internal sealed class ContractCanonicalization(
                         partialCounterpart,
                         normalizeMappedTypeParameters: true,
                         compareRuntimeShape: true,
-                        mapTypeParameter: MapTypeParameter));
+                        mapTypeParameter: type => type is null ? throw new ArgumentNullException(nameof(type)) : MapTypeParameter(type, substitutions)));
             }
+            _substitutions = substitutions.ToImmutable();
+            _signatureTypes = signatureTypes.ToImmutable();
         }
 
-        private ITypeSymbol MapTypeParameter(ITypeSymbol type)
+        private static ITypeSymbol MapTypeParameter(
+            ITypeSymbol type,
+            ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>.Builder substitutions)
         {
+            substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
             type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type is ITypeParameterSymbol parameter &&
-                _substitutions.TryGetValue(parameter, out var replacement)
+                substitutions.TryGetValue(parameter, out var replacement)
                 ? replacement : type;
         }
 
-        private void AddMethodSignature(
+        private static void AddMethodSignature(
+            ImmutableDictionary<ITypeSymbol, ITypeSymbol>.Builder signatureTypes,
             IMethodSymbol definition,
             IMethodSymbol constructed,
             bool includeReturn = true)
         {
+            signatureTypes = RepositoryParameterGuard.NotNull(signatureTypes, nameof(signatureTypes));
             constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
             definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
             if (includeReturn)
             {
-                AddSignatureType(definition.ReturnType, constructed.ReturnType);
+                AddSignatureType(signatureTypes, definition.ReturnType, constructed.ReturnType);
             }
             for (var index = 0; index < constructed.Parameters.Length; index++)
             {
-                AddSignatureType(
+                AddSignatureType(signatureTypes,
                     definition.Parameters[index].Type,
                     constructed.Parameters[index].Type);
             }
@@ -139,10 +146,8 @@ internal sealed class ContractCanonicalization(
                 {
                     return null;
                 }
-                var parameterTypes = ImmutableArray.CreateBuilder<ITypeSymbol>(
-                    signature.Parameters.Length);
-                var parameterRefKinds = ImmutableArray.CreateBuilder<RefKind>(
-                    signature.Parameters.Length);
+                var parameterTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
+                var parameterRefKinds = ImmutableArray.CreateBuilder<RefKind>();
                 foreach (var functionParameter in signature.Parameters)
                 {
                     var parameterType = Specialize(functionParameter.Type);
@@ -168,9 +173,7 @@ internal sealed class ContractCanonicalization(
                 return type;
             }
 
-            var arguments =
-                ImmutableArray.CreateBuilder<ITypeSymbol>(
-                    named.TypeArguments.Length);
+            var arguments = ImmutableArray.CreateBuilder<ITypeSymbol>();
             foreach (var argument in named.TypeArguments)
             {
                 var specialized = Specialize(argument);
@@ -205,7 +208,7 @@ internal sealed class ContractCanonicalization(
             }
 
             return ContractSpecializationPolicy.TrySpecialize(
-                (named, containing, arguments),
+                (named, containing, arguments: arguments.ToImmutable()),
                 static state =>
                 {
                     var definition = state.containing == null
@@ -222,61 +225,65 @@ internal sealed class ContractCanonicalization(
 
                     return (definition.Arity == 0
                             ? definition
-                            : definition.Construct([.. state.arguments]))
+                            : definition.Construct(state.arguments, state.arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray()))
                         .WithNullableAnnotation(state.named.NullableAnnotation);
                 }, out ITypeSymbol? specializedType)
                 ? specializedType : null;
         }
 
-        private void AddParameters(
+        private static void AddParameters(
+            ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>.Builder substitutions,
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
 
 
+            substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
             RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
             RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
             for (var index = 0; index < parameters.Length; index++)
             {
-                _substitutions[parameters[index]] = arguments[index];
+                substitutions[parameters[index]] = arguments[index];
             }
         }
 
-        private void AddSignatureType(
+        private static void AddSignatureType(
+            ImmutableDictionary<ITypeSymbol, ITypeSymbol>.Builder signatureTypes,
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
+            signatureTypes = RepositoryParameterGuard.NotNull(signatureTypes, nameof(signatureTypes));
             constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
-            if (_signatureTypes.ContainsKey(original))
+            if (signatureTypes.ContainsKey(original))
             {
                 return;
             }
-            _signatureTypes.Add(original, constructed);
+            signatureTypes.Add(original, constructed);
 
             switch (original, constructed)
             {
                 case (IArrayTypeSymbol originalArray,
                       IArrayTypeSymbol constructedArray):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalArray.ElementType,
                         constructedArray.ElementType);
                     break;
                 case (IPointerTypeSymbol originalPointer,
                       IPointerTypeSymbol constructedPointer):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalPointer.PointedAtType,
                         constructedPointer.PointedAtType);
                     break;
                 case (IFunctionPointerTypeSymbol originalFunction,
                       IFunctionPointerTypeSymbol constructedFunction):
-                    AddSignatureType(
+                    AddSignatureType(signatureTypes,
                         originalFunction.Signature.ReturnType,
                         constructedFunction.Signature.ReturnType);
                     for (var index = 0;
                          index < originalFunction.Signature.Parameters.Length;
                          index++)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalFunction.Signature.Parameters[index].Type,
                             constructedFunction.Signature.Parameters[index].Type);
                     }
@@ -286,7 +293,7 @@ internal sealed class ContractCanonicalization(
                     if (originalNamed.ContainingType is { } originalContaining &&
                         constructedNamed.ContainingType is { } constructedContaining)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalContaining,
                             constructedContaining);
                     }
@@ -294,7 +301,7 @@ internal sealed class ContractCanonicalization(
                          index < originalNamed.TypeArguments.Length;
                          index++)
                     {
-                        AddSignatureType(
+                        AddSignatureType(signatureTypes,
                             originalNamed.TypeArguments[index],
                             constructedNamed.TypeArguments[index]);
                     }
@@ -303,16 +310,16 @@ internal sealed class ContractCanonicalization(
         }
     }
 
-    internal ContractCanonicalVariables CreateVariables(
+    internal ContractCanonicalVariableBuilder CreateVariables(
         IMethodSymbol target,
         bool includeResult)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        var result = new ContractCanonicalVariables(factory);
+        var result = new ContractCanonicalVariableBuilder(factory);
         if (!target.IsStatic &&
             target.MethodKind != MethodKind.Constructor)
         {
-            result.Receiver = result.Add(
+            result.Add(
                 target.ContainingType,
                 BoundContractVariableRole.Receiver,
                 -1,
@@ -323,19 +330,19 @@ internal sealed class ContractCanonicalization(
         for (var index = 0; index < target.Parameters.Length; index++)
         {
             var parameter = target.Parameters[index];
-            result.Parameters.Add(result.Add(
+            result.Add(
                 parameter,
                 BoundContractVariableRole.Parameter,
                 index,
                 _types.GetTypeId(parameter.Type),
                 "parameter:" + index.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)));
+                    System.Globalization.CultureInfo.InvariantCulture));
         }
         if (includeResult &&
             !target.ReturnsVoid &&
             target.MethodKind != MethodKind.Constructor)
         {
-            result.Result = result.Add(
+            result.Add(
                 null,
                 BoundContractVariableRole.Result,
                 -1,
@@ -346,11 +353,11 @@ internal sealed class ContractCanonicalization(
         return result;
     }
 
-    internal IReadOnlyDictionary<IrVarId, IrTerm>? CreateSubstitutions(
+    internal ImmutableDictionary<IrVarId, IrTerm>? CreateSubstitutions(
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
-        ContractCanonicalVariables canonical)
+        ContractCanonicalVariableBuilder canonical)
     {
         ArgumentNullGuard.NotNull(source, nameof(source));
         ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
@@ -362,19 +369,23 @@ internal sealed class ContractCanonicalization(
             expressionBinder.VariableBindings,
             expressionBinder.ResultVariable,
             expressionBinder.ReceiverVariables,
-            [.. expressionBinder.PreStateVariables],
+            expressionBinder.PreStateVariablePairs,
             canonical.ToBoundVariables(),
             canonical.CreatePreState);
     }
 }
 
-internal sealed class ContractCanonicalVariables(IrFactory factory)
+internal sealed class ContractCanonicalVariableBuilder(IrFactory factory)
 {
-    private readonly List<BoundContractVariable> _variables = (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : []);
+    private readonly ImmutableArray<BoundContractVariable>.Builder _variables = factory is null
+        ? throw new System.ArgumentNullException(nameof(factory))
+        : ImmutableArray.CreateBuilder<BoundContractVariable>();
+    private readonly ImmutableArray<IrVarId>.Builder _parameters = ImmutableArray.CreateBuilder<IrVarId>();
 
-    internal IrVarId? Receiver { get; set; }
-    internal List<IrVarId> Parameters { get; } = [];
-    internal IrVarId? Result { get; set; }
+    internal ImmutableArray<IrVarId> Parameters => _parameters.ToImmutable();
+    internal IrVarId? Result => _variables.FirstOrDefault(variable => variable is null
+        ? throw new System.ArgumentNullException(nameof(variable))
+        : variable.Role == BoundContractVariableRole.Result)?.Variable;
 
     internal IrVarId Add(
         ISymbol? symbol,
@@ -392,6 +403,8 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
             ordinal,
             variable,
             null));
+        if (role == BoundContractVariableRole.Parameter)
+        { _parameters.Add(variable); }
         return variable;
     }
 
@@ -414,6 +427,6 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
 
     internal ImmutableArray<BoundContractVariable> ToBoundVariables()
     {
-        return [.. _variables];
+        return _variables.ToImmutable();
     }
 }

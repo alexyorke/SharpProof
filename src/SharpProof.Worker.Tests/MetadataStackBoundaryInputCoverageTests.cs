@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
@@ -42,7 +43,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         using var directory = new TempDirectory("sharpproof-stack-input-");
         var image = CreateImage(Code(name));
         var path = Path.Combine(directory.FullName, "StackBoundary.dll");
-        File.WriteAllBytes(path, image);
+        File.WriteAllBytes(path, image.AsSpan());
         var compilation = CSharpCompilation.Create("StackConsumer",
             [CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int value) => Library.Target(value); }")],
             TestMetadataReferences.WithSharpProof.Add(MetadataReference.CreateFromFile(path)),
@@ -54,7 +55,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         var body = session.PrepareIl(method);
         Assert.That(body, Is.Not.Null, name + " must reach the real decoded stack boundary.");
         Assert.That(body!.ImageSha256.ToUpperInvariant(),
-            Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image))));
+            Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image.AsSpan()))));
         Assert.That(TotalIlStack.TryValidate(body, session.Spend, out var shapes), Is.EqualTo(admitted));
         Assert.That(session.ConstructionLimitExceeded, Is.False);
         if (name == "widening-control")
@@ -66,7 +67,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         var runtime = new AssemblyLoadContext("StackBoundaryOracle", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var target = runtime.LoadFromStream(stream).GetType("Library")!.GetMethod("Target")!;
             if (admitted)
             {
@@ -83,7 +84,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         { runtime.Unload(); }
     }
 
-    private static byte[] Code(string name)
+    private static ImmutableArray<byte> Code(string name)
     {
         return name switch
         {
@@ -116,31 +117,34 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         };
     }
 
-    private static byte[] CreateImage(byte[] code)
+    private static ImmutableArray<byte> CreateImage(ImmutableArray<byte> code)
     {
-        System.ArgumentNullException.ThrowIfNull(code, nameof(code));
+        if (code.IsDefault)
+        { throw new ArgumentNullException(nameof(code)); }
         var metadata = new MetadataBuilder();
         metadata.AddModule(0, metadata.GetOrAddString("StackBoundary.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
         metadata.AddAssembly(metadata.GetOrAddString("StackBoundary"), new Version(1, 0, 0, 0), default, default,
             (AssemblyFlags)0, System.Reflection.AssemblyHashAlgorithm.None);
         var coreName = typeof(object).Assembly.GetName();
         var core = metadata.AddAssemblyReference(metadata.GetOrAddString(coreName.Name!), coreName.Version!, default,
-            metadata.GetOrAddBlob(coreName.GetPublicKeyToken() ?? []), (AssemblyFlags)0, default);
+            metadata.GetOrAddBlob(ImmutableArray.Create<byte>((coreName.GetPublicKeyToken() ?? []).AsSpan())), (AssemblyFlags)0, default);
         var objectType = metadata.AddTypeReference(core, metadata.GetOrAddString("System"), metadata.GetOrAddString("Object"));
         var parameter = metadata.AddParameter(ParameterAttributes.None, metadata.GetOrAddString("value"), 1);
         metadata.AddMethodDefinition(MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig,
-            MethodImplAttributes.Managed, metadata.GetOrAddString("Target"), metadata.GetOrAddBlob(new byte[] { 0, 1, 8, 8 }), 4, parameter);
+            MethodImplAttributes.Managed, metadata.GetOrAddString("Target"), metadata.GetOrAddBlob(ImmutableArray.Create<byte>(0, 1, 8, 8)), 4, parameter);
         metadata.AddTypeDefinition(TypeAttributes.NotPublic, default, metadata.GetOrAddString("<Module>"), default,
             MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
         metadata.AddTypeDefinition(TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract, default,
             metadata.GetOrAddString("Library"), objectType, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
         var il = new BlobBuilder();
-        il.WriteBytes(new byte[] { 0, 0, 0, 0 });
+        il.WriteBytes(ImmutableArray.Create<byte>(0, 0, 0, 0));
         il.WriteByte(checked((byte)((code.Length << 2) | 2)));
         il.WriteBytes(code);
         var image = new BlobBuilder();
         new ManagedPEBuilder(new PEHeaderBuilder(imageCharacteristics: Characteristics.Dll), new MetadataRootBuilder(metadata),
             il, flags: CorFlags.ILOnly).Serialize(image);
-        return image.ToArray();
+        using var stream = new MemoryStream();
+        image.WriteContentTo(stream);
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 }

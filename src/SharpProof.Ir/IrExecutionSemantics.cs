@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Ir;
 
 // Legacy remains the authority during the dual-pipeline migration.
@@ -55,12 +57,12 @@ internal static class IrCallPreconditionMarker
                 Encoding.GetByteCount(calleeIdentity) > 4096 || Encoding.GetByteCount(callSite.Document) > 4096 ||
                 Encoding.GetByteCount(clauseSite.Document) > 4096)
             { return false; }
-            var callee = Encoding.GetBytes(calleeIdentity);
-            var callDocument = Encoding.GetBytes(callSite.Document);
-            var clauseDocument = Encoding.GetBytes(clauseSite.Document);
-            name = Prefix + "v1:" + Convert.ToBase64String(callee) + ":" + Number(clauseOrdinal) + ":" +
-                Convert.ToBase64String(callDocument) + ":" + Number(callSite.Start) + ":" + Number(callSite.Length) + ":" +
-                Convert.ToBase64String(clauseDocument) + ":" + Number(clauseSite.Start) + ":" + Number(clauseSite.Length);
+            var callee = Encoding.GetBytes(calleeIdentity).ToImmutableArray();
+            var callDocument = Encoding.GetBytes(callSite.Document).ToImmutableArray();
+            var clauseDocument = Encoding.GetBytes(clauseSite.Document).ToImmutableArray();
+            name = Prefix + "v1:" + Convert.ToBase64String(callee.ToArray()) + ":" + Number(clauseOrdinal) + ":" +
+                Convert.ToBase64String(callDocument.ToArray()) + ":" + Number(callSite.Start) + ":" + Number(callSite.Length) + ":" +
+                Convert.ToBase64String(clauseDocument.ToArray()) + ":" + Number(clauseSite.Start) + ":" + Number(clauseSite.Length);
             return true;
         }
         catch (System.Text.EncoderFallbackException)
@@ -114,23 +116,23 @@ internal sealed class IrHavocRequest(
 
 internal sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
-    internal ImmutableHashSet<IrVarId> SnapshotVariables { get; set; } = [];
+    internal ImmutableHashSet<IrVarId> SnapshotVariables { get; init; } = [];
     // Only a trusted replay host may replace an approximation with an observed framework value.
-    internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; set; }
+    internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; init; }
     // A trusted host may observe a compiler-owned immutable framework value.
-    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; init; }
     // null preserves ordinary lock-prefix stopping; only a trusted host can
     // certify completion of a specific framework synchronization operation.
-    internal Func<IrLockInstruction, IrValue, bool?>? ConcreteLockCompletionProvider { get; set; }
+    internal Func<IrLockInstruction, IrValue, bool?>? ConcreteLockCompletionProvider { get; init; }
 
-    public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; set; }
-    public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
-    public Action<IrWriteInstruction>? WriteObserver { get; set; }
-    public Action<IrLockInstruction>? LockObserver { get; set; }
-    public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; set; }
-    public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; set; }
-    internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; set; }
-    public Action<IrLockInstruction, bool>? LockPrefixObserver { get; set; }
+    public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; init; }
+    public Action<IrAllocationInstruction>? AllocationObserver { get; init; }
+    public Action<IrWriteInstruction>? WriteObserver { get; init; }
+    public Action<IrLockInstruction>? LockObserver { get; init; }
+    public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; init; }
+    public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; init; }
+    internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; init; }
+    public Action<IrLockInstruction, bool>? LockPrefixObserver { get; init; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));

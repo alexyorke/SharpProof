@@ -73,7 +73,7 @@ public sealed class Pr275CoreRequiredInputTests
             fixture.Compilation,
             CompilerConfiguration.AdvisoryAll,
             TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
         AssertArgumentNull(
             "method",
@@ -86,7 +86,7 @@ public sealed class Pr275CoreRequiredInputTests
             () => ClosedContractDiagnostics.Validate(fixture.Method, session, null!));
 
         ClosedContractDiagnostics.Validate(fixture.Method, session, diagnostics.Add);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(diagnostics.ToImmutable(), Is.Empty);
     }
 
     [Test]
@@ -115,12 +115,7 @@ public sealed class Pr275CoreRequiredInputTests
         var lowering = TotalBodyLowering.Lower(
             fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         var variables = context.Parameters
-            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[]
-            {
-                parameter.Entry,
-                parameter.Current,
-                parameter.PreState
-            }))
+            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
             .Concat(lowering.Program.Blocks
                 .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrAssignInstruction>()
@@ -140,9 +135,9 @@ public sealed class Pr275CoreRequiredInputTests
 
     private static SourceFixture CreateSourceFixture()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275CoreRequiredInput",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 public static class Subject
                 {
                     public static int Target(int value)
@@ -150,7 +145,7 @@ public sealed class Pr275CoreRequiredInputTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot()
             .DescendantNodes()

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 internal static class ProcessRunner
@@ -29,10 +30,11 @@ internal static class ProcessRunner
     internal static Task<ProcessRunnerResult> RunCapturedAsync(
         string workingDirectory,
         string fileName,
-        CancellationToken cancellationToken,
-        params string[] arguments)
+        ImmutableArray<string> arguments,
+        CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(fileName);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return RunCapturedAsync(

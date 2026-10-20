@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -42,9 +43,9 @@ public sealed class NativeModuleExceptionEvidenceTests
                 [allowed == "arithmetic" ? "System.ArithmeticException" : "System.ArgumentException"]
         };
         Assert.That(WorkerProtocolJson.HasKnownEffects(constraint.AllowedEffects, constraint.AllowedCapabilities), Is.True);
-        IrExceptionKind[] kinds = allowed == "arithmetic" ? [IrExceptionKind.DivideByZero, IrExceptionKind.Overflow] :
+        ImmutableArray<IrExceptionKind> kinds = allowed == "arithmetic" ? [IrExceptionKind.DivideByZero, IrExceptionKind.Overflow] :
             allowed == "argument" ? [IrExceptionKind.Argument] : [];
-        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [.. kinds], new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, kinds, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, expected == "Proven" ? Is.TypeOf<ProvenOutcome>() :
             expected == "Refuted" ? Is.TypeOf<RefutedOutcome>() : Is.Null);
         Assert.That(result.Reason, Is.EqualTo(expected == "Unreplayable"

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -116,9 +117,9 @@ public sealed class NativeFieldReferenceViewTests
 
     private static IEnumerable<TestCaseData> AdditionalPrimitiveCases()
     {
-        foreach (var typeName in new[] { "Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64" })
+        foreach (var typeName in ImmutableArray.Create("Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64"))
         {
-            foreach (var upcastStoreView in new[] { false, true })
+            foreach (var upcastStoreView in ImmutableArray.Create(false, true))
             {
                 var viewName = upcastStoreView ? "ObjectUpcast" : "SameView";
                 yield return new TestCaseData(typeName, upcastStoreView)
@@ -171,26 +172,20 @@ public sealed class NativeFieldReferenceViewTests
         var observed = factory.CreateVariable("observed", fieldType);
         builder.Assign(block, site, observed, Read(parameter.Current));
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site)
-        };
-        var ensures = new[]
-        {
+            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site));
+        var ensures = ImmutableArray.Create(
             new PassiveContractClause(Equal(Read(parameter.Current), storedTerm), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Old), initialTerm), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Old), initialTerm), factory.Boolean(true), site));
         var candidate = new PassiveCallableCandidate("field-reference-view-" + typeName, builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var owner = factory.CreateReferenceValue(boxType, new IrObjectState().WithField(field, initialValue));
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(parameter.Entry, owner)
+            .Add(parameter.Current, owner)
+            .Add(parameter.Old, owner);
         return new(factory, candidate, observed, fieldType, isBoolean, width, signed, inputs);
     }
 
@@ -217,47 +212,41 @@ public sealed class NativeFieldReferenceViewTests
         var observed = factory.CreateVariable("observed", factory.IntegerType);
         builder.Assign(block, site, observed, Read(parameter.Current));
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site)
-        };
-        var ensures = new[]
-        {
+            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site));
+        var ensures = ImmutableArray.Create(
             new PassiveContractClause(Equal(Read(parameter.Current), factory.Integer(1)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Old), factory.Integer(0)), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Old), factory.Integer(0)), factory.Boolean(true), site));
         var candidate = new PassiveCallableCandidate("field-reference-view", builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var objectState = new IrObjectState().WithField(field, factory.CreateIntegerValue(0));
         var owner = factory.CreateReferenceValue(boxType, objectState);
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(parameter.Entry, owner)
+            .Add(parameter.Current, owner)
+            .Add(parameter.Old, owner);
         return new(factory, candidate, observed, inputs);
     }
 
     private sealed record Scenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+        ImmutableDictionary<IrVarId, IrValue> InitialValues)
     {
         public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
         public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
-        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+        public ImmutableDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
     }
 
     private sealed record TypedScenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
         IrTypeId FieldType, bool IsBoolean, int IntegerWidth, bool IntegerSigned,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+        ImmutableDictionary<IrVarId, IrValue> InitialValues)
     {
         public IrTypeId FieldType { get; init; } = FieldType.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(FieldType)) : FieldType;
         public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
         public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
-        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+        public ImmutableDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -38,7 +39,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, [5000]), Is.EqualTo(5000 + calls));
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5000]), Is.EqualTo(5001));
             var model = compilation.GetSemanticModel(tree);
-            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
             var target = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
             var helper = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Helper"));
             Assert.That(target.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(calls));
@@ -68,7 +69,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
                 Assert.That(exactHelper.IsExact, Is.True);
                 Assert.That(exactHelper.ConstructionLimitExceeded, Is.False);
                 var replay = new IrProgramInterpreter(factory).Execute(exactHelper.Program,
-                    candidate.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
+                    ImmutableDictionaryCapture.Create(candidate.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5001)));
@@ -89,7 +90,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
                 Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauses * calls));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    context.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
+                    ImmutableDictionaryCapture.Create(context.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5000 + calls)));

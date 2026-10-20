@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -29,7 +30,7 @@ internal static class NativeStaticWriteWitnessOracle
         { return Gap("UnsupportedWriteInvocationShape"); }
         // Native source writes retain their captured SDK span through replay.
         var span = preparation.Program.Factory.GetOperationInfo(evidence.WriteWitness!.Value).SourceSpan!;
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {
             // The native solver projects every parameter from this owned preparation.
@@ -37,13 +38,13 @@ internal static class NativeStaticWriteWitnessOracle
             initial[parameter.Entry] = input;
             initial[parameter.Current] = input;
         }
-        var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial,
+        var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial.ToImmutable(),
             PassiveCallableVcBuilder.MaximumSteps, cancellationToken: cancellationToken);
         if (replay.ConsumedApproximation || replay.Status is not (IrProgramExecutionStatus.Returned or IrProgramExecutionStatus.Exception))
         { return Gap("NonTerminatingOrIncompleteWriteWitness"); }
         // The producer captures full paths while the SDK tree may retain a relative path.
         var trees = compilation.SyntaxTrees.Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (Path.GetFullPath(
-            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document)).ToArray();
+            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document)).ToImmutableArray();
         if (trees.Length != 1)
         { return Gap("UnsupportedWriteSourceSite"); }
         var tree = trees[0];
@@ -65,7 +66,7 @@ internal static class NativeStaticWriteWitnessOracle
             !SymbolEqualityComparer.Default.Equals(fieldReference.Field.ContainingAssembly, compilation.Assembly))
         { return Gap("UnsupportedWriteTarget"); }
         var fieldSymbol = fieldReference.Field;
-        foreach (var owner in new[] { method.ContainingType, fieldSymbol.ContainingType })
+        foreach (var owner in ImmutableArray.Create(method.ContainingType, fieldSymbol.ContainingType))
         {
             for (var current = owner; current != null; current = current.ContainingType)
             {
@@ -89,20 +90,21 @@ internal static class NativeStaticWriteWitnessOracle
                 .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == method.MetadataName && !candidate.IsGenericMethod &&
                     candidate.GetParameters().Length == method.Parameters.Length && candidate.GetParameters().Select((parameter, ordinal) =>
                         parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerClrTypeMatcher.Matches(method.Parameters[ordinal].Type, parameter.ParameterType, typeof(int)))).All(match => match)));
-            var values = new object?[method.Parameters.Length];
-            var parameters = callable.GetParameters();
-            for (var ordinal = 0; ordinal < values.Length; ordinal++)
+            var valueBuilder = ImmutableArray.CreateBuilder<object?>(method.Parameters.Length);
+            var parameters = callable.GetParameters().ToImmutableArray();
+            for (var ordinal = 0; ordinal < method.Parameters.Length; ordinal++)
             {
                 if (!evidence.EntryModel.TryGetValue(preparation.Parameters[ordinal].Entry, out var input) ||
-                    !TryValue(parameters[ordinal].ParameterType, input, out values[ordinal]))
+                    !TryValue(parameters[ordinal].ParameterType, input, out var value))
                 { return Gap("UnsupportedWriteInput"); }
+                valueBuilder.Add(value);
             }
             var field = assembly.GetType(CompilerClrTypeMatcher.MetadataName(fieldSymbol.ContainingType), throwOnError: true)!
                 .GetField(fieldSymbol.MetadataName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
                 ?? throw new InvalidDataException("A source write witness has no matching emitted field.");
             var before = field.GetValue(null);
             try
-            { callable.Invoke(null, values); }
+            { callable.Invoke(null, valueBuilder.ToImmutable().ToArray()); }
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             { return new("WriteInvocationThrew", 1); }
             var after = field.GetValue(null);

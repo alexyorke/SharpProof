@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -30,19 +31,15 @@ public sealed class EffectContractAttributeDiagnosticsTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
             Assert.That(
                 diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start)),
-                Is.EqualTo(new[]
-                {
-                    source.IndexOf(
+                Is.EqualTo(ImmutableArray.Create(source.IndexOf(
                         "EffectContract((SharpProofEffect)(1L << 40)",
-                        StringComparison.Ordinal),
-                    source.IndexOf(
+                        StringComparison.Ordinal), source.IndexOf(
                         "EffectContract((SharpProofEffect)(1L << 41)",
-                        StringComparison.Ordinal)
-                }));
+                        StringComparison.Ordinal))));
         }
     }
 }

@@ -136,7 +136,7 @@ internal sealed class ExceptionResourceLockReplayTests
             }
         };
         var replay = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [receiver] = factory.CreateReferenceValue(factory.ObjectType, new object()) }, 100, options);
+            System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.Add(receiver, factory.CreateReferenceValue(factory.ObjectType, new object())), 100, options);
         Assert.That(replay.Status, Is.EqualTo(completion == true ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
         Assert.That(callbacks, Is.EqualTo(completion == false ? 0 : 1));
         if (completion != false)

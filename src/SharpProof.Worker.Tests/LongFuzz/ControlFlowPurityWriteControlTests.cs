@@ -13,13 +13,12 @@ public sealed class ControlFlowPurityWriteControlTests
         var fixtureType = typeof(ControlFlowLongFuzzTests);
         var bodyType = fixtureType.GetNestedType("GeneratedBody", BindingFlags.NonPublic)!;
         var runCase = fixtureType.GetMethod("RunCase", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var countField = typeof(LongFuzzSession).GetField("_counts", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var session = new LongFuzzSession("control-flow-purity-write", 0, 1);
         var body = Activator.CreateInstance(bodyType, "state-write", "State = x;")!;
 
         await (Task)runCase.Invoke(null, [session, 3_250_105, "pure-int", body])!;
 
-        var counts = (Dictionary<string, int>)countField.GetValue(session)!;
+        var counts = session.Counts;
         Assert.That(counts.GetValueOrDefault("outcome:Refuted"), Is.EqualTo(1));
         Assert.That(counts.GetValueOrDefault("refuted-unwitnessed"), Is.Zero);
         Assert.That(session.Hits, Is.Zero);

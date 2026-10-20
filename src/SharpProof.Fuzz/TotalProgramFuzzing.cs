@@ -44,7 +44,7 @@ internal sealed record TotalProgramFuzzResult(TotalProgramFuzzCoverage Coverage,
 // observe the same generated body. This trusted source adapter is tooling-only.
 internal static class TotalProgramDifferentialOracle
 {
-    internal static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
+    internal static readonly ImmutableArray<string> Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
 
     internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken)
     {
@@ -53,22 +53,26 @@ internal static class TotalProgramDifferentialOracle
         var random = new Random(seed);
         var arrayReads = 0;
         var typeMask = 0;
-        var bodies = new int[7];
+        var bodies = ImmutableArray.CreateBuilder<int>(7);
+        bodies.Count = 7;
         for (var offset = 0; offset < cases; offset += 128)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(128, cases - offset);
-            var inputs = new object?[count][];
-            var members = new string[count];
-            var loops = new bool[count];
+            var inputsBuilder = ImmutableArray.CreateBuilder<ImmutableArray<object?>>(count);
+            inputsBuilder.Count = count;
+            var membersBuilder = ImmutableArray.CreateBuilder<string>(count);
+            membersBuilder.Count = count;
+            var loopsBuilder = ImmutableArray.CreateBuilder<bool>(count);
+            loopsBuilder.Count = count;
             for (var index = 0; index < count; index++)
             {
                 var ordinal = offset + index;
                 if (ordinal / Types.Length % 5 == 3)
                 {
                     var reference = ReferenceCase(ordinal, random);
-                    members[index] = reference.Source;
-                    inputs[index] = reference.Inputs;
+                    membersBuilder[index] = reference.Source;
+                    inputsBuilder[index] = reference.Inputs;
                     typeMask |= reference.Mask;
                     bodies[6]++;
                     if (ordinal % 5 == 2)
@@ -77,11 +81,11 @@ internal static class TotalProgramDifferentialOracle
                 }
                 var type = Types[ordinal % Types.Length];
                 typeMask |= 1 << (ordinal % Types.Length);
-                loops[index] = type != "bool" && ordinal / Types.Length % 7 == 6;
-                bodies[type == "bool" ? 4 : loops[index] ? 5 : ordinal / Types.Length % 4]++;
+                loopsBuilder[index] = type != "bool" && ordinal / Types.Length % 7 == 6;
+                bodies[type == "bool" ? 4 : loopsBuilder[index] ? 5 : ordinal / Types.Length % 4]++;
                 var number = random.NextInt64();
-                inputs[index] = [Input(type, number, ordinal)];
-                var body = type == "bool" ? "return !x;" : loops[index]
+                inputsBuilder[index] = [Input(type, number, ordinal)];
+                var body = type == "bool" ? "return !x;" : loopsBuilder[index]
                     ? $"for (int i = 0; i < 2; i++) x = unchecked(({type})(x + 1)); return x;"
                     : ((ordinal / Types.Length) % 4) switch
                     {
@@ -90,17 +94,20 @@ internal static class TotalProgramDifferentialOracle
                         2 => $"try {{ return unchecked(({type})(x + 1)); }} finally {{ x = unchecked(({type})(x + 2)); }}",
                         _ => "return Copy" + ordinal.ToString(CultureInfo.InvariantCulture) + "(x);"
                     };
-                members[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
+                membersBuilder[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
             }
+            var inputs = inputsBuilder.ToImmutable();
+            var members = membersBuilder.ToImmutable();
+            var loops = loopsBuilder.ToImmutable();
             var batch = members.Select((member, index) =>
-                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToImmutableArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;
         return new(new(cases, result.Agreements, result.NativeProofs, result.NativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], result.ExceptionalExits, typeMask, arrayReads), result.Failures);
     }
 
-    private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
+    private static (string Source, ImmutableArray<object?> Inputs, int Mask) ReferenceCase(int ordinal, Random random)
     {
         RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
 
@@ -117,7 +124,7 @@ internal static class TotalProgramDifferentialOracle
         };
     }
 
-    private static (string Source, object?[] Inputs, int Mask) Objects(string name, bool same)
+    private static (string Source, ImmutableArray<object?> Inputs, int Mask) Objects(string name, bool same)
     {
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var shared = new object();
@@ -147,7 +154,12 @@ internal static class TotalProgramDifferentialOracle
         };
     }
 
-    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
+    internal static ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder CreateAliases()
+    {
+        return ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+    }
+
+    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
@@ -163,7 +175,7 @@ internal static class TotalProgramDifferentialOracle
             : factory.CreateIntegerValue(type, Convert.ToInt64(value, CultureInfo.InvariantCulture));
         }
         if (!aliases.TryGetValue(type, out var typed))
-        { aliases.Add(type, typed = new(ReferenceEqualityComparer.Instance)); }
+        { aliases.AddUnique(type, typed = ImmutableDictionary.CreateBuilder<object, IrValue>(ReferenceEqualityComparer.Instance)); }
         if (typed.TryGetValue(value, out var existing))
         { return existing; }
         // Null/length cases use a valid same-length representative, including
@@ -171,7 +183,7 @@ internal static class TotalProgramDifferentialOracle
         var result = value is string text ? factory.CreateStringValue(new string('\0', text.Length))
             : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases))))
             : factory.CreateReferenceValue(type, value);
-        typed.Add(value, result);
+        typed.AddUnique(value, result);
         return result;
     }
 

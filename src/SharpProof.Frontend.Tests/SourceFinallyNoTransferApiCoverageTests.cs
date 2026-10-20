@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -18,16 +19,16 @@ public sealed class SourceFinallyNoTransferApiCoverageTests
         Assert.That(subject.Graph.Blocks.Any(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
             block.ConditionKind == ControlFlowConditionKind.None &&
             ReferenceEquals(block.FallThroughSuccessor?.Destination, block))), Is.True);
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(subject.Graph.Root);
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(subject.Graph.Root);
         var hasFinally = false;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
+            pending = pending.Pop(out var region);
             hasFinally |= region.Kind == ControlFlowRegionKind.Finally;
             foreach (var child in region.NestedRegions)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
         Assert.That(hasFinally, Is.True);

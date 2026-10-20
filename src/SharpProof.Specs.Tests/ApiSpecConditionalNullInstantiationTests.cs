@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using static SharpProof.Testing.ApiSpecTestFacets;
@@ -57,11 +58,7 @@ public sealed class ApiSpecConditionalNullInstantiationTests
         var result = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             Factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters[0]] = ConditionTerm,
-                [template.Parameters[1]] = ReferenceTerm
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], ConditionTerm).SetItem(template.Parameters[1], ReferenceTerm));
 
         Assert.That(
             result.Status,

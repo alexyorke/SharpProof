@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -35,8 +35,8 @@ internal static class SharpProofProductionMsBuildHost
             var msbuildArguments = commandType.GetProperty("MSBuildArguments");
             if (fromArgs == null || execute == null || msbuildArguments == null)
                 throw new MissingMethodException("The active SDK has no MSBuild forwarding entrypoint.");
-            var records = new List<object>();
-            var forwarding = new List<object>();
+            var records = ImmutableArray.CreateBuilder<object>();
+            var forwarding = ImmutableArray.CreateBuilder<object>();
             foreach (var query in request.RootElement.GetProperty("queries").EnumerateArray())
             {
                 string[] arguments = query.GetProperty("arguments").EnumerateArray()
@@ -74,20 +74,20 @@ internal static class SharpProofProductionMsBuildHost
             // The SDK runtimeconfig selects the framework with its normal roll-forward
             // semantics. Report the effective framework; do not pin its minimum patch.
             var runtimeAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(value => new[] { "System.Private.CoreLib", "System.Runtime", "System.Text.Json",
+                .Where(value => ImmutableArray.Create("System.Private.CoreLib", "System.Runtime", "System.Text.Json",
                     "Microsoft.Build", "Microsoft.Build.Framework", "MSBuild", "dotnet",
-                    "Microsoft.DotNet.Cli.Utils" }.Contains(value.GetName().Name))
-                .Select(value => new { name = value.GetName().Name, path = value.Location }).ToArray();
+                    "Microsoft.DotNet.Cli.Utils").Contains(value.GetName().Name))
+                .Select(value => new { name = value.GetName().Name, path = value.Location }).ToImmutableArray();
             File.WriteAllText(args[1], JsonSerializer.Serialize(new
             {
-                queries = records,
+                queries = records.ToImmutable(),
                 runtime = RuntimeInformation.FrameworkDescription,
                 actualHost = Environment.ProcessPath,
                 sdkAssembly = assembly.Location,
                 runtimeAssemblies,
                 sdkBaseDirectory = AppContext.BaseDirectory,
                 entrypoint = "Microsoft.DotNet.Cli.Commands.MSBuild.MSBuildCommand.FromArgs.Execute",
-                forwarding
+                forwarding = forwarding.ToImmutable()
             }) + "\n");
             return 0;
         }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -72,7 +73,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
     [Test]
     public void SeparateCompilerGeneratedQueryMethodsDoNotAliasOneSiblingRole()
     {
-        static string[] Fingerprints(string parameter, string rangeVariable)
+        static ImmutableArray<string> Fingerprints(string parameter, string rangeVariable)
         {
             System.ArgumentNullException.ThrowIfNull(parameter);
             System.ArgumentNullException.ThrowIfNull(rangeVariable);
@@ -129,11 +130,12 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
             var operation = (IInvocationOperation)model.GetOperation(ensures)!;
             var foundAnonymousParameter = false;
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<IOperation>.Empty;
+            pending = pending.Push(operation);
+            while (!pending.IsEmpty)
             {
-                var current = pending.Pop();
+                var current = pending.Peek();
+                pending = pending.Pop();
                 if (current is IParameterReferenceOperation parameterReference &&
                     parameterReference.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction } owner)
                 {
@@ -143,7 +145,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 }
                 foreach (var child in current.ChildOperations)
                 {
-                    pending.Push(child);
+                    pending = pending.Push(child);
                 }
             }
             Assert.That(foundAnonymousParameter, Is.True, "The actual SDK predicate must contain an anonymous-function-owned parameter.");
@@ -366,7 +368,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("QueryValueControl", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image, writable: false);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var method = runtime.LoadFromStream(stream).GetType("QueryValueControl", throwOnError: true)!
                     .GetMethod("Root")!;
                 using (Assert.EnterMultipleScope())
@@ -391,7 +393,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
     [Test]
     public void QueryValuedSelectorSiblingsKeepDistinctRolesAcrossRenames()
     {
-        static string[] Fingerprints(string parameter, string outer, string inner)
+        static ImmutableArray<string> Fingerprints(string parameter, string outer, string inner)
         {
             System.ArgumentNullException.ThrowIfNull(inner);
             System.ArgumentNullException.ThrowIfNull(outer);
@@ -416,7 +418,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("DistinctQueryRoleControl", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image, writable: false);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var method = runtime.LoadFromStream(stream).GetType("DistinctQueryRoleControl", throwOnError: true)!
                     .GetMethod("Root")!;
                 using (Assert.EnterMultipleScope())
@@ -440,7 +442,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             Assert.That(Fingerprints("renamedValue", "renamedOuter", "renamedInner"), Is.EqualTo(first));
         }
     }
-    private static string[] InvocationFingerprints(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
+    private static ImmutableArray<string> InvocationFingerprints(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
@@ -457,7 +459,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 var method = (IMethodSymbol)model.GetEnclosingSymbol(invocation.Syntax.SpanStart)!;
                 return SemanticClaimIdentity.CreateInvocationFingerprint(invocation, method, method,
                     usesCompanion: false);
-            }).ToArray();
+            }).ToImmutableArray();
     }
 
     [Test]

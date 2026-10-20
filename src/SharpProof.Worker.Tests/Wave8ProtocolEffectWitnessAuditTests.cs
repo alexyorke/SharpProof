@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -10,7 +11,7 @@ internal sealed class Wave8ProtocolEffectWitnessAuditTests
 {
     private static IEnumerable<TestCaseData> WitnessCases()
     {
-        foreach (var boundary in new[] { "validation", "launcher" })
+        foreach (var boundary in ImmutableArray.Create("validation", "launcher"))
         {
             yield return new TestCaseData(WorkerEffectContractKind.DoesNotThrow, WorkerEffectSet.Throws, true, boundary);
             yield return new TestCaseData(WorkerEffectContractKind.DoesNotThrow, WorkerEffectSet.Allocates, false, boundary);
@@ -29,7 +30,7 @@ internal sealed class Wave8ProtocolEffectWitnessAuditTests
         var request = CreateRequest();
         var response = CreateResponse(request, contract, effects);
         var json = WorkerProtocolJson.SerializeResponse(response);
-        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(json))}");
+        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(json)).ToImmutableArray())}");
         if (boundary == "validation")
         {
             var decoded = WorkerProtocolJson.DeserializeResponse(json)!;
@@ -70,8 +71,15 @@ internal sealed class Wave8ProtocolEffectWitnessAuditTests
         Assert.That(claim.EffectWitness, Is.Not.Null);
         Assert.That(claim.EffectWitness!.Effects, Is.EqualTo(contract == WorkerEffectContractKind.DoesNotThrow
             ? WorkerEffectSet.Throws : WorkerEffectSet.Allocates));
-        claim.EffectWitness = CreateWitness(contract == WorkerEffectContractKind.DoesNotThrow
-            ? WorkerEffectSet.Allocates : WorkerEffectSet.Throws, claim.EffectWitness.Location);
+        {
+            var originalFixtureRow4428 = claim;
+            claim = claim with
+            {
+                EffectWitness = CreateWitness(contract == WorkerEffectContractKind.DoesNotThrow
+            ? WorkerEffectSet.Allocates : WorkerEffectSet.Throws, claim.EffectWitness.Location)
+            };
+            response = response with { ClaimResults = response.ClaimResults.ReplaceReference(originalFixtureRow4428, claim) };
+        }
         var json = WorkerProtocolJson.SerializeResponse(response);
         using var directory = new TempDirectory("wave8-native-witness-");
         var path = Path.Combine(directory.FullName, "response.json");

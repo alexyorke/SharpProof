@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
@@ -66,36 +67,44 @@ public sealed class PortableTotalExecutionTests
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
         var graph = CreateGraph();
-        var instructions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         var span = graph.Operations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!;
         switch (mutation)
         {
             case "mode":
-                graph.Semantics = (IrExecutionSemantics)99;
+                graph = graph with { Semantics = (IrExecutionSemantics)99 };
                 break;
             case "origin":
-                instructions[0].Origin = (IrHavocOrigin)99;
+                graph = graph.ReplaceRow(instructions[0], instructions[0] with { Origin = (IrHavocOrigin)99 });
                 break;
             case "unused-origin":
-                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).Origin = IrHavocOrigin.Input;
+                graph = graph.ReplaceRow(instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)), instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)) with { Origin = IrHavocOrigin.Input });
                 break;
             case "span-start":
-                span.Start = -1;
+                {
+                    (span, graph) = graph.ChangeRow(span, span with { Start = -1 });
+                }
                 break;
             case "span-length":
-                span.Length = -1;
+                {
+                    (span, graph) = graph.ChangeRow(span, span with { Length = -1 });
+                }
                 break;
             case "span-overflow":
-                span.Start = int.MaxValue;
+                {
+                    (span, graph) = graph.ChangeRow(span, span with { Start = int.MaxValue });
+                }
                 break;
             case "span-document":
-                span.Document = " ";
+                {
+                    (span, graph) = graph.ChangeRow(span, span with { Document = " " });
+                }
                 break;
             case "throw-kind":
-                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).A = 99;
+                graph = graph.ReplaceRow(instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)), instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)) with { A = 99 });
                 break;
             case "throw-target":
-                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).B = 99;
+                graph = graph.ReplaceRow(instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)), instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)) with { B = 99 });
                 break;
         }
         Assert.Throws<InvalidDataException>((Action)(() =>

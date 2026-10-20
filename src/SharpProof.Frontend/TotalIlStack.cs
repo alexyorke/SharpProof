@@ -8,7 +8,7 @@ internal static class TotalIlStack
     // Validate every reachable merge before allocating frame/stack storage.
     // Unknown opcodes also close unreachable code, rather than hiding evidence.
     internal static bool TryValidate(TotalIlBody body, Func<int, bool> spend,
-        out ImmutableArray<TotalIlStackType>?[] shapes)
+        out ImmutableArray<ImmutableArray<TotalIlStackType>?> shapes)
     {
         ArgumentNullGuard.NotNull(body, nameof(body));
         ArgumentNullGuard.NotNull(spend, nameof(spend));
@@ -18,20 +18,21 @@ internal static class TotalIlStack
             body.MaximumStack is < 0 or > 128 || body.Locals.Length > 128 || body.Locals.Any(type => !Supported(type)) ||
             !body.InitializeLocals && !body.Locals.IsEmpty || !spend(code.Length + body.Locals.Length))
         { return false; }
-        shapes = new ImmutableArray<TotalIlStackType>?[code.Length];
+        shapes = ImmutableArray.CreateRange(Enumerable.Repeat<ImmutableArray<TotalIlStackType>?>(null, code.Length));
         foreach (var instruction in code)
         {
             if (!Known(instruction.Code) || !spend(1) ||
                 instruction.Code.StartsWith("B", StringComparison.Ordinal) && (instruction.Target < 0 || instruction.Target >= code.Length))
             { return false; }
         }
-        shapes[0] = [];
-        var pending = new Queue<int>();
-        pending.Enqueue(0);
-        while (pending.Count != 0)
+        var shapeBuilder = shapes.ToBuilder();
+        shapeBuilder[0] = ImmutableArray<TotalIlStackType>.Empty;
+        shapes = shapeBuilder.ToImmutable();
+        var pending = ImmutableQueue<int>.Empty.Enqueue(0);
+        while (!pending.IsEmpty)
         {
-            var index = pending.Dequeue();
-            var stack = shapes[index]!.Value.ToList();
+            pending = pending.Dequeue(out var index);
+            var stack = shapes[index]!.Value.ToBuilder();
             var instruction = code[index];
             if (!spend(stack.Count + 1) || !Transfer(body, instruction, stack) || stack.Count > body.MaximumStack)
             { return false; }
@@ -52,13 +53,13 @@ internal static class TotalIlStack
                     }
                     var joined = merged.ToImmutable();
                     if (!previous.SequenceEqual(joined))
-                    { shapes[target] = joined; pending.Enqueue(target); }
+                    { shapeBuilder[target] = joined; shapes = shapeBuilder.ToImmutable(); pending = pending.Enqueue(target); }
                 }
                 else
-                { shapes[target] = [.. stack]; pending.Enqueue(target); }
+                { shapeBuilder[target] = stack.ToImmutable(); shapes = shapeBuilder.ToImmutable(); pending = pending.Enqueue(target); }
             }
         }
-        return shapes.All(shape => shape != null);
+        return shapes.All(shape => shape is { IsDefault: false });
     }
 
     internal static IEnumerable<int> Successors(ImmutableArray<TotalIlInstruction> code, int index)
@@ -76,7 +77,7 @@ internal static class TotalIlStack
         { yield return index + 1; }
     }
 
-    private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, List<TotalIlStackType> stack)
+    private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, ImmutableArray<TotalIlStackType>.Builder stack)
     {
         instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         var code = instruction.Code;

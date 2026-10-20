@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -32,7 +33,7 @@ public sealed class ManagedFlowExceptionRegionRegressionTests
             "effects",
             ["SP0046", "SP0047"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
     }
 
     [Test]
@@ -63,6 +64,6 @@ public sealed class ManagedFlowExceptionRegionRegressionTests
             "effects",
             ["SP0047"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
     }
 }

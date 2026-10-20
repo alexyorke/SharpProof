@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Z3;
 
 namespace SharpProof.Smt.Test;
@@ -65,12 +66,14 @@ public sealed class KeyedEntryModelTests
             factory.Binary(IrBinaryOperator.Equal, factory.PureOpaque(field, factory.Variable(variable)), factory.Integer(int.MaxValue))], _ => Assert.Fail("Oversized witness must not be published."))));
     }
 
-    private static void Decode(IrFactory factory, ScopedIrId<IrVariableTag>[] variables, IrTerm[] predicates,
-        Action<Dictionary<ScopedIrId<IrVariableTag>, IrValue>> inspect)
+    private static void Decode(IrFactory factory, ImmutableArray<ScopedIrId<IrVariableTag>> variables, ImmutableArray<IrTerm> predicates,
+        Action<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>> inspect)
     {
         ArgumentNullException.ThrowIfNull(factory);
-        ArgumentNullException.ThrowIfNull(variables);
-        ArgumentNullException.ThrowIfNull(predicates);
+        if (variables.IsDefault)
+        { throw new ArgumentNullException(nameof(variables)); }
+        if (predicates.IsDefault)
+        { throw new ArgumentNullException(nameof(predicates)); }
         ArgumentNullException.ThrowIfNull(inspect);
         using var context = new Context();
         using var solver = context.MkSolver();
@@ -81,7 +84,7 @@ public sealed class KeyedEntryModelTests
             var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
             var query = new VerificationQuery(factory,
                 predicates.Select(predicate => new Assumption(factory, predicate ?? throw new ArgumentNullException(nameof(predicate)), new LoweredJustification(factory.CreateOperation()))),
-                new SharpProof.Verify.Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
+                new SharpProof.Verify.Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
             encoder.ValidateQuery(query, meter, TestContext.CurrentContext.CancellationToken);
             foreach (var predicate in predicates)
             { solver.Assert(encoder.EncodeBoolean(predicate, meter)); }

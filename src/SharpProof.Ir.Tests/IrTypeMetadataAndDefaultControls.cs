@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -15,14 +16,13 @@ internal sealed class IrTypeMetadataAndDefaultControls
         var reference = factory.GetOrCreateReferenceType(identity, "Widget");
         var sequence = factory.GetOrCreateSequenceType(factory.BooleanType);
         var unsigned = factory.GetOrCreateIntegerType(64, signed: false);
-        var expectations = new[]
-        {
+        var expectations = ImmutableArray.Create(
             (Type: factory.BooleanType, Kind: IrTypeKind.Boolean, Name: "bool", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: unsigned, Kind: IrTypeKind.Integer, Name: "ulong", Element: (IrTypeId?)null, Width: 64, Signed: false),
             (Type: factory.StringType, Kind: IrTypeKind.String, Name: "string", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: reference, Kind: IrTypeKind.Reference, Name: "Widget", Element: (IrTypeId?)null, Width: 0, Signed: false),
             (Type: sequence, Kind: IrTypeKind.Sequence, Name: "bool[]", Element: (IrTypeId?)factory.BooleanType, Width: 0, Signed: false)
-        };
+        );
         using (Assert.EnterMultipleScope())
         {
             foreach (var expected in expectations)
@@ -52,16 +52,13 @@ internal sealed class IrTypeMetadataAndDefaultControls
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var interpreter = new IrInterpreter(factory);
         var boxed = factory.CreateVariable("boxed", factory.ObjectType);
-        var operand = interpreter.Evaluate(factory.Variable(boxed), new Dictionary<IrVarId, IrValue>
-        {
-            [boxed] = factory.CreateReferenceValue(factory.ObjectType, new object())
-        });
+        var operand = interpreter.Evaluate(factory.Variable(boxed), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(boxed, factory.CreateReferenceValue(factory.ObjectType, new object())));
         var boolean = interpreter.EvaluateCastValue(factory.BooleanType, operand);
         var integer = interpreter.EvaluateCastValue(factory.IntegerType, operand);
         var strings = factory.GetOrCreateSequenceType(factory.StringType);
         var variable = factory.CreateVariable("empty", strings);
         var nullable = interpreter.Evaluate(factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)),
-            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateSequenceValue(strings, Array.Empty<IrValue>()) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateSequenceValue(strings, ImmutableArray<IrValue>.Empty)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(boolean.Status, Is.EqualTo(IrEvaluationStatus.Value));

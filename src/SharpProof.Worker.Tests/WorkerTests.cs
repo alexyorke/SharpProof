@@ -30,11 +30,11 @@ internal sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var first = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
 
-        request.CompilerManifest.Sha256 = new string('f', 64);
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = new string('f', 64) } }; }
         var mismatched = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(mismatched.FailureReason, Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
 
-        request.CompilerManifest.Sha256 = snapshot.ArtifactDigest;
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = snapshot.ArtifactDigest } }; }
         request.Budgets.MethodRlimit++;
         File.Delete(request.CompilerManifest.Path);
         var changedBudget = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
@@ -118,7 +118,7 @@ internal sealed partial class WorkerTests
         }
         """;
 
-    private static readonly string[] InvalidBudgetErrorCodes = [
+    private static readonly ImmutableArray<string> InvalidBudgetErrorCodes = [
         "protocol.unsupported",
         "budgets.rlimit",
         "budgets.method_rlimit",
@@ -128,7 +128,7 @@ internal sealed partial class WorkerTests
         "cache.maximum_bytes"
     ];
 
-    private static readonly string[] RequiredReferenceFileNames = [
+    private static readonly ImmutableArray<string> RequiredReferenceFileNames = [
         "System.Private.CoreLib.dll",
         "System.Linq.dll",
         "System.Runtime.dll",
@@ -172,7 +172,7 @@ internal sealed partial class WorkerTests
             WorkerProtocolJson.DeserializeRequest(
                 """{"protocolVersion":"1","unknown":true}""")));
 
-        request.ProtocolVersion = WorkerProtocolVersions.Current;
+        { request = request with { ProtocolVersion = WorkerProtocolVersions.Current }; }
         request.Budgets.QueryRlimit = 2;
         request.Budgets.MethodRlimit = 1;
         validation = WorkerProtocolJson.Validate(request);
@@ -294,7 +294,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -340,7 +340,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: true);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -402,7 +402,7 @@ internal sealed partial class WorkerTests
         var preconditions = result.Assumptions.Where(
             static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind ==
-                WorkerAssumptionKind.Precondition)).ToArray();
+                WorkerAssumptionKind.Precondition)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -557,7 +557,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -654,7 +654,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -695,7 +695,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -837,7 +837,7 @@ internal sealed partial class WorkerTests
             cacheEnabled: false);
         var results = response.ClaimResults.OrderBy(result =>
             result is null ? throw new System.ArgumentNullException(nameof(result)) : (response.Manifest.Claims.Single(claim =>
-                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)).EffectContractKind)).ToArray();
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)).EffectContractKind)).ToImmutableArray();
         var responseJson = WorkerProtocolJson.SerializeResponse(response);
 
         using (Assert.EnterMultipleScope())
@@ -877,7 +877,7 @@ internal sealed partial class WorkerTests
                 .Where(diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
                 .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 sourceErrors,
                 Is.Empty,
@@ -1043,7 +1043,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -1095,7 +1095,7 @@ internal sealed partial class WorkerTests
         using var worker = new SharpProofWorker(new CountingBackend(BackendCheckResult.Unsatisfiable([])));
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var effectClaims = response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))).ToArray();
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(effectClaims, Has.Length.EqualTo(3));
@@ -1166,7 +1166,7 @@ internal sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -1253,7 +1253,7 @@ internal sealed partial class WorkerTests
                 static result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness?.Kind ?? string.Empty),
                 StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1418,10 +1418,9 @@ internal sealed partial class WorkerTests
         Assert.That(loweredCallables, Is.Not.Empty);
         loweredCallables[0]!.AsObject()["callableId"] = callableId;
         json = root.ToJsonString(WorkerProtocolJson.Options) + "\n";
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
 
         var deserializeException = CaptureJson(() =>
             CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken));
@@ -1498,13 +1497,13 @@ internal sealed partial class WorkerTests
         switch (binding)
         {
             case nameof(CompilerDiagnosticArtifact.SourceTreePath):
-                diagnostic.SourceTreePath = null!;
+                diagnostic = diagnostic with { SourceTreePath = null! };
                 break;
             case nameof(CompilerDiagnosticArtifact.SourceTreeSha256):
-                diagnostic.SourceTreeSha256 = null!;
+                diagnostic = diagnostic with { SourceTreeSha256 = null! };
                 break;
             case nameof(CompilerDiagnosticArtifact.SourceLineMapSha256):
-                diagnostic.SourceLineMapSha256 = null!;
+                diagnostic = diagnostic with { SourceLineMapSha256 = null! };
                 break;
             default:
                 throw new AssertionException(
@@ -1515,13 +1514,12 @@ internal sealed partial class WorkerTests
         json = json.Replace(
             "\"compilerDiagnostics\":[]",
             "\"compilerDiagnostics\":" + JsonSerializer.Serialize(
-                new[] { diagnostic },
+                ImmutableArray.Create(diagnostic),
                 WorkerProtocolJson.Options),
             StringComparison.Ordinal);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         using var worker = new SharpProofWorker(
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
@@ -1574,12 +1572,11 @@ internal sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        artifact.Compilation.CompilerVersion = "0.0.0.0";
+        artifact = artifact with { Compilation = artifact.Compilation with { CompilerVersion = "0.0.0.0" } };
         var bytes = System.Text.Encoding.UTF8.GetBytes(
-            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -1783,8 +1780,8 @@ internal sealed partial class WorkerTests
             request,
             changedSpecContent,
             TestContext.CurrentContext.CancellationToken);
-        var artifactBytes = await File.ReadAllBytesAsync(
-            request.CompilerManifest.Path);
+        var artifactBytes = (await File.ReadAllBytesAsync(
+            request.CompilerManifest.Path)).ToImmutableArray();
         var sharedHash = CompilerArtifactInputHash.Compute(
             request, ArtifactDigest.Compute(artifactBytes), baselineIdentity.ToolIdentity,
             baselineIdentity.ToolVersion, baselineIdentity.WorkerBinarySha256,
@@ -1852,10 +1849,7 @@ internal sealed partial class WorkerTests
         Assert.That(first.ClaimResults.Length, Is.EqualTo(2));
         Assert.That(
             first.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
-            Is.EquivalentTo(new[] {
-                WorkerClaimOutcome.Proven,
-                WorkerClaimOutcome.Refuted
-            }));
+            Is.EquivalentTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(
             first.ClaimResults.Select(record =>
                 record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(first, record))),
@@ -1866,7 +1860,7 @@ internal sealed partial class WorkerTests
     [Test]
     public async Task PartialMethodDiscoveryUsesOnlyTheImplementation()
     {
-        using var project = TestProject.Create(
+        using var project = TestProject.Create([
             (
                 "Definition.cs",
                 """
@@ -1885,7 +1879,7 @@ internal sealed partial class WorkerTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var request = project.CreateRequest(cacheEnabled: false);
         var compilation = project.CreateCompilation();
         using var backend = new CountingNativeBackend();
@@ -2124,7 +2118,7 @@ internal sealed partial class WorkerTests
         var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
             .Total!.Clauses.Where(static clause =>
                 clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume))
-            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId)).ToArray();
+            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId)).ToImmutableArray();
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -2140,7 +2134,7 @@ internal sealed partial class WorkerTests
             Is.EqualTo(IrExecutionSemantics.Total));
         var userAssumptions = record.Assumptions
             .Where(static evidence =>
-                evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToArray();
+                evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -2231,13 +2225,7 @@ internal sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var contradictory = new[]
-        {
-            Result("ByteImpossible"),
-            Result("UIntImpossible"),
-            Result("PositiveImpossible"),
-            Result("RangeImpossible")
-        };
+        var contradictory = ImmutableArray.Create(Result("ByteImpossible"), Result("UIntImpossible"), Result("PositiveImpossible"), Result("RangeImpossible"));
         var assumeOnly = Result("AssumeOnly");
 
         using (Assert.EnterMultipleScope())
@@ -2311,7 +2299,7 @@ internal sealed partial class WorkerTests
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                         "." + methodName + "(",
                         StringComparison.Ordinal)))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 matching,
                 Has.Length.EqualTo(1),
@@ -2433,7 +2421,7 @@ internal sealed partial class WorkerTests
             .Where(record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Empty",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -2788,14 +2776,7 @@ internal sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
-        foreach (var methodName in new[]
-                 {
-                     "RemainderRelation",
-                     "RemainderOverflowVacuous",
-                     "RemainderNormalResult",
-                     "DivisionControl",
-                     "LongRemainderControl"
-                 })
+        foreach (var methodName in ImmutableArray.Create("RemainderRelation", "RemainderOverflowVacuous", "RemainderNormalResult", "DivisionControl", "LongRemainderControl"))
         {
             var method = subject.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
@@ -2862,7 +2843,7 @@ internal sealed partial class WorkerTests
     [Test]
     public void ImplementationIlRejectsOversizedLocalSignatureBeforeMaterialization()
     {
-        var localCount =
+        const int localCount =
             129;
         var localDeclarations = string.Join(
             Environment.NewLine,
@@ -3071,9 +3052,8 @@ internal sealed partial class WorkerTests
     [Test]
     public void ImplementationIlScalarOpcodeMatrixUsesTotalBodies()
     {
-        var signatures = new (string ReturnType, string Name, string Parameters,
-            string Arguments)[]
-        {
+        var signatures = ImmutableArray.Create<(string ReturnType, string Name, string Parameters,
+            string Arguments)>(
             ("int", "MinusOne", "", ""),
             ("int", "Small", "", ""),
             ("int", "Wide", "", ""),
@@ -3105,8 +3085,7 @@ internal sealed partial class WorkerTests
             ("int", "IntegerCondition", "int value, int yes, int no", "value, yes, no"),
             ("int", "PopCall", "int value", "value"),
             ("int", "NestedCall", "int value", "value"),
-            ("int", "InadmissibleCall", "int value", "value")
-        };
+            ("int", "InadmissibleCall", "int value", "value"));
         var subjectMethods = string.Join(
             Environment.NewLine,
             signatures.Select(static signature =>
@@ -3200,8 +3179,11 @@ internal sealed partial class WorkerTests
             }
             """);
         var compilation = project.CreateCompilation();
-        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
+        var targets = ImmutableDictionaryCapture.Create(
+            new ClaimManifestBuilder(compilation).Build().Targets.Values,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
@@ -3303,15 +3285,13 @@ internal sealed partial class WorkerTests
             """,
             OptimizationLevel.Debug);
         var compilation = project.CreateCompilation();
-        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
+        var targets = ImmutableDictionaryCapture.Create(
+            new ClaimManifestBuilder(compilation).Build().Targets.Values,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
 
-        foreach (var targetName in new[]
-                 {
-                     "VerifyRoundTrip",
-                     "VerifyAssignmentValue",
-                     "VerifyManyLocals"
-                 })
+        foreach (var targetName in ImmutableArray.Create("VerifyRoundTrip", "VerifyAssignmentValue", "VerifyManyLocals"))
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
             var preparation = lowerer.Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -3464,7 +3444,7 @@ internal sealed partial class WorkerTests
             Assert.That(withArtifact.SpecificationPackIds.Single(), Is.EqualTo("dotnet.scalar"));
         }
 
-        withArtifact.Callables.Single().Total!.Graph.Semantics = IrExecutionSemantics.Legacy;
+        { withArtifact = withArtifact with { Callables = withArtifact.Callables.ReplaceReference(withArtifact.Callables.Single(), withArtifact.Callables.Single() with { Total = withArtifact.Callables.Single().Total! with { Graph = withArtifact.Callables.Single().Total!.Graph with { Semantics = IrExecutionSemantics.Legacy } } }) }; }
         Assert.That(
             new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());
@@ -3719,13 +3699,7 @@ internal sealed partial class WorkerTests
                     StringComparison.Ordinal)));
         }
 
-        foreach (var methodName in new[]
-                 {
-                     "CallPlain",
-                     "CallRequires",
-                     "CallEnsures",
-                     "CallAssume"
-                 })
+        foreach (var methodName in ImmutableArray.Create("CallPlain", "CallRequires", "CallEnsures", "CallAssume"))
         {
             Assert.That(
                 ResultFor(methodName).Outcome,
@@ -3984,7 +3958,7 @@ internal sealed partial class WorkerTests
                     record.Reason))));
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.ProofCore)),
-            Has.All.Matches<string[]>(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("normal-completion:", StringComparison.Ordinal))))));
+            Has.All.Matches<ImmutableArray<string>>(core => core.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(core)) : (core.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("normal-completion:", StringComparison.Ordinal))))));
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Vacuity)),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
@@ -4147,10 +4121,7 @@ internal sealed partial class WorkerTests
 
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
-            Is.EquivalentTo(new[] {
-                WorkerClaimReason.DeepPostcondition,
-                WorkerClaimReason.CounterexampleNotReplayable
-            }));
+            Is.EquivalentTo(ImmutableArray.Create(WorkerClaimReason.DeepPostcondition, WorkerClaimReason.CounterexampleNotReplayable)));
         Assert.That(
             response.ClaimResults.All(static record =>
                 record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome == WorkerClaimOutcome.Unknown)),
@@ -4393,9 +4364,9 @@ internal sealed partial class WorkerTests
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
             Assert.That(response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerCallableCoverageReason[])[WorkerCallableCoverageReason.InfrastructureFailure,
+                Is.EqualTo((ImmutableArray<WorkerCallableCoverageReason>)[WorkerCallableCoverageReason.InfrastructureFailure,
                     WorkerCallableCoverageReason.MethodTimeout]));
             Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)),
                 Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
@@ -4410,25 +4381,22 @@ internal sealed partial class WorkerTests
         System.ArgumentNullException.ThrowIfNull(snapshot);
         var manifest = snapshot.CompilerManifest.Manifest;
         Assert.That(manifest.Callables, Has.Length.EqualTo(2));
-        var callables = manifest.Callables.Select((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
+        var originalCallables = manifest.Callables.Select((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
         {
             CallableId = callable.CallableId,
             Coverage = WorkerCallableCoverage.Incomplete,
             Reason = index == 0 ? WorkerCallableCoverageReason.InfrastructureFailure : WorkerCallableCoverageReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        })).ToArray();
-        var claims = manifest.Callables.SelectMany((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (new WorkerClaimResult
+        })).ToImmutableArray();
+        var originalClaims = manifest.Callables.SelectMany((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (new WorkerClaimResult
         {
             ClaimId = claimId,
             Outcome = WorkerClaimOutcome.Unknown,
             Reason = index == 0 ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        })))).ToArray();
-        if (reverseRecords)
-        {
-            Array.Reverse(callables);
-            Array.Reverse(claims);
-        }
+        })))).ToImmutableArray();
+        var callables = reverseRecords ? originalCallables.Reverse().ToImmutableArray() : originalCallables;
+        var claims = reverseRecords ? originalClaims.Reverse().ToImmutableArray() : originalClaims;
         var run = WorkerResultAssembler.Classify(callables, claims);
         return WorkerResultAssembler.Create(snapshot.InputHash, manifest, run.Status, run.Failure, callables, claims,
             request.Budgets, WorkerCacheStatus.Disabled, 0, requestHash: WorkerProtocolJson.ComputeRequestHash(request),
@@ -4503,7 +4471,7 @@ internal sealed partial class WorkerTests
                 null!),
             Is.False);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4511,7 +4479,7 @@ internal sealed partial class WorkerTests
                 manifest),
             Is.True);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Unknown }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4519,9 +4487,8 @@ internal sealed partial class WorkerTests
                 manifest),
             Is.False);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
-        response.ClaimResults[0].Reason =
-            WorkerClaimReason.InfrastructureFailure;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Proven }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Reason = WorkerClaimReason.InfrastructureFailure }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4529,7 +4496,7 @@ internal sealed partial class WorkerTests
                 manifest),
             Is.False);
 
-        response.ClaimResults[0].Reason = WorkerClaimReason.None;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Reason = WorkerClaimReason.None }) }; }
         response.Errors = [
             new WorkerProtocolError {
                 Code = "worker.error",
@@ -4620,7 +4587,7 @@ internal sealed partial class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -4649,7 +4616,7 @@ internal sealed partial class WorkerTests
         await File.WriteAllTextAsync(unrelatedPath, "not a cache entry");
 
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
         await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -4668,7 +4635,7 @@ internal sealed partial class WorkerTests
         await File.WriteAllTextAsync(legacyPath, legacyContents);
 
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
         await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -4748,7 +4715,7 @@ internal sealed partial class WorkerTests
             backend,
             () => backend.ConsumedResourceCount);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        WorkerClaimOutcome[] expectedStatuses = [
+        ImmutableArray<WorkerClaimOutcome> expectedStatuses = [
             WorkerClaimOutcome.Proven,
             WorkerClaimOutcome.Proven,
             WorkerClaimOutcome.Unknown
@@ -4784,7 +4751,7 @@ internal sealed partial class WorkerTests
             Assert.That(coordination.Created, Is.EqualTo(2));
             Assert.That(coordination.MaximumActive, Is.EqualTo(2));
             Assert.That(coordination.Disposed, Is.EqualTo(2));
-            var callableIds = response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)).ToArray();
+            var callableIds = response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)).ToImmutableArray();
             Assert.That(callableIds, Is.EqualTo(callableIds.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)));
         }
     }
@@ -4836,7 +4803,7 @@ internal sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 3;
         var factoryCalls = 0;
-        var created = new List<ThrowingDisposeBackend>();
+        var createdBuilder = ImmutableArray.CreateBuilder<ThrowingDisposeBackend>();
         using var worker = new SharpProofWorker(() =>
         {
             factoryCalls++;
@@ -4847,7 +4814,7 @@ internal sealed partial class WorkerTests
 
             var backend = new ThrowingDisposeBackend(
                 BackendCheckResult.Unsatisfiable([]));
-            created.Add(backend);
+            createdBuilder.Add(backend);
             return backend;
         });
 
@@ -4856,7 +4823,8 @@ internal sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factoryCalls, Is.EqualTo(3));
-            Assert.That(created, Has.Count.EqualTo(2));
+            var created = createdBuilder.ToImmutable();
+            Assert.That(created, Has.Length.EqualTo(2));
             Assert.That(
                 created.Select(static backend => backend is null ? throw new System.ArgumentNullException(nameof(backend)) : (backend.DisposeCalls)),
                 Is.All.EqualTo(1));
@@ -4911,7 +4879,7 @@ internal sealed partial class WorkerTests
                 Task.Delay(TimeSpan.FromSeconds(1))),
             backend.SecondEntered);
         backend.ReleaseFirst();
-        var responses = await Task.WhenAll(first, second);
+        var responses = (await Task.WhenAll(first, second)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -4945,13 +4913,13 @@ internal sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None
                 ]));
@@ -4994,13 +4962,13 @@ internal sealed partial class WorkerTests
                     : WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(
                 response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerCallableCoverageReason[])[
+                Is.EqualTo((ImmutableArray<WorkerCallableCoverageReason>)[
                     WorkerCallableCoverageReason.MethodTimeout,
                     WorkerCallableCoverageReason.InfrastructureFailure
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     backendUnavailable
                         ? WorkerClaimReason.BackendUnavailable
@@ -5080,7 +5048,7 @@ internal sealed partial class WorkerTests
             Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     expectedClaimReason
                 ]));
@@ -5201,14 +5169,14 @@ internal sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
                     WorkerClaimOutcome.Refuted
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None,
                     WorkerClaimReason.None
@@ -5258,7 +5226,7 @@ internal sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(4));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
@@ -5447,7 +5415,7 @@ internal sealed partial class WorkerTests
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"using SharpProof.Attributes; internal static class Padding{index} {{ internal static int Identity(int value) {{ Contract.Ensures(Contract.Result<int>() == value); return value; }} }}"))
             .Prepend(("Subject.cs", TautologySource))
-            .ToArray();
+            .ToImmutableArray();
         using var project = TestProject.Create(sources);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodWallTimeMilliseconds = 1;
@@ -5490,7 +5458,7 @@ internal sealed partial class WorkerTests
                     "Subject",
                     $"Subject{index}",
                     StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         using var projectProject = TestProject.Create(projectSources);
         var projectRequest = projectProject.CreateRequest(cacheEnabled: false);
         projectRequest.Budgets.MethodWallTimeMilliseconds = 40;
@@ -5668,11 +5636,11 @@ internal sealed partial class WorkerTests
         return GetClaim(response, result).CallableId;
     }
 
-    private static string[] CacheFiles(TestProject project)
+    private static ImmutableArray<string> CacheFiles(TestProject project)
     {
         System.ArgumentNullException.ThrowIfNull(project);
         return Directory.Exists(project.CacheDirectory)
-            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
+            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json").ToImmutableArray()
             : [];
     }
 
@@ -5718,7 +5686,7 @@ internal sealed partial class WorkerTests
         }
     }
 
-    private static RuntimeContractCase[] CreateRuntimeContractCases(
+    private static ImmutableArray<RuntimeContractCase> CreateRuntimeContractCases(
         int seed,
         int count)
     {
@@ -5726,11 +5694,11 @@ internal sealed partial class WorkerTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(count)); }
 
         var random = new Random(seed);
-        var result = new RuntimeContractCase[count];
+        var result = ImmutableArray.CreateBuilder<RuntimeContractCase>();
         for (var index = 0; index < count; index++)
         {
             var boundary = random.Next(-50, 51);
-            var inputs = new[] {
+            ImmutableArray<long> inputs = [
                 -100L,
                 -1L,
                 0L,
@@ -5741,13 +5709,13 @@ internal sealed partial class WorkerTests
                 boundary + 1L,
                 random.Next(-100, 101),
                 random.Next(-100, 101)
-            };
+            ];
             var name = "M" + index.ToString(
                 "D2",
                 System.Globalization.CultureInfo.InvariantCulture);
             var boundaryLiteral = boundary.ToString(
                 System.Globalization.CultureInfo.InvariantCulture) + "L";
-            result[index] = (index % 8) switch
+            result.Add((index % 8) switch
             {
                 0 => new RuntimeContractCase(
                     name,
@@ -5813,9 +5781,9 @@ internal sealed partial class WorkerTests
                     (_, actual) => actual < boundary,
                     WorkerClaimOutcome.Proven,
                     inputs)
-            };
+            });
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static string CreateRuntimeContractSource(
@@ -5854,13 +5822,13 @@ internal sealed partial class WorkerTests
         Func<long, bool> Requires,
         Func<long, long, bool> Ensures,
         WorkerClaimOutcome ExpectedStatus,
-        long[] Inputs)
+        ImmutableArray<long> Inputs)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string EnsuresSource { get; init; } = EnsuresSource ?? throw new System.ArgumentNullException(nameof(EnsuresSource));
         public Func<long, bool> Requires { get; init; } = Requires ?? throw new System.ArgumentNullException(nameof(Requires));
         public Func<long, long, bool> Ensures { get; init; } = Ensures ?? throw new System.ArgumentNullException(nameof(Ensures));
-        public long[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ImmutableArray<long> Inputs { get; init; } = Inputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
     }
 
     private const string TautologySource =
@@ -5973,7 +5941,7 @@ internal sealed partial class WorkerTests
     private sealed class SignalingDelayingBackend(
         TaskCompletionSource started) : ISmtBackend
     {
-        private TaskCompletionSource _guarded_started = started ?? throw new System.ArgumentNullException(nameof(started));
+        private readonly TaskCompletionSource _guarded_started = started ?? throw new System.ArgumentNullException(nameof(started));
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
@@ -6306,7 +6274,7 @@ internal sealed partial class WorkerTests
 
         bytes[methodBodyOffset + 2] = (byte)declaredMaxStack;
         bytes[methodBodyOffset + 3] = (byte)(declaredMaxStack >> 8);
-        File.WriteAllBytes(path, bytes);
+        File.WriteAllBytes(path, bytes.AsSpan());
     }
 
     internal sealed class TestProject : IDisposable
@@ -6318,12 +6286,13 @@ internal sealed partial class WorkerTests
         private static readonly ImmutableArray<MetadataReference>
             NetCoreReferencePack = CreateNetCoreReferencePack();
         private readonly TempDirectory _temporary;
-        private readonly List<string> _additionalReferencePaths = [];
+        private readonly ImmutableArray<string>.Builder _additionalReferencePaths = ImmutableArray.CreateBuilder<string>();
         private bool _useNetCoreReferencePack;
 
-        private TestProject(TempDirectory temporary, string[] sourcePaths)
+        private TestProject(TempDirectory temporary, ImmutableArray<string> sourcePaths)
         {
-            System.ArgumentNullException.ThrowIfNull(sourcePaths, nameof(sourcePaths));
+            if (sourcePaths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sourcePaths)); }
             System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             DirectoryPath = temporary.FullName;
@@ -6335,7 +6304,7 @@ internal sealed partial class WorkerTests
         {
             get;
         }
-        internal string[] SourcePaths
+        internal ImmutableArray<string> SourcePaths
         {
             get;
         }
@@ -6347,13 +6316,14 @@ internal sealed partial class WorkerTests
         internal static TestProject Create(string source)
         {
             System.ArgumentNullException.ThrowIfNull(source);
-            return Create(("Subject.cs", source));
+            return Create([("Subject.cs", source)]);
         }
 
-        internal static TestProject Create(
-            params (string FileName, string Source)[] sources)
+
+        internal static TestProject Create(ImmutableArray<(string FileName, string Source)> sources)
         {
-            System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+            if (sources.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sources)); }
             var temporary = TempDirectory.CreateOwned(
                 "SharpProof.Worker.Test",
                 string.Empty,
@@ -6370,7 +6340,7 @@ internal sealed partial class WorkerTests
                         source.Source,
                         new System.Text.UTF8Encoding(false));
                     return sourcePath;
-                }).ToArray();
+                }).ToImmutableArray();
                 return new TestProject(temporary, sourcePaths);
             }
             catch
@@ -6411,12 +6381,12 @@ internal sealed partial class WorkerTests
                 TestContext.CurrentContext.CancellationToken,
                 specificationPacks: specificationPacks);
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var path = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest-" + Guid.NewGuid().ToString("N") +
                 ".json");
-            File.WriteAllBytes(path, bytes);
+            File.WriteAllBytes(path, bytes.AsSpan());
             return new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference
@@ -6509,7 +6479,7 @@ internal sealed partial class WorkerTests
                         System.Globalization.CultureInfo.InvariantCulture) +
                     ".0"),
                 "*.dll",
-                SearchOption.TopDirectoryOnly);
+                SearchOption.TopDirectoryOnly).ToImmutableArray();
             return [.. references
                 .Append(typeof(Contract).Assembly.Location)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -6534,7 +6504,7 @@ internal sealed partial class WorkerTests
             var references = (_useNetCoreReferencePack
                     ? NetCoreReferencePack
                     : DefaultReferences)
-                .AddRange(_additionalReferencePaths.Select(static path =>
+                .AddRange(_additionalReferencePaths.ToImmutable().Select(static path =>
                     path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));
             return CSharpCompilation.Create(
                 "WorkerTest",

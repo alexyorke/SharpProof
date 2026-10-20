@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,11 +14,11 @@ internal sealed partial class NativeSpecifiedCallTests
 {
     private static IEnumerable<TestCaseData> GenericArrayReturnCases()
     {
-        foreach (var element in new[] { "bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
+        foreach (var element in ImmutableArray.Create("bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong"))
         {
-            foreach (var local in new[] { false, true })
+            foreach (var local in ImmutableArray.Create(false, true))
             {
-                foreach (var correct in new[] { false, true })
+                foreach (var correct in ImmutableArray.Create(false, true))
                 { yield return new TestCaseData(element, local, correct); }
             }
         }
@@ -51,7 +52,7 @@ internal sealed partial class NativeSpecifiedCallTests
     {
         const string helper = "static T Read<T>(System.Collections.Generic.IList<T> list, int index) => list[index];";
         const string requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
-        var body = "return Read<int>(values as System.Collections.Generic.IList<int>, index); " + helper;
+        const string body = "return Read<int>(values as System.Collections.Generic.IList<int>, index); " + helper;
         await CheckInterfaceArrayContract("int[] values, int index", requires +
             "Contract.Ensures(Contract.Result<int>() " + (correct ? "==" : "!=") + " values[index]); " + body,
             correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted);
@@ -60,10 +61,10 @@ internal sealed partial class NativeSpecifiedCallTests
     }
     private static IEnumerable<TestCaseData> GenericArrayReturnOracleCases()
     {
-        foreach (var element in new[] { "bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
+        foreach (var element in ImmutableArray.Create("bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong"))
         {
-            foreach (var local in new[] { false, true })
-            { foreach (var directArray in new[] { false, true }) { yield return new TestCaseData(element, local, directArray); } }
+            foreach (var local in ImmutableArray.Create(false, true))
+            { foreach (var directArray in ImmutableArray.Create(false, true)) { yield return new TestCaseData(element, local, directArray); } }
         }
     }
 
@@ -96,7 +97,7 @@ internal sealed partial class NativeSpecifiedCallTests
         {
             var runtime = load.LoadFromStream(emitted).GetType("C")!.GetMethod("Target")!;
             var runtimeElement = runtime.GetParameters()[0].ParameterType.GetElementType()!;
-            object[] boundaries = element switch
+            ImmutableArray<object> boundaries = element switch
             {
                 "bool" => [false, true],
                 "char" => [char.MinValue, '\ud800', char.MaxValue],
@@ -111,19 +112,23 @@ internal sealed partial class NativeSpecifiedCallTests
                 _ => throw new ArgumentOutOfRangeException(nameof(element))
             };
             var all = Array.CreateInstance(runtimeElement, boundaries.Length);
-            var inputs = new List<Array?> { null, Array.CreateInstance(runtimeElement, 0), all };
+            var inputBuilder = ImmutableArray.CreateBuilder<Array?>();
+            inputBuilder.Add(null);
+            inputBuilder.Add(Array.CreateInstance(runtimeElement, 0));
+            inputBuilder.Add(all);
             for (var ordinal = 0; ordinal < boundaries.Length; ordinal++)
             {
                 all.SetValue(boundaries[ordinal], ordinal);
                 var single = Array.CreateInstance(runtimeElement, 1);
                 single.SetValue(boundaries[ordinal], 0);
-                inputs.Add(single);
+                inputBuilder.Add(single);
             }
+            var inputs = inputBuilder.ToImmutable();
             var arrayType = factory.GetVariableInfo(context.Parameters[0].Entry).Type;
             var elementType = factory.GetTypeInfo(arrayType).ElementType!.Value;
             foreach (var values in inputs)
             {
-                foreach (var index in new[] { -1, 0, (values?.Length ?? 0) - 1, values?.Length ?? 0, int.MaxValue }.Distinct())
+                foreach (var index in ImmutableArray.Create(-1, 0, (values?.Length ?? 0) - 1, values?.Length ?? 0, int.MaxValue).Distinct())
                 {
                     Exception? fault = null;
                     object? expected = null;
@@ -134,11 +139,7 @@ internal sealed partial class NativeSpecifiedCallTests
                     var input = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType,
                         values.Cast<object>().Select(value => GenericReturnOracleValue(factory, elementType, value ?? throw new ArgumentNullException(nameof(value)))));
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-                        {
-                            [context.Parameters[0].Entry] = input,
-                            [context.Parameters[1].Entry] = factory.CreateIntegerValue(index)
-                        }, 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                        ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(context.Parameters[0].Entry, input).SetItem(context.Parameters[1].Entry, factory.CreateIntegerValue(index)), 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                     Assert.That(replay.Status, Is.EqualTo(fault == null ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
                     if (fault == null)
                     {

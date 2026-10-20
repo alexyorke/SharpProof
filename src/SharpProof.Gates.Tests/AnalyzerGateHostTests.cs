@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -53,7 +54,7 @@ public sealed class AnalyzerGateHostTests
                     .OfType<MethodDeclarationSyntax>()
                     .Single())))
             .OfType<IMethodSymbol>()
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -14,7 +15,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class VisualBasicObjectShiftCountCoverageTests
 {
-    private static readonly string[] RuntimeMethodNames = ["Target", "Control"];
+    private static readonly ImmutableArray<string> RuntimeMethodNames = ["Target", "Control"];
 
     [TestCase("SByte", (sbyte)6, true)]
     [TestCase("Byte", (byte)6, true)]
@@ -67,7 +68,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         }
 
         var model = compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().ToArray();
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().ToImmutableArray();
         Assert.That(methods, Has.Length.EqualTo(2));
         var statement = model.GetOperation(methods[0].Statements.OfType<AssignmentStatementSyntax>().Single());
         Assert.That(statement, Is.InstanceOf<IExpressionStatementOperation>());
@@ -110,7 +111,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         var controlLowering = new RoslynProgramLowerer(controlFactory).LowerCandidate(controlGraph, controlContext);
         Assert.That(controlLowering.IsExact, Is.True, controlLowering.Classification.Abstention.ToString());
         Assert.That(controlLowering.ConstructionLimitExceeded, Is.False);
-        var environment = controlContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var environment = ImmutableDictionaryCapture.Create(controlContext.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (controlFactory.CreateIntegerValue(controlFactory.GetVariableInfo(binding.Entry).Type, binding.Parameter.Ordinal == 0 ? 6 : 1)));
         var replay = new IrProgramInterpreter(controlFactory).Execute(controlLowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

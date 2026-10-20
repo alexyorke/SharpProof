@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -31,7 +32,7 @@ public sealed class AnalyzerSyntaxHelpersTests
         var constructor = root.DescendantNodes().OfType<ConstructorDeclarationSyntax>().Single();
         var operation = root.DescendantNodes().OfType<OperatorDeclarationSyntax>().Single();
         var conversion = root.DescendantNodes().OfType<ConversionOperatorDeclarationSyntax>().Single();
-        var accessors = root.DescendantNodes().OfType<AccessorDeclarationSyntax>().ToArray();
+        var accessors = root.DescendantNodes().OfType<AccessorDeclarationSyntax>().ToImmutableArray();
         var eventAccessors = accessors.Where(
             static accessor =>
                 accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Parent?.Parent is EventDeclarationSyntax));

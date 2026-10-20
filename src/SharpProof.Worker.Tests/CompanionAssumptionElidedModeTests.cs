@@ -16,7 +16,7 @@ public sealed class CompanionAssumptionElidedModeTests
     [TestCase(true, false)]
     public async Task CompilerElidedContractModePreservesCompanionFilters(bool companion, bool valid)
     {
-        var clauses = "Contract.Assume(value > 0); Contract.Ensures(Contract.Result<int>() > 0);";
+        const string clauses = "Contract.Assume(value > 0); Contract.Ensures(Contract.Result<int>() > 0);";
         var source = "using SharpProof.Attributes; public static class Subject { public static int Target(int value) { " +
             (companion ? "" : clauses) + " return " + (valid ? "value" : "-1") + "; } } " +
             (companion ? "[ContractFor(typeof(Subject))] public static class Specification { public static int Target(int value) { " +
@@ -33,6 +33,7 @@ public sealed class CompanionAssumptionElidedModeTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

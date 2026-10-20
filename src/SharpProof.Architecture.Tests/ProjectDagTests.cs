@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Xml.Linq;
 using NUnit.Framework;
 
@@ -8,28 +9,28 @@ public sealed class ProjectDagTests
 {
     // Every production project must appear here; adding a project or a
     // reference is an explicit architecture decision.
-    private static readonly Dictionary<string, string[]> AllowedReferences =
-        new(StringComparer.Ordinal)
-        {
-            ["ConsoleLoggingAnalyzer"] = [],
-            ["DefensiveCodingAnalyzer"] = [],
-            ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
-            ["SharpProof.Analyzer.Core"] = ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"],
-            ["SharpProof.Compiler.Semantics"] = ["SharpProof.Contracts", "SharpProof.Effects"],
-            ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Host", "SharpProof.Worker.Protocol"],
-            ["SharpProof.CodeFixes"] = [],
-            ["SharpProof.CompilerArtifact"] = ["SharpProof.Ir", "SharpProof.Worker.Protocol"],
-            ["SharpProof.CompilerCollector"] = [
+    private static readonly ImmutableDictionary<string, ImmutableArray<string>> AllowedReferences =
+        ImmutableDictionary.CreateRange<string, ImmutableArray<string>>(StringComparer.Ordinal,
+        [
+            new("ConsoleLoggingAnalyzer", []),
+            new("DefensiveCodingAnalyzer", []),
+            new("SharpProof.Analyzer", ["SharpProof.Analyzer.Core"]),
+            new("SharpProof.Analyzer.Core", ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"]),
+            new("SharpProof.Compiler.Semantics", ["SharpProof.Contracts", "SharpProof.Effects"]),
+            new("SharpProof.Attributes", []),
+            new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
+            new("SharpProof.CodeFixes", []),
+            new("SharpProof.CompilerArtifact", ["SharpProof.Ir", "SharpProof.Worker.Protocol"]),
+            new("SharpProof.CompilerCollector", [
                 "SharpProof.Compiler.Semantics",
                 "SharpProof.CompilerArtifact"
-            ],
-            ["SharpProof.ContractForGenerator"] = [],
-            ["SharpProof.Contracts"] = ["SharpProof.Frontend"],
-            ["SharpProof.Dataflow"] = [],
-            ["SharpProof.Effects"] = ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"],
-            ["SharpProof.Frontend"] = ["SharpProof.Attributes", "SharpProof.Ir"],
-            ["SharpProof.Fuzz"] = [
+            ]),
+            new("SharpProof.ContractForGenerator", []),
+            new("SharpProof.Contracts", ["SharpProof.Frontend"]),
+            new("SharpProof.Dataflow", []),
+            new("SharpProof.Effects", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
+            new("SharpProof.Frontend", ["SharpProof.Attributes", "SharpProof.Ir"]),
+            new("SharpProof.Fuzz", [
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
@@ -38,45 +39,45 @@ public sealed class ProjectDagTests
                 "SharpProof.Smt",
                 "SharpProof.Testing",
                 "SharpProof.Worker"
-            ],
-            ["SharpProof.Gates"] = [
+            ]),
+            new("SharpProof.Gates", [
                 "SharpProof.Analyzer",
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.ContractForGenerator",
                 "SharpProof.Logging",
                 "SharpProof.Worker"
-            ],
-            ["SharpProof.Host"] = [],
-            ["SharpProof.Ir"] = [],
-            ["SharpProof.Logging"] = [],
-            ["SharpProof.Smt"] = ["SharpProof.Verify"],
-            ["SharpProof.Specs"] = ["SharpProof.Ir"],
-            ["SharpProof.Tool"] = ["SharpProof.Worker.Protocol"],
-            ["SharpProof.Verify"] = ["SharpProof.Ir"],
-            ["SharpProof.Worker"] = [
+            ]),
+            new("SharpProof.Host", []),
+            new("SharpProof.Ir", []),
+            new("SharpProof.Logging", []),
+            new("SharpProof.Smt", ["SharpProof.Verify"]),
+            new("SharpProof.Specs", ["SharpProof.Ir"]),
+            new("SharpProof.Tool", ["SharpProof.Worker.Protocol"]),
+            new("SharpProof.Verify", ["SharpProof.Ir"]),
+            new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Host",
                 "SharpProof.Logging",
                 "SharpProof.Smt",
                 "SharpProof.Specs"
-            ],
-            ["SharpProof.Worker.Protocol"] = [],
-        };
+            ]),
+            new("SharpProof.Worker.Protocol", []),
+        ]);
 
     // Projects that exist only to package, host tests, or smoke-test.
-    private static readonly HashSet<string> NonProductionProjects =
-        new(StringComparer.Ordinal)
-        {
+    private static readonly ImmutableHashSet<string> NonProductionProjects =
+        ImmutableHashSet.CreateRange<string>(StringComparer.Ordinal,
+        [
             "SharpProof.CompilerProbe.TestAsset",
             "SharpProof.Package",
             "SharpProof.Smoke.Net472",
             "SharpProof.Testing",
             "SharpProof.Verifier",
-        };
+        ]);
 
     // The worker must not depend on anything that binds C# source.
-    private static readonly string[] CompilerFacingProjects =
+    private static readonly ImmutableArray<string> CompilerFacingProjects =
     [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
@@ -89,12 +90,12 @@ public sealed class ProjectDagTests
         "SharpProof.Frontend",
     ];
 
-    private static readonly string[] Z3Consumers = ["SharpProof.Smt", "SharpProof.Fuzz"];
+    private static readonly ImmutableArray<string> Z3Consumers = ["SharpProof.Smt", "SharpProof.Fuzz"];
 
     [Test]
     public void EveryProductionProjectHasAnExplicitDagEntry()
     {
-        var production = new List<string>();
+        var production = ImmutableArray.CreateBuilder<string>();
         foreach (var name in SolutionProjects())
         {
             if (!name.EndsWith("Tests", StringComparison.Ordinal) && !NonProductionProjects.Contains(name))
@@ -118,7 +119,7 @@ public sealed class ProjectDagTests
     public void EvaluatedRuntimeReferencesFollowTheDag()
     {
         var inventory = EvaluatedItems();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var item in inventory)
         {
             if (!AllowedReferences.TryGetValue(item.Project, out var allowed))
@@ -154,7 +155,7 @@ public sealed class ProjectDagTests
     [Test]
     public void CollectorAndSharedSemanticsDoNotDependOnAnalyzerPolicy()
     {
-        foreach (var project in new[] { "SharpProof.CompilerCollector", "SharpProof.Compiler.Semantics" })
+        foreach (var project in ImmutableArray.Create("SharpProof.CompilerCollector", "SharpProof.Compiler.Semantics"))
         {
             var closure = RuntimeClosure(project);
             Assert.That(closure, Does.Not.Contain("SharpProof.Analyzer"));
@@ -207,6 +208,8 @@ public sealed class ProjectDagTests
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
             allowed |= item.Project == "SharpProof.Logging" &&
                 relative == "eng/logging/RepositoryLogger.cs";
+            allowed |= item.Project == "SharpProof.Gates" &&
+                relative == "eng/scripts/SharpProof.SymbolPackageValidator.cs";
             if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")
             {
                 allowed |= relative.StartsWith("eng/testing/", StringComparison.Ordinal) ||
@@ -219,7 +222,7 @@ public sealed class ProjectDagTests
     [Test]
     public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3()
     {
-        var consumers = new HashSet<string>(StringComparer.Ordinal);
+        var consumers = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var item in EvaluatedItems())
         {
             if (item.Kind == "PackageReference" && item.Value == "Microsoft.Z3")
@@ -248,15 +251,15 @@ public sealed class ProjectDagTests
             !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 
-    private static HashSet<string> RuntimeClosure(string root)
+    private static ImmutableHashSet<string> RuntimeClosure(string root)
     {
         ArgumentException.ThrowIfNullOrEmpty(root);
         var inventory = EvaluatedItems();
-        var result = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
-        pending.Push(root);
-        while (pending.TryPop(out var project))
+        var result = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var pending = ImmutableStack<string>.Empty.Push(root);
+        while (!pending.IsEmpty)
         {
+            pending = pending.Pop(out var project);
             if (!result.Add(project))
             {
                 continue;
@@ -265,33 +268,33 @@ public sealed class ProjectDagTests
             {
                 if (item.Project == project && item.Kind == "ProjectReference")
                 {
-                    pending.Push(Path.GetFileNameWithoutExtension(item.Value));
+                    pending = pending.Push(Path.GetFileNameWithoutExtension(item.Value));
                 }
             }
         }
-        return result;
+        return result.ToImmutable();
     }
 
-    private static List<ArchitectureItem> EvaluatedItems()
+    private static ImmutableArray<ArchitectureItem> EvaluatedItems()
     {
-        var result = new List<ArchitectureItem>();
+        var result = ImmutableArray.CreateBuilder<ArchitectureItem>();
         var path = Path.Combine(AppContext.BaseDirectory, "architecture-items.tsv");
         foreach (var line in File.ReadLines(path))
         {
-            var parts = line.Split('|');
+            var parts = line.Split('|').ToImmutableArray();
             if (parts.Length != 3)
             {
                 throw new InvalidDataException("Invalid architecture inventory entry.");
             }
             result.Add(new(parts[0], parts[1], parts[2]));
         }
-        return result;
+        return result.ToImmutable();
     }
 
-    private static List<string> SolutionProjectPaths()
+    private static ImmutableArray<string> SolutionProjectPaths()
     {
         var root = TestRepository.FindRoot();
-        var result = new List<string>();
+        var result = ImmutableArray.CreateBuilder<string>();
         foreach (var project in XDocument.Load(Path.Combine(root, "SharpProof.slnx")).Descendants("Project"))
         {
             var path = (string?)project.Attribute("Path") ?? throw new InvalidDataException("Missing project path.");
@@ -300,17 +303,17 @@ public sealed class ProjectDagTests
                 result.Add(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)));
             }
         }
-        return result;
+        return result.ToImmutable();
     }
 
-    private static List<string> SolutionProjects()
+    private static ImmutableArray<string> SolutionProjects()
     {
-        var result = new List<string>();
+        var result = ImmutableArray.CreateBuilder<string>();
         foreach (var path in SolutionProjectPaths())
         {
             result.Add(Path.GetFileNameWithoutExtension(path));
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static string ProjectPath(string project)
@@ -326,10 +329,10 @@ public sealed class ProjectDagTests
         throw new InvalidDataException("Project is missing from the solution: " + project);
     }
 
-    private static string[] ProjectReferences(string project)
+    private static ImmutableArray<string> ProjectReferences(string project)
     {
         ArgumentException.ThrowIfNullOrEmpty(project);
-        var references = new HashSet<string>(StringComparer.Ordinal);
+        var references = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var reference in XDocument.Load(ProjectPath(project)).Descendants("ProjectReference"))
         {
             var include = (string?)reference.Attribute("Include") ?? throw new InvalidDataException("Missing reference path.");
@@ -338,7 +341,7 @@ public sealed class ProjectDagTests
         return [.. references];
     }
 
-    private sealed class ArchitectureItem
+    private sealed record ArchitectureItem
     {
         internal ArchitectureItem(string project, string kind, string value)
         {

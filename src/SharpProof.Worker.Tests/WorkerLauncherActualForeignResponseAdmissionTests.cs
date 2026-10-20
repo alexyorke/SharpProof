@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -13,7 +14,7 @@ internal sealed partial class WorkerTests
         const string otherSource = "using SharpProof.Attributes; public static class OtherSubject { public static int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; } }";
         using var first = TestProject.Create(firstSource);
         using var other = TestProject.Create(otherSource);
-        foreach (var project in new[] { first, other })
+        foreach (var project in ImmutableArray.Create(first, other))
         {
             var compilation = project.CreateCompilation();
             TestCompilation.AssertNoErrors(compilation);
@@ -25,13 +26,13 @@ internal sealed partial class WorkerTests
         var otherRequest = other.CreateRequest(cacheEnabled: false);
         var originalRequestJson = WorkerProtocolJson.SerializeRequest(request);
         var originalManifestPath = request.CompilerManifest.Path;
-        var artifactBytes = await File.ReadAllBytesAsync(originalManifestPath);
+        var artifactBytes = (await File.ReadAllBytesAsync(originalManifestPath)).ToImmutableArray();
         var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         using var firstWorker = SharpProofWorker.Create(request.Budgets);
         using var otherWorker = SharpProofWorker.Create(otherRequest.Budgets);
         var actual = await firstWorker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         var foreign = await otherWorker.VerifyAsync(otherRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, foreign })
+        foreach (var response in ImmutableArray.Create(actual, foreign))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
@@ -44,16 +45,19 @@ internal sealed partial class WorkerTests
         var privateRequest = Path.Combine(first.DirectoryPath, "private-request.json");
         var privateResult = Path.Combine(first.DirectoryPath, "private-result.json");
         await File.WriteAllTextAsync(privateRequest, originalRequestJson, new UTF8Encoding(false));
-        var privateResultBytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(actual));
-        await File.WriteAllBytesAsync(privateResult, privateResultBytes);
+        var privateResultBytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(actual)).ToImmutableArray();
+        await File.WriteAllBytesAsync(privateResult, privateResultBytes.AsMemory());
         var positive = Arguments("accepted");
         await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, artifactBytes,
             snapshot.InputHash, Launcher.Program.ExpectedVersions(), actual, TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllBytesAsync(positive.PublishCompilerManifestPath!), Is.EqualTo(artifactBytes));
         var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(positive.PublishResultPath!))
             ?? throw new AssertionException("Matching actual response was not published.");
-        Assert.That(WorkerProtocolJson.ValidateForRequest(published, WorkerProtocolJson.ComputeRequestHash(request),
-            snapshot.InputHash, snapshot.CompilerManifest.Manifest, request, Launcher.Program.ExpectedVersions()).IsValid, Is.True);
+        var publishedRequest = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(positive.PublishRequestPath!))
+            ?? throw new AssertionException("Matching actual request was not published.");
+        Assert.That(WorkerProtocolJson.SerializeRequest(request), Is.EqualTo(originalRequestJson));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(published, WorkerProtocolJson.ComputeRequestHash(publishedRequest),
+            snapshot.InputHash, snapshot.CompilerManifest.Manifest, publishedRequest, Launcher.Program.ExpectedVersions()).IsValid, Is.True);
         var negativeRequest = WorkerProtocolJson.DeserializeRequest(originalRequestJson)
             ?? throw new AssertionException("The original actual request did not deserialize.");
         var negative = Arguments("rejected");

@@ -364,10 +364,11 @@ public sealed class ReferenceCallableSolverTests
             second = factory.PureOpaque(secondField, factory.Variable(firstVariable));
             variables = [firstVariable];
         }
-        var assumptions = ImmutableArray.Create(Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, first, factory.Null(firstType))),
-            Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, second, factory.Null(secondType))));
+        var assumptionBuilder = ImmutableArray.Create(Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, first, factory.Null(firstType))),
+            Assume(factory, factory.Binary(IrBinaryOperator.NotEqual, second, factory.Null(secondType)))).ToBuilder();
         if (fields)
-        { assumptions = assumptions.Add(NotNull(factory, firstVariable)); }
+        { assumptionBuilder.Add(NotNull(factory, firstVariable)); }
+        var assumptions = assumptionBuilder.ToImmutable();
         var alias = Equal(factory, factory.Cast(factory.ObjectType, first), factory.Cast(factory.ObjectType, second));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var requiredAlias = Query(factory, assumptions.Add(Assume(factory, alias)), factory.Boolean(false), variables);
@@ -541,7 +542,7 @@ public sealed class ReferenceCallableSolverTests
         return new(factory, assumptions, new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
     }
 
-    private static void AssertAssumptions(IrFactory factory, VerificationQuery query, IReadOnlyDictionary<IrVarId, IrValue> model)
+    private static void AssertAssumptions(IrFactory factory, VerificationQuery query, ImmutableDictionary<IrVarId, IrValue> model)
     {
         System.ArgumentNullException.ThrowIfNull(factory);
         System.ArgumentNullException.ThrowIfNull(model);

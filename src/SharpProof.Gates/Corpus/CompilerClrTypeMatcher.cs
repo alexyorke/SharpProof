@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Gates.Corpus;
@@ -22,24 +23,24 @@ internal static class CompilerClrTypeMatcher
             named.ContainingAssembly.Identity.Version != assembly.Version ||
             !named.ContainingAssembly.Identity.PublicKeyToken.SequenceEqual(assembly.GetPublicKeyToken() ?? [])))
         { return false; }
-        var arguments = new Stack<INamedTypeSymbol>();
+        var arguments = ImmutableStack<INamedTypeSymbol>.Empty;
         for (var current = named; current != null; current = current.ContainingType)
-        { arguments.Push(current); }
-        var symbols = arguments.SelectMany(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.TypeArguments)).ToArray();
-        var types = runtime.GetGenericArguments();
+        { arguments = arguments.Push(current); }
+        var symbols = arguments.SelectMany(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.TypeArguments)).ToImmutableArray();
+        var types = runtime.GetGenericArguments().ToImmutableArray();
         return symbols.Length == types.Length && symbols.Select((argument, ordinal) => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Matches(argument, types[ordinal], choice))).All(match => match);
     }
 
     internal static string MetadataName(INamedTypeSymbol type)
     {
         System.ArgumentNullException.ThrowIfNull(type);
-        var names = new Stack<string>();
+        var names = ImmutableStack<string>.Empty;
         for (var current = type; current != null; current = current.ContainingType)
-        { names.Push(current.MetadataName); }
-        var namespaces = new Stack<string>();
+        { names = names.Push(current.MetadataName); }
+        var namespaces = ImmutableStack<string>.Empty;
         for (var current = type.ContainingNamespace; !current.IsGlobalNamespace; current = current.ContainingNamespace)
-        { namespaces.Push(current.MetadataName); }
-        return (namespaces.Count == 0 ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
+        { namespaces = namespaces.Push(current.MetadataName); }
+        return (namespaces.IsEmpty ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
     }
 
 }

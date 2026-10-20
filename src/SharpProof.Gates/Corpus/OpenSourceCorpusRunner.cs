@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
 using SharpProof.Compiler.Semantics;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -21,12 +22,11 @@ internal static class OpenSourceCorpusRunner
         var prepared = Prepare(document, "global::SharpProof.Attributes.EnforcePure", cancellationToken);
         var compilation = prepared.Compilation;
         var targetMap = prepared.Targets;
-        var diagnosticsByMethod = targetMap.Values
-            .Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Id))
-            .ToDictionary(
-                static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
-                static _ => new List<string>(),
-                StringComparer.Ordinal);
+        var diagnosticsByMethod = ImmutableDictionaryCapture.Create(
+            targetMap.Values.Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Id)),
+            static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
+            static _ => ImmutableArray.CreateBuilder<string>(),
+            StringComparer.Ordinal);
         var factory = new RecordingSessionFactory(targetMap);
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
                 compilation,
@@ -36,22 +36,25 @@ internal static class OpenSourceCorpusRunner
                 cancellationToken)
             .ConfigureAwait(false);
         var outcomes = factory.GetOutcomes();
-        var nativeOutcomes = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken).ConfigureAwait(false))
+        var nativeRows = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken).ConfigureAwait(false))
             .SelectMany(verdict => verdict is null ? throw new System.ArgumentNullException(nameof(verdict)) : (FindCallableTargets(verdict.Method, targetMap)
-                .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : ((target.Method.Id, verdict.Outcome)))))
-            .ToDictionary(static item => item.Id, static item => item.Outcome, StringComparer.Ordinal);
+                .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : ((target.Method.Id, verdict.Outcome)))));
+        var nativeOutcomes = ImmutableDictionaryCapture.Create(nativeRows,
+            static item => item.Id, static item => item.Outcome, StringComparer.Ordinal);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
-        var diagnosticAssignments = new int[diagnostics.Length];
-        var targetsByTree = targetMap.Values
+        var diagnosticAssignments = ImmutableArray.CreateBuilder<int>(diagnostics.Length);
+        for (var index = 0; index < diagnostics.Length; index++)
+        { diagnosticAssignments.Add(0); }
+        var groupedTargets = targetMap.Values
             .SelectMany(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (DiagnosticTargets(compilation, target, cancellationToken)))
             .GroupBy(
                 static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Tree),
-                (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance)
-            .ToDictionary(
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToArray()),
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance);
+        var targetsByTree = ImmutableDictionaryCapture.Create(groupedTargets,
+            static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+            static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()),
+            (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance);
         for (var index = 0; index < diagnostics.Length; index++)
         {
             var diagnostic = diagnostics[index];
@@ -83,7 +86,7 @@ internal static class OpenSourceCorpusRunner
                     $"Analyzer did not record an outcome for OSS method {method.Id}.");
             }
 
-            var methodDiagnostics = diagnosticsByMethod[method.Id];
+            var methodDiagnostics = diagnosticsByMethod[method.Id].ToImmutable();
             var canonicalDiagnostics = methodDiagnostics
                 .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic), StringComparer.Ordinal)
                 .ToImmutableArray();
@@ -99,15 +102,16 @@ internal static class OpenSourceCorpusRunner
         }
         RequireCompleteDiagnosticAssignment(
             diagnostics,
-            diagnosticAssignments);
+            diagnosticAssignments.ToImmutable());
         return observations.ToImmutable();
     }
 
     internal static void RequireCompleteDiagnosticAssignment(
         ImmutableArray<Diagnostic> diagnostics,
-        int[] assignmentCounts)
+        ImmutableArray<int> assignmentCounts)
     {
-        ArgumentNullException.ThrowIfNull(assignmentCounts);
+        if (assignmentCounts.IsDefault)
+        { throw new ArgumentNullException(nameof(assignmentCounts)); }
         if (assignmentCounts.Length != diagnostics.Length)
         {
             throw new ArgumentException(
@@ -119,7 +123,7 @@ internal static class OpenSourceCorpusRunner
             .Select((diagnostic, index) =>
                 ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((Diagnostic: diagnostic, Count: assignmentCounts[index])))))
             .Where(static item => item.Count != 1)
-            .ToArray();
+            .ToImmutableArray();
         if (invalid.Length == 0)
         {
             return;
@@ -264,7 +268,7 @@ internal static class OpenSourceCorpusRunner
             includeExternalEffectsFixture: includeExternalEffectsFixture && effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
-            .AddSyntaxTrees(trees);
+            .AddSyntaxTrees(trees.MoveToImmutable());
         AnalyzerGateHost.ThrowIfCompilationHasErrors(
             compilation,
             CorpusExecutionDefaults.MaximumReportedDiagnostics,
@@ -330,11 +334,12 @@ internal static class OpenSourceCorpusRunner
         System.ArgumentNullException.ThrowIfNull(method);
         System.ArgumentNullException.ThrowIfNull(targets);
         method = method.PartialImplementationPart ?? method;
-        var references = method.DeclaringSyntaxReferences;
+        var referenceBuilder = method.DeclaringSyntaxReferences.ToBuilder();
         if (method.PartialDefinitionPart is { } definition)
         {
-            references = references.AddRange(definition.DeclaringSyntaxReferences);
+            referenceBuilder.AddRange(definition.DeclaringSyntaxReferences);
         }
+        var references = referenceBuilder.ToImmutable();
         return [.. references
             .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (new TargetKey(reference.SyntaxTree, reference.Span.Start)))
             .Where(targets.ContainsKey)
@@ -369,7 +374,7 @@ internal static class OpenSourceCorpusRunner
         ImmutableDictionary<TargetKey, TargetInfo> targets)
         : AnalyzerSessionFactoryBase<string>(StringComparer.Ordinal)
     {
-        private ImmutableDictionary<TargetKey, TargetInfo> _guarded_targets = targets ?? throw new System.ArgumentNullException(nameof(targets));
+        private readonly ImmutableDictionary<TargetKey, TargetInfo> _guarded_targets = targets ?? throw new System.ArgumentNullException(nameof(targets));
         internal ImmutableDictionary<string, AnalyzerSemanticOutcome>
             GetOutcomes()
         {

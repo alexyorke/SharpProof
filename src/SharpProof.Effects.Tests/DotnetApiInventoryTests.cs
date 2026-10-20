@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -18,17 +19,17 @@ public sealed partial class DotnetApiInventoryTests
         var root = RepositoryRoot.Find(AppContext.BaseDirectory, "SharpProof.slnx", "global.json") ?? throw new InvalidOperationException("Repository root unavailable.");
         var pack = Path.Combine(new DirectoryInfo(RuntimeEnvironment.GetRuntimeDirectory()).Parent!.Parent!.Parent!.FullName, "packs", "Microsoft.NETCore.App.Ref", DotnetApiInventory.PackVersion, "ref", DotnetApiInventory.Framework);
         Assert.That(Directory.Exists(pack), Is.True, "Pinned reference pack is missing; do not fall back to runtime assemblies.");
-        var files = Directory.GetFiles(pack, "*.dll").Order(StringComparer.Ordinal).ToArray();
+        var files = Directory.GetFiles(pack, "*.dll").Order(StringComparer.Ordinal).ToImmutableArray();
         Assert.That(files, Is.Not.Empty);
         var compilation = CSharpCompilation.Create("DotnetApiInventory", references: files.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var rows = DotnetApiInventory.Collect(compilation);
         Assert.That(rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(rows.Length));
-        var current = rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Line)).ToArray();
+        var current = rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Line)).ToImmutableArray();
         var baselineDirectory = Path.Combine(root, "eng", "api-coverage");
         var baselinePath = Path.Combine(baselineDirectory, "net10.0.tsv");
         var manifestPath = Path.Combine(baselineDirectory, "net10.0.manifest.json");
         var manifest = JsonSerializer.Serialize(new { schemaVersion = 1, sdkVersion = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "global.json"))).RootElement.GetProperty("sdk").GetProperty("version").GetString(), pack = "Microsoft.NETCore.App.Ref", version = DotnetApiInventory.PackVersion, framework = DotnetApiInventory.Framework, catalogSha256 = ApiSpecTable.Default.ContentSha256, assemblies = files.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (new { name = Path.GetFileName(path), sha256 = DotnetApiInventory.Fingerprint(path) })) }, JsonOptions) + "\n";
-        var before = File.Exists(baselinePath) ? File.ReadAllLines(baselinePath) : [];
+        var before = File.Exists(baselinePath) ? File.ReadAllLines(baselinePath).ToImmutableArray() : ImmutableArray<string>.Empty;
         var delta = DotnetApiInventory.Compare(before, current);
         var output = Path.Combine(root, "artifacts", "api-coverage");
         Directory.CreateDirectory(output);
@@ -95,7 +96,7 @@ public sealed partial class DotnetApiInventoryTests
             }
             internal class HiddenOuter { public class Nested { } }
             """)], references: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
-        var declarations = DotnetApiInventory.Members(compilation.Assembly.GlobalNamespace).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (symbol.GetDocumentationCommentId())).ToArray();
+        var declarations = DotnetApiInventory.Members(compilation.Assembly.GlobalNamespace).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (symbol.GetDocumentationCommentId())).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(declarations, Does.Contain("M:Outer.Overload(System.Int32)"));

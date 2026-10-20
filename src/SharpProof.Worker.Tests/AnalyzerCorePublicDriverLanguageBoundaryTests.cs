@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -37,7 +37,7 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
         using var externalImage = new MemoryStream();
         var externalEmit = external.Emit(externalImage);
         Assert.That(externalEmit.Success, Is.True, string.Join(Environment.NewLine, externalEmit.Diagnostics));
-        var reference = MetadataReference.CreateFromImage(externalImage.ToArray());
+        var reference = MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(externalImage.GetBuffer().AsSpan(0, checked((int)externalImage.Length))));
         var references = TestMetadataReferences.WithSharpProof.Add(reference);
         Compilation compilation = visualBasic
             ? VisualBasicCompilation.Create("PublicDriverVisualBasicBoundary",
@@ -80,15 +80,15 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
         Assert.That(syntaxReference.Span.Contains(operation.Syntax.Span), Is.EqualTo(!visualBasic));
 
         var analyzer = new SharpProofAnalyzer();
-        var exceptions = new ConcurrentQueue<string>();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var options = new AnalyzerOptions([], new OptionsProvider(strict));
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
-            options, (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
+            options, (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); lock (exceptions) { exceptions.Add(exception.ToString()); } },
             concurrentAnalysis: concurrent, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: false));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
         var diagnostics = await driver.GetAnalyzerDiagnosticsAsync();
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         Assert.That(diagnostics, Is.Empty);
         var telemetry = await driver.GetAnalyzerTelemetryInfoAsync(analyzer, TestContext.CurrentContext.CancellationToken);
         Assert.That(telemetry.CompilationStartActionsCount, Is.EqualTo(1));

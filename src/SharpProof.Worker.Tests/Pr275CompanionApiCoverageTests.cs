@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -84,7 +85,7 @@ public sealed class Pr275CompanionApiCoverageTests
     {
         TestCompilation.AssertNoErrors(Compilation);
         var type = Compilation.GetTypeByMetadataName("Target")!;
-        var methods = ContractForSymbolMatcher.GetOrdinaryMethods(type).ToArray();
+        var methods = ContractForSymbolMatcher.GetOrdinaryMethods(type).ToImmutableArray();
 
         Assert.That(methods, Has.Length.EqualTo(1));
         Assert.That(methods[0].Name, Is.EqualTo("Read"));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
@@ -7,9 +8,9 @@ namespace SharpProof.CompilerArtifact;
 // whose effects do not require a graph.
 internal static class ArtifactDigest
 {
-    internal static string Compute(byte[] canonicalArtifactBytes)
+    internal static string Compute(ImmutableArray<byte> canonicalArtifactBytes)
     {
-        canonicalArtifactBytes = RepositoryParameterGuard.NotNull(canonicalArtifactBytes, nameof(canonicalArtifactBytes));
+        RepositoryParameterGuard.ThrowIfMissing(canonicalArtifactBytes.IsDefault, nameof(canonicalArtifactBytes));
         return WorkerProtocolJson.ComputeSha256(canonicalArtifactBytes);
     }
 }

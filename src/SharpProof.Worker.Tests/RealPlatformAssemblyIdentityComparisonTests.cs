@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -32,13 +33,13 @@ public sealed class RealPlatformAssemblyIdentityComparisonTests
         using var emittedImage = new MemoryStream();
         var emission = compilation.Emit(emittedImage);
         Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
-        using var image = new MemoryStream(emittedImage.ToArray(), writable: false);
+        var image = ImmutableArray.Create<byte>(emittedImage.GetBuffer().AsSpan(0, checked((int)emittedImage.Length)));
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var handle = reader.AssemblyReferences.Single(candidate =>
             reader.GetString(reader.GetAssemblyReference(candidate).Name) == consoleIdentity.Name);
         var reference = reader.GetAssemblyReference(handle);
-        var token = reader.GetBlobBytes(reference.PublicKeyOrToken);
+        var token = reader.GetBlobBytes(reference.PublicKeyOrToken).ToImmutableArray();
         const AssemblyFlags contentTypeMask = (AssemblyFlags)0x0e00;
         const AssemblyFlags allowed = AssemblyFlags.PublicKey | AssemblyFlags.Retargetable | contentTypeMask;
         var retargetable = (reference.Flags & AssemblyFlags.Retargetable) != 0;

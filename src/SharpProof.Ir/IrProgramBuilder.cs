@@ -6,7 +6,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly long _scope = Interlocked.Increment(ref s_nextScope);
-    private readonly List<MutableBlock> _blocks = [];
+    private readonly ImmutableList<BlockDraft>.Builder _blocks = ImmutableList.CreateBuilder<BlockDraft>();
     private int _nextInstruction;
     private IrBlockId? _entry;
     private bool _built;
@@ -18,7 +18,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         var nameId = string.IsNullOrWhiteSpace(name)
             ? (IrStringId?)null
             : _factory.InternString(name!);
-        _blocks.Add(new MutableBlock(id, nameId));
+        _blocks.Add(new BlockDraft(id, nameId));
         _entry ??= id;
         return id;
     }
@@ -35,19 +35,24 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        ImmutableArray<IrTerm> immutableArguments = [.. arguments];
+        return MemberLocationSnapshot(member, receiver, [.. arguments]);
+    }
 
+    internal IrMemberLocation MemberLocationSnapshot(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         var memberInfo = _factory.GetMemberInfo(member);
         _factory.ValidateCallShape(
             memberInfo,
             receiver,
-            immutableArguments,
+            arguments,
             nameof(arguments));
         return new IrMemberLocation(
             memberInfo.ReturnType,
             member,
             receiver,
-            immutableArguments);
+            arguments);
     }
 
     public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index)
@@ -171,6 +176,23 @@ internal sealed class IrProgramBuilder(IrFactory factory)
                 [.. arguments]));
     }
 
+    internal IrCallInstruction CallSnapshot(
+        IrBlockId block,
+        OperationId operation,
+        IrVarId? target,
+        IrMemberId member,
+        IrTerm? receiver,
+        ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        return Append(
+            block,
+            new IrCallInstruction(
+                NextInstructionId(), operation, target, member, receiver, arguments));
+    }
     public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -213,6 +235,16 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(variables, nameof(variables));
 
+        return HavocSnapshot(block, operation, havocKind, origin, variables.ToImmutableArray());
+    }
+
+    internal IrHavocInstruction HavocSnapshot(
+        IrBlockId block, OperationId operation, IrHavocKind havocKind,
+        IrHavocOrigin origin, ImmutableArray<IrVarId> variables)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         var distinct = variables
             .Distinct()
             .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
@@ -285,7 +317,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
                 "A program must contain at least one block.");
         }
 
-        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(_blocks.Count);
+        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>();
         foreach (var block in _blocks)
         {
             if (block.Instructions.Count == 0 ||
@@ -302,7 +334,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
             _factory,
             _scope,
             _entry.Value,
-            blocks.MoveToImmutable());
+            blocks.ToImmutable());
     }
 
     private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
@@ -552,7 +584,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         }
     }
 
-    private MutableBlock GetBlock(IrBlockId id)
+    private BlockDraft GetBlock(IrBlockId id)
     {
         if (id.Scope != _scope)
         {
@@ -647,15 +679,15 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         }
     }
 
-    private sealed class MutableBlock(IrBlockId id, IrStringId? name)
+    private sealed class BlockDraft(IrBlockId id, IrStringId? name)
     {
         internal IrBlockId Id { get; } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
         internal IrStringId? Name { get; } = name;
-        internal List<IrInstruction> Instructions { get; } = [];
+        internal ImmutableArray<IrInstruction>.Builder Instructions { get; } = ImmutableArray.CreateBuilder<IrInstruction>();
 
         internal IrBasicBlock Freeze()
         {
-            return new(Id, Name, [.. Instructions]);
+            return new(Id, Name, Instructions.ToImmutable());
         }
     }
 }

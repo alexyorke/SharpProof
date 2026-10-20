@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RequiresOnlyTerminalSpecificationTests
 {
-    private static readonly bool[] RuntimeInputs = [false, true];
+    private static readonly ImmutableArray<bool> RuntimeInputs = [false, true];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -32,7 +33,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
             }
             """);
         var originalTree = compilation.SyntaxTrees.Single();
-        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty);
         compilation = compilation.ReplaceSyntaxTree(originalTree,
             CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
@@ -52,12 +53,12 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToImmutableArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
         Assert.That(ensuresSyntax.Span.Contains(conditionals[0].BranchValue!.Syntax.Span), Is.True);
-        var thrown = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+        var thrown = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
         Assert.That(thrown, Has.Length.EqualTo(terminalArm ? 1 : 0));
         if (terminalArm)
         {
@@ -93,7 +94,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
             foreach (var input in RuntimeInputs)
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(input)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));

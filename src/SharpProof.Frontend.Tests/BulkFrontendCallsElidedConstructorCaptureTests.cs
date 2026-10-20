@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -48,7 +49,7 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             // Freeze actual compiled behavior before checking the proposed CFG shape.
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             {
                 if (enabled)
                 {
@@ -75,7 +76,7 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             Assert.That(owner.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
             var outer = (ConditionalExpressionSyntax)ownerSyntax.ArgumentList.Arguments.Single().Expression;
             var terminal = graph.Blocks.Where(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
             Assert.That(terminal.Length, Is.GreaterThanOrEqualTo(2));
             foreach (var block in terminal)
             {
@@ -89,23 +90,23 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             var falseEdge = dispatch.ConditionKind == ControlFlowConditionKind.WhenTrue
                 ? dispatch.FallThroughSuccessor : dispatch.ConditionalSuccessor;
             Assert.That(falseEdge?.Destination, Is.Not.Null);
-            var pending = new Stack<BasicBlock>();
-            var visited = new HashSet<BasicBlock>();
-            pending.Push(falseEdge!.Destination!);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<BasicBlock>.Empty;
+            var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+            pending = pending.Push(falseEdge!.Destination!);
+            while (!pending.IsEmpty)
             {
-                var block = pending.Pop();
+                pending = pending.Pop(out var block);
                 if (!visited.Add(block))
                 { continue; }
                 Assert.That(visited.Count, Is.LessThanOrEqualTo(graph.Blocks.Length));
-                foreach (var edge in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
+                foreach (var edge in ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor))
                 {
                     if (edge?.Destination is { } destination)
-                    { pending.Push(destination); }
+                    { pending = pending.Push(destination); }
                 }
             }
             var captures = visited.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>()
-                .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SyntaxTree == tree && outer.WhenFalse.Span.Contains(operation.Syntax.Span))).ToArray();
+                .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SyntaxTree == tree && outer.WhenFalse.Span.Contains(operation.Syntax.Span))).ToImmutableArray();
             Assert.That(captures, Is.Not.Empty, "The fixed false-arm constructor argument must produce compiler scan operations.");
             foreach (var capture in captures)
             {
@@ -119,11 +120,10 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
                 : lowerer.LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) },
-                    maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(flag)), maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(factory));
                 Assert.That(replay.Status, Is.EqualTo(enabled ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                 if (enabled)
                 {

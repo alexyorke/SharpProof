@@ -21,7 +21,7 @@ public sealed class Pr275NativeAssumptionMapTests
                 public static int Target(int value) { Contract.Requires(false); return value; }
             }
             """;
-        var compilation = TestCompilation.Create("Pr275MappedAssumptionIds", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("Pr275MappedAssumptionIds", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -29,6 +29,7 @@ public sealed class Pr275NativeAssumptionMapTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single();
         var entry = preparation.TotalEntry;
         Assert.That(entry, Is.Not.Null);
@@ -52,9 +53,9 @@ public sealed class Pr275NativeAssumptionMapTests
         Assert.That(core.IsDefault, Is.False);
         Assert.That(core, Has.Length.EqualTo(1));
         Assert.That(core.Single(), Is.EqualTo(justification));
-        var ownedIds = new Dictionary<ProofJustification, string> { [justification] = clause.AssumptionId! };
-        Assert.That(CallableProofCore.AssumptionIds(core, ownedIds), Is.EqualTo(new[] { clause.AssumptionId }));
+        var ownedIds = ImmutableDictionary<ProofJustification, string>.Empty.Add(justification, clause.AssumptionId!);
+        Assert.That(CallableProofCore.AssumptionIds(core, ownedIds), Is.EqualTo(ImmutableArray.Create(clause.AssumptionId)));
         // An absent raw map entry contributes no ID; it grants no claim or proof publication.
-        Assert.That(CallableProofCore.AssumptionIds(core, new Dictionary<ProofJustification, string>()), Is.Empty);
+        Assert.That(CallableProofCore.AssumptionIds(core, ImmutableDictionary<ProofJustification, string>.Empty), Is.Empty);
     }
 }

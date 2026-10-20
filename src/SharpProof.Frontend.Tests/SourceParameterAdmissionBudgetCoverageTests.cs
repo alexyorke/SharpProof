@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -15,7 +16,7 @@ public sealed class SourceParameterAdmissionBudgetCoverageTests
         var parameters = string.Join(", ", Enumerable.Range(0, parameterCount).Select(index => $"int p{index}"));
         var body = withFinally ? "try { return p0; } finally { p0++; }" : "return p0;";
         using var subject = TypedProgramSubject.Create("int Target(" + parameters + ") { " + body + " }");
-        var arguments = Enumerable.Range(0, parameterCount).Select(_ => (object)17).ToArray();
+        ImmutableArray<object> arguments = Enumerable.Range(0, parameterCount).Select(_ => (object)17).ToImmutableArray();
         Assert.That(subject.Invoke(arguments), Is.EqualTo(17));
         var lowering = subject.Lower();
         Assert.That(lowering.ConstructionLimitExceeded, Is.EqualTo(expectedLimit));

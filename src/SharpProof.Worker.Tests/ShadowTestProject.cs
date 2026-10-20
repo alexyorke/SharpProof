@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -16,6 +17,7 @@ internal sealed class ShadowTestProject : IDisposable
         """;
 
     private readonly TempDirectory _directory = new("sharpproof-shadow-");
+    internal CompilerManifestArtifact Artifact { get; }
     internal WorkerVerifyRequest Request { get; }
     internal WorkerInputSnapshot Snapshot { get; }
     internal ShadowTestProject(string source, bool cacheEnabled = false)
@@ -28,10 +30,11 @@ internal sealed class ShadowTestProject : IDisposable
         System.ArgumentNullException.ThrowIfNull(artifact);
         try
         {
-            artifact.Compilation.ProjectDirectory = _directory.FullName;
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+            Artifact = artifact with { Compilation = artifact.Compilation with { ProjectDirectory = _directory.FullName } };
+            artifact = Artifact;
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");
-            File.WriteAllBytes(path, bytes);
+            File.WriteAllBytes(path, bytes.AsSpan());
             Request = new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },

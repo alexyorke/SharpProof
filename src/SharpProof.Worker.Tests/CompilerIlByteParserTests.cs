@@ -14,7 +14,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerIlByteParserTests
 {
-    private static readonly (byte[] Bytes, string Code, long Operand, int Cursor, int Target)[] ScalarCases =
+    private static readonly ImmutableArray<(ImmutableArray<byte> Bytes, string Code, long Operand, int Cursor, int Target)> ScalarCases =
     [
         ([0x00], "Nop", 0, 1, -1),
         ([0x1f, 0x80], "Ldc_i4_s", -128, 2, -1),
@@ -26,21 +26,21 @@ public sealed class CompilerIlByteParserTests
         ([0x2b, 0x00, 0x2a], "Br_s", 0, 2, 2),
         ([0x38, 0x00, 0x00, 0x00, 0x00, 0x2a], "Br", 0, 5, 5)
     ];
-    private static readonly byte[] OffsetInput = [0x00, 0x20, 0x01, 0x00, 0x00, 0x00, 0x2a];
-    private static readonly byte[] UnknownSingle = [0x24];
-    private static readonly byte[] KnownSingleNeighbor = [0x25];
-    private static readonly byte[] UnknownDouble = [0xfe, 0x08];
-    private static readonly byte[] KnownDoubleNeighbor = [0xfe, 0x09, 0x00, 0x00];
-    private static readonly byte[] StringOperand = [0x72, 0x00, 0x00, 0x00, 0x00];
-    private static readonly byte[] TruncatedPrefix = [0xfe];
-    private static readonly byte[] TruncatedInteger = [0x20, 0x01];
-    private static readonly byte[] EndTarget = [0x2b, 0x00];
-    private static readonly byte[] NegativeTarget = [0x2b, 0xfd, 0x2a];
-    private static readonly byte[] OverflowTarget = [0x38, 0xff, 0xff, 0xff, 0x7f];
-    private static readonly byte[] ForwardBoundary = [0x2b, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x2a];
-    private static readonly byte[] ForwardInterior = [0x2b, 0x01, 0x20, 0x00, 0x00, 0x00, 0x00, 0x2a];
-    private static readonly byte[] BackwardBoundary = [0x00, 0x2b, 0xfd];
-    private static readonly (int Input, int Expected)[] StringControls = [(112, 0), (120, 5), (63, -1)];
+    private static readonly ImmutableArray<byte> OffsetInput = [0x00, 0x20, 0x01, 0x00, 0x00, 0x00, 0x2a];
+    private static readonly ImmutableArray<byte> UnknownSingle = [0x24];
+    private static readonly ImmutableArray<byte> KnownSingleNeighbor = [0x25];
+    private static readonly ImmutableArray<byte> UnknownDouble = [0xfe, 0x08];
+    private static readonly ImmutableArray<byte> KnownDoubleNeighbor = [0xfe, 0x09, 0x00, 0x00];
+    private static readonly ImmutableArray<byte> StringOperand = [0x72, 0x00, 0x00, 0x00, 0x00];
+    private static readonly ImmutableArray<byte> TruncatedPrefix = [0xfe];
+    private static readonly ImmutableArray<byte> TruncatedInteger = [0x20, 0x01];
+    private static readonly ImmutableArray<byte> EndTarget = [0x2b, 0x00];
+    private static readonly ImmutableArray<byte> NegativeTarget = [0x2b, 0xfd, 0x2a];
+    private static readonly ImmutableArray<byte> OverflowTarget = [0x38, 0xff, 0xff, 0xff, 0x7f];
+    private static readonly ImmutableArray<byte> ForwardBoundary = [0x2b, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x2a];
+    private static readonly ImmutableArray<byte> ForwardInterior = [0x2b, 0x01, 0x20, 0x00, 0x00, 0x00, 0x00, 0x2a];
+    private static readonly ImmutableArray<byte> BackwardBoundary = [0x00, 0x2b, 0xfd];
+    private static readonly ImmutableArray<(int Input, int Expected)> StringControls = [(112, 0), (120, 5), (63, -1)];
 
     [Test]
     public void SupportedOperandsRetainRawNamesValuesAndAbsoluteCursor()
@@ -48,7 +48,7 @@ public sealed class CompilerIlByteParserTests
         foreach (var example in ScalarCases)
         {
             var cursor = 0;
-            Assert.That(CompilerScalarIlDecoder.TryReadInstruction(example.Bytes, ref cursor, out var instruction), Is.True);
+            Assert.That(CompilerScalarIlDecoder.TryReadInstruction(example.Bytes.AsSpan(), ref cursor, out var instruction), Is.True);
             Assert.That(instruction.Offset, Is.Zero);
             Assert.That(instruction.RawCode, Is.EqualTo(example.Code));
             Assert.That(instruction.Operand, Is.EqualTo(example.Operand));
@@ -61,7 +61,7 @@ public sealed class CompilerIlByteParserTests
     public void ReaderKeepsTheFullStreamOffsetWhenStartingAfterAnInstruction()
     {
         var cursor = 1;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(OffsetInput, ref cursor, out var instruction), Is.True);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(OffsetInput.AsSpan(), ref cursor, out var instruction), Is.True);
         Assert.That(instruction.Offset, Is.EqualTo(1));
         Assert.That(instruction.RawCode, Is.EqualTo("Ldc_i4"));
         Assert.That(instruction.Operand, Is.EqualTo(1));
@@ -76,10 +76,10 @@ public sealed class CompilerIlByteParserTests
         var unknown = twoByte ? UnknownDouble : UnknownSingle;
         var known = twoByte ? KnownDoubleNeighbor : KnownSingleNeighbor;
         var cursor = 0;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(unknown, ref cursor, out _), Is.False);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(unknown.AsSpan(), ref cursor, out _), Is.False);
         Assert.That(cursor, Is.EqualTo(unknown.Length));
         cursor = 0;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(known, ref cursor, out var instruction), Is.True);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(known.AsSpan(), ref cursor, out var instruction), Is.True);
         Assert.That(instruction.RawCode, Is.EqualTo(twoByte ? "Ldarg" : "Dup"));
         Assert.That(cursor, Is.EqualTo(known.Length));
     }
@@ -88,7 +88,7 @@ public sealed class CompilerIlByteParserTests
     public void UnsupportedOperandCategoryStopsAfterTheOpcode()
     {
         var cursor = 0;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(StringOperand, ref cursor, out _), Is.False);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(StringOperand.AsSpan(), ref cursor, out _), Is.False);
         Assert.That(cursor, Is.EqualTo(1));
     }
 
@@ -99,7 +99,7 @@ public sealed class CompilerIlByteParserTests
         var code = prefix ? TruncatedPrefix : TruncatedInteger;
         var cursor = 0;
         Assert.Throws<BadImageFormatException>((Action)(() =>
-            CompilerScalarIlDecoder.TryReadInstruction(code, ref cursor, out _)));
+            CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out _)));
         Assert.That(cursor, Is.EqualTo(1));
     }
 
@@ -109,7 +109,7 @@ public sealed class CompilerIlByteParserTests
     {
         var code = negative ? NegativeTarget : EndTarget;
         var cursor = 0;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code, ref cursor, out _), Is.False);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out _), Is.False);
         Assert.That(cursor, Is.EqualTo(2));
     }
 
@@ -118,7 +118,7 @@ public sealed class CompilerIlByteParserTests
     {
         var cursor = 0;
         Assert.Throws<OverflowException>((Action)(() =>
-            CompilerScalarIlDecoder.TryReadInstruction(OverflowTarget, ref cursor, out _)));
+            CompilerScalarIlDecoder.TryReadInstruction(OverflowTarget.AsSpan(), ref cursor, out _)));
         Assert.That(cursor, Is.EqualTo(5));
     }
 
@@ -127,7 +127,7 @@ public sealed class CompilerIlByteParserTests
     public void TargetNormalizerDistinguishesAnInstructionStartFromItsOperandInterior(bool interior)
     {
         var decoded = ReadUnboundSyntax(interior ? ForwardInterior : ForwardBoundary);
-        var normalized = CompilerScalarIlDecoder.NormalizeTargets(decoded);
+        var normalized = CompilerScalarIlDecoder.NormalizeTargets(decoded.ToBuilder());
         Assert.That(normalized.IsDefault, Is.EqualTo(interior));
         if (!interior)
         {
@@ -146,7 +146,7 @@ public sealed class CompilerIlByteParserTests
     [Test]
     public void BackwardTargetResolvesToTheOriginalInstructionIndex()
     {
-        var normalized = CompilerScalarIlDecoder.NormalizeTargets(ReadUnboundSyntax(BackwardBoundary));
+        var normalized = CompilerScalarIlDecoder.NormalizeTargets(ReadUnboundSyntax(BackwardBoundary).ToBuilder());
         Assert.That(normalized.IsDefault, Is.False);
         Assert.That(normalized, Has.Length.EqualTo(2));
         Assert.That(normalized[1].Offset, Is.EqualTo(1));
@@ -177,19 +177,19 @@ public sealed class CompilerIlByteParserTests
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(subject.ImagePath)));
-        Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image))));
-        Assert.That(captured.SizeBytes, Is.EqualTo(subject.Image.LongLength));
+        Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image.AsSpan()))));
+        Assert.That(captured.SizeBytes, Is.EqualTo((long)subject.Image.Length));
         Assert.That(captured.Mvid, Is.EqualTo(subject.Method.Module.ModuleVersionId.ToString("D")));
 
-        using var pe = new PEReader(new MemoryStream(subject.Image, writable: false));
+        using var pe = new PEReader(subject.Image);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
         var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
-        var code = body.GetILBytes();
-        Assert.That(code, Is.Not.Null.And.Not.Empty);
+        var code = body.GetILBytes()!.ToImmutableArray();
+        Assert.That(code, Is.Not.Empty);
         Assert.That(code![0], Is.EqualTo((byte)ILOpCode.Ldstr), "Observe actual compiler output before claiming the shared parser rejection.");
         var cursor = 0;
-        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code, ref cursor, out _), Is.False);
+        Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out _), Is.False);
         Assert.That(cursor, Is.EqualTo(1));
         Assert.That(CompilerScalarIlDecoder.Decode(body, metadata, assembly, method.ContainingModule.Name,
             TestContext.CurrentContext.CancellationToken).IsDefault, Is.True);
@@ -201,16 +201,19 @@ public sealed class CompilerIlByteParserTests
 
     // Parser records remain unbound. They are never wrapped in TotalIlBody or
     // supplied as compiler/worker authority; no method owner is fabricated.
-    private static ImmutableArray<TotalIlInstruction>.Builder ReadUnboundSyntax(byte[] code)
+    private static ImmutableArray<TotalIlInstruction> ReadUnboundSyntax(ImmutableArray<byte> code)
     {
-        System.ArgumentNullException.ThrowIfNull(code, nameof(code));
+        if (code.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(code));
+        }
         var decoded = ImmutableArray.CreateBuilder<TotalIlInstruction>();
         var cursor = 0;
         while (cursor != code.Length)
         {
-            Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code, ref cursor, out var instruction), Is.True);
+            Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out var instruction), Is.True);
             decoded.Add(new(instruction.Offset, instruction.RawCode, instruction.Operand, instruction.TargetByteOffset));
         }
-        return decoded;
+        return decoded.ToImmutable();
     }
 }

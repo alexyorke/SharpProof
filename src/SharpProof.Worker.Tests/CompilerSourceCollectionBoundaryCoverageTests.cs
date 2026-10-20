@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -19,7 +20,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             "public static int Root((int,int) pair) { Contract.Ensures(Contract.Result<int>()==1); int a,b; (a,b)=pair;" +
             new string(';', emptyStatements) + "return 1; } }";
-        var compilation = TestCompilation.Create("DeconstructionCollectionBoundary", ("deconstruction.cs", source));
+        var compilation = TestCompilation.CreateExact("DeconstructionCollectionBoundary", [("deconstruction.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, [(3, 4)]);
         var tree = compilation.SyntaxTrees.Single();
@@ -34,17 +35,16 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         Assert.That(information.Nested.All(item => item.Method == null && item.Nested.IsEmpty), Is.True);
         var operation = model.GetOperation(declaration);
         Assert.That(operation, Is.InstanceOf<IMethodBodyOperation>());
-        var pending = new Stack<IOperation>();
-        pending.Push(operation!);
+        var pending = ImmutableStack<IOperation>.Empty.Push(operation!);
         var rank = 0;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            pending = pending.Pop(out var current);
             rank++;
             if (current is IDeconstructionAssignmentOperation)
             { break; }
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         Assert.That(rank, Is.EqualTo(emptyStatements + 6));
         var artifact = CreateArtifact(compilation);
@@ -76,13 +76,13 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         }));
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             "public static int Root() { Contract.Ensures(Contract.Result<int>()==1); H0(); return 1; }\n" + methods + "}";
-        var compilation = TestCompilation.Create("ReachableBodyBoundary", ("call-tree.cs", source));
+        var compilation = TestCompilation.CreateExact("ReachableBodyBoundary", [("call-tree.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, []);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot();
         Assert.That(syntax.DescendantNodesAndSelf().Count(), Is.LessThan(65536));
-        var declarations = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(helperCount + 1));
         var model = compilation.GetSemanticModel(tree);
         foreach (var declaration in declarations)
@@ -118,9 +118,10 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, object?[] arguments)
+    private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, ImmutableArray<object?> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -130,7 +131,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("SourceCollectionBoundary", isCollectible: true);
         try
         {
-            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments), Is.EqualTo(1));
+            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments.ToArray()), Is.EqualTo(1));
         }
         finally { runtime.Unload(); }
     }

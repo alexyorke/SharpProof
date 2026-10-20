@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Smt;
@@ -146,13 +147,14 @@ public sealed class WorkerVcCyclicRegionTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(RepeatedFilterSource);
         var total = artifact.Callables.Single().Total!;
-        var throws = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).ToArray();
+        var throws = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).ToImmutableArray();
         Assert.That(throws, Is.Not.Empty);
         foreach (var instruction in throws)
         {
-            instruction.Kind = IrInstructionKind.Goto;
-            instruction.A = instruction.B;
-            instruction.B = -1;
+            {
+                total = total with { Graph = total.Graph.ReplaceRow(instruction, instruction with { Kind = IrInstructionKind.Goto, A = instruction.B, B = -1 }) };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -162,13 +164,13 @@ public sealed class WorkerVcCyclicRegionTests
     [TestCase(true)]
     public void OptionalCyclicEvidenceKeepsEveryLegacyByteAndFailureRow(bool repeated)
     {
-        var compilation = TestCompilation.Create("CyclicLegacyPreservation", ("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource));
+        var compilation = TestCompilation.CreateExact("CyclicLegacyPreservation", [("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
+        { withTotal = withTotal with { Total = null }; }
         Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions), Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }
 
@@ -203,11 +205,14 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
         Assert.That(first.Errors, Is.Empty);
         Assert.That(cached.Errors, Is.Empty);
-        var ordinals = cached.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-        var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+        var ordinals = ImmutableDictionaryCapture.Create(
+            cached.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)),
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal),
+            StringComparer.Ordinal);
+        var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Is.EqualTo(ImmutableArray.Create(repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(posts[1].Model, Is.Not.Empty);
         Assert.That(JsonSerializer.Serialize(cached.ClaimResults, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(first.ClaimResults, WorkerProtocolJson.SharedOptions)));

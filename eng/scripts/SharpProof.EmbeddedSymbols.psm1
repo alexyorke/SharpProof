@@ -9,8 +9,8 @@ function Get-SharpProofEmbeddedPdb {
     try {
         $pe = [Reflection.PortableExecutable.PEReader]::new($stream)
         try {
-            $entries = @($pe.ReadDebugDirectory())
-            $embedded = @($entries | Where-Object Type -EQ EmbeddedPortablePdb)
+            $entries = $pe.ReadDebugDirectory()
+            $embedded = [Collections.Immutable.ImmutableArray]::CreateRange[Reflection.PortableExecutable.DebugDirectoryEntry]([Reflection.PortableExecutable.DebugDirectoryEntry[]]@($entries | Where-Object Type -EQ EmbeddedPortablePdb))
             if ($embedded.Count -eq 0) { return $null }
             if ($embedded.Count -ne 1 -or @($entries | Where-Object Type -EQ CodeView).Count -ne 1) {
                 throw 'An embedded-symbol assembly must contain exactly one embedded PDB and one CodeView record.'

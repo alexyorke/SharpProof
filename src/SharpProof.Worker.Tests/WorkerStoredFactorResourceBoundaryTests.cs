@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,7 +92,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
     {
         System.ArgumentNullException.ThrowIfNull(label);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("FactorTheoremObservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FactorTheoremObservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);
@@ -106,7 +107,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(instructions.Single(instruction =>
@@ -136,10 +137,10 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
                 searchIsBoundedSearch = plan.LoopSearch.IsBoundedSearch,
                 proofQueryCount = proofQueries.Length,
                 searchQueryCount = searchQueries.Length,
-                proofAssumptionCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToArray(),
-                searchAssumptionCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToArray(),
-                proofModelCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToArray(),
-                searchModelCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToArray()
+                proofAssumptionCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToImmutableArray(),
+                searchAssumptionCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToImmutableArray(),
+                proofModelCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToImmutableArray(),
+                searchModelCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToImmutableArray()
             }));
         }
         var budgets = new WorkerBudgets();
@@ -148,7 +149,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(plan.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
-        var resourceReads = new List<long>();
+        var resourceReads = ImmutableArray.CreateBuilder<long>();
         long ReadActualResources()
         {
             var consumed = session.ConsumedResourceCount;
@@ -165,7 +166,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         var beforeCall = solver.ConsumedResourceCount;
         resourceReads.Clear();
         var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var callResourceReads = resourceReads.ToArray();
+        var callResourceReads = resourceReads.ToImmutable();
         WriteObservation(label, "call-precondition", source, result, beforeCall, solver.ConsumedResourceCount);
         if (requireProof || result.Outcome is ProvenOutcome)
         {
@@ -173,7 +174,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedJustifications = plan.CallPreconditionQueries(0)
-                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToHashSet();
+                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToImmutableHashSet();
             Assert.That(((ProvenOutcome)result.Outcome!).Core.All(ownedJustifications.Contains), Is.True);
         }
         else
@@ -182,7 +183,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
             Assert.That(callResourceReads.Length % 2, Is.Zero);
             var queryDeltas = Enumerable.Range(0, callResourceReads.Length / 2)
-                .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (callResourceReads[ordinal * 2 + 1] - callResourceReads[ordinal * 2]))).ToArray();
+                .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (callResourceReads[ordinal * 2 + 1] - callResourceReads[ordinal * 2]))).ToImmutableArray();
             var cutQueryCount = plan.CallPreconditionQueries(0).Length;
             Assert.That(queryDeltas.Length, Is.GreaterThan(cutQueryCount));
             Assert.That(queryDeltas.Length, Is.LessThanOrEqualTo(cutQueryCount + plan.LoopSearch!.CallPreconditionQueries(0).Length));
@@ -218,10 +219,10 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             outcome = result.Outcome?.GetType().Name,
             reason = result.Reason.ToString(),
             result.QueryCompleted,
-            core = result.Core.ToArray(),
+            core = result.Core,
             model = result.EntryModel.OrderBy(pair => pair.Key.Value).Select(pair => new
-            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToArray(),
-            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToArray(),
+            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToImmutableArray(),
+            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToImmutableArray(),
             callPreconditionWitness = result.CallPreconditionWitness?.Value,
             consumedBefore = before,
             consumedAfter = after,

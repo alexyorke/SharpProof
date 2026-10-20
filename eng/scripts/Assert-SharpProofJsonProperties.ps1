@@ -19,8 +19,8 @@ function Assert-UniqueJsonProperties {
         return
     }
 
-    $names = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
+    $names = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer(
+        [StringComparer]::Ordinal).ToBuilder()
     foreach ($property in $Value.EnumerateObject()) {
         if (-not $names.Add($property.Name)) {
             throw "$Context contains duplicate property '$($property.Name)'."
@@ -38,11 +38,12 @@ function Assert-SharpProofExactJsonProperties {
         [switch]$RejectDuplicates
     )
 
-    $actual = @($Actual)
+    $actualSnapshot = [Collections.Immutable.ImmutableArray]::CreateRange[string]($Actual)
+    $expectedSnapshot = [Collections.Immutable.ImmutableArray]::CreateRange[string]($Expected)
     if (($RejectDuplicates -and
-            @($actual | Select-Object -Unique).Count -ne $actual.Count) -or
-        $actual.Count -ne $Expected.Count -or
-        @($actual | Where-Object { $Expected -cnotcontains $_ }).Count -ne 0) {
+            @($actualSnapshot | Select-Object -Unique).Count -ne $actualSnapshot.Length) -or
+        $actualSnapshot.Length -ne $expectedSnapshot.Length -or
+        @($actualSnapshot | Where-Object { $expectedSnapshot -cnotcontains $_ }).Count -ne 0) {
         throw "$Description has an unexpected property set."
     }
 }

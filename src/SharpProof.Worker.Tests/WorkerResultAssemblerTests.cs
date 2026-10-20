@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using NUnit.Framework;
@@ -79,7 +80,7 @@ public sealed class WorkerResultAssemblerTests
                 new WorkerCallableManifestEntry
                 {
                     CallableId = "callable",
-                    Assumptions = null!
+                    Assumptions = default
                 }
             ],
             Claims =
@@ -176,13 +177,17 @@ public sealed class WorkerResultAssemblerTests
             {
                 CallableId = CallableId(index)
             });
-        var callables = targetFirst
-            ? new[] { target }.Concat(otherCallables)
-            : otherCallables.Append(target);
+        var callableBuilder = ImmutableArray.CreateBuilder<WorkerCallableManifestEntry>();
+        if (targetFirst)
+        { callableBuilder.Add(target); }
+        callableBuilder.AddRange(otherCallables);
+        if (!targetFirst)
+        { callableBuilder.Add(target); }
+        var callables = callableBuilder.ToImmutable();
 
         return new WorkerClaimManifest
         {
-            Callables = [.. callables],
+            Callables = callables,
             // Duplicate claim IDs keep response canonicalization constant-time
             // per row so this failure-path regression measures callable lookup.
             Claims = [.. Enumerable.Range(0, size).Select(_ =>

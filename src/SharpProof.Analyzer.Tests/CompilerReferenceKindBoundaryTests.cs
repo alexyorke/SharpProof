@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -20,14 +21,14 @@ public sealed class CompilerReferenceKindBoundaryTests
         try
         {
             var path = Path.Combine(directory, "Subject.dll");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, (image).ToArray());
             var reference = MetadataReference.CreateFromImage(image, filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single();
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ReferenceKind", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image, writable: false);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var assembly = loadContext.LoadFromStream(stream);
                 Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
                     .Invoke(null, [7]), Is.EqualTo(7));

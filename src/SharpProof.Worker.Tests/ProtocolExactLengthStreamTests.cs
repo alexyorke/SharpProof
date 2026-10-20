@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using NUnit.Framework;
@@ -90,14 +91,14 @@ public sealed class ProtocolExactLengthStreamTests
                 Sha256 = WorkerProtocolVersions.EmptySha256
             }
         });
-        var bytes = Encoding.UTF8.GetBytes(json);
+        var bytes = Encoding.UTF8.GetBytes(json).ToImmutableArray();
         try
         {
-            await File.WriteAllBytesAsync(path, bytes);
+            await File.WriteAllBytesAsync(path, bytes.AsMemory());
             Assert.That(WorkerProtocolJson.ReadUtf8File(path), Is.EqualTo(json));
             Assert.That(await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(json));
             Assert.That(WorkerProtocolJson.ComputeFileSha256(path),
-                Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(bytes))));
+                Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan()))));
         }
         finally
         {

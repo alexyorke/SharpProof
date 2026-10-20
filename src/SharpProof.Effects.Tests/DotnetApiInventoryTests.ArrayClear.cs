@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -35,13 +36,12 @@ public sealed partial class DotnetApiInventoryTests
             for (var length = 0; length <= 4 - start; length++)
             {
                 int[] expected = [3, 5, 7, 11];
-                var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-                {
-                    [context.Parameters[0].Entry] = factory.CreateSequenceValue(factory.GetVariableInfo(context.Parameters[0].Entry).Type,
-                        expected.Select(value => factory.CreateIntegerValue(value))),
-                    [context.Parameters[1].Entry] = factory.CreateIntegerValue(start),
-                    [context.Parameters[2].Entry] = factory.CreateIntegerValue(length)
-                };
+                var argumentBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+                argumentBuilder[context.Parameters[0].Entry] = factory.CreateSequenceValue(factory.GetVariableInfo(context.Parameters[0].Entry).Type,
+                    expected.Select(value => factory.CreateIntegerValue(value)));
+                argumentBuilder[context.Parameters[1].Entry] = factory.CreateIntegerValue(start);
+                argumentBuilder[context.Parameters[2].Entry] = factory.CreateIntegerValue(length);
+                var arguments = argumentBuilder.ToImmutable();
                 if (whole)
                 { Array.Clear(expected); }
                 else

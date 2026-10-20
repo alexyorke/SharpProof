@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -25,9 +26,9 @@ namespace SharpProof.Worker.Test;
 public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
 {
     private const int ParameterCount = 128;
-    private static readonly bool[] Inputs = [false, true];
-    private static readonly string[] ExpectedCodes = ["Ldarg", "Ret"];
-    private static readonly bool[] ExpectedPreconditions = [true];
+    private static readonly ImmutableArray<bool> Inputs = [false, true];
+    private static readonly ImmutableArray<string> ExpectedCodes = ["Ldarg", "Ret"];
+    private static readonly ImmutableArray<bool> ExpectedPreconditions = [true];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -46,11 +47,12 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var module = builder.DefineDynamicModule("IdentityWitness.dll");
             var type = module.DefineType(typeName,
                 TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
-            var parameterTypes = Enumerable.Repeat(typeof(bool), ParameterCount).ToArray();
+            var parameterTypes = ImmutableArray.CreateBuilder<Type>(ParameterCount);
+            parameterTypes.AddRange(Enumerable.Repeat(typeof(bool), ParameterCount));
             parameterTypes[0] = typeof(int);
             var methodBuilder = type.DefineMethod(methodName,
                 MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig,
-                typeof(bool), parameterTypes);
+                typeof(bool), parameterTypes.ToArray());
             var positiveConstructor = typeof(PositiveAttribute).GetConstructor(Type.EmptyTypes)!;
             for (var ordinal = 0; ordinal < ParameterCount; ordinal++)
             {
@@ -67,19 +69,20 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             type.CreateType();
             using var emitted = new MemoryStream();
             builder.Save(emitted);
-            var image = emitted.ToArray();
+            var image = ImmutableArray.Create<byte>(emitted.GetBuffer().AsSpan(0, checked((int)emitted.Length)));
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
-            await File.WriteAllBytesAsync(imagePath, image, TestContext.CurrentContext.CancellationToken);
+            await File.WriteAllBytesAsync(imagePath, image.AsMemory(), TestContext.CurrentContext.CancellationToken);
 
-            using var runtimeImage = new MemoryStream(image, writable: false);
+            using var runtimeImage = new MemoryStream(image.ToArray(), writable: false);
             var runtimeAssembly = runtime.LoadFromStream(runtimeImage);
             var runtimeMethod = runtimeAssembly.GetType(typeName)!.GetMethod(methodName)!;
             foreach (var input in Inputs)
             {
-                var arguments = Enumerable.Repeat<object>(false, ParameterCount).ToArray();
+                var arguments = ImmutableArray.CreateBuilder<object>(ParameterCount);
+                arguments.AddRange(Enumerable.Repeat<object>(false, ParameterCount));
                 arguments[0] = 1;
                 arguments[1] = input;
-                Assert.That(runtimeMethod.Invoke(null, arguments), Is.EqualTo(input),
+                Assert.That(runtimeMethod.Invoke(null, arguments.ToArray()), Is.EqualTo(input),
                     "The saved implementation must load and run before any admission or fallback assertion.");
             }
 
@@ -123,8 +126,8 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
-            Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
-            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image))));
+            Assert.That(captured.SizeBytes, Is.EqualTo((long)image.Length));
+            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image.AsSpan()))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
             var provider = new CompilerTotalIlBodyProvider(compilation, references);
@@ -135,7 +138,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(decodedBody.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(decodedBody.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(decodedBody.Module, Is.EqualTo(captured.Name));
-            Assert.That(decodedBody.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToArray(), Is.EqualTo(ExpectedCodes));
+            Assert.That(decodedBody.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToImmutableArray(), Is.EqualTo(ExpectedCodes));
             Assert.That(decodedBody.Instructions[0].Operand, Is.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes, Has.Length.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes.Single().Kind, Is.EqualTo("Positive"));
@@ -169,7 +172,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(identityBytes, Is.EqualTo(longIdentity ? 4194 : 2022));
             TestContext.WriteLine($"longIdentity={longIdentity}; calleeIdentityBytes={identityBytes}");
             var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken,
                 enableMetadataRequires: true);
             if (longIdentity)
@@ -197,8 +200,8 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var entry = body.Parameters.Single().Entry;
             foreach (var input in Inputs)
             {
-                var observations = new List<bool>();
-                var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToHashSet();
+                var observationBuilder = ImmutableArray.CreateBuilder<bool>();
+                var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
                 var options = new IrProgramReplayOptions(static _ => null)
                 {
                     AssignmentObserver = (instruction, assigned, _) =>
@@ -206,14 +209,14 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                         System.ArgumentNullException.ThrowIfNull(assigned);
                         System.ArgumentNullException.ThrowIfNull(instruction);
                         if (markers.Contains(instruction.Id))
-                        { observations.Add(assigned.Boolean); }
+                        { observationBuilder.Add(assigned.Boolean); }
                     }
                 };
                 var replay = new IrProgramInterpreter(factory).Execute(body.Program,
-                    new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateBooleanValue(input) }, 10000, options);
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateBooleanValue(input)), 10000, options);
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.Boolean, Is.EqualTo(input));
-                Assert.That(observations, Is.EqualTo(ExpectedPreconditions));
+                Assert.That(observationBuilder.ToImmutable(), Is.EqualTo(ExpectedPreconditions));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ApproximationVariables, Is.Empty);
             }

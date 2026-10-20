@@ -14,7 +14,7 @@ internal static class CompilerSpecificationScalarDomain
         integerType = default;
         if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
         { return false; }
-        var integerTypes = parameters.Add(resultType).Where(type => type.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(type)) : (factory.GetTypeInfo(type).Kind == IrTypeKind.Integer)).Distinct().ToArray();
+        var integerTypes = parameters.Add(resultType).Where(type => type.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(type)) : (factory.GetTypeInfo(type).Kind == IrTypeKind.Integer)).Distinct().ToImmutableArray();
         if (integerTypes.Length > 1)
         { return false; }
         integerType = integerTypes.Length == 0 ? factory.IntegerType : integerTypes[0];

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -19,7 +20,7 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
             1 => ReferencedTypeSymbols.GetAllCached(null!, TestContext.CurrentContext.CancellationToken),
             _ => ReferencedTypeSymbols.GetAllCached(null!, compilation.Assembly, TestContext.CurrentContext.CancellationToken)
         };
-        var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToArray()));
+        var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToImmutableArray()));
         Assert.That(error!.ParamName, Is.EqualTo("compilation"));
     }
 
@@ -27,7 +28,7 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
     public void CachedTypeTraversalRejectsNullReferencedAssembly()
     {
         var sequence = ReferencedTypeSymbols.GetAllCached(CreateCompilation(), null!, TestContext.CurrentContext.CancellationToken);
-        var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToArray()));
+        var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToImmutableArray()));
         Assert.That(error!.ParamName, Is.EqualTo("referencedAssembly"));
     }
 
@@ -36,12 +37,11 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
     {
         var compilation = CreateCompilation();
         var platformAssembly = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
-        foreach (var types in new[]
-                 {
+        foreach (var types in ImmutableArray.Create(
                      ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken),
                      ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken),
                      ReferencedTypeSymbols.GetAllCached(compilation, platformAssembly, TestContext.CurrentContext.CancellationToken)
-                 })
+                 ))
         {
             Assert.That(types.Any(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Name == "Subject" &&
                 SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly))), Is.True);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -57,18 +58,20 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
             Assert.That(invocation.SemanticModel, Is.Not.Null);
             Assert.That(invocation.SemanticModel!.SyntaxTree, Is.SameAs(tree));
         }
-        var pending = new Stack<IOperation>();
-        pending.Push(invocation);
-        var anonymousParameters = new List<IParameterSymbol>();
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(invocation);
+        var anonymousParameterBuilder = ImmutableArray.CreateBuilder<IParameterSymbol>();
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is IParameterReferenceOperation parameter &&
                 parameter.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
-            { anonymousParameters.Add(parameter.Parameter); }
+            { anonymousParameterBuilder.Add(parameter.Parameter); }
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
+        var anonymousParameters = anonymousParameterBuilder.ToImmutable();
         Assert.That(anonymousParameters, Is.Not.Empty);
         var anonymousDeclaration = await anonymousParameters.First().ContainingSymbol
             .DeclaringSyntaxReferences.First().GetSyntaxAsync();
@@ -77,7 +80,7 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ScriptQueryIdentity", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            using var image = new MemoryStream((AnalyzerTestHost.EmitImage(compilation)).ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(image);
             var factory = assembly.GetType(entryPoint.ContainingType.MetadataName, throwOnError: true)!
                 .GetMethod(entryPoint.MetadataName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;

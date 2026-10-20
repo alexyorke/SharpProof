@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -79,7 +80,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         if (innerHasClaim)
         {
@@ -97,7 +98,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         var factory = body.Program.Factory;
         var entry = body.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(18)));
         Assert.That(replay.ConsumedApproximation, Is.False);

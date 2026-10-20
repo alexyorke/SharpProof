@@ -18,30 +18,30 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Assert.That(rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status != "passed")).Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api + "/" + row.Facet + ": " + row.Detail)), Is.Empty, "Every modeled facet/postcondition requires executed behavioral and wrong-claim evidence. See catalog-test-evidence.md.");
     }
 
-    private static ApiTestEvidence.Row[] CollectTestEvidence(IEnumerable<ApiSpecTemplate> templates, ImmutableDictionary<string, RowWitness> registry)
+    private static ImmutableArray<ApiTestEvidence.Row> CollectTestEvidence(IEnumerable<ApiSpecTemplate> templates, ImmutableDictionary<string, RowWitness> registry)
     {
         global::System.ArgumentNullException.ThrowIfNull(templates);
         global::System.ArgumentNullException.ThrowIfNull(registry);
-        var evidence = new List<ApiTestEvidence.Row>();
+        var evidence = ImmutableArray.CreateBuilder<ApiTestEvidence.Row>();
         foreach (var template in templates)
         {
             registry.TryGetValue(template.Target.WitnessIdentifier, out var row);
             var api = template.Target.DocumentationCommentId;
             foreach (var facet in ExpectedFacets(template))
             {
-                var matches = row?.Facets.Where(witness => witness is null ? throw new global::System.ArgumentNullException(nameof(witness)) : (witness.Facet == facet)).ToArray() ?? [];
+                var matches = row?.Facets.Where(witness => witness is null ? throw new global::System.ArgumentNullException(nameof(witness)) : (witness.Facet == facet)).ToImmutableArray() ?? ImmutableArray<IFacetWitness>.Empty;
                 evidence.Add(matches.Length == 1 ? ApiTestEvidence.Run(api, facet.ToString(), EvidenceTest, matches[0].EdgeInputs, () => matches[0].AcceptsDeclared(template), matches[0].AcceptsMutation) : new(api, facet.ToString(), EvidenceTest, "", "missing", "Expected exactly one facet witness; found " + matches.Length));
             }
 
             for (var index = 0; index < template.Postconditions.Length; index++)
             {
-                var matches = row?.Postconditions.Where(witness => witness is null ? throw new global::System.ArgumentNullException(nameof(witness)) : (witness.Index == index)).ToArray() ?? [];
+                var matches = row?.Postconditions.Where(witness => witness is null ? throw new global::System.ArgumentNullException(nameof(witness)) : (witness.Index == index)).ToImmutableArray() ?? ImmutableArray<PostconditionWitness>.Empty;
                 var facet = "Postcondition[" + index + "]";
                 evidence.Add(matches.Length == 1 ? ApiTestEvidence.Run(api, facet, EvidenceTest, matches[0].EdgeInputs, () => matches[0].AcceptsDeclared(template), () => matches[0].AcceptsNegatedMutation(template)) : new(api, facet, EvidenceTest, "", "missing", "Expected exactly one postcondition witness; found " + matches.Length));
             }
         }
 
-        return evidence.ToArray();
+        return evidence.ToImmutable();
     }
 
     [Test]

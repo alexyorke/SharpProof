@@ -9,96 +9,171 @@ using SharpProof.Ir;
 
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class PortableIrGraph
+internal sealed record PortableIrGraph
 {
     [System.Text.Json.Serialization.JsonRequired]
-    public IrExecutionSemantics Semantics { get; set; }
-    public bool HasProgram { get; set; }
-    public PortableIrType[] Types { get; set; } = [];
-    public int[] Identities { get; set; } = [];
-    public PortableIrVariable[] Variables { get; set; } = [];
-    public PortableIrMember[] Members { get; set; } = [];
-    public PortableIrOperation[] Operations { get; set; } = [];
-    public PortableIrTerm[] Terms { get; set; } = [];
-    public PortableIrBlock[] Blocks { get; set; } = [];
-    public int Entry { get; set; } = -1;
-    public int[] Roots { get; set; } = [];
+    public IrExecutionSemantics Semantics { get; init; }
+    public bool HasProgram { get; init; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrType> Types { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Identities { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrVariable> Variables { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrMember> Members { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrOperation> Operations { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrTerm> Terms { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrBlock> Blocks { get; init; } = [];
+    public int Entry { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Roots { get; init; } = [];
+
 }
 
-internal sealed class PortableIrType(
+internal sealed record PortableIrType
+{
+    public IrTypeKind Kind { get; init; } = default;
+    public string Name { get; init; } = string.Empty;
+    public int Element { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Width { get; init; } = 0;
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Signed { get; init; } = false;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ClosedSealedReference { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? ClosedClassBase { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool InterfaceReference { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<int>? ImplementedInterfaces { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrType() { }
+
+    public PortableIrType(
     IrTypeKind kind = default,
     string? name = null,
     int element = -1,
     int width = 0,
     bool signed = false
-)
-{
-    public IrTypeKind Kind { get; set; } = kind;
-    public string Name { get; set; } = name ?? string.Empty;
-    public int Element { get; set; } = element;
-    [System.Text.Json.Serialization.JsonRequired]
-    public int Width { get; set; } = width;
-    [System.Text.Json.Serialization.JsonRequired]
-    public bool Signed { get; set; } = signed;
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool ClosedSealedReference { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    public int? ClosedClassBase { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool InterfaceReference { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    public int[]? ImplementedInterfaces { get; set; }
+) : this()
+    {
+        Kind = kind;
+        Name = name ?? string.Empty;
+        Element = element;
+        Width = width;
+        Signed = signed;
+    }
+
 }
 
-internal sealed class PortableIrVariable(
+internal sealed record PortableIrVariable
+{
+    public string Name { get; init; } = string.Empty;
+    public int Type { get; init; } = -1;
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrVariable() { }
+
+    public PortableIrVariable(
     string? name = null,
     int type = -1
-)
-{
-    public string Name { get; set; } = name ?? string.Empty;
-    public int Type { get; set; } = type;
+) : this()
+    {
+        Name = name ?? string.Empty;
+        Type = type;
+    }
+
 }
 
-internal sealed class PortableIrMember(
+internal sealed record PortableIrMember
+{
+    public int Identity { get; init; } = -1;
+    public int DeclaringType { get; init; } = -1;
+    public string Name { get; init; } = string.Empty;
+    public int ReturnType { get; init; } = -1;
+    public bool IsStatic { get; init; } = false;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> ParameterTypes { get; init; } = [];
+    public string? DocumentationCommentId { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrMember() { }
+
+    public PortableIrMember(
     int identity = -1,
     int declaringType = -1,
     string? name = null,
     int returnType = -1,
     bool isStatic = false,
-    int[]? parameterTypes = null
-)
-{
-    public int Identity { get; set; } = identity;
-    public int DeclaringType { get; set; } = declaringType;
-    public string Name { get; set; } = name ?? string.Empty;
-    public int ReturnType { get; set; } = returnType;
-    public bool IsStatic { get; set; } = isStatic;
-    public int[] ParameterTypes { get; set; } = parameterTypes ?? [];
-    public string? DocumentationCommentId { get; set; }
+    ImmutableArray<int> parameterTypes /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
+) : this()
+    {
+        Identity = identity;
+        DeclaringType = declaringType;
+        Name = name ?? string.Empty;
+        ReturnType = returnType;
+        IsStatic = isStatic;
+        ParameterTypes = parameterTypes.IsDefault ? [] : parameterTypes;
+    }
+
 }
 
-internal sealed class PortableIrOperation(
+internal sealed record PortableIrOperation
+{
+    public string? Description { get; init; } = null;
+    [System.Text.Json.Serialization.JsonRequired]
+    public PortableIrSourceSpan? SourceSpan { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrOperation() { }
+
+    public PortableIrOperation(
     string? description = null
-)
-{
-    public string? Description { get; set; } = description;
-    [System.Text.Json.Serialization.JsonRequired]
-    public PortableIrSourceSpan? SourceSpan { get; set; }
+) : this()
+    {
+        Description = description;
+    }
+
 }
 
-internal sealed class PortableIrSourceSpan
+internal sealed record PortableIrSourceSpan
 {
     [System.Text.Json.Serialization.JsonRequired]
-    public string Document { get; set; } = string.Empty;
+    public string Document { get; init; } = string.Empty;
     [System.Text.Json.Serialization.JsonRequired]
-    public int Start { get; set; }
+    public int Start { get; init; }
     [System.Text.Json.Serialization.JsonRequired]
-    public int Length { get; set; }
-    public int Line { get; set; }
-    public int Column { get; set; }
+    public int Length { get; init; }
+    public int Line { get; init; }
+    public int Column { get; init; }
+
 }
 
-internal sealed class PortableIrTerm(
+internal sealed record PortableIrTerm
+{
+    public IrTermKind Kind { get; init; } = default;
+    public int Type { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    public int C { get; init; } = -1;
+    public int D { get; init; } = -1;
+    public long Number { get; init; } = 0;
+    [System.Text.Json.Serialization.JsonRequired]
+    public ulong Bits { get; init; }
+    public string? Text { get; init; } = null;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrTerm() { }
+
+    public PortableIrTerm(
     IrTermKind kind = default,
     int type = -1,
     int a = -1,
@@ -107,95 +182,136 @@ internal sealed class PortableIrTerm(
     int d = -1,
     long number = 0,
     string? text = null,
-    int[]? items = null
-)
-{
-    public IrTermKind Kind { get; set; } = kind;
-    public int Type { get; set; } = type;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int C { get; set; } = c;
-    public int D { get; set; } = d;
-    public long Number { get; set; } = number;
-    [System.Text.Json.Serialization.JsonRequired]
-    public ulong Bits { get; set; }
-    public string? Text { get; set; } = text;
-    public int[] Items { get; set; } = items ?? [];
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
+) : this()
+    {
+        Kind = kind;
+        Type = type;
+        A = a;
+        B = b;
+        C = c;
+        D = d;
+        Number = number;
+        Text = text;
+        Items = items.IsDefault ? [] : items;
+    }
+
 }
 
-internal sealed class PortableIrLocation(
+internal sealed record PortableIrLocation
+{
+    public IrLocationKind Kind { get; init; } = default;
+    public int Type { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrLocation() { }
+
+    public PortableIrLocation(
     IrLocationKind kind = default,
     int type = -1,
     int a = -1,
     int b = -1,
-    int[]? items = null
-)
-{
-    public IrLocationKind Kind { get; set; } = kind;
-    public int Type { get; set; } = type;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int[] Items { get; set; } = items ?? [];
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
+) : this()
+    {
+        Kind = kind;
+        Type = type;
+        A = a;
+        B = b;
+        Items = items.IsDefault ? [] : items;
+    }
+
 }
 
-internal sealed class PortableIrInstruction(
+internal sealed record PortableIrInstruction
+{
+    public IrInstructionKind Kind { get; init; } = default;
+    public int Operation { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    public int C { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+    public PortableIrLocation? Location { get; init; } = null;
+    [System.Text.Json.Serialization.JsonRequired]
+    public IrHavocOrigin Origin { get; init; } = IrHavocOrigin.Approximation;
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrInstruction() { }
+
+    public PortableIrInstruction(
     IrInstructionKind kind = default,
     int operation = -1,
     int a = -1,
     int b = -1,
     int c = -1,
-    int[]? items = null,
+    ImmutableArray<int> items /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default,
     PortableIrLocation? location = null
-)
-{
-    public IrInstructionKind Kind { get; set; } = kind;
-    public int Operation { get; set; } = operation;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int C { get; set; } = c;
-    public int[] Items { get; set; } = items ?? [];
-    public PortableIrLocation? Location { get; set; } = location;
-    [System.Text.Json.Serialization.JsonRequired]
-    public IrHavocOrigin Origin { get; set; } = IrHavocOrigin.Approximation;
+) : this()
+    {
+        Kind = kind;
+        Operation = operation;
+        A = a;
+        B = b;
+        C = c;
+        Items = items.IsDefault ? [] : items;
+        Location = location;
+    }
+
 }
 
-internal sealed class PortableIrBlock(
-    string? name = null,
-    PortableIrInstruction[]? instructions = null
-)
+internal sealed record PortableIrBlock
 {
-    public string? Name { get; set; } = name;
-    public PortableIrInstruction[] Instructions { get; set; } = instructions ?? [];
+    public string? Name { get; init; } = null;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrInstruction> Instructions { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrBlock() { }
+
+    public PortableIrBlock(
+    string? name = null,
+    ImmutableArray<PortableIrInstruction> instructions /* SPINT001: all values valid - default is normalized to initialized empty metadata */ = default
+) : this()
+    {
+        Name = name;
+        Instructions = instructions.IsDefault ? [] : instructions;
+    }
+
 }
 
 internal sealed class DecodedPortableIrGraph(
     IrFactory factory,
     IrProgram? program,
-    IrTerm[] roots,
-    IrVarId[] variables,
-    IrInstruction[] instructions,
-    OperationId[] operations
+    ImmutableArray<IrTerm> roots,
+    ImmutableArray<IrVarId> variables,
+    ImmutableArray<IrInstruction> instructions,
+    ImmutableArray<OperationId> operations
 )
 {
     internal IrFactory Factory { get; } = factory;
     internal IrProgram? Program { get; } = program;
-    internal IReadOnlyList<IrTerm> Roots { get; } = roots;
-    internal IReadOnlyList<IrVarId> Variables { get; } = variables;
-    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
-    internal IReadOnlyList<OperationId> Operations { get; } = operations;
+    internal ImmutableArray<IrTerm> Roots { get; } = roots;
+    internal ImmutableArray<IrVarId> Variables { get; } = variables;
+    internal ImmutableArray<IrInstruction> Instructions { get; } = instructions;
+    internal ImmutableArray<OperationId> Operations { get; } = operations;
 }
 
 internal sealed class EncodedPortableIrGraph(
     PortableIrGraph graph,
-    IReadOnlyDictionary<IrVarId, int> variableIndices,
-    IReadOnlyDictionary<IrInstructionId, int> instructionIndices,
-    IReadOnlyDictionary<OperationId, int> operationIndices
+    ImmutableDictionary<IrVarId, int> variableIndices,
+    ImmutableDictionary<IrInstructionId, int> instructionIndices,
+    ImmutableDictionary<OperationId, int> operationIndices
 )
 {
     internal PortableIrGraph Graph { get; } = graph;
-    internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices;
-    internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices;
-    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices;
+    internal ImmutableDictionary<IrVarId, int> VariableIndices { get; } = variableIndices.ToImmutableDictionary();
+    internal ImmutableDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices.ToImmutableDictionary();
+    internal ImmutableDictionary<OperationId, int> OperationIndices { get; } = operationIndices.ToImmutableDictionary();
 }
 
 internal static class PortableIrWireCatalog
@@ -315,7 +431,7 @@ internal static partial class PortableIrGraphCodec
                 ClosedSealedReference = _factory.IsClosedSealedReferenceType(id),
                 ClosedClassBase = _factory.TryGetClosedClassReferenceBase(id, out var parent) ? parent.HasValue ? TypeIndex(parent.Value) : -1 : null,
                 InterfaceReference = _factory.IsInterfaceReferenceType(id),
-                ImplementedInterfaces = _factory.GetImplementedReferenceInterfaces(id) is { Length: > 0 } interfaces ? interfaces.Select(TypeIndex).OrderBy(index => index).ToArray() : null
+                ImplementedInterfaces = _factory.GetImplementedReferenceInterfaces(id) is { Length: > 0 } interfaces ? interfaces.Select(TypeIndex).OrderBy(index => index).ToImmutableArray() : null
             };
         }
 
@@ -335,8 +451,8 @@ internal static partial class PortableIrGraphCodec
                 TypeIndex(value.DeclaringType),
                 _factory.GetString(value.Name),
                 TypeIndex(value.ReturnType),
-                value.IsStatic,
-                [.. value.ParameterTypes.Select(TypeIndex)]);
+                value.IsStatic)
+            { ParameterTypes = value.ParameterTypes.Select(TypeIndex).ToImmutableArray() };
         }
 
         private PortableIrOperation OperationRow(OperationId id)
@@ -374,11 +490,11 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> MemberIndex,
         Func<OperationId, int> OperationIndex,
         Func<IrTerm?, int> OptionalTermIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
         Func<IrOpaquePurity, int> OpaquePurity,
         Func<IrUnaryOperator, int> UnaryOperator,
         Func<IrBinaryOperator, int> BinaryOperator,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> Row);
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> Row);
 
     private readonly record struct TermDecodingContext(
         IrFactory Factory,
@@ -389,7 +505,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> Variable,
         Func<int, IrMemberId> Member,
         Func<int, OperationId> Operation,
-        Func<int[], int, IrTerm[]> Terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> Terms,
         Func<int, IrOpaquePurity> OpaquePurity,
         Func<int, IrUnaryOperator> UnaryOperator,
         Func<int, IrBinaryOperator> BinaryOperator,
@@ -399,15 +515,15 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> MemberIndex,
         Func<IrTerm?, int> OptionalTermIndex,
         Func<IrTerm, int> TermIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
-        Func<IrLocation, int, int, int[]?, PortableIrLocation> Row);
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
+        Func<IrLocation, int, int, ImmutableArray<int>?, PortableIrLocation> Row);
 
     private readonly record struct LocationDecodingContext(
         IrProgramBuilder Builder,
         Func<int, IrMemberId> Member,
         Func<int, IrTerm?> OptionalTerm,
         Func<int, IrTerm> Term,
-        Func<int[], IrTerm[]> Terms);
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> Terms);
 
     private readonly record struct InstructionEncodingContext(
         Func<IrTypeId, int> TypeIndex,
@@ -419,10 +535,10 @@ internal static class PortableIrGraphCodecProjections
         Func<IrTerm?, int> OptionalTermIndex,
         Func<IrHavocKind, int> HavocKind,
         Func<IrBlockId, int> BlockIndex,
-        Func<IEnumerable<IrTerm>, int[]> TermIndices,
-        Func<IEnumerable<IrVarId>, int[]> VariableIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> TermIndices,
+        Func<IEnumerable<IrVarId>, ImmutableArray<int>> VariableIndices,
         Func<IrLocation, PortableIrLocation> Location,
-        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> Row);
+        Func<IrInstruction, int, int, int, int, ImmutableArray<int>?, PortableIrLocation?, PortableIrInstruction> Row);
 
     private readonly record struct InstructionDecodingContext(
         IrProgramBuilder Builder,
@@ -437,14 +553,17 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> HavocKind,
         Func<int, IrBlockId> BlockAt,
         Func<PortableIrLocation?, IrLocation> Location,
-        Func<int[], IrTerm[]> Terms,
-        Func<int[], IrVarId[]> Variables,
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> Terms,
+        Func<ImmutableArray<int>, ImmutableArray<IrVarId>> Variables,
         Func<Exception> Invalid);
 
     private static readonly ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> TermProjections =
-        new Dictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>>
-        {
-            [IrTermKind.Boolean] = new(
+        CreateTermProjections();
+
+    private static ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> CreateTermProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>>();
+        result.Add(IrTermKind.Boolean, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Boolean],
                 static (term, context) =>
                 {
@@ -455,8 +574,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     RequirePayload(row.A is 0 or 1, context.Invalid);
                     return context.Factory.Boolean(row.A == 1);
-                }),
-            [IrTermKind.Integer] = new(
+                }));
+        result.Add(IrTermKind.Integer, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Integer],
                 static (term, context) =>
                 {
@@ -473,8 +592,8 @@ internal static class PortableIrGraphCodecProjections
                     }
                     RequirePayload(row.Number == 0, context.Invalid);
                     return context.Factory.IntegerBits(context.Type(row.Type), row.Bits);
-                }),
-            [IrTermKind.String] = new(
+                }));
+        result.Add(IrTermKind.String, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.String],
                 static (term, context) =>
                 {
@@ -485,8 +604,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     RequirePayload(row.Text != null, context.Invalid);
                     return context.Factory.String(row.Text!);
-                }),
-            [IrTermKind.Null] = new(
+                }));
+        result.Add(IrTermKind.Null, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Null],
                 static (term, context) =>
                 {
@@ -495,8 +614,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Null(context.Type(row.Type));
-                }),
-            [IrTermKind.EmptyArray] = new(
+                }));
+        result.Add(IrTermKind.EmptyArray, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.EmptyArray],
                 static (term, context) =>
                 {
@@ -505,8 +624,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.EmptyArray(context.Type(row.Type));
-                }),
-            [IrTermKind.Variable] = new(
+                }));
+        result.Add(IrTermKind.Variable, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Variable],
                 static (term, context) =>
                 {
@@ -516,8 +635,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Variable(context.Variable(row.A));
-                }),
-            [IrTermKind.Opaque] = new(
+                }));
+        result.Add(IrTermKind.Opaque, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque],
                 static (term, context) =>
                 {
@@ -544,8 +663,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Terms,
                         context.OpaquePurity,
                         context.Invalid);
-                }),
-            [IrTermKind.Unary] = new(
+                }));
+        result.Add(IrTermKind.Unary, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Unary],
                 static (term, context) =>
                 {
@@ -565,8 +684,8 @@ internal static class PortableIrGraphCodecProjections
                     return context.Factory.Unary(
                         context.UnaryOperator(row.A),
                         context.Term(row.B, context.Depth + 1));
-                }),
-            [IrTermKind.Binary] = new(
+                }));
+        result.Add(IrTermKind.Binary, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Binary],
                 static (term, context) =>
                 {
@@ -587,8 +706,8 @@ internal static class PortableIrGraphCodecProjections
                         context.BinaryOperator(row.A),
                         context.Term(row.B, context.Depth + 1),
                         context.Term(row.C, context.Depth + 1));
-                }),
-            [IrTermKind.Conditional] = new(
+                }));
+        result.Add(IrTermKind.Conditional, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Conditional],
                 static (term, context) =>
                 {
@@ -609,8 +728,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Term(row.A, context.Depth + 1),
                         context.Term(row.B, context.Depth + 1),
                         context.Term(row.C, context.Depth + 1));
-                }),
-            [IrTermKind.Cast] = new(
+                }));
+        result.Add(IrTermKind.Cast, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Cast],
                 static (term, context) =>
                 {
@@ -620,8 +739,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Cast(context.Type(row.Type), context.Term(row.A, context.Depth + 1));
-                }),
-            [IrTermKind.Length] = new(
+                }));
+        result.Add(IrTermKind.Length, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Length],
                 static (term, context) =>
                 {
@@ -631,8 +750,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Length(context.Term(row.A, context.Depth + 1));
-                }),
-            [IrTermKind.SequenceAccess] = new(
+                }));
+        result.Add(IrTermKind.SequenceAccess, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.SequenceAccess],
                 static (term, context) =>
                 {
@@ -652,8 +771,9 @@ internal static class PortableIrGraphCodecProjections
                     return context.Factory.SequenceAccess(
                         context.Term(row.A, context.Depth + 1),
                         context.Term(row.B, context.Depth + 1));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping TermSlotMapping(IrTermKind kind)
     {
@@ -661,9 +781,12 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static readonly ImmutableDictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>> LocationProjections =
-        new Dictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>>
-        {
-            [IrLocationKind.Member] = new(
+        CreateLocationProjections();
+
+    private static ImmutableDictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>> CreateLocationProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>>();
+        result.Add(IrLocationKind.Member, new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Member],
                 static (location, context) =>
                 {
@@ -676,12 +799,12 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.MemberLocation(
+                    return context.Builder.MemberLocationSnapshot(
                         context.Member(row.A),
                         context.OptionalTerm(row.B),
                         context.Terms(row.Items));
-                }),
-            [IrLocationKind.Sequence] = new(
+                }));
+        result.Add(IrLocationKind.Sequence, new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Sequence],
                 static (location, context) =>
                 {
@@ -697,8 +820,9 @@ internal static class PortableIrGraphCodecProjections
                     return context.Builder.SequenceLocation(
                         context.Term(row.A),
                         context.Term(row.B));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping LocationSlotMapping(IrLocationKind kind)
     {
@@ -706,9 +830,12 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static readonly ImmutableDictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>> InstructionProjections =
-        new Dictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>>
-        {
-            [IrInstructionKind.Allocate] = new(
+        CreateInstructionProjections();
+
+    private static ImmutableDictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>> CreateInstructionProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>>();
+        result.Add(IrInstructionKind.Allocate, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Allocate],
                 static (instruction, context) =>
                 {
@@ -719,8 +846,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items).ToImmutableArray());
-                }),
-            [IrInstructionKind.Lock] = new(
+                }));
+        result.Add(IrInstructionKind.Lock, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Lock],
                 static (instruction, context) =>
                 {
@@ -731,8 +858,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.Lock(context.Block, context.Operation(row.Operation), context.Term(row.A));
-                }),
-            [IrInstructionKind.Write] = new(
+                }));
+        result.Add(IrInstructionKind.Write, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Write],
                 static (instruction, context) =>
                 {
@@ -753,8 +880,8 @@ internal static class PortableIrGraphCodecProjections
                             ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0], row.Items.Length == 2 ? context.Terms(row.Items)[1] : null)
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
-                }),
-            [IrInstructionKind.Assign] = new(
+                }));
+        result.Add(IrInstructionKind.Assign, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assign],
                 static (instruction, context) =>
                 {
@@ -775,8 +902,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Variable(row.A),
                         context.Term(row.B));
-                }),
-            [IrInstructionKind.Load] = new(
+                }));
+        result.Add(IrInstructionKind.Load, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Load],
                 static (instruction, context) =>
                 {
@@ -797,8 +924,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Variable(row.A),
                         context.Location(row.Location));
-                }),
-            [IrInstructionKind.Store] = new(
+                }));
+        result.Add(IrInstructionKind.Store, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Store],
                 static (instruction, context) =>
                 {
@@ -819,8 +946,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Location(row.Location),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Call] = new(
+                }));
+        result.Add(IrInstructionKind.Call, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call],
                 static (instruction, context) =>
                 {
@@ -836,15 +963,15 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Call(
+                    return context.Builder.CallSnapshot(
                         context.Block,
                         context.Operation(row.Operation),
                         context.OptionalVariable(row.A),
                         context.Member(row.B),
                         context.OptionalTerm(row.C),
                         context.Terms(row.Items));
-                }),
-            [IrInstructionKind.Assume] = new(
+                }));
+        result.Add(IrInstructionKind.Assume, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assume],
                 static (instruction, context) =>
                 {
@@ -864,8 +991,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Assert] = new(
+                }));
+        result.Add(IrInstructionKind.Assert, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assert],
                 static (instruction, context) =>
                 {
@@ -885,8 +1012,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Havoc] = new(
+                }));
+        result.Add(IrInstructionKind.Havoc, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Havoc],
                 static (instruction, context) =>
                 {
@@ -902,14 +1029,14 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Havoc(
+                    return context.Builder.HavocSnapshot(
                         context.Block,
                         context.Operation(row.Operation),
                         context.HavocKind(row.A),
                         row.Origin,
                         context.Variables(row.Items));
-                }),
-            [IrInstructionKind.Branch] = new(
+                }));
+        result.Add(IrInstructionKind.Branch, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Branch],
                 static (instruction, context) =>
                 {
@@ -931,8 +1058,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Term(row.A),
                         context.BlockAt(row.B),
                         context.BlockAt(row.C));
-                }),
-            [IrInstructionKind.Goto] = new(
+                }));
+        result.Add(IrInstructionKind.Goto, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Goto],
                 static (instruction, context) =>
                 {
@@ -952,8 +1079,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.BlockAt(row.A));
-                }),
-            [IrInstructionKind.Return] = new(
+                }));
+        result.Add(IrInstructionKind.Return, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Return],
                 static (instruction, context) =>
                 {
@@ -973,8 +1100,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.OptionalTerm(row.A));
-                }),
-            [IrInstructionKind.Throw] = new(
+                }));
+        result.Add(IrInstructionKind.Throw, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Throw],
                 static (instruction, context) =>
                 {
@@ -986,8 +1113,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     return context.Builder.Throw(context.Block, context.Operation(row.Operation),
                         (IrExceptionKind)row.A, context.BlockAt(row.B));
-                }),
-            [IrInstructionKind.ExceptionalExit] = new(
+                }));
+        result.Add(IrInstructionKind.ExceptionalExit, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.ExceptionalExit],
                 static (instruction, context) =>
                 {
@@ -997,8 +1124,9 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.ExceptionalExit(context.Block, context.Operation(row.Operation));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping InstructionSlotMapping(IrInstructionKind kind)
     {
@@ -1032,11 +1160,11 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> memberIndex,
         Func<OperationId, int> operationIndex,
         Func<IrTerm?, int> optionalTermIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
         Func<IrOpaquePurity, int> opaquePurity,
         Func<IrUnaryOperator, int> unaryOperator,
         Func<IrBinaryOperator, int> binaryOperator,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> row)
     {
         var projection = GetProjection(TermProjections, term.Kind);
         var context = new TermEncodingContext(
@@ -1064,7 +1192,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> variable,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<int[], int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<int, IrUnaryOperator> unaryOperator,
         Func<int, IrBinaryOperator> binaryOperator,
@@ -1093,8 +1221,8 @@ internal static class PortableIrGraphCodecProjections
         Func<IrMemberId, int> memberIndex,
         Func<IrTerm?, int> optionalTermIndex,
         Func<IrTerm, int> termIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IrLocation, int, int, int[]?, PortableIrLocation> row)
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
+        Func<IrLocation, int, int, ImmutableArray<int>?, PortableIrLocation> row)
     {
         var projection = GetProjection(LocationProjections, location.Kind);
         var context = new LocationEncodingContext(
@@ -1112,7 +1240,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrMemberId> member,
         Func<int, IrTerm?> optionalTerm,
         Func<int, IrTerm> term,
-        Func<int[], IrTerm[]> terms)
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> terms)
     {
         var projection = GetProjection(LocationProjections, row.Kind);
         var context = new LocationDecodingContext(
@@ -1135,10 +1263,10 @@ internal static class PortableIrGraphCodecProjections
         Func<IrTerm?, int> optionalTermIndex,
         Func<IrHavocKind, int> havocKind,
         Func<IrBlockId, int> blockIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IEnumerable<IrVarId>, int[]> variableIndices,
+        Func<IEnumerable<IrTerm>, ImmutableArray<int>> termIndices,
+        Func<IEnumerable<IrVarId>, ImmutableArray<int>> variableIndices,
         Func<IrLocation, PortableIrLocation> location,
-        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> row)
+        Func<IrInstruction, int, int, int, int, ImmutableArray<int>?, PortableIrLocation?, PortableIrInstruction> row)
     {
         var projection = GetProjection(InstructionProjections, instruction.Kind);
         var context = new InstructionEncodingContext(
@@ -1172,8 +1300,8 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> havocKind,
         Func<int, IrBlockId> blockAt,
         Func<PortableIrLocation?, IrLocation> location,
-        Func<int[], IrTerm[]> terms,
-        Func<int[], IrVarId[]> variables,
+        Func<ImmutableArray<int>, ImmutableArray<IrTerm>> terms,
+        Func<ImmutableArray<int>, ImmutableArray<IrVarId>> variables,
         Func<Exception> invalid)
     {
         var projection = GetProjection(InstructionProjections, row.Kind);
@@ -1197,11 +1325,10 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static PortableIrTerm IntegerRow(IrIntegerTerm value,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+        Func<IrTerm, int, int, int, int, long, string?, ImmutableArray<int>?, PortableIrTerm> row)
     {
         var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
-        result.Bits = value.Width == 0 ? 0 : value.Bits;
-        return result;
+        return result with { Bits = value.Width == 0 ? 0 : value.Bits };
     }
 
     private static IrTerm DecodeOpaque(
@@ -1211,7 +1338,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, int, IrTerm?> optionalTerm,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<int[], int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, ImmutableArray<IrTerm>> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<Exception> invalid)
     {
@@ -1221,9 +1348,9 @@ internal static class PortableIrGraphCodecProjections
         return purity switch
         {
             IrOpaquePurity.Pure when row.D == -1 =>
-                factory.PureOpaque(member(row.A), receiver, arguments),
+                factory.PureOpaqueSnapshot(member(row.A), receiver, arguments),
             IrOpaquePurity.Impure =>
-                factory.ImpureOpaque(operation(row.D), member(row.A), receiver, arguments),
+                factory.ImpureOpaqueSnapshot(operation(row.D), member(row.A), receiver, arguments),
             _ => throw invalid()
         };
     }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -32,7 +33,7 @@ public sealed partial class DotnetApiInventoryTests
     {
         var references = CSharpCompilation.Create("HashSetDomain", references: TestMetadataReferences.Platform);
         var type = references.GetTypeByMetadataName("System.Collections.Generic.HashSet`1")!.Construct(references.GetSpecialType(element));
-        foreach (var name in new[] { "Add", "Contains", "Remove" })
+        foreach (var name in ImmutableArray.Create("Add", "Contains", "Remove"))
         { Assert.That(CSharpOperationSemantics.IsHashSetStateMember(type.GetMembers(name).OfType<IMethodSymbol>().Single()), Is.EqualTo(modeled), name); }
         Assert.That(CSharpOperationSemantics.IsHashSetStateMember(type.GetMembers("Count").OfType<IPropertySymbol>().Single().GetMethod!), Is.True);
     }
@@ -46,7 +47,7 @@ public sealed partial class DotnetApiInventoryTests
     {
         var references = CSharpCompilation.Create("HashSetInterfaceDomain", references: TestMetadataReferences.Platform);
         var type = references.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")!.Construct(references.GetSpecialType(element));
-        foreach (var name in new[] { "Add", "Contains", "Remove" })
+        foreach (var name in ImmutableArray.Create("Add", "Contains", "Remove"))
         { Assert.That(CSharpOperationSemantics.IsHashSetStateMember(type.GetMembers(name).OfType<IMethodSymbol>().Single()), Is.EqualTo(modeled), name); }
         Assert.That(CSharpOperationSemantics.IsHashSetStateMember(type.GetMembers("Count").OfType<IPropertySymbol>().Single().GetMethod!), Is.True);
         Assert.That(TotalLoweringContext.IsHashSetReceiverType(type), Is.True);

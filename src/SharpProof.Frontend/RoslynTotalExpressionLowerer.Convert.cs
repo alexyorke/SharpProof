@@ -18,9 +18,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
         // Beforefieldinit does not establish a warmed Convert/DBNull singleton.
         // Its initialization can allocate, store static state, synchronize or
         // fail, but cannot reach caller objects through these scalar arguments.
-        var member = OpaqueCallMember(invocation.TargetMethod, [argument], _factory.BooleanType, out var display);
-        _builder.Call(effects, _context.OpaqueCallSite(invocation, IrOpaqueCallEffects.All & ~IrOpaqueCallEffects.Writes,
-            display + ":primitive-runtime-initialization"), null, member, null, [argument]);
+        var arguments = ImmutableArray.Create(argument);
+        var member = OpaqueCallMember(invocation.TargetMethod, arguments, _factory.BooleanType, out var display);
+        _builder.CallSnapshot(effects, _context.OpaqueCallSite(invocation, IrOpaqueCallEffects.All & ~IrOpaqueCallEffects.Writes,
+            display + ":primitive-runtime-initialization"), null, member, null, arguments);
         _builder.Write(effects, site, IrWriteRegion.Static);
         _builder.Allocate(effects, site, _factory.ObjectType);
         _builder.Goto(effects, site, initialized);
@@ -43,8 +44,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         // The managed overflow helper resolves resources through user culture
         // code, which can mutate caller memory or throw before OverflowException.
         var effects = IrOpaqueCallSite.WithCapabilities(IrOpaqueCallEffects.All | IrOpaqueCallEffects.ReadsAmbient, int.MaxValue);
-        var member = OpaqueCallMember(invocation.TargetMethod, [argument], _factory.BooleanType, out var display);
-        _builder.Call(invalid, _context.OpaqueCallSite(invocation, effects, display + ":overflow-resource"), null, member, null, [argument]);
+        var arguments = ImmutableArray.Create(argument);
+        var member = OpaqueCallMember(invocation.TargetMethod, arguments, _factory.BooleanType, out var display);
+        _builder.CallSnapshot(invalid, _context.OpaqueCallSite(invocation, effects, display + ":overflow-resource"), null, member, null, arguments);
         var source = _factory.GetOperationInfo(site).SourceSpan;
         var ancillary = _factory.CreateOperation("framework-integral-convert-overflow-ancillary", source);
         var mayThrow = _context.Temporary(_factory.BooleanType);

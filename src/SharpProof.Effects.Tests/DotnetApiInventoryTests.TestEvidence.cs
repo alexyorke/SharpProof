@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -8,12 +9,13 @@ namespace SharpProof.Effects.Test;
 public sealed partial class DotnetApiInventoryTests
 {
     private static readonly string IntrinsicEvidenceTest = typeof(DotnetApiInventoryTests).FullName + "." + nameof(PinnedFrameworkApiSurfaceAndSupportEvidenceMatchReviewedBaseline);
-    private static readonly (string? Left, string? Right)[] EqualityEdges = [("same", "same"), ("left", "right"), ("", ""), (null, null), (null, "value"), ("value", null), ("a\0b", "a\0b"), ("\u00e9", "e")];
-    private static void WriteIntrinsicTestEvidence(string root, CSharpCompilation compilation, DotnetApiInventory.Row[] inventory)
+    private static readonly ImmutableArray<(string? Left, string? Right)> EqualityEdges = [("same", "same"), ("left", "right"), ("", ""), (null, null), (null, "value"), ("value", null), ("a\0b", "a\0b"), ("\u00e9", "e")];
+    private static void WriteIntrinsicTestEvidence(string root, CSharpCompilation compilation, ImmutableArray<DotnetApiInventory.Row> inventory)
     {
         global::System.ArgumentNullException.ThrowIfNull(root);
         global::System.ArgumentNullException.ThrowIfNull(compilation);
-        global::System.ArgumentNullException.ThrowIfNull(inventory);
+        if (inventory.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(inventory)); }
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
             if (row.Evidence.Contains("intrinsic=guarded-exception-message-construction", StringComparison.Ordinal))
@@ -183,7 +185,7 @@ public sealed partial class DotnetApiInventoryTests
                 _ => (bool?)null
             };
             return instance.HasValue ? ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "equal, unequal, empty, null receiver/argument, embedded null, ordinal Unicode; compiled lowering and IR evaluation versus runtime", () => CheckEqualityIntrinsic(compilation, instance.Value, false), () => CheckEqualityIntrinsic(compilation, instance.Value, true)) : new ApiTestEvidence.Row(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "", "missing", "No behavioral probe registered for this intrinsic.");
-        }).ToArray();
+        }).ToImmutableArray();
         ApiTestEvidence.Write(root, "intrinsic-test-evidence", rows);
         Assert.That(rows, Is.Not.Empty);
         Assert.That(rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status != "passed")).Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api + ": " + row.Detail)), Is.Empty, "Every inventoried intrinsic needs passing behavioral evidence; see intrinsic-test-evidence.md.");
@@ -204,13 +206,12 @@ public sealed partial class DotnetApiInventoryTests
         if (!lowered.Classification.IsExact)
         { return false; }
         object first = new object(), second = new object();
-        foreach (var (left, right) in new (object? Left, object? Right)[] { (null, null), (null, first), (first, null), (first, first), (first, second) })
+        foreach (var (left, right) in ImmutableArray.Create<(object? Left, object? Right)>((null, null), (null, first), (first, null), (first, first), (first, second)))
         {
-            var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-            {
-                [context.Parameters[0].Current] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left),
-                [context.Parameters[1].Current] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right)
-            };
+            var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+            inputBuilder[context.Parameters[0].Current] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left);
+            inputBuilder[context.Parameters[1].Current] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right);
+            var inputs = inputBuilder.ToImmutable();
             var interpreter = new IrInterpreter(factory);
             if (interpreter.Evaluate(lowered.SafeCondition, inputs).Value?.Boolean != true ||
                 interpreter.Evaluate(lowered.Value, inputs).Value?.Boolean != (object.ReferenceEquals(left, right) ^ wrongClaim))

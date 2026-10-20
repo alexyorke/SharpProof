@@ -45,7 +45,7 @@ public sealed class DiscardedDelegateAllocationTests
             "System.Runtime.CompilerServices.MethodImplOptions.NoInlining | " +
             "System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static object Target(int value) { " + body + " } }";
-        var compilation = TestCompilation.Create("DiscardedDelegateOracle", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("DiscardedDelegateOracle", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(
             release ? OptimizationLevel.Release : OptimizationLevel.Debug));
         using var image = new MemoryStream();

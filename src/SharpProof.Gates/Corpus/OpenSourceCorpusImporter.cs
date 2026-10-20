@@ -13,10 +13,10 @@ namespace SharpProof.Gates.Corpus;
 
 internal sealed record OpenSourceCorpusImportPlan(
     OpenSourceCorpusDocument Document,
-    CorpusFileUpdate[] Updates)
+    ImmutableArray<CorpusFileUpdate> Updates)
 {
     public OpenSourceCorpusDocument Document { get; init; } = Document ?? throw new System.ArgumentNullException(nameof(Document));
-    public CorpusFileUpdate[] Updates { get; init; } = Updates ?? throw new System.ArgumentNullException(nameof(Updates));
+    public ImmutableArray<CorpusFileUpdate> Updates { get; init; } = Updates.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Updates)) : Updates;
 }
 
 internal static class OpenSourceCorpusImporter
@@ -140,12 +140,12 @@ SOFTWARE.
 
         var licenseText = OpenSourceCorpusCatalog.NormalizeLineEndings(
             Encoding.UTF8.GetString(
-                await ReadGitBlobAsync(
+                (await ReadGitBlobAsync(
                         resolvedUpstreamRoot,
                         commit,
                         "LICENSE",
                         cancellationToken)
-                    .ConfigureAwait(false)));
+                    .ConfigureAwait(false)).AsSpan()));
         ValidateReviewedMitLicense(licenseText);
 
         var (files, candidates) = await DiscoverSourcesAsync(
@@ -167,7 +167,7 @@ SOFTWARE.
             ? licenseText
             : licenseText + "\n";
         var licenseHash = HashEncoding.ComputeSha256Hex(
-            Encoding.UTF8.GetBytes(licenseContent));
+            (Encoding.UTF8.GetBytes(licenseContent)).ToImmutableArray());
         var source = new OpenSourceCorpusSource(
             SourceId,
             RepositoryUrl,
@@ -220,7 +220,7 @@ SOFTWARE.
             .Where(static method =>
                 method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Unspecified))
             .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))
-            .ToArray();
+            .ToImmutableArray();
         if (unreviewedMethods.Length != 0)
         {
             throw new InvalidDataException(
@@ -274,10 +274,9 @@ SOFTWARE.
     {
         System.ArgumentNullException.ThrowIfNull(commit);
         System.ArgumentNullException.ThrowIfNull(upstreamRoot);
-        var sourceRoots = new[] {
+        var sourceRoots = ImmutableArray.Create(
             Path.Combine(upstreamRoot, "Algorithms"),
-            Path.Combine(upstreamRoot, "DataStructures")
-        };
+            Path.Combine(upstreamRoot, "DataStructures"));
         foreach (var sourceRoot in sourceRoots)
         {
             if (!Directory.Exists(sourceRoot))
@@ -289,7 +288,7 @@ SOFTWARE.
 
         var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
-        var declarationHashes = new HashSet<string>(StringComparer.Ordinal);
+        var declarationHashes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
                 ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
@@ -302,12 +301,12 @@ SOFTWARE.
         {
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 Encoding.UTF8.GetString(
-                    await ReadGitBlobAsync(
+                    (await ReadGitBlobAsync(
                             upstreamRoot,
                             commit,
                             relativePath,
                             cancellationToken)
-                        .ConfigureAwait(false)));
+                        .ConfigureAwait(false)).AsSpan()));
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
@@ -333,11 +332,12 @@ SOFTWARE.
                     OpenSourceCorpusCatalog.GetDeclaration(method);
                 var hash =
                     OpenSourceCorpusCatalog.ComputeNormalizedSha256(declaration);
-                if (!declarationHashes.Add(hash))
+                if (declarationHashes.Contains(hash))
                 {
                     continue;
                 }
 
+                declarationHashes.Add(hash);
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
@@ -377,6 +377,14 @@ SOFTWARE.
             .OrderBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
             .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()))
             .ToImmutableArray();
+        ValidateCapacity(count);
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1512:Use ArgumentOutOfRangeException throw helper",
+            Justification = "Preserve the former builder's capacity exception without an ActualValue.")]
+        static void ValidateCapacity(int capacity)
+        {
+            if (capacity < 0)
+            { throw new ArgumentOutOfRangeException(nameof(capacity)); }
+        }
         var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
         for (var offset = 0; selected.Count < count; offset++)
         {
@@ -423,17 +431,19 @@ SOFTWARE.
 
     internal static async Task<string> ReadGitAsync(
         string workingDirectory,
-        IReadOnlyList<string> arguments,
+        ImmutableArray<string> arguments,
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        System.ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(gitExecutable);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = GateProcess.CreateCaptured(
             gitExecutable,
             workingDirectory);
-        foreach (var argument in arguments)
+        var capturedArguments = arguments;
+        foreach (var argument in capturedArguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -445,13 +455,13 @@ SOFTWARE.
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"git {string.Join(" ", arguments)} failed: {result.Error.Trim()}");
+                $"git {string.Join(" ", capturedArguments)} failed: {result.Error.Trim()}");
         }
 
         return result.Output.Trim();
     }
 
-    internal static async Task<byte[]> ReadGitBlobAsync(
+    internal static async Task<ImmutableArray<byte>> ReadGitBlobAsync(
         string workingDirectory,
         string commit,
         string relativePath,
@@ -513,7 +523,7 @@ SOFTWARE.
                 $"git cat-file blob {commit}:{relativePath} failed: {error}");
         }
 
-        return output.ToArray();
+        return ImmutableArray.Create<byte>(output.GetBuffer().AsSpan(0, checked((int)output.Length)));
     }
 
     internal static string NormalizeRepositoryUrl(string value)

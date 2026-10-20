@@ -39,7 +39,7 @@ internal sealed class ContractApiPayloadPolicy
             return false;
         }
 
-        var matches = new List<PortableExecutableReference>();
+        var matches = ImmutableArray.CreateBuilder<PortableExecutableReference>();
         foreach (var reference in compilation.References)
         {
             if (!SymbolEqualityComparer.Default.Equals(
@@ -60,7 +60,7 @@ internal sealed class ContractApiPayloadPolicy
         }
 
         var trusted = true;
-        foreach (var match in matches)
+        foreach (var match in matches.ToImmutable())
         {
             var current = match.FilePath is { Length: > 0 } path
                 ? MatchesBoundFilePayload(path, match, out var currentReason)

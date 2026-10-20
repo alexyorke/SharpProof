@@ -7,20 +7,22 @@ $validator = Join-Path $PSScriptRoot 'Test-SharpProofThirdPartyInventory.ps1'
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-inventory-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($temporary) | Out-Null
 $inventoryPath = Join-Path $temporary 'inventory.json'
-$nativeBytes = [Text.Encoding]::UTF8.GetBytes('synthetic-native-payload')
-$nativeDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($nativeBytes)).ToLowerInvariant()
+$nativeBytes = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes('synthetic-native-payload'))
+$nativeDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@($nativeBytes))).ToLowerInvariant()
 
-function New-FixturePackage([string]$Id, [hashtable]$Files) {
+function New-FixturePackage([string]$Id, [Collections.IDictionary]$Files) {
     $path = Join-Path $temporary "$Id.1.0.0.nupkg"
     if ([IO.File]::Exists($path)) { [IO.File]::Delete($path) }
     $archive = [IO.Compression.ZipFile]::Open($path, [IO.Compression.ZipArchiveMode]::Create)
     try {
         $metadata = '<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"><metadata><id>' + $Id + '</id><version>1.0.0</version></metadata></package>'
-        $contents = @{ "$Id.nuspec" = [Text.Encoding]::UTF8.GetBytes($metadata) }
-        foreach ($name in $Files.Keys) { $contents[$name] = $Files[$name] }
+        $contentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+        $contentBuilder.Add("$Id.nuspec", [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes($metadata)))
+        foreach ($name in $Files.Keys) { $contentBuilder[$name] = $Files[$name] }
+        $contents = $contentBuilder.ToImmutable()
         foreach ($name in $contents.Keys) {
             $stream = $archive.CreateEntry($name).Open()
-            try { $stream.Write([byte[]]$contents[$name]) }
+            try { $stream.Write([byte[]]@($contents[$name])) }
             finally { $stream.Dispose() }
         }
     }
@@ -56,7 +58,10 @@ function Assert-Rejected([hashtable]$Inventory, [string]$Expected) {
 try {
     New-FixturePackage 'SharpProof' @{}
     New-FixturePackage 'SharpProof.Attributes' @{ 'lib/SharpProof.Attributes.dll' = $nativeBytes }
-    $verifierFiles = @{ 'tools/Vendor.dll' = $nativeBytes; 'tools/native/win-x64/libz3.dll' = $nativeBytes; 'tools/SharpProof.Worker.dll' = $nativeBytes }
+    $verifierFiles = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+    $verifierFiles.Add('tools/Vendor.dll', $nativeBytes)
+    $verifierFiles.Add('tools/native/win-x64/libz3.dll', $nativeBytes)
+    $verifierFiles.Add('tools/SharpProof.Worker.dll', $nativeBytes)
     New-FixturePackage 'SharpProof.Verifier' $verifierFiles
     $valid = New-FixtureInventory
     $valid | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $inventoryPath -Encoding utf8NoBOM

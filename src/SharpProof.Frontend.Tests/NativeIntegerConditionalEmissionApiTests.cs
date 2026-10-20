@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -20,7 +21,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
 
     // SP-NATIVE-CONDITIONAL-001. Frozen before production changes at f1195945502a9393621576f4fc305513e9dbf840.
     // Roslyn's TypeDefinitions_FromSource fixture emits the same minimal core-library family:
@@ -101,7 +102,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         Assert.That(compilation.Options.OutputKind, Is.EqualTo(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames,
-            Is.EqualTo(enabled ? EnabledSymbols : Array.Empty<string>()));
+            Is.EqualTo(enabled ? EnabledSymbols : ImmutableArray<string>.Empty));
         Assert.That(method.IsConditional, Is.True);
         Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(method.OriginalDefinition, Is.SameAs(method));
@@ -184,7 +185,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         var runtime = new AssemblyLoadContext("FrameworkConditionalControl", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(bytes);
+            using var image = new MemoryStream(bytes.ToArray(), writable: false);
             var subject = runtime.LoadFromStream(image).GetType("Subject")!;
             Assert.That(subject.GetMethod("Target")!.Invoke(null, null), Is.EqualTo(enabled ? 8 : 7));
         }
@@ -207,25 +208,25 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         return compilation;
     }
 
-    private static byte[] Emit(CSharpCompilation compilation)
+    private static ImmutableArray<byte> Emit(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        return image.ToArray();
+        return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 
-    private static string[] TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
-        var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
-        var calls = new List<string>();
+        var il = (pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
+        var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
             ushort value = il[offset++];
@@ -238,13 +239,13 @@ public sealed class NativeIntegerConditionalEmissionApiTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
             if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt)
             {
-                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il, offset));
+                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il.AsSpan(offset..)));
                 var name = handle.Kind == HandleKind.MethodDefinition
                     ? metadata.GetString(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).Name)
                     : metadata.GetString(metadata.GetMemberReference((MemberReferenceHandle)handle).Name);
@@ -253,13 +254,13 @@ public sealed class NativeIntegerConditionalEmissionApiTests
             }
             offset += size;
         }
-        return [.. calls];
+        return calls.ToImmutable();
     }
 
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

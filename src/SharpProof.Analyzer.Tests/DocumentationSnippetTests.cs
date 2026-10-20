@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
@@ -30,7 +31,7 @@ internal sealed class DocumentationSnippetTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(
             errors,
@@ -44,7 +45,7 @@ internal sealed class DocumentationSnippetTests
     private static IEnumerable<TestCaseData> GetCSharpSnippets()
     {
         var root = TestRepository.FindRoot();
-        var paths = new[] { Path.Combine(root, "README.md") }
+        var paths = ImmutableArray.Create(Path.Combine(root, "README.md"))
             .Concat(Directory.EnumerateFiles(
                 Path.Combine(root, "docs"),
                 "*.md",

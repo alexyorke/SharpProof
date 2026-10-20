@@ -46,7 +46,7 @@ internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> 
 }
 internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrVarId> variables) : IAbstractDomain<CoreIrAdvisoryState>
 {
-    private IrFactory _guarded_factory = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : factory ?? throw new System.ArgumentNullException(nameof(factory));
+    private readonly IrFactory _guarded_factory = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : factory ?? throw new System.ArgumentNullException(nameof(factory));
     internal IntervalValue Range(IrVarId variable)
     {
         RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
@@ -182,13 +182,13 @@ internal sealed class CoreIrAdvisoryInterpreter
     private readonly IrFactory _factory;
     private readonly CoreIrAdvisoryDomain _domain;
     private readonly ImmutableArray<IrVarId> _variables;
-    private readonly HashSet<string> _gaps = [];
+    private ImmutableHashSet<string>.Builder _gaps = ImmutableHashSet.CreateBuilder<string>();
     private CancellationToken _token;
     private int _termWorkRemaining;
     private bool _termBudgetExceeded;
     private bool _activeTransferHasGap;
-    private Dictionary<IrInstructionId, IrAssignInstruction>? _markerSites;
-    private List<CoreIrAdvisoryMarkerSnapshot>? _markerSnapshots;
+    private ImmutableDictionary<IrInstructionId, IrAssignInstruction>? _markerSites;
+    private ImmutableArray<CoreIrAdvisoryMarkerSnapshot>.Builder? _markerSnapshots;
     internal const int DefaultMaximumIterations = 1000;
     internal const int DefaultMaximumTermWork = 65536;
     internal const int DefaultMaximumSyntheticEdges = 8192;
@@ -220,7 +220,7 @@ internal sealed class CoreIrAdvisoryInterpreter
         initial = RepositoryParameterGuard.NotNull(initial, nameof(initial));
         _token = token;
         token.ThrowIfCancellationRequested();
-        _gaps.Clear();
+        _gaps = ImmutableHashSet.CreateBuilder<string>();
         _markerSites = null;
         _markerSnapshots = null;
         if (_factory.Semantics != IrExecutionSemantics.Total || _program.Blocks.Length > 4096)
@@ -245,28 +245,30 @@ internal sealed class CoreIrAdvisoryInterpreter
         }
         // Roslyn lowering keeps a detached structural exceptional exit. Only
         // unsupported flow reachable from the actual entry blocks admission.
-        var reachable = new HashSet<IrBlockId>();
-        var pending = new Stack<IrBlockId>();
-        pending.Push(_program.Entry);
-        while (pending.Count != 0)
+        var reachable = ImmutableHashSet.CreateBuilder<IrBlockId>();
+        var pending = ImmutableStack<IrBlockId>.Empty;
+        pending = pending.Push(_program.Entry);
+        while (!pending.IsEmpty)
         {
             _token.ThrowIfCancellationRequested();
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!reachable.Add(current))
             {
                 continue;
             }
+
             switch (_program.GetBlock(current).Terminator)
             {
                 case IrGotoInstruction go:
-                    pending.Push(go.Target);
+                    pending = pending.Push(go.Target);
                     break;
                 case IrBranchInstruction branch:
-                    pending.Push(branch.WhenTrue);
-                    pending.Push(branch.WhenFalse);
+                    pending = pending.Push(branch.WhenTrue);
+                    pending = pending.Push(branch.WhenFalse);
                     break;
                 case IrThrowInstruction thrown:
-                    pending.Push(thrown.Target);
+                    pending = pending.Push(thrown.Target);
                     break;
             }
         }
@@ -314,8 +316,8 @@ internal sealed class CoreIrAdvisoryInterpreter
             {
                 return Incomplete("marker budget");
             }
-            var owned = _program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().ToDictionary(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id));
-            var selected = new Dictionary<IrInstructionId, IrAssignInstruction>();
+            var owned = ImmutableDictionaryCapture.Create(_program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>(), assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id), assign => assign ?? throw new ArgumentNullException(nameof(assign)));
+            var selected = ImmutableDictionary.CreateBuilder<IrInstructionId, IrAssignInstruction>();
             foreach (var marker in markers)
             {
                 _token.ThrowIfCancellationRequested();
@@ -326,11 +328,11 @@ internal sealed class CoreIrAdvisoryInterpreter
                 }
                 selected.Add(marker.Id, marker);
             }
-            _markerSites = selected;
+            _markerSites = selected.ToImmutable();
         }
-        var ids = _program.Blocks.Select((b, i) => b is null ? throw new System.ArgumentNullException(nameof(b)) : ((b.Id, i))).ToDictionary(p => p.Id, p => p.i);
-        var blocks = new List<DataflowBlock<CoreIrAdvisoryState>>();
-        var edges = new List<DataflowEdge>();
+        var ids = ImmutableDictionaryCapture.Create(_program.Blocks.Select((b, i) => b is null ? throw new System.ArgumentNullException(nameof(b)) : ((b.Id, i))), p => p.Id, p => p.i);
+        var blocks = ImmutableArray.CreateBuilder<DataflowBlock<CoreIrAdvisoryState>>();
+        var edges = ImmutableArray.CreateBuilder<DataflowEdge>();
         foreach (var block in _program.Blocks)
         {
             blocks.Add(new(ids[block.Id], state => { state = RepositoryParameterGuard.NotNull(state, nameof(state)); _token.ThrowIfCancellationRequested(); return Transfer(block, state); }));
@@ -347,7 +349,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             }
             else if (last is IrBranchInstruction branch)
             {
-                foreach (var (target, truth) in new[] { (branch.WhenTrue, true), (branch.WhenFalse, false) })
+                foreach (var (target, truth) in ImmutableArray.Create((branch.WhenTrue, true), (branch.WhenFalse, false)))
                 {
                     _token.ThrowIfCancellationRequested();
                     if (blocks.Count - _program.Blocks.Length >= maximumSyntheticEdges)
@@ -367,13 +369,13 @@ internal sealed class CoreIrAdvisoryInterpreter
                 edges.Add(new(from, ids[thrown.Target]));
             }
         }
-        if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks, edges, ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(maxIterations: maxIterations)))
+        if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks.ToImmutable(), edges.ToImmutable(), ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(maxIterations: maxIterations)))
         {
             return Incomplete(_termBudgetExceeded ? "aggregate term work budget" : failure == DataflowAnalysisFailure.NonmonotoneTransfer ? "nonmonotone transfer" : "iteration limit");
         }
         if (_markerSites != null)
         {
-            _markerSnapshots = [];
+            _markerSnapshots = ImmutableArray.CreateBuilder<CoreIrAdvisoryMarkerSnapshot>();
             try
             {
                 for (var ordinal = 0; ordinal < _program.Blocks.Length; ordinal++)
@@ -388,16 +390,16 @@ internal sealed class CoreIrAdvisoryInterpreter
                 return Incomplete("aggregate term work budget");
             }
         }
-        return new(result!.InputStates, result.OutputStates, [.. _gaps.OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], result.Iterations)
+        return new(result!.InputStates, result.OutputStates, [.. _gaps.ToImmutable().OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], result.Iterations)
         {
-            Markers = _markerSnapshots == null ? [] : [.. _markerSnapshots]
+            Markers = _markerSnapshots == null ? [] : _markerSnapshots.ToImmutable()
         };
     }
     private CoreIrAdvisoryResult Incomplete(string reason)
     {
         reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
         AddGap(reason);
-        return new([], [], [.. _gaps.OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], 0, Accepted: false);
+        return new([], [], [.. _gaps.ToImmutable().OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], 0, Accepted: false);
     }
     private void AddGap(string reason)
     {
@@ -433,14 +435,15 @@ internal sealed class CoreIrAdvisoryInterpreter
     private static bool ReadsVariable(IrTerm term, IrVarId variable)
     {
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        var pending = new Stack<IrTerm>();
-        pending.Push(term);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IrTerm>.Empty;
+        pending = pending.Push(term);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is IrVariableTerm read && read.Variable == variable)
             { return true; }
-            IrTraversal.PushChildren(current, pending);
+            pending = IrTraversal.PushChildren(current, pending);
         }
         return false;
     }
@@ -448,13 +451,14 @@ internal sealed class CoreIrAdvisoryInterpreter
     {
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        var origins = state.Origins.Remove(target);
+        var origins = state.Origins.ToBuilder();
+        origins.Remove(target);
         foreach (var pair in state.Origins)
         {
             if (ReadsVariable(pair.Value, target))
-            { origins = origins.Remove(pair.Key); }
+            { origins.Remove(pair.Key); }
         }
-        return state with { Origins = origins };
+        return state with { Origins = origins.ToImmutable() };
     }
     private static CoreIrAdvisoryState CaptureOrigin(CoreIrAdvisoryState state, IrVarId target, IrTerm value)
     {
@@ -798,9 +802,10 @@ internal sealed class CoreIrAdvisoryInterpreter
             {
                 var empty = truth == expectedEmpty;
                 var aliasVariable = lengthSequence.Variable;
-                var seen = new HashSet<IrVarId>();
+                var seen = ImmutableHashSet.CreateBuilder<IrVarId>();
                 while (seen.Add(aliasVariable))
                 {
+
                     var card = SequenceCardinalityDomain.Instance.Create(empty ? SequenceCardinalityKind.Empty : SequenceCardinalityKind.NonEmpty, CoreIrAdvisoryDomain.GetCard(state, aliasVariable).Length);
                     state = _domain.SetReference(state, aliasVariable, CoreIrAdvisoryDomain.GetNull(state, aliasVariable), card);
                     if (!state.Reachable || !state.Origins.TryGetValue(aliasVariable, out var alias) || alias is not IrVariableTerm source)
@@ -835,9 +840,10 @@ internal sealed class CoreIrAdvisoryInterpreter
 
             // Follow live source aliases only for call diagnostics; other summaries keep their established abstraction.
             var aliasVariable = variable.Variable;
-            var seen = new HashSet<IrVarId>();
+            var seen = ImmutableHashSet.CreateBuilder<IrVarId>();
             while (seen.Add(aliasVariable))
             {
+
                 var value = _domain.Get(state, aliasVariable);
                 value = op switch { IrBinaryOperator.LessThan => bound == long.MinValue ? IntervalValue.Bottom : intervals.AssumeAtMost(value, bound - 1), IrBinaryOperator.LessThanOrEqual => intervals.AssumeAtMost(value, bound), IrBinaryOperator.GreaterThan => bound == long.MaxValue ? IntervalValue.Bottom : intervals.AssumeAtLeast(value, bound + 1), IrBinaryOperator.GreaterThanOrEqual => intervals.AssumeAtLeast(value, bound), IrBinaryOperator.Equal => intervals.AssumeAtMost(intervals.AssumeAtLeast(value, bound), bound), _ => value };
                 state = _domain.Set(state, aliasVariable, value);
@@ -853,10 +859,14 @@ internal sealed class CoreIrAdvisoryInterpreter
     {
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        var seen = new HashSet<IrVarId>();
-        while (term is IrVariableTerm variable && seen.Add(variable.Variable) &&
-            state.Origins.TryGetValue(variable.Variable, out var origin))
-        { term = origin; }
+        var seen = ImmutableHashSet.CreateBuilder<IrVarId>();
+        while (term is IrVariableTerm variable && seen.Add(variable.Variable))
+        {
+
+            if (!state.Origins.TryGetValue(variable.Variable, out var origin))
+            { break; }
+            term = origin;
+        }
         return term;
     }
 }

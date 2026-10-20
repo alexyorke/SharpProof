@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -18,7 +19,7 @@ public sealed class BoundedReadStreamTests
         var buffer = new byte[5];
 
         Assert.That(await ReadAsyncOrSync(bounded, buffer, 1, 4, asynchronous), Is.EqualTo(2));
-        Assert.That(buffer, Is.EqualTo(new byte[] { 0, 10, 20, 0, 0 }));
+        Assert.That(buffer, Is.EqualTo(ImmutableArray.Create<byte>(0, 10, 20, 0, 0)));
         Assert.That(inner.Position, Is.EqualTo(2));
         Assert.That(await ReadAsyncOrSync(bounded, buffer, 0, 0, asynchronous), Is.Zero);
         Assert.That(inner.Position, Is.EqualTo(2), "zero-length reads must not consume the overflow byte");

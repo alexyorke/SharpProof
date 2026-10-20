@@ -4,12 +4,6 @@ internal static class EffectSummaryOperations
 {
     private static EffectSummaryDomain Domain => EffectSummaryDomain.Instance;
 
-    internal static EffectSummary Join(params EffectSummary[] summaries)
-    {
-        summaries = RepositoryParameterGuard.NotNull(summaries, nameof(summaries));
-        return JoinFrom(EffectSummary.Bottom, summaries);
-    }
-
     internal static EffectSummary Join(EffectSummary first, EffectSummary second)
     {
         first = RepositoryParameterGuard.NotNull(first, nameof(first));
@@ -213,8 +207,7 @@ internal static class EffectSummaryOperations
         }
 
         RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
-        var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>(
-            regions.Regions.Length);
+        var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>();
         var hasUnknown = false;
         foreach (var region in regions.Regions)
         {

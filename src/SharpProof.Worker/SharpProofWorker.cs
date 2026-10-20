@@ -89,8 +89,8 @@ internal sealed class SharpProofWorker : IDisposable
         }
 
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        CompilerCallablePreparation[]? interruptedTargets = null;
-        CallableVerificationResult[]? interruptedResults = null;
+        ImmutableArray<CompilerCallablePreparation> interruptedTargets = default;
+        ImmutableArray<CallableVerificationResult>.Builder? interruptedResults = null;
         using var projectBoundary =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
@@ -118,13 +118,18 @@ internal sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null)
         {
             var canceled = cancellationToken.IsCancellationRequested;
-            if (input != null && interruptedTargets != null && interruptedResults != null)
+            if (input != null && !interruptedTargets.IsDefault && interruptedResults != null)
             {
                 // Lanes have settled before this projection. Keep their validated
                 // publications and synthesize interruption results only for work not started.
-                var settled = interruptedTargets.Select((target, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (target is null ? throw new System.ArgumentNullException(nameof(target)) : (interruptedResults[index] ?? Unknown(target,
+                ImmutableArray<CallableVerificationResult> publishedResults;
+                lock (interruptedResults)
+                {
+                    publishedResults = interruptedResults.ToImmutable();
+                }
+                var settled = interruptedTargets.Select((target, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (target is null ? throw new System.ArgumentNullException(nameof(target)) : (publishedResults[index] ?? Unknown(target,
                     canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
-                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout))))).ToArray();
+                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout))))).ToImmutableArray();
                 var projected = ProjectResults(settled);
                 var run = WorkerResultAssembler.Classify(projected.Callables, projected.Claims);
                 return WorkerResultAssembler.Create(input.InputHash, input.CompilerManifest.Manifest,
@@ -151,7 +156,8 @@ internal sealed class SharpProofWorker : IDisposable
             return Interrupted();
         }
         WorkerInputSnapshot snapshot;
-        VerificationLane[] solverLanes = [];
+        ImmutableArray<VerificationLane> solverLanes = [];
+        var laneRenewalGate = new object();
         var ownsInjectedBackendRunGate = false;
         var authoritativeResponseCompleted = false;
         try
@@ -273,7 +279,7 @@ internal sealed class SharpProofWorker : IDisposable
             }
             ThrowIfProjectInterrupted();
             var orderedTargets = targets.OrderBy(
-                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToArray();
+                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToImmutableArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
                 CountSolverTargets(orderedTargets),
@@ -299,15 +305,19 @@ internal sealed class SharpProofWorker : IDisposable
                         ? WorkerClaimReason.BackendUnavailable
                         : WorkerClaimReason.InfrastructureFailure);
             }
-            var results = new CallableVerificationResult[orderedTargets.Length];
+            var results = ImmutableArray.CreateBuilder<CallableVerificationResult>(orderedTargets.Length);
+            results.Count = orderedTargets.Length;
             interruptedTargets = orderedTargets;
             interruptedResults = results;
             for (var index = 0; index < orderedTargets.Length; index++)
             {
                 if (!CanVerifyTarget(orderedTargets[index]))
                 {
-                    results[index] = CallableVerificationPolicy.FailedLowering(
-                        orderedTargets[index], projectBoundary.Token);
+                    lock (results)
+                    {
+                        results[index] = CallableVerificationPolicy.FailedLowering(
+                            orderedTargets[index], projectBoundary.Token);
+                    }
                 }
             }
             var scheduler = new VerificationTargetScheduler(orderedTargets.Length);
@@ -325,12 +335,15 @@ internal sealed class SharpProofWorker : IDisposable
                     var result = await VerifyNativeTargetAsync(lane.Backend, orderedTargets[index], request.Budgets,
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
                         projectBoundary, cancellationToken).ConfigureAwait(false);
-                    results[index] = result;
+                    lock (results)
+                    {
+                        results[index] = result;
+                    }
                     if (result.Callable.Reason ==
                             WorkerCallableCoverageReason.MethodTimeout &&
                         !projectBoundary.IsCancellationRequested)
                     {
-                        var renewal = lane.Renew(solverLanes);
+                        var renewal = lane.Renew(solverLanes, laneRenewalGate);
                         if (renewal != LaneRenewalResult.Success)
                         {
                             if (renewal == LaneRenewalResult.Unsupported && _backend != null)
@@ -362,19 +375,27 @@ internal sealed class SharpProofWorker : IDisposable
             ThrowIfProjectInterrupted();
 
             var (completedRetirementCallableReason, completedRetirementClaimReason) = scheduler.SnapshotRetirement();
-            for (var index = 0; index < results.Length; index++)
+            for (var index = 0; index < results.Count; index++)
             {
                 ThrowIfProjectInterrupted();
-                if (results[index] == null)
+                lock (results)
                 {
-                    results[index] = Unknown(
-                        orderedTargets[index],
-                        completedRetirementClaimReason,
-                        completedRetirementCallableReason);
+                    if (results[index] == null)
+                    {
+                        results[index] = Unknown(
+                            orderedTargets[index],
+                            completedRetirementClaimReason,
+                            completedRetirementCallableReason);
+                    }
                 }
             }
 
-            var projected = ProjectResults(results);
+            ImmutableArray<CallableVerificationResult> completedResults;
+            lock (results)
+            {
+                completedResults = results.ToImmutable();
+            }
+            var projected = ProjectResults(completedResults);
             var callableResults = projected.Callables;
             var claimResults = projected.Claims;
             ThrowIfProjectInterrupted();
@@ -505,7 +526,7 @@ internal sealed class SharpProofWorker : IDisposable
         };
     }
 
-    private static WorkerProtocolError[] Error(string code, string message)
+    private static ImmutableArray<WorkerProtocolError> Error(string code, string message)
     {
         System.ArgumentNullException.ThrowIfNull(code);
         System.ArgumentNullException.ThrowIfNull(message);
@@ -530,7 +551,7 @@ internal sealed class SharpProofWorker : IDisposable
     private LaneCreationResult TryCreateLanes(
         WorkerBudgets budgets,
         int targetCount,
-        out VerificationLane[] lanes, out string? error)
+        out ImmutableArray<VerificationLane> lanes, out string? error)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         lanes = [];
@@ -551,7 +572,7 @@ internal sealed class SharpProofWorker : IDisposable
                 _readConsumedResourceCount)];
             return LaneCreationResult.Success;
         }
-        var created = new List<VerificationLane>();
+        var created = ImmutableArray.CreateBuilder<VerificationLane>();
         try
         {
             var backendFactory = _backendFactory ??
@@ -568,7 +589,7 @@ internal sealed class SharpProofWorker : IDisposable
                 created.Add(new VerificationLane(backend,
                     backend as IDisposable, _backendFactory));
             }
-            lanes = [.. created];
+            lanes = created.ToImmutable();
             return LaneCreationResult.Success;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and
@@ -619,30 +640,29 @@ internal sealed class SharpProofWorker : IDisposable
         return (malformed, false);
     }
 
-    internal static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
+    internal static (ImmutableArray<WorkerCallableResult> Callables, ImmutableArray<WorkerClaimResult> Claims)
         ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
     {
 
         RepositoryParameterGuard.RequireInitialized(targets.IsDefault, nameof(targets), "Array must be initialized.");
         var malformed = targets.Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (Unknown(target, WorkerClaimReason.InfrastructureFailure,
-            WorkerCallableCoverageReason.MissingClaimResult))).ToArray();
+            WorkerCallableCoverageReason.MissingClaimResult))).ToImmutableArray();
         return ProjectResults(malformed);
     }
 
-    private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
-        ProjectResults(CallableVerificationResult[] results)
+    private static (ImmutableArray<WorkerCallableResult> Callables, ImmutableArray<WorkerClaimResult> Claims)
+        ProjectResults(ImmutableArray<CallableVerificationResult> results)
     {
-        System.ArgumentNullException.ThrowIfNull(results, nameof(results));
-        var callables = new WorkerCallableResult[results.Length];
-        var claims = new List<WorkerClaimResult>();
-        for (var index = 0; index < results.Length; index++)
+        RepositoryParameterGuard.RequireInitialized(results.IsDefault, nameof(results), "Array must be initialized.");
+        var callables = ImmutableArray.CreateBuilder<WorkerCallableResult>(results.Length);
+        var claims = ImmutableArray.CreateBuilder<WorkerClaimResult>();
+        foreach (var result in results)
         {
-            var result = results[index];
-            callables[index] = result.Callable;
+            callables.Add(result.Callable);
             claims.AddRange(result.Claims);
         }
 
-        return (callables, [.. claims]);
+        return (callables.ToImmutable(), claims.ToImmutable());
     }
 
     private static Func<long>? ReadResources(ISmtBackend backend)
@@ -665,14 +685,16 @@ internal sealed class SharpProofWorker : IDisposable
             _backend = ProjectBackend((backend ?? throw new System.ArgumentNullException(nameof(backend))), resourceReader);
         internal ISmtBackend Backend => _backend.Backend;
         internal Func<long>? ReadConsumedResourceCount => _backend.ResourceReader;
-        internal LaneRenewalResult Renew(VerificationLane[] lanes)
+        internal LaneRenewalResult Renew(ImmutableArray<VerificationLane> lanes, object renewalGate)
         {
+            ArgumentNullException.ThrowIfNull(renewalGate);
+            RepositoryParameterGuard.RequireInitialized(lanes.IsDefault, nameof(lanes), "Array must be initialized.");
             if (_backendFactory == null)
             {
                 return LaneRenewalResult.Unsupported;
             }
 
-            lock (lanes)
+            lock (renewalGate)
             {
                 var prior = Backend;
                 IDisposable? replacementOwner = null;

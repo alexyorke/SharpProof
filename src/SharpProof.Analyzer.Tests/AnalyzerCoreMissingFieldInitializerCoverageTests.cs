@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -8,7 +9,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreMissingFieldInitializerCoverageTests
 {
-    private static readonly string[] MissingValueCompilerErrors = ["CS1525"];
+    private static readonly ImmutableArray<string> MissingValueCompilerErrors = ["CS1525"];
 
     [TestCase(false)]
     [TestCase(true)]

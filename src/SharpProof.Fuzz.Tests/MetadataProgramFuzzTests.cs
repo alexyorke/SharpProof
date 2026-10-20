@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Fuzz.Test;
@@ -9,9 +10,10 @@ public sealed class MetadataProgramFuzzTests
     [TestCase(1000)]
     public async Task ScalarImplementationImagesAgreeWithCompiledCodeAndOwnedReplay(int cases)
     {
-        var timings = new Dictionary<string, long>(StringComparer.Ordinal);
+        var timingsBuilder = ImmutableDictionary.CreateBuilder<string, long>(StringComparer.Ordinal);
         var result = await MetadataProgramDifferentialOracle.RunAsync(cases, 23063, timingSink: (stage, elapsed) =>
-        { System.ArgumentNullException.ThrowIfNull(stage, nameof(stage)); timings[stage] = timings.GetValueOrDefault(stage) + elapsed; }, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        { System.ArgumentNullException.ThrowIfNull(stage, nameof(stage)); timingsBuilder[stage] = (timingsBuilder.TryGetValue(stage, out var prior) ? prior : 0) + elapsed; }, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var timings = timingsBuilder.ToImmutable();
         Assert.That(result.Passed, Is.True, string.Join("\n", result.Failures));
         Assert.That(result.Agreements, Is.EqualTo(cases));
         Assert.That(result.NativeProofs, Is.EqualTo(cases));

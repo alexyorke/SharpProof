@@ -19,7 +19,7 @@ public sealed class TotalProgramSourceReplayTests
     {
         const string member = "public static long Target0(long value) => value;";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12345);
         await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -34,7 +34,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) { " +
             "for (int i = 0; i < 2; i++) value = unchecked(value + 1); return value; }";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 9L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(9L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12346);
         await replay.CompareBatchAsync([new(member, [7L], true)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -48,7 +48,7 @@ public sealed class TotalProgramSourceReplayTests
     {
         var member = LockMember(0);
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         Assert.That(reference.Classifications[0].Execution, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var replay = new TotalProgramSourceReplay(12347);
@@ -73,7 +73,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) { " +
             "try { return 49L / value; } catch (System.Exception error) { return 0; } }";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.False);
         var replay = new TotalProgramSourceReplay(12351);
         await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -83,7 +83,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(result.NativeProofs, Is.Zero);
         Assert.That(result.NativeRefutations, Is.Zero);
         Assert.That(result.Failures, Has.Length.EqualTo(1));
-        var reproducer = member + "\n// inputs: [7]";
+        const string reproducer = member + "\n// inputs: [7]";
         Assert.That(result.Failures[0], Is.EqualTo(new FuzzFailure(0, 12351,
             "total-program", reproducer, reproducer,
             "Target0: incomplete " + reference.Classifications[0].Abstention)));
@@ -116,7 +116,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) => value; " +
             "public static long Target1(long value) => value + 1L;";
         var reference = ObserveActualSource([member], ["Target0", "Target1"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L, 8L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L, 8L)));
         Assert.That(reference.Classifications, Has.Length.EqualTo(2));
         Assert.That(reference.Classifications.All(item => item.Exact), Is.True);
         var replay = new TotalProgramSourceReplay(12349);
@@ -130,17 +130,17 @@ public sealed class TotalProgramSourceReplayTests
     [Test]
     public async Task ActualUnsupportedCasesKeepTheExistingRetentionCapAcrossBatches()
     {
-        var members = Enumerable.Range(0, 65).Select(LockMember).ToArray();
-        var names = Enumerable.Range(0, 65).Select(index => "Target" + index).ToArray();
+        var members = Enumerable.Range(0, 65).Select(LockMember).ToImmutableArray();
+        var names = Enumerable.Range(0, 65).Select(index => "Target" + index).ToImmutableArray();
         var reference = ObserveActualSource(members, names);
         Assert.That(reference.Values, Has.Length.EqualTo(65));
         Assert.That(reference.Values, Is.All.EqualTo(7L));
         Assert.That(reference.Classifications.All(item => item.Exact &&
             item.Execution == IrProgramExecutionStatus.Unsupported), Is.True);
         var replay = new TotalProgramSourceReplay(12350);
-        var cases = members.Select(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, [7L], false))).ToArray();
-        await replay.CompareBatchAsync(cases.Take(33).ToArray(), 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        await replay.CompareBatchAsync(cases.Skip(33).ToArray(), 33, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var cases = members.Select(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, [7L], false))).ToImmutableArray();
+        await replay.CompareBatchAsync(cases.Take(33).ToImmutableArray(), 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        await replay.CompareBatchAsync(cases.Skip(33).ToImmutableArray(), 33, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var result = replay.Result;
         Assert.That(result.Cases, Is.EqualTo(65));
@@ -164,9 +164,10 @@ public sealed class TotalProgramSourceReplayTests
         return "public static long Target" + index + "(long value) { lock (new object()) { return value; } }";
     }
 
-    private static CSharpCompilation Compile(IReadOnlyList<string> members)
+    private static CSharpCompilation Compile(ImmutableArray<string> members)
     {
-        System.ArgumentNullException.ThrowIfNull(members);
+        if (members.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(members)); }
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " +
             string.Join("\n", members) + " }", new CSharpParseOptions(LanguageVersion.CSharp12),
             "total-source-replay-control.cs");
@@ -176,33 +177,37 @@ public sealed class TotalProgramSourceReplayTests
                 optimizationLevel: OptimizationLevel.Release));
     }
 
-    private static (object?[] Values, (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[] Classifications)
-        ObserveActualSource(IReadOnlyList<string> members, string[] names)
+    private static (ImmutableArray<object?> Values, ImmutableArray<(bool Exact, string Abstention, IrProgramExecutionStatus? Execution)> Classifications)
+        ObserveActualSource(ImmutableArray<string> members, ImmutableArray<string> names)
     {
-        System.ArgumentNullException.ThrowIfNull(names, nameof(names));
-        System.ArgumentNullException.ThrowIfNull(members);
+        if (names.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(names)); }
+        if (members.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(members)); }
         var compilation = Compile(members);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join("\n", emission.Emit.Diagnostics));
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)))
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Keys, Is.EquivalentTo(names));
         var context = new AssemblyLoadContext("TotalSourceReplayControl", isCollectible: true);
         try
         {
             image.Position = 0;
             var runtime = context.LoadFromStream(image).GetType("TotalGenerated")!;
-            var values = new object?[names.Length];
-            var classifications = new (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[names.Length];
+            var values = ImmutableArray.CreateBuilder<object?>(names.Length);
+            var classifications = ImmutableArray.CreateBuilder<(bool Exact, string Abstention, IrProgramExecutionStatus? Execution)>(names.Length);
             for (var index = 0; index < names.Length; index++)
             {
                 var name = names[index];
-                values[index] = runtime.GetMethod(name, BindingFlags.Public | BindingFlags.Static)!
-                    .Invoke(null, [7L]);
+                values.Add(runtime.GetMethod(name, BindingFlags.Public | BindingFlags.Static)!
+                    .Invoke(null, [7L]));
                 var method = methods[name];
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var declared = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
@@ -213,13 +218,15 @@ public sealed class TotalProgramSourceReplayTests
                 IrProgramExecutionStatus? execution = null;
                 if (lowering.IsExact)
                 {
-                    var entries = loweringContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                    var entries = ImmutableDictionaryCapture.Create(
+                        loweringContext.Parameters,
+                        binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                         binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L)));
                     execution = new IrProgramInterpreter(factory).Execute(lowering.Program, entries).Status;
                 }
-                classifications[index] = (lowering.IsExact, lowering.Classification.Abstention.ToString(), execution);
+                classifications.Add((lowering.IsExact, lowering.Classification.Abstention.ToString(), execution));
             }
-            return (values, classifications);
+            return (values.ToImmutable(), classifications.ToImmutable());
         }
         finally
         {

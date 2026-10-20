@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
@@ -17,7 +18,7 @@ public sealed class CfgExpressionLoweringCoverageTests
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
         var operations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
+            .Concat(block.BranchValue is { } branch ? ImmutableArray.Create<IOperation>(branch) : ImmutableArray<IOperation>.Empty))).ToImmutableArray();
         Assert.That(operations.OfType<IFlowCaptureOperation>(), Is.Not.Empty);
         foreach (var operation in operations)
         {
@@ -55,6 +56,6 @@ public sealed class CfgExpressionLoweringCoverageTests
         var total = new RoslynTotalExpressionLowerer(new TotalLoweringContext(totalFactory, target)).LowerClause(operation);
         Assert.That(total.Classification.IsExact, Is.False);
         Assert.That(total.Classification.Abstention, Is.EqualTo(FrontendAbstention.InvalidOperation));
-        Assert.That(new IrInterpreter(totalFactory).Evaluate(total.SafeCondition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(totalFactory).Evaluate(total.SafeCondition, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
     }
 }

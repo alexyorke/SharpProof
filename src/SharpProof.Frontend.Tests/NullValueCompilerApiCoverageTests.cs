@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NullValueCompilerApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0037"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0037"];
 
     [Test]
     public void NullToIntegerRecoveryRetainsCompilerErrorAndExpressionApiAbstention()
@@ -22,7 +23,7 @@ public sealed class NullValueCompilerApiCoverageTests
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);

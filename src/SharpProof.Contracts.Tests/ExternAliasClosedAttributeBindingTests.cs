@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ExternAliasClosedAttributeBindingTests
 {
-    private static readonly int[] Inputs = [-1, 0, 1];
+    private static readonly ImmutableArray<int> Inputs = [-1, 0, 1];
 
     [TestCase(false, false)]
     [TestCase(false, true)]
@@ -122,7 +123,7 @@ public sealed class ExternAliasClosedAttributeBindingTests
         var operation = factory.GetOperationInfo(clause.SourceOperation);
         Assert.That(operation.SourceSpan!.Start, Is.EqualTo(attributeSyntax.SpanStart));
         Assert.That(operation.SourceSpan.Length, Is.EqualTo(attributeSyntax.Span.Length));
-        Assert.That(IrTermAnalysis.CollectVariables(clause.Condition), Is.EquivalentTo(new[] { variable }));
+        Assert.That(IrTermAnalysis.CollectVariables(clause.Condition), Is.EquivalentTo(ImmutableArray.Create(variable)));
         var runtimeMethod = System.Reflection.Assembly.Load(image.ToArray())
             .GetType("Target")!.GetMethod("Read")!;
         var interpreter = new IrInterpreter(factory);
@@ -130,10 +131,7 @@ public sealed class ExternAliasClosedAttributeBindingTests
         {
             var returned = (int)runtimeMethod.Invoke(null, new object[] { input })!;
             Assert.That(returned, Is.EqualTo(input));
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, input));
             Assert.That(interpreter.Evaluate(clause.Condition, values).Value!.Boolean,
                 Is.EqualTo(returned > 0));
         }

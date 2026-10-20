@@ -1,25 +1,63 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SharpProof.Testing;
 
 internal sealed class DictionaryAnalyzerConfigOptions(
-    IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
 {
-    private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+    private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
     internal static DictionaryAnalyzerConfigOptions Empty { get; } =
-        new(new Dictionary<string, string>());
+        new(ImmutableDictionary<string, string>.Empty);
 
     internal DictionaryAnalyzerConfigOptions(
-        params (string Key, string Value)[] values)
-        : this(values.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value,
-            StringComparer.OrdinalIgnoreCase))
+        ImmutableArray<(string Key, string Value)> values)
+        : this(Capture(values))
     {
-        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        RequireInitialized(values);
     }
 
+    private static void RequireInitialized(ImmutableArray<(string Key, string Value)> values)
+    {
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
+    }
+
+    private static ImmutableDictionary<string, string> Capture(
+        ImmutableArray<(string Key, string Value)> values)
+    {
+        RequireInitialized(values);
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in values)
+        {
+            if (builder.ContainsKey(pair.Key))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + pair.Key); }
+            builder.Add(pair.Key, pair.Value);
+        }
+        return builder.ToImmutable();
+    }
+    internal DictionaryAnalyzerConfigOptions(Dictionary<string, string> values)
+        : this(values, values?.Comparer ?? throw new ArgumentNullException(nameof(values)))
+    {
+        System.ArgumentNullException.ThrowIfNull(values);
+    }
+
+    internal DictionaryAnalyzerConfigOptions(
+        IReadOnlyDictionary<string, string> values, IEqualityComparer<string> comparer)
+        : this(Capture(values, comparer))
+    {
+        System.ArgumentNullException.ThrowIfNull(values);
+        System.ArgumentNullException.ThrowIfNull(comparer);
+    }
+
+    private static ImmutableDictionary<string, string> Capture(
+        IReadOnlyDictionary<string, string> values, IEqualityComparer<string> comparer)
+    {
+        System.ArgumentNullException.ThrowIfNull(values);
+        System.ArgumentNullException.ThrowIfNull(comparer);
+        return values.ToImmutableDictionary(comparer);
+    }
     public override bool TryGetValue(string key, out string value)
     {
         if (_guarded_values.TryGetValue(key, out var found))
@@ -38,13 +76,25 @@ internal sealed class DictionaryAnalyzerConfigOptionsProvider
 {
     private readonly AnalyzerConfigOptions _fileOptions;
 
-    internal DictionaryAnalyzerConfigOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
+    internal DictionaryAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalValues)
         : this(new DictionaryAnalyzerConfigOptions(globalValues), globalForFiles: false)
     {
-        System.ArgumentNullException.ThrowIfNull(globalValues, nameof(globalValues));
+        System.ArgumentNullException.ThrowIfNull(globalValues);
     }
 
+    internal DictionaryAnalyzerConfigOptionsProvider(Dictionary<string, string> globalValues)
+        : this(new DictionaryAnalyzerConfigOptions(globalValues), globalForFiles: false)
+    {
+        System.ArgumentNullException.ThrowIfNull(globalValues);
+    }
+
+    internal DictionaryAnalyzerConfigOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues, IEqualityComparer<string> comparer)
+        : this(new DictionaryAnalyzerConfigOptions(globalValues, comparer), globalForFiles: false)
+    {
+        System.ArgumentNullException.ThrowIfNull(globalValues);
+        System.ArgumentNullException.ThrowIfNull(comparer);
+    }
     internal DictionaryAnalyzerConfigOptionsProvider(
         AnalyzerConfigOptions globalOptions,
         bool globalForFiles = true)

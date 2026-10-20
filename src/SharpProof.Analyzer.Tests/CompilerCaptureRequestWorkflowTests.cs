@@ -10,7 +10,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerCaptureRequestWorkflowTests
 {
-    private static readonly string[] SelectedPackIds = ["dotnet.scalar"];
+    private static readonly ImmutableArray<string> SelectedPackIds = ["dotnet.scalar"];
     private const string RequestKey =
         "build_property._SharpProofCompilerCaptureRequestPath";
 
@@ -53,7 +53,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 additionalFiles: [new FailingAdditionalInput()]);
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "AD0001");
+                AnalyzerTestHost.AssertIds(diagnostics, ["AD0001"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "input reader failed");
                 Assert.That(File.Exists(path), Is.False);
                 Assert.That(File.Exists(request + ".completed"), Is.False);
@@ -81,7 +81,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
 
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+                AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(),
                     "compiler capture invocation is invalid");
                 Assert.That(File.Exists(path), Is.False);
@@ -155,10 +155,10 @@ public sealed class CompilerCaptureRequestWorkflowTests
         var directory = CreateDirectory();
         try
         {
-            var identities = new List<string>();
-            foreach (var (name, captured) in new[] { ("left", "left"), ("renamed", "renamed"), ("left", "right") })
+            var identitiesBuilder = ImmutableArray.CreateBuilder<string>();
+            foreach (var (name, captured) in ImmutableArray.Create(("left", "left"), ("renamed", "renamed"), ("left", "right")))
             {
-                var path = Path.Combine(directory, "manifest-" + identities.Count + ".json");
+                var path = Path.Combine(directory, "manifest-" + identitiesBuilder.Count + ".json");
                 var request = path + ".request";
                 await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
                 var diagnostics = await AnalyzeAsync(path, request, source:
@@ -178,8 +178,9 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 var artifact = CompilerManifestArtifactJson.Deserialize(
                     await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
-                identities.Add(artifact.Manifest.Claims.Single().ClaimId);
+                identitiesBuilder.Add(artifact.Manifest.Claims.Single().ClaimId);
             }
+            var identities = identitiesBuilder.ToImmutable();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(identities[1], Is.EqualTo(identities[0]));
@@ -248,7 +249,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request, "dotnet.scalar; dotnet.scalar");
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+                AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(),
                     "must not contain duplicate identifiers");
                 Assert.That(File.Exists(path), Is.False);
@@ -282,25 +283,23 @@ public sealed class CompilerCaptureRequestWorkflowTests
         System.ArgumentNullException.ThrowIfNull(path);
         System.ArgumentNullException.ThrowIfNull(request);
         System.ArgumentNullException.ThrowIfNull(source);
-        var options = new Dictionary<string, string>
-        {
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow",
-            ["build_property._SharpProofCompilerManifestPath"] = path,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net8.0",
-            ["build_property._SharpProofProjectDirectory"] = Path.GetDirectoryName(path)!,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64",
-            [RequestKey] = request
-        };
+        var options = ImmutableDictionary.CreateBuilder<string, string>();
+        options["build_property.SharpProofProfile"] = "advisory";
+        options["build_property.SharpProofFeatures"] = "all";
+        options["build_property.SharpProofVerifyPolicy"] = "advisory";
+        options["build_property.SharpProofAssumptionPolicy"] = "allow";
+        options["build_property._SharpProofCompilerManifestPath"] = path;
+        options["build_property._SharpProofCompilationTargetFramework"] = "net8.0";
+        options["build_property._SharpProofProjectDirectory"] = Path.GetDirectoryName(path)!;
+        options["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64";
+        options[RequestKey] = request;
         if (packs != null)
         {
             options["build_property.SharpProofSpecificationPacks"] = packs;
         }
         return AnalyzerTestHost.AnalyzeAsync(
             AnalyzerTestHost.CreateCompilation(source, []),
-            options,
+            options.ToImmutable(),
             additionalFiles: additionalFiles,
             analyzer: new FinalCompilationCollectorAnalyzer(),
             cancellationToken: cancellationToken);
@@ -309,7 +308,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText,
         ICompilerAdditionalTextSnapshot
     {
-        private CancellationTokenSource _guarded_cancellation = cancellation ?? throw new System.ArgumentNullException(nameof(cancellation));
+        private readonly CancellationTokenSource _guarded_cancellation = cancellation ?? throw new System.ArgumentNullException(nameof(cancellation));
         public override string Path => "input.data";
 
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(_guarded_cancellation.Token);

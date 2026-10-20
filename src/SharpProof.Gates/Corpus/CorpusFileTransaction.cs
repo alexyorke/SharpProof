@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 
@@ -18,31 +19,35 @@ internal static class CorpusFileTransaction
 
     internal static async Task WriteAllAsync(
         string transactionRoot,
-        IReadOnlyList<CorpusFileUpdate> updates,
+        ImmutableArray<CorpusFileUpdate> updates,
         CancellationToken cancellationToken,
         Action<int>? beforePublish = null)
     {
-        ArgumentNullException.ThrowIfNull(updates);
+        if (updates.IsDefault)
+        { throw new ArgumentNullException(nameof(updates)); }
+        var capturedUpdates = updates;
         transactionRoot = Path.GetFullPath(transactionRoot);
         Directory.CreateDirectory(transactionRoot);
         Recover(transactionRoot);
-        if (updates.Count == 0)
+        if (capturedUpdates.Length == 0)
         {
             return;
         }
 
-        var destinations = new string[updates.Count];
-        var seenDestinations = new HashSet<string>(StringComparer.Ordinal);
+        var destinationsBuilder = ImmutableArray.CreateBuilder<string>(capturedUpdates.Length);
+        var seenDestinations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var hasDuplicateDestination = false;
-        for (var index = 0; index < updates.Count; index++)
+        for (var index = 0; index < capturedUpdates.Length; index++)
         {
-            ArgumentNullException.ThrowIfNull(updates[index], nameof(updates));
-            var destination = Path.GetFullPath(updates[index].Path);
-            destinations[index] = destination;
+            ArgumentNullException.ThrowIfNull(capturedUpdates[index], nameof(updates));
+            var destination = Path.GetFullPath(capturedUpdates[index].Path);
+            destinationsBuilder.Add(destination);
             OpenSourceCorpusCatalog.EnsureContained(
                 transactionRoot,
                 destination);
-            if (!seenDestinations.Add(destination))
+            var duplicateDestination = seenDestinations.Contains(destination);
+            seenDestinations.Add(destination);
+            if (duplicateDestination)
             {
                 hasDuplicateDestination = true;
             }
@@ -54,13 +59,15 @@ internal static class CorpusFileTransaction
                 nameof(updates));
         }
 
+        var destinations = destinationsBuilder.ToImmutable();
         var transactionId = Guid.NewGuid().ToString("N");
-        var entries = new List<TransactionEntry>(updates.Count);
+        var entriesBuilder = ImmutableArray.CreateBuilder<TransactionEntry>(capturedUpdates.Length);
+        ImmutableArray<TransactionEntry> entries = default;
         var markerPath = Path.Combine(transactionRoot, MarkerName);
         var markerPublished = false;
         try
         {
-            for (var index = 0; index < updates.Count; index++)
+            for (var index = 0; index < capturedUpdates.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var destination = destinations[index];
@@ -74,7 +81,7 @@ internal static class CorpusFileTransaction
                 var staged = Path.Combine(directory, stem + ".new");
                 var backup = Path.Combine(directory, stem + ".old");
                 var existed = File.Exists(destination);
-                entries.Add(new TransactionEntry(destination, staged, backup, existed));
+                entriesBuilder.Add(new TransactionEntry(destination, staged, backup, existed));
                 if (existed)
                 {
                     await CopyDurablyAsync(
@@ -85,19 +92,20 @@ internal static class CorpusFileTransaction
                 }
                 await WriteDurablyAsync(
                         staged,
-                        Utf8.GetBytes(updates[index].Content),
+                        Utf8.GetBytes(capturedUpdates[index].Content),
                         cancellationToken)
                     .ConfigureAwait(false);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            entries = entriesBuilder.ToImmutable();
             await WriteMarkerAsync(
                     markerPath,
-                    new TransactionMarker(SchemaVersion, entries.ToArray()),
+                    new TransactionMarker(SchemaVersion, entries),
                     cancellationToken)
                 .ConfigureAwait(false);
             markerPublished = true;
-            for (var index = 0; index < entries.Count; index++)
+            for (var index = 0; index < entries.Length; index++)
             {
                 beforePublish?.Invoke(index);
                 File.Move(
@@ -123,7 +131,7 @@ internal static class CorpusFileTransaction
         {
             if (!markerPublished)
             {
-                Cleanup(entries);
+                Cleanup(entries.IsDefault ? entriesBuilder.ToImmutable() : entries);
             }
         }
     }
@@ -143,31 +151,32 @@ internal static class CorpusFileTransaction
             throw new InvalidDataException(
                 "The corpus transaction marker is empty.");
         if (marker.SchemaVersion != SchemaVersion ||
-            marker.Entries is not { Length: > 0 })
+            marker.Entries.IsDefaultOrEmpty)
         {
             throw new InvalidDataException(
                 "The corpus transaction marker is invalid.");
         }
 
-        var paths = new HashSet<string>(StringComparer.Ordinal)
-        {
+        var paths = ImmutableHashSet.Create(StringComparer.Ordinal,
             OpenSourceCorpusCatalog.ResolvePath(transactionRoot),
-            OpenSourceCorpusCatalog.ResolvePath(markerPath)
-        };
+            OpenSourceCorpusCatalog.ResolvePath(markerPath)).ToBuilder();
         foreach (var entry in marker.Entries)
         {
             if (entry == null)
             {
                 throw new InvalidDataException("A corpus transaction entry is null.");
             }
-            foreach (var path in new[] { entry.DestinationPath, entry.StagedPath, entry.BackupPath })
+            foreach (var path in ImmutableArray.Create(entry.DestinationPath, entry.StagedPath, entry.BackupPath))
             {
                 if (string.IsNullOrEmpty(path) || !Path.IsPathFullyQualified(path))
                 {
                     throw new InvalidDataException("A corpus transaction path is invalid.");
                 }
                 OpenSourceCorpusCatalog.EnsureContained(transactionRoot, path);
-                if (!paths.Add(OpenSourceCorpusCatalog.ResolvePath(path)) || Directory.Exists(path))
+                var resolvedPath = OpenSourceCorpusCatalog.ResolvePath(path);
+                var duplicate = paths.Contains(resolvedPath);
+                paths.Add(resolvedPath);
+                if (duplicate || Directory.Exists(path))
                 {
                     throw new InvalidDataException("Corpus transaction paths must name distinct files.");
                 }
@@ -213,18 +222,17 @@ internal static class CorpusFileTransaction
     {
         System.ArgumentNullException.ThrowIfNull(destination);
         System.ArgumentNullException.ThrowIfNull(source);
-        var bytes = await File.ReadAllBytesAsync(source, cancellationToken)
-            .ConfigureAwait(false);
-        await WriteDurablyAsync(destination, bytes, cancellationToken)
+        var bytes = (await File.ReadAllBytesAsync(source, cancellationToken)
+            .ConfigureAwait(false)).ToImmutableArray();
+        await WriteDurablyAsync(destination, bytes.AsMemory(), cancellationToken)
             .ConfigureAwait(false);
     }
 
     private static async Task WriteDurablyAsync(
         string path,
-        byte[] content,
+        ReadOnlyMemory<byte> /* SPINT001: all values valid - empty content creates an empty durable file */ content,
         CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(content, nameof(content));
         System.ArgumentNullException.ThrowIfNull(path);
         using var stream = OpenDurableFile(path, asynchronous: true);
         await stream.WriteAsync(content, cancellationToken)
@@ -265,12 +273,12 @@ internal static class CorpusFileTransaction
                     Guid.NewGuid().ToString("N") + ".restore";
                 try
                 {
-                    var content = File.ReadAllBytes(entry.BackupPath);
+                    var content = File.ReadAllBytes(entry.BackupPath).ToImmutableArray();
                     using (var stream = OpenDurableFile(
                         restore,
                         asynchronous: false))
                     {
-                        stream.Write(content, 0, content.Length);
+                        stream.Write(content.AsSpan());
                         stream.Flush(flushToDisk: true);
                     }
                     File.Move(
@@ -318,9 +326,9 @@ internal static class CorpusFileTransaction
 
     private sealed record TransactionMarker(
         int SchemaVersion,
-        TransactionEntry[] Entries)
+        ImmutableArray<TransactionEntry> Entries)
     {
-        public TransactionEntry[] Entries { get; init; } = Entries ?? throw new System.ArgumentNullException(nameof(Entries));
+        public ImmutableArray<TransactionEntry> Entries { get; init; } = !Entries.IsDefault ? Entries : throw new System.ArgumentNullException(nameof(Entries));
     }
 
     private sealed record TransactionEntry(

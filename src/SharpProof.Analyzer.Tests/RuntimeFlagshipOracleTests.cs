@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
@@ -70,7 +71,7 @@ public sealed class RuntimeFlagshipOracleTests
     [Test]
     public async Task AnalyzerVerdictsMatchConcreteFlagshipEffects()
     {
-        string[] enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
+        ImmutableArray<string> enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
         var compilation = AnalyzerTestHost.CreateCompilation(
             Source,
             enabledIds);
@@ -80,13 +81,7 @@ public sealed class RuntimeFlagshipOracleTests
             "effects");
 
         AssertDiagnostics(
-            diagnostics,
-            ("SP0002", "Writes"),
-            ("SP0045", "Allocate"),
-            ("SP0045", "Concatenate"),
-            ("SP0046", "Throws"),
-            ("SP0016", "DisallowedSync"),
-            ("SP0046", "DisallowedException"));
+            diagnostics, [("SP0002", "Writes"), ("SP0045", "Allocate"), ("SP0045", "Concatenate"), ("SP0046", "Throws"), ("SP0016", "DisallowedSync"), ("SP0046", "DisallowedException")]);
 
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly(
@@ -183,9 +178,12 @@ public sealed class RuntimeFlagshipOracleTests
 
     private static void AssertDiagnostics(
         IEnumerable<Diagnostic> diagnostics,
-        params (string Id, string Method)[] expected)
+        ImmutableArray<(string Id, string Method)> expected)
     {
-        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
+        if (expected.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(expected));
+        }
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         var actual = diagnostics
             .Select(static diagnostic =>
@@ -193,11 +191,11 @@ public sealed class RuntimeFlagshipOracleTests
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)))))
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         var orderedExpected = expected
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(actual, Is.EqualTo(orderedExpected));
     }
 

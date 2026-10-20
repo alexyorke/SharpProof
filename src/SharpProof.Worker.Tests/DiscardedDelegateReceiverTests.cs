@@ -22,7 +22,7 @@ public sealed class DiscardedDelegateReceiverTests
             ", System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | " +
             "System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static object Target(int value) { System.Action unused = new System.Action(GetReceiver().Sink); return null; } }";
-        var compilation = TestCompilation.Create("DiscardedReceiverOracle", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("DiscardedReceiverOracle", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);

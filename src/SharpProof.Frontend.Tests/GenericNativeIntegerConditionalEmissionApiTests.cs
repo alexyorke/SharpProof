@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -19,10 +20,10 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class GenericNativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
-    private static readonly byte[] OmittedTargetIl = [0x1d, 0x2a];
-    private static readonly int[] UnderlyingArities = [0, 1];
-    private static readonly int[] NativeArities = [0];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<byte> OmittedTargetIl = [0x1d, 0x2a];
+    private static readonly ImmutableArray<int> UnderlyingArities = [0, 1];
+    private static readonly ImmutableArray<int> NativeArities = [0];
 
     // Genuine matcher rejection controls: native wrappers exclude generic methods,
     // while the underlying type still publishes both own Trace members. These
@@ -62,7 +63,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var options = new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: enabled ? EnabledSymbols : []);
         const string core = CoreSource;
         const string call = "((nint)default(System.IntPtr)).Trace();";
-        var source = "public static class Subject { public static int Target() { " + call + " return 7; } }";
+        const string source = "public static class Subject { public static int Target() { " + call + " return 7; } }";
         var coreTree = CSharpSyntaxTree.ParseText(core, options, "source-native-core.cs");
         var callerTree = CSharpSyntaxTree.ParseText(source, options, "source-native-caller.cs");
         var compilation = CSharpCompilation.Create("GenericNativeConditional", [coreTree, callerTree], [],
@@ -76,7 +77,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var method = invocation.TargetMethod;
-        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
+        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToImmutableArray();
         var raw = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 0));
         var generic = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 1));
         var attribute = raw.GetAttributes().Single();
@@ -100,8 +101,8 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var reader = pe.GetMetadataReader();
         var targetDefinition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
             .Single(candidate => reader.GetString(candidate.Name) == "Target");
-        var targetIl = pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!;
-        Assert.That(TraceCalls(image.ToArray()), Has.Length.EqualTo(enabled ? 1 : 0));
+        var targetIl = (pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
+        Assert.That(TraceCalls(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)))), Has.Length.EqualTo(enabled ? 1 : 0));
         if (!enabled)
         { Assert.That(targetIl, Is.EqualTo(OmittedTargetIl)); }
         TestContext.WriteLine(JsonSerializer.Serialize(new
@@ -115,7 +116,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
             WrapperAttributes = method.GetAttributes().Length,
             CandidateCount = candidates.Length,
             Attribute = attribute.ToString(),
-            TargetIl = Convert.ToHexString(targetIl),
+            TargetIl = Convert.ToHexString(targetIl.AsSpan()),
             CoreSource = core,
             CallerSource = source
         }));
@@ -143,16 +144,16 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         }
     }
 
-    private static string[] TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
-        var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
-        var calls = new List<string>();
+        var il = (pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
+        var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
             ushort value = il[offset++];
@@ -165,13 +166,13 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
             if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt)
             {
-                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il, offset));
+                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il.AsSpan(offset..)));
                 var name = handle.Kind == HandleKind.MethodDefinition
                     ? metadata.GetString(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).Name)
                     : metadata.GetString(metadata.GetMemberReference((MemberReferenceHandle)handle).Name);
@@ -184,13 +185,13 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
             }
             offset += size;
         }
-        return [.. calls];
+        return calls.ToImmutable();
     }
 
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

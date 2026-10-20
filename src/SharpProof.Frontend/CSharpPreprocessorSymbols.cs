@@ -86,17 +86,15 @@ internal static class CSharpPreprocessorSymbols
 
 internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 {
-    // One policy is shared by every concurrent analyzer callback on a
-    // compilation session, so the caches are guarded.  Values are pure
-    // functions of their keys: compute outside the gate and let the last
-    // writer store the identical result.
-    private readonly object _cacheGate = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : new());
-    private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
-        _definedPreprocessorSymbols = [];
-    private readonly Dictionary<IMethodSymbol, bool>
-        _unimplementedPartials = new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<IMethodSymbol, ImmutableArray<string>>
-        _conditionalSymbols = new(SymbolEqualityComparer.Default);
+    // Analyzer callbacks share these pure caches; atomic publication retains
+    // concurrent entries without exposing mutable collection state.
+    private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+    private ImmutableDictionary<SyntaxTree, ImmutableHashSet<string>>
+        _definedPreprocessorSymbols = ImmutableDictionary<SyntaxTree, ImmutableHashSet<string>>.Empty;
+    private ImmutableDictionary<IMethodSymbol, bool>
+        _unimplementedPartials = ImmutableDictionary<IMethodSymbol, bool>.Empty.WithComparers(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, ImmutableArray<string>>
+        _conditionalSymbols = ImmutableDictionary<IMethodSymbol, ImmutableArray<string>>.Empty.WithComparers(SymbolEqualityComparer.Default);
 
     internal bool IsElided(IOperation operation, bool requireOwningInvocation = false)
     {
@@ -113,7 +111,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var target = invocation.TargetMethod.ReducedFrom ??
             invocation.TargetMethod;
         var isUnimplementedPartial = GetOrAdd(
-            _unimplementedPartials,
+            ref _unimplementedPartials,
             target,
             IsUnimplementedPartial);
         if (isUnimplementedPartial)
@@ -127,7 +125,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             return false;
         }
         var conditionalSymbols = GetOrAdd(
-            _conditionalSymbols,
+            ref _conditionalSymbols,
             target,
             GetConditionalSymbols);
         if (conditionalSymbols.IsDefaultOrEmpty)
@@ -135,7 +133,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             return false;
         }
         var definedSymbols = GetOrAdd(
-            _definedPreprocessorSymbols,
+            ref _definedPreprocessorSymbols,
             invocation.Syntax.SyntaxTree,
             static tree =>
             {
@@ -178,7 +176,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             (!ReferenceEquals(callSyntax, operation.Syntax) ||
                 operation is not (IInvocationOperation or IConditionalAccessOperation)) &&
             SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
-                compilation, callSyntax.SyntaxTree).GetOperation(callSyntax)
+                _compilation, callSyntax.SyntaxTree).GetOperation(callSyntax)
                 is { } sourceCall)
         {
             operation = sourceCall;
@@ -236,7 +234,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         if (declaration.ContainingType.NativeIntegerUnderlyingType is not { } underlying)
         { return declaration; }
         return ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
-            compilation, declaration, underlying);
+            _compilation, declaration, underlying);
     }
 
     private static void AddMetadataConditionalSymbols(IMethodSymbol method, ImmutableArray<string>.Builder symbols)
@@ -251,28 +249,16 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         ConditionalMetadataSymbolReader.AppendSymbols(reader, handle, symbols);
     }
 
-    private TValue GetOrAdd<TKey, TValue>(
-        Dictionary<TKey, TValue> cache,
+    private static TValue GetOrAdd<TKey, TValue>(
+        ref ImmutableDictionary<TKey, TValue> cache,
         TKey key,
         Func<TKey, TValue> create)
         where TKey : notnull
     {
+        RepositoryParameterGuard.NotNull(cache, nameof(cache));
+        ArgumentNullGuard.NotNull(key, nameof(key));
         create = RepositoryParameterGuard.NotNull(create, nameof(create));
-        lock (_cacheGate)
-        {
-            if (cache.TryGetValue(key, out var cached))
-            {
-                return cached;
-            }
-        }
-
-        var value = create(key);
-        lock (_cacheGate)
-        {
-            cache[key] = value;
-        }
-
-        return value;
+        return ImmutableInterlocked.GetOrAdd(ref cache, key, create);
     }
 
     internal static bool IsUnimplementedPartial(IMethodSymbol method)

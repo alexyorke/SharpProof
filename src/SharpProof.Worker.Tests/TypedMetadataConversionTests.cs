@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using NUnit.Framework;
@@ -9,7 +10,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TypedMetadataConversionTests
 {
-    private static readonly string[] NumericTypes = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
+    private static readonly ImmutableArray<string> NumericTypes = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
 
     private static IEnumerable<TestCaseData> Conversions()
     {
@@ -46,7 +47,7 @@ public sealed class TypedMetadataConversionTests
         var entryType = factory.GetVariableInfo(entry).Type;
         var (minimum, maximum) = Range(source);
         var (targetMinimum, targetMaximum) = Range(target);
-        BigInteger[] boundaries = [minimum, maximum, -1, 0, 1, targetMinimum - 1, targetMinimum, targetMinimum + 1,
+        ImmutableArray<BigInteger> boundaries = [minimum, maximum, -1, 0, 1, targetMinimum - 1, targetMinimum, targetMinimum + 1,
             targetMaximum - 1, targetMaximum, targetMaximum + 1, int.MinValue, int.MaxValue, uint.MaxValue, long.MinValue, long.MaxValue];
         foreach (var boundary in boundaries.Distinct().Where(value => value >= minimum && value <= maximum))
         {
@@ -57,7 +58,7 @@ public sealed class TypedMetadataConversionTests
             var entryValue = source == "ulong" ? factory.CreateIntegerValue(entryType, (ulong)boundary) :
                 factory.CreateIntegerValue(entryType, (long)boundary);
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = entryValue });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, entryValue));
             var description = $"{source} -> {target}, {mode}, input={boundary}";
             Assert.That(execution.ConsumedApproximation, Is.False, description);
             if (compiled is OverflowException)

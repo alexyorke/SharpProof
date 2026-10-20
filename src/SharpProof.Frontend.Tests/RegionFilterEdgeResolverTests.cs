@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -157,7 +158,7 @@ public sealed class RegionFilterEdgeResolverTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         var lowerer = new RoslynTotalProgramLowerer(context, cancellationToken);
         var builder = new IrProgramBuilder(factory);
-        var blocks = graph.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock("cfg:" + block.Ordinal)));
+        var blocks = graph.Blocks.ToImmutableDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock("cfg:" + block.Ordinal)));
         var accepted = builder.CreateBlock("accepted");
         var rejected = builder.CreateBlock("rejected");
         var resolver = new RoslynTotalProgramLowerer.RegionFilterEdgeResolver(lowerer, filter, caught, accepted, rejected, blocks);
@@ -187,19 +188,19 @@ public sealed class RegionFilterEdgeResolverTests
     }
 
     private sealed record Subject(ControlFlowGraph Graph, ControlFlowRegion Filter, ControlFlowRegion Catch,
-        Dictionary<BasicBlock, IrBlockId> Blocks, IrBlockId Accepted, IrBlockId Rejected,
+        ImmutableDictionary<BasicBlock, IrBlockId> Blocks, IrBlockId Accepted, IrBlockId Rejected,
         RoslynTotalProgramLowerer.RegionFilterEdgeResolver Resolver)
     {
         public ControlFlowGraph Graph { get; init; } = Graph ?? throw new System.ArgumentNullException(nameof(Graph));
         public ControlFlowRegion Filter { get; init; } = Filter ?? throw new System.ArgumentNullException(nameof(Filter));
         public ControlFlowRegion Catch { get; init; } = Catch ?? throw new System.ArgumentNullException(nameof(Catch));
-        public Dictionary<BasicBlock, IrBlockId> Blocks { get; init; } = Blocks ?? throw new System.ArgumentNullException(nameof(Blocks));
+        public ImmutableDictionary<BasicBlock, IrBlockId> Blocks { get; init; } = Blocks ?? throw new System.ArgumentNullException(nameof(Blocks));
         public IrBlockId Accepted { get; init; } = Accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Accepted)) : Accepted;
         public IrBlockId Rejected { get; init; } = Rejected.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Rejected)) : Rejected;
         public RoslynTotalProgramLowerer.RegionFilterEdgeResolver Resolver { get; init; } = Resolver.Equals(default(RoslynTotalProgramLowerer.RegionFilterEdgeResolver)) ? throw new System.ArgumentException("Value must be initialized.", nameof(Resolver)) : Resolver;
 
         internal IEnumerable<ControlFlowBranch> Edges => Graph.Blocks
-            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
+            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
             .OfType<ControlFlowBranch>();
     }
 }

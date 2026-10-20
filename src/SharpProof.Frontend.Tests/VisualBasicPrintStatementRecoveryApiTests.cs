@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class VisualBasicPrintStatementRecoveryApiTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["BC31003"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["BC31003"];
 
     [TestCase(1)]
     [TestCase(2)]
@@ -134,10 +135,10 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(lowered.IsExact, Is.EqualTo(depth == 255));
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(depth == 255
             ? FrontendAbstention.None : FrontendAbstention.ExpressionDepthLimit));
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.Length, Is.LessThanOrEqualTo(64));
         Assert.That(instructions.OfType<IrWriteInstruction>(), Is.Empty);
-        var havoc = instructions.OfType<IrHavocInstruction>().ToArray();
+        var havoc = instructions.OfType<IrHavocInstruction>().ToImmutableArray();
         Assert.That(havoc, Has.Length.EqualTo(depth == 255 ? 0 : 1));
         if (depth == 256)
         {
@@ -179,12 +180,12 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var input in new[] { -3, 0, 7 })
+            foreach (var input in ImmutableArray.Create(-3, 0, 7))
             {
                 Assert.That(method.Invoke(null, [input]), Is.EqualTo(input));
                 var entry = context.Parameters.Single().Entry;
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(input)));
                 Assert.That(replay.ConsumedApproximation, Is.False);

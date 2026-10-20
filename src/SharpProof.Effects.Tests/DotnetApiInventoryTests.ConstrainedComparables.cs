@@ -48,7 +48,7 @@ public sealed partial class DotnetApiInventoryTests
         Assert.That(Mutate(sbyte.MinValue, sbyte.MaxValue), Is.Zero);
         Assert.That(Mutate(ulong.MinValue, ulong.MaxValue), Is.Zero);
 
-        foreach (var choose in new[] { true, false })
+        foreach (var choose in ImmutableArray.Create(true, false))
         {
             Assert.That(MutateConditional(17, 23, choose), Is.Zero);
             var data = new[] { 17 };

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -8,10 +9,30 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerReportingTests
 {
     [Test]
+    public void LineMapIdentityRequiresAnInitializedEntryArray()
+    {
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerReportingIdentity.ComputeLineMapSha256(default)));
+        Assert.That(error!.ParamName, Is.EqualTo("entries"));
+    }
+
+    [Test]
+    public void ReportingMapLookupRejectsNullableContainingDefaultTrees()
+    {
+        ImmutableArray<CompilerSyntaxTreeSnapshot>? defaultTrees =
+            default(ImmutableArray<CompilerSyntaxTreeSnapshot>);
+        Assert.That(defaultTrees.HasValue, Is.True);
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerSourceCoordinates.FindUniqueTree(
+                Location(), defaultTrees, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.ParamName, Is.EqualTo("syntaxTrees"));
+    }
+
+    [Test]
     public void DefaultAdditionalFilesCaptureAsAnEmptyCollection()
     {
-        var compilation = TestCompilation.Create("DefaultAdditionalFiles",
-            ("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var compilation = TestCompilation.CreateExact("DefaultAdditionalFiles",
+            [("Subject.cs", "public static class Subject { public static int Root() => 1; }")]);
         var captured = CompilerCompilationCapture.Capture(compilation,
             Directory.GetCurrentDirectory(), "net8.0", default,
             TestContext.CurrentContext.CancellationToken);
@@ -19,7 +40,7 @@ public sealed class CompilerReportingTests
         Assert.That(captured.SyntaxTrees, Has.Length.EqualTo(1));
     }
 
-    private static readonly string[][] CapturedPathCases = [
+    private static readonly ImmutableArray<ImmutableArray<string>> CapturedPathCases = [
         ["Subject.cs", "./Subject.cs"],
         ["Subject.cs", "Subject.cs", "Subject.cs#1"],
         ["Subject.cs#2", "Subject.cs", "Subject.cs"],
@@ -38,12 +59,12 @@ public sealed class CompilerReportingTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(caseIndex)); }
 
         var paths = CapturedPathCases[caseIndex];
-        var compilation = TestCompilation.Create("DocumentIdentityTests", paths.Select((path, index) =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : ((path, "public static class Subject" + index + " { public static int Root() => " + index + "; }"))).ToArray());
+        var compilation = TestCompilation.CreateExact("DocumentIdentityTests", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, paths.Select((path, index) =>
+            path is null ? throw new System.ArgumentNullException(nameof(path)) : ((path, "public static class Subject" + index + " { public static int Root() => " + index + "; }"))).ToImmutableArray());
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(snapshots.Select(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path)).Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(paths.Length));
-        var trees = compilation.SyntaxTrees.ToArray();
+        var trees = compilation.SyntaxTrees;
         for (var ordinal = 0; ordinal < trees.Length; ordinal++)
         {
             var independentlyCaptured = CompilerCompilationCapture.CaptureTree(trees[ordinal], TestContext.CurrentContext.CancellationToken);
@@ -78,22 +99,22 @@ public sealed class CompilerReportingTests
         switch (coordinate)
         {
             case "start":
-                second.Location.Start++;
+                second = second with { Location = second.Location with { Start = second.Location.Start + 1 } };
                 break;
             case "line":
-                second.Location.Line++;
+                { second = second with { Location = second.Location with { Line = second.Location.Line + 1 } }; }
                 break;
             case "column":
-                second.Location.Column++;
+                second = second with { Location = second.Location with { Column = second.Location.Column + 1 } };
                 break;
             case "path":
-                second.Location.Path += ".other";
+                { second = second with { Location = second.Location with { Path = second.Location.Path + (".other") } }; }
                 break;
             case "message":
-                second.Message += " other";
+                { second = second with { Message = second.Message + " other" }; }
                 break;
         }
-        Assert.That(CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]), Is.EqualTo(new[] { first, second }));
+        Assert.That(CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]), Is.EqualTo(ImmutableArray.Create(first, second)));
     }
 
     [Test]
@@ -119,7 +140,7 @@ public sealed class CompilerReportingTests
         // Rebinding replaces the producer's previous association.
         CompilerSourceCoordinates.RememberTree(location, 0);
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
-        location.Column++;
+        location = location with { Column = location.Column + 1 };
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(-1));
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerSourceCoordinates.Bind(location, compilation, out _, out _, out _, out _)));
@@ -129,15 +150,15 @@ public sealed class CompilerReportingTests
     public void MappedColumnsAccountForLineDirectiveCharacterOffsets()
     {
         var tree = Tree("physical.cs");
-        tree.LineMap[0].CharacterOffset = 2;
+        tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { CharacterOffset = 2 }) };
         var location = Location();
-        location.Column = 3;
+        { location = location with { Column = 3 }; }
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [tree], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
         using (Assert.EnterMultipleScope())
         {
-            location.Start = 1;
-            location.Column = 2;
+            { location = location with { Start = 1 }; }
+            { location = location with { Column = 2 }; }
             Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
             Assert.That(CompilerSourceCoordinates.FindUniqueTree(null, [tree], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(-1));
         }
@@ -157,37 +178,19 @@ public sealed class CompilerReportingTests
         System.ArgumentNullException.ThrowIfNull(malformed);
         var tree = Tree("physical.cs");
         var entry = tree.LineMap[0];
-        switch (malformed)
+        tree = malformed switch
         {
-            case "start":
-                entry.SourceStart = -1;
-                break;
-            case "length":
-                entry.SourceLength = tree.TextLength + 1;
-                break;
-            case "path":
-                entry.MappedPath = " ";
-                break;
-            case "line":
-                entry.MappedLine = -1;
-                break;
-            case "column":
-                entry.MappedColumn = int.MaxValue;
-                break;
-            case "offset":
-                entry.CharacterOffset = entry.SourceLength + 1;
-                break;
-            case "gap":
-                tree.LineMap = [entry, new CompilerSourceLineMapEntry { SourceStart = 2 }];
-                break;
-            case "missing":
-                tree.LineMap = [];
-                break;
-            case "first-line":
-                entry.SourceStart = 1;
-                entry.SourceLength = tree.TextLength - 1;
-                break;
-        }
+            "start" => tree with { LineMap = [entry with { SourceStart = -1 }] },
+            "length" => tree with { LineMap = [entry with { SourceLength = tree.TextLength + 1 }] },
+            "path" => tree with { LineMap = [entry with { MappedPath = " " }] },
+            "line" => tree with { LineMap = [entry with { MappedLine = -1 }] },
+            "column" => tree with { LineMap = [entry with { MappedColumn = int.MaxValue }] },
+            "offset" => tree with { LineMap = [entry with { CharacterOffset = entry.SourceLength + 1 }] },
+            "gap" => tree with { LineMap = [entry, new CompilerSourceLineMapEntry { SourceStart = 2 }] },
+            "missing" => tree with { LineMap = [] },
+            "first-line" => tree with { LineMap = [entry with { SourceStart = 1, SourceLength = tree.TextLength - 1 }] },
+            _ => tree
+        };
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
@@ -200,9 +203,9 @@ public sealed class CompilerReportingTests
         Assert.Throws<OperationCanceledException>((Action)(() =>
             CompilerSourceCoordinates.FindUniqueTree(Location(), [tree], canceled.Token)));
         var location = Location();
-        location.Start = tree.TextLength + 1;
+        { location = location with { Start = tree.TextLength + 1 }; }
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
-        tree.LineMap[0].MappedColumn = int.MaxValue;
+        tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { MappedColumn = int.MaxValue }) };
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
@@ -232,16 +235,19 @@ public sealed class CompilerReportingTests
         var canonical = CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(canonical, Is.EqualTo(new[] { first, second }));
+            Assert.That(canonical, Is.EqualTo(ImmutableArray.Create(first, second)));
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical(canonical), Is.True);
+            Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical(ImmutableArray<CompilerDiagnosticArtifact>.Empty), Is.True);
+            Action invalidOrdering = () => CompilerDiagnosticArtifactOrdering.IsCanonical(default);
+            Assert.That(Assert.Throws<ArgumentException>(invalidOrdering)!.ParamName, Is.EqualTo("diagnostics"));
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical([second, first]), Is.False);
             Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, first), Is.Zero);
         }
-        second.SourceTreeOrdinal = 0;
+        second = second with { SourceTreeOrdinal = 0 };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
-        second.SourceTreePath = first.SourceTreePath;
+        second = second with { SourceTreePath = first.SourceTreePath };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
-        second.SourceTreeSha256 = first.SourceTreeSha256;
+        second = second with { SourceTreeSha256 = first.SourceTreeSha256 };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
     }
 

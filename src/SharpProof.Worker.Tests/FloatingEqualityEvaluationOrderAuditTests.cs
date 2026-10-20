@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,8 +15,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class FloatingEqualityEvaluationOrderAuditTests
 {
-    private static readonly ArgumentKind[] ExplicitArgumentKinds = [ArgumentKind.Explicit, ArgumentKind.Explicit];
-    private static readonly BinaryOperatorKind[] FloatingComparisonKinds = [BinaryOperatorKind.Equals, BinaryOperatorKind.NotEquals];
+    private static readonly ImmutableArray<ArgumentKind> ExplicitArgumentKinds = [ArgumentKind.Explicit, ArgumentKind.Explicit];
+    private static readonly ImmutableArray<BinaryOperatorKind> FloatingComparisonKinds = [BinaryOperatorKind.Equals, BinaryOperatorKind.NotEquals];
 
     private const string SourceTemplate = """
         #undef SHARPPROOF_CONTRACTS
@@ -38,7 +39,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(valueType);
         var source = SourceTemplate.Replace("__VALUE_TYPE__", valueType, StringComparison.Ordinal);
-        var compilation = TestCompilation.Create("FloatingEqualityEvaluationOrder_" + valueType, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingEqualityEvaluationOrder_" + valueType, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
@@ -46,7 +47,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         var model = compilation.GetSemanticModel(tree);
         var expectedType = valueType == "double" ? SpecialType.System_Double : SpecialType.System_Single;
         var calls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" })).ToArray();
+            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" })).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(4));
         foreach (var syntax in calls)
         {
@@ -56,14 +57,14 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(call.TargetMethod.IsStatic, Is.True);
             Assert.That(call.TargetMethod.ReturnType.SpecialType, Is.EqualTo(expectedType));
             Assert.That(call.TargetMethod.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType)),
-                Is.EqualTo(new[] { expectedType, SpecialType.System_Int32 }));
+                Is.EqualTo(ImmutableArray.Create(expectedType, SpecialType.System_Int32)));
             Assert.That(call.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ArgumentKind)),
                 Is.EqualTo(ExplicitArgumentKinds));
         }
         var comparisons = root.DescendantNodes().OfType<BinaryExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetOperation(syntax))).OfType<IBinaryOperation>()
             .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.LeftOperand.Type?.SpecialType == expectedType &&
-                operation.RightOperand.Type?.SpecialType == expectedType)).ToArray();
+                operation.RightOperand.Type?.SpecialType == expectedType)).ToImmutableArray();
         Assert.That(comparisons.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind)),
             Is.EquivalentTo(FloatingComparisonKinds));
         Assert.That(comparisons.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorMethod == null && !operation.IsLifted)), Is.True);
@@ -77,8 +78,8 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("FloatingEqualityEvaluationOrder_" + valueType, isCollectible: true);
         try
@@ -87,18 +88,19 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(method.ReturnType, Is.EqualTo(typeof(int)));
             Assert.That(method.GetParameters().Single().ParameterType,
                 Is.EqualTo(valueType == "double" ? typeof(double) : typeof(float)));
-            object[] witnesses = valueType == "double" ? [double.NaN, 1.25d] : [float.NaN, 1.25f];
-            var observations = new List<string>();
+            ImmutableArray<object> witnesses = valueType == "double" ? [double.NaN, 1.25d] : [float.NaN, 1.25f];
+            var observationBuilder = ImmutableArray.CreateBuilder<string>();
             foreach (var witness in witnesses)
             {
                 var result = (int)method.Invoke(null, [witness])!;
                 var observation = $"type={valueType}; witness={witness}; CLR={result}; " +
                     $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                    $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
+                    $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
                     $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
-                observations.Add(observation);
+                observationBuilder.Add(observation);
                 Assert.That(result, Is.EqualTo(1234), observation);
             }
+            var observations = observationBuilder.ToImmutable();
             await File.WriteAllTextAsync(Path.Combine(evidence, "clr.txt"), string.Join("\n", observations) + "\n");
         }
         finally
@@ -116,6 +118,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         Assert.That(captured.Total, Is.Not.Null, "Expected retained compiler-captured Total for the floating-parameter method.");
         Assert.That(captured.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);

@@ -118,11 +118,8 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
         }
         if (invocationResponse != null)
         {
-            var invocationRequestHash = invocationResponse.RequestHash;
-            invocationResponse.RequestHash = response.RequestHash;
             var invocationJson = WorkerProtocolJson.SerializeResponse(
-                invocationResponse);
-            invocationResponse.RequestHash = invocationRequestHash;
+                invocationResponse with { RequestHash = response.RequestHash });
             if (!string.Equals(
                     invocationJson,
                     WorkerProtocolJson.SerializeResponse(response),

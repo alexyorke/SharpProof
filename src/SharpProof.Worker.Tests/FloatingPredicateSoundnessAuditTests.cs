@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using NUnit.Framework;
@@ -50,13 +51,13 @@ public sealed class FloatingPredicateSoundnessAuditTests
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("FloatingPredicateSoundness_" + valueType, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingPredicateSoundness_" + valueType, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, valueType + ".oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, valueType + ".oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("FloatingPredicateSoundness_" + valueType, isCollectible: true);
         string runtimeObservation;
@@ -67,7 +68,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
             var argument = valueType == "object" ? "same non-null object reference" : "NaN";
             runtimeObservation = $"type={valueType}; argument={argument}; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
+                $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
                 $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".clr.txt"), runtimeObservation + "\n");
@@ -82,6 +83,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null, "Expected admitted compiler-captured total body.");
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);

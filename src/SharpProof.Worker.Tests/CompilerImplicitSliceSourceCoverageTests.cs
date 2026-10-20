@@ -29,7 +29,7 @@ public sealed class CompilerImplicitSliceSourceCoverageTests
             Assert.That(emittedDependency.Success, Is.True, string.Join(Environment.NewLine, emittedDependency.Diagnostics));
             Assert.That(dependencyImage.Length, Is.GreaterThan(0));
             var dependencyPath = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(dependencyPath, dependencyImage.ToArray());
+            File.WriteAllBytes(dependencyPath, dependencyImage.GetBuffer().AsSpan(0, checked((int)dependencyImage.Length)));
             var reference = MetadataReference.CreateFromFile(dependencyPath);
             var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public sealed class Value:ExternalBase { " +
                 (sourceSlice ? "public new Value Slice(int start,int length) => this;" : string.Empty) +

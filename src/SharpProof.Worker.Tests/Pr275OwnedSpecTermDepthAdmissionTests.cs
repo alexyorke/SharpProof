@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
@@ -23,7 +24,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
                 public static bool Target() { Contract.Ensures(Contract.Result<bool>() == true); return true; }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSpecTermDepthAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSpecTermDepthAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -63,6 +64,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.Parameters, Is.Empty);
@@ -83,12 +85,12 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         {
             var term = CompilerTotalSpecTermInstantiator.Instantiate(factory, declaration, [], factory.IntegerType, 0);
             Assert.That(term.Type, Is.EqualTo(factory.BooleanType));
-            var value = new IrInterpreter(factory).Evaluate(term, new Dictionary<ScopedIrId<IrVariableTag>, IrValue>());
+            var value = new IrInterpreter(factory).Evaluate(term, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty);
             Assert.That(value.Status, Is.EqualTo(IrEvaluationStatus.Value));
             Assert.That(value.Value!.Boolean, Is.False);
         }
         var leaf = CompilerTotalSpecTermInstantiator.Instantiate(factory, new SpecBooleanDeclaration(true), [], factory.IntegerType, 0);
-        var control = new IrInterpreter(factory).Evaluate(leaf, new Dictionary<ScopedIrId<IrVariableTag>, IrValue>());
+        var control = new IrInterpreter(factory).Evaluate(leaf, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty);
         Assert.That(control.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(control.Value!.Boolean, Is.True);
     }

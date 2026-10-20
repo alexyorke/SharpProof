@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,21 +14,21 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataZeroArgumentCallDepthApiTests
 {
-    private static readonly string[] LeafInstructions = ["Ret"];
-    private static readonly string[] CallingInstructions = ["Call", "Ret"];
+    private static readonly ImmutableArray<string> LeafInstructions = ["Ret"];
+    private static readonly ImmutableArray<string> CallingInstructions = ["Call", "Ret"];
 
     [TestCase(8, true)]
     [TestCase(256, false)]
     public void DistinctEmittedMethodsRespectTheDefaultCallDepth(int methodCount, bool exact)
     {
-        var names = Enumerable.Range(0, methodCount).Select(index => index == 0 ? "Target" : "Step" + index).ToArray();
+        var names = Enumerable.Range(0, methodCount).Select(index => index == 0 ? "Target" : "Step" + index).ToImmutableArray();
         var methods = names.Select((name, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (name is null ? throw new System.ArgumentNullException(nameof(name)) : ("public static void " + name + "() { " +
             (index + 1 == methodCount ? "" : names[index + 1] + "();") + " }"))));
         var library = "public static class Library { " + string.Join(" ", methods) + " }";
         const string source = "public static class Subject { public static int Target() { Library.Target(); return 0; } }";
         using var subject = new MetadataTestSubject(library, source);
         var owner = subject.Compilation.GetTypeByMetadataName("Library")!;
-        var symbols = names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (owner.GetMembers(name).OfType<IMethodSymbol>().Single())).ToArray();
+        var symbols = names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (owner.GetMembers(name).OfType<IMethodSymbol>().Single())).ToImmutableArray();
         Assert.That(symbols, Has.Length.EqualTo(methodCount));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);

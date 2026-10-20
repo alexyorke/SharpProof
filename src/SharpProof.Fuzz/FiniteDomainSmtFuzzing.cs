@@ -24,7 +24,7 @@ internal sealed record FiniteDomainDifferentialResult(
 internal static class FiniteDomainSmtDifferentialOracle
 {
     private const int MaximumAssignmentCount = 65_536;
-    private static readonly bool[] BooleanDomain = [false, true];
+    private static readonly ImmutableArray<bool> BooleanDomain = [false, true];
 
     public static ImmutableArray<long> IntegerDomain
     {
@@ -276,13 +276,13 @@ internal static class FiniteDomainSmtDifferentialOracle
     {
         var factory = domain.Factory;
         var variables = domain.Variables;
-        var assumptions = ImmutableArray.CreateBuilder<Assumption>(
+        var assumptionBuilder = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
         foreach (var variable in variables)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var predicate = CreateDomainPredicate(factory, variable);
-            assumptions.Add(
+            assumptionBuilder.Add(
                 new Assumption(
                     factory,
                     predicate,
@@ -291,6 +291,7 @@ internal static class FiniteDomainSmtDifferentialOracle
                             "finite-domain-v" +
                             variable.Value))));
         }
+        var assumptions = assumptionBuilder.MoveToImmutable();
         var query = new VerificationQuery(
             factory,
             assumptions,
@@ -323,7 +324,7 @@ internal static class FiniteDomainSmtDifferentialOracle
                 FuzzOracleStatus.Abstained,
                 expected,
                 null,
-                assumptions.Count,
+                assumptions.Length,
                 detail);
         }
         return new FiniteDomainDifferentialResult(
@@ -332,7 +333,7 @@ internal static class FiniteDomainSmtDifferentialOracle
                 : FuzzOracleStatus.Mismatch,
             expected,
             actual,
-            assumptions.Count,
+            assumptions.Length,
             actual == expected
                 ? ""
                 : "Finite enumeration reported " +
@@ -361,7 +362,7 @@ internal static class FiniteDomainSmtDifferentialOracle
         {
             cancellationToken.ThrowIfCancellationRequested();
             var remaining = assignment;
-            var assumptions = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
+            var assumptionBuilder = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
             foreach (var variable in variables)
             {
                 var type = factory.GetVariableInfo(variable).Type;
@@ -370,10 +371,11 @@ internal static class FiniteDomainSmtDifferentialOracle
                 var ordinal = remaining % domainSize;
                 remaining /= domainSize;
                 var literal = CreateDomainLiteral(factory, type, ordinal);
-                assumptions.Add(new Assumption(factory,
+                assumptionBuilder.Add(new Assumption(factory,
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
             }
+            var assumptions = assumptionBuilder.MoveToImmutable();
             var proof = await kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
                 cancellationToken).ConfigureAwait(false);
             if (proof is RefutedOutcome)
@@ -422,11 +424,11 @@ internal static class FiniteDomainSmtDifferentialOracle
         matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
         RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         var interpreter = new IrInterpreter(factory);
-        var environment = new Dictionary<IrVarId, IrValue>();
-        return Search(0);
+        return Search(0, ImmutableDictionary<IrVarId, IrValue>.Empty);
 
-        bool Search(int index)
+        bool Search(int index, ImmutableDictionary<IrVarId, IrValue> environment)
         {
+            environment = RepositoryParameterGuard.NotNull(environment, nameof(environment));
             cancellationToken.ThrowIfCancellationRequested();
             if (index == variables.Length)
             {
@@ -445,12 +447,9 @@ internal static class FiniteDomainSmtDifferentialOracle
             {
                 foreach (var value in BooleanDomain)
                 {
-                    environment[variable] =
-                        factory.CreateBooleanValue(value);
-                    var child = Search(index + 1);
+                    var child = Search(index + 1, environment.SetItem(variable, factory.CreateBooleanValue(value)));
                     if (requireMatch ? !child : child)
                     {
-                        environment.Remove(variable);
                         return requireMatch ? false : true;
                     }
                 }
@@ -459,12 +458,9 @@ internal static class FiniteDomainSmtDifferentialOracle
             {
                 foreach (var value in IntegerDomain)
                 {
-                    environment[variable] =
-                        factory.CreateIntegerValue(variableType, value);
-                    var child = Search(index + 1);
+                    var child = Search(index + 1, environment.SetItem(variable, factory.CreateIntegerValue(variableType, value)));
                     if (requireMatch ? !child : child)
                     {
-                        environment.Remove(variable);
                         return requireMatch ? false : true;
                     }
                 }
@@ -473,7 +469,6 @@ internal static class FiniteDomainSmtDifferentialOracle
             {
                 return false;
             }
-            environment.Remove(variable);
             return requireMatch;
         }
     }
@@ -651,18 +646,18 @@ internal static class IrStructuralShrinker
             throw new ArgumentNullException(nameof(term));
         }
 
-        var seen = new HashSet<IrId>();
-        var pending = new Stack<IrTerm>();
-        pending.Push(term);
-        while (pending.Count != 0)
+        var seen = ImmutableHashSet.CreateBuilder<IrId>();
+        var pending = ImmutableStack<IrTerm>.Empty.Push(term);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!seen.Add(current.Id))
             {
                 continue;
             }
 
-            IrTraversal.PushChildren(current, pending);
+            pending = IrTraversal.PushChildren(current, pending);
         }
         return seen.Count;
     }

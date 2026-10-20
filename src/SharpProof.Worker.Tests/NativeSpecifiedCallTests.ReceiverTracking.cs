@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -118,11 +119,11 @@ internal sealed partial class NativeSpecifiedCallTests
         {
             var assembly = load.LoadFromStream(emitted);
             var runtime = assembly.GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int[]?, int, int, int, int>>();
-            foreach (var values in new int[]?[] { null, [], [17], [11, 23], [-1, 0, 7] })
+            foreach (var values in ImmutableArray.Create<int[]?>(null, [], [17], [11, 23], [-1, 0, 7]))
             {
-                foreach (var first in new[] { -1, 0, 1, values?.Length ?? 0 })
+                foreach (var first in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                 {
-                    foreach (var second in new[] { -1, 0, 1, values?.Length ?? 0 })
+                    foreach (var second in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                     {
                         for (var read = 0; read < Math.Max(1, values?.Length ?? 0); read++)
                         {
@@ -135,14 +136,8 @@ internal sealed partial class NativeSpecifiedCallTests
                             var parameters = context.Parameters;
                             var type = factory.GetVariableInfo(parameters[0].Entry).Type;
                             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                                new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-                                {
-                                    [parameters[0].Entry] = values == null ? factory.CreateNullValue(type) :
-                                        factory.CreateSequenceValue(type, values.Select(value => factory.CreateIntegerValue(value))),
-                                    [parameters[1].Entry] = factory.CreateIntegerValue(first),
-                                    [parameters[2].Entry] = factory.CreateIntegerValue(second),
-                                    [parameters[3].Entry] = factory.CreateIntegerValue(read)
-                                }, 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                                ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(parameters[0].Entry, values == null ? factory.CreateNullValue(type) :
+                                        factory.CreateSequenceValue(type, values.Select(value => factory.CreateIntegerValue(value)))).SetItem(parameters[1].Entry, factory.CreateIntegerValue(first)).SetItem(parameters[2].Entry, factory.CreateIntegerValue(second)).SetItem(parameters[3].Entry, factory.CreateIntegerValue(read)), 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                             Assert.That(replay.Status, Is.EqualTo(fault == null ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
                             if (fault == null)
                             {

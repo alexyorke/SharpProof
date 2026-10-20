@@ -86,7 +86,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             var shipped = kind == DependencyKind.Shipped;
             var retargetable = kind == DependencyKind.Retargetable;
             var foreignName = "OrdinaryParameterAttributes_" + kind;
-            byte[]? attributeImage = null;
+            ImmutableArray<byte>? attributeImage = null;
             string? attributePath = null;
             AssemblyIdentity? foreignIdentity = null;
             var libraryReferences = TestMetadataReferences.WithSharpProof;
@@ -99,13 +99,13 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
                 Assert.That(attributes.Assembly.Identity.PublicKey, Is.Empty);
                 foreignIdentity = attributes.Assembly.Identity;
                 attributeImage = Emit(attributes);
-                using (var attributePe = new PEReader(new MemoryStream(attributeImage, writable: false)))
+                using (var attributePe = new PEReader(attributeImage.Value))
                 {
                     var flags = attributePe.GetMetadataReader().GetAssemblyDefinition().Flags;
                     Assert.That((flags & AssemblyFlags.Retargetable) != 0, Is.EqualTo(retargetable));
                 }
                 attributePath = Path.Combine(directory.FullName, foreignName + ".dll");
-                await File.WriteAllBytesAsync(attributePath, attributeImage);
+                await File.WriteAllBytesAsync(attributePath, attributeImage.Value.AsMemory());
                 libraryReferences = TestMetadataReferences.WithoutSharpProof.Add(MetadataReference.CreateFromFile(attributePath));
             }
 
@@ -113,7 +113,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             var library = Create(libraryName, LibrarySource, libraryReferences);
             var libraryImage = Emit(library);
             var libraryPath = Path.Combine(directory.FullName, libraryName + ".dll");
-            await File.WriteAllBytesAsync(libraryPath, libraryImage);
+            await File.WriteAllBytesAsync(libraryPath, libraryImage.AsMemory());
             var libraryReference = MetadataReference.CreateFromFile(libraryPath);
             var consumer = Create("OrdinaryParameterConsumer_" + kind, ConsumerSource,
                 TestMetadataReferences.WithSharpProof.Add(libraryReference));
@@ -146,7 +146,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
             Assert.That(CompilerScalarIlDecoder.Candidate(method), Is.True);
 
-            using var pe = new PEReader(new MemoryStream(libraryImage, writable: false));
+            using var pe = new PEReader(libraryImage);
             var reader = pe.GetMetadataReader();
             var definition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
                 .Single(candidate => reader.GetString(candidate.Name) == "Target");
@@ -209,14 +209,14 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             }
 
             _ = runtime.LoadFromAssemblyPath(typeof(PositiveAttribute).Assembly.Location);
-            if (attributeImage != null)
+            if (attributeImage is { } dependencyImage)
             {
-                using var attributeStream = new MemoryStream(attributeImage, writable: false);
+                using var attributeStream = new MemoryStream(dependencyImage.ToArray(), writable: false);
                 _ = runtime.LoadFromStream(attributeStream);
             }
-            using var libraryStream = new MemoryStream(libraryImage, writable: false);
+            using var libraryStream = new MemoryStream(libraryImage.ToArray(), writable: false);
             var runtimeLibrary = runtime.LoadFromStream(libraryStream);
-            using var consumerStream = new MemoryStream(consumerImage, writable: false);
+            using var consumerStream = new MemoryStream(consumerImage.ToArray(), writable: false);
             var runtimeConsumer = runtime.LoadFromStream(consumerStream);
             var libraryResult = runtimeLibrary.GetType("Library")!.GetMethod("Target")!.Invoke(null, [7]);
             var consumerResult = runtimeConsumer.GetType("Subject")!.GetMethod("Target")!.Invoke(null, [7]);
@@ -255,12 +255,12 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
         return compilation;
     }
 
-    private static byte[] Emit(CSharpCompilation compilation)
+    private static ImmutableArray<byte> Emit(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.That(result.Success, Is.True, string.Join("\n", result.Diagnostics));
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 }

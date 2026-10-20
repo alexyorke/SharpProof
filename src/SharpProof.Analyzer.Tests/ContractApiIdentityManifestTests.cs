@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -42,12 +43,10 @@ public sealed class ContractApiIdentityManifestTests
         var callable = result.Manifest.Callables.Single();
         Assert.That(
             callable.SelectedFeatures,
-            Is.EqualTo(new[] { WorkerSelectedFeature.Contracts }));
+            Is.EqualTo(ImmutableArray.Create(WorkerSelectedFeature.Contracts)));
         Assert.That(
             callable.SelectionReasons,
-            Is.EqualTo(new[] {
-                WorkerSelectionReason.ExplicitAnnotation
-            }));
+            Is.EqualTo(ImmutableArray.Create(WorkerSelectionReason.ExplicitAnnotation)));
         Assert.That(callable.ClaimIds, Is.Empty);
     }
 }

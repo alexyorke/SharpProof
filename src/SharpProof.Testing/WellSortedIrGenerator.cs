@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using SharpProof.Ir;
 
@@ -5,11 +6,11 @@ namespace SharpProof.Testing;
 
 internal sealed record GeneratedIrCase(
     IrTerm Term,
-    IReadOnlyDictionary<IrVarId, IrValue> Variables,
+    ImmutableDictionary<IrVarId, IrValue> Variables,
     GeneratedIrCategory Category = GeneratedIrCategory.Arithmetic)
 {
     public IrTerm Term { get; init; } = Term ?? throw new System.ArgumentNullException(nameof(Term));
-    public IReadOnlyDictionary<IrVarId, IrValue> Variables { get; init; } = Variables ?? throw new System.ArgumentNullException(nameof(Variables));
+    public ImmutableDictionary<IrVarId, IrValue> Variables { get; init; } = Variables ?? throw new System.ArgumentNullException(nameof(Variables));
 }
 
 internal enum GeneratedIrCategory
@@ -30,7 +31,7 @@ internal enum GeneratedIrCategory
 
 internal static class DifferentialIntegerCorpus
 {
-    public static IReadOnlyList<long> InterestingIntegers { get; } = [
+    public static ImmutableArray<long> InterestingIntegers { get; } = [
         long.MinValue,
         -3,
         -1,
@@ -48,11 +49,11 @@ internal static class DifferentialIntegerCorpus
     Justification = "The seeded generator intentionally produces deterministic test cases.")]
 internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 {
-    private static readonly IrBinaryOperator[] IntegerOperators = [
+    private static readonly ImmutableArray<IrBinaryOperator> IntegerOperators = [
         IrBinaryOperator.Add, IrBinaryOperator.Subtract, IrBinaryOperator.Multiply,
         IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd,
         IrBinaryOperator.BitwiseOr, IrBinaryOperator.BitwiseXor];
-    private static readonly IrBinaryOperator[] ComparisonOperators = [
+    private static readonly ImmutableArray<IrBinaryOperator> ComparisonOperators = [
         IrBinaryOperator.Equal, IrBinaryOperator.NotEqual, IrBinaryOperator.LessThan,
         IrBinaryOperator.LessThanOrEqual, IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThanOrEqual];
 
@@ -116,73 +117,75 @@ internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         var textChoice = _random.Next(4);
         var sequenceIsNull = _random.Next(4) == 0;
         var sequenceLength = sequenceIsNull ? 0 : _random.Next(4);
-        long[]? sequenceElements = referenced.Contains(_values) && !sequenceIsNull
-            ? new long[sequenceLength]
+        var sequenceElements = referenced.Contains(_values) && !sequenceIsNull
+            ? ImmutableArray.CreateBuilder<long>(sequenceLength)
             : null;
         for (var index = 0; index < sequenceLength; index++)
         {
             var value = NextInteger();
             if (sequenceElements != null)
             {
-                sequenceElements[index] = value;
+                sequenceElements.Add(value);
             }
         }
 
         var leftValue = NextInteger();
         var rightValue = NextInteger();
         var conditionValue = _random.Next(2) == 0;
-        var variables = new Dictionary<IrVarId, IrValue>();
+        var variables = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (referenced.Contains(_left))
         {
-            variables[_left] = _factory.CreateIntegerValue(leftValue);
+            variables.Add(_left, _factory.CreateIntegerValue(leftValue));
         }
         if (referenced.Contains(_right))
         {
-            variables[_right] = _factory.CreateIntegerValue(rightValue);
+            variables.Add(_right, _factory.CreateIntegerValue(rightValue));
         }
         if (referenced.Contains(_condition))
         {
-            variables[_condition] = _factory.CreateBooleanValue(conditionValue);
+            variables.Add(_condition, _factory.CreateBooleanValue(conditionValue));
         }
         if (referenced.Contains(_text))
         {
-            variables[_text] = textChoice switch
+            variables.Add(_text, textChoice switch
             {
                 0 => _factory.CreateNullValue(_factory.StringType),
                 1 => _factory.CreateStringValue(""),
                 2 => _factory.CreateStringValue("sharp"),
                 _ => _factory.CreateStringValue("proof")
-            };
+            });
         }
         if (referenced.Contains(_reference))
         {
-            variables[_reference] = _factory.CreateNullValue(_factory.ObjectType);
+            variables.Add(_reference, _factory.CreateNullValue(_factory.ObjectType));
         }
         if (referenced.Contains(_values))
         {
-            variables[_values] = sequenceIsNull
+            variables.Add(_values, sequenceIsNull
                 ? _factory.CreateNullValue(_integerSequence)
                 : _factory.CreateSequenceValue(
                     _integerSequence,
-                    sequenceElements!.Select(_factory.CreateIntegerValue));
+                    sequenceElements!.ToImmutable().Select(_factory.CreateIntegerValue)));
         }
-        return new GeneratedIrCase(term, variables, category);
+        return new GeneratedIrCase(term, variables.ToImmutable(), category);
     }
 
-    private static HashSet<IrVarId> CollectVariables(IrTerm root)
+    private static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
         System.ArgumentNullException.ThrowIfNull(root);
-        var variables = new HashSet<IrVarId>();
-        var visited = new HashSet<IrId>();
-        var pending = new Stack<IrTerm>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
+        var pending = ImmutableStack<IrTerm>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!visited.Add(current.Id))
             {
                 continue;
             }
+
 
             if (current is IrVariableTerm variable)
             {
@@ -194,38 +197,38 @@ internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
                 case IrOpaqueTerm opaque:
                     if (opaque.Receiver is { } receiver)
                     {
-                        pending.Push(receiver);
+                        pending = pending.Push(receiver);
                     }
                     for (var index = 0; index < opaque.Arguments.Length; index++)
                     {
-                        pending.Push(opaque.Arguments[index]);
+                        pending = pending.Push(opaque.Arguments[index]);
                     }
                     break;
                 case IrUnaryTerm unary:
-                    pending.Push(unary.Operand);
+                    pending = pending.Push(unary.Operand);
                     break;
                 case IrBinaryTerm binary:
-                    pending.Push(binary.Left);
-                    pending.Push(binary.Right);
+                    pending = pending.Push(binary.Left);
+                    pending = pending.Push(binary.Right);
                     break;
                 case IrConditionalTerm conditional:
-                    pending.Push(conditional.Condition);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.WhenFalse);
+                    pending = pending.Push(conditional.Condition);
+                    pending = pending.Push(conditional.WhenTrue);
+                    pending = pending.Push(conditional.WhenFalse);
                     break;
                 case IrCastTerm cast:
-                    pending.Push(cast.Operand);
+                    pending = pending.Push(cast.Operand);
                     break;
                 case IrLengthTerm length:
-                    pending.Push(length.Value);
+                    pending = pending.Push(length.Value);
                     break;
                 case IrSequenceAccessTerm access:
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
+                    pending = pending.Push(access.Sequence);
+                    pending = pending.Push(access.Index);
                     break;
             }
         }
-        return variables;
+        return variables.ToImmutable();
     }
 
     private IrTerm Integer(int depth)
@@ -327,7 +330,7 @@ internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private long NextInteger()
     {
         var value = DifferentialIntegerCorpus.InterestingIntegers[
-            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)];
+            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)];
         // Total factories use signed 32-bit integers by default. Keep boundary
         // samples at that width instead of constructing invalid 64-bit literals.
         return _factory.Semantics == IrExecutionSemantics.Total

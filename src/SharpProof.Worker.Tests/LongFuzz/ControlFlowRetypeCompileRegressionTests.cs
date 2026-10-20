@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -16,7 +17,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         var random = new Random(seed);
         Assert.That(random.Next(9), Is.EqualTo(4), "seed must select dnt-bool");
         var generator = typeof(ControlFlowLongFuzzTests);
-        var generated = Invoke(generator, "Body", seed, random)!;
+        var generated = Invoke(generator, "Body", [seed, random])!;
         var body = (string)generated.GetType().GetProperty("Body")!.GetValue(generated)!;
         Assert.That(body, Does.Contain("int L1()"));
 
@@ -37,7 +38,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         var random = new Random(seed);
         Assert.That(random.Next(9), Is.EqualTo(modeIndex), "seed must select its pinned mode");
         var generator = typeof(ControlFlowLongFuzzTests);
-        var generated = Invoke(generator, "Body", seed, random)!;
+        var generated = Invoke(generator, "Body", [seed, random])!;
         var body = (string)generated.GetType().GetProperty("Body")!.GetValue(generated)!;
         Assert.That(body, Does.Contain("int L1()"));
 
@@ -94,11 +95,11 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(type);
         var generator = typeof(ControlFlowLongFuzzTests);
-        var retyped = (string)Invoke(generator, "Retype", body, type)!;
+        var retyped = (string)Invoke(generator, "Retype", [body, type])!;
         var source = $"public static class C {{ public static int State; public static {type} Target(int x) {{ {retyped} }} }}";
-        var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
+        var compilation = (CSharpCompilation)Invoke(generator, "Compile", [source])!;
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         using var stream = new MemoryStream();
@@ -119,26 +120,27 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         }
     }
 
-    private static Diagnostic[] CompileForType(string body, string type)
+    private static ImmutableArray<Diagnostic> CompileForType(string body, string type)
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(type);
         var generator = typeof(ControlFlowLongFuzzTests);
-        var retyped = (string)Invoke(generator, "Retype", body, type)!;
-        var runtime = (string)Invoke(generator, "Runtime", retyped)!;
+        var retyped = (string)Invoke(generator, "Retype", [body, type])!;
+        var runtime = (string)Invoke(generator, "Runtime", [retyped])!;
         var runtimeState = (string)generator.GetField("RuntimeState", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!;
-        var source = (string)Invoke(generator, "Source", runtimeState,
-            $"public static {type} Target(int x) {{ ", runtime)!;
-        var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
+        var source = (string)Invoke(generator, "Source", [runtimeState,
+            $"public static {type} Target(int x) {{ ", runtime])!;
+        var compilation = (CSharpCompilation)Invoke(generator, "Compile", [source])!;
         return compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
     }
 
-    private static object? Invoke(Type type, string name, params object[] arguments)
+    private static object? Invoke(Type type, string name, ImmutableArray<object?> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(type);
-        return type.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, arguments);
+        return type.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, arguments.ToArray());
     }
 }

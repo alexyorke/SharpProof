@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 
@@ -25,19 +26,19 @@ public sealed class MetadataSourceNativeBoundaryControls
         };
         var subject = (family == "static-read" ? "public static long State = 7; " : "") +
             "public static long Target0(long value) { Contract.Ensures(true); " + body + " }";
-        MetadataProgramSourceCase[] cases = [new(Library, subject, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(Library, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
-            Assert.That(actual.Premises, Has.Length.EqualTo(1));
-            Assert.That(actual.Premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
-            Assert.That(actual.Premises[0].HasTotal, Is.True);
-            Assert.That(actual.Premises[0].HasResult, Is.True);
+            var compiled = await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Assert.That(compiled.Premises, Has.Length.EqualTo(1));
+            Assert.That(compiled.Premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
+            Assert.That(compiled.Premises[0].HasTotal, Is.True);
+            Assert.That(compiled.Premises[0].HasResult, Is.True);
             var expected = family is "identity" or "static-read" ? 7L : 0L;
-            Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(expected));
+            Assert.That(compiled.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(expected));
             if (family == "static-read")
             {
-                Assert.That(actual.Subject.GetField("State")!.GetValue(null), Is.EqualTo(7L));
+                Assert.That(compiled.Subject.GetField("State")!.GetValue(null), Is.EqualTo(7L));
             }
         }
         var replay = new MetadataProgramSourceReplay(12370);

@@ -4,22 +4,22 @@ internal sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = new(ExternalIdentityBucketKeyComparer.Instance);
-    private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
-    private readonly List<string> _strings = [];
-    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
-    private readonly List<IrTypeInfo> _types = [];
-    private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
-    private readonly Dictionary<IrTypeId, IrTypeId?> _closedClassReferenceBases = [];
-    private readonly HashSet<IrTypeId> _interfaceReferenceTypes = [];
-    private readonly Dictionary<IrTypeId, HashSet<IrTypeId>> _implementedReferenceInterfaces = [];
-    private readonly List<IrVariableInfo> _variables = [];
-    private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
-    private readonly List<IrMemberInfo> _members = [];
-    private readonly List<IrOperationInfo> _operations = [];
-    private readonly Dictionary<StructuralKey, IrTerm> _termIds = new(StructuralKeyComparer.Instance);
-    private readonly List<IrTerm> _terms = [];
-    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
+    private readonly ImmutableDictionary<ExternalIdentityBucketKey, ExternalIdentityBucket>.Builder _externalIdentityBuckets = ImmutableDictionary.CreateBuilder<ExternalIdentityBucketKey, ExternalIdentityBucket>(ExternalIdentityBucketKeyComparer.Instance);
+    private readonly ImmutableDictionary<string, IrStringId>.Builder _stringIds = ImmutableDictionary.CreateBuilder<string, IrStringId>(StringComparer.Ordinal);
+    private readonly ImmutableList<string>.Builder _strings = ImmutableList.CreateBuilder<string>();
+    private readonly ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>.Builder _typeIds = ImmutableDictionary.CreateBuilder<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>();
+    private readonly ImmutableList<IrTypeInfo>.Builder _types = ImmutableList.CreateBuilder<IrTypeInfo>();
+    private readonly ImmutableHashSet<IrTypeId>.Builder _closedSealedReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
+    private readonly ImmutableList<IrVariableInfo>.Builder _variables = ImmutableList.CreateBuilder<IrVariableInfo>();
+    private readonly ImmutableDictionary<StructuralKey, IrMemberId>.Builder _memberIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrMemberId>(StructuralKeyComparer.Instance);
+    private readonly ImmutableList<IrMemberInfo>.Builder _members = ImmutableList.CreateBuilder<IrMemberInfo>();
+    private readonly ImmutableList<IrOperationInfo>.Builder _operations = ImmutableList.CreateBuilder<IrOperationInfo>();
+    private readonly ImmutableDictionary<StructuralKey, IrTerm>.Builder _termIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrTerm>(StructuralKeyComparer.Instance);
+    private readonly ImmutableList<IrTerm>.Builder _terms = ImmutableList.CreateBuilder<IrTerm>();
+    private readonly ImmutableDictionary<IrTypeId, IrValue>.Builder _emptyArrays = ImmutableDictionary.CreateBuilder<IrTypeId, IrValue>();
+    private readonly ImmutableDictionary<IrTypeId, IrTypeId?>.Builder _closedClassReferenceBases = ImmutableDictionary.CreateBuilder<IrTypeId, IrTypeId?>();
+    private readonly ImmutableHashSet<IrTypeId>.Builder _interfaceReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
+    private readonly ImmutableDictionary<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>.Builder _implementedReferenceInterfaces = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>();
     private readonly long _scope;
     private int _identityCount;
 
@@ -120,7 +120,7 @@ internal sealed class IrFactory
             }
             else
             {
-                bucket = new ExternalIdentityBucket<T>();
+                bucket = new ExternalIdentityBucket<T>([]);
                 _externalIdentityBuckets.Add(bucketKey, bucket);
             }
         }
@@ -128,16 +128,11 @@ internal sealed class IrFactory
         var comparedCount = 0;
         while (true)
         {
-            ExternalIdentityEntry<T>[] candidates;
+            ImmutableArray<ExternalIdentityEntry<T>> candidates;
             lock (_gate)
             {
-                var candidateCount = bucket.Entries.Count - comparedCount;
-                candidates = new ExternalIdentityEntry<T>[candidateCount];
-                bucket.Entries.CopyTo(
-                    comparedCount,
-                    candidates,
-                    0,
-                    candidateCount);
+                bucket = (ExternalIdentityBucket<T>)_externalIdentityBuckets[bucketKey];
+                candidates = bucket.Entries.Skip(comparedCount).ToImmutableArray();
             }
 
             foreach (var candidate in candidates)
@@ -151,13 +146,15 @@ internal sealed class IrFactory
             comparedCount += candidates.Length;
             lock (_gate)
             {
+                bucket = (ExternalIdentityBucket<T>)_externalIdentityBuckets[bucketKey];
                 if (bucket.Entries.Count != comparedCount)
                 {
                     continue;
                 }
 
                 var id = CreateIdentityCore();
-                bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id));
+                _externalIdentityBuckets[bucketKey] =
+                    new ExternalIdentityBucket<T>(bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id)));
                 return id;
             }
         }
@@ -265,12 +262,12 @@ internal sealed class IrFactory
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || !_interfaceReferenceTypes.Contains(interfaceType))
             { throw new ArgumentException("An implemented interface requires certified nominal views.", nameof(interfaceType)); }
             if (!_implementedReferenceInterfaces.TryGetValue(type, out var interfaces))
-            { _implementedReferenceInterfaces.Add(type, interfaces = []); }
+            { _implementedReferenceInterfaces.AddUnique(type, interfaces = ImmutableHashSet.CreateBuilder<IrTypeId>()); }
             interfaces.Add(interfaceType);
         }
     }
 
-    internal IrTypeId[] GetImplementedReferenceInterfaces(IrTypeId type)
+    internal ImmutableArray<IrTypeId> GetImplementedReferenceInterfaces(IrTypeId type)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
@@ -346,13 +343,22 @@ internal sealed class IrFactory
         }
     }
 
-    public IrMemberId GetOrCreateMember(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
+    public IrMemberId GetOrCreateMember(IrIdentityId identity /* SPINT001: all values valid - GetOrCreateMemberSnapshot validates the identity scope under the factory gate */, IrTypeId declaringType, string name /* SPINT001: all values valid - GetOrCreateMemberSnapshot validates names after parameter types to preserve guard ordering */, IrTypeId returnType, bool isStatic,
         params IrTypeId[] parameterTypes)
     {
         RepositoryParameterGuard.ThrowIfInvalid(declaringType.IsDefault, nameof(declaringType));
         RepositoryParameterGuard.ThrowIfInvalid(returnType.IsDefault, nameof(returnType));
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
-        var parameters = ImmutableArray.CreateRange(parameterTypes);
+        return GetOrCreateMemberSnapshot(identity, declaringType, name, returnType, isStatic, ImmutableArray.CreateRange(parameterTypes));
+    }
+
+    internal IrMemberId GetOrCreateMemberSnapshot(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
+        ImmutableArray<IrTypeId> parameterTypes)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(declaringType.IsDefault, nameof(declaringType));
+        RepositoryParameterGuard.ThrowIfInvalid(returnType.IsDefault, nameof(returnType));
+        RepositoryParameterGuard.RequireInitialized(parameterTypes.IsDefault, nameof(parameterTypes), "Array must be initialized.");
+        var parameters = parameterTypes;
         var parameterIds = ImmutableArray.CreateRange(
             parameters.Select(static parameter => parameter.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(parameter)) : (parameter.Value)));
         ValidateName(name, nameof(name));
@@ -616,7 +622,7 @@ internal sealed class IrFactory
         {
             EmptyArray(type);
             if (!_emptyArrays.TryGetValue(type, out var value))
-            { _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            { _emptyArrays.Add(type, value = CreateSequenceValue(type, ImmutableArray<IrValue>.Empty)); }
             return value;
         }
     }
@@ -638,7 +644,7 @@ internal sealed class IrFactory
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
+        return Opaque(member, receiver, ImmutableArray.CreateRange(arguments), IrOpaquePurity.Pure, default);
     }
 
     public IrOpaqueTerm ImpureOpaque(OperationId operation, IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
@@ -646,6 +652,21 @@ internal sealed class IrFactory
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        return Opaque(member, receiver, ImmutableArray.CreateRange(arguments), IrOpaquePurity.Impure, operation);
+    }
+
+    internal IrOpaqueTerm PureOpaqueSnapshot(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
+    }
+
+    internal IrOpaqueTerm ImpureOpaqueSnapshot(OperationId operation, IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
     }
 
@@ -917,11 +938,12 @@ internal sealed class IrFactory
     }
 
     internal void ValidateCallShape(
-        IrMemberInfo member, IrTerm? receiver, IReadOnlyList<IrTerm> arguments,
+        IrMemberInfo member, IrTerm? receiver, ImmutableArray<IrTerm> arguments,
         string parameterName)
     {
         ArgumentNullGuard.NotNull(member, nameof(member));
-        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         lock (_gate)
         {
             IrTermServices.ValidateCallShape(
@@ -934,19 +956,22 @@ internal sealed class IrFactory
         }
     }
 
-    private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
+    internal IrOpaqueTerm RebuildOpaque(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrOpaquePurity purity, OperationId operation)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var normalizedPurity = purity == IrOpaquePurity.Pure ? IrOpaquePurity.Pure : IrOpaquePurity.Impure;
+        RepositoryParameterGuard.ThrowIfInvalid(normalizedPurity == IrOpaquePurity.Impure && operation.IsDefault, nameof(operation));
+        return Opaque(member, receiver, arguments, normalizedPurity, normalizedPurity == IrOpaquePurity.Pure ? default : operation);
+    }
+
+    private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrOpaquePurity purity, OperationId operation)
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         // Pure opaque terms use the default operation ID as an intentional sentinel.
         RepositoryParameterGuard.ThrowIfInvalid(purity == IrOpaquePurity.Impure && operation.IsDefault, nameof(operation));
-        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        var argumentBuilder =
-            ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
-        foreach (var argument in arguments)
-        {
-            argumentBuilder.Add(argument);
-        }
-        var immutableArguments = argumentBuilder.MoveToImmutable();
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var immutableArguments = arguments;
 
         lock (_gate)
         {
@@ -962,19 +987,14 @@ internal sealed class IrFactory
             {
                 GetOperationInfoCore(operation, nameof(operation));
             }
-            var childIdBuilder =
-                ImmutableArray.CreateBuilder<int>(immutableArguments.Length + 1);
-            childIdBuilder.Add(receiver?.Id.Value ?? -1);
-            foreach (var argument in immutableArguments)
-            {
-                childIdBuilder.Add(argument.Id.Value);
-            }
+            var childIds = ImmutableArray.Create(receiver?.Id.Value ?? -1).AddRange(
+                immutableArguments.Select(static (IrTerm /* SPINT001: all values valid - call-shape validation rejects null arguments before interning */ argument) => argument.Id.Value));
 
             return Intern(new StructuralKey(
                     IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value,
                     IrOperatorCatalog.GetPurityKey(purity),
                     operation.IsDefault ? -1 : operation.Value,
-                    children: childIdBuilder.MoveToImmutable()),
+                    children: childIds),
                 (memberInfo.ReturnType, member, receiver, immutableArguments, purity, operation),
                 static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrOpaqueTerm(
                     id, state.ReturnType, state.member, state.receiver,
@@ -1139,7 +1159,7 @@ internal sealed class IrFactory
         return term;
     }
 
-    private T GetScoped<T>(long scope, int value, IReadOnlyList<T> items, string parameterName)
+    private T GetScoped<T>(long scope, int value, ImmutableList<T>.Builder items, string parameterName)
     {
         EnsureScope(scope, parameterName);
         return items[ArgumentNullGuard.RequireIndex(
@@ -1150,12 +1170,9 @@ internal sealed class IrFactory
 
     private abstract class ExternalIdentityBucket;
 
-    private sealed class ExternalIdentityBucket<T> : ExternalIdentityBucket where T : notnull
+    private sealed class ExternalIdentityBucket<T>(ImmutableList<ExternalIdentityEntry<T>> entries) : ExternalIdentityBucket where T : notnull
     {
-        public List<ExternalIdentityEntry<T>> Entries
-        {
-            get;
-        } = [];
+        public ImmutableList<ExternalIdentityEntry<T>> Entries { get; } = ArgumentNullGuard.NotNull(entries, nameof(entries));
     }
 
     private sealed class ExternalIdentityEntry<T>(T value, IrIdentityId id) where T : notnull

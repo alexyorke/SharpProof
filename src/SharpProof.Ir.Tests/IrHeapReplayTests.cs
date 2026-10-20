@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -27,7 +28,7 @@ internal sealed class IrHeapReplayTests
         else
         { heap.Fields[(value.Reference, field)] = replacement; }
         var term = array ? factory.SequenceAccess(factory.Variable(owner), factory.Integer(0)) : factory.PureOpaque(field, factory.Variable(owner));
-        var result = new IrInterpreter(factory).Evaluate(term, new Dictionary<IrVarId, IrValue> { [owner] = value }, null, heap, default);
+        var result = new IrInterpreter(factory).Evaluate(term, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, value), null, heap, default);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value, Is.SameAs(replacement));
         Assert.That(heap.ConsumedApproximation, Is.False);
@@ -49,7 +50,7 @@ internal sealed class IrHeapReplayTests
         heap.StoreElement(first, 0, factory.CreateIntegerValue(7));
         var owner = factory.Conditional(factory.Variable(choose), factory.Variable(known), factory.Variable(unknown));
         var result = new IrInterpreter(factory).Evaluate(factory.SequenceAccess(owner, factory.Integer(0)),
-            new Dictionary<IrVarId, IrValue> { [known] = first, [unknown] = second, [choose] = factory.CreateBooleanValue(chooseKnown) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(known, first).SetItem(unknown, second).SetItem(choose, factory.CreateBooleanValue(chooseKnown)),
             null, heap, default);
         Assert.That(result.Status, Is.EqualTo(chooseKnown ? IrEvaluationStatus.Value : IrEvaluationStatus.Unsupported));
         Assert.That(heap.ConsumedApproximation, Is.EqualTo(!chooseKnown));
@@ -69,7 +70,7 @@ internal sealed class IrHeapReplayTests
         var second = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Second", factory.IntegerType, false);
         var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3), factory.CreateIntegerValue(4)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(first, factory.CreateIntegerValue(3)).WithField(second, factory.CreateIntegerValue(4)));
-        var variables = new Dictionary<IrVarId, IrValue> { [owner] = value, [old] = value };
+        var variables = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, value).SetItem(old, value);
         var heap = new IrHeap();
         heap.Invalidate();
         if (array)
@@ -86,13 +87,13 @@ internal sealed class IrHeapReplayTests
                 : factory.PureOpaque(other ? second : first, factory.Variable(receiver));
         }
         var interpreter = new IrInterpreter(factory);
-        var restored = interpreter.Evaluate(Read(owner, false), variables, null, heap, default, [old]);
+        var restored = interpreter.Evaluate(Read(owner, false), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(restored.Value!.Integer, Is.EqualTo(7));
         Assert.That(heap.ConsumedApproximation, Is.False);
-        var snapshot = interpreter.Evaluate(Read(old, false), variables, null, heap, default, [old]);
+        var snapshot = interpreter.Evaluate(Read(old, false), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(snapshot.Value!.Integer, Is.EqualTo(3));
         Assert.That(heap.ConsumedApproximation, Is.False);
-        var unknown = interpreter.Evaluate(Read(owner, true), variables, null, heap, default, [old]);
+        var unknown = interpreter.Evaluate(Read(owner, true), variables, null, heap, default, ImmutableHashSet.Create(old));
         Assert.That(unknown.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(heap.ConsumedApproximation, Is.True);
         heap.Invalidate();
@@ -138,7 +139,7 @@ internal sealed class IrHeapReplayTests
         builder.Write(entry, factory.CreateOperation(), region);
         builder.Return(entry, factory.CreateOperation(), factory.SequenceAccess(factory.Variable(array), factory.Integer(0)));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [array] = factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])));
         Assert.That(result.Status, Is.EqualTo(region == IrWriteRegion.Static ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(region != IrWriteRegion.Static));
     }

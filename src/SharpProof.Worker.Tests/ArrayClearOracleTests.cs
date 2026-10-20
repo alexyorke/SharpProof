@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -60,11 +61,9 @@ public sealed class ArrayClearOracleTests
         try
         {
             image.Position = 0;
-            Dictionary<ScopedIrId<IrVariableTag>, IrValue>? inputs = data == null ? null : new()
-            {
-                [context.Parameters[0].Entry] = factory.CreateSequenceValue(factory.GetVariableInfo(context.Parameters[0].Entry).Type,
-                    data.Select(factory.CreateStringValue))
-            };
+            var inputs = data == null ? null : ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(
+                context.Parameters[0].Entry, factory.CreateSequenceValue(factory.GetVariableInfo(context.Parameters[0].Entry).Type,
+                    data.Select(factory.CreateStringValue)));
             var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, data == null ? null : [data]);
             var result = new IrProgramInterpreter(factory).Execute(lowered.Program, inputs, 5000);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -145,7 +146,7 @@ internal sealed class ContractApiTests
     public void CompanionAndAllowanceAttributesPreserveTheirTypedArguments()
     {
         Type[] exceptions = [typeof(IOException), typeof(InvalidOperationException)];
-        var capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
+        const SharpProofCapability capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(new AllowedExceptionsAttribute(exceptions).ExceptionTypes, Is.SameAs(exceptions));
@@ -177,11 +178,7 @@ internal sealed class ContractApiTests
     [Test]
     public void ClosedContractsTargetOnlyParametersAndReturns()
     {
-        foreach (var type in new[] {
-                     typeof(NotNullAttribute),
-                     typeof(PositiveAttribute),
-                     typeof(InRangeAttribute)
-                 })
+        foreach (var type in ImmutableArray.Create(typeof(NotNullAttribute), typeof(PositiveAttribute), typeof(InRangeAttribute)))
         {
             Assert.That(
                 type.GetCustomAttribute<AttributeUsageAttribute>()!.ValidOn,
@@ -199,7 +196,7 @@ internal sealed class ContractApiTests
     [Test]
     public void PublicEffectVocabularyContainsNoAnalysisState()
     {
-        var names = Enum.GetNames<SharpProofEffect>();
+        var names = Enum.GetNames<SharpProofEffect>().ToImmutableArray();
 
         Assert.That(names, Does.Not.Contain("Unknown"));
         Assert.That(names, Does.Not.Contain("DirectCall"));

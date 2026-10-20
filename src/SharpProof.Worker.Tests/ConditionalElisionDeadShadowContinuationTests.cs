@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -54,7 +55,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         Assert.That(batch.Callers, Has.Length.EqualTo(1));
@@ -65,7 +66,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         var factory = body.Program.Factory;
         var entry = body.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(18)));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -79,17 +80,17 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         System.ArgumentNullException.ThrowIfNull(owningInvocations);
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
-        var regions = new List<ControlFlowRegion>();
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
+        var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var pending = ImmutableStack<ControlFlowRegion>.Empty.Push(graph.Root);
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
-            regions.Add(region);
+            pending = pending.Pop(out var region);
+            regionsBuilder.Add(region);
             foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
+            { pending = pending.Push(nested); }
         }
-        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToDictionary(item => item.region, item => item.id);
+        var regions = regionsBuilder.ToImmutable();
+        var regionIds = ImmutableDictionaryCapture.Create(regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))), item => item.region, item => item.id);
         var evidence = new
         {
             Source = source,
@@ -110,7 +111,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                 Length = invocation.Syntax.Span.Length,
                 Syntax = invocation.Syntax.ToString(),
                 Target = invocation.TargetMethod.ToDisplayString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Regions = regions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (new
             {
                 Id = regionIds[region],
@@ -118,7 +119,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                 Kind = region.Kind.ToString(),
                 First = region.FirstBlockOrdinal,
                 Last = region.LastBlockOrdinal
-            })).ToArray(),
+            })).ToImmutableArray(),
             Blocks = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
             {
                 block.Ordinal,
@@ -134,7 +135,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                     Start = operation.Syntax.SpanStart,
                     Length = operation.Syntax.Span.Length,
                     Syntax = operation.Syntax.ToString()
-                })).ToArray(),
+                })).ToImmutableArray(),
                 BranchValue = block.BranchValue?.DescendantsAndSelf().Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (new
                 {
                     Kind = operation.Kind.ToString(),
@@ -143,20 +144,20 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                     Start = operation.Syntax.SpanStart,
                     Length = operation.Syntax.Span.Length,
                     Syntax = operation.Syntax.ToString()
-                })).ToArray(),
+                })).ToImmutableArray(),
                 Fall = block.FallThroughSuccessor == null ? null : new
                 {
                     Semantics = block.FallThroughSuccessor.Semantics.ToString(),
                     Destination = block.FallThroughSuccessor.Destination?.Ordinal,
-                    Finally = block.FallThroughSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToArray()
+                    Finally = block.FallThroughSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 },
                 Alternative = block.ConditionalSuccessor == null ? null : new
                 {
                     Semantics = block.ConditionalSuccessor.Semantics.ToString(),
                     Destination = block.ConditionalSuccessor.Destination?.Ordinal,
-                    Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToArray()
+                    Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 }
-            })).ToArray()
+            })).ToImmutableArray()
         };
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ?? TestContext.CurrentContext.WorkDirectory;
         var directory = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "conditional-elision-cfg");

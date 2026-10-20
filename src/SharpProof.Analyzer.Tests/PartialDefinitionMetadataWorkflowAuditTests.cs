@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -46,7 +47,7 @@ public sealed class PartialDefinitionMetadataWorkflowAuditTests
         });
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,
             profile: profile, features: "effects");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics.Single().Location.SourceTree?.FilePath, Is.EqualTo("Subject.Definition.cs"));
     }
 }

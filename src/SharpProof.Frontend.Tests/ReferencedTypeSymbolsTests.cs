@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,7 +9,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ReferencedTypeSymbolsTests
 {
-    private static readonly string[] ExpectedTraversalOrder =
+    private static readonly ImmutableArray<string> ExpectedTraversalOrder =
     [
         "ConsumerAssembly:ConsumerRoot",
         "ConsumerAssembly:ConsumerRoot.Nested",
@@ -29,14 +30,14 @@ public sealed class ReferencedTypeSymbolsTests
     {
         var compilation = CreateCompilation(
             "Cancellation",
-            "namespace A.B.C.D { }");
+            "namespace A.B.C.D { }", []);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         var exception = Assert.Throws<OperationCanceledException>(
             (Action)(() => ReferencedTypeSymbols.GetAll(
                 compilation,
-                cancellation.Token).ToArray()));
+                cancellation.Token).ToImmutableArray()));
 
         Assert.That(
             exception!.CancellationToken,
@@ -54,7 +55,7 @@ public sealed class ReferencedTypeSymbolsTests
                 internal sealed class Marker { }
                 namespace B.C.D { }
             }
-            """);
+            """, []);
         using var cancellation = new CancellationTokenSource();
         using var types = ReferencedTypeSymbols.GetAll(
             compilation,
@@ -82,9 +83,9 @@ public sealed class ReferencedTypeSymbolsTests
                     "N" + index.ToString(CultureInfo.InvariantCulture)));
         var compilation = CreateCompilation(
             "DeepNamespaces",
-            "namespace " + namespaceName + " { }");
+            "namespace " + namespaceName + " { }", []);
 
-        var types = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
+        var types = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
 
         Assert.That(types, Is.Empty);
     }
@@ -117,7 +118,7 @@ public sealed class ReferencedTypeSymbolsTests
             {
                 internal sealed class Nested { }
             }
-            """);
+            """, []);
         var compilation = CreateCompilation(
             "ConsumerAssembly",
             """
@@ -144,12 +145,12 @@ public sealed class ReferencedTypeSymbolsTests
                 internal sealed class Nested { }
             }
             """,
-            referenced.ToMetadataReference());
+            [referenced.ToMetadataReference()]);
 
         var identities = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type =>
                 type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ContainingAssembly.Name + ":" + type.ToDisplayString()))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(
             identities,
@@ -173,7 +174,7 @@ public sealed class ReferencedTypeSymbolsTests
                 compilation,
                 contractFor!.ContainingAssembly, TestContext.CurrentContext.CancellationToken)
             .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(types, Does.Contain("Consumer.Marker"));
         Assert.That(types, Does.Not.Contain("object"));
@@ -182,9 +183,10 @@ public sealed class ReferencedTypeSymbolsTests
     private static CSharpCompilation CreateCompilation(
         string assemblyName,
         string source,
-        params MetadataReference[] references)
+        ImmutableArray<MetadataReference> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(assemblyName);
         System.ArgumentNullException.ThrowIfNull(source);
         return CSharpCompilation.Create(

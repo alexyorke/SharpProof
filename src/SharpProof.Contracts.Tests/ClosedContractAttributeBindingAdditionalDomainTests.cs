@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,10 +9,10 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
 {
-    private static readonly long[] PredicateInputs = [-1L, 2L, 4L];
-    private static readonly string[] MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
+    private static readonly ImmutableArray<long> PredicateInputs = [-1L, 2L, 4L];
+    private static readonly ImmutableArray<string> MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
 
-    private static readonly string[] MetadataIntegerDiagnostics =
+    private static readonly ImmutableArray<string> MetadataIntegerDiagnostics =
     [
         "[Positive] count",
         "[InRange(1, 3)] count"
@@ -182,7 +183,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var value = factory.Variable(variable);
         var valueRequests = 0;
-        var operationSites = new List<SyntaxNode?>();
+        var operationSiteBuilder = ImmutableArray.CreateBuilder<SyntaxNode?>();
         var result = ClosedContractAttributeBinding.BindValue(
             factory,
             api.Selections,
@@ -199,27 +200,22 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
-                operationSites.Add(syntax);
+                operationSiteBuilder.Add(syntax);
                 return factory.CreateOperation("held-marker-control");
             });
+        var operationSites = operationSiteBuilder.ToImmutable();
 
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses, Has.Length.EqualTo(1));
         Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[Positive] value"));
         Assert.That(result.Clauses[0].SourceSyntax, Is.Not.Null);
         Assert.That(valueRequests, Is.EqualTo(1));
-        Assert.That(operationSites, Has.Count.EqualTo(1));
+        Assert.That(operationSites, Has.Length.EqualTo(1));
         Assert.That(operationSites[0] is not null, Is.EqualTo(semantics == IrExecutionSemantics.Total));
 
         var interpreter = new IrInterpreter(factory);
-        var negative = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateIntegerValue(factory.IntegerType, -1)
-        };
-        var positive = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateIntegerValue(factory.IntegerType, 2)
-        };
+        var negative = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, -1));
+        var positive = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, 2));
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, negative).Value!.Boolean, Is.False);
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, positive).Value!.Boolean, Is.True);
     }
@@ -285,10 +281,10 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[NotNull] text"));
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateNullValue(factory.StringType) }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateNullValue(factory.StringType))).Value!.Boolean,
                 Is.False);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateStringValue("present") }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateStringValue("present"))).Value!.Boolean,
                 Is.True);
             return;
         }
@@ -299,10 +295,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var integerInterpreter = new IrInterpreter(factory);
         foreach (var input in PredicateInputs)
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(factory.IntegerType, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, input));
             Assert.That(integerInterpreter.Evaluate(result.Clauses[0].Condition, values).Value!.Boolean,
                 Is.EqualTo(input > 0));
             Assert.That(integerInterpreter.Evaluate(result.Clauses[1].Condition, values).Value!.Boolean,
@@ -336,7 +329,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
 
         var consumer = TestCompilation.Create("ClosedAttributeMetadataConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(consumer);
         var method = consumer.GetTypeByMetadataName("Library")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();

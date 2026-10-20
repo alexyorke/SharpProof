@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ValidatedArrayInitializerDepthCoverageTests
 {
-    private static readonly int[] Inputs = [5, -17];
+    private static readonly ImmutableArray<int> Inputs = [5, -17];
 
     [TestCase(253, true)]
     [TestCase(254, false)]

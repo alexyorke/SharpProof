@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -18,8 +19,8 @@ public sealed class IntegralConvertOracleTests
     public void IntegralToInt64SymbolGuardRejectsSourceLookalikesAndOtherDomains()
     {
         var references = CSharpCompilation.Create("SymbolGuard", references: TestMetadataReferences.Platform);
-        var overloads = references.GetTypeByMetadataName("System.Convert")!.GetMembers("ToInt64").OfType<IMethodSymbol>().ToArray();
-        Assert.That(overloads.Where(CSharpOperationSemantics.IsIntegralConvertToInt64).ToArray(), Has.Length.EqualTo(10));
+        var overloads = references.GetTypeByMetadataName("System.Convert")!.GetMembers("ToInt64").OfType<IMethodSymbol>().ToImmutableArray();
+        Assert.That(overloads.Where(CSharpOperationSemantics.IsIntegralConvertToInt64).ToImmutableArray(), Has.Length.EqualTo(10));
         foreach (var method in overloads)
         {
             var type = method.Parameters[0].Type.SpecialType;
@@ -155,8 +156,10 @@ public sealed class IntegralConvertOracleTests
                     return PassiveCallableVcPlan.ObserveIntegralConvertInitialization(factory, request, PassiveCallableVcPlan.WarmIntegralConvert);
                 }
             };
+            var initialValues = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+            initialValues[parameter] = irValue;
             var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter] = irValue }, 5000, options);
+                initialValues.ToImmutable(), 5000, options);
             Assert.That(execution.ConsumedApproximation, Is.EqualTo(overflow));
             if (fault is null)
             {

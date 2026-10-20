@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -40,9 +41,10 @@ public sealed class CompilerBodyAbstractionTests
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
         var unknown = checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is not ProvenOutcome));
         Assert.That(unknown.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
@@ -67,19 +69,46 @@ public sealed class CompilerBodyAbstractionTests
         switch (mutation)
         {
             case "missing-marker":
-                total.IsBodyAbstraction = false;
+                {
+                    total = total with { IsBodyAbstraction = false };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "drop-current":
-                havoc.Items = [total.Result];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Result] });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "havoc-entry":
-                havoc.Items = [total.Parameters[0].Entry, total.Result];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Parameters[0].Entry, total.Result] });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "origin":
-                havoc.Origin = IrHavocOrigin.Input;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Origin = IrHavocOrigin.Input });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "initial-old":
-                instructions[1].A = total.Parameters[0].Current;
+                {
+                    total = total with { Graph = total.Graph.ReplaceRow(instructions[1], instructions[1] with { A = total.Parameters[0].Current }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -124,9 +153,10 @@ public sealed class CompilerBodyAbstractionTests
             } }
             """);
         using var project = new ShadowTestProject(metadata.CreateArtifact());
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks, Has.Count.EqualTo(2));
         if (string.IsNullOrEmpty(initialization))
         {

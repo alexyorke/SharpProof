@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -13,7 +14,7 @@ public sealed class NativeConstructionWorkAdmissionTests
     {
         var small = DispatcherLoops(3);
         var large = DispatcherLoops(300);
-        foreach (var candidate in new[] { small, large })
+        foreach (var candidate in ImmutableArray.Create(small, large))
         {
             Assert.That(candidate.Program.Blocks.Length, Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
             AssertReturned(new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program));
@@ -36,7 +37,7 @@ public sealed class NativeConstructionWorkAdmissionTests
     {
         var small = HeapStores(1);
         var large = HeapStores(725);
-        foreach (var candidate in new[] { small, large })
+        foreach (var candidate in ImmutableArray.Create(small, large))
         {
             Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(),
                 Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
@@ -57,9 +58,9 @@ public sealed class NativeConstructionWorkAdmissionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("dominance-work-admission");
-        var dispatch = Enumerable.Range(0, count + 1).Select(_ => builder.CreateBlock()).ToArray();
-        var headers = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToArray();
-        var latches = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToArray();
+        var dispatch = Enumerable.Range(0, count + 1).Select(_ => builder.CreateBlock()).ToImmutableArray();
+        var headers = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToImmutableArray();
+        var latches = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var index = 0; index < count; index++)
         {
             builder.Branch(dispatch[index], site, factory.Boolean(false), headers[index], dispatch[index + 1]);

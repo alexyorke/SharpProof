@@ -1,4 +1,7 @@
+using System.Collections.Immutable;
+using SharpProof.Ir;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
@@ -16,7 +19,7 @@ internal static class SarifProjection
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
         var projectDirectoryUri = DirectoryUri(projectDirectory);
-        WorkerProtocolJson.Canonicalize(response);
+        response = WorkerProtocolJson.CanonicalizeCopy(response);
         var manifest = response.Manifest ?? throw new InvalidDataException(
             "The worker response has no manifest.");
         var summary = response.Summary;
@@ -25,29 +28,33 @@ internal static class SarifProjection
         var claimResults = response.ClaimResults;
         var callableResults = response.CallableResults;
         var errors = response.Errors;
-        var claims = manifest.Claims.ToDictionary(
-            static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
-        var callables = manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
-        var results = claimResults
+        var claims = ImmutableDictionaryCapture.Create(manifest.Claims,
+            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId,
+            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim, StringComparer.Ordinal);
+        var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
+            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable, StringComparer.Ordinal);
+        var resultBuilder = ImmutableArray.CreateBuilder<object>();
+        resultBuilder.AddRange(claimResults
             .Select(result => ClaimResult(
-                request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory))
-            .ToList();
-        results.AddRange(callableResults
+                request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory)));
+        resultBuilder.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete))
             .Select(result => IncompleteResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
-        results.AddRange(callableResults
+        resultBuilder.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(IsPolicyAssumption)))
             .Select(result => AssumptionResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
-        var notifications = errors.Select(
-            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))).ToList();
+        var results = resultBuilder.ToImmutable();
+        var notificationBuilder = ImmutableArray.CreateBuilder<object>();
+        notificationBuilder.AddRange(errors.Select(
+            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))));
 
         if (runStatus != WorkerRunStatus.Complete &&
-            notifications.Count == 0)
+            notificationBuilder.Count == 0)
         {
-            notifications.Add(Notification(
+            notificationBuilder.Add(Notification(
                 "worker." + runStatus,
                 "SharpProof worker run " + runStatus +
                     " (" + failureReason + ")."));
@@ -62,43 +69,81 @@ internal static class SarifProjection
                     name = "SharpProof",
                     informationUri = "https://github.com/alexyorke/SharpProof",
                     version = summary.Versions.WorkerVersion,
-                    rules = new[]
-                    {
+                    rules = ImmutableArray.Create(
                         new { id = "SharpProof.Proven", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" },
                         new { id = "SharpProof.Refuted", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" },
                         new { id = "SharpProof.Unknown", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md" },
                         new { id = VerifierDiagnosticCodes.IncompleteSelectedCallable, helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md" },
                         new { id = VerifierDiagnosticCodes.AssumptionsDeclared, helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" }
-                    }
+                    )
                 }
             },
             automationDetails = new
             {
                 id = manifest.Hash
             },
-            originalUriBaseIds = new Dictionary<string, object>
+            originalUriBaseIds = new SourceRootUriBases(new { uri = projectDirectoryUri }),
+            invocations = ImmutableArray.Create(new
             {
-                [SourceRootUriBaseId] = new { uri = projectDirectoryUri }
-            },
-            invocations = new[] { new {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
                 properties = new { RunStatus = runStatus, FailureReason = failureReason },
-                toolExecutionNotifications = notifications
-            }},
+                toolExecutionNotifications = notificationBuilder.ToImmutable()
+            }),
             results,
             properties = summary
         };
-        var document = new Dictionary<string, object>
-        {
-            ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
-            ["version"] = "2.1.0",
-            ["runs"] = new[] { run }
-        };
+        var document = new SarifDocument(
+            "https://json.schemastore.org/sarif-2.1.0.json",
+            "2.1.0", ImmutableArray.Create<object>(run));
         return JsonSerializer.Serialize(document, WorkerProtocolJson.SharedOptions);
     }
 
+    private sealed record SarifDocument
+    {
+        [JsonPropertyName("$schema"), JsonPropertyOrder(0)]
+        public string Schema { get; }
+        [JsonPropertyOrder(1)]
+        public string Version { get; }
+        [JsonPropertyOrder(2)]
+        public ImmutableArray<object> Runs { get; }
+
+        internal SarifDocument(string schema, string version, ImmutableArray<object> runs)
+        {
+            ArgumentNullException.ThrowIfNull(schema);
+            ArgumentNullException.ThrowIfNull(version);
+            RepositoryParameterGuard.RequireInitialized(runs.IsDefault, nameof(runs), "Array must be initialized.");
+            Schema = schema;
+            Version = version;
+            Runs = runs;
+        }
+    }
+
+    private sealed record SourceRootUriBases
+    {
+        [JsonPropertyName(SourceRootUriBaseId)]
+        public object SourceRoot { get; }
+
+        internal SourceRootUriBases(object sourceRoot)
+        {
+            ArgumentNullException.ThrowIfNull(sourceRoot);
+            SourceRoot = sourceRoot;
+        }
+    }
+
+    private sealed record SemanticFingerprints
+    {
+        [JsonPropertyName("sharpProofSemanticId/v1")]
+        public string SemanticId { get; }
+
+        internal SemanticFingerprints(string semanticId)
+        {
+            ArgumentNullException.ThrowIfNull(semanticId);
+            SemanticId = semanticId;
+        }
+    }
+
     private static TEntry RequireEntry<TEntry>(
-        Dictionary<string, TEntry> entries, string id, string kind)
+        ImmutableDictionary<string, TEntry> entries, string id, string kind)
         where TEntry : class
     {
         System.ArgumentNullException.ThrowIfNull(kind);
@@ -186,7 +231,7 @@ internal static class SarifProjection
         System.ArgumentNullException.ThrowIfNull(result);
         var assumptions = result.Assumptions
             .Where(IsPolicyAssumption)
-            .ToArray();
+            .ToImmutableArray();
         var level = LauncherPresentation.Level(
             request.AssumptionPolicy, "none");
         return Result(
@@ -260,17 +305,20 @@ internal static class SarifProjection
             {
                 text = message
             },
-            locations = new[] { new { physicalLocation = new {
-                artifactLocation = ArtifactLocation(
-                    location.Path, projectDirectory),
-                region = new {
-                    startLine = location.Line, startColumn = location.Column
-                }
-            }}},
-            partialFingerprints = new Dictionary<string, string>
+            locations = ImmutableArray.Create(new
             {
-                ["sharpProofSemanticId/v1"] = semanticId
-            },
+                physicalLocation = new
+                {
+                    artifactLocation = ArtifactLocation(
+                    location.Path, projectDirectory),
+                    region = new
+                    {
+                        startLine = location.Line,
+                        startColumn = location.Column
+                    }
+                }
+            }),
+            partialFingerprints = new SemanticFingerprints(semanticId),
             properties
         };
     }
@@ -366,8 +414,8 @@ internal static class SarifProjection
         System.ArgumentNullException.ThrowIfNull(path);
         var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
-            '/', StringSplitOptions.RemoveEmptyEntries);
-        var reducedSegments = new List<string>(segments.Length);
+            '/', StringSplitOptions.RemoveEmptyEntries).ToImmutableArray();
+        var reducedSegments = ImmutableArray.CreateBuilder<string>(segments.Length);
         foreach (var segment in segments)
         {
             if (segment == ".")
@@ -389,7 +437,7 @@ internal static class SarifProjection
         }
 
         var prefix = windowsPath ? normalized[..2] + "/" : "/";
-        return prefix + string.Join("/", reducedSegments);
+        return prefix + string.Join("/", reducedSegments.ToImmutable());
     }
 
     private static string DirectoryUri(string path)

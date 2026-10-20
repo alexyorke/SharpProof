@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -27,7 +28,7 @@ public sealed class ContractClaimUnaryMinCompileRegressionTests
                 optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty,
             $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}\n{source}");
     }
@@ -45,7 +46,7 @@ public sealed class ContractClaimUnaryMinCompileRegressionTests
                 optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Does.Contain("CS0220"));
     }
 }

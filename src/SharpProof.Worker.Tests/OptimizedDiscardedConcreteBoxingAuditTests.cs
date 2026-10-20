@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -21,14 +22,14 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     private const int WarmupIterations = 10000;
     private const int MeasuredIterations = 128;
     private const int MeasurementRounds = 3;
-    private static readonly decimal[] WitnessValues = [0m, 1.25m];
-    private static readonly byte[] IdentityBody = [0x02, 0x2A];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableArray<decimal> WitnessValues = [0m, 1.25m];
+    private static readonly ImmutableArray<byte> IdentityBody = [0x02, 0x2A];
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string BoundarySource = """
         using SharpProof.Attributes;
@@ -83,14 +84,14 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "Subject.cs"), source);
         await File.WriteAllTextAsync(Path.Combine(evidence, "Boundary.cs"), BoundarySource);
 
-        var external = TestCompilation.Create("OptimizedDiscardBoundary_" + shape, ("Boundary.cs", BoundarySource));
+        var external = TestCompilation.CreateExact("OptimizedDiscardBoundary_" + shape, [("Boundary.cs", BoundarySource)]);
         external = external.WithOptions(external.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var directory = new TempDirectory("sharpproof-optimized-boxing");
         var boundaryPath = Path.Combine(directory.FullName, "Boundary.dll");
         var externalEmission = external.Emit(boundaryPath);
         Assert.That(externalEmission.Success, Is.True, string.Join("\n", externalEmission.Diagnostics));
-        var boundaryBytes = await File.ReadAllBytesAsync(boundaryPath);
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes);
+        var boundaryBytes = (await File.ReadAllBytesAsync(boundaryPath)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes.AsMemory());
         var tree = CSharpSyntaxTree.ParseText(source, (CSharpParseOptions)external.SyntaxTrees.Single().Options, "Subject.cs");
         var compilation = CSharpCompilation.Create("OptimizedDiscardCaller_" + shape, [tree],
             external.References.Append(MetadataReference.CreateFromFile(boundaryPath)), external.Options);
@@ -123,30 +124,30 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             $"shape={shape}; assembly={compilation.Assembly.Identity}; optimization={compilation.Options.OptimizationLevel}; " +
             $"compiler={typeof(CSharpCompilation).Assembly.GetName().Version}; cast={cast.Syntax}; " +
             $"operand={cast.Operand.Type}; target={cast.Type}; explicit={!cast.IsImplicit}; " +
-            $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
-            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(BoundarySource))}\n");
+            $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
+            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}\n");
 
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
-        var observations = new List<RuntimeObservation>();
+        var observationsBuilder = ImmutableArray.CreateBuilder<RuntimeObservation>();
         var runtime = new AssemblyLoadContext("OptimizedDiscardOracle_" + shape, isCollectible: true);
         try
         {
-            using var externalImage = new MemoryStream(boundaryBytes);
+            using var externalImage = new MemoryStream(boundaryBytes.ToArray(), writable: false);
             var boundaryMethod = runtime.LoadFromStream(externalImage).GetType("Boundary")!.GetMethod("Echo")!;
             var type = runtime.LoadFromStream(image).GetType("Subject")!;
             var targetMethod = type.GetMethod("Target")!;
             var controlMethod = type.GetMethod("Control")!;
             var sourceMethod = type.GetMethod("SourceEcho", BindingFlags.NonPublic | BindingFlags.Static)!;
-            foreach (var method in new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod })
+            foreach (var method in ImmutableArray.Create(targetMethod, controlMethod, sourceMethod, boundaryMethod))
             { AssertNoInliningOnly(method); }
             Assert.That(boundaryMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
             Assert.That(sourceMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
-            var il = new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod }.Select(DescribeIl).ToArray();
+            var il = ImmutableArray.Create(targetMethod, controlMethod, sourceMethod, boundaryMethod).Select(DescribeIl).ToImmutableArray();
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
                 JsonSerializer.Serialize(il, WorkerProtocolJson.SharedOptions));
             var target = targetMethod.CreateDelegate<Func<decimal, object, int>>();
@@ -164,16 +165,17 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
                     var before = Measure(control, witness, sentinel);
                     var subject = Measure(target, witness, sentinel);
                     var after = Measure(control, witness, sentinel);
-                    observations.Add(new(witness.ToString(CultureInfo.InvariantCulture), round,
+                    observationsBuilder.Add(new(witness.ToString(CultureInfo.InvariantCulture), round,
                         subject.Bytes, subject.Result, before.Bytes, before.Result, after.Bytes, after.Result));
                 }
             }
         }
         finally { runtime.Unload(); }
+        var observations = observationsBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "clr-measurements.json"),
             JsonSerializer.Serialize(observations, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
-            $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}; " +
+            $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
             $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
             $"warmup={WarmupIterations}; measured={MeasuredIterations}; rounds={MeasurementRounds}; " +
             $"framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; " +
@@ -188,6 +190,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         var callableId = artifact.Manifest.Claims.Single().CallableId;
         var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == callableId));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
@@ -244,8 +247,8 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     private static IlObservation DescribeIl(MethodInfo method)
     {
         System.ArgumentNullException.ThrowIfNull(method);
-        var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = new List<IlInstruction>();
+        var bytes = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+        var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -261,24 +264,24 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.AsSpan((offset)..)),
                 _ => 4
             };
             if (offset + size > bytes.Length)
             { throw new InvalidOperationException("Truncated emitted IL operand."); }
             var operand = code.OperandType switch
             {
-                OperandType.InlineMethod => method.Module.ResolveMethod(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes, offset)).ToString(),
-                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
+                OperandType.InlineMethod => method.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
+                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes.AsSpan((offset)..))).ToString(),
+                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
+                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
                 _ => null
             };
             rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows);
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes.AsSpan()), rows.ToImmutable());
     }
 
     private sealed record RuntimeObservation(string Witness, int Round, long SubjectBytes, int SubjectResult,
@@ -292,11 +295,11 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions)
+        string RawIl, ImmutableArray<IlInstruction> Instructions)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
 }

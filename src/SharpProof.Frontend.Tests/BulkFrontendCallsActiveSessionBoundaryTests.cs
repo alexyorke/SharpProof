@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -27,12 +28,12 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
         var parked = subject.Compilation.GetTypeByMetadataName("Parking")!
             .GetMembers().OfType<IMethodSymbol>()
             .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MethodKind == MethodKind.Ordinary))
-            .ToArray();
+            .ToImmutableArray();
         var callee = subject.Compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Callee").OfType<IMethodSymbol>().Single();
         Assert.That(parked, Has.Length.EqualTo(255));
 
-        var prepared = new List<IMethodSymbol>();
+        var prepared = ImmutableArray.CreateBuilder<IMethodSymbol>();
         var session = new TotalSourceCallSession(subject.Compilation,
             frame =>
             {
@@ -40,7 +41,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
                 prepared.Add(frame.Target);
                 return true;
             }, null, default);
-        var entered = new List<IMethodSymbol>();
+        var entered = ImmutableArray.CreateBuilder<IMethodSymbol>();
         try
         {
             foreach (var method in parked)
@@ -82,7 +83,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
         var exact = control.LowerSourceCalls();
         Assert.That(exact.IsExact, Is.True);
         Assert.That(exact.ConstructionLimitExceeded, Is.False);
-        foreach (var allow in new[] { false, true })
+        foreach (var allow in ImmutableArray.Create(false, true))
         {
             var replay = control.Execute(exact, [allow]);
             Assert.That(replay.Status,

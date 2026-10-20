@@ -10,8 +10,8 @@ function Test-SharpProofCoverageReportName {
 function Save-SharpProofCoverageCohort {
     param([string]$Root, [object[]]$Expected, [object[]]$Completed, [string]$ProjectPath = '')
 
-    $expectedNames = @($Expected | ForEach-Object { [string]$_.Name } | Sort-Object)
-    $completedNames = @($Completed | ForEach-Object { [string]$_.Test.Name } | Sort-Object)
+    $expectedNames = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Expected | ForEach-Object { [string]$_.Name } | Sort-Object))
+    $completedNames = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Completed | ForEach-Object { [string]$_.Test.Name } | Sort-Object))
     if ($expectedNames.Count -eq 0 -or
         @($completedNames | Select-Object -Unique).Count -ne $expectedNames.Count -or
         ($expectedNames -join "`n") -cne ($completedNames -join "`n") -or
@@ -20,12 +20,13 @@ function Save-SharpProofCoverageCohort {
     }
     foreach ($name in $expectedNames) {
         $taskRoot = Join-Path $Root $name
-        $receipts = @(Get-ChildItem -LiteralPath $taskRoot -Recurse -Filter '*.trx' -File)
+        $receipts = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $taskRoot -Recurse -Filter '*.trx' -File))
         if ($receipts.Count -eq 0) { throw "Coverage task '$name' has no TRX receipt." }
-        $descriptor = @($Expected | Where-Object { $_.Name -ceq $name })[0]
-        $target = if ($descriptor.PSObject.Properties.Name -contains 'Target') { [string]$descriptor.Target } else { $ProjectPath }
+        $descriptors = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Expected | Where-Object { $_.Name -ceq $name }))
+        $descriptor = if ($descriptors.Length -eq 0) { $null } else { $descriptors[0] }
+        $target = if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'Target') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'Target'))) { [string]$descriptor.Target } else { $ProjectPath }
         $architectureEvidence = $false
-        if ($descriptor.PSObject.Properties.Name -contains 'EvidenceKind') {
+        if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'EvidenceKind') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'EvidenceKind'))) {
             if ([string]$descriptor.EvidenceKind -cne 'ArchitectureOnly' -or
                 $name -cne 'architecture' -or
                 $target.Replace('\', '/') -cnotmatch '(^|/)src/SharpProof\.Architecture\.Tests/SharpProof\.Architecture\.Tests\.csproj$') {
@@ -33,11 +34,12 @@ function Save-SharpProofCoverageCohort {
             }
             $architectureEvidence = $true
         }
-        $requiredProjects = if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
-            @((Get-Content -LiteralPath $target -Raw | ConvertFrom-Json).solution.projects)
-        }
-        elseif ($target.EndsWith('.csproj', [StringComparison]::Ordinal)) { @($target) }
-        else { @() }
+        $requiredProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
+                    (Get-Content -LiteralPath $target -Raw | ConvertFrom-Json).solution.projects
+                }
+                elseif ($target.EndsWith('.csproj', [StringComparison]::Ordinal)) { $target }
+            ))
         $projectBaseDirectory = (Get-Location).Path
         if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
             $projectBaseDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($target))
@@ -47,25 +49,25 @@ function Save-SharpProofCoverageCohort {
             }
             $projectBaseDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($solutionPath))
         }
-        $requiredAssemblies = @($requiredProjects | ForEach-Object {
-                $project = ([string]$_).Replace('\', '/')
-                if (-not [IO.Path]::IsPathRooted($project)) {
-                    $project = Join-Path $projectBaseDirectory $project
-                }
-                $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
-                if (Test-Path -LiteralPath $project -PathType Leaf) {
-                    [xml]$projectDocument = Get-Content -LiteralPath $project -Raw
-                    $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
-                    if ($null -ne $declaredName) {
-                        $assemblyName = [string]$declaredName.InnerText
-                        if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
-                            throw "Coverage task '$name' has an unresolved assembly identity: $project"
+        $requiredAssemblies = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($requiredProjects | ForEach-Object {
+                    $project = ([string]$_).Replace('\', '/')
+                    if (-not [IO.Path]::IsPathRooted($project)) {
+                        $project = Join-Path $projectBaseDirectory $project
+                    }
+                    $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
+                    if (Test-Path -LiteralPath $project -PathType Leaf) {
+                        [xml]$projectDocument = Get-Content -LiteralPath $project -Raw
+                        $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
+                        if ($null -ne $declaredName) {
+                            $assemblyName = [string]$declaredName.InnerText
+                            if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
+                                throw "Coverage task '$name' has an unresolved assembly identity: $project"
+                            }
                         }
                     }
-                }
-                $assemblyName + '.dll'
-            } | Sort-Object -Unique)
-        $observedAssemblies = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+                    $assemblyName + '.dll'
+                } | Sort-Object -Unique))
+        $observedAssemblyBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
         foreach ($receipt in $receipts) {
             [xml]$trx = Get-Content -LiteralPath $receipt.FullName -Raw
             $counters = $trx.SelectSingleNode('//*[local-name()="Counters"]')
@@ -76,7 +78,7 @@ function Save-SharpProofCoverageCohort {
             if ($architectureEvidence -and [int]$counters.total -lt 5) {
                 throw 'Architecture-only evidence must retain all five established architecture tests.'
             }
-            $definitions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+            $definitionBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
             foreach ($definition in $trx.SelectNodes('//*[local-name()="TestDefinitions"]/*[local-name()="UnitTest"]')) {
                 $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
                 if ($null -eq $method -or [string]::IsNullOrWhiteSpace([string]$definition.id)) {
@@ -87,12 +89,13 @@ function Save-SharpProofCoverageCohort {
                     throw 'Architecture-only receipt evidence cannot contain production or other test assemblies.'
                 }
                 $id = [string]$definition.id
-                if ($definitions.ContainsKey($id) -and $definitions[$id] -cne $assembly) {
+                if ($definitionBuilder.ContainsKey($id) -and $definitionBuilder[$id] -cne $assembly) {
                     throw "Coverage task '$name' has inconsistent test definitions."
                 }
-                $definitions[$id] = $assembly
+                $definitionBuilder[$id] = $assembly
             }
-            $results = @($trx.SelectNodes('//*[local-name()="UnitTestResult"]'))
+            $definitions = $definitionBuilder.ToImmutable()
+            $results = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($trx.SelectNodes('//*[local-name()="UnitTestResult"]')))
             if ($results.Count -ne [int]$counters.total) {
                 throw "Coverage task '$name' result count differs from its TRX counters."
             }
@@ -104,11 +107,11 @@ function Save-SharpProofCoverageCohort {
                     throw "Coverage task '$name' has a dangling or unsuccessful test result."
                 }
                 if ([string]$result.outcome -ceq 'Passed') {
-                    [void]$observedAssemblies.Add($definitions[$id])
+                    [void]$observedAssemblyBuilder.Add($definitions[$id])
                 }
             }
-            $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
-                    Where-Object { Test-SharpProofCoverageReportName -Path ([string]$_.href) })
+            $attachments = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
+                        Where-Object { Test-SharpProofCoverageReportName -Path ([string]$_.href) }))
             if ($architectureEvidence) {
                 if ($attachments.Count -ne 0) {
                     throw 'The architecture-only task must execute without production coverage collection.'
@@ -128,33 +131,34 @@ function Save-SharpProofCoverageCohort {
                 }
             }
         }
+        $observedAssemblies = $observedAssemblyBuilder.ToImmutable()
         foreach ($assembly in $requiredAssemblies) {
             if (-not $observedAssemblies.Contains($assembly)) {
                 throw "Coverage task '$name' has no test receipt for expected assembly '$assembly'."
             }
         }
     }
-    [ordered]@{ schemaVersion = 1; tasks = $expectedNames } |
+    ([ordered]@{ schemaVersion = 1; tasks = $expectedNames }).AsReadOnly() |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Root 'coverage-cohort.json') -Encoding utf8NoBOM
 }
 
 function Save-SharpProofCoverageShardManifest {
     param([string]$Root, [string]$Phase)
 
-    $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
-            Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-                $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
-            Sort-Object FullName | ForEach-Object {
-                [ordered]@{
-                    path   = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
-                    sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-                }
-            })
+    $files = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $Root -Recurse -File |
+                Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
+                    $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
+                Sort-Object FullName | ForEach-Object {
+                    ([ordered]@{
+                        path   = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
+                        sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                    }).AsReadOnly()
+                }))
     if (@($files | Where-Object { Test-SharpProofCoverageReportName -Path $_.path }).Count -eq 0 -or
         @($files | Where-Object { $_.path -like '*/coverage-cohort.json' }).Count -ne 1) {
         throw "Coverage shard '$Phase' has no complete cohort evidence."
     }
-    [ordered]@{ schemaVersion = 1; phase = $Phase; files = $files } |
+    ([ordered]@{ schemaVersion = 1; phase = $Phase; files = $files }).AsReadOnly() |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Root 'coverage-shard.json') -Encoding utf8NoBOM
 }
 
@@ -169,11 +173,11 @@ function Assert-SharpProofCoverageShardManifest {
     if ($manifest.schemaVersion -ne 1 -or $manifest.phase -cne $Phase) {
         throw "Coverage shard '$Phase' has an invalid completion manifest."
     }
-    $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
-            Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-                $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
-            ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object)
-    $recorded = @($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object)
+    $actual = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $Root -Recurse -File |
+                Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
+                    $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
+                ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object))
+    $recorded = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object))
     if ($actual.Count -eq 0 -or ($actual -join "`n") -cne ($recorded -join "`n") -or
         @($recorded | Select-Object -Unique).Count -ne $recorded.Count -or
         @($recorded | Where-Object { Test-SharpProofCoverageReportName -Path $_ }).Count -eq 0 -or

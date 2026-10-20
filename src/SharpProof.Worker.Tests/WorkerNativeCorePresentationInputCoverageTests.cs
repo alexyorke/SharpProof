@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
@@ -38,13 +39,15 @@ internal sealed partial class WorkerTests
         Assert.That(proof.Core, Is.Not.Empty);
 
         // These are presentation inputs only; the native proof and owned plan are unchanged.
-        var labels = proof.Core.Distinct().Select((justification, ordinal) =>
-                justification is null ? throw new System.ArgumentNullException(nameof(justification)) : ((Justification: justification, Label: "actual-core:" + ordinal)))
-            .ToDictionary(row => row.Justification, row => row.Label);
+        var labels = ImmutableDictionaryCapture.Create(
+            proof.Core.Distinct().Select((justification, ordinal) =>
+                justification is null ? throw new System.ArgumentNullException(nameof(justification)) : ((Justification: justification, Label: "actual-core:" + ordinal))),
+            row => row.Justification,
+            row => row.Label);
         var complete = CallableProofCore.Create(proof, labels);
         Assert.That(complete, Is.EqualTo(labels.Values.OrderBy(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal)));
-        labels.Remove(proof.Core[0]);
-        Assert.That(CallableProofCore.Create(proof, labels), Is.Empty);
+        var incompleteLabels = labels.Remove(proof.Core[0]);
+        Assert.That(CallableProofCore.Create(proof, incompleteLabels), Is.Empty);
         Assert.That(plan!.CoreLabels(proof), Is.Not.Empty);
 
         using var project = TestProject.Create(source);

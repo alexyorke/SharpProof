@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -17,15 +18,15 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedFilterSharedFramePurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, int.MaxValue];
-    private static readonly bool[] s_expectedReturns = [false, true, false];
-    private static readonly string[] s_expectedFilterOpCodes = ["ldc.i4.1", "ret"];
-    private static readonly Dictionary<ushort, OpCode> s_opCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, int.MaxValue];
+    private static readonly ImmutableArray<bool> s_expectedReturns = [false, true, false];
+    private static readonly ImmutableArray<string> s_expectedFilterOpCodes = ["ldc.i4.1", "ret"];
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private const string SubjectTemplate = """
         using System;
         using System.Runtime.CompilerServices;
@@ -52,7 +53,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized-filter" : "no-inlining-filter-control";
@@ -61,7 +62,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), source);
 
-        var compilation = TestCompilation.Create("SynchronizedFilterSharedFramePurity_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SynchronizedFilterSharedFramePurity_" + caseName, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -71,11 +72,11 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedFilterSharedFramePurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         RuntimeObservation runtimeObservation;
@@ -90,10 +91,10 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             var filterIl = DescribeIl(filter, filter);
             var clauses = target.GetMethodBody()!.ExceptionHandlingClauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new ClauseObservation(
                 clause.Flags.ToString(), clause.TryOffset, clause.TryLength, clause.HandlerOffset, clause.HandlerLength,
-                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null))).ToArray();
+                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null))).ToImmutableArray();
             runtimeObservation = new(DescribeMethod(target), DescribeMethod(filter),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
-                subject.TypeInitializer != null, s_inputValues.Select(execute).ToArray(), executeFilter(), targetIl, filterIl, clauses);
+                subject.TypeInitializer != null, s_inputValues.Select(execute).ToImmutableArray(), executeFilter(), targetIl, filterIl, clauses);
             await Save(evidenceDirectory, "runtime-observations.json", new
             {
                 SourceSha256 = sourceHash,
@@ -123,7 +124,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 Assert.That(runtimeObservation.Filter.IsStatic, Is.True);
                 Assert.That(runtimeObservation.Target.ReturnType, Is.EqualTo(typeof(bool).FullName));
                 Assert.That(runtimeObservation.Filter.ReturnType, Is.EqualTo(typeof(bool).FullName));
-                Assert.That(runtimeObservation.Target.ParameterTypes, Is.EqualTo(new[] { typeof(int).FullName }));
+                Assert.That(runtimeObservation.Target.ParameterTypes, Is.EqualTo(ImmutableArray.Create(typeof(int).FullName)));
                 Assert.That(runtimeObservation.Filter.ParameterTypes, Is.Empty);
                 Assert.That(runtimeObservation.FieldCount, Is.Zero);
                 Assert.That(runtimeObservation.HasTypeInitializer, Is.False);
@@ -152,8 +153,9 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        artifact = project.Artifact;
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -184,7 +186,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -192,7 +194,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The source caller of synchronized Filter cannot be Proven EnforcePure."
                 : "The NoInlining-only filter control remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -236,15 +238,15 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         return new(method.DeclaringType!.FullName + "." + method.Name, method.MetadataToken, method.Module.ModuleVersionId,
             (int)flags, flags.ToString(), (flags & MethodImplAttributes.NoInlining) != 0,
             (flags & MethodImplAttributes.Synchronized) != 0, method.IsStatic, method.ReturnType.FullName,
-            method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray());
+            method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray());
     }
 
     private static IlObservation DescribeIl(MethodInfo method, MethodInfo filter)
     {
         System.ArgumentNullException.ThrowIfNull(filter);
         System.ArgumentNullException.ThrowIfNull(method);
-        var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = new List<IlInstruction>();
+        var bytes = (method.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+        var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -266,35 +268,36 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => checked(4 + 4 * BitConverter.ToInt32(bytes, offset)),
+                OperandType.InlineSwitch => checked(4 + 4 * BitConverter.ToInt32(bytes.AsSpan(offset..))),
                 _ => 4
             };
             if (size < 0 || offset + size > bytes.Length)
             { throw new InvalidOperationException("Truncated emitted IL operand."); }
-            var token = code.OperandType == OperandType.InlineMethod ? BitConverter.ToInt32(bytes, offset) : (int?)null;
+            var token = code.OperandType == OperandType.InlineMethod ? BitConverter.ToInt32(bytes.AsSpan(offset..)) : (int?)null;
             var resolved = token is { } methodToken ? method.Module.ResolveMethod(methodToken) : null;
             var operand = code.OperandType switch
             {
                 OperandType.InlineMethod => resolved?.ToString(),
-                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes, offset)).ToString(),
-                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
+                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes.AsSpan(offset..))).ToString(),
+                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes.AsSpan(offset..)))?.ToString(),
+                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes.AsSpan(offset..)))?.ToString(),
                 _ => null
             };
             var resolvesExactFilter = resolved != null && resolved.MetadataToken == filter.MetadataToken &&
                 resolved.Module.ModuleVersionId == filter.Module.ModuleVersionId && resolved.DeclaringType == filter.DeclaringType;
-            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
+            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset..(offset + size))), operand,
                 token, resolvesExactFilter));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows);
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes.AsSpan()), rows.ToImmutable());
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)
@@ -306,11 +309,11 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
     }
 
     private sealed record MethodObservation(string Method, int MetadataToken, Guid ModuleVersionId, int RawImplementationFlags,
-        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, string?[] ParameterTypes)
+        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, ImmutableArray<string?> ParameterTypes)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
-        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+        public ImmutableArray<string?> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
     }
     private sealed record ClauseObservation(string Flags, int TryOffset, int TryLength, int HandlerOffset, int HandlerLength, int? FilterOffset)
     {
@@ -323,22 +326,22 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions)
+        string RawIl, ImmutableArray<IlInstruction> Instructions)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(MethodObservation Target, MethodObservation Filter, int FieldCount,
-        bool HasTypeInitializer, bool[] TargetReturnValues, bool FilterReturnValue, IlObservation TargetIl, IlObservation FilterIl,
-        ClauseObservation[] ExceptionClauses)
+        bool HasTypeInitializer, ImmutableArray<bool> TargetReturnValues, bool FilterReturnValue, IlObservation TargetIl, IlObservation FilterIl,
+        ImmutableArray<ClauseObservation> ExceptionClauses)
     {
         public MethodObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
         public MethodObservation Filter { get; init; } = Filter ?? throw new System.ArgumentNullException(nameof(Filter));
         public IlObservation TargetIl { get; init; } = TargetIl ?? throw new System.ArgumentNullException(nameof(TargetIl));
         public IlObservation FilterIl { get; init; } = FilterIl ?? throw new System.ArgumentNullException(nameof(FilterIl));
-        public bool[] TargetReturnValues { get; init; } = TargetReturnValues ?? throw new System.ArgumentNullException(nameof(TargetReturnValues));
-        public ClauseObservation[] ExceptionClauses { get; init; } = ExceptionClauses ?? throw new System.ArgumentNullException(nameof(ExceptionClauses));
+        public ImmutableArray<bool> TargetReturnValues { get; init; } = TargetReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(TargetReturnValues)) : TargetReturnValues;
+        public ImmutableArray<ClauseObservation> ExceptionClauses { get; init; } = ExceptionClauses.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ExceptionClauses)) : ExceptionClauses;
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -32,11 +33,9 @@ public sealed class DictionaryOpaqueCountOracleTests
         var factory = total.Program.Factory;
         var parameter = total.Parameters.Single().Entry;
         var parameterType = factory.GetVariableInfo(parameter).Type;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
-                : factory.CreateReferenceValue(parameterType, new IrObjectState())
-        };
+        var inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(parameter,
+            !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
+                : factory.CreateReferenceValue(parameterType, new IrObjectState()));
         IrValue? SelectNormal(IrHavocRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -88,10 +87,10 @@ public sealed class DictionaryOpaqueCountOracleTests
         Check(rejected, approximation: true);
         Assert.That(rejectedInitializations, Is.GreaterThan(0));
 
-        var compilation = TestCompilation.Create("DictionaryOpaqueCountOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("DictionaryOpaqueCountOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(";", emitted.Diagnostics));

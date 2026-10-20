@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Fuzz;
@@ -64,13 +65,15 @@ public sealed class FrontendExpressionCoverageTests
         Assert.That(FrontendDifferentialOracle.CompareBatch([], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Empty);
         Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Empty);
         AssertParameter<ArgumentNullException>(
+            () => FrontendDifferentialOracle.CreateBatchSource(default), "generatedCases");
+        AssertParameter<ArgumentNullException>(
             () => FrontendDifferentialOracle.Compare(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "generated");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareBatch(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
+            () => FrontendDifferentialOracle.CompareBatch(default, cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
         AssertParameter<ArgumentException>(
             () => FrontendDifferentialOracle.CompareBatch([null!], cancellationToken: TestContext.CurrentContext.CancellationToken), "generatedCases");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareSemanticEdges(null!, cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
+            () => FrontendDifferentialOracle.CompareSemanticEdges(default, cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
         AssertParameter<ArgumentException>(
             () => FrontendDifferentialOracle.CompareSemanticEdges([null!], cancellationToken: TestContext.CurrentContext.CancellationToken), "cases");
         AssertParameter<ArgumentOutOfRangeException>(
@@ -88,8 +91,7 @@ public sealed class FrontendExpressionCoverageTests
     [Test]
     public void SemanticEdgeOracleReportsInputAndClassificationErrorsPerCase()
     {
-        var cases = new[]
-        {
+        var cases = ImmutableArray.Create(
             new FrontendSemanticEdgeCase(
                 "long", "long value", "value", [],
                 FrontendSubsetDecision.Exact, FrontendAbstention.None),
@@ -99,8 +101,7 @@ public sealed class FrontendExpressionCoverageTests
                 FrontendAbstention.UnsupportedType),
             new FrontendSemanticEdgeCase(
                 "long", "long value", "value", [7L],
-                FrontendSubsetDecision.Exact, FrontendAbstention.None)
-        };
+                FrontendSubsetDecision.Exact, FrontendAbstention.None));
 
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -122,8 +123,7 @@ public sealed class FrontendExpressionCoverageTests
         var one = GeneratedCSharpExpression.Integer(1);
         var two = GeneratedCSharpExpression.Integer(2);
         var zero = GeneratedCSharpExpression.Integer(0);
-        var cases = new (GeneratedCSharpExpression Expression, bool IsConstant, long Value)[]
-        {
+        var cases = ImmutableArray.Create<(GeneratedCSharpExpression Expression, bool IsConstant, long Value)>(
             (one, true, 1),
             (GeneratedCSharpExpression.Boolean(true), false, 0),
             (GeneratedCSharpExpression.Left(), false, 0),
@@ -159,8 +159,7 @@ public sealed class FrontendExpressionCoverageTests
                     GeneratedCSharpExpression.Boolean(false),
                     GeneratedCSharpExpression.Boolean(true)),
                 one,
-                two), true, 1)
-        };
+                two), true, 1));
 
         foreach (var (expression, isConstant, expected) in cases)
         {
@@ -182,8 +181,8 @@ public sealed class FrontendExpressionCoverageTests
         var text = GeneratedCSharpExpression.Text();
         var values = GeneratedCSharpExpression.Values();
         var reference = GeneratedCSharpExpression.Reference();
-        var cases = new List<GeneratedCSharpCase>
-        {
+        var casesBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpCase>();
+        casesBuilder.AddRange(ImmutableArray.Create<GeneratedCSharpCase>(
             Case(GeneratedCSharpExpression.Boolean(true)),
             Case(GeneratedCSharpExpression.Integer(7)),
             Case(integer),
@@ -201,11 +200,9 @@ public sealed class FrontendExpressionCoverageTests
             Case(GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.NullReference())),
             Case(GeneratedCSharpExpression.Conditional(boolean, integer, other)),
             Case(GeneratedCSharpExpression.Conditional(boolean, text, GeneratedCSharpExpression.NullString())),
-            Case(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!")))
-        };
+            Case(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!")))));
 
-        foreach (var kind in new[]
-        {
+        foreach (var kind in ImmutableArray.Create(
             GeneratedExpressionKind.Add,
             GeneratedExpressionKind.Subtract,
             GeneratedExpressionKind.Multiply,
@@ -216,31 +213,27 @@ public sealed class FrontendExpressionCoverageTests
             GeneratedExpressionKind.GreaterThan,
             GeneratedExpressionKind.GreaterThanOrEqual,
             GeneratedExpressionKind.Equal,
-            GeneratedExpressionKind.NotEqual
-        })
+            GeneratedExpressionKind.NotEqual))
         {
-            cases.Add(Case(GeneratedCSharpExpression.Binary(kind, integer, other)));
+            casesBuilder.Add(Case(GeneratedCSharpExpression.Binary(kind, integer, other)));
         }
 
-        foreach (var kind in new[]
+        foreach (var kind in ImmutableArray.Create(GeneratedExpressionKind.AndAlso, GeneratedExpressionKind.OrElse))
         {
-            GeneratedExpressionKind.AndAlso,
-            GeneratedExpressionKind.OrElse
-        })
-        {
-            cases.Add(Case(GeneratedCSharpExpression.Binary(kind, boolean, GeneratedCSharpExpression.Boolean(false))));
+            casesBuilder.Add(Case(GeneratedCSharpExpression.Binary(kind, boolean, GeneratedCSharpExpression.Boolean(false))));
         }
 
-        cases.Add(Case(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.Equal, text, GeneratedCSharpExpression.String("proof"))));
-        cases.Add(Case(GeneratedCSharpExpression.Binary(
+        casesBuilder.Add(Case(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.Equal, text, GeneratedCSharpExpression.String("proof"))));
+        casesBuilder.Add(Case(GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.NotEqual,
             reference,
             GeneratedCSharpExpression.NullReference())));
 
+        var cases = casesBuilder.ToImmutable();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(results, Has.Length.EqualTo(cases.Count));
-        for (var index = 0; index < cases.Count; index++)
+        Assert.That(results, Has.Length.EqualTo(cases.Length));
+        for (var index = 0; index < cases.Length; index++)
         {
             Assert.That(
                 results[index].Status,
@@ -257,18 +250,16 @@ public sealed class FrontendExpressionCoverageTests
         var boolean = GeneratedCSharpExpression.Condition();
         var text = GeneratedCSharpExpression.Text();
         var values = GeneratedCSharpExpression.Values();
-        var parents = new List<GeneratedCSharpExpression>
-        {
+        var parentsBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpExpression>();
+        parentsBuilder.AddRange(ImmutableArray.Create<GeneratedCSharpExpression>(
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Not, boolean),
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Negate, integer),
             GeneratedCSharpExpression.Conditional(boolean, integer, other),
             GeneratedCSharpExpression.Length(text),
             GeneratedCSharpExpression.ArrayIndex(values, integer),
             GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.Reference()),
-            GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!"))
-        };
-        foreach (var kind in new[]
-        {
+            GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!"))));
+        foreach (var kind in ImmutableArray.Create(
             GeneratedExpressionKind.Add,
             GeneratedExpressionKind.Subtract,
             GeneratedExpressionKind.Multiply,
@@ -279,24 +270,24 @@ public sealed class FrontendExpressionCoverageTests
             GeneratedExpressionKind.LessThan,
             GeneratedExpressionKind.LessThanOrEqual,
             GeneratedExpressionKind.GreaterThan,
-            GeneratedExpressionKind.GreaterThanOrEqual
-        })
+            GeneratedExpressionKind.GreaterThanOrEqual))
         {
-            parents.Add(GeneratedCSharpExpression.Binary(kind, integer, other));
+            parentsBuilder.Add(GeneratedCSharpExpression.Binary(kind, integer, other));
         }
-        parents.Add(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.AndAlso, boolean, GeneratedCSharpExpression.Boolean(true)));
-        parents.Add(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, GeneratedCSharpExpression.Boolean(false)));
+        parentsBuilder.Add(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.AndAlso, boolean, GeneratedCSharpExpression.Boolean(true)));
+        parentsBuilder.Add(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, GeneratedCSharpExpression.Boolean(false)));
 
+        var parents = parentsBuilder.ToImmutable();
         var candidates = parents.SelectMany(parent =>
             parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (CSharpStructuralShrinker.GetCandidates(parent)
                 .Where(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.NodeCount < parent.NodeCount))
                 .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((Parent: parent, Candidate: candidate)))))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(candidates, Is.Not.Empty);
-        Assert.That(candidates.Select(item => item.Parent.Kind).Distinct().Count(), Is.EqualTo(parents.Count));
+        Assert.That(candidates.Select(item => item.Parent.Kind).Distinct().Count(), Is.EqualTo(parents.Length));
         Assert.That(candidates.All(item => item.Parent.Type == item.Candidate.Type), Is.True);
 
-        var cases = candidates.Select(item => Case(item.Candidate)).ToArray();
+        var cases = candidates.Select(item => Case(item.Candidate)).ToImmutableArray();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < cases.Length; index++)

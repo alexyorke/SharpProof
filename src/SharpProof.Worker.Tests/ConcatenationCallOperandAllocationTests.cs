@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -16,7 +17,7 @@ public sealed class ConcatenationCallOperandAllocationTests
     private const string Empty = "(x == 0 ? \"\" : \"\")";
     private const string Letter = "(x == 0 ? \"a\" : \"b\")";
 
-    private static readonly string[] s_spliced =
+    private static readonly ImmutableArray<string> s_spliced =
     [
         "return (string.Concat(" + Letter + ", " + Empty + ") + " + Empty + " + " + Empty + " + " + Empty + ").Length;",
         "return (" + Empty + " + " + Empty + " + " + Empty + " + string.Concat(" + Letter + ", " + Empty + ")).Length;",
@@ -28,7 +29,7 @@ public sealed class ConcatenationCallOperandAllocationTests
         "return ((string)string.Concat(" + Letter + ", " + Empty + ")! + " + Empty + " + " + Empty + " + " + Empty + ").Length;"
     ];
 
-    private static readonly string[] s_separate =
+    private static readonly ImmutableArray<string> s_separate =
     [
         "return string.Concat(" + Letter + " + " + Empty + " + " + Empty + " + " + Empty + ", " + Empty + ").Length;",
         "return ((x == 0 ? string.Concat(" + Letter + ", " + Empty + ") : " + Empty + ") + " + Empty + " + " + Empty + " + " + Empty + ").Length;",
@@ -50,9 +51,9 @@ public sealed class ConcatenationCallOperandAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_spliced[index]);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.GreaterThan(0), optimization + " x=" + input); }
         }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -69,9 +70,9 @@ public sealed class ConcatenationCallOperandAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_separate[index]);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
         }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);

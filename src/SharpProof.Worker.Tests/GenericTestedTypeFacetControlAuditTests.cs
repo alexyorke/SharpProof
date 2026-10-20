@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -42,7 +44,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         Directory.CreateDirectory(evidenceDirectory);
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash), "Frozen facet source changed.");
-        var compilation = TestCompilation.Create("GenericTestedTypeFacetControl", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypeFacetControl", [("Subject.cs", Source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -50,7 +52,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericTestedTypeFacetControl", isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         try
         {
             var generic = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
@@ -99,9 +101,14 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        var expectedClaims = manifest.Claims.ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
+        var expectedClaims = ImmutableDictionaryCapture.Create(
+            manifest.Claims,
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {
             System.ArgumentNullException.ThrowIfNull(claim);
@@ -113,7 +120,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
             };
-        }).ToArray();
+        }).ToImmutableArray();
         await Save(evidenceDirectory, "facet-native.json", new
         {
             SourceSha256 = sourceHash,
@@ -126,7 +133,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = observedClaims,
             Cases = cases,
             FrozenExpectation = "Both EnforcePure and DoesNotThrow remain Proven independently of potential allocation."
@@ -137,10 +144,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(manifest.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect)), Is.True);
-            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(new[]
-            {
-                WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow
-            }));
+            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(ImmutableArray.Create(WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow)));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)), Is.EquivalentTo(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             foreach (var claim in response.ClaimResults)

@@ -34,7 +34,7 @@ internal static class RoslynCfgReachability
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(block, nameof(block));
-        var yielded = new HashSet<int>();
+        var yielded = ImmutableHashSet.CreateBuilder<int>();
         for (var region = block.EnclosingRegion;
              region != null;
              region = region.EnclosingRegion)

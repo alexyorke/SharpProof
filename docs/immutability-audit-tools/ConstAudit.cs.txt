@@ -1,0 +1,353 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
+using System;
+using System.Collections.Immutable;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
+
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+public sealed class ConstAudit : DiagnosticAnalyzer
+{
+    private static readonly DiagnosticDescriptor Failure = new DiagnosticDescriptor(
+        "CONSTAUDIT001", "Const audit failure", "{0}", "Audit", DiagnosticSeverity.Error, true, customTags: new[] { WellKnownDiagnosticTags.CompilationEnd });
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Failure);
+    public override void Initialize(AnalysisContext context)
+    {
+        context.EnableConcurrentExecution();
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
+        context.RegisterCompilationAction(Audit);
+    }
+    private static string Cell(object? value) => Convert.ToString(value, CultureInfo.InvariantCulture)?.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ') ?? "<null>";
+    private static string Row(params object?[] cells) => string.Join("\t", cells.Select(Cell));
+    private static string Hash(string text)
+    {
+        using (var sha = SHA256.Create())
+            return string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(text)).Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+    private static string Property(CompilationAnalysisContext context, string name)
+    {
+        if (!context.Options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property." + name, out var value) || string.IsNullOrEmpty(value))
+            throw new InvalidOperationException("Missing analyzer property " + name);
+        return value;
+    }
+    private static void Audit(CompilationAnalysisContext context)
+    {
+        try
+        {
+            var output = Property(context, "ConstAuditOutput");
+            var root = Property(context, "ConstAuditRoot").Replace((char)92, '/').TrimEnd('/') + "/";
+            var projectPath = Property(context, "MSBuildProjectFullPath").Replace((char)92, '/');
+            var project = projectPath.StartsWith(root, StringComparison.Ordinal) ? projectPath.Substring(root.Length) : projectPath;
+            var framework = Property(context, "TargetFramework");
+            var configuration = Property(context, "Configuration");
+            var compilationOptions = (CSharpCompilationOptions)context.Compilation.Options;
+            var contextId = Hash(Row(project, framework, configuration, context.Compilation.AssemblyName,
+                compilationOptions.CheckOverflow, compilationOptions.AllowUnsafe, compilationOptions.NullableContextOptions, compilationOptions.MetadataImportOptions,
+                string.Join("|", context.Compilation.SyntaxTrees.Select(tree => (CSharpParseOptions)tree.Options).Select(options => Row(options.LanguageVersion, options.Kind, options.DocumentationMode, string.Join(";", options.PreprocessorSymbolNames.OrderBy(value => value, StringComparer.Ordinal)))).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)),
+                context.Compilation.Options.OptimizationLevel, context.Compilation.Options.Platform,
+                string.Join(";", context.Compilation.ReferencedAssemblyNames.Select(identity => identity.ToString()).OrderBy(value => value, StringComparer.Ordinal))));
+            contextId = Hash(contextId + "\n" + string.Join("\n", context.Compilation.SyntaxTrees.Select(tree =>
+            {
+                var compilerPath = tree.FilePath.Replace('\\', '/');
+                var fullPath = Path.GetFullPath(Path.IsPathRooted(compilerPath) ? compilerPath :
+                    Path.Combine(Path.GetDirectoryName(projectPath)!, compilerPath)).Replace('\\', '/');
+                var relativePath = fullPath.StartsWith(root, StringComparison.Ordinal) ? fullPath.Substring(root.Length) : fullPath;
+                return Row(relativePath, Hash(tree.GetText(context.CancellationToken).ToString()));
+            }).OrderBy(value => value, StringComparer.Ordinal)));
+            var referenceRows = ImmutableArray.CreateBuilder<string>();
+            foreach (var reference in context.Compilation.References)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var portable = reference as PortableExecutableReference;
+                var referencePath = portable?.FilePath;
+                var authority = "UnhashedMetadataReference";
+                var contentHash = "";
+                var display = reference.Display ?? "";
+                if (!string.IsNullOrEmpty(referencePath))
+                {
+                    var full = Path.GetFullPath(Path.IsPathRooted(referencePath) ? referencePath :
+                        Path.Combine(Path.GetDirectoryName(projectPath)!, referencePath)).Replace((char)92, '/');
+                    referencePath = full.StartsWith(root, StringComparison.Ordinal) ? full.Substring(root.Length) : full;
+                    display = referencePath;
+                    if (File.Exists(full))
+                    {
+                        using (var stream = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+                        using (var sha = SHA256.Create())
+                            contentHash = string.Concat(sha.ComputeHash(stream).Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
+                        authority = "ExactMetadataFileSha256";
+                    }
+                    else authority = "MissingMetadataFile";
+                }
+                referenceRows.Add(Row(referencePath, display, authority, contentHash, reference.Properties.Kind,
+                    reference.Properties.EmbedInteropTypes, string.Join(";", reference.Properties.Aliases.OrderBy(value => value, StringComparer.Ordinal))));
+            }
+            var referenceSnapshot = referenceRows.ToImmutable().OrderBy(value => value, StringComparer.Ordinal).ToImmutableArray();
+            contextId = Hash(contextId + "\nReferenceContentAuthority-v1\n" + string.Join("\n", referenceSnapshot));
+            var referenceDirectory = Path.Combine(output, "references");
+            Directory.CreateDirectory(referenceDirectory);
+            File.WriteAllText(Path.Combine(referenceDirectory, "references-" + contextId + ".tsv"),
+                "ReferencePath\tDisplay\tAuthority\tContentSha256\tKind\tEmbedInteropTypes\tAliases\tContextSha256\tProject\tFramework\tConfiguration\n" +
+                string.Join("\n", referenceSnapshot.Select(row => row + "\t" + Row(contextId, project, framework, configuration))) + "\n", new UTF8Encoding(false));
+            var universe = File.ReadAllLines(Property(context, "ConstAuditUniverse")).Select(path => path.Trim().Replace((char)92, '/')).Where(path => path.Length > 0).ToImmutableHashSet(StringComparer.Ordinal);
+            ResidualAudit.Audit(context, output, root, projectPath, project, framework, configuration, contextId, universe);
+            var paths = ImmutableArray.CreateBuilder<string>();
+            paths.Add("Project\tFramework\tCompilerPath\tResolvedPath\tTracked\tContextSha256");
+            var rows = ImmutableArray.CreateBuilder<string>();
+            rows.Add("Project\tFramework\tPath\tLine\tColumn\tKind\tName\tType\tConstant\tStatus\tDetail\tOwner\tSourceSha256\tLanguageVersion\tPreprocessorSymbols\tNullableContext\tContextSha256\tAssembly\tConfiguration\tSpanStart\tSpanLength\tDeclarationForm\tConstantExpressionType\tFieldMetadata");
+            foreach (var tree in context.Compilation.SyntaxTrees)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var compilerPath = tree.FilePath.Replace('\\', '/');
+                var path = Path.GetFullPath(Path.IsPathRooted(compilerPath) ? compilerPath :
+                    Path.Combine(Path.GetDirectoryName(projectPath)!, compilerPath)).Replace('\\', '/');
+                var relative = path.StartsWith(root, StringComparison.Ordinal) ? path.Substring(root.Length) : path;
+                paths.Add(Row(project, framework, compilerPath, relative, universe.Contains(relative), contextId));
+                if (!universe.Contains(relative)) continue;
+                var model = context.Compilation.GetSemanticModel(tree);
+                var syntax = tree.GetRoot(context.CancellationToken);
+                var parse = (CSharpParseOptions)tree.Options;
+                var sourceHash = Hash(tree.GetText(context.CancellationToken).ToString());
+                string SourceRow(SyntaxNode node, params object?[] cells)
+                {
+                    var declared = node is CompilationUnitSyntax ? null : model.GetDeclaredSymbol(node, context.CancellationToken);
+                    var owner = declared?.ContainingSymbol ?? model.GetEnclosingSymbol(node.SpanStart, context.CancellationToken);
+                    var field = declared as IFieldSymbol;
+                    var initializer = (node as VariableDeclaratorSyntax)?.Initializer?.Value;
+                    return Row(cells.Concat(new object?[] {
+                        owner?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), sourceHash, parse.LanguageVersion,
+                        string.Join(";", parse.PreprocessorSymbolNames.OrderBy(value => value, StringComparer.Ordinal)),
+                        model.GetNullableContext(node.SpanStart), contextId, context.Compilation.AssemblyName, configuration,
+                        node.SpanStart, node.Span.Length, node.Parent?.Kind(),
+                        initializer is null ? "" : model.GetTypeInfo(initializer, context.CancellationToken).Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                        field is null ? "" : Row(field.DeclaredAccessibility, field.IsStatic, field.IsReadOnly, field.IsVolatile, field.IsRequired, field.IsFixedSizeBuffer,
+                            string.Join(";", field.GetAttributes().Select(attribute => attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))), initializer?.ToString())
+                    }).ToArray());
+                }
+                rows.Add(SourceRow(syntax, project, framework, relative, 0, 0, "Unit", "", "", "", "Compiled", ((CSharpParseOptions)tree.Options).LanguageVersion));
+                foreach (var declarator in syntax.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+                {
+                    var symbol = model.GetDeclaredSymbol(declarator, context.CancellationToken);
+                    if (!(symbol is ILocalSymbol) && !(symbol is IFieldSymbol)) continue;
+                    var location = tree.GetLineSpan(declarator.Identifier.Span).StartLinePosition;
+                    var initializer = declarator.Initializer?.Value;
+                    var constant = initializer is null ? default : model.GetConstantValue(initializer, context.CancellationToken);
+                    var local = symbol as ILocalSymbol;
+                    var field = symbol as IFieldSymbol;
+                    var type = local?.Type ?? field!.Type;
+                    var isConst = local?.IsConst ?? field!.IsConst;
+                    var status = isConst ? "AlreadyConst" : !constant.HasValue ? "NonConstant" : "CandidateRequiresBindingReview";
+                    var reasons = ImmutableArray.CreateBuilder<string>();
+                    if (!isConst && constant.HasValue)
+                    {
+                        if (!Legal(type, constant.Value)) status = "IllegalConstType";
+                        else if (local is null) status = "FieldRequiresWriteAndApiReview";
+                        else
+                        {
+                            if (!(declarator.Parent is VariableDeclarationSyntax declaration) || declaration.Variables.Count != 1 ||
+                                !(declaration.Parent is LocalDeclarationStatementSyntax statement) || statement.UsingKeyword != default ||
+                                statement.AwaitKeyword != default || declaration.Type is RefTypeSyntax)
+                                reasons.Add("UnsupportedDeclarationForm");
+                            var scope = declarator.Ancestors().FirstOrDefault(node => node is BaseMethodDeclarationSyntax || node is AccessorDeclarationSyntax || node is LocalFunctionStatementSyntax || node is AnonymousFunctionExpressionSyntax) ?? syntax;
+                            foreach (var identifier in scope.DescendantNodes().OfType<IdentifierNameSyntax>())
+                            {
+                                if (identifier.Identifier.ValueText != local.Name || !SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, context.CancellationToken).Symbol, local)) continue;
+                                var ancestors = identifier.Ancestors().TakeWhile(node => node != scope).ToImmutableArray();
+                                if (ancestors.OfType<AssignmentExpressionSyntax>().Any(node => node.Left.Span.Contains(identifier.Span)) ||
+                                    ancestors.OfType<PrefixUnaryExpressionSyntax>().Any(node => node.IsKind(SyntaxKind.PreIncrementExpression) || node.IsKind(SyntaxKind.PreDecrementExpression)) ||
+                                    ancestors.OfType<PostfixUnaryExpressionSyntax>().Any(node => node.IsKind(SyntaxKind.PostIncrementExpression) || node.IsKind(SyntaxKind.PostDecrementExpression)))
+                                    reasons.Add("Write");
+                                if (ancestors.OfType<ArgumentSyntax>().Any(node => node.RefKindKeyword != default ||
+                                        model.GetOperation(node, context.CancellationToken) is IArgumentOperation argument && argument.Parameter is { RefKind: not RefKind.None }) ||
+                                    ancestors.Any(node => node is RefExpressionSyntax || node.IsKind(SyntaxKind.AddressOfExpression)))
+                                    reasons.Add("RefOrAddress");
+                                if (ancestors.Any(node => node is AnonymousFunctionExpressionSyntax || node is LocalFunctionStatementSyntax))
+                                    reasons.Add("CaptureReview");
+                                if (ancestors.OfType<InvocationExpressionSyntax>().Any(node => new[] { "ReferenceEquals", "GetHashCode", "Enter", "Exit", "Wait", "Pulse", "PulseAll", "TryEnter" }.Any(name => node.Expression.ToString().EndsWith(name, StringComparison.Ordinal))) ||
+                                    ancestors.OfType<LockStatementSyntax>().Any(node => node.Expression.Span.Contains(identifier.Span)))
+                                    reasons.Add("IdentityReview");
+                            }
+                            if (reasons.Contains("Write")) status = "Write";
+                            else if (reasons.Contains("RefOrAddress")) status = "RefOrAddress";
+                            else if (reasons.Contains("UnsupportedDeclarationForm")) status = "UnsupportedDeclarationForm";
+                            else if (reasons.Count > 0) status = "CandidateRequiresSensitiveBindingReview";
+                        }
+                    }
+                    if (status.StartsWith("CandidateRequires", StringComparison.Ordinal) &&
+                        context.Options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.ConstAuditVerify", out var verify) && verify == "true")
+                    {
+                        var proof = VerifyBinding(context.Compilation, tree, model, declarator, local!, context.CancellationToken);
+                        status = proof == "BindingPreserved" && reasons.Count > 0 ? "BindingPreservedNeedsSensitiveReview" : proof;
+                    }
+                    rows.Add(SourceRow(declarator, project, framework, relative, location.Line + 1, location.Character + 1, local is null ? "Field" : "Local", symbol!.Name,
+                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), constant.HasValue ? (constant.Value is null ? "<null>" : constant.Value.GetType().FullName + ":" + Cell(constant.Value)) : "<not-constant>", status,
+                        string.Join(";", reasons.Distinct(StringComparer.Ordinal))));
+                }
+                foreach (var designation in syntax.DescendantNodes().OfType<SingleVariableDesignationSyntax>())
+                {
+                    var symbol = model.GetDeclaredSymbol(designation, context.CancellationToken) as ILocalSymbol;
+                    if (symbol is null) continue;
+                    var location = tree.GetLineSpan(designation.Span).StartLinePosition;
+                    rows.Add(SourceRow(designation, project, framework, relative, location.Line + 1, location.Character + 1, "Local", symbol.Name,
+                        symbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "<not-constant>", "LanguageFormNotConst",
+                        designation.Ancestors().Any(node => node is ForEachVariableStatementSyntax) ? "ForEachVariable" :
+                        designation.Ancestors().Any(node => node is PatternSyntax) ? "PatternVariable" :
+                        designation.Ancestors().Any(node => node is ArgumentSyntax argument && argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) ? "OutVariable" : "DeconstructionVariable"));
+                }
+                foreach (var declarationNode in syntax.DescendantNodes().Where(node => node is CatchDeclarationSyntax || node is ParameterSyntax ||
+                    node is EnumMemberDeclarationSyntax || node is FromClauseSyntax || node is LetClauseSyntax || node is JoinClauseSyntax ||
+                    node is JoinIntoClauseSyntax || node is QueryContinuationSyntax))
+                {
+                    var symbol = model.GetDeclaredSymbol(declarationNode, context.CancellationToken);
+                    var location = tree.GetLineSpan(declarationNode.Span).StartLinePosition;
+                    var enumMember = symbol as IFieldSymbol;
+                    var category = declarationNode is EnumMemberDeclarationSyntax ? "EnumMember" :
+                        declarationNode is ParameterSyntax ? "Parameter" : declarationNode is CatchDeclarationSyntax ? "CatchVariable" : "QueryVariable";
+                    rows.Add(SourceRow(declarationNode, project, framework, relative, location.Line + 1, location.Character + 1, category,
+                        symbol?.Name, (symbol is IParameterSymbol parameter ? parameter.Type : symbol is IFieldSymbol enumField ? enumField.Type : (symbol as ILocalSymbol)?.Type)?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                        enumMember?.HasConstantValue == true ? Cell(enumMember.ConstantValue) : "<not-applicable>",
+                        category == "EnumMember" ? "AlreadyConst" : "LanguageFormNotConst", declarationNode.Kind()));
+                }
+                foreach (var loop in syntax.DescendantNodes().OfType<ForEachStatementSyntax>())
+                {
+                    var symbol = model.GetDeclaredSymbol(loop, context.CancellationToken);
+                    var location = tree.GetLineSpan(loop.Identifier.Span).StartLinePosition;
+                    rows.Add(SourceRow(loop, project, framework, relative, location.Line + 1, location.Character + 1, "Local", symbol?.Name,
+                        (symbol as ILocalSymbol)?.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "<not-constant>", "IterationVariable", "foreach"));
+                }
+            }
+            Directory.CreateDirectory(output);
+            var reportName = context.Compilation.AssemblyName + "-" + framework + "-" + Guid.NewGuid().ToString("N");
+            File.WriteAllLines(Path.Combine(output, reportName + ".tsv"), rows.ToImmutable());
+            File.WriteAllLines(Path.Combine(output, reportName + ".paths.txt"), paths.ToImmutable());
+        }
+        catch (Exception error)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(Failure, Location.None, error.GetType().Name + ": " + error.Message));
+        }
+    }
+    private static string VerifyBinding(Compilation compilation, SyntaxTree tree, SemanticModel model,
+        VariableDeclaratorSyntax declarator, ILocalSymbol local, System.Threading.CancellationToken cancellationToken)
+    {
+        var declaration = (VariableDeclarationSyntax)declarator.Parent!;
+        var statement = (LocalDeclarationStatementSyntax)declaration.Parent!;
+        var scope = statement.Ancestors().FirstOrDefault(node => node is BaseMethodDeclarationSyntax || node is AccessorDeclarationSyntax || node is LocalFunctionStatementSyntax || node is AnonymousFunctionExpressionSyntax);
+        scope = scope ?? tree.GetRoot(cancellationToken);
+        var annotation = new SyntaxAnnotation("ConstAuditScope");
+        var root = tree.GetRoot(cancellationToken).ReplaceNode(scope, scope.WithAdditionalAnnotations(annotation));
+        var originalStatement = root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>().Single(node => node.SpanStart == statement.SpanStart);
+        var changedType = declaration.Type.IsVar ? SyntaxFactory.ParseTypeName(local.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)).WithTriviaFrom(declaration.Type) : declaration.Type;
+        var changedStatement = originalStatement.WithDeclaration(originalStatement.Declaration.WithType(changedType))
+            .WithModifiers(originalStatement.Modifiers.Insert(0, SyntaxFactory.Token(SyntaxKind.ConstKeyword).WithTrailingTrivia(SyntaxFactory.Space)));
+        var changedRoot = root.ReplaceNode(originalStatement, changedStatement);
+        var changedTree = tree.WithRootAndOptions(changedRoot, tree.Options);
+        var changedCompilation = compilation.ReplaceSyntaxTree(tree, changedTree);
+        var changedModel = changedCompilation.GetSemanticModel(changedTree);
+        var changedScope = changedTree.GetRoot(cancellationToken).GetAnnotatedNodes(annotation).Single();
+        var beforeDiagnostics = model.GetDiagnostics(scope.Span, cancellationToken).Select(diagnostic => diagnostic.Id + ":" + diagnostic.Severity + ":" + diagnostic.GetMessage(CultureInfo.InvariantCulture)).OrderBy(value => value, StringComparer.Ordinal).ToImmutableArray();
+        var afterDiagnostics = changedModel.GetDiagnostics(changedScope.Span, cancellationToken).Select(diagnostic => diagnostic.Id + ":" + diagnostic.Severity + ":" + diagnostic.GetMessage(CultureInfo.InvariantCulture)).OrderBy(value => value, StringComparer.Ordinal).ToImmutableArray();
+        if (!beforeDiagnostics.SequenceEqual(afterDiagnostics)) return "DiagnosticChange";
+        var before = Fingerprint(model, scope, cancellationToken);
+        var after = Fingerprint(changedModel, changedScope, cancellationToken);
+        if (before.Contains("OperationRootMissing") || after.Contains("OperationRootMissing")) return "OperationRootRequiresReview";
+        if (before.Any(value => value.StartsWith("DynamicBinding", StringComparison.Ordinal))) return "DynamicBindingRequiresReview";
+        return before.SequenceEqual(after) ? "BindingPreserved" : "BindingChanged";
+    }
+    private static ImmutableArray<string> Fingerprint(SemanticModel model, SyntaxNode scope, System.Threading.CancellationToken cancellationToken)
+    {
+        var result = ImmutableArray.CreateBuilder<string>();
+        var operationRoots = scope is CompilationUnitSyntax compilationUnit
+            ? compilationUnit.Members.OfType<GlobalStatementSyntax>().Select(statement => model.GetOperation(statement.Statement, cancellationToken))
+            : new[] { model.GetOperation(scope, cancellationToken) };
+        foreach (var operationRoot in operationRoots)
+        {
+            if (operationRoot is null) { result.Add("OperationRootMissing"); continue; }
+            result.Add("OperationRoot:" + operationRoot.Kind);
+            Visit(operationRoot);
+        }
+        void Visit(IOperation operation)
+        {
+            result.Add(Row("Operation", operation.Kind, operation.Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), operation.IsImplicit));
+            if (operation is IDynamicInvocationOperation || operation is IDynamicMemberReferenceOperation || operation is IDynamicIndexerAccessOperation)
+                result.Add("DynamicBinding:" + operation.Kind);
+            if (operation is IInvocationOperation invocation)
+                result.Add(Row("Target", Signature(invocation.TargetMethod), invocation.IsVirtual, invocation.Instance?.Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+            if (operation is IMemberReferenceOperation member)
+                result.Add(Row("Member", Signature(member.Member), member.Instance?.Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+            if (operation is IObjectCreationOperation creation)
+                result.Add(Row("Created", Signature(creation.Constructor)));
+            if (operation is IArgumentOperation argument)
+                result.Add(Row("Argument", argument.ArgumentKind, Signature(argument.Parameter), argument.Parameter?.Ordinal,
+                    argument.Parameter?.RefKind, Conversion(argument.InConversion), Conversion(argument.OutConversion)));
+            if (operation is IConversionOperation conversion)
+                result.Add(Row("Converted", Conversion(conversion.Conversion), conversion.IsChecked, conversion.IsTryCast, Signature(conversion.OperatorMethod)));
+            if (operation is IBinaryOperation binary)
+                result.Add(Row("BinaryOperation", binary.OperatorKind, binary.IsChecked, binary.IsLifted, Signature(binary.OperatorMethod)));
+            if (operation is IUnaryOperation unary)
+                result.Add(Row("UnaryOperation", unary.OperatorKind, unary.IsChecked, unary.IsLifted, Signature(unary.OperatorMethod)));
+            if (operation is ILocalReferenceOperation reference)
+                result.Add(Row("LocalReference", Signature(reference.Local)));
+            foreach (var child in operation.ChildOperations) Visit(child);
+        }
+        var expressions = scope is CompilationUnitSyntax unit
+            ? unit.Members.OfType<GlobalStatementSyntax>().SelectMany(statement => statement.DescendantNodesAndSelf().OfType<ExpressionSyntax>())
+            : scope.DescendantNodes().OfType<ExpressionSyntax>();
+        foreach (var node in expressions)
+        {
+            var symbol = model.GetSymbolInfo(node, cancellationToken).Symbol;
+            if (!(node is InvocationExpressionSyntax || node is ObjectCreationExpressionSyntax || node is ImplicitObjectCreationExpressionSyntax ||
+                node is ElementAccessExpressionSyntax || node is BinaryExpressionSyntax || node is PrefixUnaryExpressionSyntax || node is PostfixUnaryExpressionSyntax ||
+                node is CastExpressionSyntax || node is ConditionalExpressionSyntax || node is IsPatternExpressionSyntax || node is SwitchExpressionSyntax ||
+                node is AssignmentExpressionSyntax || node is AwaitExpressionSyntax || node is MemberAccessExpressionSyntax || node is ConditionalAccessExpressionSyntax || (node is IdentifierNameSyntax && symbol is ILocalSymbol))) continue;
+            var types = model.GetTypeInfo(node, cancellationToken);
+            var operation = model.GetOperation(node, cancellationToken);
+            if (operation is IDynamicInvocationOperation || operation is IDynamicMemberReferenceOperation || operation is IDynamicIndexerAccessOperation)
+                result.Add("DynamicBinding:" + operation.Kind);
+            if (operation is IInvocationOperation invocation)
+                result.Add(Row("Invocation", Signature(invocation.TargetMethod), string.Join(";", invocation.Arguments.Select(argument => Row(argument.ArgumentKind, argument.Parameter?.Ordinal, argument.Parameter?.RefKind, argument.Parameter?.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), Conversion(argument.InConversion), Conversion(argument.OutConversion))))));
+            if (operation is IObjectCreationOperation creation) result.Add(Row("Constructor", Signature(creation.Constructor)));
+            if (operation is IBinaryOperation binary) result.Add(Row("Binary", binary.OperatorKind, Signature(binary.OperatorMethod)));
+            if (operation is IConversionOperation converted) result.Add(Row("Conversion", Conversion(converted.Conversion)));
+            var conversion = model.GetConversion(node, cancellationToken);
+            result.Add(Row(node.Kind(), types.Type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                types.ConvertedType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                Signature(symbol), operation?.Kind,
+                Signature(conversion.MethodSymbol)));
+        }
+        return result.ToImmutable();
+    }
+    private static string Conversion(CommonConversion conversion) => Row(conversion.Exists, conversion.IsIdentity, conversion.IsImplicit,
+        conversion.IsNumeric, conversion.IsNullable, conversion.IsReference, conversion.IsUserDefined, Signature(conversion.MethodSymbol));
+    private static string Signature(ISymbol? symbol)
+    {
+        if (symbol is null) return "<none>";
+        if (symbol is ILocalSymbol local) return Row("local", local.ContainingSymbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), local.Name, local.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), local.RefKind);
+        var method = symbol as IMethodSymbol;
+        return Row(symbol.Kind, symbol.ContainingAssembly?.Identity, symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            symbol.ContainingType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), method?.MethodKind, method?.Arity,
+            method?.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), method?.RefKind,
+            method is null ? "" : string.Join(";", method.TypeArguments.Select(type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))),
+            method is null ? "" : string.Join(";", method.Parameters.Select(parameter => parameter.RefKind + ":" + parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))));
+    }
+    private static bool Legal(ITypeSymbol type, object? value)
+    {
+        if (type.TypeKind == TypeKind.Enum) return true;
+        if (type.IsReferenceType && type.TypeKind != TypeKind.TypeParameter && value is null) return true;
+        switch (type.SpecialType)
+        {
+            case SpecialType.System_Boolean: case SpecialType.System_Byte: case SpecialType.System_SByte:
+            case SpecialType.System_Int16: case SpecialType.System_UInt16: case SpecialType.System_Int32:
+            case SpecialType.System_UInt32: case SpecialType.System_Int64: case SpecialType.System_UInt64:
+            case SpecialType.System_Char: case SpecialType.System_Single: case SpecialType.System_Double:
+            case SpecialType.System_Decimal: case SpecialType.System_String:
+            case SpecialType.System_IntPtr: case SpecialType.System_UIntPtr: return true;
+            default: return false;
+        }
+    }
+}

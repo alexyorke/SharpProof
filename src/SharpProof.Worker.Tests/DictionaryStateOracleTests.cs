@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -108,7 +109,7 @@ public sealed class DictionaryStateOracleTests
         var first = new ObservedValueEquality();
         var second = new ObservedValueEquality();
         Compare("var data = new System.Collections.Generic.Dictionary<int, object>(); data.Add(17, value0); " +
-            "data[17] = value1; return data.Count == 1 && object.ReferenceEquals(data[17], value1) ? 1 : 0;", first, second);
+            "data[17] = value1; return data.Count == 1 && object.ReferenceEquals(data[17], value1) ? 1 : 0;", [first, second]);
         Assert.That(first.Callbacks, Is.Zero);
         Assert.That(second.Callbacks, Is.Zero);
     }
@@ -150,17 +151,31 @@ public sealed class DictionaryStateOracleTests
         Compare("var data = new System.Collections.Generic.Dictionary<" + key + ", int>(); var alias = data; return data.Count + alias.Count;", true);
     }
 
-    private static void Compare(string body, params object?[] inputs)
+    private static void Compare(string body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        ArgumentNullException.ThrowIfNull(inputs);
+        Compare(body, false, ImmutableArray<object?>.Empty);
+    }
+
+    private static void Compare(string body, bool approximateInitialization)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        Compare(body, approximateInitialization, ImmutableArray<object?>.Empty);
+    }
+
+    private static void Compare(string body, ImmutableArray<object?> inputs)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         Compare(body, false, inputs);
     }
 
-    private static void Compare(string body, bool approximateInitialization, params object?[] inputs)
+    private static void Compare(string body, bool approximateInitialization, ImmutableArray<object?> inputs)
     {
         ArgumentNullException.ThrowIfNull(body);
-        ArgumentNullException.ThrowIfNull(inputs);
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         var parameters = string.Join(", ", Enumerable.Range(0, inputs.Length).Select(index => "object value" + index));
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(" + parameters + ") { " + body + " } }");
         var compilation = CSharpCompilation.Create("DictionaryStateOracle", [tree], TestMetadataReferences.Platform,
@@ -179,7 +194,7 @@ public sealed class DictionaryStateOracleTests
         try
         {
             image.Position = 0;
-            var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, inputs);
+            var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, inputs.ToArray());
             // Primitive operations use observed replay authority. Generic-key
             // initialization selects a bounded normal model choice and must
             // remain approximation-dependent, never trusted native replay.
@@ -193,12 +208,13 @@ public sealed class DictionaryStateOracleTests
                 ConcreteHavocValueProvider = request => IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) != null &&
                     factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null
             };
-            var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+            var argumentBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
             for (var index = 0; index < inputs.Length; index++)
             {
-                arguments.Add(context.Parameters[index].Entry, inputs[index] is { } value
+                argumentBuilder.AddUnique(context.Parameters[index].Entry, inputs[index] is { } value
                     ? factory.CreateReferenceValue(factory.ObjectType, value) : factory.CreateNullValue(factory.ObjectType));
             }
+            var arguments = argumentBuilder.ToImmutable();
             var result = new IrProgramInterpreter(factory).Execute(lowered.Program, arguments, 5000, options);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);
             Assert.That(result.ConsumedApproximation, Is.EqualTo(approximateInitialization));

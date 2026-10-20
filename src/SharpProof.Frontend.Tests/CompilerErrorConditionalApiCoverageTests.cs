@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorConditionalApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0173"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0173"];
 
     [Test]
     public void IncompatibleConditionalArmsRetainCompilerRecoveryAndApiAbstention()
@@ -39,7 +40,7 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         Assert.That(conditional.WhenFalse, Is.AssignableTo<IConversionOperation>());
         var trueArm = (IConversionOperation)conditional.WhenTrue;
         var falseArm = (IConversionOperation)conditional.WhenFalse!;
-        foreach (var arm in new[] { trueArm, falseArm })
+        foreach (var arm in ImmutableArray.Create(trueArm, falseArm))
         {
             Assert.That(arm.IsImplicit, Is.True);
             Assert.That(arm.Type!.TypeKind, Is.EqualTo(TypeKind.Error));
@@ -65,7 +66,7 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         Assert.That(lowerer.Lower(conditional.Condition).Classification.IsExact, Is.True);
         Assert.That(lowerer.Lower(trueArm.Operand).Classification.IsExact, Is.True);
         Assert.That(lowerer.Lower(falseArm.Operand).Classification.IsExact, Is.True);
-        foreach (var arm in new[] { trueArm, falseArm })
+        foreach (var arm in ImmutableArray.Create(trueArm, falseArm))
         {
             var recovery = lowerer.Lower(arm);
             Assert.That(recovery.Classification.IsExact, Is.False);

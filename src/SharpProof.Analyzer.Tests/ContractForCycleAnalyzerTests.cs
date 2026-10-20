@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,7 +9,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ContractForCycleAnalyzerTests
 {
-    private static readonly string[] DiagnosticIds =
+    private static readonly ImmutableArray<string> DiagnosticIds =
         ["SP0047", "SPCF0009", "SPCF0010"];
     private const string UnsupportedMapBody = """
                     Contract.Ensures(true);
@@ -70,7 +71,7 @@ public sealed class ContractForCycleAnalyzerTests
             }
             """);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0009", "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0009", "SP0047"]);
         Assert.That(
             diagnostics[0].GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -106,7 +107,7 @@ public sealed class ContractForCycleAnalyzerTests
 
         var cycleDiagnostics = diagnostics
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0010"))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(

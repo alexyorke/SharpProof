@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -12,11 +13,11 @@ internal sealed class NativeAllocationEffectTests
     [Test]
     public void DelegateNullEmissionDistinguishesEscapingAndErasedConstruction()
     {
-        foreach (var optimization in new[] { Microsoft.CodeAnalysis.OptimizationLevel.Debug, Microsoft.CodeAnalysis.OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(Microsoft.CodeAnalysis.OptimizationLevel.Debug, Microsoft.CodeAnalysis.OptimizationLevel.Release))
         {
-            foreach (var framework in new[] { false, true })
+            foreach (var framework in ImmutableArray.Create(false, true))
             {
-                foreach (var escapes in new[] { false, true })
+                foreach (var escapes in ImmutableArray.Create(false, true))
                 {
                     var source = "public class Receiver { public void Sink() {} } public static class C { public static object Target() { " +
                         (framework ? "System.Func<string> action = new System.Func<string>(((string)null).Trim); "
@@ -137,7 +138,7 @@ internal sealed class NativeAllocationEffectTests
         var factory = total.Program.Factory;
         var count = 0;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = factory.CreateIntegerValue(factory.IntegerType, 0L) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, factory.CreateIntegerValue(factory.IntegerType, 0L)),
             1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
         Assert.That(execution.Exception?.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         var runtimeSource = source.Replace("10 / x", "Fault(x)", StringComparison.Ordinal)
@@ -170,8 +171,11 @@ internal sealed class NativeAllocationEffectTests
         foreach (var allocation in artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate)))
         {
-            allocation.Kind = IrInstructionKind.Write;
-            allocation.A = (int)IrWriteRegion.Local;
+            var total = artifact.Callables.Single().Total!;
+            {
+                total = total with { Graph = total.Graph.ReplaceRow(allocation, allocation with { Kind = IrInstructionKind.Write, A = (int)IrWriteRegion.Local }) };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
         }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -193,7 +197,7 @@ internal sealed class NativeAllocationEffectTests
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         var total = preparation.Total!;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(0)));
         Assert.That(execution.ReturnValue!.Boolean, Is.False);
     }
 
@@ -206,7 +210,7 @@ internal sealed class NativeAllocationEffectTests
         var total = Prepare(source).Total!;
         var count = 0;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(input) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(input)),
             1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
         Assert.That(execution.Exception?.Kind, Is.EqualTo(expected));
         Assert.That(count, Is.Zero);
@@ -238,16 +242,28 @@ internal sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "missing-length":
-                allocation.C = -1;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = -1 });
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+                }
                 break;
             case "missing-target":
-                allocation.B = -1;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = -1 });
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+                }
                 break;
             case "invalid-length":
-                allocation.C = int.MaxValue;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = int.MaxValue });
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+                }
                 break;
             case "wrong-length-type":
-                allocation.C = Array.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean));
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean)) });
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+                }
                 break;
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
@@ -264,11 +280,17 @@ internal sealed class NativeAllocationEffectTests
             "[ZeroAllocations] public static int Target(int x) { int[] values = new int[] { 1, -2 }; return values[0]; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
         var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
-        allocation.Items = mutation == "count" ? new[] { allocation.Items[0] }
-            : new[] { Array.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
-                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)), allocation.Items[1] };
+        (allocation, graph) = graph.ChangeRow(allocation, allocation with
+        {
+            Items = (mutation == "count" ? ImmutableArray.Create(allocation.Items[0])
+                    : ImmutableArray.Create(
+                        PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
+                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)),
+                        allocation.Items[1]))
+        });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+                    CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("System.Action action = Sink;")]
@@ -370,17 +392,13 @@ internal sealed class NativeAllocationEffectTests
     [TestCase(1, IrExceptionKind.Argument)]
     public void InstanceDelegateEvaluatesReceiverBeforeNullCheckAndAllocation(int x, IrExceptionKind expected)
     {
-        var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+        const string source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
             "private static Receiver Pass(Receiver receiver, int value) { return receiver; } " +
             "[ZeroAllocations] public static System.Action Target(Receiver instance, int x) { " +
             "return new System.Action(Pass(instance, 10 / x).Sink); } }";
         var total = Prepare(source).Total!;
         var factory = total.Program.Factory;
-        var initial = new Dictionary<IrVarId, IrValue>
-        {
-            [total.Parameters[0].Entry] = factory.CreateNullValue(factory.GetVariableInfo(total.Parameters[0].Entry).Type),
-            [total.Parameters[1].Entry] = factory.CreateIntegerValue(factory.IntegerType, x)
-        };
+        var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters[0].Entry, factory.CreateNullValue(factory.GetVariableInfo(total.Parameters[0].Entry).Type)).SetItem(total.Parameters[1].Entry, factory.CreateIntegerValue(factory.IntegerType, x));
         var allocations = 0;
         var replay = new IrProgramInterpreter(factory).Execute(total.Program, initial, 10000,
             new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
@@ -419,28 +437,84 @@ internal sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "input-origin":
-                row.Origin = IrHavocOrigin.Input;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.Input });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "spec-origin":
-                row.Origin = IrHavocOrigin.SpecResult;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.SpecResult });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "memory":
-                row.A = (int)IrHavocKind.VariablesAndMemory;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { A = (int)IrHavocKind.VariablesAndMemory });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "duplicate":
-                row.Items = [row.Items.Single(), row.Items.Single()];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [row.Items.Single(), row.Items.Single()] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "entry":
-                row.Items = [total.Parameters[1].Entry];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Entry] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "current":
-                row.Items = [total.Parameters[1].Current];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Current] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "old":
-                row.Items = [total.Parameters[1].Old];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Old] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "result":
-                row.Items = [total.Result];
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Result] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -463,22 +537,52 @@ internal sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "foreign-claim":
-                total.ValidEffectClaimIds = ["foreign"];
+                {
+                    total = total with { ValidEffectClaimIds = ["foreign"] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "duplicate-claim":
-                total.ValidEffectClaimIds = [total.ValidEffectClaimIds.Single(), total.ValidEffectClaimIds.Single()];
+                {
+                    total = total with { ValidEffectClaimIds = [total.ValidEffectClaimIds.Single(), total.ValidEffectClaimIds.Single()] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "null-claims":
-                total.ValidEffectClaimIds = null!;
+                {
+                    total = total with { ValidEffectClaimIds = default };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "unused-slot":
-                allocation.C = 0;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { C = 0 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "invalid-type":
-                allocation.A = -1;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { A = -1 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
             case "scalar-type":
-                allocation.A = 0;
+                {
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { A = 0 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -496,11 +600,20 @@ internal sealed class NativeAllocationEffectTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
         if (mutation == "invalid-index")
-        { allocation.B = int.MaxValue; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = int.MaxValue });
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+        }
         else if (mutation == "wrong-type")
-        { allocation.B = 0; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = 0 });
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+        }
         else
-        { allocation.C = 0; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = 0 });
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+        }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -513,9 +626,19 @@ internal sealed class NativeAllocationEffectTests
             "[ZeroAllocations] public static int Target(int x) { Contract.Requires(false); new object(); return x; } }");
         var total = artifact.Callables.Single().Total!;
         if (initialization)
-        { total.EffectsCompleteAtEntry = false; }
+        {
+            {
+                total = total with { EffectsCompleteAtEntry = false };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         else
-        { total.ValidEffectClaimIds = []; }
+        {
+            {
+                total = total with { ValidEffectClaimIds = [] };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Null);
@@ -609,10 +732,7 @@ internal sealed class NativeAllocationEffectTests
         var total = preparation.Total!;
         var allocations = 0;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(total.Program.Factory.IntegerType, 0L)
-            }, 10000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(total.Program.Factory.IntegerType, 0L)), 10000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         Assert.That(allocations, Is.Zero);

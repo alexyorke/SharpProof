@@ -34,7 +34,7 @@ internal sealed class PassiveCallableVcTests
         if (result.Kind == PassiveCallableFeasibilityKind.Feasible)
         {
             Assert.That(result.Evidence.Outcome, Is.TypeOf<RefutedOutcome>());
-            Assert.That(result.Evidence.EntryModel.Keys, Is.EqualTo(new[] { subject.Parameter.Entry }));
+            Assert.That(result.Evidence.EntryModel.Keys, Is.EqualTo(ImmutableArray.Create(subject.Parameter.Entry)));
         }
     }
 
@@ -130,11 +130,11 @@ internal sealed class PassiveCallableVcTests
         Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
         var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(proof.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
+        Assert.That(proof.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.True);
         var normal = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
-        Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
+        Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
@@ -290,13 +290,15 @@ internal sealed class PassiveCallableVcTests
             "old-entry" => original with { Old = original.Entry },
             _ => original
         };
-        ImmutableArray<PassiveParameterBinding> parameters = [first];
+        var parameterBuilder = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
+        parameterBuilder.Add(first);
         if (alias == "cross-input")
         {
-            parameters = parameters.Add(new(original.Current,
+            parameterBuilder.Add(new(original.Current,
                 subject.Factory.CreateVariable("other-current", subject.Factory.IntegerType),
                 subject.Factory.CreateVariable("other-old", subject.Factory.IntegerType)));
         }
+        var parameters = parameterBuilder.ToImmutable();
         Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableCandidate("aliases", program, parameters,
             alias == "result" ? original.Current : subject.Result, [], [])));
     }
@@ -329,13 +331,13 @@ internal sealed class PassiveCallableVcTests
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<LoweredJustification>()
             .Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (justification.Operation)).Distinct(),
-            Is.EqualTo(new[] { subject.Site }));
+            Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<UserAssumedJustification>()
             .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
         var proof = (ProvenOutcome)await kernel.VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(plan.CoreLabels(proof), Has.Length.EqualTo(query.Assumptions.Length));
-        Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(new[] { subject.Site }));
+        Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(ImmutableArray.Create(subject.Site)));
         var other = new ScalarSubject();
         var otherBlock = other.Builder.CreateBlock();
         other.Builder.Return(otherBlock, other.Site, other.Factory.Integer(0));
@@ -659,13 +661,13 @@ internal sealed class PassiveCallableVcTests
         if (restore)
         { Store(7); }
         subject.Builder.Return(block, subject.Site, factory.Integer(0));
-        var requires = new List<PassiveContractClause>
-        { new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site) };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
         var cell = array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
             : factory.PureOpaque(field, factory.Variable(owner.Current));
-        return new("opaque-heap", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+        return new("opaque-heap", subject.Builder.Build(), [owner], subject.Result, requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, cell, factory.Integer(nonwriter ? 3 : 5)), factory.Boolean(true), subject.Site)]);
     }
 
@@ -682,10 +684,10 @@ internal sealed class PassiveCallableVcTests
         Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
         Assert.That(actual.ConsumedApproximation, Is.False);
         var plan = Build(candidate);
-        var replay = plan.ReplayEffects(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken);
+        var replay = plan.ReplayEffects(inputs, TestContext.CurrentContext.CancellationToken);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(3));
         Assert.That(replay.ConsumedApproximation, Is.False);
-        Assert.That(plan.ReplayException(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken).ReturnValue!.Integer, Is.EqualTo(3));
+        Assert.That(plan.ReplayException(inputs, TestContext.CurrentContext.CancellationToken).ReturnValue!.Integer, Is.EqualTo(3));
         using var solver = new PassiveCallableSolver(plan);
         var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
@@ -696,7 +698,7 @@ internal sealed class PassiveCallableVcTests
         { Assert.That(result.EntryModel.All(row => row.Key == candidate.Parameters.Single().Entry), Is.True); }
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) BodyOldHeapCandidate(bool array)
+    internal static (PassiveCallableCandidate Candidate, ImmutableDictionary<IrVarId, IrValue> Inputs) BodyOldHeapCandidate(bool array)
     {
         var subject = new ScalarSubject();
         var factory = subject.Factory;
@@ -714,19 +716,17 @@ internal sealed class PassiveCallableVcTests
         else
         { subject.Builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(7)); }
         subject.Builder.Return(block, subject.Site, Read(owner.Old));
-        var requires = new List<PassiveContractClause>
-        {
-            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site),
-            new(factory.Binary(IrBinaryOperator.Equal, Read(owner.Entry), factory.Integer(3)), factory.Boolean(true), subject.Site)
-        };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site));
+        requires.Add(new(factory.Binary(IrBinaryOperator.Equal, Read(owner.Entry), factory.Integer(3)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
-        var candidate = new PassiveCallableCandidate("body-snapshot", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+        var candidate = new PassiveCallableCandidate("body-snapshot", subject.Builder.Build(), [owner], subject.Result, requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(7)), factory.Boolean(true), subject.Site),
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(3)), factory.Boolean(true), subject.Site)]);
         var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
-        return (candidate, new Dictionary<IrVarId, IrValue> { [owner.Entry] = value });
+        return (candidate, ImmutableDictionary<IrVarId, IrValue>.Empty.Add(owner.Entry, value));
     }
 
     [TestCase("allocation", true, false)]
@@ -870,7 +870,7 @@ internal sealed class PassiveCallableVcTests
         var site = factory.CreateOperation();
         var result = factory.CreateVariable("result", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
-        var blocks = Enumerable.Range(0, blockCount).Select(_ => builder.CreateBlock()).ToArray();
+        var blocks = Enumerable.Range(0, blockCount).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var index = 0; index < blocks.Length - 1; index++)
         { builder.Goto(blocks[index], site, blocks[index + 1]); }
         builder.Return(blocks[^1], site, factory.Integer(0));
@@ -879,7 +879,7 @@ internal sealed class PassiveCallableVcTests
 
     private sealed class FixedModelBackend(BackendModel model) : ISmtBackend
     {
-        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
+        private readonly BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(query);

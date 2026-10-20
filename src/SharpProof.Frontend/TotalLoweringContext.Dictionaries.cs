@@ -37,10 +37,10 @@ internal static partial class CSharpOperationSemantics
 
 internal sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _defaultDictionaries = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _defaultDictionaryCaptures = [];
-    private readonly HashSet<ISymbol> _defaultDictionaryOrigins = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _defaultDictionaryOriginCaptures = [];
+    private readonly ImmutableHashSet<ISymbol>.Builder _defaultDictionaries = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _defaultDictionaryCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
+    private readonly ImmutableHashSet<ISymbol>.Builder _defaultDictionaryOrigins = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _defaultDictionaryOriginCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
 
     // The comparer is a constructor-established invariant. A dictionary-typed
     // incoming value, callback, ref escape or cyclic definition supplies no proof.

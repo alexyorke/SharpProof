@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,7 +21,7 @@ public sealed class OrdinarySummaryCapturedSuffixReportTests
     {
         const string source = "public class SummaryInvocation { public static int Counter; public static void Target() { Counter = 1; } }";
         var compilation = await PrepareAsync(source);
-        var originals = compilation.SyntaxTrees.ToArray();
+        var originals = compilation.SyntaxTrees;
         Assert.That(originals, Has.Length.EqualTo(2));
         var targetTree = originals[1];
         Assert.That(targetTree.FilePath, Is.EqualTo("summary-write-invocation.cs"));

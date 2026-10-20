@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Worker.Protocol;
 
 internal static partial class WorkerProtocolJson
@@ -13,7 +14,7 @@ internal static partial class WorkerProtocolJson
     {
         _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         manifest.Claims = [
-            .. (manifest.Claims ?? [])
+            .. (EmptyIfDefault(manifest.Claims))
                 .OrderBy(
                     static (WorkerClaimManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) => value?.CallableId,
                     StringComparer.Ordinal)
@@ -35,7 +36,7 @@ internal static partial class WorkerProtocolJson
             callable.SelectionReasons =
                 SortManifestEnums(callable.SelectionReasons);
             callable.ClaimIds = [
-                .. (callable.ClaimIds ?? [])
+                .. (EmptyIfDefault(callable.ClaimIds))
                     .OrderBy(id =>
                         id is null ? throw new System.ArgumentNullException(nameof(id)) : (FindClaimOrdinal(claimsById, id)))
                     .ThenBy(
@@ -53,7 +54,7 @@ internal static partial class WorkerProtocolJson
         WorkerClaimManifest manifest)
     {
         _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        return ComputeSha256(System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
+        return ComputeSha256((System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest))).ToImmutableArray());
     }
 
     public static void SealManifest(WorkerClaimManifest manifest)

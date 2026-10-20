@@ -16,7 +16,7 @@ internal static class IrSubstitution
 
         var replacementMap = CreateReplacementMap(
             factory,
-            new Dictionary<IrVarId, IrTerm> { [variable] = replacement });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement));
         return SubstituteValidated(factory, root, replacementMap);
     }
 
@@ -37,7 +37,7 @@ internal static class IrSubstitution
     private static IrTerm SubstituteValidated(
         IrFactory factory,
         IrTerm root,
-        Dictionary<IrVarId, IrTerm> replacementMap)
+        ImmutableDictionary<IrVarId, IrTerm> replacementMap)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
@@ -46,14 +46,14 @@ internal static class IrSubstitution
             return root;
         }
 
-        var memo = new Dictionary<IrId, IrTerm>();
+        var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
         return Rewrite(
             factory,
             root,
             replacementMap,
             memo,
             allowedVariables: null,
-            out _);
+            out _, out _);
     }
 
     // Substitutes variables and rebuilds each element or field read,
@@ -71,14 +71,14 @@ internal static class IrSubstitution
         ArgumentNullGuard.NotNull(read, nameof(read));
         factory.EnsureTerm(root, nameof(root));
         var replacementMap = CreateReplacementMap(factory, replacements);
-        return Rewrite(factory, root, replacementMap, [], allowedVariables: null, out _, read);
+        return Rewrite(factory, root, replacementMap, ImmutableDictionary<IrId, IrTerm>.Empty, allowedVariables: null, out _, out _, read);
     }
 
     internal static bool TrySubstitute(
         IrFactory factory,
         IrTerm root,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        ISet<IrVarId>? freeVariables,
+        ImmutableHashSet<IrVarId>? freeVariables,
         out IrTerm result)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -87,14 +87,14 @@ internal static class IrSubstitution
 
         factory.EnsureTerm(root, nameof(root));
         var replacementMap = CreateReplacementMap(factory, replacements);
-        var memo = new Dictionary<IrId, IrTerm>();
+        var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
         result = Rewrite(
             factory,
             root,
             replacementMap,
             memo,
-            freeVariables,
-            out var variablesValid);
+            freeVariables?.WithComparer(EqualityComparer<IrVarId>.Default),
+            out var variablesValid, out _);
         return variablesValid;
     }
 
@@ -110,7 +110,7 @@ internal static class IrSubstitution
         // IReadOnlyList is a caller-owned view, not an immutable snapshot.
         // Validate and process the same materialized roots so a changing view
         // cannot substitute terms that were never checked for factory ownership.
-        var rootSnapshot = roots.ToArray();
+        var rootSnapshot = roots.ToImmutableArray();
         foreach (var root in rootSnapshot)
         {
             ArgumentNullGuard.NotNull(root, nameof(roots));
@@ -123,8 +123,8 @@ internal static class IrSubstitution
             return [.. rootSnapshot];
         }
 
-        var memo = new Dictionary<IrId, IrTerm>();
-        var result = ImmutableArray.CreateBuilder<IrTerm>(rootSnapshot.Length);
+        var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
+        var result = ImmutableArray.CreateBuilder<IrTerm>();
         foreach (var root in rootSnapshot)
         {
             result.Add(Rewrite(
@@ -133,13 +133,13 @@ internal static class IrSubstitution
                 replacementMap,
                 memo,
                 allowedVariables: null,
-                out _));
+                out _, out memo));
         }
 
-        return result.MoveToImmutable();
+        return result.ToImmutable();
     }
 
-    private static Dictionary<IrVarId, IrTerm> CreateReplacementMap(
+    private static ImmutableDictionary<IrVarId, IrTerm> CreateReplacementMap(
         IrFactory factory,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements)
     {
@@ -147,10 +147,18 @@ internal static class IrSubstitution
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        var replacementMap = replacements.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value);
-        foreach (var replacement in replacementMap)
+        var replacementMap = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        var replacementOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrTerm>>();
+        foreach (var replacement in replacements)
+        {
+            if (replacementMap.ContainsKey(replacement.Key))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + replacement.Key);
+            }
+            replacementMap.Add(replacement.Key, replacement.Value);
+            replacementOrder.Add(replacement);
+        }
+        foreach (var replacement in replacementOrder.ToImmutable())
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             ArgumentNullGuard.NotNull(replacement.Value, nameof(replacements));
@@ -163,7 +171,7 @@ internal static class IrSubstitution
             }
         }
 
-        return replacementMap;
+        return replacementMap.ToImmutable();
     }
 
     /// <summary>
@@ -174,10 +182,11 @@ internal static class IrSubstitution
     private static IrTerm Rewrite(
         IrFactory factory,
         IrTerm root,
-        Dictionary<IrVarId, IrTerm> replacements,
-        Dictionary<IrId, IrTerm> memo,
-        ISet<IrVarId>? allowedVariables,
+        ImmutableDictionary<IrVarId, IrTerm> replacements,
+        ImmutableDictionary<IrId, IrTerm> memo,
+        ImmutableHashSet<IrVarId>? allowedVariables,
         out bool variablesValid,
+        out ImmutableDictionary<IrId, IrTerm> updatedMemo,
         Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?>? read = null)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
@@ -213,13 +222,14 @@ internal static class IrSubstitution
                 return (false, null!);
             });
         variablesValid = allVariablesValid;
-        return result;
+        updatedMemo = result.Memo;
+        return result.Value;
     }
 
     private static IrTerm RewriteNode(
         IrFactory factory,
         IrTerm term,
-        Dictionary<IrId, IrTerm> memo)
+        ImmutableDictionary<IrId, IrTerm> memo)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
@@ -227,50 +237,50 @@ internal static class IrSubstitution
         return term.Accept(RewriteVisitor.Instance, (factory, memo));
     }
 
-    private sealed class RewriteVisitor : IIrTermVisitor<(IrFactory Factory, Dictionary<IrId, IrTerm> Memo), IrTerm>
+    private sealed class RewriteVisitor : IIrTermVisitor<(IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo), IrTerm>
     {
         internal static RewriteVisitor Instance { get; } = new();
 
-        public IrTerm Visit(IrBooleanTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrBooleanTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrIntegerTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrIntegerTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrStringTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrStringTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrNullTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrNullTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrEmptyArrayTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrEmptyArrayTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrVariableTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrVariableTerm term, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term;
         }
 
-        public IrTerm Visit(IrOpaqueTerm opaque, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrOpaqueTerm opaque, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             var receiver = IrSubstitution.VisitNullable(state.Memo, opaque.Receiver);
-            IrTerm[]? arguments = null;
+            ImmutableArray<IrTerm>.Builder? argumentBuilder = null;
             for (var index = 0; index < opaque.Arguments.Length; index++)
             {
                 var argument = IrSubstitution.Visit(state.Memo, opaque.Arguments[index]);
@@ -279,30 +289,22 @@ internal static class IrSubstitution
                     continue;
                 }
 
-                arguments ??= [.. opaque.Arguments];
-                arguments[index] = argument;
+                argumentBuilder ??= opaque.Arguments.ToBuilder();
+                argumentBuilder[index] = argument;
             }
 
             if (ReferenceEquals(receiver, opaque.Receiver) &&
-                arguments == null)
+                argumentBuilder is null)
             {
                 return opaque;
             }
 
-            arguments ??= [.. opaque.Arguments];
-            return opaque.Purity == IrOpaquePurity.Pure
-                ? state.Factory.PureOpaque(
-                    opaque.Member,
-                    receiver,
-                    arguments)
-                : state.Factory.ImpureOpaque(
-                    opaque.Operation,
-                    opaque.Member,
-                    receiver,
-                    arguments);
+            var arguments = argumentBuilder?.ToImmutable() ?? opaque.Arguments;
+            return state.Factory.RebuildOpaque(
+                opaque.Member, receiver, arguments, opaque.Purity, opaque.Operation);
         }
 
-        public IrTerm Visit(IrUnaryTerm unary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrUnaryTerm unary, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             unary = RepositoryParameterGuard.NotNull(unary, nameof(unary));
             var operand = IrSubstitution.Visit(state.Memo, unary.Operand);
@@ -311,7 +313,7 @@ internal static class IrSubstitution
                 : state.Factory.Unary(unary.Operator, operand);
         }
 
-        public IrTerm Visit(IrBinaryTerm binary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrBinaryTerm binary, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             binary = RepositoryParameterGuard.NotNull(binary, nameof(binary));
             var left = IrSubstitution.Visit(state.Memo, binary.Left);
@@ -322,7 +324,7 @@ internal static class IrSubstitution
                 : state.Factory.RewriteBinary(binary.Operator, left, right);
         }
 
-        public IrTerm Visit(IrConditionalTerm conditional, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrConditionalTerm conditional, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             conditional = RepositoryParameterGuard.NotNull(conditional, nameof(conditional));
             var condition = IrSubstitution.Visit(state.Memo, conditional.Condition);
@@ -335,7 +337,7 @@ internal static class IrSubstitution
                 : state.Factory.Conditional(condition, whenTrue, whenFalse);
         }
 
-        public IrTerm Visit(IrCastTerm cast, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrCastTerm cast, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             cast = RepositoryParameterGuard.NotNull(cast, nameof(cast));
             var operand = IrSubstitution.Visit(state.Memo, cast.Operand);
@@ -344,7 +346,7 @@ internal static class IrSubstitution
                 : state.Factory.Cast(cast.Type, operand);
         }
 
-        public IrTerm Visit(IrLengthTerm length, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrLengthTerm length, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             length = RepositoryParameterGuard.NotNull(length, nameof(length));
             var value = IrSubstitution.Visit(state.Memo, length.Value);
@@ -353,7 +355,7 @@ internal static class IrSubstitution
                 : state.Factory.Length(value);
         }
 
-        public IrTerm Visit(IrSequenceAccessTerm access, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrSequenceAccessTerm access, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             access = RepositoryParameterGuard.NotNull(access, nameof(access));
             var sequence = IrSubstitution.Visit(state.Memo, access.Sequence);
@@ -365,14 +367,14 @@ internal static class IrSubstitution
         }
     }
 
-    private static IrTerm Visit(Dictionary<IrId, IrTerm> memo, IrTerm child)
+    private static IrTerm Visit(ImmutableDictionary<IrId, IrTerm> memo, IrTerm child)
     {
         child = RepositoryParameterGuard.NotNull(child, nameof(child));
         memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
         return memo[child.Id];
     }
 
-    private static IrTerm? VisitNullable(Dictionary<IrId, IrTerm> memo, IrTerm? child)
+    private static IrTerm? VisitNullable(ImmutableDictionary<IrId, IrTerm> memo, IrTerm? child)
     {
         memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
         return child == null ? null : Visit(memo, child);

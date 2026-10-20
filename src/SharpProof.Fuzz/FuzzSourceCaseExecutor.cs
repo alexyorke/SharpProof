@@ -15,15 +15,15 @@ namespace SharpProof.Fuzz;
 internal sealed record FuzzSourceCampaignCase(
     GeneratedCSharpCase Frontend,
     string FiniteMembers,
-    IReadOnlyList<object?> FiniteArguments,
+    ImmutableArray<object?> FiniteArguments,
     string PartialMembers,
-    IReadOnlyList<IReadOnlyList<object?>> PartialScenarios)
+    ImmutableArray<ImmutableArray<object?>> PartialScenarios)
 {
     public GeneratedCSharpCase Frontend { get; init; } = Frontend ?? throw new System.ArgumentNullException(nameof(Frontend));
     public string FiniteMembers { get; init; } = FiniteMembers ?? throw new System.ArgumentNullException(nameof(FiniteMembers));
-    public IReadOnlyList<object?> FiniteArguments { get; init; } = FiniteArguments ?? throw new System.ArgumentNullException(nameof(FiniteArguments));
+    public ImmutableArray<object?> FiniteArguments { get; init; } = FiniteArguments.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(FiniteArguments)) : FiniteArguments;
     public string PartialMembers { get; init; } = PartialMembers ?? throw new System.ArgumentNullException(nameof(PartialMembers));
-    public IReadOnlyList<IReadOnlyList<object?>> PartialScenarios { get; init; } = PartialScenarios ?? throw new System.ArgumentNullException(nameof(PartialScenarios));
+    public ImmutableArray<ImmutableArray<object?>> PartialScenarios { get; init; } = PartialScenarios.IsDefault || PartialScenarios.Any(arguments /* SPINT001: all values valid - validation inspects default scenario rows */ => arguments.IsDefault) ? throw new ArgumentException("Scenario arrays must be initialized.", nameof(PartialScenarios)) : PartialScenarios;
 }
 
 internal sealed record FuzzSourceCampaignResult(
@@ -210,10 +210,10 @@ internal static class FuzzSourceCaseExecutor
                 Case = generated;
             }
 
-            internal PartialScope(string members, IReadOnlyList<IReadOnlyList<object?>> inputs,
+            internal PartialScope(string members, ImmutableArray<ImmutableArray<object?>> inputs,
                 CancellationToken cancellationToken)
             {
-                inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+                RepositoryParameterGuard.ThrowIfInvalid(inputs.IsDefault, nameof(inputs));
                 members = RepositoryParameterGuard.NotNull(members, nameof(members));
                 _source = new BooleanSourceScope(members, cancellationToken);
                 try
@@ -288,7 +288,7 @@ internal static class FuzzSourceCaseExecutor
         private readonly AssemblyLoadContext _context;
         private readonly SemanticModel _model;
         private readonly Type _runtime;
-        private readonly MethodDeclarationSyntax[] _methods;
+        private readonly ImmutableArray<MethodDeclarationSyntax> _methods;
         internal IrFactory Factory { get; } = new(IrExecutionSemantics.Total);
 
         internal BooleanSourceScope(string members, CancellationToken cancellationToken)
@@ -316,7 +316,7 @@ internal static class FuzzSourceCaseExecutor
             {
                 _model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                     compilation, tree);
-                _methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+                _methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
                 _image.Position = 0;
                 _runtime = _context.LoadFromStream(_image).GetType("SharpProofSourceCampaignBoolean") ??
                     throw new InvalidOperationException("The compiled source does not contain its subject type.");
@@ -380,9 +380,9 @@ internal static class FuzzSourceCaseExecutor
                 throw new InvalidOperationException("The finite source safety condition is not defined and true for every bounded assignment.");
             }
         }
-        internal static (bool? Value, Exception? Exception) Invoke(BooleanMethod method, IReadOnlyList<object?> inputs)
+        internal static (bool? Value, Exception? Exception) Invoke(BooleanMethod method, ImmutableArray<object?> inputs)
         {
-            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+            RepositoryParameterGuard.ThrowIfInvalid(inputs.IsDefault, nameof(inputs));
             method = RepositoryParameterGuard.NotNull(method, nameof(method));
             try
             {
@@ -394,10 +394,10 @@ internal static class FuzzSourceCaseExecutor
             }
         }
 
-        internal PartialTermSmtCase CreatePartial(IReadOnlyList<IReadOnlyList<object?>> inputs,
+        internal PartialTermSmtCase CreatePartial(ImmutableArray<ImmutableArray<object?>> inputs,
             CancellationToken cancellationToken)
         {
-            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+            RepositoryParameterGuard.ThrowIfInvalid(inputs.IsDefault, nameof(inputs));
             var target = Lower("Target", cancellationToken);
             var completion = Lower("NormalCompletion", cancellationToken);
             var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>();
@@ -430,10 +430,11 @@ internal static class FuzzSourceCaseExecutor
         }
 
         private ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> Bind(BooleanMethod method,
-            IReadOnlyList<object?> inputs, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> scenario)
+            ImmutableArray<object?> inputs, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> scenario)
         {
-            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+            RepositoryParameterGuard.ThrowIfInvalid(inputs.IsDefault, nameof(inputs));
             scenario = RepositoryParameterGuard.NotNull(scenario, nameof(scenario));
+            var result = scenario.ToBuilder();
             foreach (var binding in method.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||
@@ -445,9 +446,9 @@ internal static class FuzzSourceCaseExecutor
                 var type = Factory.GetVariableInfo(binding.Variable).Type;
                 var value = input is bool boolean ? Factory.CreateBooleanValue(boolean)
                     : Factory.CreateIntegerValue(type, Convert.ToInt64(input, CultureInfo.InvariantCulture));
-                scenario = scenario.Add(binding.Variable, value);
+                result.Add(binding.Variable, value);
             }
-            return scenario;
+            return result.ToImmutable();
         }
 
         public void Dispose()

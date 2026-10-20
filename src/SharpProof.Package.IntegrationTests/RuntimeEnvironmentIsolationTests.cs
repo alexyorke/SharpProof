@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -9,7 +10,7 @@ public static class StartupHook
     public static void Initialize()
     {
         var temporaryDirectory = Environment.GetEnvironmentVariable("TMPDIR");
-        var arguments = Environment.GetCommandLineArgs();
+        var arguments = Environment.GetCommandLineArgs().ToImmutableArray();
         if (string.IsNullOrWhiteSpace(temporaryDirectory) ||
             arguments.Length == 0 ||
             !string.Equals(
@@ -98,25 +99,24 @@ namespace SharpProof.Package.Test
         public void WorkerProcessReceivesOnlyTheRuntimeAllowlist()
         {
             using var temporary = new TempDirectory("sharp-env-");
-            var inheritedEnvironment = new Dictionary<string, string?>
-            {
-                ["PATH"] = "/usr/bin:/bin",
-                ["HOME"] = temporary.FullName,
-                ["TMPDIR"] = temporary.FullName,
-                ["SHARPPROOF_CONTAINER"] = "1",
-                ["SHARPPROOF_CONTAINER_CONTRACT"] = "/etc/sharpproof/container-contract.json",
-                ["SHARPPROOF_NATIVE_ROOT"] = "/opt/sharpproof/native",
-                ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
-                ["DOTNET_STARTUP_HOOKS"] = "/tmp/injected-hook.dll",
-                ["DOTNET_ADDITIONAL_DEPS"] = "/tmp/injected.deps.json",
-                ["DOTNET_SHARED_STORE"] = "/tmp/injected-store",
-                ["DOTNET_ROLL_FORWARD"] = "Major",
-                ["DOTNET_HOST_PATH"] = "/tmp/untrusted/dotnet",
-                ["LD_PRELOAD"] = "/tmp/injected.so",
-                ["LD_LIBRARY_PATH"] = "/tmp/injected-libraries",
-                ["LD_AUDIT"] = "/tmp/injected-audit.so",
-                ["SHARPPROOF_UNTRUSTED"] = "must-not-pass"
-            };
+            var inheritedEnvironmentBuilder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
+            inheritedEnvironmentBuilder["PATH"] = "/usr/bin:/bin";
+            inheritedEnvironmentBuilder["HOME"] = temporary.FullName;
+            inheritedEnvironmentBuilder["TMPDIR"] = temporary.FullName;
+            inheritedEnvironmentBuilder["SHARPPROOF_CONTAINER"] = "1";
+            inheritedEnvironmentBuilder["SHARPPROOF_CONTAINER_CONTRACT"] = "/etc/sharpproof/container-contract.json";
+            inheritedEnvironmentBuilder["SHARPPROOF_NATIVE_ROOT"] = "/opt/sharpproof/native";
+            inheritedEnvironmentBuilder["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+            inheritedEnvironmentBuilder["DOTNET_STARTUP_HOOKS"] = "/tmp/injected-hook.dll";
+            inheritedEnvironmentBuilder["DOTNET_ADDITIONAL_DEPS"] = "/tmp/injected.deps.json";
+            inheritedEnvironmentBuilder["DOTNET_SHARED_STORE"] = "/tmp/injected-store";
+            inheritedEnvironmentBuilder["DOTNET_ROLL_FORWARD"] = "Major";
+            inheritedEnvironmentBuilder["DOTNET_HOST_PATH"] = "/tmp/untrusted/dotnet";
+            inheritedEnvironmentBuilder["LD_PRELOAD"] = "/tmp/injected.so";
+            inheritedEnvironmentBuilder["LD_LIBRARY_PATH"] = "/tmp/injected-libraries";
+            inheritedEnvironmentBuilder["LD_AUDIT"] = "/tmp/injected-audit.so";
+            inheritedEnvironmentBuilder["SHARPPROOF_UNTRUSTED"] = "must-not-pass";
+            var inheritedEnvironment = inheritedEnvironmentBuilder.ToImmutable();
             const string script =
                 "test \"$PATH\" = /usr/bin:/bin && " +
                 "test \"$HOME\" = \"$TMPDIR\" && " +
@@ -153,12 +153,11 @@ namespace SharpProof.Package.Test
         [Test]
         public void DotNetChildRootComesFromTheValidatedMuxer()
         {
-            var inheritedEnvironment = new Dictionary<string, string?>
-            {
-                ["PATH"] = "/safe/bin",
-                ["DOTNET_ROOT"] = "/untrusted/dotnet",
-                ["DOTNET_STARTUP_HOOKS"] = "/tmp/injected-hook.dll"
-            };
+            var inheritedEnvironmentBuilder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
+            inheritedEnvironmentBuilder["PATH"] = "/safe/bin";
+            inheritedEnvironmentBuilder["DOTNET_ROOT"] = "/untrusted/dotnet";
+            inheritedEnvironmentBuilder["DOTNET_STARTUP_HOOKS"] = "/tmp/injected-hook.dll";
+            var inheritedEnvironment = inheritedEnvironmentBuilder.ToImmutable();
             var startInfo = new System.Diagnostics.ProcessStartInfo();
             TrustedChildEnvironment.Apply(
                 startInfo,
@@ -179,14 +178,13 @@ namespace SharpProof.Package.Test
         [Test]
         public void ChildRuntimePreservesWindowsSystemAndTemporaryDirectories()
         {
-            var inherited = new Dictionary<string, string?>
-            {
-                ["SystemRoot"] = "C:\\Windows",
-                ["TEMP"] = "C:\\Temp",
-                ["TMP"] = "C:\\Temp",
-                ["USERPROFILE"] = "C:\\Users\\Proof",
-                ["DOTNET_STARTUP_HOOKS"] = "C:\\untrusted.dll"
-            };
+            var inheritedBuilder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
+            inheritedBuilder["SystemRoot"] = "C:\\Windows";
+            inheritedBuilder["TEMP"] = "C:\\Temp";
+            inheritedBuilder["TMP"] = "C:\\Temp";
+            inheritedBuilder["USERPROFILE"] = "C:\\Users\\Proof";
+            inheritedBuilder["DOTNET_STARTUP_HOOKS"] = "C:\\untrusted.dll";
+            var inherited = inheritedBuilder.ToImmutable();
             var startInfo = new System.Diagnostics.ProcessStartInfo();
             TrustedChildEnvironment.Apply(startInfo, null, inherited.GetValueOrDefault);
             using (Assert.EnterMultipleScope())
@@ -217,10 +215,9 @@ namespace SharpProof.Package.Test
         public void UnsafeRuntimeOverridesAreIdentifiedBeforeLaunch(string variable)
         {
             System.ArgumentNullException.ThrowIfNull(variable);
-            var inheritedEnvironment = new Dictionary<string, string?>
-            {
-                [variable] = "/untrusted/dotnet"
-            };
+            var inheritedEnvironmentBuilder = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
+            inheritedEnvironmentBuilder[variable] = "/untrusted/dotnet";
+            var inheritedEnvironment = inheritedEnvironmentBuilder.ToImmutable();
 
             Assert.That(
                 TrustedChildEnvironment.FindUnsafeRuntimeVariable(

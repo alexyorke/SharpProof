@@ -2,27 +2,25 @@ namespace SharpProof.CompilerProbe.TestAsset;
 
 internal sealed class ProbeJsonObject
 {
+    private readonly StringBuilder _builder = new();
     private bool _first = true;
 
-    internal ProbeJsonObject(StringBuilder? builder = null)
+    internal ProbeJsonObject()
     {
-        Builder = builder ?? new StringBuilder();
-        Builder.Append('{');
+        _builder.Append('{');
     }
-
-    internal StringBuilder Builder { get; }
 
     internal void PropertyName(string name)
     {
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         if (!_first)
         {
-            Builder.Append(',');
+            _builder.Append(',');
         }
 
         _first = false;
-        AppendString(Builder, name);
-        Builder.Append(':');
+        AppendString(name);
+        _builder.Append(':');
     }
 
     internal void String(string name, string value)
@@ -30,21 +28,21 @@ internal sealed class ProbeJsonObject
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         PropertyName(name);
-        AppendString(Builder, value);
+        AppendString(value);
     }
 
     internal void Boolean(string name, bool value)
     {
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         PropertyName(name);
-        Builder.Append(value ? "true" : "false");
+        _builder.Append(value ? "true" : "false");
     }
 
     internal void Integer(string name, int value)
     {
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         PropertyName(name);
-        Builder.Append(value.ToString(CultureInfo.InvariantCulture));
+        _builder.Append(value.ToString(CultureInfo.InvariantCulture));
     }
 
     internal void StringArray(string name, IEnumerable<string> values)
@@ -52,7 +50,7 @@ internal sealed class ProbeJsonObject
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
         PropertyName(name);
-        AppendStringArray(Builder, values);
+        AppendArray(values, AppendString);
     }
 
     internal void RawArray(string name, IEnumerable<string> rows)
@@ -60,92 +58,90 @@ internal sealed class ProbeJsonObject
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         rows = RepositoryParameterGuard.NotNull(rows, nameof(rows));
         PropertyName(name);
-        AppendArray(Builder, rows, static (builder, row) => { builder = RepositoryParameterGuard.NotNull(builder, nameof(builder)); row = RepositoryParameterGuard.NotNull(row, nameof(row)); builder.Append(row); });
+        AppendArray(rows, row => { row = RepositoryParameterGuard.NotNull(row, nameof(row)); _builder.Append(row); });
     }
 
-    internal void Complete()
+    internal void Object(string name, Action<ProbeJsonObject> append)
     {
-        Builder.Append('}');
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        append = RepositoryParameterGuard.NotNull(append, nameof(append));
+        PropertyName(name);
+        var child = new ProbeJsonObject();
+        append(child);
+        _builder.Append(child.Complete());
     }
-
-    private static void AppendStringArray(
-        StringBuilder builder,
-        IEnumerable<string> values)
+    internal string Complete()
     {
-        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
-        AppendArray(builder, values, AppendString);
+        _builder.Append('}');
+        return _builder.ToString();
     }
 
-    private static void AppendArray(
-        StringBuilder builder,
+    private void AppendArray(
         IEnumerable<string> values,
-        Action<StringBuilder, string> append)
+        Action<string> append)
     {
         append = RepositoryParameterGuard.NotNull(append, nameof(append));
-        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
-        builder.Append('[');
+        _builder.Append('[');
         var first = true;
         foreach (var value in values)
         {
             if (!first)
             {
-                builder.Append(',');
+                _builder.Append(',');
             }
 
             first = false;
-            append(builder, value);
+            append(value);
         }
-        builder.Append(']');
+        _builder.Append(']');
     }
 
-    private static void AppendString(StringBuilder builder, string value)
+    private void AppendString(string value)
     {
-        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        builder.Append('"');
+        _builder.Append('"');
         foreach (var character in value)
         {
             switch (character)
             {
                 case '"':
-                    builder.Append("\\\"");
+                    _builder.Append("\\\"");
                     break;
                 case '\\':
-                    builder.Append("\\\\");
+                    _builder.Append("\\\\");
                     break;
                 case '\b':
-                    builder.Append("\\b");
+                    _builder.Append("\\b");
                     break;
                 case '\f':
-                    builder.Append("\\f");
+                    _builder.Append("\\f");
                     break;
                 case '\n':
-                    builder.Append("\\n");
+                    _builder.Append("\\n");
                     break;
                 case '\r':
-                    builder.Append("\\r");
+                    _builder.Append("\\r");
                     break;
                 case '\t':
-                    builder.Append("\\t");
+                    _builder.Append("\\t");
                     break;
                 default:
                     if (character < ' ' || character > '\u007f')
                     {
-                        builder.Append("\\u");
-                        builder.Append(
+                        _builder.Append("\\u");
+                        _builder.Append(
                             ((int)character).ToString(
                                 "x4",
                                 CultureInfo.InvariantCulture));
                     }
                     else
                     {
-                        builder.Append(character);
+                        _builder.Append(character);
                     }
                     break;
             }
         }
-        builder.Append('"');
+        _builder.Append('"');
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -9,7 +10,7 @@ public sealed class ParameterGuardContractTests
     [Test]
     public void LinkedGuardsPreserveValuesAndNamedExceptionContracts()
     {
-        var types = GuardTypes().ToArray();
+        var types = GuardTypes().ToImmutableArray();
         Assert.That(types, Is.Not.Empty, "The test's production dependency closure must include shared guards.");
         foreach (var type in types)
         {
@@ -26,7 +27,10 @@ public sealed class ParameterGuardContractTests
             Assert.That(Invoke(type, "ValidateInitialized", [value, false, "input", null]), Is.SameAs(value));
             Assert.That(Invoke(type, "ValidateInitialized", [null, false, "input", null]), Is.Null);
             AssertFailure(type, "ValidateInitialized", [value, true, "input", "detail"], typeof(ArgumentException), "input", "detail");
-            foreach (var invalidName in new string?[] { null, "" })
+            Assert.That(Invoke(type, "RequireUniqueKey", [false, "entry"]), Is.Null);
+            AssertFailure(type, "RequireUniqueKey", [true, "entry"], typeof(ArgumentException), null,
+                "An item with the same key has already been added. Key: entry");
+            foreach (var invalidName in ImmutableArray.Create<string?>(null, ""))
             {
                 AssertFailure(type, "ValidateInitialized", [value, false, invalidName, null], typeof(ArgumentException), "parameterName");
                 AssertFailure(type, "ThrowIfMissing", [false, invalidName], typeof(ArgumentException), "parameterName");
@@ -39,11 +43,12 @@ public sealed class ParameterGuardContractTests
 
     private static IEnumerable<Type> GuardTypes()
     {
-        var pending = new Queue<AssemblyName>(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (pending.Count != 0)
+        var pending = ImmutableArray.CreateBuilder<AssemblyName>();
+        pending.AddRange(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
+        var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        for (var cursor = 0; cursor < pending.Count; cursor++)
         {
-            var name = pending.Dequeue();
+            var name = pending[cursor];
             if (name.Name?.StartsWith("SharpProof.", StringComparison.Ordinal) != true || !visited.Add(name.FullName))
             { continue; }
             var assembly = Assembly.Load(name);
@@ -52,29 +57,30 @@ public sealed class ParameterGuardContractTests
             if (assembly.GetType("SharpProof.Internal." + component.Replace(".", "", StringComparison.Ordinal) + ".ParameterGuard") is { } guard)
             { yield return guard; }
             foreach (var reference in assembly.GetReferencedAssemblies())
-            { pending.Enqueue(reference); }
+            { pending.Add(reference); }
         }
     }
 
-    private static object? Invoke(Type type, string name, object?[] arguments)
+    private static object? Invoke(Type type, string name, ImmutableArray<object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         var method = type.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
         if (method.IsGenericMethodDefinition)
         { method = method.MakeGenericMethod(typeof(object)); }
-        return method.Invoke(null, arguments);
+        return method.Invoke(null, arguments.ToArray());
     }
 
-    private static void AssertFailure(Type type, string name, object?[] arguments,
-        Type expectedType, string parameterName, string? detail = null)
+    private static void AssertFailure(Type type, string name, ImmutableArray<object?> arguments,
+        Type expectedType, string? parameterName, string? detail = null)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         ArgumentNullException.ThrowIfNull(expectedType);
-        ArgumentNullException.ThrowIfNull(parameterName);
         var wrapper = Assert.Throws<TargetInvocationException>((Action)(() => Invoke(type, name, arguments)));
         Assert.That(wrapper!.InnerException, Is.TypeOf(expectedType));
         var exception = (ArgumentException)wrapper.InnerException!;

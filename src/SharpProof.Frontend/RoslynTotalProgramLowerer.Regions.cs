@@ -21,33 +21,34 @@ internal sealed partial class RoslynTotalProgramLowerer
         internal ControlFlowRegion Region { get; } = (region ?? throw new System.ArgumentNullException(nameof(region)));
         internal IrVarId Selector { get; } = (selector.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(selector)) : selector);
         internal IrBlockId Dispatch { get; } = (dispatch.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(dispatch)) : dispatch);
-        internal List<(IrBlockId Entry, IrBlockId Target, OperationId Site, RegionExceptionToken? Exception)> Transfers { get; } = [];
-        internal Dictionary<(IrBlockId Target, OperationId Site, IrExceptionKind? Kind, bool Return), IrBlockId> Entries { get; } = [];
+        internal ImmutableArray<(IrBlockId Entry, IrBlockId Target, OperationId Site, RegionExceptionToken? Exception)>.Builder Transfers { get; } = ImmutableArray.CreateBuilder<(IrBlockId Entry, IrBlockId Target, OperationId Site, RegionExceptionToken? Exception)>();
+        internal ImmutableDictionary<(IrBlockId Target, OperationId Site, IrExceptionKind? Kind, bool Return), IrBlockId>.Builder Entries { get; } = ImmutableDictionary.CreateBuilder<(IrBlockId Target, OperationId Site, IrExceptionKind? Kind, bool Return), IrBlockId>();
     }
-    private readonly Dictionary<ControlFlowRegion, ImmutableArray<IrExceptionKind>> _regionCatchKinds = [];
-    private readonly Dictionary<ControlFlowRegion, IrVarId> _regionCaught = [];
-    private readonly Dictionary<(ControlFlowRegion Catch, int Token), IrBlockId> _regionCatchEntries = [];
-    private readonly Dictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken> _regionTokens = [];
-    private readonly Dictionary<OperationId, (INamedTypeSymbol Type, bool Exact)> _explicitThrowTypes = [];
-    private readonly List<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)> _regionRethrows = [];
-    private readonly List<ILocalSymbol> _regionLocals = [];
+    private readonly ImmutableDictionary<ControlFlowRegion, ImmutableArray<IrExceptionKind>>.Builder _regionCatchKinds = ImmutableDictionary.CreateBuilder<ControlFlowRegion, ImmutableArray<IrExceptionKind>>();
+    private readonly ImmutableDictionary<ControlFlowRegion, IrVarId>.Builder _regionCaught = ImmutableDictionary.CreateBuilder<ControlFlowRegion, IrVarId>();
+    private readonly ImmutableDictionary<(ControlFlowRegion Catch, int Token), IrBlockId>.Builder _regionCatchEntries = ImmutableDictionary.CreateBuilder<(ControlFlowRegion Catch, int Token), IrBlockId>();
+    private readonly ImmutableDictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken>.Builder _regionTokens = ImmutableDictionary.CreateBuilder<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken>();
+    private readonly ImmutableDictionary<OperationId, (INamedTypeSymbol Type, bool Exact)>.Builder _explicitThrowTypes = ImmutableDictionary.CreateBuilder<OperationId, (INamedTypeSymbol Type, bool Exact)>();
+    private readonly ImmutableArray<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)>.Builder _regionRethrows = ImmutableArray.CreateBuilder<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)>();
+    private readonly ImmutableArray<ILocalSymbol>.Builder _regionLocals = ImmutableArray.CreateBuilder<ILocalSymbol>();
+    private readonly ImmutableArray<RegionFinally>.Builder _regionFinallyOrder = ImmutableArray.CreateBuilder<RegionFinally>();
+    private readonly ImmutableArray<RegionFilter>.Builder _regionFilterOrder = ImmutableArray.CreateBuilder<RegionFilter>();
     private ControlFlowGraph _regionGraph = null!;
     private BasicBlock _regionSource = null!;
-    private readonly Dictionary<ControlFlowRegion, RegionFinally> _regionFinallys = [];
+    private readonly ImmutableDictionary<ControlFlowRegion, RegionFinally>.Builder _regionFinallys = ImmutableDictionary.CreateBuilder<ControlFlowRegion, RegionFinally>();
     private IrBlockId _regionExceptionalExit;
 
-    private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
+    private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural, bool freshReceiver)
     {
         RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         _regionGraph = graph;
-        var filterRegions = new HashSet<ControlFlowRegion>();
-        var regions = new Stack<ControlFlowRegion>();
-        regions.Push(graph.Root);
-        while (regions.Count != 0)
+        var filterRegions = ImmutableHashSet.CreateBuilder<ControlFlowRegion>();
+        var regions = ImmutableStack<ControlFlowRegion>.Empty.Push(graph.Root);
+        while (!regions.IsEmpty)
         {
             SpendRegion();
-            var region = regions.Pop();
+            regions = regions.Pop(out var region);
             if (region.Kind == ControlFlowRegionKind.Filter ||
                 region.EnclosingRegion is { } enclosing && filterRegions.Contains(enclosing))
             { filterRegions.Add(region); }
@@ -69,22 +70,26 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation ||
                     !CSharpOperationSemantics.TryCatchKinds(compilation, region.ExceptionType, out var kinds))
                 { throw new RegionIncompleteException(); }
-                _regionCatchKinds.Add(region, kinds);
-                _regionCaught.Add(region, _context.Temporary(RegionInteger));
+                _regionCatchKinds.AddUnique(region, kinds);
+                _regionCaught.AddUnique(region, _context.Temporary(RegionInteger));
             }
             if (region.Kind == ControlFlowRegionKind.Finally)
             {
-                _regionFinallys.Add(region, new(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch")));
+                var state = new RegionFinally(region, _context.Temporary(RegionInteger), RegionBlock("finally:dispatch"));
+                _regionFinallys.AddUnique(region, state);
+                _regionFinallyOrder.Add(state);
             }
             if (region.Kind == ControlFlowRegionKind.Filter)
             {
                 var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
                 var caught = parent.NestedRegions.SingleOrDefault(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Catch)) ?? throw new RegionIncompleteException();
-                _regionFilters.Add(region, new(region, caught, _context.Temporary(RegionInteger),
-                    RegionBlock("filter:accepted"), RegionBlock("filter:rejected")));
+                var filter = new RegionFilter(region, caught, _context.Temporary(RegionInteger),
+                    RegionBlock("filter:accepted"), RegionBlock("filter:rejected"));
+                _regionFilters.AddUnique(region, filter);
+                _regionFilterOrder.Add(filter);
             }
             foreach (var child in region.NestedRegions.Reverse())
-            { SpendRegion(); regions.Push(child); }
+            { SpendRegion(); regions = regions.Push(child); }
         }
         foreach (var binding in _context.Inputs)
         {
@@ -95,11 +100,11 @@ internal sealed partial class RoslynTotalProgramLowerer
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in graph.Blocks)
         {
-            _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            _blocks.AddUnique(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
             if (block.IsReachable && !filterRegions.Contains(block.EnclosingRegion))
             { _compilerElision.PlanCompilerElidedTerminator(block); }
         }
-        _compilerElision.RestoreCompilerElidedReachability(filterRegions);
+        _compilerElision.RestoreCompilerElidedReachability(filterRegions.ToImmutable());
         _regionExceptionalExit = RegionBlock("exceptional:exit");
         _builder.ExceptionalExit(_regionExceptionalExit, structural);
         _expressions = new(_context, _builder, _regionExceptionalExit)
@@ -109,6 +114,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,
+            FreshReceiver = freshReceiver,
+            AllowObjectWidening = _calls?.MetadataRequiresEnabled == true,
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ShadowCallSkeleton = _preserveSourceCall != null,
             OpaqueEffects = _calls?.OpaqueEffects,
@@ -142,9 +149,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionTerminator(source, block, structural);
         }
         ResolveRegionRethrows();
-        foreach (var filter in _regionFilters.Values)
+        foreach (var filter in _regionFilterOrder)
         { FinishRegionFilter(filter, structural); }
-        foreach (var state in _regionFinallys.Values)
+        foreach (var state in _regionFinallyOrder)
         { FinishRegionFinally(state, structural); }
     }
 
@@ -176,7 +183,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // Follow the same elided prologue edges as RegionTerminator. Initialize
         // only after all point filters and before the first runtime body action.
         var source = _regionGraph.Blocks[0];
-        var visited = new HashSet<BasicBlock>();
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
         while (visited.Add(source))
         {
             SpendRegion();
@@ -233,7 +240,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         closed.Return(start, structural);
         _abstentions.Add(new(structural, reason));
         return new(closed.Build(), FrontendSubsetClassification.Abstain(reason),
-            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
+            _context.Variables, _context.Captures, _abstentions.ToImmutable(), _context.Origin)
         {
             ConstructionLimitExceeded = _constructionLimitExceeded || _regionWork.ConstructionLimitExceeded || _calls?.ConstructionLimitExceeded == true,
             IsShadowCallSkeleton = _preserveSourceCall != null
@@ -380,7 +387,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
         if (_regionFilters.Count != 0 || _frame != null)
         { return RegionExceptionSearch(source, token); }
-        var throughFinally = new List<ControlFlowRegion>();
+        var throughFinally = ImmutableArray.CreateBuilder<ControlFlowRegion>();
         var target = _regionExceptionalExit;
         // A nested CFG root can link to declaration regions in another graph.
         // Only this graph's handlers and finally regions belong to this search.
@@ -412,7 +419,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 { throughFinally.Add(parent.NestedRegions.SingleOrDefault(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Finally)) ?? throw new RegionIncompleteException()); }
             }
         }
-        return EnterRegionFinallyChain(throughFinally, target, token.Site, token,
+        return EnterRegionFinallyChain(throughFinally.ToImmutable(), target, token.Site, token,
             preserveResult: HasEnclosingRegionFinally(source));
     }
 
@@ -480,7 +487,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         entry = RegionBlock("catch:entry");
         _builder.Assign(entry, token.Site, _regionCaught[caught], _context.Factory.Integer(RegionInteger, token.Ordinal));
         _builder.Goto(entry, token.Site, _blocks[_regionGraph.Blocks[caught.FirstBlockOrdinal]]);
-        _regionCatchEntries.Add(key, entry);
+        _regionCatchEntries.AddUnique(key, entry);
         return entry;
     }
 
@@ -511,7 +518,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void ResolveRegionRethrows()
     {
-        var tokens = _regionTokens.Values.OrderBy(token => token.Ordinal).ToArray();
+        var tokens = _regionTokens.Values.OrderBy(token => token.Ordinal).ToImmutableArray();
         foreach (var token in tokens)
         {
             SpendRegion();
@@ -520,7 +527,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             SpendRegion();
             var block = request.Block;
-            var selected = new List<RegionExceptionToken>();
+            var selected = ImmutableArray.CreateBuilder<RegionExceptionToken>();
             foreach (var token in tokens)
             {
                 SpendRegion();
@@ -592,19 +599,19 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (!_regionTokens.TryGetValue(key, out var token))
         {
             token = new(kind, site, _regionTokens.Count);
-            _regionTokens.Add(key, token);
+            _regionTokens.AddUnique(key, token);
         }
         return token;
     }
     private IrTypeId RegionInteger => _context.Factory.GetOrCreateIntegerType(32, true);
 
-    private IrBlockId EnterRegionFinallyChain(IReadOnlyList<ControlFlowRegion> regions, IrBlockId target,
+    private IrBlockId EnterRegionFinallyChain(ImmutableArray<ControlFlowRegion> regions, IrBlockId target,
         OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
-        regions = RepositoryParameterGuard.NotNull(regions, nameof(regions));
+        RepositoryParameterGuard.ThrowIfMissing(regions.IsDefault, nameof(regions));
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
+        for (var ordinal = regions.Length - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
             // Every chain uses this graph's finally regions, registered before body lowering.

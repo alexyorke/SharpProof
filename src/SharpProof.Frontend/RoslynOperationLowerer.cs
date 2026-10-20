@@ -7,20 +7,18 @@ internal sealed class RoslynOperationLowerer
     private readonly RoslynTypeMapper _types;
     private readonly Func<IMethodSymbol, bool> _isKnownPure;
     private readonly bool _allowCompilerConstants;
-    private readonly Dictionary<ISymbol, IrVarId> _variables =
-        new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
-        new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<CaptureId, IrVarId> _captures = [];
-    private readonly List<IrVarId> _captureOrder = [];
+    private readonly ImmutableDictionary<ISymbol, IrVarId>.Builder _variables = ImmutableDictionary.CreateBuilder<ISymbol, IrVarId>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<ITypeSymbol, IrVarId>.Builder _instances = ImmutableDictionary.CreateBuilder<ITypeSymbol, IrVarId>(SymbolEqualityComparer.Default);
+    private readonly ImmutableDictionary<CaptureId, IrVarId>.Builder _captures = ImmutableDictionary.CreateBuilder<CaptureId, IrVarId>();
+    private readonly ImmutableArray<IrVarId>.Builder _captureOrder = ImmutableArray.CreateBuilder<IrVarId>();
     private readonly LoweringVisitor _visitor;
-    private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
+    private ImmutableDictionary<IOperation, LoweredExpression>.Builder? _currentLoweringResults;
     private RoslynOperationPurityClassifier? _currentPurityClassifier;
 
     public RoslynOperationLowerer(
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure = null)
-        : this(factory, isKnownPure, allowCompilerConstants: false)
+        : this(factory, isKnownPure, allowCompilerConstants: false, static type => type, static _ => default)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
@@ -28,12 +26,16 @@ internal sealed class RoslynOperationLowerer
     private RoslynOperationLowerer(
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure,
-        bool allowCompilerConstants)
+        bool allowCompilerConstants,
+        Func<ITypeSymbol?, ITypeSymbol?> typeSpecializer,
+        Func<IOperation, (bool Handled, IrTerm? Term)> customLowering)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _types = new RoslynTypeMapper(_factory);
+        _types.TypeSpecializer = ArgumentNullGuard.NotNull(typeSpecializer, nameof(typeSpecializer));
         _isKnownPure = isKnownPure ?? (static _ => false);
         _allowCompilerConstants = allowCompilerConstants;
+        _customLowering = ArgumentNullGuard.NotNull(customLowering, nameof(customLowering));
         _visitor = new LoweringVisitor(this);
     }
 
@@ -45,19 +47,31 @@ internal sealed class RoslynOperationLowerer
         return new RoslynOperationLowerer(
             factory,
             isKnownPure,
-            allowCompilerConstants: true);
+            allowCompilerConstants: true, static type => type, static _ => default);
+    }
+
+    internal static RoslynOperationLowerer CreateConfigured(
+        IrFactory factory,
+        Func<ITypeSymbol?, ITypeSymbol?> typeSpecializer,
+        Func<IOperation, (bool Handled, IrTerm? Term)> customLowering,
+        Func<IMethodSymbol, bool>? isKnownPure = null,
+        bool allowCompilerConstants = false)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        typeSpecializer = RepositoryParameterGuard.NotNull(typeSpecializer, nameof(typeSpecializer));
+        customLowering = RepositoryParameterGuard.NotNull(customLowering, nameof(customLowering));
+        return new RoslynOperationLowerer(
+            factory, isKnownPure, allowCompilerConstants, typeSpecializer, customLowering);
     }
 
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer
     {
         get => _types.TypeSpecializer;
-        set => _types.TypeSpecializer = ArgumentNullGuard.NotNull(value, nameof(value));
     }
-    private Func<IOperation, (bool Handled, IrTerm? Term)> _customLowering = static _ => default;
+    private readonly Func<IOperation, (bool Handled, IrTerm? Term)> _customLowering;
     internal Func<IOperation, (bool Handled, IrTerm? Term)> CustomLowering
     {
         get => _customLowering;
-        set => _customLowering = ArgumentNullGuard.NotNull(value, nameof(value));
     }
 
     public FrontendLoweringResult Lower(IOperation operation)
@@ -82,8 +96,7 @@ internal sealed class RoslynOperationLowerer
 
         var previousResults = _currentLoweringResults;
         var previousPurityClassifier = _currentPurityClassifier;
-        _currentLoweringResults = new(
-            ReferenceComparer<IOperation>.Instance);
+        _currentLoweringResults = ImmutableDictionary.CreateBuilder<IOperation, LoweredExpression>(ReferenceComparer<IOperation>.Instance);
         _currentPurityClassifier = new(_isKnownPure, MaximumLoweringDepth);
         try
         {
@@ -114,7 +127,7 @@ internal sealed class RoslynOperationLowerer
 
     internal ImmutableArray<IrVarId> CreateCaptureBindings()
     {
-        return [.. _captureOrder];
+        return _captureOrder.ToImmutable();
     }
 
     private LoweredExpression LowerCore(IOperation operation)
@@ -127,7 +140,7 @@ internal sealed class RoslynOperationLowerer
         }
 
         var lowered = _visitor.Visit(operation, default);
-        results.Add(operation, lowered);
+        _currentLoweringResults!.AddUnique(operation, lowered);
         return lowered;
     }
 
@@ -151,7 +164,7 @@ internal sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 symbol.Kind + ":" + symbol.MetadataName,
                 GetTypeId(type));
-            _variables.Add(symbol, variable);
+            _variables.AddUnique(symbol, variable);
         }
         return _factory.Variable(variable);
     }
@@ -166,7 +179,7 @@ internal sealed class RoslynOperationLowerer
                 "capture:" +
                 _captureOrder.Count.ToString(CultureInfo.InvariantCulture),
                 GetTypeId(type));
-            _captures.Add(id, variable);
+            _captures.AddUnique(id, variable);
             _captureOrder.Add(variable);
         }
         return _factory.Variable(variable);
@@ -254,7 +267,7 @@ internal sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 "instance:" + type.MetadataName,
                 GetTypeId(specializedType));
-            _instances.Add(type, variable);
+            _instances.AddUnique(type, variable);
         }
         return _factory.Variable(variable);
     }
@@ -269,7 +282,7 @@ internal sealed class RoslynOperationLowerer
         var loweredReceiver = depthLimited || receiver == null
             ? null
             : LowerCore(receiver);
-        IrTerm[] loweredArguments = depthLimited
+        ImmutableArray<IrTerm> loweredArguments = depthLimited
             ? []
             : (arguments ?? operation.ChildOperations)
                 .Where(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!ReferenceEquals(child, receiver)))
@@ -285,7 +298,7 @@ internal sealed class RoslynOperationLowerer
                 .OrderBy(static value => value.Ordinal)
                 .ThenBy(static value => value.Index)
                 .Select(static value => value.Term)
-                .ToArray();
+                .ToImmutableArray();
         var receiverTerm = loweredReceiver?.Term;
         var argumentTerms = loweredArguments;
         var resultType = GetTypeId(operation.Type);
@@ -301,17 +314,19 @@ internal sealed class RoslynOperationLowerer
             CompilerIdentityBridge.CreateSymbolDisplay(symbol) +
             ":result=" +
             CompilerIdentityBridge.CreateTypeDisplay(operation.Type);
-        var parameterTypes = argumentTerms.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type)).ToArray();
-        var member = _factory.GetOrCreateMember(
+        var parameterTypes = argumentTerms.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type)).ToImmutableArray();
+        var member = _factory.GetOrCreateMemberSnapshot(
             identity, declaringType, displayName, resultType,
             receiverTerm == null, parameterTypes);
-        var term = isPure
-            ? _factory.PureOpaque(member, receiverTerm, argumentTerms)
-            : _factory.ImpureOpaque(
-                _factory.CreateOperation(
-                    operation.Kind + "@" +
-                    operation.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture)),
-                member, receiverTerm, argumentTerms);
+        var opaqueOperation = isPure
+            ? default
+            : _factory.CreateOperation(
+                operation.Kind + "@" +
+                operation.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture));
+        var term = _factory.RebuildOpaque(
+            member, receiverTerm, argumentTerms,
+            isPure ? IrOpaquePurity.Pure : IrOpaquePurity.Impure,
+            opaqueOperation);
         return new LoweredExpression(
             term, FrontendSubsetClassification.Abstain(abstention));
     }
@@ -689,7 +704,7 @@ internal sealed class RoslynOperationLowerer
             var right = _owner.LowerCore(rightOperand);
             if (!left.Classification.IsExact || !right.Classification.IsExact)
             {
-                return OpaqueBinary(operation, FirstAbstention(left, right));
+                return OpaqueBinary(operation, FirstAbstention([left, right]));
             }
 
             IrBinaryOperator? mapped;
@@ -785,7 +800,7 @@ internal sealed class RoslynOperationLowerer
                 !whenFalse.Classification.IsExact)
             {
                 return OpaqueConditional(operation,
-                    FirstAbstention(condition, whenTrue, whenFalse));
+                    FirstAbstention([condition, whenTrue, whenFalse]));
             }
 
             try
@@ -936,7 +951,7 @@ internal sealed class RoslynOperationLowerer
             var index = _owner.LowerCore(operation.Indices[0]);
             if (!array.Classification.IsExact || !index.Classification.IsExact)
             {
-                return OpaqueElement(operation, FirstAbstention(array, index));
+                return OpaqueElement(operation, FirstAbstention([array, index]));
             }
 
             try
@@ -991,9 +1006,9 @@ internal sealed class RoslynOperationLowerer
         }
 
         private static FrontendAbstention FirstAbstention(
-            params LoweredExpression[] expressions)
+            ImmutableArray<LoweredExpression> expressions)
         {
-            expressions = RepositoryParameterGuard.NotNull(expressions, nameof(expressions));
+            RepositoryParameterGuard.RequireInitialized(expressions.IsDefault, nameof(expressions), "Value must be initialized.");
             return expressions
                 .First(static expression =>
                     expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (expression.Classification.Abstention != FrontendAbstention.None))

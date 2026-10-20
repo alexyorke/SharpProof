@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Goal = SharpProof.Verify.Goal;
 
 namespace SharpProof.Smt.Test;
@@ -32,12 +33,10 @@ public sealed class CanonicalCacheIdentityControlTests
         var second = factory.CreateVariable("second", factory.GetOrCreateSequenceType(factory.GetOrCreateIntegerType(32, false)));
         var alias = factory.Binary(IrBinaryOperator.Equal,
             factory.Cast(factory.ObjectType, factory.Variable(first)), factory.Cast(factory.ObjectType, factory.Variable(second)));
-        var assumptions = new[]
-        {
+        var assumptions = ImmutableArray.Create(
             new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(first)), factory.Integer(0)), new LoweredJustification(factory.CreateOperation())),
             new Assumption(factory, factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(first), factory.Null(factory.GetVariableInfo(first).Type)), new LoweredJustification(factory.CreateOperation())),
-            new Assumption(factory, alias, new LoweredJustification(factory.CreateOperation()))
-        };
+            new Assumption(factory, alias, new LoweredJustification(factory.CreateOperation())));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = new VerificationQuery(factory, assumptions,
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [first, second]);

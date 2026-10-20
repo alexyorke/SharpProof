@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -14,9 +15,9 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
     [Test]
     public void ArithmeticPostconditionWithStaticFieldRetainsItsAdmissionResult()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275LunaCollectorArithmeticPostcondition",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 using SharpProof.Attributes;
                 internal static class Subject {
                     private static readonly int Offset = 5;
@@ -31,7 +32,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                         return value + Offset;
                     }
                 }
-                """));
+                """)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory())
@@ -45,9 +46,9 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
     [Test]
     public void CapturedScalarContractKeepsControlFlowAndReadOnlyInitializationEvidence()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275LunaCollectorScalar",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 using SharpProof.Attributes;
                 internal static class Subject {
                     private static readonly int Offset = 5;
@@ -62,7 +63,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(item =>
             item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
@@ -78,7 +79,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             compilation,
             new IrFactory(),
             packs,
-            trees,
+            trees.ToImmutableArray(),
             references).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifact = CreateArtifact(compilation, discovery);
         var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
@@ -88,7 +89,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         Assert.That(preparation.Total, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(trees, Has.Length.EqualTo(1));
+            Assert.That(trees, Has.Count.EqualTo(1));
             Assert.That(references, Is.Not.Empty);
             Assert.That(preparation.Total!.Program.Factory.Semantics,
                 Is.EqualTo(IrExecutionSemantics.Total));
@@ -101,9 +102,9 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
     [Test]
     public void SourceConstructorAndAccessorsKeepTheirEffectClaimsInTheArtifact()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275LunaCollectorAccessors",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 using SharpProof.Attributes;
                 internal sealed class Subject {
                     private int _value;
@@ -121,31 +122,26 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                         set { _value = value; }
                     }
                 }
-                """));
+                """)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var targets = discovery.Targets.Values
             .Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind is
                 MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet))
-            .ToArray();
+            .ToImmutableArray();
         var artifact = CreateArtifact(compilation, discovery);
-        var callables = artifact.Callables.ToDictionary(
+        var callables = artifact.Callables.ToImmutableDictionary(
             item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
             StringComparer.Ordinal);
 
-        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(new[]
-        {
-            MethodKind.Constructor,
-            MethodKind.PropertyGet,
-            MethodKind.PropertySet
-        }));
+        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(ImmutableArray.Create(MethodKind.Constructor, MethodKind.PropertyGet, MethodKind.PropertySet)));
         foreach (var target in targets)
         {
             var manifestClaims = target.EffectClaims
                 .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))
-                .ToArray();
+                .ToImmutableArray();
             var artifactClaims = callables[target.Entry.CallableId].EffectClaims
                 .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId))
-                .ToArray();
+                .ToImmutableArray();
 
             Assert.That(manifestClaims, Has.Length.EqualTo(1), target.Method.MethodKind.ToString());
             Assert.That(artifactClaims, Is.EqualTo(manifestClaims), target.Method.MethodKind.ToString());
@@ -158,16 +154,16 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
     [Test]
     public void AttributedFieldInitializerLambdaIsDiscoveredWithItsSourceOwner()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275LunaCollectorFieldLambda",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 using System;
                 using SharpProof.Attributes;
                 internal static class Subject {
                     internal static readonly Action Callback =
                         [DoesNotThrow] static () => { };
                 }
-                """));
+                """)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single();
         var artifact = CreateArtifact(compilation, discovery);

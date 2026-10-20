@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -12,7 +13,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerOwnedMethodBodyGraphTests
 {
-    private static readonly string[] ExpectedOwnerNames = ["Root", "Helper"];
+    private static readonly ImmutableArray<string> ExpectedOwnerNames = ["Root", "Helper"];
     [TestCase("block")]
     [TestCase("expression")]
     [TestCase("partial-block")]
@@ -30,7 +31,7 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static partial class Subject { " +
             "public static int Helper(int value) { Contract.Requires(value > 0); return value + 1; } " +
             declaration + " public static int Property => 2; static Subject() { } }";
-        var compilation = TestCompilation.Create("OwnedMethodBodyGraph", ("owned-body.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedMethodBodyGraph", [("owned-body.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -71,7 +72,7 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         Assert.That(inventory.Owners.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Declaration is MethodDeclarationSyntax)), Is.True);
     }
 
-    private static string[] GraphDescription(ControlFlowGraph graph)
+    private static ImmutableArray<string> GraphDescription(ControlFlowGraph graph)
     {
         System.ArgumentNullException.ThrowIfNull(graph);
         return graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (string.Join("|",
@@ -82,6 +83,6 @@ public sealed class CompilerOwnedMethodBodyGraphTests
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ($"{operation.Kind}:{operation.Syntax.SpanStart}:{operation.Syntax.Span.Length}"))),
             block.BranchValue == null ? string.Empty :
                 $"{block.BranchValue.Kind}:{block.BranchValue.Syntax.SpanStart}:{block.BranchValue.Syntax.Span.Length}")))
-            .ToArray();
+            .ToImmutableArray();
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
@@ -37,7 +38,7 @@ internal sealed partial class WorkerTests
         Assert.That(total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
             .Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)), Is.EqualTo(1));
-        var actualGoals = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToArray();
+        var actualGoals = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
         Assert.That(actualGoals, Has.Length.EqualTo(2));
         Assert.That(actualGoals.Select(goal => goal is null ? throw new System.ArgumentNullException(nameof(goal)) : (goal.ClaimId)), Is.EquivalentTo(preparation.Entry.ClaimIds));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
@@ -48,7 +49,7 @@ internal sealed partial class WorkerTests
         Assert.That(plan.EnsuresCount, Is.EqualTo(actualGoals.Length));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var solver = new PassiveCallableSolver(plan);
-        var checkedIds = new List<string>();
+        var checkedIdBuilder = ImmutableArray.CreateBuilder<string>();
         for (var ordinal = 0; ordinal < plan.EnsuresCount; ordinal++)
         {
             var checkedGoal = await solver.VerifyEnsuresAsync(ordinal, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -59,8 +60,9 @@ internal sealed partial class WorkerTests
             { Assert.That(checkedGoal.EntryModel, Is.Not.Empty); }
             else
             { Assert.That(checkedGoal.Core, Is.Not.Empty); }
-            checkedIds.Add(actualGoals[ordinal].ClaimId!);
+            checkedIdBuilder.Add(actualGoals[ordinal].ClaimId!);
         }
+        var checkedIds = checkedIdBuilder.ToImmutable();
         Assert.That(checkedIds, Is.EquivalentTo(preparation.Entry.ClaimIds));
         Assert.That(checkedIds.Distinct().Count(), Is.EqualTo(plan.EnsuresCount));
 

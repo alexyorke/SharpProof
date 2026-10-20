@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -12,7 +13,7 @@ public sealed class Pr275AcyclicOrderCoverageTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         builder.Return(entry, factory.CreateOperation("return"));
-        var charges = new List<int>();
+        var charges = ImmutableArray.CreateBuilder<int>();
 
         var order = IrBlockOrder.TryCreateAcyclicOrder(builder.Build(), cost =>
         {
@@ -22,7 +23,7 @@ public sealed class Pr275AcyclicOrderCoverageTests
 
         Assert.That(order.IsDefault, Is.True);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.ResourceLimit));
-        Assert.That(charges, Has.Count.EqualTo(1));
+        Assert.That(charges.ToImmutable(), Has.Length.EqualTo(1));
         Assert.That(charges[0], Is.EqualTo(1));
     }
 
@@ -43,7 +44,7 @@ public sealed class Pr275AcyclicOrderCoverageTests
         var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(entry).Terminator);
 
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(order, Is.EqualTo(new[] { entry, exit }));
+        Assert.That(order, Is.EqualTo(ImmutableArray.Create(entry, exit)));
         Assert.That(successors!.Value.First, Is.EqualTo(exit));
         Assert.That(successors.Value.Second, Is.Null);
     }
@@ -62,7 +63,7 @@ public sealed class Pr275AcyclicOrderCoverageTests
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out var failure);
 
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(order, Is.EqualTo(new[] { entry, exit }));
+        Assert.That(order, Is.EqualTo(ImmutableArray.Create(entry, exit)));
     }
 
     [Test]

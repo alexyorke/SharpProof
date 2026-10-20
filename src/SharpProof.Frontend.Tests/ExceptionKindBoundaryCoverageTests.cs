@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ExceptionKindBoundaryCoverageTests
 {
-    private static readonly IrExceptionKind[] OverflowKinds = [IrExceptionKind.Overflow];
+    private static readonly ImmutableArray<IrExceptionKind> OverflowKinds = [IrExceptionKind.Overflow];
 
     [TestCase("new System.Exception((string)null)", -1)]
     [TestCase("new System.ArgumentException((string)null)", -1)]
@@ -94,7 +95,7 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        foreach (var divisor in new[] { 0, 1 })
+        foreach (var divisor in ImmutableArray.Create(0, 1))
         {
             var expected = divisor == 0 ? 23 : 17;
             Assert.That(subject.Invoke([divisor]), Is.EqualTo(expected));

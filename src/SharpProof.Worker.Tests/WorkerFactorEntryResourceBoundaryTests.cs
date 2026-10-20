@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -44,7 +45,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("FactorCompanionEntryObservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FactorCompanionEntryObservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);
@@ -76,8 +77,8 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             entryKind = entry.Kind.ToString(),
             entryReason = entry.Reason.ToString(),
-            core = entry.ProofCore.ToArray(),
-            usedAssumptions = entry.UsedAssumptionIds.Order().ToArray(),
+            core = entry.ProofCore,
+            usedAssumptions = entry.UsedAssumptionIds.Order().ToImmutableArray(),
             projectedOutcome = projected.Outcome.ToString(),
             projectedReason = projected.Reason.ToString(),
             projectedCertainty = projected.EffectCertainty.ToString(),
@@ -93,7 +94,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             Assert.That(entry.ProofCore, Is.Not.Empty);
             var ownedLabels = Enumerable.Range(0, preparation.TotalEntry.Clauses.Length)
                 .Select(ordinal => "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                .ToHashSet(StringComparer.Ordinal);
+                .ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(entry.ProofCore.All(ownedLabels.Contains), Is.True);
             var expectedUsed = entry.ProofCore.Select(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (preparation.TotalEntry.Clauses[
                 int.Parse(label.AsSpan("requires:".Length), System.Globalization.CultureInfo.InvariantCulture)].AssumptionId!));

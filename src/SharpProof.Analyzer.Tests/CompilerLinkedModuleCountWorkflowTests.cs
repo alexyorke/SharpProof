@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,7 +9,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerLinkedModuleCountWorkflowTests
 {
-    private static readonly string[] ExpectedModuleNames = ["CaptureLinked.dll", "First.netmodule", "Second.netmodule"];
+    private static readonly ImmutableArray<string> ExpectedModuleNames = ["CaptureLinked.dll", "First.netmodule", "Second.netmodule"];
 
     [Test]
     public void SameGenuineThreeModuleReferenceRejectsCountTwoAndAcceptsCountThree()
@@ -22,8 +23,8 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
             var manifestPath = Path.Combine(directory, "CaptureLinked.dll");
             var firstImage = EmitModule("First");
             var secondImage = EmitModule("Second");
-            File.WriteAllBytes(firstPath, firstImage);
-            File.WriteAllBytes(secondPath, secondImage);
+            File.WriteAllBytes(firstPath, (firstImage).ToArray());
+            File.WriteAllBytes(secondPath, (secondImage).ToArray());
             var moduleProperties = new MetadataReferenceProperties(MetadataImageKind.Module);
             var firstReference = MetadataReference.CreateFromImage(firstImage, moduleProperties, filePath: firstPath);
             var secondReference = MetadataReference.CreateFromImage(secondImage, moduleProperties, filePath: secondPath);
@@ -31,15 +32,15 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
                 "public static class CaptureLinked { public static int Value => First.Value + Second.Value; }", [])
                 .WithAssemblyName("CaptureLinked").AddReferences(firstReference, secondReference);
             var manifestImage = AnalyzerTestHost.EmitImage(manifest);
-            File.WriteAllBytes(manifestPath, manifestImage);
+            File.WriteAllBytes(manifestPath, (manifestImage).ToArray());
             using var metadata = AssemblyMetadata.Create(ModuleMetadata.CreateFromImage(manifestImage),
                 ModuleMetadata.CreateFromImage(firstImage), ModuleMetadata.CreateFromImage(secondImage));
             var reference = metadata.GetReference(filePath: manifestPath);
             var subject = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []).AddReferences(reference);
             Assert.That(subject.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.InstanceOf<IAssemblySymbol>());
-            var maximumModule = Math.Max(manifestImage.LongLength, Math.Max(firstImage.LongLength, secondImage.LongLength));
-            var closureBytes = manifestImage.LongLength + firstImage.LongLength + secondImage.LongLength;
+            var maximumModule = Math.Max(((long)manifestImage.Length), Math.Max(((long)firstImage.Length), ((long)secondImage.Length)));
+            var closureBytes = ((long)manifestImage.Length) + ((long)firstImage.Length) + ((long)secondImage.Length);
             Assert.That((Action)(() => CompilerCompilationCapture.CaptureReferences([reference],
                 new CompilerCompilationCapture.ReferenceCaptureLimits(maximumModule, closureBytes, 2), TestContext.CurrentContext.CancellationToken)),
                 Throws.TypeOf<InvalidDataException>().With.Message.EqualTo("A compiler reference exceeds the module count limit."));
@@ -51,9 +52,9 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
                     Is.EqualTo(ExpectedModuleNames));
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
-                    Is.EqualTo(new[] { manifestImage.LongLength, firstImage.LongLength, secondImage.LongLength }));
+                    Is.EqualTo(ImmutableArray.Create(((long)manifestImage.Length), ((long)firstImage.Length), ((long)secondImage.Length))));
                 Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
-                    Is.EqualTo(new[] { manifestPath, firstPath, secondPath }.Select(Path.GetFullPath)));
+                    Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath).Select(Path.GetFullPath)));
             }
         }
         finally
@@ -62,7 +63,7 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
         }
     }
 
-    private static byte[] EmitModule(string name)
+    private static ImmutableArray<byte> EmitModule(string name)
     {
         System.ArgumentNullException.ThrowIfNull(name);
         var compilation = AnalyzerTestHost.CreateCompilation(

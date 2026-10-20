@@ -59,7 +59,7 @@ internal sealed class StringConcatenationMaxLengthTests
     [Test]
     public void RuntimeRejectsStringsBeyondItsMaximumLength()
     {
-        var length = 0x3FFFFFE0;
+        const int length = 0x3FFFFFE0;
         Assert.Throws<OutOfMemoryException>(new Action(() => AllocateString(length)));
     }
 

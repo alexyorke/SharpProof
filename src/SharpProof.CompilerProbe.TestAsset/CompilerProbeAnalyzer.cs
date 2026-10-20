@@ -53,7 +53,7 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
                 SharpProof.Ir.AtomicFile.WriteStagedBytes(
                     temporary,
                     new UTF8Encoding(false).GetBytes(
-                        CompilerProbeSnapshot.Create(context)));
+                        CompilerProbeSnapshot.Create(context)).ToImmutableArray());
                 SharpProof.Ir.AtomicFile.PublishStaged(temporary, destination);
             }
             finally

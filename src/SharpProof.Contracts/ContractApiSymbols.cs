@@ -52,12 +52,10 @@ internal sealed class ContractApiSymbols(
 internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 {
     private static readonly ImmutableDictionary<ContractApiClauseRole, ContractClauseClassification> Classifications =
-        new Dictionary<ContractApiClauseRole, ContractClauseClassification>
-        {
-            [ContractApiClauseRole.Requires] = ContractClauseClassification.Requires,
-            [ContractApiClauseRole.Ensures] = ContractClauseClassification.Ensures,
-            [ContractApiClauseRole.Assume] = ContractClauseClassification.Assume
-        }.ToImmutableDictionary();
+        ImmutableDictionary<ContractApiClauseRole, ContractClauseClassification>.Empty
+            .Add(ContractApiClauseRole.Requires, ContractClauseClassification.Requires)
+            .Add(ContractApiClauseRole.Ensures, ContractClauseClassification.Ensures)
+            .Add(ContractApiClauseRole.Assume, ContractClauseClassification.Assume);
 
     internal INamedTypeSymbol ContractType { get; } = (contractType ?? throw new System.ArgumentNullException(nameof(contractType)));
 

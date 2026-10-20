@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -11,8 +12,8 @@ namespace SharpProof.Worker.Test.LongFuzz;
 [TestFixture]
 public sealed class LongFuzzRuntimeCoverageRegressionTests
 {
-    private static readonly int[] SingleItem = [0];
-    private static readonly bool[] ClaimValidity = [false, true];
+    private static readonly ImmutableArray<int> SingleItem = [0];
+    private static readonly ImmutableArray<bool> ClaimValidity = [false, true];
 
     [TestCase(0, false, "==", 0)]
     [TestCase(1, true, "==", 1)]
@@ -66,9 +67,9 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
             try
             {
                 var type = context.LoadFromStream(image).GetType("C")!;
-                object?[] arguments = [0, 0, null, new string('x', length)];
-                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                ImmutableArray<object?> arguments = [0, 0, null, new string('x', length)];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
                 Assert.That(result, Is.EqualTo(length));
                 Assert.That(type.GetMethod("Post")!.Invoke(null, [result, 0, 0, 0, 0]), Is.EqualTo(valid));
             }
@@ -110,14 +111,14 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [0, 0, null, "a"];
-            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [0, 0, null, "a"];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
             Assert.That(result, Is.EqualTo(0));
             var state = type.GetField("State")!.GetValue(null);
             Assert.That(state, Is.EqualTo(1));
-            object?[] postArguments = [result, 0, 0, 0, state];
-            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(false));
+            ImmutableArray<object?> postArguments = [result, 0, 0, 0, state];
+            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments.ToArray()), Is.EqualTo(false));
             TestContext.WriteLine("Original hosted source: CLR Pre=true, Target=0, State=1, Post=false at x=0,y=0,a=null,s=a (length1).");
         }
         finally
@@ -193,12 +194,12 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
                 var type = context.LoadFromStream(image).GetType("C")!;
                 var x = useY ? 0 : literal;
                 var y = useY ? literal : 0;
-                object?[] arguments = [x, y, null, null];
-                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                ImmutableArray<object?> arguments = [x, y, null, null];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
                 Assert.That(result, Is.EqualTo(literal));
-                object?[] postArguments = [result, x, y, 0, 0];
-                Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(valid));
+                ImmutableArray<object?> postArguments = [result, x, y, 0, 0];
+                Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments.ToArray()), Is.EqualTo(valid));
             }
             finally
             {
@@ -238,12 +239,12 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [7, 0, null, null];
-            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [7, 0, null, null];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
             Assert.That(result, Is.EqualTo(7));
-            object?[] postArguments = [result, 7, 0, 0, 0];
-            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(false));
+            ImmutableArray<object?> postArguments = [result, 7, 0, 0, 0];
+            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments.ToArray()), Is.EqualTo(false));
             TestContext.WriteLine("Original hosted source: CLR Pre=true, Target=7, Post=false at x=7,y=0,a=null,s=null.");
         }
         finally
@@ -271,7 +272,7 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(seed == 3000036 ? "Thrower((y + 5))" : "case 1: case 2: State++;"));
-        var compilation = TestCompilation.Create("LongFuzzCoverage" + seed, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LongFuzzCoverage" + seed, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -281,13 +282,13 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            var arguments = seed == 3000036
-                ? new object?[] { 0, -2, null, null }
-                : new object?[] { 0, 0, SingleItem.ToArray(), null };
+            ImmutableArray<object?> arguments = seed == 3000036
+                ? [0, -2, null, null]
+                : [0, 0, SingleItem.ToArray(), null];
             TargetInvocationException? thrown = null;
             try
             {
-                type.GetMethod("Target")!.Invoke(null, arguments);
+                type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
             }
             catch (TargetInvocationException exception)
             {
@@ -321,7 +322,7 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(sourceMarker));
-        var compilation = TestCompilation.Create("LongFuzzBoundary" + seed, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LongFuzzBoundary" + seed, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

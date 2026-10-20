@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -13,19 +14,19 @@ public sealed class CompilationModelProviderTests
     {
         var leafTree = CSharpSyntaxTree.ParseText(
             "internal static class Leaf { internal static int Value => 1; }");
-        var leaf = CreateCompilation("Leaf", leafTree);
+        var leaf = CreateCompilation("Leaf", leafTree, []);
         var middleTree = CSharpSyntaxTree.ParseText(
             "internal static class Middle { internal static int Value => 2; }");
         var middle = CreateCompilation(
             "Middle",
             middleTree,
-            leaf.ToMetadataReference());
+            [leaf.ToMetadataReference()]);
         var rootTree = CSharpSyntaxTree.ParseText(
             "internal static class Root { internal static int Value => 3; }");
         var root = CreateCompilation(
             "Root",
             rootTree,
-            middle.ToMetadataReference());
+            [middle.ToMetadataReference()]);
 
         var rootModel = CompilationModelProvider.GetSemanticModel(
             root,
@@ -47,7 +48,7 @@ public sealed class CompilationModelProviderTests
         var root = CreateCompilation(
             "Root",
             CSharpSyntaxTree.ParseText(
-                "internal static class Root { }"));
+                "internal static class Root { }"), []);
         var unrelated = CSharpSyntaxTree.ParseText(
             "internal static class Unrelated { }");
 
@@ -63,13 +64,13 @@ public sealed class CompilationModelProviderTests
     {
         var sharedTree = CSharpSyntaxTree.ParseText(
             "internal static class Shared { }");
-        var firstOwner = CreateCompilation("FirstOwner", sharedTree);
-        var secondOwner = CreateCompilation("SecondOwner", sharedTree);
+        var firstOwner = CreateCompilation("FirstOwner", sharedTree, []);
+        var secondOwner = CreateCompilation("SecondOwner", sharedTree, []);
         var root = CreateCompilation(
             "Root",
             CSharpSyntaxTree.ParseText("internal static class Root { }"),
-            firstOwner.ToMetadataReference(),
-            secondOwner.ToMetadataReference());
+            [firstOwner.ToMetadataReference(),
+            secondOwner.ToMetadataReference()]);
 
         var exception = Assert.Throws<ArgumentException>(
             (Action)(() =>
@@ -85,8 +86,8 @@ public sealed class CompilationModelProviderTests
             "internal static class Same { internal static int Value => 1; }");
         var secondTree = CSharpSyntaxTree.ParseText(
             "internal static class Same { internal static int Value => 1; }");
-        var first = CreateCompilation("First", firstTree);
-        var second = CreateCompilation("Second", secondTree);
+        var first = CreateCompilation("First", firstTree, []);
+        var second = CreateCompilation("Second", secondTree, []);
 
         var firstModel = CompilationModelProvider.GetSemanticModel(
             first,
@@ -106,8 +107,8 @@ public sealed class CompilationModelProviderTests
     public void RootModelUsesExplicitOwnerWhenTreeIsSharedWithReference()
     {
         var tree = CSharpSyntaxTree.ParseText("internal static class Shared { }");
-        var dependency = CreateCompilation("Dependency", tree);
-        var root = CreateCompilation("Root", tree, dependency.ToMetadataReference());
+        var dependency = CreateCompilation("Dependency", tree, []);
+        var root = CreateCompilation("Root", tree, [dependency.ToMetadataReference()]);
 
         var model = CompilationModelProvider.GetRootSemanticModel(root, tree);
         var exception = Assert.Throws<ArgumentException>(
@@ -121,10 +122,10 @@ public sealed class CompilationModelProviderTests
     public void RootModelRejectsTreeOwnedOnlyBySourceReference()
     {
         var dependencyTree = CSharpSyntaxTree.ParseText("internal static class Dependency { }");
-        var dependency = CreateCompilation("Dependency", dependencyTree);
+        var dependency = CreateCompilation("Dependency", dependencyTree, []);
         var root = CreateCompilation("Root",
             CSharpSyntaxTree.ParseText("internal static class Root { }"),
-            dependency.ToMetadataReference());
+            [dependency.ToMetadataReference()]);
 
         var exception = Assert.Throws<ArgumentException>(
             (Action)(() => CompilationModelProvider.GetRootSemanticModel(root, dependencyTree)));
@@ -139,7 +140,7 @@ public sealed class CompilationModelProviderTests
     public void RootModelRejectsNullArguments(bool nullCompilation)
     {
         var tree = CSharpSyntaxTree.ParseText("internal static class Root { }");
-        var root = CreateCompilation("Root", tree);
+        var root = CreateCompilation("Root", tree, []);
 
         var exception = Assert.Throws<ArgumentNullException>(
             (Action)(() => CompilationModelProvider.GetRootSemanticModel(
@@ -153,9 +154,10 @@ public sealed class CompilationModelProviderTests
     private static CSharpCompilation CreateCompilation(
         string name,
         SyntaxTree tree,
-        params MetadataReference[] references)
+        ImmutableArray<MetadataReference> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(tree);
         return CSharpCompilation.Create(

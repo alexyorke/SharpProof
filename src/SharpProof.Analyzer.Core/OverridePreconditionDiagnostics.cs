@@ -69,7 +69,7 @@ internal static class OverridePreconditionDiagnostics
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        var identities = right.Variables.ToDictionary(
+        var identities = ImmutableDictionaryCapture.Create(right.Variables,
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((variable.Role, variable.Ordinal, factory.GetVariableInfo(variable.Variable).Type)),
             static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable));
         return NormalizeRequires(left, factory, identities).SequenceEqual(
@@ -79,12 +79,12 @@ internal static class OverridePreconditionDiagnostics
     private static ImmutableArray<IrTerm> NormalizeRequires(
         BoundMethodContracts contracts,
         IrFactory factory,
-        Dictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
+        ImmutableDictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
     {
         contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
-        var variables = new Dictionary<IrVarId, IrTerm>();
+        var variables = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables)
         {
             var type = factory.GetVariableInfo(variable.Variable).Type;
@@ -93,11 +93,13 @@ internal static class OverridePreconditionDiagnostics
             {
                 continue;
             }
-            variables.Add(variable.Variable, factory.Variable(identity));
+            var value = factory.Variable(identity);
+            variables.AddUnique(variable.Variable, value);
         }
+        var substitutions = variables.ToImmutable();
         return [.. contracts.Clauses
             .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
-            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrSubstitution.Substitute(factory, clause.Condition, variables)))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrSubstitution.Substitute(factory, clause.Condition, substitutions)))
             .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id.Value))];
     }
 

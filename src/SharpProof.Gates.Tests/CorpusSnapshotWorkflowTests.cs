@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,6 +11,14 @@ namespace SharpProof.Gates.Test;
 [NonParallelizable]
 public sealed class CorpusSnapshotWorkflowTests
 {
+    [Test]
+    public void DefaultDataLinesRejectAtTheRenderingBoundary()
+    {
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            CorpusSnapshotFormat.Render(default(ImmutableArray<string>))));
+        Assert.That(exception!.ParamName, Is.EqualTo("lines"));
+    }
+
     [Test]
     public async Task GateCountsAndRejectsAnUnreviewedSilentUnknown()
     {
@@ -59,7 +68,7 @@ public sealed class CorpusSnapshotWorkflowTests
         using var temporary = new TempDirectory("SharpProof-snapshot-update-");
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
-        var before = await File.ReadAllBytesAsync(snapshotPath);
+        var before = (await File.ReadAllBytesAsync(snapshotPath)).ToImmutableArray();
         var previousSource = Environment.GetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable);
         try
         {
@@ -81,22 +90,24 @@ public sealed class CorpusSnapshotWorkflowTests
         using var temporary = new TempDirectory("SharpProof-snapshot-drift-");
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
-        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
+        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToBuilder();
         var changedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
-        var fields = changedRow.Split('|');
+        var fields = ImmutableArray.CreateBuilder<string>();
+        fields.AddRange(changedRow.Split('|'));
         Assert.That(fields[1], Is.EqualTo("Proven"));
         fields[1] = "Unknown";
-        rows[rows.IndexOf(changedRow)] = string.Join('|', fields);
+        rows[rows.IndexOf(changedRow)] = string.Join('|', fields.ToImmutable());
         var allowedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal)));
-        var allowedFields = allowedRow.Split('|');
+        var allowedFields = ImmutableArray.CreateBuilder<string>();
+        allowedFields.AddRange(allowedRow.Split('|'));
         Assert.That(allowedFields[1], Is.EqualTo("Unknown"));
         allowedFields[1] = "Proven";
-        rows[rows.IndexOf(allowedRow)] = string.Join('|', allowedFields);
+        rows[rows.IndexOf(allowedRow)] = string.Join('|', allowedFields.ToImmutable());
         var removedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E02.baseline|", StringComparison.Ordinal)));
         rows.Remove(removedRow);
         rows.Add("obsolete-case-a|Proven|Proven|");
         rows.Add("obsolete-case-b|Proven|Proven|");
-        var changedSnapshot = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
+        var changedSnapshot = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
         await File.WriteAllTextAsync(snapshotPath, changedSnapshot);
         var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
         const string allowance = """

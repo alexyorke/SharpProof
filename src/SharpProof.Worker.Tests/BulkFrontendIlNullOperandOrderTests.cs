@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
@@ -17,8 +18,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class BulkFrontendIlNullOperandOrderTests
 {
-    private static readonly string[] ExpectedLeft = ["Ldnull", "Ldarg", "Ceq", "Ret"];
-    private static readonly string[] ExpectedRight = ["Ldarg", "Ldnull", "Ceq", "Ret"];
+    private static readonly ImmutableArray<string> ExpectedLeft = ["Ldnull", "Ldarg", "Ceq", "Ret"];
+    private static readonly ImmutableArray<string> ExpectedRight = ["Ldarg", "Ldnull", "Ceq", "Ret"];
 
     [TestCase(true)]
     [TestCase(false)]
@@ -45,16 +46,16 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             type.CreateType();
             using var emitted = new MemoryStream();
             builder.Save(emitted);
-            var image = emitted.ToArray();
+            var image = ImmutableArray.Create<byte>(emitted.GetBuffer().AsSpan(0, checked((int)emitted.Length)));
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
-            File.WriteAllBytes(imagePath, image);
+            File.WriteAllBytes(imagePath, image.AsSpan());
 
-            using var runtimeImage = new MemoryStream(image, writable: false);
+            using var runtimeImage = new MemoryStream(image.ToArray(), writable: false);
             var runtimeAssembly = runtime.LoadFromStream(runtimeImage);
             var runtimeMethod = runtimeAssembly.GetType("Library")!.GetMethod("IsNull")!;
             Assert.That(runtimeMethod.ReturnType, Is.EqualTo(typeof(bool)));
             Assert.That(runtimeMethod.GetParameters().Single().ParameterType, Is.EqualTo(typeof(string)));
-            string?[] inputs = [null, "x"];
+            ImmutableArray<string?> inputs = [null, "x"];
             foreach (var input in inputs)
             {
                 Assert.That(runtimeMethod.Invoke(null, [input]), Is.EqualTo(input == null));
@@ -84,8 +85,8 @@ public sealed class BulkFrontendIlNullOperandOrderTests
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
-            Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
-            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image))));
+            Assert.That(captured.SizeBytes, Is.EqualTo((long)image.Length));
+            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image.AsSpan()))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
 
@@ -97,7 +98,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(body.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(body.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(body.Module, Is.EqualTo(captured.Name));
-            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToArray(),
+            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToImmutableArray(),
                 Is.EqualTo(nullOnLeft ? ExpectedLeft : ExpectedRight));
             Assert.That(body.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Ldarg")).Operand, Is.Zero);
             bool PrepareSourceCallee(TotalLoweringContext frame)
@@ -155,7 +156,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
                 var expected = input == null;
                 var value = input == null ? factory.CreateNullValue(entryType) : factory.CreateStringValue(input);
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    new Dictionary<IrVarId, IrValue> { [entry] = value });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.Boolean, Is.EqualTo(expected));
                 Assert.That(replay.ConsumedApproximation, Is.False);

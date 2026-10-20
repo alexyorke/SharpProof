@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -10,6 +12,24 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerMetadataResolutionTests
 {
+    [Test]
+    public void NamespaceVectorsRejectDefaultAndRetainGlobalAndOrdinalMatching()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "namespace System.Runtime.CompilerServices { internal class Subject { } }", []);
+        var nameSpace = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.Subject")!.ContainingNamespace;
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerMetadataResolution.HasNamespace(nameSpace, default)));
+        Assert.That(failure!.ParamName, Is.EqualTo("segments"));
+        Assert.That(CompilerMetadataResolution.HasNamespace(compilation.Assembly.GlobalNamespace,
+            ImmutableArray<string>.Empty), Is.True);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace, []), Is.False);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
+            ["System", "Runtime", "CompilerServices"]), Is.True);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
+            ["system", "Runtime", "CompilerServices"]), Is.False);
+    }
+
     [Test]
     public void ReferenceResolutionCachesTheMatchedModuleAndRejectsMissingIdentities()
     {
@@ -71,14 +91,9 @@ public sealed class CompilerMetadataResolutionTests
         image.Position = 0;
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
-        var definitions = reader.MethodDefinitions.ToDictionary(
-            handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetString(reader.GetMethodDefinition(handle).Name))),
-            handle => handle);
+        var definitions = ImmutableDictionaryCapture.Create(reader.MethodDefinitions, handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetString(reader.GetMethodDefinition(handle).Name))), handle => handle);
 
-        foreach (var (name, hasManagedBody) in new[]
-                 {
-                     ("Managed", true), ("Abstract", false), ("Native", false)
-                 })
+        foreach (var (name, hasManagedBody) in ImmutableArray.Create(("Managed", true), ("Abstract", false), ("Native", false)))
         {
             var token = MetadataTokens.GetToken(definitions[name]);
             Assert.That(CompilerMetadataResolution.TryGetMethodDefinition(
@@ -127,11 +142,11 @@ public sealed class CompilerMetadataResolutionTests
             Assert.That(CompilerMetadataResolution.IsReferenceAssembly(ordinary.Assembly),
                 Is.False);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Runtime", "CompilerServices"), Is.True);
+                ["System", "Runtime", "CompilerServices"]), Is.True);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Runtime"), Is.False);
+                ["System", "Runtime"]), Is.False);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Other", "CompilerServices"), Is.False);
+                ["System", "Other", "CompilerServices"]), Is.False);
         }
     }
 }

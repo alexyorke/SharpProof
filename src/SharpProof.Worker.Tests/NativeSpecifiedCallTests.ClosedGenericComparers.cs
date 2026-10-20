@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -7,9 +8,9 @@ internal sealed partial class NativeSpecifiedCallTests
 {
     private static IEnumerable<TestCaseData> ClosedGenericIntegerComparerProofCases()
     {
-        foreach (var element in new[] { "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
+        foreach (var element in ImmutableArray.Create("char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong"))
         {
-            foreach (var local in new[] { false, true })
+            foreach (var local in ImmutableArray.Create(false, true))
             { yield return new TestCaseData(element, local); }
         }
     }

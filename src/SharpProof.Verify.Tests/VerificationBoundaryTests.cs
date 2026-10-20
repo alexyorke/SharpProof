@@ -34,13 +34,8 @@ public sealed class VerificationBoundaryTests
         var factory = new IrFactory();
         var query = new VerificationQuery(factory, [], FalseGoal(factory));
         var emptyModel = new BackendModel([]);
-        var malformed = new BackendCheckResult?[]
-        {
-            null,
-            new((BackendCheckStatus)99, [], null, BackendFailureReason.None, default),
-            new(BackendCheckStatus.Unsatisfiable, [], emptyModel, BackendFailureReason.None, default),
-            new(BackendCheckStatus.Satisfiable, [], null, BackendFailureReason.None, default)
-        };
+        var malformed = ImmutableArray.Create<BackendCheckResult?>(null, new((BackendCheckStatus)99, [], null, BackendFailureReason.None, default), new(BackendCheckStatus.Unsatisfiable, [], emptyModel, BackendFailureReason.None, default), new(BackendCheckStatus.Satisfiable, [], null, BackendFailureReason.None, default)
+);
 
         foreach (var result in malformed)
         {

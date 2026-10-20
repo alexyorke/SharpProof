@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -30,7 +31,7 @@ public sealed class AnalyzerCoreOwnedMultiModuleLifetimeTests
         Assert.That(assemblyPath.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.Ordinal), Is.True);
         try
         {
-            File.WriteAllBytes(modulePath, moduleImage);
+            File.WriteAllBytes(modulePath, (moduleImage).ToArray());
             Assert.That(File.ReadAllBytes(modulePath), Is.EqualTo(moduleImage));
             var moduleReference = MetadataReference.CreateFromFile(modulePath, MetadataReferenceProperties.Module);
             Assert.That(moduleReference.Properties.Kind, Is.EqualTo(MetadataImageKind.Module));
@@ -40,7 +41,7 @@ public sealed class AnalyzerCoreOwnedMultiModuleLifetimeTests
             Assert.That(assemblyCompilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var assemblyImage = AnalyzerTestHost.EmitImage(assemblyCompilation);
             Assert.That(assemblyImage, Is.Not.Empty);
-            File.WriteAllBytes(assemblyPath, assemblyImage);
+            File.WriteAllBytes(assemblyPath, (assemblyImage).ToArray());
             Assert.That(File.ReadAllBytes(assemblyPath), Is.EqualTo(assemblyImage));
             var reference = MetadataReference.CreateFromFile(assemblyPath);
             Assert.That(reference.FilePath, Is.EqualTo(assemblyPath));

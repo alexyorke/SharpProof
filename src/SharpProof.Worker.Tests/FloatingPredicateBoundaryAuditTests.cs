@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using NUnit.Framework;
@@ -91,9 +92,10 @@ public sealed class FloatingPredicateBoundaryAuditTests
             "        " + body + "\n    }\n}\n";
     }
 
-    private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string scenario, string source, object?[] witnesses)
+    private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string scenario, string source, ImmutableArray<object?> witnesses)
     {
-        System.ArgumentNullException.ThrowIfNull(witnesses, nameof(witnesses));
+        if (witnesses.IsDefault)
+        { throw new ArgumentNullException(nameof(witnesses)); }
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
@@ -101,13 +103,13 @@ public sealed class FloatingPredicateBoundaryAuditTests
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit", "nearby-boundaries");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("FloatingPredicateBoundary_" + scenario, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingPredicateBoundary_" + scenario, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, scenario + ".oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, scenario + ".oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("FloatingPredicateBoundary_" + scenario, isCollectible: true);
         string runtimeObservation;
@@ -116,10 +118,10 @@ public sealed class FloatingPredicateBoundaryAuditTests
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             if (method.IsGenericMethodDefinition)
             { method = method.MakeGenericMethod(typeof(object)); }
-            var actual = (bool)method.Invoke(null, witnesses)!;
+            var actual = (bool)method.Invoke(null, witnesses.ToArray())!;
             runtimeObservation = $"scenario={scenario}; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
+                $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
                 $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".clr.txt"), runtimeObservation + "\n");
@@ -134,6 +136,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var hasTotal = artifact.Callables.Single().Total != null;
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);

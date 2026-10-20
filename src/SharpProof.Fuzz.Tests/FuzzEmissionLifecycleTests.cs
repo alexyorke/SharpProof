@@ -14,7 +14,7 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzEmissionLifecycleTests
 {
-    private static readonly string[] ParameterBindingMethodNames = ["Supported", "Extra"];
+    private static readonly ImmutableArray<string> ParameterBindingMethodNames = ["Supported", "Extra"];
 
     [Test]
     public void RealCompilationEmissionReturnsItsSuccessfulReadableImage()
@@ -98,9 +98,11 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
-        var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {
@@ -190,7 +192,7 @@ public sealed class FuzzEmissionLifecycleTests
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
         var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().ToArray();
+            .OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
             Is.EquivalentTo(ParameterBindingMethodNames));
         var generated = new GeneratedCSharpCase(
@@ -294,8 +296,8 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            object?[] preservationArguments = [0L, 0L, false, loneSurrogate, null, null];
-            Assert.That(target!.Invoke(null, preservationArguments), Is.True);
+            ImmutableArray<object?> preservationArguments = [0L, 0L, false, loneSurrogate, null, null];
+            Assert.That(target!.Invoke(null, preservationArguments.ToArray()), Is.True);
         }
         finally
         {
@@ -343,9 +345,11 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
-        var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {
@@ -373,13 +377,13 @@ public sealed class FuzzEmissionLifecycleTests
             var runtime = context.LoadFromStream(image).GetType("SharpProofGeneratedFrontendEdges");
             Assert.That(runtime, Is.Not.Null);
             Assert.That(runtime!.Assembly.GetName().Name, Is.EqualTo(compilation.AssemblyName));
-            object?[] arguments = [true];
+            ImmutableArray<object?> arguments = [true];
             foreach (var method in methods.Values)
             {
                 var compiled = runtime.GetMethod(method.Identifier.ValueText,
                     BindingFlags.Public | BindingFlags.Static);
                 Assert.That(compiled, Is.Not.Null);
-                Assert.That(compiled!.Invoke(null, arguments), Is.True);
+                Assert.That(compiled!.Invoke(null, arguments.ToArray()), Is.True);
             }
             var generated = new FrontendSemanticEdgeCase("bool", "bool value", "value",
                 arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
@@ -440,7 +444,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
         Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().Span, Is.EqualTo(guardSyntax.Span));
         var sourceOperators = guardSyntax.ExpressionBody!.Expression.DescendantNodesAndSelf()
-            .OfType<PrefixUnaryExpressionSyntax>().ToArray();
+            .OfType<PrefixUnaryExpressionSyntax>().ToImmutableArray();
         Assert.That(sourceOperators.Length, Is.EqualTo(unaryCount));
         Assert.That(sourceOperators.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsKind(SyntaxKind.LogicalNotExpression))), Is.True);
         Assert.That(model.GetOperation(guardSyntax.ExpressionBody.Expression), Is.Not.Null);
@@ -471,8 +475,8 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(IrStructuralShrinker.StructuralSize(completion), Is.EqualTo(unaryCount + 3));
         var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>(3);
         var references = ImmutableArray.CreateBuilder<PartialTermSemanticOutcome>(3);
-        bool[] inputs = unaryCount == 2 ? [true, false, false] : [true, false];
-        bool[] guards = unaryCount == 2 ? [true, true, false] : [true, true];
+        ImmutableArray<bool> inputs = unaryCount == 2 ? [true, false, false] : [true, false];
+        ImmutableArray<bool> guards = unaryCount == 2 ? [true, true, false] : [true, true];
         var context = new AssemblyLoadContext("BooleanDepthReferenceControl", isCollectible: true);
         try
         {
@@ -488,12 +492,12 @@ public sealed class FuzzEmissionLifecycleTests
             {
                 var input = inputs[index];
                 var guardInput = guards[index];
-                object?[] arguments = [guardInput, input];
+                ImmutableArray<object?> arguments = [guardInput, input];
                 var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty
                     .Add(variable, factory.CreateBooleanValue(input))
                     .Add(guardVariable, factory.CreateBooleanValue(guardInput));
                 scenarios.Add(scenario);
-                var runtimeCompletion = guard!.Invoke(null, arguments);
+                var runtimeCompletion = guard!.Invoke(null, arguments.ToArray());
                 Assert.That(runtimeCompletion, Is.EqualTo(guardInput || input));
                 var evaluated = new IrInterpreter(factory).Evaluate(completion, scenario);
                 Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -501,7 +505,7 @@ public sealed class FuzzEmissionLifecycleTests
                 Assert.That(evaluated.Value!.Boolean, Is.EqualTo(runtimeCompletion));
                 if (guardInput)
                 {
-                    var returned = reference!.Invoke(null, arguments);
+                    var returned = reference!.Invoke(null, arguments.ToArray());
                     Assert.That(returned, Is.EqualTo(input));
                     var interpreted = new IrInterpreter(factory).Evaluate(formula, scenario);
                     Assert.That(interpreted.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -511,7 +515,7 @@ public sealed class FuzzEmissionLifecycleTests
                 }
                 else
                 {
-                    var thrown = Assert.Throws<TargetInvocationException>((Action)(() => reference!.Invoke(null, arguments)));
+                    var thrown = Assert.Throws<TargetInvocationException>((Action)(() => reference!.Invoke(null, arguments.ToArray())));
                     Assert.That(thrown!.InnerException, Is.TypeOf<DivideByZeroException>());
                     references.Add(PartialTermSemanticOutcome.Undefined);
                 }

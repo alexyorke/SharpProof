@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 
 #if SHARPPROOF_WORKER_PROTOCOL
@@ -17,11 +18,11 @@ internal static class HashEncoding
             "x2", System.Globalization.CultureInfo.InvariantCulture)));
     }
 
-    internal static string ComputeSha256Hex(byte[] bytes)
+    internal static string ComputeSha256Hex(ImmutableArray<byte> bytes)
     {
-        bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
+        RepositoryParameterGuard.ThrowIfMissing(bytes.IsDefault, nameof(bytes));
         using var hash = SHA256.Create();
-        return ToLowerHex(hash.ComputeHash(bytes));
+        return ToLowerHex(hash.ComputeHash(bytes.ToArray()));
     }
 
     internal static string ComputeSha256Hex(Stream stream)

@@ -63,10 +63,9 @@ public sealed class Pr275AdvisoryArgumentListTests
         var duplicate = Interpreter(built).Run(Initial(built),
             markers: [built.BooleanMarker, built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(duplicate, "marker ownership");
-        var oversized = new IrAssignInstruction[4097];
-        Array.Fill(oversized, built.BooleanMarker);
+        var oversized = Enumerable.Repeat(built.BooleanMarker, 4097).ToImmutableArray();
         var countRejected = Interpreter(built).Run(Initial(built),
-            markers: ImmutableArray.CreateRange(oversized), token: TestContext.CurrentContext.CancellationToken);
+            markers: oversized, token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(countRejected, "marker budget");
     }
 

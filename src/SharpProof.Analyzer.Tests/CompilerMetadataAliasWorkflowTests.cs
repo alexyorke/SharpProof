@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerMetadataAliasWorkflowTests
 {
-    private static readonly string[] AlternateAlias = ["alternate"];
+    private static readonly ImmutableArray<string> AlternateAlias = ["alternate"];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -29,8 +30,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 }
                 """, []).WithAssemblyName("MetadataSizeDependency");
             var originalImage = AnalyzerTestHost.EmitImage(dependency);
-            var replacementImage = await File.ReadAllBytesAsync(
-                typeof(SharpProof.Attributes.PositiveAttribute).Assembly.Location);
+            var replacementImage = (await File.ReadAllBytesAsync(
+                typeof(SharpProof.Attributes.PositiveAttribute).Assembly.Location)).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(originalImage, Is.Not.Empty);
@@ -39,7 +40,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             }
             await TestContext.Out.WriteLineAsync($"actual dependency assembly bytes={originalImage.Length}; actual replacement SDK attributes assembly bytes={replacementImage.Length}");
             var dependencyPath = Path.Combine(directory, "dependency.dll");
-            await File.WriteAllBytesAsync(dependencyPath, originalImage);
+            await File.WriteAllBytesAsync(dependencyPath, (originalImage).ToArray());
             var reference = MetadataReference.CreateFromImage(originalImage, filePath: dependencyPath);
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
@@ -50,7 +51,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
                 module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
-            await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : originalImage);
+            await File.WriteAllBytesAsync(dependencyPath, (replaceBackingFile ? replacementImage : originalImage).ToArray());
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
@@ -113,7 +114,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             dependency = dependency.WithOptions(dependency.Options
                 .WithOptimizationLevel(OptimizationLevel.Debug));
             var dependencyPath = Path.Combine(directory, "dependency.dll");
-            await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+            await File.WriteAllBytesAsync(dependencyPath, (AnalyzerTestHost.EmitImage(dependency)).ToArray());
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], [MetadataReference.CreateFromFile(dependencyPath)]);
@@ -173,11 +174,11 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var image = AnalyzerTestHost.EmitImage(dependency);
             var firstPath = Path.Combine(directory, "A.dll");
             var secondPath = Path.Combine(directory, "B.dll");
-            await File.WriteAllBytesAsync(firstPath, image);
-            await File.WriteAllBytesAsync(secondPath, image);
+            await File.WriteAllBytesAsync(firstPath, (image).ToArray());
+            await File.WriteAllBytesAsync(secondPath, (image).ToArray());
             var first = MetadataReference.CreateFromFile(firstPath);
             var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
-            MetadataReference[] references = includeAlias ? [first, second] : [first];
+            ImmutableArray<MetadataReference> references = includeAlias ? [first, second] : [first];
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], references);
@@ -223,8 +224,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var image = AnalyzerTestHost.EmitImage(dependency);
             var firstPath = Path.Combine(directory, "A.dll");
             var secondPath = Path.Combine(directory, "B.dll");
-            await File.WriteAllBytesAsync(firstPath, image);
-            await File.WriteAllBytesAsync(secondPath, image);
+            await File.WriteAllBytesAsync(firstPath, (image).ToArray());
+            await File.WriteAllBytesAsync(secondPath, (image).ToArray());
             var first = MetadataReference.CreateFromFile(firstPath);
             var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
 
@@ -255,26 +256,25 @@ public sealed class CompilerMetadataAliasWorkflowTests
     }
 
     private static async Task<string> PublishAsync(string source, string directory,
-        string name, MetadataReference[] references)
+        string name, ImmutableArray<MetadataReference> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(source);
         var path = Path.Combine(directory, name + ".json");
-        var options = new Dictionary<string, string>
-        {
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow",
-            ["build_property._SharpProofCompilerManifestPath"] = path,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net8.0",
-            ["build_property._SharpProofProjectDirectory"] = directory,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64"
-        };
+        var options = ImmutableDictionary.CreateBuilder<string, string>();
+        options["build_property.SharpProofProfile"] = "advisory";
+        options["build_property.SharpProofFeatures"] = "all";
+        options["build_property.SharpProofVerifyPolicy"] = "advisory";
+        options["build_property.SharpProofAssumptionPolicy"] = "allow";
+        options["build_property._SharpProofCompilerManifestPath"] = path;
+        options["build_property._SharpProofCompilationTargetFramework"] = "net8.0";
+        options["build_property._SharpProofProjectDirectory"] = directory;
+        options["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64";
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            AnalyzerTestHost.CreateCompilation(source, [], references), options,
+            AnalyzerTestHost.CreateCompilation(source, [], references), options.ToImmutable(),
             analyzer: new FinalCompilationCollectorAnalyzer());
         Assert.That(diagnostics, Is.Empty);
         return await File.ReadAllTextAsync(path);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
@@ -6,8 +7,8 @@ public sealed class EffectCompositionBoundaryTests
     [Test]
     public void CallRemappingPreservesDistinctReadAndWriteOwnersAndAmbientEffects()
     {
-        var reads = EffectRegionSet.Create(EffectRegionId.Receiver, EffectRegionId.Parameter(0), EffectRegionId.Ambient);
-        var writes = EffectRegionSet.Create(EffectRegionId.Receiver, EffectRegionId.Parameter(1), EffectRegionId.Static());
+        var reads = EffectRegionSet.Create([EffectRegionId.Receiver, EffectRegionId.Parameter(0), EffectRegionId.Ambient]);
+        var writes = EffectRegionSet.Create([EffectRegionId.Receiver, EffectRegionId.Parameter(1), EffectRegionId.Static()]);
         var source = EffectSummaryOperations.Join(EffectSummaryOperations.Read(reads),
             EffectSummaryOperations.Write(writes), EffectSummaryOperations.Capability(EffectCapabilityKind.IO));
         var mapped = EffectSummaryOperations.Remap(source, EffectRegionSet.Create(EffectRegionId.Captured(3)),
@@ -15,10 +16,10 @@ public sealed class EffectCompositionBoundaryTests
             [EffectRegionSet.Create(EffectRegionId.Parameter(4)), EffectRegionSet.Create(EffectRegionId.Static(2))]);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(mapped.Reads.Regions, Is.EquivalentTo(new[] { EffectRegionId.Captured(3),
-                EffectRegionId.Parameter(4), EffectRegionId.Ambient }));
-            Assert.That(mapped.Writes.Regions, Is.EquivalentTo(new[] { EffectRegionId.Fresh(9),
-                EffectRegionId.Static(2), EffectRegionId.Static() }));
+            Assert.That(mapped.Reads.Regions, Is.EquivalentTo(ImmutableArray.Create(EffectRegionId.Captured(3),
+                EffectRegionId.Parameter(4), EffectRegionId.Ambient)));
+            Assert.That(mapped.Writes.Regions, Is.EquivalentTo(ImmutableArray.Create(EffectRegionId.Fresh(9),
+                EffectRegionId.Static(2), EffectRegionId.Static())));
             Assert.That(mapped.Capabilities, Is.EqualTo(source.Capabilities));
             Assert.That(mapped.Completeness, Is.EqualTo(source.Completeness));
         }
@@ -117,9 +118,9 @@ public sealed class EffectCompositionBoundaryTests
     public void SequencingSeveralEffectsKeepsTheUnionAndBottomIdentity()
     {
         var region = EffectRegionSet.Create(EffectRegionId.Parameter(0));
-        var effects = new[] { EffectSummaryOperations.Read(region), EffectSummaryOperations.Write(region),
-            EffectSummaryOperations.Allocate(EffectAllocationKind.Native), EffectSummaryOperations.DirectCall() };
-        var result = EffectSummaryOperations.Join(effects);
+        var effects = ImmutableArray.Create(EffectSummaryOperations.Read(region), EffectSummaryOperations.Write(region),
+            EffectSummaryOperations.Allocate(EffectAllocationKind.Native), EffectSummaryOperations.DirectCall());
+        var result = EffectSummaryOperations.JoinFrom(EffectSummary.Bottom, effects);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Reads, Is.EqualTo(region));

@@ -22,7 +22,7 @@ public sealed class CSharpOperationSemanticsTests
         var parameter = subject.Context.Parameters.Single().Current;
         var rule = CSharpOperationSemantics.Int32MathAbs(subject.Factory, subject.Factory.Variable(parameter));
         var interpreter = new IrInterpreter(subject.Factory);
-        var environment = new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, value) };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Value(parameter, value));
         var runtime = subject.Invoke([value]);
         var overflow = interpreter.Evaluate(rule.Throws.Single().Condition, environment).Value!.Boolean;
         Assert.That(overflow, Is.EqualTo(runtime is OverflowException));
@@ -51,7 +51,7 @@ public sealed class CSharpOperationSemanticsTests
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(rule.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
@@ -87,7 +87,7 @@ public sealed class CSharpOperationSemanticsTests
         }
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         var expression = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b)));
         Assert.That(subject.Invoke([a, b]), Is.InstanceOf<ArithmeticException>());
         Assert.That(expression.Classification.IsExact, Is.True);
@@ -109,7 +109,7 @@ public sealed class CSharpOperationSemanticsTests
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var expression = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
         Assert.That(expression.Classification.IsExact, Is.True);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b)));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(expression.SafeCondition, environment).Value!.Boolean, Is.EqualTo(safe));

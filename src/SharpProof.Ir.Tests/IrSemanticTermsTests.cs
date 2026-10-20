@@ -6,6 +6,19 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrSemanticTermsTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public void BooleanCombinationsRejectDefaultAfterFactoryValidation(bool conjunction)
+    {
+        var factory = new IrFactory();
+        Func<IrFactory, System.Collections.Immutable.ImmutableArray<IrTerm>, IrTerm> operation = conjunction ? IrSemanticTerms.Conjoin : IrSemanticTerms.Disjoin;
+        var missingFactory = Assert.Throws<ArgumentNullException>((Action)(() => operation(null!, default)));
+        Assert.That(missingFactory!.ParamName, Is.EqualTo("factory"));
+        var missingTerms = Assert.Throws<ArgumentNullException>((Action)(() => operation(factory, default)));
+        Assert.That(missingTerms!.ParamName, Is.EqualTo("terms"));
+        Assert.That(operation(factory, []), Is.SameAs(factory.Boolean(conjunction)));
+    }
+
     [Test]
     public void SingletonBooleanCombinationsRejectInvalidTerms()
     {

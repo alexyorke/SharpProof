@@ -14,8 +14,8 @@ internal sealed partial class PassiveLoopCutter
     {
         // Kosaraju's second, iterative walk uses the finished forward DFS.
         // Every cyclic component is checked before any encoded graph grows.
-        var visited = new HashSet<IrBlockId>();
-        var immutable = new HashSet<IrVarId>();
+        var visited = ImmutableHashSet.CreateBuilder<IrBlockId>();
+        var immutable = ImmutableHashSet.CreateBuilder<IrVarId>();
         foreach (var parameter in _candidate.Parameters)
         { Spend(); immutable.Add(parameter.Entry); immutable.Add(parameter.Old); }
         for (var ordinal = _finished.Count - 1; ordinal >= 0; ordinal--)
@@ -24,20 +24,20 @@ internal sealed partial class PassiveLoopCutter
             var first = _finished[ordinal];
             if (visited.Contains(first))
             { continue; }
-            var nodes = new HashSet<IrBlockId>();
-            var pending = new Stack<IrBlockId>();
-            pending.Push(first);
-            while (pending.Count != 0)
+            var nodes = ImmutableArray.CreateBuilder<IrBlockId>();
+            var pending = ImmutableStack<IrBlockId>.Empty;
+            pending = pending.Push(first);
+            while (!pending.IsEmpty)
             {
                 Spend();
-                var block = pending.Pop();
+                pending = pending.Pop(out var block);
                 if (!visited.Add(block))
                 { continue; }
                 nodes.Add(block);
                 if (_predecessors.TryGetValue(block, out var predecessors))
                 {
                     foreach (var predecessor in predecessors)
-                    { Spend(); pending.Push(predecessor); }
+                    { Spend(); pending = pending.Push(predecessor); }
                 }
             }
             if (nodes.Count == 1 && !Targets(_candidate.Program.GetBlock(first).Terminator).Contains(first))
@@ -73,7 +73,7 @@ internal sealed partial class PassiveLoopCutter
             Spend(nodes.Count);
             var component = new ExceptionComponent([.. nodes.OrderBy(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value))], writes, forgetsHeap, throws.ToImmutable());
             foreach (var block in nodes)
-            { Spend(); _exceptionComponents.Add(block, component); }
+            { Spend(); _exceptionComponents.AddUnique(block, component); }
         }
         return true;
     }
@@ -81,7 +81,7 @@ internal sealed partial class PassiveLoopCutter
     private ImmutableArray<IrVarId> WrittenVariables(IEnumerable<IrBlockId> nodes)
     {
         System.ArgumentNullException.ThrowIfNull(nodes);
-        var writes = new HashSet<IrVarId>();
+        var writes = ImmutableHashSet.CreateBuilder<IrVarId>();
         foreach (var node in nodes)
         {
             foreach (var instruction in _candidate.Program.GetBlock(node).Instructions)

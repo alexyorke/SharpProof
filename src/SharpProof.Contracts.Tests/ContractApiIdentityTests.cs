@@ -161,7 +161,7 @@ public sealed class ContractApiIdentityTests
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
-        return MetadataReference.CreateFromImage(stream.ToArray());
+        return MetadataReference.CreateFromImage(ImmutableArray.Create(stream.GetBuffer(), 0, checked((int)stream.Length)));
     }
 
 }

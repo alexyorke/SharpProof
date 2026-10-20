@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -39,11 +40,11 @@ public sealed class PartialConstructedReturnEditingRecoveryTests
                 NullableContextOptions.Enable));
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToArray();
+            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToImmutableArray();
         var definitionSyntax = methods.Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body == null));
         var implementationSyntax = methods.Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body != null));
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS8817"));
         Assert.That(errors[0].Location.SourceTree, Is.SameAs(tree));
@@ -58,7 +59,7 @@ public sealed class PartialConstructedReturnEditingRecoveryTests
         Assert.That(callOperation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)callOperation!).TargetMethod;
         Assert.That(target.OriginalDefinition, Is.SameAs(definition));
-        var actualImplementation = implementation.Construct(target.TypeArguments.ToArray());
+        var actualImplementation = implementation.Construct(target.TypeArguments, target.TypeArgumentNullableAnnotations);
         Assert.That(SymbolEqualityComparer.Default.Equals(target.ReturnType,
             actualImplementation.ReturnType), Is.EqualTo(coincident));
         var binder = new ContractBinder(compilation, new IrFactory());

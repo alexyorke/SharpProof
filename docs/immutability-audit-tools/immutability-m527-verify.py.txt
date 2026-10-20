@@ -1,0 +1,24 @@
+# Immutable audit source snapshot; strip this documentation header before execution.
+import collections,csv,gzip,hashlib,io,json,pathlib,sys
+root=pathlib.Path.cwd();base=pathlib.Path(sys.argv[1]) if len(sys.argv)>1 else root/'artifacts/immutability-legacy-provenance/m527-qualified-archive-7ye6l59w'
+summary=json.loads((base/'reconciliation-summary.json').read_text())
+legacy=list(csv.DictReader(gzip.open(base/'legacy-rows.tsv.gz','rt',encoding='utf-8',newline=''),delimiter='\t'))
+by_epoch=collections.defaultdict(list)
+for row in legacy:by_epoch[row['EpochOrdinal']].append(row)
+if len({r['LegacyRowKey'] for r in legacy})!=len(legacy):raise RuntimeError('Duplicate legacy keys')
+for ordinal,rows in by_epoch.items():
+ blob=rows[0]['LedgerGitBlob'];raw=gzip.decompress((base/'blobs'/(blob+'.tsv.gz')).read_bytes())
+ if hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()!=blob:raise RuntimeError('Raw Git blob authority failed')
+ original=list(csv.DictReader(io.StringIO(raw.decode('utf-8-sig')),delimiter='\t'))
+ if len(original)!=len(rows):raise RuntimeError('Historical row count drift')
+ for before,after in zip(original,rows):
+  for column in ['Id','Path','Line','Column','Kind','Owner','Detail','Status']:
+   target={'Id':'LegacyId','Status':'LegacyStatus'}.get(column,column)
+   if before[column]!=after[target]:raise RuntimeError('Lossy historical row column '+column)
+current=list(csv.DictReader(gzip.open(base/'current-observations.tsv.gz','rt',encoding='utf-8',newline=''),delimiter='\t'))
+keys={(r['ContextSha256'],r['StableId']) for r in current}
+if len(keys)!=len(current) or len(current)!=summary['CurrentObservations']:raise RuntimeError('Current union conservation')
+relations=list(csv.DictReader(gzip.open(base/'historical-current-relations.tsv.gz','rt',encoding='utf-8',newline=''),delimiter='\t'))
+if {r['LegacyRowKey'] for r in relations}!={r['LegacyRowKey'] for r in legacy}:raise RuntimeError('Relation conservation')
+if any(r['EffectiveStatus']!='NoAutomaticTransfer' for r in relations):raise RuntimeError('Unauthoritative status transfer')
+print(f'Lossless verification passed: {len(by_epoch)} raw Git ledger epochs, {len(legacy)} complete legacy rows, {len(current)} unique current observations and {len(relations)} no-transfer relations.')

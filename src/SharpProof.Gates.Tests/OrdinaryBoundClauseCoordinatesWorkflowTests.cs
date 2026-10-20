@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -54,7 +55,7 @@ public sealed class OrdinaryBoundClauseCoordinatesWorkflowTests
         Assert.That(span.Length, Is.EqualTo(syntax.Span.Length).And.GreaterThan(0));
 
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;

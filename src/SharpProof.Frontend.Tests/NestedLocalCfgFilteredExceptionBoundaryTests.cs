@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
@@ -32,15 +33,15 @@ public sealed class NestedLocalCfgFilteredExceptionBoundaryTests
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(graph.Root);
         var ownFilter = false;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
+            pending = pending.Pop(out var region);
             ownFilter |= region.Kind == ControlFlowRegionKind.Filter;
             foreach (var child in region.NestedRegions)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         Assert.That(ownFilter, Is.True);
         var externalFinally = false;
@@ -53,10 +54,7 @@ public sealed class NestedLocalCfgFilteredExceptionBoundaryTests
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = context.Parameters.Single();
         var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Values[parameter.Current].IntegerNumericValue, Is.EqualTo(new BigInteger(input + 1)));
         if (input == 0)

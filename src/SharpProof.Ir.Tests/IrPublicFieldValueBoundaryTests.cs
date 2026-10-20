@@ -17,13 +17,13 @@ public sealed class IrPublicFieldValueBoundaryTests
         var interpreter = new IrInterpreter(factory);
         var matching = booleanField ? factory.CreateBooleanValue(true) : factory.CreateIntegerValue(3);
         var validOwner = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, matching));
-        var valid = interpreter.Evaluate(read, new Dictionary<IrVarId, IrValue> { [owner] = validOwner });
+        var valid = interpreter.Evaluate(read, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, validOwner));
         Assert.That(valid.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(valid.Value, Is.SameAs(matching));
 
         var mismatched = booleanField ? factory.CreateIntegerValue(3) : factory.CreateBooleanValue(true);
         var invalidOwner = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, mismatched));
-        var invalid = interpreter.Evaluate(read, new Dictionary<IrVarId, IrValue> { [owner] = invalidOwner });
+        var invalid = interpreter.Evaluate(read, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, invalidOwner));
         Assert.That(invalid.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(invalid.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
     }
@@ -42,13 +42,13 @@ public sealed class IrPublicFieldValueBoundaryTests
         var interpreter = new IrProgramInterpreter(factory);
         var matching = booleanField ? factory.CreateBooleanValue(true) : factory.CreateIntegerValue(3);
         var validOwner = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, matching));
-        var valid = interpreter.Execute(program, new Dictionary<IrVarId, IrValue> { [owner] = validOwner });
+        var valid = interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, validOwner));
         Assert.That(valid.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(valid.ReturnValue, Is.SameAs(matching));
 
         var mismatched = booleanField ? factory.CreateIntegerValue(3) : factory.CreateBooleanValue(true);
         var invalidOwner = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, mismatched));
-        var invalid = interpreter.Execute(program, new Dictionary<IrVarId, IrValue> { [owner] = invalidOwner });
+        var invalid = interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, invalidOwner));
         Assert.That(invalid.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(invalid.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
     }

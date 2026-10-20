@@ -48,8 +48,8 @@ internal static partial class CSharpOperationSemantics
 
 internal sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _defaultHashSetOrigins = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _defaultHashSetOriginCaptures = [];
+    private readonly ImmutableHashSet<ISymbol>.Builder _defaultHashSetOrigins = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _defaultHashSetOriginCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
 
     internal static bool IsHashSetReceiverType(ITypeSymbol? type)
     {

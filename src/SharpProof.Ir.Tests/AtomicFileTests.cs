@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -32,6 +33,20 @@ public sealed class AtomicFileTests : IDisposable
         _temporary?.Dispose();
         _temporary = null;
     }
+
+    [Test]
+    public void StagedBytesRejectDefaultBeforeCreatingTheFileAndAcceptEmpty()
+    {
+        var temporary = Path.Combine(_root, "staged-empty.tmp");
+        var invalidPath = Assert.Throws<ArgumentNullException>((Action)(() => AtomicFile.WriteStagedBytes(null!, default)));
+        Assert.That(invalidPath!.ParamName, Is.EqualTo("temporary"));
+        var invalidContent = Assert.Throws<ArgumentNullException>((Action)(() => AtomicFile.WriteStagedBytes(temporary, default)));
+        Assert.That(invalidContent!.ParamName, Is.EqualTo("content"));
+        Assert.That(File.Exists(temporary), Is.False);
+        AtomicFile.WriteStagedBytes(temporary, ImmutableArray<byte>.Empty);
+        Assert.That(new FileInfo(temporary).Length, Is.Zero);
+    }
+
 
     [Test]
     public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination()
@@ -80,14 +95,16 @@ public sealed class AtomicFileTests : IDisposable
     {
         var path = Path.Combine(_root, "concurrent", "result.txt");
         const int publicationCount = 32;
-        var staged = new string[publicationCount];
-        for (var index = 0; index < staged.Length; index++)
+        var stagedBuilder = ImmutableArray.CreateBuilder<string>(publicationCount);
+        for (var index = 0; index < publicationCount; index++)
         {
-            staged[index] = AtomicFile.PrepareStaged(path);
+            var temporary = AtomicFile.PrepareStaged(path);
+            stagedBuilder.Add(temporary);
             AtomicFile.WriteStagedBytes(
-                staged[index],
-                Encoding.UTF8.GetBytes($"content-{index}\n"));
+                temporary,
+                Encoding.UTF8.GetBytes($"content-{index}\n").ToImmutableArray());
         }
+        var staged = stagedBuilder.ToImmutable();
 
         using var start = new Barrier(publicationCount + 1);
         var publications = staged.Select(temporary => temporary is null ? throw new System.ArgumentNullException(nameof(temporary)) : (Task.Factory.StartNew(() =>
@@ -102,7 +119,7 @@ public sealed class AtomicFileTests : IDisposable
                 AtomicFile.TryDeleteStaged(temporary);
             }
         }, TestContext.CurrentContext.CancellationToken, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
-            TaskScheduler.Default))).ToArray();
+            TaskScheduler.Default))).ToImmutableArray();
 
         start.SignalAndWait();
         await Task.WhenAll(publications);
@@ -147,7 +164,7 @@ public sealed class AtomicFileTests : IDisposable
             Assert.That(Path.GetFileName(temporary).Length, Is.LessThan(255));
             AtomicFile.WriteStagedBytes(
                 temporary,
-                Encoding.UTF8.GetBytes("content"));
+                Encoding.UTF8.GetBytes("content").ToImmutableArray());
             AtomicFile.PublishStaged(temporary, path);
             Assert.That(File.ReadAllText(path), Is.EqualTo("content"));
         }
@@ -157,10 +174,10 @@ public sealed class AtomicFileTests : IDisposable
         }
     }
 
-    private static string[] TemporaryFiles(string path)
+    private static ImmutableArray<string> TemporaryFiles(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
-        return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
+        return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp").ToImmutableArray();
     }
 
     private async Task AssertWriteUtf8ReplacementAsync(

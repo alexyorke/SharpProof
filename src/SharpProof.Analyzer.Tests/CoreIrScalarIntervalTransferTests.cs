@@ -24,9 +24,9 @@ public sealed class CoreIrScalarIntervalTransferTests
         var info = factory.GetTypeInfo(type);
         Assert.That(CoreIrScalarIntervalTransfer.TryTypeRange(info, out var range), Is.True);
         Assert.That(range, Is.EqualTo(IntervalValue.Range(minimum, maximum)));
-        long[] samples = isSigned ? [minimum, minimum + 1, -1, 0, 1, maximum - 1, maximum]
+        ImmutableArray<long> samples = isSigned ? [minimum, minimum + 1, -1, 0, 1, maximum - 1, maximum]
             : [0, 1, maximum - 1, maximum];
-        IrBinaryOperator[] operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
+        ImmutableArray<IrBinaryOperator> operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
             IrBinaryOperator.Multiply, IrBinaryOperator.Divide, IrBinaryOperator.Remainder];
         var x = factory.CreateVariable("x", type);
         var y = factory.CreateVariable("y", type);
@@ -73,10 +73,10 @@ public sealed class CoreIrScalarIntervalTransferTests
         var interpreter = new IrInterpreter(factory);
         var minimum = isSigned ? -128 : 0;
         var maximum = isSigned ? 127 : 255;
-        IntervalValue[] intervals = [IntervalValue.Range(minimum, minimum + 4),
+        ImmutableArray<IntervalValue> intervals = [IntervalValue.Range(minimum, minimum + 4),
             IntervalValue.Range(maximum - 4, maximum), IntervalValue.Range(0, 5),
             IntervalValue.Range(minimum, maximum)];
-        IrBinaryOperator[] operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
+        ImmutableArray<IrBinaryOperator> operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
             IrBinaryOperator.Multiply, IrBinaryOperator.Divide, IrBinaryOperator.Remainder];
         foreach (var operation in operations)
         {
@@ -150,8 +150,7 @@ public sealed class CoreIrScalarIntervalTransferTests
         var type = factory.GetTypeInfo(factory.GetOrCreateIntegerType(64, true));
         var even = IntervalValue.Congruent(null, null, 2, 0);
         var odd = IntervalValue.Congruent(null, null, 2, 1);
-        foreach (var (interval, first, last) in new[] {
-            (even, long.MinValue, long.MaxValue - 1), (odd, long.MinValue + 1, long.MaxValue) })
+        foreach (var (interval, first, last) in ImmutableArray.Create((even, long.MinValue, long.MaxValue - 1), (odd, long.MinValue + 1, long.MaxValue)))
         {
             var sum = CoreIrScalarIntervalTransfer.Binary(IrBinaryOperator.Add, type,
                 interval, IntervalValue.Constant(0));

@@ -159,12 +159,12 @@ public sealed class TotalClaimResultTests
             project.Snapshot.Callables.Single(), check with { ClaimId = "foreign" })));
     }
 
-    private static async Task<Dictionary<string, TotalCallableClaimCheck>> Checks(ShadowTestProject project)
+    private static async Task<ImmutableDictionary<string, TotalCallableClaimCheck>> Checks(ShadowTestProject project)
     {
         System.ArgumentNullException.ThrowIfNull(project);
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checks = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
             check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
-        return checks;
+        return checks.ToImmutable();
     }
 }

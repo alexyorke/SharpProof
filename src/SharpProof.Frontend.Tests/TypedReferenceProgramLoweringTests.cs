@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -17,7 +18,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("bool Target(int[] x, int[] y) => x != y;", [shared, shared], false);
         yield return Case("bool Target(int[] x, int[] y) => x != y;", [shared, shared.ToArray()], true);
         yield return Case("int Target(int[] x) => x.Length;", [null!], typeof(NullReferenceException));
-        var sharedText = "a";
+        const string sharedText = "a";
         var mixed = new object[] { sharedText, shared };
         var wide = new[] { ulong.MaxValue };
         yield return Case("bool Target(object x) => x != null;", [sharedText], true, "string as object");
@@ -47,9 +48,10 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     [TestCaseSource(nameof(ReferenceCases))]
-    public void CompiledReferenceBodyMatchesNullLengthAndIdentityObservations(string members, object[] arguments, object expected)
+    public void CompiledReferenceBodyMatchesNullLengthAndIdentityObservations(string members, ImmutableArray<object> arguments, object expected)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
@@ -64,8 +66,8 @@ public sealed class TypedReferenceProgramLoweringTests
         }
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
                 arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
@@ -92,10 +94,12 @@ public sealed class TypedReferenceProgramLoweringTests
         var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
         var interpreter = new IrInterpreter(factory);
         var shared = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
-        var model = new Dictionary<IrVarId, IrValue> { [left] = shared, [right] = shared };
-        Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.True);
+        var model = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        model[left] = shared;
+        model[right] = shared;
+        Assert.That(interpreter.Evaluate(equal, model.ToImmutable()).Value!.Boolean, Is.True);
         model[right] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
-        Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.False);
+        Assert.That(interpreter.Evaluate(equal, model.ToImmutable()).Value!.Boolean, Is.False);
         var nullLength = interpreter.Evaluate(factory.Length(factory.Null(sequenceType))).Value!;
         Assert.That(nullLength.IntegerWidth, Is.EqualTo(32));
         Assert.That(nullLength.Integer, Is.Zero);
@@ -121,9 +125,9 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var entry = subject.Context.Parameters.Single().Entry;
-        var value = Value(subject.Factory, subject.Factory.GetVariableInfo(entry).Type, input, []);
+        var value = Value(subject.Factory, subject.Factory.GetVariableInfo(entry).Type, input, ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>());
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = value });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(ReferenceEquals(replay.ReturnValue, value), Is.True);
@@ -131,7 +135,7 @@ public sealed class TypedReferenceProgramLoweringTests
 
     public static IEnumerable<TestCaseData> ArrayMutationCases()
     {
-        foreach (var index in new[] { 0U, 1U, (uint)int.MaxValue, 0x80000000U, uint.MaxValue })
+        foreach (var index in ImmutableArray.Create(0U, 1U, (uint)int.MaxValue, 0x80000000U, uint.MaxValue))
         {
             yield return Case("int Target(uint index) { int[] values = new int[1]; values[index] = 7; return values[0]; }",
                 [index], index == 0 ? 7 : typeof(IndexOutOfRangeException), index.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -141,7 +145,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("int Target() { int[] values = null; uint index = uint.MaxValue; int seen = 0; try { values[index] &= ++seen; } catch (System.NullReferenceException) { return seen; } return -1; }", [], 0);
         yield return Case("int Target() { int[] values = new int[2]; uint i = 0; values[i] = (int)(i = 1); return values[0] * 10 + values[1]; }", [], 10);
         yield return Case("int Target() { int[] values = new int[1]; int[] original = values; uint i = 0; values[i] = (values = new int[1]).Length + (int)(i = 1); return original[0] * 10 + values[0]; }", [], 20);
-        foreach (var assignment in new[] { "=", "&=" })
+        foreach (var assignment in ImmutableArray.Create("=", "&="))
         {
             var expected = assignment == "=" ? 7 : 9;
             yield return Case($"int Target(int zero) {{ int[] values = null; uint i = 0; try {{ values[i] {assignment} 1 / zero; }} catch (System.DivideByZeroException) {{ return 7; }} catch (System.NullReferenceException) {{ return 9; }} return -1; }}", [0], expected);
@@ -159,7 +163,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("int Target(int[] x) => x[0] & 0;", [Array.Empty<int>()], typeof(IndexOutOfRangeException));
         yield return Case("int Target(int[] x) { int seen = 0; try { return x[seen++] & 0; } catch (System.NullReferenceException) when (seen == 1) { return seen; } }", [null!], 1);
         yield return Case("int Target(int[] x) { int seen = 0; try { return x[0] & seen++; } catch (System.NullReferenceException) { return seen; } }", [null!], 0);
-        (string Type, Array Input, object Expected)[] scalars =
+        ImmutableArray<(string Type, Array Input, object Expected)> scalars =
         [
             ("sbyte", new[] { sbyte.MinValue }, sbyte.MinValue), ("byte", new[] { byte.MaxValue }, byte.MaxValue),
             ("short", new[] { short.MinValue }, short.MinValue), ("ushort", new[] { ushort.MaxValue }, ushort.MaxValue),
@@ -169,7 +173,7 @@ public sealed class TypedReferenceProgramLoweringTests
         ];
         foreach (var (type, input, expected) in scalars)
         { yield return Case($"{type} Target({type}[] x) => x[0];", [input], expected); }
-        (string Type, object Index)[] indexes =
+        ImmutableArray<(string Type, object Index)> indexes =
         [("int", -1), ("int", int.MaxValue), ("uint", uint.MaxValue)];
         foreach (var (type, index) in indexes)
         {
@@ -186,16 +190,17 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     [TestCaseSource(nameof(ArrayReadCases))]
-    public void GuardedArrayReadsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, false); }
+    public void GuardedArrayReadsMatchCompiledExecution(string members, ImmutableArray<object> arguments, object expected)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, false); }
 
     [TestCaseSource(nameof(ArrayMutationCases))]
-    public void GuardedArrayMutationsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, true); }
+    public void GuardedArrayMutationsMatchCompiledExecution(string members, ImmutableArray<object> arguments, object expected)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, true); }
 
-    private static void AssertArrayExecution(string members, object[] arguments, object expected, bool opaqueCalls)
+    private static void AssertArrayExecution(string members, ImmutableArray<object> arguments, object expected, bool opaqueCalls)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
@@ -204,8 +209,8 @@ public sealed class TypedReferenceProgramLoweringTests
             "Compiled result type: " + actual?.GetType().FullName);
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: opaqueCalls);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -243,9 +248,10 @@ public sealed class TypedReferenceProgramLoweringTests
         Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
     }
 
-    private static TestCaseData Case(string members, object[] arguments, object expected, string? label = null)
+    private static TestCaseData Case(string members, ImmutableArray<object> arguments, object expected, string? label = null)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         return new TestCaseData(members, arguments, expected).SetName("Reference observations: " + members + " #" +
@@ -253,7 +259,7 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     private static IrValue Value(IrFactory factory, IrTypeId type, object? input,
-        Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
+        ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases)
     {
         if (type.IsDefault)
         {
@@ -273,8 +279,8 @@ public sealed class TypedReferenceProgramLoweringTests
         }
         if (!aliases.TryGetValue(type, out var typedAliases))
         {
-            typedAliases = new Dictionary<object, IrValue>(ReferenceEqualityComparer.Instance);
-            aliases.Add(type, typedAliases);
+            typedAliases = ImmutableDictionary.CreateBuilder<object, IrValue>(ReferenceEqualityComparer.Instance);
+            aliases.AddUnique(type, typedAliases);
         }
         if (typedAliases.TryGetValue(input, out var shared))
         { return shared; }
@@ -289,7 +295,7 @@ public sealed class TypedReferenceProgramLoweringTests
             IrTypeKind.Reference => factory.CreateReferenceValue(type, input),
             _ => throw new ArgumentException("The runtime value does not match the reference oracle type.", nameof(input))
         };
-        typedAliases.Add(input, value);
+        typedAliases.AddUnique(input, value);
         return value;
     }
 }

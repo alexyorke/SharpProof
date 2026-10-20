@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -128,17 +129,16 @@ public sealed class CompilerDriverAdditionalFileContractTests
         var trustedAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         Assert.That(trustedAssemblies, Is.Not.Null.And.Not.Empty);
         var references = trustedAssemblies!.Split(Path.PathSeparator)
-            .Distinct(StringComparer.Ordinal).ToArray();
+            .Distinct(StringComparer.Ordinal).ToImmutableArray();
         Assert.That(references.All(Path.IsPathFullyQualified), Is.True);
         Assert.That(references.All(File.Exists), Is.True);
-        var arguments = new List<string>
-        {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create(
             "/noconfig", "/nologo", "/target:library",
             "/out:" + outputPath,
             "/analyzer:" + collectorPath,
             "/analyzerconfig:" + configPath,
-            "/additionalfile:" + additionalPath
-        };
+            "/additionalfile:" + additionalPath));
         arguments.AddRange(references.Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : ("/reference:" + path)));
         arguments.Add(sourcePath);
         var originalOutput = Console.Out;

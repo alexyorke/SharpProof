@@ -117,9 +117,8 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
-        var resolved = new List<(ApiSpecTemplate Template, ISymbol Symbol)>();
-        var containingTypes = new Dictionary<string, ContainingTypeLookup>(
-            StringComparer.Ordinal);
+        var resolved = ImmutableArray.CreateBuilder<(ApiSpecTemplate Template, ISymbol Symbol)>();
+        var containingTypes = ImmutableDictionary.CreateBuilder<string, ContainingTypeLookup>(StringComparer.Ordinal);
         foreach (var template in _table.Templates)
         {
             var candidate = ResolveTemplate(
@@ -167,7 +166,7 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     private static (ISymbol? Symbol, ApiSpecResolutionFailure? Failure) ResolveTemplate(
         Compilation compilation,
         ApiSpecTemplate template,
-        Dictionary<string, ContainingTypeLookup> containingTypes)
+        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         containingTypes = RepositoryParameterGuard.NotNull(containingTypes, nameof(containingTypes));
@@ -240,7 +239,7 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     private static ContainingTypeLookup ResolveContainingType(
         Compilation compilation,
         string metadataName,
-        Dictionary<string, ContainingTypeLookup> containingTypes)
+        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (containingTypes.TryGetValue(metadataName, out var lookup))
@@ -319,7 +318,7 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
 
         var identityMatches = target.ApprovedAssemblies
             .Where(IdentityMatches)
-            .ToArray();
+            .ToImmutableArray();
         if (identityMatches.Length == 0)
         {
             return (false, false, ApiSpecReferenceFamily.Unspecified, string.Empty);

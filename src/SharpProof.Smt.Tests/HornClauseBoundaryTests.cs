@@ -7,6 +7,30 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class HornClauseBoundaryTests
 {
+    [Test]
+    public void DefaultClausesRejectBeforeCreatingNativeSearchResources()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = HornInvariantSearch.Propose(
+                factory, default, ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>>.Empty,
+                IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("clauses"));
+    }
+
+    [Test]
+    public void InitializedEmptyClausesProduceNoProposals()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var proposals = HornInvariantSearch.Propose(
+            factory, ImmutableArray<VerificationQuery>.Empty,
+            ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>>.Empty,
+            IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
+        Assert.That(proposals, Is.Empty);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task CompoundRelationHeadsPreserveTheEstablishedCounterBound(bool guarded)
@@ -24,8 +48,10 @@ public sealed class HornClauseBoundaryTests
             ? factory.Binary(IrBinaryOperator.OrElse, factory.Unary(IrUnaryOperator.Not, zero), atom)
             : factory.Binary(IrBinaryOperator.AndAlso, atom, nonnegative);
         var body = factory.Binary(IrBinaryOperator.AndAlso, atom, nonnegative);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [zero], head),
             Query(factory, [body, factory.Binary(IrBinaryOperator.LessThan, current, factory.Integer(3))],
@@ -56,7 +82,9 @@ public sealed class HornClauseBoundaryTests
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:negative", factory.BooleanType, isStatic: true, factory.IntegerType);
         var atom = factory.PureOpaque(relation, null, current);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
 
         var proposals = HornInvariantSearch.Propose(factory,
             [Query(factory, [], factory.Unary(IrUnaryOperator.Not, atom))], states,
@@ -73,7 +101,9 @@ public sealed class HornClauseBoundaryTests
         var current = factory.Variable(variable);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:budget", factory.BooleanType, isStatic: true, factory.IntegerType);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
 
         var proposals = HornInvariantSearch.Propose(factory,
             [Query(factory, [], factory.PureOpaque(relation, null, current))], states, 1, TestContext.CurrentContext.CancellationToken);
@@ -99,11 +129,10 @@ public sealed class HornClauseBoundaryTests
         var affine = factory.Binary(IrBinaryOperator.Equal, currentValue,
             factory.Binary(IrBinaryOperator.Add,
                 factory.Binary(IrBinaryOperator.Multiply, factory.Integer(2), currentIndex), factory.Integer(1)));
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>
-        {
-            [relation] = [currentIndex, currentValue]
-        };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [currentIndex, currentValue];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [initialIndex, initialValue], atom),
             Query(factory, [atom], factory.PureOpaque(relation, null, nextIndex, nextValue)),
@@ -115,8 +144,10 @@ public sealed class HornClauseBoundaryTests
 
         Assert.That(proposals, Does.ContainKey(relation));
         var invariant = proposals[relation];
-        var preserved = IrSubstitution.Substitute(factory, invariant,
-            new Dictionary<IrVarId, IrTerm> { [index] = nextIndex, [value] = nextValue });
+        var replacementsBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        replacementsBuilder[index] = nextIndex;
+        replacementsBuilder[value] = nextValue;
+        var preserved = IrSubstitution.Substitute(factory, invariant, replacementsBuilder.ToImmutable());
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
         Assert.That(await kernel.VerifyAsync(Query(factory, [initialIndex, initialValue], invariant), TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());

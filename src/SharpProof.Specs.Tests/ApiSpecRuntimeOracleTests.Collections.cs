@@ -28,7 +28,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var empty = CreateCountReceiver(kind, 0);
         var populated = CreateCountReceiver(kind, 65);
         var fields = InstanceFields(populated.Receiver.GetType());
-        var before = fields.Select(field => field is null ? throw new global::System.ArgumentNullException(nameof(field)) : (field.GetValue(populated.Receiver))).ToArray();
+        var before = fields.Select(field => field is null ? throw new global::System.ArgumentNullException(nameof(field)) : (field.GetValue(populated.Receiver))).ToImmutableArray();
         var emptyCount = empty.Read();
         var populatedCount = populated.Read();
         return emptyCount == 0 && populatedCount > 0 && populated.Read() == populatedCount && fields.Select((field, index) => field is null ? throw new global::System.ArgumentNullException(nameof(field)) : (Equals(before[index], field.GetValue(populated.Receiver)))).All(equal => equal) ? SpecEffect.ReadsReceiverState : SpecEffect.Unknown;
@@ -36,7 +36,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static CountReceiver CreateCountReceiver(string kind, int size)
     {
-        var values = Enumerable.Range(0, size).Select(value => (object)value).ToArray();
+        var values = Enumerable.Range(0, size).Select(value => (object)value).ToImmutableArray();
         switch (kind)
         {
             case "List":

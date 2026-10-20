@@ -72,7 +72,7 @@ internal sealed class Wave8ExceptionInitializationAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("Wave8ExceptionInitialization", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("Wave8ExceptionInitialization", [("Subject.cs", source)]);
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
         Assert.That(((CSharpParseOptions)compilation.SyntaxTrees.Single().Options).LanguageVersion, Is.EqualTo(LanguageVersion.CSharp12));
@@ -118,6 +118,7 @@ internal sealed class Wave8ExceptionInitializationAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

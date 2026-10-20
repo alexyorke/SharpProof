@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -19,7 +20,7 @@ public sealed class FrontendSourceReplayTests
     [Test]
     public void ActualExpressionBodyReplaysItsCompiledArgument()
     {
-        var source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
+        const string source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
         AssertActualCompilation(source, [First], [7], [true]);
         var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
@@ -29,7 +30,7 @@ public sealed class FrontendSourceReplayTests
     [Test]
     public void ActualBlockBodyKeepsTheOperationRejection()
     {
-        var source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
+        const string source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
         AssertActualCompilation(source, [First], [7], [false]);
         var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
@@ -103,12 +104,15 @@ public sealed class FrontendSourceReplayTests
                 nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static void AssertActualCompilation(string source, GeneratedCSharpCase[] inputs,
-        long[] expected, bool[] hasExpressionBody)
+    private static void AssertActualCompilation(string source, ImmutableArray<GeneratedCSharpCase> inputs,
+        ImmutableArray<long> expected, ImmutableArray<bool> hasExpressionBody)
     {
-        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
-        System.ArgumentNullException.ThrowIfNull(hasExpressionBody, nameof(hasExpressionBody));
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (expected.IsDefault)
+        { throw new ArgumentNullException(nameof(expected)); }
+        if (hasExpressionBody.IsDefault)
+        { throw new ArgumentNullException(nameof(hasExpressionBody)); }
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
@@ -120,7 +124,7 @@ public sealed class FrontendSourceReplayTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal).ToArray();
+            .OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal).ToImmutableArray();
         Assert.That(methods.Length, Is.EqualTo(inputs.Length));
         var context = new AssemblyLoadContext("FrontendSourceReplayPremise", isCollectible: true);
         try
@@ -143,9 +147,9 @@ public sealed class FrontendSourceReplayTests
                     BindingFlags.Public | BindingFlags.Static);
                 Assert.That(compiled, Is.Not.Null);
                 var input = inputs[index];
-                object?[] arguments = [input.Left, input.Right, input.Condition,
+                ImmutableArray<object?> arguments = [input.Left, input.Right, input.Condition,
                     input.Text, input.Values, input.Reference];
-                Assert.That(compiled!.Invoke(null, arguments), Is.EqualTo(expected[index]));
+                Assert.That(compiled!.Invoke(null, arguments.ToArray()), Is.EqualTo(expected[index]));
             }
         }
         finally

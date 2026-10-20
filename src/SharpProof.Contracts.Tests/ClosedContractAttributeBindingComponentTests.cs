@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,9 +9,9 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ClosedContractAttributeBindingComponentTests
 {
-    private static readonly IrExecutionSemantics[] Modes = [IrExecutionSemantics.Legacy, IrExecutionSemantics.Total];
-    private static readonly string[] ExpectedDiagnostics = ["[Positive] count", "[InRange(1L, 3L)] count"];
-    private static readonly long[] Inputs = [-1L, 2L, 4L];
+    private static readonly ImmutableArray<IrExecutionSemantics> Modes = [IrExecutionSemantics.Legacy, IrExecutionSemantics.Total];
+    private static readonly ImmutableArray<string> ExpectedDiagnostics = ["[Positive] count", "[InRange(1L, 3L)] count"];
+    private static readonly ImmutableArray<long> Inputs = [-1L, 2L, 4L];
     [Test]
     public void ValidCompilerAttributesProjectInSourceOrderAndKeepPredicateMeaning()
     {
@@ -25,7 +26,7 @@ public sealed class ClosedContractAttributeBindingComponentTests
             var variable = factory.CreateVariable("count", factory.IntegerType);
             var value = factory.Variable(variable);
             var valueRequests = 0;
-            var operationSites = new List<SyntaxNode?>();
+            var operationSiteBuilder = ImmutableArray.CreateBuilder<SyntaxNode?>();
             var result = ClosedContractAttributeBinding.BindValue(
                 factory,
                 api.Selections,
@@ -42,9 +43,10 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 total: semantics == IrExecutionSemantics.Total,
                 syntax =>
                 {
-                    operationSites.Add(syntax);
+                    operationSiteBuilder.Add(syntax);
                     return factory.CreateOperation("held-attribute");
                 });
+            var operationSites = operationSiteBuilder.ToImmutable();
 
             Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
             Assert.That(result.Clauses, Has.Length.EqualTo(2));
@@ -53,16 +55,13 @@ public sealed class ClosedContractAttributeBindingComponentTests
             Assert.That(result.Clauses.All(static clause => clause.Kind == BoundContractKind.Requires), Is.True);
             Assert.That(result.Clauses.All(static clause => clause.SourceSyntax is not null), Is.True);
             Assert.That(valueRequests, Is.EqualTo(2));
-            Assert.That(operationSites, Has.Count.EqualTo(2));
+            Assert.That(operationSites, Has.Length.EqualTo(2));
             Assert.That(operationSites.All(static syntax => syntax is not null), Is.EqualTo(semantics == IrExecutionSemantics.Total));
 
             var interpreter = new IrInterpreter(factory);
             foreach (var input in Inputs)
             {
-                var values = new Dictionary<IrVarId, IrValue>
-                {
-                    [variable] = factory.CreateIntegerValue(factory.IntegerType, input)
-                };
+                var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, input));
                 Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, values).Value!.Boolean,
                     Is.EqualTo(input > 0));
                 Assert.That(interpreter.Evaluate(result.Clauses[1].Condition, values).Value!.Boolean,
@@ -108,10 +107,10 @@ public sealed class ClosedContractAttributeBindingComponentTests
             Assert.That(result.Clauses[0].SourceSyntax, Is.Not.Null);
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateNullValue(factory.StringType) }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateNullValue(factory.StringType))).Value!.Boolean,
                 Is.False);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateStringValue("present") }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateStringValue("present"))).Value!.Boolean,
                 Is.True);
         }
     }

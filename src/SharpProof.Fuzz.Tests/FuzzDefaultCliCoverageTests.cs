@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -26,8 +27,8 @@ public sealed class FuzzDefaultCliCoverageTests
         {
             var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
             Assert.That(entryPoint, Is.Not.Null);
-            string[] arguments = [];
-            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments]));
+            ImmutableArray<string> arguments = [];
+            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments.ToArray()]));
             exitCode = result switch
             {
                 Task<int> task => await task,

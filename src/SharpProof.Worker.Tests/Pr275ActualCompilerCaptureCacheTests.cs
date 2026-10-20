@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -18,11 +19,11 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
     {
         var compilation = TestCompilation.Create("Pr275ActualCaptureCache",
             Enumerable.Range(0, treeCount).Select(index =>
-                ($"Subject{index}.cs", $"public static class Subject{index} {{ public static int Value() => {index}; }}")).ToArray());
+                ($"Subject{index}.cs", $"public static class Subject{index} {{ public static int Value() => {index}; }}")).ToImmutableArray());
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
-        var trees = compilation.SyntaxTrees.ToArray();
+        var trees = compilation.SyntaxTrees;
         for (var ordinal = 0; ordinal < treeCount; ordinal++)
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, ordinal, out var length), Is.False);
@@ -35,7 +36,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
                 selectedOrdinal, trees[selectedOrdinal].GetText())
             : CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), Is.SameAs(captured));
-        Assert.That(captured, Has.Length.EqualTo(treeCount));
+        Assert.That(captured, Has.Count.EqualTo(treeCount));
         for (var ordinal = 0; ordinal < treeCount; ordinal++)
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, ordinal, out var length), Is.True);
@@ -44,7 +45,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
             Assert.That(captured[ordinal].Sha256,
                 Is.EqualTo(CompilerCompilationCapture.CaptureTree(trees[ordinal], TestContext.CurrentContext.CancellationToken).Sha256));
         }
-        foreach (var invalidOrdinal in new[] { -1, treeCount, int.MaxValue })
+        foreach (var invalidOrdinal in ImmutableArray.Create(-1, treeCount, int.MaxValue))
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, invalidOrdinal, out var length), Is.False);
             Assert.That(length, Is.Zero);
@@ -59,7 +60,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
     {
         var source = $"#line (10,2)-(10,80) {offset} \"original.dsl\"\n" +
             new string(' ', offset) + "public static class Subject { public static int Value() => 7; }\n#line default\n";
-        var compilation = TestCompilation.Create("Pr275ActualEnhancedLine", ("generated.cs", source));
+        var compilation = TestCompilation.CreateExact("Pr275ActualEnhancedLine", [("generated.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
@@ -86,7 +87,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "generated.cs");
         var compilation = CSharpCompilation.Create("Pr275ActualRejectedZeroOffset", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS8938"));
         Assert.That(errors[0].Location.SourceTree, Is.SameAs(tree));

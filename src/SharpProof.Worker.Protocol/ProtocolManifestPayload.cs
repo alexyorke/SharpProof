@@ -11,7 +11,7 @@ internal static partial class WorkerProtocolJson
         {
             SchemaVersion = manifest.SchemaVersion,
             Hash = string.Empty,
-            Callables = [.. (manifest.Callables ?? []).Select(static entry =>
+            Callables = [.. (EmptyIfDefault(manifest.Callables)).Select(static entry =>
                 entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry == null ? null! : new WorkerCallableManifestEntry
                 {
                     CallableId = entry.CallableId,
@@ -19,7 +19,7 @@ internal static partial class WorkerProtocolJson
                     SelectionReasons = entry.SelectionReasons,
                     Location = entry.Location,
                     ClaimIds = entry.ClaimIds,
-                    Assumptions = [.. (entry.Assumptions ?? []).Select(static assumption =>
+                    Assumptions = [.. (EmptyIfDefault(entry.Assumptions)).Select(static assumption =>
                         assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption == null ? null! : new WorkerAssumptionEvidence
                         {
                             Id = assumption.Id,

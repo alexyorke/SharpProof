@@ -148,13 +148,13 @@ public sealed class FuzzClosedDomainTests
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            object?[] arguments = [0L];
-            var runtimeResult = target!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [0L];
+            var runtimeResult = target!.Invoke(null, arguments.ToArray());
             var runtimeCompleted = runtimeResult is bool;
             Assert.That(runtimeCompleted, Is.True);
             Assert.That(runtimeResult, Is.TypeOf<bool>());
             Assert.That(runtimeResult, Is.EqualTo(true));
-            var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+            var scenarioBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
             foreach (var variable in IrTermAnalysis.CollectVariables(lowering.Term))
             {
                 var binding = lowering.Variables.Single(entry => entry.Variable == variable);
@@ -162,9 +162,10 @@ public sealed class FuzzClosedDomainTests
                 var parameter = (IParameterSymbol)binding.Symbol;
                 Assert.That(parameter.Ordinal, Is.Zero);
                 Assert.That(parameter.Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
-                scenario = scenario.Add(variable,
+                scenarioBuilder.Add(variable,
                     factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, (long)arguments[parameter.Ordinal]!));
             }
+            var scenario = scenarioBuilder.ToImmutable();
             var evaluated = new IrInterpreter(factory).Evaluate(lowering.Term, scenario);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
             Assert.That(evaluated.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.OpaqueTerm));
@@ -193,8 +194,8 @@ public sealed class FuzzClosedDomainTests
             Assert.That(trueRejection, Is.Null);
             Assert.That(await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
                 trueDomain!, trueFormula, TestContext.CurrentContext.CancellationToken), Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-            object?[] falseArguments = [-2L];
-            var falseRuntimeResult = target!.Invoke(null, falseArguments);
+            ImmutableArray<object?> falseArguments = [-2L];
+            var falseRuntimeResult = target!.Invoke(null, falseArguments.ToArray());
             Assert.That(falseRuntimeResult, Is.TypeOf<bool>());
             Assert.That(falseRuntimeResult, Is.EqualTo(false));
             var falseFormula = factory.Boolean((bool)falseRuntimeResult!);

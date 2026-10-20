@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -16,14 +17,12 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
         var index = factory.CreateVariable("index", factory.IntegerType);
         var text = factory.CreateVariable("text", factory.StringType);
         var other = factory.CreateVariable("other", factory.StringType);
-        var bindings = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [flag] = factory.CreateBooleanValue(flagValue),
-            [number] = factory.CreateIntegerValue(3),
-            [index] = factory.CreateIntegerValue(0),
-            [text] = factory.CreateStringValue("abc"),
-            [other] = factory.CreateStringValue("defg")
-        };
+        var bindingsBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        bindingsBuilder[flag] = factory.CreateBooleanValue(flagValue);
+        bindingsBuilder[number] = factory.CreateIntegerValue(3);
+        bindingsBuilder[index] = factory.CreateIntegerValue(0);
+        bindingsBuilder[text] = factory.CreateStringValue("abc");
+        bindingsBuilder[other] = factory.CreateStringValue("defg");
         var condition = factory.Variable(flag);
         var integer = factory.Variable(number);
         var sum = factory.Binary(IrBinaryOperator.Add, integer, factory.Integer(1));
@@ -35,12 +34,13 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
             var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
             var leftSequence = factory.CreateVariable("leftSequence", sequenceType);
             var rightSequence = factory.CreateVariable("rightSequence", sequenceType);
-            bindings[leftSequence] = factory.CreateSequenceValue(sequenceType,
+            bindingsBuilder[leftSequence] = factory.CreateSequenceValue(sequenceType,
                 [factory.CreateIntegerValue(4), factory.CreateIntegerValue(5), factory.CreateIntegerValue(6)]);
-            bindings[rightSequence] = factory.CreateSequenceValue(sequenceType,
+            bindingsBuilder[rightSequence] = factory.CreateSequenceValue(sequenceType,
                 [factory.CreateIntegerValue(7), factory.CreateIntegerValue(8), factory.CreateIntegerValue(9)]);
             accessSelection = factory.Conditional(condition, factory.Variable(leftSequence), factory.Variable(rightSequence));
         }
+        var bindings = bindingsBuilder.ToImmutable();
         var term = shape switch
         {
             "negate" => factory.Unary(IrUnaryOperator.Negate, sum),
@@ -99,11 +99,19 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
 
     private static IEnumerable<TestCaseData> NestedShapes()
     {
-        foreach (var shape in new[]
-                 {
-                     "negate", "not", "add", "comparison", "integer-conditional", "boolean-conditional",
-                     "string-conditional", "cast", "length", "sequence", "concat", "shared-dag"
-                 })
+        foreach (var shape in ImmutableArray.Create(
+            "negate",
+            "not",
+            "add",
+            "comparison",
+            "integer-conditional",
+            "boolean-conditional",
+            "string-conditional",
+            "cast",
+            "length",
+            "sequence",
+            "concat",
+            "shared-dag"))
         {
             yield return new TestCaseData(shape, false);
             yield return new TestCaseData(shape, true);

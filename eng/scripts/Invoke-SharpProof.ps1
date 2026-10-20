@@ -15,7 +15,8 @@ $gitDirectory = & git -C $repositoryRoot rev-parse --absolute-git-dir
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve Git checkout metadata.' }
 $commonDirectory = (Resolve-Path -LiteralPath $commonDirectory).Path
 $gitDirectory = (Resolve-Path -LiteralPath $gitDirectory).Path
-$arguments = @('compose', '--project-directory', $repositoryRoot, 'run', '--rm')
+$arguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$arguments.AddRange([string[]]@('compose', '--project-directory', $repositoryRoot, 'run', '--rm'))
 $pointerPath = $null
 try {
     if ($gitDirectory -ne $commonDirectory) {
@@ -27,20 +28,22 @@ try {
         $relative = $gitDirectory.Substring($commonPrefix.Length).Replace('\', '/')
         $pointerPath = [IO.Path]::GetTempFileName()
         [IO.File]::WriteAllText($pointerPath, "gitdir: /git-common/$relative`n", [Text.UTF8Encoding]::new($false))
-        $arguments += @('--volume', "${commonDirectory}:/git-common:ro",
-            '--volume', "${pointerPath}:/workspace/SharpProof/.git:ro")
+        $arguments.AddRange([string[]]@('--volume', "${commonDirectory}:/git-common:ro",
+                '--volume', "${pointerPath}:/workspace/SharpProof/.git:ro"))
     }
     $service = if ($ToolingArguments[0] -eq 'lint') { 'lint' } else { 'tooling' }
     if ($service -eq 'lint') {
         if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
-            $arguments += @('--env', 'GITHUB_TOKEN')
+            $arguments.AddRange([string[]]@('--env', 'GITHUB_TOKEN'))
         }
         # Older Compose releases lose additional service contexts in run --build.
         & docker compose --project-directory $repositoryRoot build lint
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
-    $arguments += @($service) + $ToolingArguments
-    & docker @arguments
+    $arguments.Add($service)
+    $arguments.AddRange($ToolingArguments)
+    [string[]]$nativeArguments = @($arguments.ToImmutable())
+    & docker @nativeArguments
     $toolingExitCode = $LASTEXITCODE
 }
 finally {

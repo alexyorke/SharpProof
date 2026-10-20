@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
@@ -84,12 +85,12 @@ public sealed class CompilerCaptureInputWorkflowTests
             compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.NetModule));
             var image = AnalyzerTestHost.EmitImage(compilation);
             var path = Path.Combine(directory, "CaptureModule.netmodule");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, (image).ToArray());
             var reference = MetadataReference.CreateFromImage(image,
                 new MetadataReferenceProperties(MetadataImageKind.Module), filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single();
-            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var module = captured.Modules.Single();
             using (Assert.EnterMultipleScope())
@@ -101,7 +102,7 @@ public sealed class CompilerCaptureInputWorkflowTests
                 Assert.That(module.Path, Is.EqualTo(Path.GetFullPath(path)));
                 Assert.That(module.SizeBytes, Is.EqualTo(image.Length));
                 Assert.That(module.Mvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
-                Assert.That(module.Sha256, Is.EqualTo(SharpProof.Ir.HashEncoding.ToLowerHex(SHA256.HashData(image))));
+                Assert.That(module.Sha256, Is.EqualTo(SharpProof.Ir.HashEncoding.ToLowerHex(SHA256.HashData((image).AsSpan()))));
             }
         }
         finally
