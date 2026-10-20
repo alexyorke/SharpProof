@@ -107,8 +107,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             cases = ObserveCases(form, target, control);
             var flags = target.GetMethodImplementationFlags();
             var controlFlags = control.GetMethodImplementationFlags();
-            var il = target.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = target.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             await Save(evidenceDirectory, form + "-runtime.json", new
             {
                 Form = form,
@@ -127,7 +127,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
                 HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
                 HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
                 TieredCompilation = Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"),

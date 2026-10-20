@@ -106,8 +106,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
             control = Measure(form + "/typed-control", typedControl, expected: true);
             var flags = generic.GetMethodImplementationFlags();
             var controlFlags = controlMethod.GetMethodImplementationFlags();
-            var il = generic.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = generic.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
             var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
             await Save(evidenceDirectory, form + "-runtime.json", new
@@ -128,7 +128,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
                 HasBox = hasBox,
                 HasIsinst = hasIsinst,
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Target = measured,
                 Control = control,

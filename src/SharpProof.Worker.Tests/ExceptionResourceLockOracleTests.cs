@@ -19,8 +19,8 @@ public sealed class ExceptionResourceLockOracleTests
 ))
         {
             var method = resources.GetMethod(name, flags)!;
-            var body = method.GetMethodBody()!.GetILAsByteArray()!;
-            Assert.That(Convert.ToHexString(SHA256.HashData(body)), Is.EqualTo(digest), name);
+            var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            Assert.That(Convert.ToHexString(SHA256.HashData(body.AsSpan())), Is.EqualTo(digest), name);
         }
     }
 

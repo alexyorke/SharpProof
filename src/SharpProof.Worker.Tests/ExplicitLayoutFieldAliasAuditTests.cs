@@ -95,8 +95,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             var written = cellType.GetField("Written", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
             var target = subjectType.GetMethod("Target", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var constructor = cellType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
-            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(OperatingSystem.IsLinux(), Is.True);
@@ -127,9 +127,9 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
                 Assert.That(observed.IsInitOnly, Is.EqualTo(settings.ReadOnlyObserved));
                 Assert.That(written.IsInitOnly, Is.False);
             }
-            var storedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 3))!;
-            var returnedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 9))!;
-            var baseConstructor = constructor.Module.ResolveMethod(BitConverter.ToInt32(constructorIl, 2))!;
+            var storedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl.AsSpan((3)..)))!;
+            var returnedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl.AsSpan((9)..)))!;
+            var baseConstructor = constructor.Module.ResolveMethod(BitConverter.ToInt32(constructorIl.AsSpan((2)..)))!;
             using var pe = new PEReader(imageBytes);
             var metadata = pe.GetMetadataReader();
             var cellHandle = MetadataTokens.TypeDefinitionHandle(cellType.MetadataToken & 0x00ffffff);
@@ -214,8 +214,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
                 WrittenWidthBytes = sizeof(int),
                 ObservedInitOnly = observed.IsInitOnly,
                 WrittenInitOnly = written.IsInitOnly,
-                TargetIl = Convert.ToHexStringLower(targetIl),
-                ConstructorIl = Convert.ToHexStringLower(constructorIl),
+                TargetIl = Convert.ToHexStringLower(targetIl.AsSpan()),
+                ConstructorIl = Convert.ToHexStringLower(constructorIl.AsSpan()),
                 StoreIlOffset = 2,
                 ReadIlOffset = 8,
                 InitialObserved = initialObserved,

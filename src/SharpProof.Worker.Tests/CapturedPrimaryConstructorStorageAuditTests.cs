@@ -514,7 +514,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
         }
         System.ArgumentNullException.ThrowIfNull(method);
-        var body = method.GetMethodBody()!.GetILAsByteArray()!;
+        var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
         using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
@@ -533,15 +533,15 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 OperandType.ShortInlineI or OperandType.ShortInlineVar or OperandType.ShortInlineBrTarget => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body.AsSpan((offset)..)),
                 _ => 4
             };
-            FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
+            FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body.AsSpan((offset)..))) : null;
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset..(offset + size))),
                 field?.MetadataToken, field?.Module.ModuleVersionId, field?.DeclaringType?.FullName, field?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), instructions.ToImmutable());
+        return new(method.MetadataToken, Convert.ToHexStringLower(body.AsSpan()), instructions.ToImmutable());
     }
 
     private static IEnumerable<IOperation> Walk(IOperation operation)

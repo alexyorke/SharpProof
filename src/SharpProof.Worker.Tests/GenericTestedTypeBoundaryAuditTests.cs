@@ -79,8 +79,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
             cases = ObserveCases(boundary, target, control);
             var targetFlags = target.GetMethodImplementationFlags();
             var controlFlags = control.GetMethodImplementationFlags();
-            var il = target.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = target.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             await Save(evidenceDirectory, boundary + "-runtime.json", new
             {
                 Boundary = boundary,
@@ -98,7 +98,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
                 TargetNoOptimization = (targetFlags & MethodImplAttributes.NoOptimization) != 0,
                 HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
                 HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
                 TieredCompilation = Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"),

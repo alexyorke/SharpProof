@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -31,7 +32,7 @@ public sealed class OrdinaryLongBranchAllocationWorkflowTests
             var assembly = context.LoadFromStream(image);
             var method = assembly.GetType("ScalarBody", throwOnError: true)!.GetMethod("Read")!;
             var body = method.GetMethodBody()!;
-            var bytes = body.GetILAsByteArray()!;
+            var bytes = body.GetILAsByteArray()!.ToImmutableArray();
             var arguments = new object[] { seed };
 
             using (Assert.EnterMultipleScope())

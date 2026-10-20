@@ -70,7 +70,7 @@ public sealed class OptionalDefaultBoxingAuditTests
             var boundaryType = runtime.LoadFromStream(boundaryImage).GetType("Boundary")!;
             var echoMethod = boundaryType.GetMethod("Echo")!;
             var echo = echoMethod.CreateDelegate<Func<object, object>>();
-            var calleeIl = echoMethod.GetMethodBody()!.GetILAsByteArray()!;
+            var calleeIl = echoMethod.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
             Assert.That(calleeIl, Is.EqualTo(ImmutableArray.Create<byte>(0x02, 0x2A)), "Reviewed callee must only return its supplied reference.");
             var sentinel = new object();
             var calleeControl = Measure(() => echo(sentinel));
@@ -78,13 +78,13 @@ public sealed class OptionalDefaultBoxingAuditTests
             Assert.That(calleeControl.Bytes, Is.Zero, "The identity callee itself must allocate nothing.");
             var targetMethod = runtime.LoadFromStream(callerImage).GetType("Subject")!.GetMethod("Target")!;
             var target = targetMethod.CreateDelegate<Func<object?>>();
-            var callerIl = targetMethod.GetMethodBody()!.GetILAsByteArray()!;
+            var callerIl = targetMethod.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
             var boxOffset = scenario == "default-int" ? 1 : 9;
             var callOffset = allocates ? boxOffset + 5 : 1;
             if (allocates)
             {
                 Assert.That(callerIl[boxOffset], Is.EqualTo((byte)OpCodes.Box.Value));
-                var boxedType = targetMethod.Module.ResolveType(BitConverter.ToInt32(callerIl, boxOffset + 1));
+                var boxedType = targetMethod.Module.ResolveType(BitConverter.ToInt32(callerIl.AsSpan((boxOffset + 1)..)));
                 Assert.That(boxedType, Is.EqualTo(scenario == "default-int" ? typeof(int) : typeof(double)));
                 var first = target();
                 var second = target();
@@ -95,7 +95,7 @@ public sealed class OptionalDefaultBoxingAuditTests
                 Assert.That(callerIl[0], Is.EqualTo((byte)OpCodes.Ldnull.Value));
             }
             Assert.That(callerIl[callOffset], Is.EqualTo((byte)OpCodes.Call.Value));
-            Assert.That(targetMethod.Module.ResolveMethod(BitConverter.ToInt32(callerIl, callOffset + 1)), Is.EqualTo(echoMethod));
+            Assert.That(targetMethod.Module.ResolveMethod(BitConverter.ToInt32(callerIl.AsSpan((callOffset + 1)..))), Is.EqualTo(echoMethod));
             Assert.That(callerIl[callOffset + 5], Is.EqualTo((byte)OpCodes.Ret.Value));
             Assert.That(callerIl.Length, Is.EqualTo(callOffset + 6));
             var measured = Measure(target);
@@ -109,8 +109,8 @@ public sealed class OptionalDefaultBoxingAuditTests
                 Assert.That(measured.Bytes, Is.Zero);
                 Assert.That(measured.Value, Is.Null);
             }
-            await TestContext.Progress.WriteLineAsync("scenario=" + scenario + "; calleeIL=" + Convert.ToHexString(calleeIl) +
-                "; callerIL=" + Convert.ToHexString(callerIl) + "; callee32=" + calleeControl.Bytes + "; caller32=" + measured.Bytes);
+            await TestContext.Progress.WriteLineAsync("scenario=" + scenario + "; calleeIL=" + Convert.ToHexString(calleeIl.AsSpan()) +
+                "; callerIL=" + Convert.ToHexString(callerIl.AsSpan()) + "; callee32=" + calleeControl.Bytes + "; caller32=" + measured.Bytes);
         }
         finally
         {

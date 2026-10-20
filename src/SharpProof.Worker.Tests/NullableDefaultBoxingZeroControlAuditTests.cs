@@ -310,7 +310,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     private static IlObservation DescribeIl(MethodInfo method)
     {
         System.ArgumentNullException.ThrowIfNull(method);
-        var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
+        var bytes = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
         var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
@@ -327,24 +327,24 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.AsSpan((offset)..)),
                 _ => 4
             };
             if (offset + size > bytes.Length)
             { throw new InvalidOperationException("Truncated emitted IL operand."); }
             var operand = code.OperandType switch
             {
-                OperandType.InlineMethod => method.Module.ResolveMethod(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes, offset)).ToString(),
-                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
+                OperandType.InlineMethod => method.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
+                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes.AsSpan((offset)..))).ToString(),
+                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
+                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes.AsSpan((offset)..)))?.ToString(),
                 _ => null
             };
             rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutable());
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes.AsSpan()), rows.ToImmutable());
     }
     private sealed record MeasurementObservation(int Round, long SubjectBytes, bool SubjectNull,
         long BeforeBytes, bool BeforeNull, long AfterBytes, bool AfterNull, long IdentityBytes, bool IdentityNull);

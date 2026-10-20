@@ -490,7 +490,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
         }
         System.ArgumentNullException.ThrowIfNull(method);
-        var body = method.GetMethodBody()!.GetILAsByteArray()!;
+        var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
         using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
@@ -509,15 +509,15 @@ public sealed class EmptyIteratorAllocationAuditTests
                 OperandType.ShortInlineI or OperandType.ShortInlineVar or OperandType.ShortInlineBrTarget => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body.AsSpan((offset)..)),
                 _ => 4
             };
-            var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
+            var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body.AsSpan((offset)..))) : null;
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset..(offset + size))), called?.MetadataToken,
                 called?.Module.ModuleVersionId, called?.DeclaringType?.FullName, called?.DeclaringType?.MetadataToken, called?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), instructions.ToImmutable());
+        return new(method.MetadataToken, Convert.ToHexStringLower(body.AsSpan()), instructions.ToImmutable());
     }
 
     private static object DiagnosticObservation(Diagnostic diagnostic)

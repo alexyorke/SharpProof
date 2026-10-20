@@ -66,8 +66,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
             var interfaceTarget = generic.MakeGenericMethod(typeof(int), typeof(IComparable)).CreateDelegate<Func<int, bool>>();
             var stringTarget = generic.MakeGenericMethod(typeof(int), typeof(string)).CreateDelegate<Func<int, bool>>();
             var controlTarget = subject.GetMethod("Control")!.CreateDelegate<Func<int, bool>>();
-            var il = generic.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = generic.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             cases =
             [
                 Measure("int/object", objectTarget, expected: true),
@@ -91,7 +91,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 NoInlining = noInlining,
                 HasBox = hasBox,
                 HasIsinst = hasIsinst,
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
                 Control = control,
