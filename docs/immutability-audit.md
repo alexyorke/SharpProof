@@ -4933,3 +4933,7 @@ Literal/source-unit gates verify 4299/1068 and 1948. Two current coordinates and
 ### IMM-M494: direct reflection and assembly-load adapter review
 
 Ten current MethodInfo.Invoke or Assembly.Load calls are individually traced with their supplied frame and adjacent producer. Immutable argument/image evidence or native emitted-image producers retain only final runtime-required object/byte-array frames. No mutable observation owner is published. This role review changes no code and claims no new execution or historical transfer. The old array subset has 201 unchecked candidates; Final expanded reflection/binding collection remain pending.
+
+### IMM-M495: preserve actual reference-array and payload-corruption subjects
+
+Six typed-reference fixture sites are the actual compiled CLR array/index/length/identity subjects, including deliberately distinct clones and shared aliases. Their native types and object identity must remain intact. Two Linux/macOS contract images are deliberately extended or XOR-modified before size/digest rejection. These eight direct subject traces change no code and claim no new execution, including macOS platform execution. The old array subset has 193 unchecked candidates; final coverage/binding/reflection/compiler collection, ownership/archive and exact-head gates remain pending.
