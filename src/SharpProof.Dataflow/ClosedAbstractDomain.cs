@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Provides shared operations for SharpProof's closed abstract domains.
 /// </summary>
-public abstract class ClosedAbstractDomain<T> : IAbstractDomain<T>
+internal abstract class ClosedAbstractDomain<T> : IAbstractDomain<T>
 {
     public abstract T Bottom
     {

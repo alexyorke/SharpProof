@@ -5,14 +5,14 @@ using SharpProof.Verify;
 
 namespace SharpProof.Fuzz;
 
-public enum PartialTermSemanticOutcome
+internal enum PartialTermSemanticOutcome
 {
     DefinedTrue,
     DefinedFalse,
     Undefined
 }
 
-public sealed record PartialTermSmtDifferentialResult(
+internal sealed record PartialTermSmtDifferentialResult(
     FuzzOracleStatus Status,
     int ScenarioCount,
     int DefinedTrueCount,
@@ -23,7 +23,7 @@ public sealed record PartialTermSmtDifferentialResult(
     public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-public sealed record PartialTermSmtCase(
+internal sealed record PartialTermSmtCase(
     IrTerm Formula,
     IrTerm NormalCompletion,
     ImmutableArray<ImmutableDictionary<IrVarId, IrValue>> Scenarios,
@@ -35,7 +35,7 @@ public sealed record PartialTermSmtCase(
     public ImmutableArray<PartialTermSemanticOutcome> ExpectedOutcomes { get; init; } = ExpectedOutcomes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(ExpectedOutcomes)) : ExpectedOutcomes;
 }
 
-public static class PartialTermSmtCaseGenerator
+internal static class PartialTermSmtCaseGenerator
 {
     public static PartialTermSmtCase Create(
         IrFactory factory,
@@ -137,7 +137,7 @@ public static class PartialTermSmtCaseGenerator
     }
 }
 
-public static class PartialTermSmtDifferentialOracle
+internal static class PartialTermSmtDifferentialOracle
 {
     public static async Task<PartialTermSmtDifferentialResult> CompareAsync(
         IrFactory factory,

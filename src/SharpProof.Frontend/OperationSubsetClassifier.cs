@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public static class OperationSubsetClassifier
+internal static class OperationSubsetClassifier
 {
     private static readonly ImmutableArray<OperationKind> s_knownOperationKinds =
         [.. Enum.GetValues(typeof(OperationKind))

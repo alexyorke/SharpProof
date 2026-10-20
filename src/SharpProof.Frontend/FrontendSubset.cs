@@ -1,13 +1,13 @@
 namespace SharpProof.Frontend;
 
-public enum FrontendSubsetDecision
+internal enum FrontendSubsetDecision
 {
     Unspecified = 0,
     Exact = 1,
     ClosedAbstention = 2
 }
 
-public enum FrontendAbstention
+internal enum FrontendAbstention
 {
     None,
     UnsupportedOperationKind,
@@ -63,7 +63,7 @@ internal static class FrontendAbstentionValidation
     }
 }
 
-public readonly struct FrontendSubsetClassification
+internal readonly struct FrontendSubsetClassification
 {
     public FrontendSubsetClassification(
         FrontendSubsetDecision decision,
@@ -114,7 +114,7 @@ public readonly struct FrontendSubsetClassification
     }
 }
 
-public readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variable)
+internal readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variable)
 {
     public ISymbol Symbol
     {
@@ -123,7 +123,7 @@ public readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variable)
     public IrVarId Variable { get; } = (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : variable);
 }
 
-public sealed partial class FrontendLoweringResult
+internal sealed partial class FrontendLoweringResult
 {
     internal FrontendLoweringResult(
         IrTerm term,
@@ -139,7 +139,7 @@ public sealed partial class FrontendLoweringResult
     public bool IsExact => Classification.IsExact;
 }
 
-public readonly struct FrontendProgramAbstention
+internal readonly struct FrontendProgramAbstention
 {
     public FrontendProgramAbstention(
         OperationId operation,
@@ -175,7 +175,7 @@ public readonly struct FrontendProgramAbstention
     }
 }
 
-public sealed partial class FrontendProgramLoweringResult
+internal sealed partial class FrontendProgramLoweringResult
 {
     internal bool SourceInitializationEffectsComplete { get; set; } = true;
     internal bool ConstructionLimitExceeded { get; set; }

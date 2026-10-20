@@ -1,6 +1,6 @@
 namespace SharpProof.Verify;
 
-public enum ProofDiagnosticKind
+internal enum ProofDiagnosticKind
 {
     EffectContract,
     Precondition,
@@ -8,7 +8,7 @@ public enum ProofDiagnosticKind
     InternalConsistency
 }
 
-public readonly record struct SourceLocationId
+internal readonly record struct SourceLocationId
 {
     public SourceLocationId(int value)
     {
@@ -26,24 +26,14 @@ public readonly record struct SourceLocationId
     }
 }
 
-public abstract class ProofJustification
+internal abstract class ProofJustification
 {
     private protected ProofJustification()
     {
     }
 }
 
-public sealed class SpecJustification(SpecId spec) : ProofJustification
-{
-    public SpecId Spec
-    {
-        get;
-    } = !spec.IsDefault
-        ? spec
-        : throw new ArgumentException("A non-default spec identifier is required.", nameof(spec));
-}
-
-public sealed class LoweredJustification(OperationId operation) : ProofJustification
+internal sealed class LoweredJustification(OperationId operation) : ProofJustification
 {
     public OperationId Operation
     {
@@ -53,12 +43,12 @@ public sealed class LoweredJustification(OperationId operation) : ProofJustifica
         : throw new ArgumentException("A non-default operation identifier is required.", nameof(operation));
 }
 
-public sealed class UserAssumedJustification(SourceLocationId location /* SPINT001: all values valid - every location index, including zero, is valid */) : ProofJustification
+internal sealed class UserAssumedJustification(SourceLocationId location /* SPINT001: all values valid - every location index, including zero, is valid */) : ProofJustification
 {
     public SourceLocationId Location { get; } = location;
 }
 
-public sealed class Assumption
+internal sealed class Assumption
 {
     public Assumption(
         IrFactory factory,
@@ -80,7 +70,7 @@ public sealed class Assumption
     }
 }
 
-public sealed partial class Goal
+internal sealed partial class Goal
 {
     public static Goal CreateInternalConsistency(IrFactory factory)
     {

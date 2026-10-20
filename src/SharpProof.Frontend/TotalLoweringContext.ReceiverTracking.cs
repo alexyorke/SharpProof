@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly HashSet<ISymbol> _entryNullableDefaultComparers = new(SymbolEqualityComparer.Default);
     private readonly HashSet<ISymbol> _nullableDefaultComparers = new(SymbolEqualityComparer.Default);

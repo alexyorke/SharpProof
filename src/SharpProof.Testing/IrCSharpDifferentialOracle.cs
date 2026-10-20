@@ -9,14 +9,14 @@ using SharpProof.Ir;
 
 namespace SharpProof.Testing;
 
-public enum DifferentialStatus
+internal enum DifferentialStatus
 {
     Agreement,
     Abstained,
     Mismatch
 }
 
-public sealed record DifferentialResult(
+internal sealed record DifferentialResult(
     DifferentialStatus Status,
     IrEvaluationResult Interpreted,
     string Detail)
@@ -25,7 +25,7 @@ public sealed record DifferentialResult(
     public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-public sealed class IrCSharpDifferentialOracle
+internal sealed class IrCSharpDifferentialOracle
 {
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(

@@ -1,7 +1,7 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectCapabilitySetValidationTests
+internal sealed class EffectCapabilitySetValidationTests
 {
     [TestCaseSource(nameof(PartialUnknownKinds))]
     public void ConstructorRejectsPartialUnknownKinds(EffectCapabilityKind kinds)

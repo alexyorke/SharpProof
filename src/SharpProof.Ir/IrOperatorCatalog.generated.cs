@@ -6,7 +6,7 @@
 
 namespace SharpProof.Ir;
 
-public enum IrTypeKind
+internal enum IrTypeKind
 {
     Boolean = 0,
     Integer = 1,
@@ -15,13 +15,13 @@ public enum IrTypeKind
     Sequence = 4
 }
 
-public enum IrUnaryOperator
+internal enum IrUnaryOperator
 {
     Not = 0,
     Negate = 1
 }
 
-public enum IrBinaryOperator
+internal enum IrBinaryOperator
 {
     Add = 0,
     Subtract = 1,

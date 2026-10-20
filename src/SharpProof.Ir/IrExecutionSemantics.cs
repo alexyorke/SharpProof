@@ -1,13 +1,13 @@
 namespace SharpProof.Ir;
 
 // Legacy remains the authority during the dual-pipeline migration.
-public enum IrExecutionSemantics
+internal enum IrExecutionSemantics
 {
     Legacy = 0,
     Total = 1
 }
 
-public sealed class IrSourceSpan
+internal sealed class IrSourceSpan
 {
     // Line and column are one-based display positions; zero means unknown.
     public IrSourceSpan(string document, int start, int length, int line = 0, int column = 0)
@@ -94,14 +94,14 @@ internal static class IrCallPreconditionMarker
     { return value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
 }
 
-public enum IrHavocOrigin
+internal enum IrHavocOrigin
 {
     Input = 0,
     SpecResult = 1,
     Approximation = 2
 }
 
-public sealed class IrHavocRequest(
+internal sealed class IrHavocRequest(
     IrInstructionId instruction, OperationId site, IrVarId variable,
     int occurrence, IrHavocOrigin origin)
 {
@@ -112,7 +112,7 @@ public sealed class IrHavocRequest(
     public IrHavocOrigin Origin { get; } = origin;
 }
 
-public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
+internal sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
     internal ImmutableHashSet<IrVarId> SnapshotVariables { get; set; } = [];
     // Only a trusted replay host may replace an approximation with an observed framework value.

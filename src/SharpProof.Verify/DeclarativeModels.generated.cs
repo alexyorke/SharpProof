@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Verify;
 
-public sealed partial class BackendModel
+internal sealed partial class BackendModel
 {
     internal readonly struct StorageTag
     {
@@ -17,7 +17,7 @@ public sealed partial class BackendModel
     public ImmutableDictionary<IrVarId, IrValue> Assignments { get; }
 }
 
-public sealed partial class Goal
+internal sealed partial class Goal
 {
     internal readonly struct StorageTag
     {
@@ -33,7 +33,7 @@ public sealed partial class Goal
     public SourceLocationId Location { get; }
 }
 
-public sealed partial class BackendCheckResult
+internal sealed partial class BackendCheckResult
 {
     internal readonly struct StorageTag
     {
@@ -57,7 +57,7 @@ public sealed partial class BackendCheckResult
     public BackendFailureReason FailureReason { get; }
 }
 
-public sealed partial class ProvenOutcome : ProofOutcome
+internal sealed partial class ProvenOutcome : ProofOutcome
 {
     internal ProvenOutcome(ImmutableArray<ProofJustification> core)
     {
@@ -66,7 +66,7 @@ public sealed partial class ProvenOutcome : ProofOutcome
     public ImmutableArray<ProofJustification> Core { get; }
 }
 
-public sealed partial class ValidatedModel
+internal sealed partial class ValidatedModel
 {
     internal ValidatedModel(ImmutableDictionary<IrVarId, IrValue> assignments)
     {
@@ -75,7 +75,7 @@ public sealed partial class ValidatedModel
     public ImmutableDictionary<IrVarId, IrValue> Assignments { get; }
 }
 
-public sealed partial class RefutedOutcome : ProofOutcome
+internal sealed partial class RefutedOutcome : ProofOutcome
 {
     internal RefutedOutcome(ValidatedModel model)
     {
@@ -84,7 +84,7 @@ public sealed partial class RefutedOutcome : ProofOutcome
     public ValidatedModel Model { get; }
 }
 
-public sealed partial class UnknownOutcome : ProofOutcome
+internal sealed partial class UnknownOutcome : ProofOutcome
 {
     internal UnknownOutcome(AbstentionReason reason)
     {

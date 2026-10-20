@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Compiler.Semantics\SharpProof.Compiler.Semantics.csproj" />
+    <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />

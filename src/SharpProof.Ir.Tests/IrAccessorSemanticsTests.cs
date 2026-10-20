@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrAccessorSemanticsTests
+internal sealed class IrAccessorSemanticsTests
 {
     [TestCase(true, 17L)]
     [TestCase(false, 23L)]

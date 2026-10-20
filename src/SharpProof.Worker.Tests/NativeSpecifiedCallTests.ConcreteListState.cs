@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("Contract.Requires(data != null); var before = data.Count; return data.Count - before;", 0)]
     [TestCase("Contract.Requires(data != null && data.Count > 0); data[0] = 17; return data[0];", 17)]

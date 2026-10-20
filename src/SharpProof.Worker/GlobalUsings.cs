@@ -7,7 +7,6 @@ global using System.Security.Cryptography;
 global using System.Text;
 global using System.Text.Json;
 global using SharpProof.CompilerArtifact;
-global using SharpProof.Dataflow;
 global using SharpProof.Ir;
 global using SharpProof.Smt;
 global using SharpProof.Specs;

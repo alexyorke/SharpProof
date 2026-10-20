@@ -3,7 +3,7 @@ using System.Reflection;
 namespace SharpProof.Verify.Test;
 
 [TestFixture]
-public sealed class ProofKernelTests
+internal sealed class ProofKernelTests
 {
     [Test]
     public async Task UnsatCreatesAProvenOutcomeWithOnlyRequestedEvidence()

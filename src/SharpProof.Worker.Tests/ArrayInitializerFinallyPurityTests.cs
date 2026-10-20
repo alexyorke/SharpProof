@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Test;
 // a finally write on both the normal return and the index-throwing path.
 [TestFixture]
 [NonParallelizable]
-public sealed class ArrayInitializerFinallyPurityTests
+internal sealed class ArrayInitializerFinallyPurityTests
 {
     private const string DynamicArray = "new[] { y, -2, 3, 5 }[y & 7]";
 

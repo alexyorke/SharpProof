@@ -1,6 +1,6 @@
 namespace SharpProof.Effects;
 
-public static class EffectSummaryProjector
+internal static class EffectSummaryProjector
 {
     public static EffectProjection Project(EffectSummary summary)
     {

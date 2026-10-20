@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public sealed class ContractClauseInventoryBuilder(Compilation compilation)
+internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
 {
     private static readonly ConditionalWeakTable<Compilation, ContractClauseInventoryBuilder> Cache = new();
     private readonly Compilation _compilation =

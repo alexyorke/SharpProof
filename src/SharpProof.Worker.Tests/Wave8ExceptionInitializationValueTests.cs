@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ExceptionInitializationValueTests
+internal sealed class Wave8ExceptionInitializationValueTests
 {
     [TestCase("user-conversion-fault", false)]
     [TestCase("user-conversion-fault", true)]

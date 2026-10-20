@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.List<int>(); data.Insert(0, 17); return data.Count * 100 + data[0];", 117)]
     [TestCase("var data = new System.Collections.Generic.List<int>(); data.Add(11); data.Add(23); data.Insert(0, 17); return data.Count * 1000 + data[0] * 100 + data[1] * 10 + data[2];", 4833)]

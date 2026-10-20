@@ -2,14 +2,14 @@ namespace SharpProof.Frontend;
 
 // A callable input: its value on entry, its current storage and its Old
 // snapshot.
-public sealed class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
+internal sealed class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
 {
     public IrVarId Entry { get; } = (entry.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(entry)) : entry);
     public IrVarId Current { get; } = (current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : current);
     public IrVarId PreState { get; } = (preState.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(preState)) : preState);
 }
 
-public sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId entry, IrVarId current, IrVarId preState)
+internal sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId entry, IrVarId current, IrVarId preState)
 {
     public TotalInputBinding Input { get; } = new(
         entry.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(entry)) : entry,
@@ -48,7 +48,7 @@ internal readonly struct TotalCallPrecondition(string calleeIdentity, int clause
     internal TotalMetadataPrecondition? MetadataClause { get; } = metadataClause;
 }
 
-public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
+internal sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
 {
     public IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
     public IrTerm SafeCondition { get; } = (safeCondition ?? throw new System.ArgumentNullException(nameof(safeCondition)));
@@ -57,7 +57,7 @@ public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, Fronte
 
 // One callable context is shared by its body and clauses. Entry values are
 // immutable inputs; current parameter storage and Old snapshots remain distinct.
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly RoslynTypeMapper _types;
     private readonly Func<SyntaxTree, string> _document;

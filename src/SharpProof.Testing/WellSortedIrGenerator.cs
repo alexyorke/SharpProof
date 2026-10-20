@@ -3,7 +3,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Testing;
 
-public sealed record GeneratedIrCase(
+internal sealed record GeneratedIrCase(
     IrTerm Term,
     IReadOnlyDictionary<IrVarId, IrValue> Variables,
     GeneratedIrCategory Category = GeneratedIrCategory.Arithmetic)
@@ -12,7 +12,7 @@ public sealed record GeneratedIrCase(
     public IReadOnlyDictionary<IrVarId, IrValue> Variables { get; init; } = Variables ?? throw new System.ArgumentNullException(nameof(Variables));
 }
 
-public enum GeneratedIrCategory
+internal enum GeneratedIrCategory
 {
     Arithmetic,
     Boolean,
@@ -28,7 +28,7 @@ public enum GeneratedIrCategory
     StringEquality
 }
 
-public static class DifferentialIntegerCorpus
+internal static class DifferentialIntegerCorpus
 {
     public static IReadOnlyList<long> InterestingIntegers { get; } = [
         long.MinValue,
@@ -46,7 +46,7 @@ public static class DifferentialIntegerCorpus
     "Security",
     "CA5394:Do not use insecure randomness",
     Justification = "The seeded generator intentionally produces deterministic test cases.")]
-public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
+internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 {
     private static readonly IrBinaryOperator[] IntegerOperators = [
         IrBinaryOperator.Add, IrBinaryOperator.Subtract, IrBinaryOperator.Multiply,

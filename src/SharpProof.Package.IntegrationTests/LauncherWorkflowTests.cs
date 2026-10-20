@@ -11,7 +11,7 @@ namespace SharpProof.Package.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class LauncherWorkflowTests
+internal sealed class LauncherWorkflowTests
 {
     [TestCase(WorkerRunStatus.TimedOut, 124)]
     [TestCase(WorkerRunStatus.Canceled, 4)]

@@ -4,7 +4,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrRuntimeValueBoundaryTests
+internal sealed class IrRuntimeValueBoundaryTests
 {
     [TestCase(IrExecutionSemantics.Legacy, false)]
     [TestCase(IrExecutionSemantics.Legacy, true)]

@@ -1,6 +1,6 @@
 namespace SharpProof.Fuzz;
 
-public sealed record RetainedFrontendFailure(
+internal sealed record RetainedFrontendFailure(
     GeneratedCSharpCase OriginalCase,
     GeneratedCSharpCase MinimizedCase,
     FrontendDifferentialResult OriginalResult,
@@ -14,7 +14,7 @@ public sealed record RetainedFrontendFailure(
     public FuzzFailure Failure { get; init; } = Failure ?? throw new System.ArgumentNullException(nameof(Failure));
 }
 
-public static class FrontendFailureRetention
+internal static class FrontendFailureRetention
 {
     public static RetainedFrontendFailure Retain(
         GeneratedCSharpCase original,

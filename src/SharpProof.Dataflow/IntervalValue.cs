@@ -5,7 +5,7 @@ namespace SharpProof.Dataflow;
 /// A modulus of zero denotes an exact singleton and a modulus of one denotes no
 /// congruence restriction.
 /// </summary>
-public readonly struct IntervalValue : IEquatable<IntervalValue>
+internal readonly struct IntervalValue : IEquatable<IntervalValue>
 {
     private readonly bool _hasValue;
 

@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // like scalar ones, and a counterexample's objects carry their decoded entry
 // values, referenced objects included.
 [TestFixture]
-public sealed class WorkerVcReferenceFieldTests
+internal sealed class WorkerVcReferenceFieldTests
 {
     private const string Source =
         """

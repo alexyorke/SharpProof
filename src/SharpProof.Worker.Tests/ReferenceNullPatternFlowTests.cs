@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class ReferenceNullPatternFlowTests
+internal sealed class ReferenceNullPatternFlowTests
 {
     [Test]
     public async Task NullPatternGuardsStringLength()

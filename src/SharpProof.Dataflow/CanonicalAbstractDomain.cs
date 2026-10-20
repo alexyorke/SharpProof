@@ -13,7 +13,7 @@ namespace SharpProof.Dataflow;
 /// performing a normalizing join. Implementations must preserve these
 /// guarantees for every accepted transfer result.
 /// </remarks>
-public abstract class CanonicalAbstractDomain<T> : ClosedAbstractDomain<T>
+internal abstract class CanonicalAbstractDomain<T> : ClosedAbstractDomain<T>
 {
     /// <summary>
     /// Determines whether a transfer result is a canonical representative.

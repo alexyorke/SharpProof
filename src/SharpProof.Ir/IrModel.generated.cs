@@ -6,57 +6,57 @@
 
 namespace SharpProof.Ir;
 
-public interface IIrIdentifierTag
+internal interface IIrIdentifierTag
 {
     string Prefix { get; }
 }
 
-public readonly record struct IrIdentityTag : IIrIdentifierTag
+internal readonly record struct IrIdentityTag : IIrIdentifierTag
 {
     public string Prefix => "identity";
 }
 
-public readonly record struct IrTermTag : IIrIdentifierTag
+internal readonly record struct IrTermTag : IIrIdentifierTag
 {
     public string Prefix => "ir";
 }
 
-public readonly record struct IrVariableTag : IIrIdentifierTag
+internal readonly record struct IrVariableTag : IIrIdentifierTag
 {
     public string Prefix => "v";
 }
 
-public readonly record struct IrTypeTag : IIrIdentifierTag
+internal readonly record struct IrTypeTag : IIrIdentifierTag
 {
     public string Prefix => "t";
 }
 
-public readonly record struct IrMemberTag : IIrIdentifierTag
+internal readonly record struct IrMemberTag : IIrIdentifierTag
 {
     public string Prefix => "m";
 }
 
-public readonly record struct IrStringTag : IIrIdentifierTag
+internal readonly record struct IrStringTag : IIrIdentifierTag
 {
     public string Prefix => "s";
 }
 
-public readonly record struct IrOperationTag : IIrIdentifierTag
+internal readonly record struct IrOperationTag : IIrIdentifierTag
 {
     public string Prefix => "op";
 }
 
-public readonly record struct IrBlockTag : IIrIdentifierTag
+internal readonly record struct IrBlockTag : IIrIdentifierTag
 {
     public string Prefix => "b";
 }
 
-public readonly record struct IrInstructionTag : IIrIdentifierTag
+internal readonly record struct IrInstructionTag : IIrIdentifierTag
 {
     public string Prefix => "i";
 }
 
-public enum IrValueKind
+internal enum IrValueKind
 {
     Boolean = 0,
     Integer = 1,
@@ -66,14 +66,14 @@ public enum IrValueKind
     Sequence = 5
 }
 
-public enum IrEvaluationStatus
+internal enum IrEvaluationStatus
 {
     Value = 0,
     Unsupported = 1,
     Exception = 2
 }
 
-public enum IrUnsupportedReason
+internal enum IrUnsupportedReason
 {
     OpaqueTerm = 0,
     MissingVariable = 1,
@@ -82,7 +82,7 @@ public enum IrUnsupportedReason
     UnsupportedOperation = 4
 }
 
-public enum IrExceptionKind
+internal enum IrExceptionKind
 {
     DivideByZero = 0,
     Overflow = 1,
@@ -99,7 +99,7 @@ public enum IrExceptionKind
     ArgumentOutOfRange = 8
 }
 
-public enum IrProgramExecutionStatus
+internal enum IrProgramExecutionStatus
 {
     Returned = 0,
     AssumptionViolated = 1,
@@ -109,7 +109,7 @@ public enum IrProgramExecutionStatus
     StepLimit = 5
 }
 
-public sealed partial class IrValue
+internal sealed partial class IrValue
 {
     internal IrValue(IrTypeId type, IrValueKind kind, object? payload)
     {
@@ -124,7 +124,7 @@ public sealed partial class IrValue
     internal object? Payload { get; }
 }
 
-public sealed class IrUnsupportedInfo
+internal sealed class IrUnsupportedInfo
 {
     internal IrUnsupportedInfo(IrUnsupportedReason reason, string detail)
     {
@@ -137,7 +137,7 @@ public sealed class IrUnsupportedInfo
     public string Detail { get; }
 }
 
-public sealed class IrExceptionInfo
+internal sealed class IrExceptionInfo
 {
     internal IrExceptionInfo(IrExceptionKind kind, string detail, OperationId? site = null)
     {
@@ -151,7 +151,7 @@ public sealed class IrExceptionInfo
     public OperationId? Site { get; }
 }
 
-public sealed partial class IrEvaluationResult
+internal sealed partial class IrEvaluationResult
 {
     internal IrEvaluationResult(
         IrEvaluationStatus status,
@@ -173,7 +173,7 @@ public sealed partial class IrEvaluationResult
     public IrExceptionInfo? Exception { get; }
 }
 
-public sealed partial class IrProgramExecutionResult
+internal sealed partial class IrProgramExecutionResult
 {
     internal IrProgramExecutionResult(
         IrProgramExecutionStatus status,
@@ -215,7 +215,7 @@ public sealed partial class IrProgramExecutionResult
     public ImmutableHashSet<IrVarId> ApproximationVariables { get; }
 }
 
-public enum IrTermKind
+internal enum IrTermKind
 {
     Boolean = 0,
     Integer = 1,
@@ -232,7 +232,7 @@ public enum IrTermKind
     EmptyArray = 12
 }
 
-public enum IrOpaquePurity
+internal enum IrOpaquePurity
 {
     Pure = 0,
     Impure = 1
@@ -285,7 +285,7 @@ internal sealed class IrNullableTypeShape : IrTypeShape
     }
 }
 
-public sealed class IrTypeInfo
+internal sealed class IrTypeInfo
 {
     private readonly IrTypeShape _shape;
 
@@ -317,7 +317,7 @@ public sealed class IrTypeInfo
     public bool Signed { get; }
 }
 
-public sealed class IrVariableInfo
+internal sealed class IrVariableInfo
 {
     internal IrVariableInfo(IrVarId id, IrStringId name, IrTypeId type)
     {
@@ -332,7 +332,7 @@ public sealed class IrVariableInfo
     public IrTypeId Type { get; }
 }
 
-public sealed class IrMemberInfo
+internal sealed class IrMemberInfo
 {
     internal IrMemberInfo(
         IrMemberId id,
@@ -363,7 +363,7 @@ public sealed class IrMemberInfo
     public ImmutableArray<IrTypeId> ParameterTypes { get; }
 }
 
-public sealed class IrOperationInfo
+internal sealed class IrOperationInfo
 {
     internal IrOperationInfo(OperationId id, IrStringId? description, IrSourceSpan? sourceSpan = null)
     {
@@ -395,7 +395,7 @@ internal interface IIrTermVisitor<TState, TResult>
     TResult Visit(IrSequenceAccessTerm term, TState state);
 }
 
-public abstract class IrTerm
+internal abstract class IrTerm
 {
     internal abstract TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state);
 
@@ -412,7 +412,7 @@ public abstract class IrTerm
     public IrTermKind Kind { get; }
 }
 
-public sealed class IrBooleanTerm : IrTerm
+internal sealed class IrBooleanTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -428,7 +428,7 @@ public sealed class IrBooleanTerm : IrTerm
     public bool Value { get; }
 }
 
-public sealed class IrIntegerTerm : IrTerm
+internal sealed class IrIntegerTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -452,7 +452,7 @@ public sealed class IrIntegerTerm : IrTerm
     public bool Signed => Integer.Signed;
 }
 
-public sealed class IrStringTerm : IrTerm
+internal sealed class IrStringTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -468,7 +468,7 @@ public sealed class IrStringTerm : IrTerm
     public IrStringId Value { get; }
 }
 
-public sealed class IrNullTerm : IrTerm
+internal sealed class IrNullTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -481,7 +481,7 @@ public sealed class IrNullTerm : IrTerm
     }
 }
 
-public sealed class IrEmptyArrayTerm : IrTerm
+internal sealed class IrEmptyArrayTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -492,7 +492,7 @@ public sealed class IrEmptyArrayTerm : IrTerm
     internal IrEmptyArrayTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.EmptyArray) { }
 }
 
-public sealed class IrVariableTerm : IrTerm
+internal sealed class IrVariableTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -508,7 +508,7 @@ public sealed class IrVariableTerm : IrTerm
     public IrVarId Variable { get; }
 }
 
-public sealed class IrOpaqueTerm : IrTerm
+internal sealed class IrOpaqueTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -577,7 +577,7 @@ internal sealed class IrNegateOperatorInfo : IrUnaryOperatorInfo
     }
 }
 
-public sealed class IrUnaryTerm : IrTerm
+internal sealed class IrUnaryTerm : IrTerm
 {
     private readonly IrUnaryOperatorInfo _operatorInfo;
 
@@ -711,7 +711,7 @@ internal sealed class IrStringEqualsBinaryOperatorInfo : IrBinaryOperatorInfo
     }
 }
 
-public sealed class IrBinaryTerm : IrTerm
+internal sealed class IrBinaryTerm : IrTerm
 {
     private readonly IrBinaryOperatorInfo _operatorInfo;
 
@@ -746,7 +746,7 @@ public sealed class IrBinaryTerm : IrTerm
     public IrTerm Right { get; }
 }
 
-public sealed class IrConditionalTerm : IrTerm
+internal sealed class IrConditionalTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -773,7 +773,7 @@ public sealed class IrConditionalTerm : IrTerm
     public IrTerm WhenFalse { get; }
 }
 
-public sealed class IrCastTerm : IrTerm
+internal sealed class IrCastTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -789,7 +789,7 @@ public sealed class IrCastTerm : IrTerm
     public IrTerm Operand { get; }
 }
 
-public sealed class IrLengthTerm : IrTerm
+internal sealed class IrLengthTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -805,7 +805,7 @@ public sealed class IrLengthTerm : IrTerm
     public IrTerm Value { get; }
 }
 
-public sealed class IrSequenceAccessTerm : IrTerm
+internal sealed class IrSequenceAccessTerm : IrTerm
 {
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
@@ -829,7 +829,7 @@ public sealed class IrSequenceAccessTerm : IrTerm
     public IrTerm Index { get; }
 }
 
-public enum IrInstructionKind
+internal enum IrInstructionKind
 {
     Assign = 0,
     Load = 1,
@@ -848,7 +848,7 @@ public enum IrInstructionKind
     Lock = 14
 }
 
-public enum IrWriteRegion
+internal enum IrWriteRegion
 {
     Local = 0,
     Parameter = 1,
@@ -858,13 +858,13 @@ public enum IrWriteRegion
     Unknown = 5
 }
 
-public enum IrLocationKind
+internal enum IrLocationKind
 {
     Member = 0,
     Sequence = 1
 }
 
-public enum IrHavocKind
+internal enum IrHavocKind
 {
     Variables = 0,
     Memory = 1,
@@ -877,7 +877,7 @@ internal interface IIrLocationVisitor<TState, TResult>
     TResult Visit(IrSequenceLocation location, TState state);
 }
 
-public abstract class IrLocation
+internal abstract class IrLocation
 {
     internal abstract TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state);
 
@@ -892,7 +892,7 @@ public abstract class IrLocation
     public IrLocationKind Kind { get; }
 }
 
-public sealed class IrMemberLocation : IrLocation
+internal sealed class IrMemberLocation : IrLocation
 {
     internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
     {
@@ -917,7 +917,7 @@ public sealed class IrMemberLocation : IrLocation
     public ImmutableArray<IrTerm> Arguments { get; }
 }
 
-public sealed class IrSequenceLocation : IrLocation
+internal sealed class IrSequenceLocation : IrLocation
 {
     internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
     {
@@ -950,7 +950,7 @@ internal interface IIrTerminatorVisitor<TState>
     void Visit(IrExceptionalExitInstruction instruction, TState state);
 }
 
-public abstract partial class IrInstruction
+internal abstract partial class IrInstruction
 {
     private protected IrInstruction(IrInstructionId id, IrInstructionKind kind, OperationId operation)
     {
@@ -965,7 +965,7 @@ public abstract partial class IrInstruction
     public OperationId Operation { get; }
 }
 
-public sealed partial class IrAllocationInstruction : IrInstruction
+internal sealed partial class IrAllocationInstruction : IrInstruction
 {
     internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
         IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
@@ -980,7 +980,7 @@ public sealed partial class IrAllocationInstruction : IrInstruction
 
 // A synchronization attempt is an explicit effect and a concrete replay
 // barrier. It does not claim acquisition, release, completion or exception facts.
-public sealed partial class IrLockInstruction : IrInstruction
+internal sealed partial class IrLockInstruction : IrInstruction
 {
     internal IrLockInstruction(IrInstructionId id, OperationId operation, IrTerm receiver)
         : base(id, IrInstructionKind.Lock, operation)
@@ -989,7 +989,7 @@ public sealed partial class IrLockInstruction : IrInstruction
     public IrTerm Receiver { get; }
 }
 
-public sealed partial class IrWriteInstruction : IrInstruction
+internal sealed partial class IrWriteInstruction : IrInstruction
 {
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
         : base(id, IrInstructionKind.Write, operation)
@@ -1018,7 +1018,7 @@ public sealed partial class IrWriteInstruction : IrInstruction
     public bool IsStore => Value != null;
 }
 
-public sealed partial class IrAssignInstruction : IrInstruction
+internal sealed partial class IrAssignInstruction : IrInstruction
 {
     internal IrAssignInstruction(
         IrInstructionId id,
@@ -1036,7 +1036,7 @@ public sealed partial class IrAssignInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed partial class IrLoadInstruction : IrInstruction
+internal sealed partial class IrLoadInstruction : IrInstruction
 {
     internal IrLoadInstruction(
         IrInstructionId id,
@@ -1054,7 +1054,7 @@ public sealed partial class IrLoadInstruction : IrInstruction
     public IrLocation Location { get; }
 }
 
-public sealed partial class IrStoreInstruction : IrInstruction
+internal sealed partial class IrStoreInstruction : IrInstruction
 {
     internal IrStoreInstruction(
         IrInstructionId id,
@@ -1072,7 +1072,7 @@ public sealed partial class IrStoreInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed partial class IrCallInstruction : IrInstruction
+internal sealed partial class IrCallInstruction : IrInstruction
 {
     internal IrCallInstruction(
         IrInstructionId id,
@@ -1096,7 +1096,7 @@ public sealed partial class IrCallInstruction : IrInstruction
     public ImmutableArray<IrTerm> Arguments { get; }
 }
 
-public sealed partial class IrAssumeInstruction : IrInstruction
+internal sealed partial class IrAssumeInstruction : IrInstruction
 {
     internal IrAssumeInstruction(
         IrInstructionId id,
@@ -1110,7 +1110,7 @@ public sealed partial class IrAssumeInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed partial class IrAssertInstruction : IrInstruction
+internal sealed partial class IrAssertInstruction : IrInstruction
 {
     internal IrAssertInstruction(
         IrInstructionId id,
@@ -1124,7 +1124,7 @@ public sealed partial class IrAssertInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed partial class IrHavocInstruction : IrInstruction
+internal sealed partial class IrHavocInstruction : IrInstruction
 {
     internal IrHavocInstruction(
         IrInstructionId id,
@@ -1145,7 +1145,7 @@ public sealed partial class IrHavocInstruction : IrInstruction
     public IrHavocOrigin Origin { get; }
 }
 
-public sealed partial class IrThrowInstruction : IrInstruction, IIrTerminator
+internal sealed partial class IrThrowInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1165,7 +1165,7 @@ public sealed partial class IrThrowInstruction : IrInstruction, IIrTerminator
     public IrBlockId Target { get; }
 }
 
-public sealed partial class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
+internal sealed partial class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1178,7 +1178,7 @@ public sealed partial class IrExceptionalExitInstruction : IrInstruction, IIrTer
         : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
-public sealed partial class IrBranchInstruction : IrInstruction, IIrTerminator
+internal sealed partial class IrBranchInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1206,7 +1206,7 @@ public sealed partial class IrBranchInstruction : IrInstruction, IIrTerminator
     public IrBlockId WhenFalse { get; }
 }
 
-public sealed partial class IrGotoInstruction : IrInstruction, IIrTerminator
+internal sealed partial class IrGotoInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1227,7 +1227,7 @@ public sealed partial class IrGotoInstruction : IrInstruction, IIrTerminator
     public IrBlockId Target { get; }
 }
 
-public sealed partial class IrReturnInstruction : IrInstruction, IIrTerminator
+internal sealed partial class IrReturnInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1248,7 +1248,7 @@ public sealed partial class IrReturnInstruction : IrInstruction, IIrTerminator
     public IrTerm? Value { get; }
 }
 
-public sealed partial class IrBasicBlock
+internal sealed partial class IrBasicBlock
 {
     internal IrBasicBlock(IrBlockId id, IrStringId? name, ImmutableArray<IrInstruction> instructions)
     {
@@ -1264,7 +1264,7 @@ public sealed partial class IrBasicBlock
     public ImmutableArray<IrInstruction> Instructions { get; }
 }
 
-public sealed partial class IrProgram
+internal sealed partial class IrProgram
 {
 
     public IrFactory Factory { get; }

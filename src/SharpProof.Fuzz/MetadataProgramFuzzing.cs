@@ -16,7 +16,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Fuzz;
 
-public sealed record MetadataProgramFuzzCoverage(int Cases, int Agreements, int NativeProofs,
+internal sealed record MetadataProgramFuzzCoverage(int Cases, int Agreements, int NativeProofs,
     int NativeRefutations, int TypeMask, int RecipeMask)
 {
     [JsonIgnore]

@@ -1,6 +1,6 @@
 namespace SharpProof.Smt;
 
-public sealed class IrSmtBackendOptions
+internal sealed class IrSmtBackendOptions
 {
     public const uint DefaultQueryRlimit = SharpProof.Configuration.SolverDefaults.QueryRlimit;
 

@@ -5,7 +5,7 @@ namespace SharpProof.Worker.Test;
 
 // `string == string` compares content; reference identity stays separate.
 [TestFixture]
-public sealed class WorkerVcStringEqualityTests
+internal sealed class WorkerVcStringEqualityTests
 {
     private const string Source =
         """
