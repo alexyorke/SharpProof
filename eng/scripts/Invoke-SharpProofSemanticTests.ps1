@@ -27,7 +27,7 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds every slot, the two Worker remainder shards dominate the rest, and
+    # holds every slot, the Worker remainder shards dominate the rest, and
     # Projects holds every other task. All keeps the single-runner task set.
     [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
     [string]$CoverageTaskGroup = 'All'
@@ -246,31 +246,25 @@ $workerRemainderFilter = @(
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
-# The measured heavy classes account for about half of the remainder's test
-# time. Complementary filters keep every current and future test in one shard.
-$workerRemainderHeavyClasses = @(
-    'WorkerVcShadowSourceGateTests',
-    'NativeWorkerRoutingTests',
-    'TypedMetadataConversionTests',
-    'GoldenWorkerTests',
-    'CompilerTotalCallableArtifactTests',
-    'NativeAllocationEffectTests',
-    'NativePurityEffectTests',
-    'TypedMetadataCallTests',
-    'CompilerReachableSourceTests',
-    'NativeAliasingBoundaryTests',
-    'ScalarPatternFlowTests',
-    'BitwiseOperatorSemanticsTests')
-$workerRemainderHeavyFilter = @(
-    $workerRemainderHeavyClasses |
-        ForEach-Object {
-            'FullyQualifiedName~' + $workerClassPrefix + $_
-        }) -join '|'
-$workerRemainderOtherFilter = @(
-    $workerRemainderHeavyClasses |
-        ForEach-Object {
+# The remainder holds about thirteen minutes of serial Worker test time, and
+# one test process keeps about one CPU busy. Split it by test class name
+# prefix into shards balanced by measured class durations (about three
+# minutes each uninstrumented). The last shard is the complement of the
+# listed prefixes, so every current and future class runs in exactly one
+# shard. Rebalance the prefixes when one shard grows well past the others.
+$workerRemainderShardPrefixes = @(
+    , @('NativeA')
+    , @('NativeS', 'C')
+    , @('W', 'T', 'G', 'F'))
+$workerRemainderShardFilters = @(
+    foreach ($prefixes in $workerRemainderShardPrefixes) {
+        '(' + (@($prefixes | ForEach-Object {
+                    'FullyQualifiedName~' + $workerClassPrefix + $_
+                }) -join '|') + ')'
+    }
+    @($workerRemainderShardPrefixes | ForEach-Object { $_ } | ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
-        }) -join '&'
+        }) -join '&')
 
 $testProject = Join-Path $repositoryRoot (
     'src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
@@ -290,10 +284,10 @@ $checksumTaskFilter = "($workerRemainderTaskFilter)&(FullyQualifiedName=$checksu
 if ($coverageEnabled) {
     $workerRemainderTaskFilter += "&(FullyQualifiedName!=$checksumMethod)"
 }
-$workerRemainderHeavyTaskFilter =
-"($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
-$workerRemainderOtherTaskFilter =
-"($workerRemainderTaskFilter)&($workerRemainderOtherFilter)"
+$workerRemainderTaskNames = @(
+    for ($index = 1; $index -le $workerRemainderShardFilters.Count; $index++) {
+        'worker-remainder-' + $index
+    })
 $tasks = [Collections.Generic.List[object]]::new()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
@@ -372,22 +366,17 @@ if (-not $ArchitectureOnly) {
             DefaultEstimatedMilliseconds = 10000L
         }
     }
-    # The remainder is the longest Worker task in every mode (about five
-    # minutes uninstrumented on a four-CPU runner), so it always runs as two
-    # complementary halves that the scheduler can overlap.
-    $workerTaskDescriptors += @(
-        [pscustomobject]@{
-            Name                         = 'worker-remainder-heavy'
-            Filter                       = $workerRemainderHeavyTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 160000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-remainder-other'
-            Filter                       = $workerRemainderOtherTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 160000L
-        })
+    # Each remainder shard keeps about one CPU busy, so uninstrumented runs
+    # schedule one slot per shard and overlap every shard. Instrumented
+    # processes use more memory, so coverage keeps two shards at a time.
+    for ($index = 0; $index -lt $workerRemainderShardFilters.Count; $index++) {
+        $workerTaskDescriptors += [pscustomobject]@{
+            Name                         = $workerRemainderTaskNames[$index]
+            Filter                       = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
+            Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+            DefaultEstimatedMilliseconds = 200000L
+        }
+    }
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
         $tasks.Add([pscustomobject]@{
                 Name                         = $descriptor.Name
@@ -419,10 +408,7 @@ if ($architectureShardingEnabled) {
 }
 if ($CoverageTaskGroup -ne 'All') {
     $gatesTaskNames = @('semantic-gates')
-    $workerTaskNames = @(
-        'worker-remainder-heavy',
-        'worker-remainder-other',
-        'worker-fixed-checksum')
+    $workerTaskNames = $workerRemainderTaskNames + @('worker-fixed-checksum')
     # Capture the name first: inside switch, $_ is the switch value.
     $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
             $taskName = [string]$_.Name

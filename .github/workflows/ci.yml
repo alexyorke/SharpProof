@@ -36,11 +36,13 @@ jobs:
         with:
           download-packages: "false"
 
-      # The package phase runs in canonical-package, in parallel.
+      # This job is the critical path, so the package phase and the
+      # source-only repository gates run in canonical-package, in parallel.
       - name: Run the single-build non-Gates semantic PR phases
         run: >-
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
-          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining -SkipPackageTests
+          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining
+          -SkipPackageTests -SkipRepositoryGates
 
       - name: Upload container gate evidence
         if: always()
@@ -70,21 +72,31 @@ jobs:
         with:
           download-packages: "false"
 
+      # The documentation, container contract, layout, and regression checks
+      # that pr runs before its build. They read only sources, so they run
+      # here, off canonical-main's critical path.
+      - name: Run the PR repository gates
+        run: docker compose run --rm tooling repository-gates -Configuration Release
+
       # The package phase of pr, with the same Release configuration and
       # canonical filter. -Fast skips analyzers in this build only;
       # canonical-main's full solution build enforces them.
       - name: Run the PR package phase
+        if: ${{ !cancelled() }}
         run: >-
           docker compose run --rm tooling package-tests
           -Configuration Release -Fast
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
-      - name: Upload package phase timing evidence
+      - name: Upload package phase and repository gate evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: canonical-package-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/timings
+          path: |
+            artifacts/timings
+            artifacts/layout-audit
+            artifacts/public-api-governance
           if-no-files-found: warn
           retention-days: 14
 
@@ -114,13 +126,6 @@ jobs:
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
           -Configuration Release -Fast -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-
-      # Repository formatting runs here rather than on its own runner, saving
-      # a runner slot and a tooling image build; build-and-test requires
-      # this job, so the formatting gate is unchanged.
-      - name: Require C#, PowerShell, and shell linting and formatting
-        if: ${{ !cancelled() }}
-        run: docker compose run --rm tooling format-check
 
       - name: Upload Gates cohort and timing evidence
         if: always()
@@ -206,9 +211,69 @@ jobs:
         with:
           mode: report
 
+  # Independent-path package reproduction rebuilds and packs the solution
+  # twice and needs no other job's output. It runs here, beside the canonical
+  # jobs, rather than in the package job that every consumer job waits for.
+  # Repository formatting shares this runner and its tooling image. Release
+  # qualification requires this workflow's exact-commit success on master.
+  package-reproducibility:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Require C#, PowerShell, and shell linting and formatting
+        run: docker compose run --rm tooling format-check
+
+      - name: Require full independent-path managed payload reproducibility
+        id: package-reproducibility
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReproduciblePackages.ps1
+          -Scope Full -OutputDirectory artifacts/reproducibility'
+
+      - name: Summarize managed payload and raw ZIP comparisons separately
+        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path('artifacts/reproducibility/report.json').read_text())
+          archives = report.get('archiveComparisons', [])
+          equal_archives = sum(item['equal'] for item in archives)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('### Independent-path package reproduction\n\n')
+              summary.write(f"Source: `{report['sourceCommit']}`; scope: `{report['scope']}`.\n\n")
+              summary.write(f"Managed first-party DLL/PDB payloads: equal=`{report['managedPayloadsEqual']}`, entries=`{report['managedPayloadCount']}`. Equality is required.\n\n")
+              summary.write(f"Raw NuGet/SNuGet ZIP archives: equal=`{report['packageBytesEqual']}`, identical archives=`{equal_archives}/{len(archives)}`. Raw ZIP equality is measured separately and is not claimed by managed payload equality.\n")
+          PY
+
+      - name: Upload the independent-path reproduction report
+        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}
+          path: artifacts/reproducibility/report.json
+          if-no-files-found: error
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-package, canonical-gates, self-application, repository-quality]
+    needs: [canonical-main, canonical-package, canonical-gates, self-application, package-reproducibility, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -217,14 +282,15 @@ jobs:
           SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
+          SHARPPROOF_REPRODUCIBILITY_RESULT: ${{ needs.package-reproducibility.result }}
           SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
         run: |
           if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
             echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
             exit 1
           fi
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
-            echo "Canonical jobs (Gates includes formatting), or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_REPRODUCIBILITY_RESULT" != success ]]; then
+            echo "Canonical jobs (package includes repository gates), self-application and API inventory, or package reproducibility and formatting failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_REPRODUCIBILITY_RESULT" >&2
             exit 1
           fi
 
