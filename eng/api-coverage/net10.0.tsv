@@ -27810,7 +27810,7 @@ System.Runtime	M:System.HttpStyleUriParser.#ctor	Method	unmodeled	-
 System.Runtime	M:System.IAsyncDisposable.DisposeAsync	Method	unmodeled	-
 System.Runtime	M:System.ICloneable.Clone	Method	unmodeled	-
 System.Runtime	M:System.IComparable.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.IComparable`1.CompareTo(`0)	Method	unmodeled	-
+System.Runtime	M:System.IComparable`1.CompareTo(`0)	Method	partially-modeled	intrinsic=constrained-integer-comparable
 System.Runtime	M:System.IConvertible.GetTypeCode	Method	unmodeled	-
 System.Runtime	M:System.IConvertible.ToBoolean(System.IFormatProvider)	Method	unmodeled	-
 System.Runtime	M:System.IConvertible.ToByte(System.IFormatProvider)	Method	unmodeled	-

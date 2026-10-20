@@ -186,6 +186,7 @@
           "src/SharpProof.Frontend/CSharpOperationSemantics.Convert.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.InterfaceArrays.cs",
           "src/SharpProof.Frontend/TotalLoweringContext.ReceiverTracking.cs",
+          "src/SharpProof.Frontend/TotalLoweringContext.Comparables.cs",
           "src/SharpProof.Frontend/TotalLoweringContext.Dictionaries.cs",
             "src/SharpProof.Frontend/TotalLoweringContext.HashSets.cs",
           "src/SharpProof.Frontend/TotalLoweringContext.FreshCollections.cs",

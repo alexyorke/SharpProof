@@ -507,7 +507,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return FieldRead(operation, capturedRead.Field, capturedRead.Instance, block, depth, captured: true); }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false } capturedStore &&
             _context.CapturedField(capturedStore.Target) is { } capturedTarget &&
-            CSharpOperationSemantics.IsSupportedFieldWrite(capturedTarget.Field, _context.Target.ContainingAssembly))
+            CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(capturedTarget.Field), _context.Target.ContainingAssembly))
         { return FieldWrite(capturedStore, capturedTarget, block, depth, captured: true); }
         if (depth < 256 && operation is IIncrementOrDecrementOperation incrementedField &&
             (incrementedField.Target as IFieldReferenceOperation ?? _context.CapturedField(incrementedField.Target)) is { } incrementTarget &&
@@ -516,7 +516,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // A nonvirtual auto-property's setter only stores its backing field.
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Arguments.Length: 0 } setProperty } propertyStore &&
             CSharpOperationSemantics.SetterField(setProperty.Property) is { } setField &&
-            CSharpOperationSemantics.IsSupportedFieldWrite(setField, _context.Target.ContainingAssembly))
+            CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(setField), _context.Target.ContainingAssembly))
         { return FieldWrite(propertyStore, setField, setProperty.Instance, block, depth); }
         if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } incrementedProperty } &&
             CSharpOperationSemantics.SetterField(incrementedProperty.Property, readsValue: true) is { } incrementedBacking &&
@@ -626,7 +626,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     return right;
                 }
             case ISimpleAssignmentOperation { IsRef: false, Target: IFieldReferenceOperation field } assignment
-                when CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly):
+                when CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(field.Field), _context.Target.ContainingAssembly):
                 return FieldWrite(assignment, field, block, depth);
             case IIncrementOrDecrementOperation increment when TryStorage(increment.Target, out var target):
                 return Increment(increment, target, block);
@@ -903,8 +903,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             values[values.Length - 1] = lowered.Value;
             block = lowered.Continuation;
         }
-        if (receiver != null && (instance!.Type!.IsReferenceType ||
-            instance.Type is ITypeParameterSymbol { IsValueType: false }))
+        if (receiver != null && _context.SpecializeSourceType(instance!.Type) is { } receiverType &&
+            (receiverType.IsReferenceType || receiverType is ITypeParameterSymbol { IsValueType: false }))
         { block = CheckReceiver(operation, receiver, block); }
         // A dispatched call may run an override the specification does not describe.
         return EmitOpaqueCall(operation, method, values, block, assigned != null ? values[values.Length - 1] : null,
@@ -1109,6 +1109,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
         if (!array.Classification.IsExact)
         { return Approximate(mutation ?? access, array.Continuation, array.Classification.Abstention); }
+        var managedReceiver = mutation == null && _context.NeedsManagedValueLocation(access);
+        if (managedReceiver)
+        { array = Pin(access.ArrayReference, array); }
         block = array.Continuation;
         var indices = new List<IrTerm>();
         foreach (var index in access.Indices)
@@ -1116,6 +1119,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var lowered = LowerBodyValue(index, block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(mutation ?? access, lowered.Continuation, lowered.Classification.Abstention); }
+            if (managedReceiver)
+            { lowered = Pin(index, lowered); }
             indices.Add(lowered.Value);
             block = lowered.Continuation;
         }
@@ -1148,7 +1153,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
             // A scalar element of a single-dimensional array is stored with its
             // value; other stores are effect sites only.
-            var modeled = outside == null && (CSharpOperationSemantics.IsScalar(elementType) ||
+            var modeled = outside == null && (CSharpOperationSemantics.IsScalar(elementType) || _context.KnownScalarType(elementType) != null ||
                 _context.ConcreteArray(access.ArrayReference) is { } knownArray && CSharpOperationSemantics.IsScalar(knownArray.ElementType)) &&
                 _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
             if (stored is { } value)
@@ -1169,7 +1174,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             }
             TotalBodyValue old;
             if (modeled && !ApproximateElementReads)
-            { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
+            {
+                var read = _factory.SequenceAccess(array.Value, indices[0]);
+                if (managedReceiver)
+                { _context.RecordManagedValueLocation(access, read); }
+                old = Pin(access, new(read, block, FrontendSubsetClassification.Exact));
+            }
             else
             {
                 var current = _context.Temporary(_context.Type(elementType));
@@ -1233,12 +1243,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
             receiver = lowered.Value;
+            if (_context.NeedsManagedValueLocation(operation))
+            {
+                lowered = Pin(instance, lowered);
+                receiver = lowered.Value;
+            }
             block = lowered.Continuation;
         }
         if ((receiver ?? (implicitThis && !captured ? _context.ReceiverValue() : null)) is { } owner && !ApproximateElementReads &&
             FieldMember(field) is { } member)
         {
             var read = ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.PureOpaque(member, AsObject(owner)), receiver), block);
+            if (_context.NeedsManagedValueLocation(operation) && operation is IFieldReferenceOperation &&
+                (!field.IsReadOnly || implicitThis && _context.Target.MethodKind == MethodKind.Constructor &&
+                    SymbolEqualityComparer.Default.Equals(_context.Target.ContainingType, field.ContainingType)))
+            { _context.RecordManagedValueLocation(operation, _factory.PureOpaque(member, AsObject(owner))); }
             return PinElementReads && read.Classification.IsExact ? Pin(operation, read) : read;
         }
         var value = _context.Temporary(_context.Type(field.Type));
@@ -1249,8 +1268,25 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     // A scalar or reference instance field of a class: its reads and stores
     // are modeled through an object-typed receiver.
+    private IFieldSymbol BoundField(IFieldSymbol field)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        // Only concrete scalar substitutions add storage support here. Open and
+        // reference-dependent fields retain their existing identity/replay boundary.
+        if (_context.KnownScalarType(field.Type) != null && _context.SpecializeSourceType(field.ContainingType) is INamedTypeSymbol owner &&
+            !SymbolEqualityComparer.Default.Equals(owner, field.ContainingType))
+        {
+            return owner.GetMembers(field.Name).OfType<IFieldSymbol>().Single(candidate => candidate is null
+                ? throw new ArgumentNullException(nameof(candidate))
+                : SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, field.OriginalDefinition));
+        }
+        return field;
+    }
+
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        field = BoundField(field);
         if (field.IsStatic || !field.ContainingType.IsReferenceType ||
             !CSharpOperationSemantics.HasIndependentFieldStorage(field) ||
             !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type))
@@ -1276,6 +1312,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private bool IsMutableField(IFieldSymbol field, IOperation? instance)
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        field = BoundField(field);
         return CSharpOperationSemantics.IsSupportedFieldRead(field) &&
             CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) &&
             (IsImplicitThis(instance) || instance is IParameterReferenceOperation or ILocalReferenceOperation);
