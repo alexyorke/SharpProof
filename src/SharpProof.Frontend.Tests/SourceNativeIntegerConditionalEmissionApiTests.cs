@@ -117,7 +117,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var reader = pe.GetMetadataReader();
         var targetDefinition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
             .Single(candidate => reader.GetString(candidate.Name) == "Target");
-        var targetIl = pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!;
+        var targetIl = (pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         if (!enabled)
         { Assert.That(targetIl, Is.EqualTo(OmittedTargetIl)); }
         TestContext.WriteLine(JsonSerializer.Serialize(new
@@ -132,7 +132,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
             WrapperAttributes = method.GetAttributes().Length,
             CandidateCount = candidates.Length,
             Attribute = attribute.ToString(),
-            TargetIl = Convert.ToHexString(targetIl),
+            TargetIl = Convert.ToHexString(targetIl.AsSpan()),
             CoreSource = core,
             CallerSource = source
         }));

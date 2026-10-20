@@ -296,8 +296,8 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            object?[] preservationArguments = [0L, 0L, false, loneSurrogate, null, null];
-            Assert.That(target!.Invoke(null, preservationArguments), Is.True);
+            ImmutableArray<object?> preservationArguments = [0L, 0L, false, loneSurrogate, null, null];
+            Assert.That(target!.Invoke(null, preservationArguments.ToArray()), Is.True);
         }
         finally
         {
@@ -377,13 +377,13 @@ public sealed class FuzzEmissionLifecycleTests
             var runtime = context.LoadFromStream(image).GetType("SharpProofGeneratedFrontendEdges");
             Assert.That(runtime, Is.Not.Null);
             Assert.That(runtime!.Assembly.GetName().Name, Is.EqualTo(compilation.AssemblyName));
-            object?[] arguments = [true];
+            ImmutableArray<object?> arguments = [true];
             foreach (var method in methods.Values)
             {
                 var compiled = runtime.GetMethod(method.Identifier.ValueText,
                     BindingFlags.Public | BindingFlags.Static);
                 Assert.That(compiled, Is.Not.Null);
-                Assert.That(compiled!.Invoke(null, arguments), Is.True);
+                Assert.That(compiled!.Invoke(null, arguments.ToArray()), Is.True);
             }
             var generated = new FrontendSemanticEdgeCase("bool", "bool value", "value",
                 arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
@@ -492,12 +492,12 @@ public sealed class FuzzEmissionLifecycleTests
             {
                 var input = inputs[index];
                 var guardInput = guards[index];
-                object?[] arguments = [guardInput, input];
+                ImmutableArray<object?> arguments = [guardInput, input];
                 var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty
                     .Add(variable, factory.CreateBooleanValue(input))
                     .Add(guardVariable, factory.CreateBooleanValue(guardInput));
                 scenarios.Add(scenario);
-                var runtimeCompletion = guard!.Invoke(null, arguments);
+                var runtimeCompletion = guard!.Invoke(null, arguments.ToArray());
                 Assert.That(runtimeCompletion, Is.EqualTo(guardInput || input));
                 var evaluated = new IrInterpreter(factory).Evaluate(completion, scenario);
                 Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -505,7 +505,7 @@ public sealed class FuzzEmissionLifecycleTests
                 Assert.That(evaluated.Value!.Boolean, Is.EqualTo(runtimeCompletion));
                 if (guardInput)
                 {
-                    var returned = reference!.Invoke(null, arguments);
+                    var returned = reference!.Invoke(null, arguments.ToArray());
                     Assert.That(returned, Is.EqualTo(input));
                     var interpreted = new IrInterpreter(factory).Evaluate(formula, scenario);
                     Assert.That(interpreted.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -515,7 +515,7 @@ public sealed class FuzzEmissionLifecycleTests
                 }
                 else
                 {
-                    var thrown = Assert.Throws<TargetInvocationException>((Action)(() => reference!.Invoke(null, arguments)));
+                    var thrown = Assert.Throws<TargetInvocationException>((Action)(() => reference!.Invoke(null, arguments.ToArray())));
                     Assert.That(thrown!.InnerException, Is.TypeOf<DivideByZeroException>());
                     references.Add(PartialTermSemanticOutcome.Undefined);
                 }

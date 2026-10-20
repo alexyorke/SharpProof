@@ -4985,3 +4985,9 @@ Nine array sites retain required subject behavior: explicit AllowedExceptionsAtt
 ### IMM-M506: immutable project, modifier, IR and IL observations
 
 Project path parts, two modifier-name observations, IR mask observations and two generic native-integer IL snapshots are immutable. Native integer/hex consumers use readonly spans. A selection-count assertion exposed the second IL root before verification; both sites are included in the completed batch. Actual gates pass 10 architecture, 4 contracts and 52 frontend cases. Literal/source-unit gates verify 4299/1071 and 1948. Six current coordinates and old array entries reconcile independently, leaving 95 unchecked local roots and zero Open C# coordinates. Final collection, coverage, binding, archive and exact-head workflows remain pending.
+
+### IMM-M507: immutable fuzz invocation vectors and native IL observations
+
+Nine retained fuzz invocation/CLI argument vectors and two native-integer IL observations are immutable. Native reflection/CLI conversion occurs at the final call; integer/hex readers use readonly spans. Actual native typed inputs, source completion/type-initialization/lone-surrogate semantics, console cancellation and default executable output retain their contracts.
+
+An initial combined filter stopped at the console fixture's mandatory isolated-testhost environment guard before signaling. The corrected repository-style isolated host runs only console/default CLI fixtures with SHARPPROOF_FUZZ_CONSOLE_ISOLATED=1. Actual corrected gates pass 22 ordinary fuzz cases, both isolated CLI cases and 12 frontend cases. Literal/source-unit gates verify 4299/1073 and 1948. Eleven current coordinates and old array entries reconcile independently, returning C# coordinates to zero Open and leaving 84 unchecked local roots before prepared native-subject reviews. Final collection, coverage, binding, archive and exact-head workflows remain pending.

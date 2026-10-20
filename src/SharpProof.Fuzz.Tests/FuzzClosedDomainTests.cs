@@ -148,8 +148,8 @@ public sealed class FuzzClosedDomainTests
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            object?[] arguments = [0L];
-            var runtimeResult = target!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [0L];
+            var runtimeResult = target!.Invoke(null, arguments.ToArray());
             var runtimeCompleted = runtimeResult is bool;
             Assert.That(runtimeCompleted, Is.True);
             Assert.That(runtimeResult, Is.TypeOf<bool>());
@@ -194,8 +194,8 @@ public sealed class FuzzClosedDomainTests
             Assert.That(trueRejection, Is.Null);
             Assert.That(await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
                 trueDomain!, trueFormula, TestContext.CurrentContext.CancellationToken), Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-            object?[] falseArguments = [-2L];
-            var falseRuntimeResult = target!.Invoke(null, falseArguments);
+            ImmutableArray<object?> falseArguments = [-2L];
+            var falseRuntimeResult = target!.Invoke(null, falseArguments.ToArray());
             Assert.That(falseRuntimeResult, Is.TypeOf<bool>());
             Assert.That(falseRuntimeResult, Is.EqualTo(false));
             var falseFormula = factory.Boolean((bool)falseRuntimeResult!);

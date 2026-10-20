@@ -147,9 +147,9 @@ public sealed class FrontendSourceReplayTests
                     BindingFlags.Public | BindingFlags.Static);
                 Assert.That(compiled, Is.Not.Null);
                 var input = inputs[index];
-                object?[] arguments = [input.Left, input.Right, input.Condition,
+                ImmutableArray<object?> arguments = [input.Left, input.Right, input.Condition,
                     input.Text, input.Values, input.Reference];
-                Assert.That(compiled!.Invoke(null, arguments), Is.EqualTo(expected[index]));
+                Assert.That(compiled!.Invoke(null, arguments.ToArray()), Is.EqualTo(expected[index]));
             }
         }
         finally

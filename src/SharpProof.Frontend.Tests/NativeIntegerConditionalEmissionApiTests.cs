@@ -225,7 +225,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
-        var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
+        var il = (pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
@@ -239,13 +239,13 @@ public sealed class NativeIntegerConditionalEmissionApiTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
             if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt)
             {
-                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il, offset));
+                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il.AsSpan(offset..)));
                 var name = handle.Kind == HandleKind.MethodDefinition
                     ? metadata.GetString(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).Name)
                     : metadata.GetString(metadata.GetMemberReference((MemberReferenceHandle)handle).Name);

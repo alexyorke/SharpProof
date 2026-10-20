@@ -61,10 +61,10 @@ public sealed class FrontendTypeInitializationControls
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target0", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            object?[] arguments = [7L, 11L, true, null, null, null];
+            ImmutableArray<object?> arguments = [7L, 11L, true, null, null, null];
             if (fault)
             {
-                Action invoke = () => { target!.Invoke(null, arguments); };
+                Action invoke = () => { target!.Invoke(null, arguments.ToArray()); };
                 var exception = Assert.Throws<TargetInvocationException>(invoke);
                 Assert.That(exception!.InnerException, Is.TypeOf<TypeInitializationException>());
                 Assert.That(exception.InnerException!.InnerException, Is.TypeOf<InvalidOperationException>());
@@ -72,7 +72,7 @@ public sealed class FrontendTypeInitializationControls
             }
             else
             {
-                Assert.That(target!.Invoke(null, arguments), Is.EqualTo(7L));
+                Assert.That(target!.Invoke(null, arguments.ToArray()), Is.EqualTo(7L));
                 Assert.That(runtime.GetField("State")!.GetValue(null), Is.EqualTo(7));
             }
         }
