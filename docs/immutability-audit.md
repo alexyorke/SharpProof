@@ -4973,3 +4973,7 @@ All 297 affected WorkerTests and GoldenWorkerTests cases pass. Literal conservat
 ### IMM-M503: native type/term/Z3 and actual CLR array frames
 
 Thirteen final materializations are individually traced through native formals and actual consumers: CLR type signatures, public IrFactory term params, Z3 expression params and native typed array/shape/runtime subjects. Existing immutable/scoped-builder inputs remain frozen. Null mapping, reference identity and allocation warmup/measurement placement remain exact; no code changes, new execution or performance claims are inferred. The old array subset has 119 unchecked candidates; remaining materializations are nine avoidable copy/construction observations prepared for direct immutable publication.
+
+### IMM-M504: direct immutable image freezing and scalar string construction
+
+Eight intermediate native image-array copies are removed by freezing exact native MemoryStream buffer spans directly. Expected host error text uses scalar string concatenation over sanitized characters without a mutable char-array materialization. Native emission/reader lifecycles and exact bytes/text remain intact. All nineteen affected worker cases pass; literal/source-unit gates verify 4299/1070 and 1948. Nine coordinates and the remaining nine old materialization entries reconcile, returning C# coordinates to zero Open. The old subset now has 110 unchecked local roots and no unchecked materializations; fresh final collection may add sites and remains required.

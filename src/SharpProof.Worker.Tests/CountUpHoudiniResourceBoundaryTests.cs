@@ -140,7 +140,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-        var imageBytes = image.ToArray().ToImmutableArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
             ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
                 ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
@@ -148,7 +148,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         TestCompilation.AssertNoErrors(runtimeCompilation);
         using var runtimeImage = new MemoryStream();
         Assert.That(runtimeCompilation.Emit(runtimeImage).Success, Is.True);
-        var runtimeBytes = runtimeImage.ToArray().ToImmutableArray();
+        var runtimeBytes = ImmutableArray.Create<byte>(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length)));
         var runtimeMethod = Assembly.Load(runtimeBytes.ToArray()).GetType("Subject")!.GetMethod("CountUp")!;
         foreach (var input in RuntimeInputs)
         {

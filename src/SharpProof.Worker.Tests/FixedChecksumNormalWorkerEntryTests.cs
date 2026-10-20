@@ -614,7 +614,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             using var image = new MemoryStream();
             var emitted = ownedCompilation.Emit(image);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            evidence["ownedImageSha256"] = Hash(image.ToArray().ToImmutableArray());
+            evidence["ownedImageSha256"] = Hash(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
             await File.WriteAllBytesAsync(Path.Combine(output, "owned-image.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
             await File.WriteAllTextAsync(Path.Combine(output, "source.cs"), Source, new UTF8Encoding(false));
             evidence["compilationEnvironment"] = "Owned TestProject filtered references and temp document paths, not the original full-TPA artifact identity";

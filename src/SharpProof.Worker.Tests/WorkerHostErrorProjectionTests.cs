@@ -61,8 +61,8 @@ public sealed class WorkerHostErrorProjectionTests
         Assert.That(response.Summary.Budgets.MaximumExpressionDepth, Is.EqualTo(budgets.MaximumExpressionDepth));
         Assert.That(response.Errors, Has.Length.EqualTo(1));
         Assert.That(response.Errors[0].Code, Is.EqualTo(code));
-        var expectedMessage = new string(exception.GetBaseException().Message.Select(character =>
-            char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character).ToArray());
+        var expectedMessage = string.Concat(exception.GetBaseException().Message.Select(character =>
+            char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character));
         Assert.That(response.Errors[0].Message, Is.EqualTo(prefix + " " + expectedMessage));
         var validation = WorkerProtocolJson.Validate(response);
         Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));

@@ -71,7 +71,7 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             type.CreateType();
             using var emitted = new MemoryStream();
             builder.Save(emitted);
-            var image = emitted.ToArray().ToImmutableArray();
+            var image = ImmutableArray.Create<byte>(emitted.GetBuffer().AsSpan(0, checked((int)emitted.Length)));
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
             await File.WriteAllBytesAsync(imagePath, image.AsMemory(), TestContext.CurrentContext.CancellationToken);
 

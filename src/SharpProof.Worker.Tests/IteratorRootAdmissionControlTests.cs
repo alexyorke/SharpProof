@@ -49,7 +49,7 @@ public sealed class IteratorRootAdmissionControlTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True);
-        var bytes = image.ToArray().ToImmutableArray();
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
         var context = new AssemblyLoadContext("IteratorRootControl_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
