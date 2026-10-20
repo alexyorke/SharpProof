@@ -4981,3 +4981,7 @@ Eight intermediate native image-array copies are removed by freezing exact nativ
 ### IMM-M505: preserve native attribute identity and array operation subjects
 
 Nine array sites retain required subject behavior: explicit AllowedExceptionsAttribute array identity, Array.Clear mutation, constrained receiver/argument-order mutation, caller-observed floating-array mutation and exact native CLR array-index/domain/read inputs. Each current formal/consumer/assertion is reviewed directly. No code edit or new execution authority is inferred; final collection and remaining ownership/coverage/binding/archive work remain pending.
+
+### IMM-M506: immutable project, modifier, IR and IL observations
+
+Project path parts, two modifier-name observations, IR mask observations and two generic native-integer IL snapshots are immutable. Native integer/hex consumers use readonly spans. A selection-count assertion exposed the second IL root before verification; both sites are included in the completed batch. Actual gates pass 10 architecture, 4 contracts and 52 frontend cases. Literal/source-unit gates verify 4299/1071 and 1948. Six current coordinates and old array entries reconcile independently, leaving 95 unchecked local roots and zero Open C# coordinates. Final collection, coverage, binding, archive and exact-head workflows remain pending.

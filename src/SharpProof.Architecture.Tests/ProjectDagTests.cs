@@ -279,7 +279,7 @@ public sealed class ProjectDagTests
         var path = Path.Combine(AppContext.BaseDirectory, "architecture-items.tsv");
         foreach (var line in File.ReadLines(path))
         {
-            var parts = line.Split('|');
+            var parts = line.Split('|').ToImmutableArray();
             if (parts.Length != 3)
             {
                 throw new InvalidDataException("Invalid architecture inventory entry.");

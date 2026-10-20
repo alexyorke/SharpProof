@@ -101,7 +101,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var reader = pe.GetMetadataReader();
         var targetDefinition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
             .Single(candidate => reader.GetString(candidate.Name) == "Target");
-        var targetIl = pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!;
+        var targetIl = (pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         Assert.That(TraceCalls(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)))), Has.Length.EqualTo(enabled ? 1 : 0));
         if (!enabled)
         { Assert.That(targetIl, Is.EqualTo(OmittedTargetIl)); }
@@ -116,7 +116,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
             WrapperAttributes = method.GetAttributes().Length,
             CandidateCount = candidates.Length,
             Attribute = attribute.ToString(),
-            TargetIl = Convert.ToHexString(targetIl),
+            TargetIl = Convert.ToHexString(targetIl.AsSpan()),
             CoreSource = core,
             CallerSource = source
         }));
@@ -152,7 +152,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var metadata = pe.GetMetadataReader();
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
-        var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
+        var il = (pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
@@ -166,13 +166,13 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
             if (opcode == OpCodes.Call || opcode == OpCodes.Callvirt)
             {
-                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il, offset));
+                var handle = MetadataTokens.EntityHandle(BitConverter.ToInt32(il.AsSpan(offset..)));
                 var name = handle.Kind == HandleKind.MethodDefinition
                     ? metadata.GetString(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).Name)
                     : metadata.GetString(metadata.GetMemberReference((MemberReferenceHandle)handle).Name);

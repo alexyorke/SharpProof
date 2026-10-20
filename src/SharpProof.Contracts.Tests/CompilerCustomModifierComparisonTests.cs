@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -48,8 +49,8 @@ public sealed class CompilerCustomModifierComparisonTests
         Assert.That(rightSignature.RefKind, Is.EqualTo(RefKind.None));
         var leftModifiers = leftSignature.ReturnTypeCustomModifiers;
         var rightModifiers = rightSignature.ReturnTypeCustomModifiers;
-        var leftNames = (leftConventions ?? throw new ArgumentNullException(nameof(leftConventions))).Split(',', StringSplitOptions.TrimEntries);
-        var rightNames = (rightConventions ?? throw new ArgumentNullException(nameof(rightConventions))).Split(',', StringSplitOptions.TrimEntries);
+        var leftNames = (leftConventions ?? throw new ArgumentNullException(nameof(leftConventions))).Split(',', StringSplitOptions.TrimEntries).ToImmutableArray();
+        var rightNames = (rightConventions ?? throw new ArgumentNullException(nameof(rightConventions))).Split(',', StringSplitOptions.TrimEntries).ToImmutableArray();
         Assert.That(leftModifiers, Has.Length.EqualTo(leftNames.Length));
         Assert.That(rightModifiers, Has.Length.EqualTo(rightNames.Length));
         for (var index = 0; index < leftModifiers.Length; index++)
