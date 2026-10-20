@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -12,7 +13,7 @@ public sealed class CollectionApiSpecResolutionTests
     [Test]
     public void GetterEvidenceDoesNotApproveSettersInterfacesComparersOrResultRelations()
     {
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
         var compilation = CSharpCompilation.Create("CollectionResolution", references: paths.Append(typeof(Contract).Assembly.Location).Distinct(StringComparer.Ordinal).Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         Assert.That(resolved.Failures, Is.Empty);

@@ -670,7 +670,7 @@ public sealed class ClaimManifestBuilderTests
     [Test]
     public void EffectWireMappingsAreNamedAndExhaustive()
     {
-        var effects = Enum.GetValues<SharpProof.Effects.EffectContractKind>();
+        var effects = Enum.GetValues<SharpProof.Effects.EffectContractKind>().ToImmutableArray();
         foreach (var effect in effects)
         {
             Assert.That(
@@ -679,7 +679,7 @@ public sealed class ClaimManifestBuilderTests
         }
 
         var capabilities =
-            Enum.GetValues<SharpProof.Effects.EffectContractCapabilityKind>();
+            Enum.GetValues<SharpProof.Effects.EffectContractCapabilityKind>().ToImmutableArray();
         foreach (var capability in capabilities)
         {
             Assert.That(

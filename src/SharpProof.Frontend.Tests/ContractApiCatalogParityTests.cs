@@ -15,7 +15,7 @@ public sealed class ContractApiCatalogParityTests
         var methods = typeof(Contract).GetMethods(
             BindingFlags.Public |
             BindingFlags.Static |
-            BindingFlags.DeclaredOnly);
+            BindingFlags.DeclaredOnly).ToImmutableArray();
         var attributes = typeof(Contract).Assembly.GetExportedTypes()
             .Where(static type =>
                 type is null ? throw new System.ArgumentNullException(nameof(type)) : (!type.IsAbstract &&
@@ -149,7 +149,7 @@ public sealed class ContractApiCatalogParityTests
         if (parameters.IsDefault)
         { throw new System.ArgumentNullException(nameof(parameters)); }
         System.ArgumentNullException.ThrowIfNull(method);
-        var generic = method.GetGenericArguments();
+        var generic = method.GetGenericArguments().ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(method.IsGenericMethodDefinition, Is.True);

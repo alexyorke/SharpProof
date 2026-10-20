@@ -23,7 +23,7 @@ public sealed class ExceptionConstructorProfileOracleTests
         {
             foreach (var constructor in type.GetConstructors().Where(constructor => constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.GetParameters().All(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.ParameterType == typeof(string) || parameter.ParameterType == typeof(Exception))))
             {
-                var parameters = constructor.GetParameters();
+                var parameters = constructor.GetParameters().ToImmutableArray();
                 var id = "M:" + type.FullName!.Replace('+', '.') + ".#ctor" + (parameters.Length == 0 ? "" : "(" + string.Join(",", parameters.Select(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.ParameterType.FullName)) + ")");
                 var symbol = (IMethodSymbol)DocumentationCommentId.GetFirstSymbolForDeclarationId(id, compilation)!;
                 Assert.That(symbol, Is.Not.Null, id);
@@ -37,15 +37,15 @@ public sealed class ExceptionConstructorProfileOracleTests
                     foreach (var throws in ImmutableArray.Create(false, true))
                     {
                         var inner = new CallbackException(throws);
-                        var arguments = new object?[parameters.Length];
+                        var arguments = ImmutableArray.CreateBuilder<object?>(parameters.Length);
                         var remainder = combination;
                         for (var index = 0; index < parameters.Length; index++)
                         {
                             if (parameters[index].ParameterType == typeof(Exception))
-                            { arguments[index] = inner; continue; }
+                            { arguments.Add(inner); continue; }
                             var category = remainder % 3;
                             remainder /= 3;
-                            arguments[index] = category == 0 ? "message" : category == 1 ? "" : null;
+                            arguments.Add(category == 0 ? "message" : category == 1 ? "" : null);
                         }
                         var culture = new CallbackCulture(throws);
                         var previousUi = CultureInfo.CurrentUICulture;
@@ -56,7 +56,7 @@ public sealed class ExceptionConstructorProfileOracleTests
                             CultureInfo.CurrentUICulture = culture;
                             CultureInfo.CurrentCulture = culture;
                             culture.Armed = inner.Armed = true;
-                            _ = constructor.Invoke(arguments);
+                            _ = constructor.Invoke(arguments.ToImmutable().ToArray());
                         }
                         // Reflection's own wrapper can perform a resource lookup
                         // and let the marker escape before wrapping the failure.
