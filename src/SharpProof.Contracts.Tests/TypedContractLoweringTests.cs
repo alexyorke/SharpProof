@@ -12,7 +12,7 @@ using SharpProof.Verify;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class TypedContractLoweringTests
+internal sealed class TypedContractLoweringTests
 {
     [Test]
     public void ContractBindingEntryPointsHonorCancellation()

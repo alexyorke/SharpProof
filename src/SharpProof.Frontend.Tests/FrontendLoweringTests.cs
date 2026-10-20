@@ -11,7 +11,7 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class FrontendLoweringTests
+internal sealed class FrontendLoweringTests
 {
     private static readonly ImmutableArray<long> ElementValues = [4L, 8L, 15L];
 

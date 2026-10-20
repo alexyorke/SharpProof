@@ -5,7 +5,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrTypeMetadataAndDefaultControls
+internal sealed class IrTypeMetadataAndDefaultControls
 {
     [TestCase(IrExecutionSemantics.Legacy)]
     [TestCase(IrExecutionSemantics.Total)]

@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class PassiveCallableVcTests
+internal sealed class PassiveCallableVcTests
 {
     [TestCase(false, false, PassiveCallableFeasibilityKind.Feasible)]
     [TestCase(true, false, PassiveCallableFeasibilityKind.NoModeledNormalReturn)]

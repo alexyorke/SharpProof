@@ -4,7 +4,7 @@ namespace SharpProof.Ir;
 /// Canonical Boolean constructions used by callable verification.
 /// Each input belongs to the same factory and has Boolean type.
 /// </summary>
-public static class IrSemanticTerms
+internal static class IrSemanticTerms
 {
     public static IrTerm Guard(
         IrFactory factory,
@@ -75,7 +75,7 @@ public static class IrSemanticTerms
 
 }
 
-public static class IrTermAnalysis
+internal static class IrTermAnalysis
 {
     public static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {

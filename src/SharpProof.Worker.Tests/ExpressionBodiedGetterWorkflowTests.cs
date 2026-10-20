@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // `int P { get => 0; }`: the native verifier decides a caller of either
 // alike, and a false postcondition never yields a proof.
 [TestFixture]
-public sealed class ExpressionBodiedGetterWorkflowTests
+internal sealed class ExpressionBodiedGetterWorkflowTests
 {
     [TestCase("return Arrow + 1;", "return Accessor + 1;", 1, WorkerClaimOutcome.Proven)]
     [TestCase("return new Grid().Arrow + 1;", "return new Grid().Accessor + 1;", 1, WorkerClaimOutcome.Proven)]

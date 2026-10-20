@@ -5,7 +5,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrKernelTests
+internal sealed class IrKernelTests
 {
     [Test]
     public void FactoryInternsStringsTypesMembersAndLiteralTerms()

@@ -23,7 +23,7 @@ internal static partial class CSharpOperationSemantics
     }
 }
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     internal static bool IsStackReceiverType(ITypeSymbol? type)
     {

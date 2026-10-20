@@ -123,7 +123,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/net10/SharpProof.BuildTasks.deps.json",
         "tools/net10/SharpProof.BuildTasks.dll",
         "tools/net10/SharpProof.CompilerArtifact.dll",
-        "tools/net10/SharpProof.Dataflow.dll",
         "tools/net10/SharpProof.Host.dll",
         "tools/net10/SharpProof.Ir.dll",
         "tools/net10/SharpProof.Logging.dll",

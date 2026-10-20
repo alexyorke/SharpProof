@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public enum ContractClausePlacement
+internal enum ContractClausePlacement
 {
     ValidPrologue,
     Conditional,
@@ -10,13 +10,13 @@ public enum ContractClausePlacement
     Misplaced
 }
 
-public sealed partial class ContractClauseOccurrence
+internal sealed partial class ContractClauseOccurrence
 {
     public Location Location => Invocation.Syntax.GetLocation();
     public bool IsValid => Placement == ContractClausePlacement.ValidPrologue;
 }
 
-public sealed partial class ContractClauseInventory
+internal sealed partial class ContractClauseInventory
 {
     private readonly int _hasValidClause;
 

@@ -9,7 +9,7 @@ using SharpProof.Contracts;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class AnalyzerCoreClausePlacementModuleTests
+internal sealed class AnalyzerCoreClausePlacementModuleTests
 {
     private const string AnonymousReason = "preconditions inside lambda and anonymous methods cannot be enforced at delegate invocation sites";
     private const string LateReason = "expected the clause before every non-contract statement";

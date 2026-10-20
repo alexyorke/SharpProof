@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace SharpProof.Host;
 
-public sealed record ContainerContractInfo(
+internal sealed record ContainerContractInfo(
     int ContractVersion,
     string Platform,
     string DotNetSdkVersion,
@@ -22,7 +22,7 @@ public sealed record ContainerContractInfo(
     public string VerifierPackageId { get; init; } = VerifierPackageId ?? throw new ArgumentNullException(nameof(VerifierPackageId));
 }
 
-public static class ContainerContract
+internal static class ContainerContract
 {
     private const int MaximumContractBytes = 16 * 1024;
     private const string DefaultContractPath =

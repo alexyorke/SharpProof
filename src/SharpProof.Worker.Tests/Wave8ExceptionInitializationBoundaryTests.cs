@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ExceptionInitializationBoundaryTests
+internal sealed class Wave8ExceptionInitializationBoundaryTests
 {
     [TestCase("module-fault", false)]
     [TestCase("module-fault", true)]

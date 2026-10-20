@@ -13,7 +13,7 @@ using OperationId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrOperationTag>;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class AnalyzerCoreIrEffectCoverageTests
+internal sealed class AnalyzerCoreIrEffectCoverageTests
 {
     [TestCase(IrWriteRegion.Local, false)]
     [TestCase(IrWriteRegion.Parameter, true)]

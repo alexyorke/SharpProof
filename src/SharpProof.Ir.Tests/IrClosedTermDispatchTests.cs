@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrClosedTermDispatchTests
+internal sealed class IrClosedTermDispatchTests
 {
     [Test]
     public void PrinterPreservesGrammarForEveryRegisteredTermShape()

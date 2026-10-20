@@ -4,7 +4,7 @@ using SharpProof.Specs;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class ExternalEffectBoundaryTests
+internal sealed class ExternalEffectBoundaryTests
 {
     private static readonly ImmutableArray<string> s_exceptionNames = ["System.InvalidOperationException"];
 

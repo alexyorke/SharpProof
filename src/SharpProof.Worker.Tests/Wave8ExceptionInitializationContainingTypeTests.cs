@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ExceptionInitializationContainingTypeTests
+internal sealed class Wave8ExceptionInitializationContainingTypeTests
 {
     [TestCase("unused-containing-initializer", WorkerClaimOutcome.Proven)]
     public async Task NoFaultInitializationAndExistingCalleeBoundariesStayDistinct(string scenario, WorkerClaimOutcome expected)

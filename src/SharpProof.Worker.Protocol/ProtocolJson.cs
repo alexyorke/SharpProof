@@ -5,7 +5,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     internal static ImmutableArray<T> EmptyIfDefault<T>(
         ImmutableArray<T> values /* SPINT001: all values valid - default is the wire null sentinel */)

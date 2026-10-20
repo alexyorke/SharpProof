@@ -41,7 +41,7 @@ internal static partial class CSharpOperationSemantics
     }
 }
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly ImmutableHashSet<ISymbol>.Builder _exactLists = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
     private readonly ImmutableHashSet<CaptureId>.Builder _exactListCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();

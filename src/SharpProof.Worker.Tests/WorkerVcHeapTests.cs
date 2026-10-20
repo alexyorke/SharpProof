@@ -6,7 +6,7 @@ namespace SharpProof.Worker.Test;
 // Element stores carry their values: later reads and postconditions see them,
 // aliases are compared by identity, and Contract.Old reads entry contents.
 [TestFixture]
-public sealed class WorkerVcHeapTests
+internal sealed class WorkerVcHeapTests
 {
     private const string Source =
         """

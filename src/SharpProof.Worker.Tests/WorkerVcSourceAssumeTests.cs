@@ -10,7 +10,7 @@ namespace SharpProof.Worker.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class WorkerVcSourceAssumeTests
+internal sealed class WorkerVcSourceAssumeTests
 {
     internal const string Source = """
         using SharpProof.Attributes;

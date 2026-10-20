@@ -7,7 +7,7 @@ using SharpProof.Ir;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Pr275AdvisoryMarkerComparisonTests
+internal sealed class Pr275AdvisoryMarkerComparisonTests
 {
     [TestCase(IrBinaryOperator.Equal, false, 0)]
     [TestCase(IrBinaryOperator.NotEqual, false, 1)]

@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class InactiveConcatWorkflowBoundaryTests
+internal sealed class InactiveConcatWorkflowBoundaryTests
 {
     [TestCase("Contract.Result<bool>() == (unchecked(a.Length + b.Length + c.Length) >= 0)", WorkerClaimOutcome.Unknown)]
     [TestCase("Contract.Result<bool>() == true", WorkerClaimOutcome.Proven)]

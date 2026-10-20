@@ -22,7 +22,7 @@ internal static class IrFieldSites
 
 // The identity of an object in a counterexample, with its fields' values as
 // the callable entered.
-public sealed class IrObjectState
+internal sealed class IrObjectState
 {
     internal ImmutableDictionary<IrMemberId, IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<IrMemberId, IrValue>();
 

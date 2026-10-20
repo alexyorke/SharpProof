@@ -16,6 +16,9 @@
     "src/SharpProof.Smt/GlobalUsings.cs",
     "src/SharpProof.Specs/FrameworkTypeMetadataNames.cs",
     "eng/shared/Polyfills/NotNullAttribute.cs",
+    "eng/shared/Polyfills/EmbeddedAttribute.cs",
+    "src/SharpProof.Dataflow/IAbstractDomain.cs",
+    "src/SharpProof.Dataflow/NullnessValue.cs",
     "src/SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {

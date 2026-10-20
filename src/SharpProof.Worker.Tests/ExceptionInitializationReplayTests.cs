@@ -4,7 +4,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
 
-public sealed class ExceptionInitializationReplayTests
+internal sealed class ExceptionInitializationReplayTests
 {
     [TestCase("Argument")]
     [TestCase("ArgumentNull")]

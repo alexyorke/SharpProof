@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly ImmutableHashSet<ISymbol>.Builder _entryNullableDefaultComparers = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
     private readonly ImmutableHashSet<ISymbol>.Builder _nullableDefaultComparers = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);

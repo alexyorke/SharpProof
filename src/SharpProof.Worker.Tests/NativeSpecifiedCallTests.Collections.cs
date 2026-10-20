@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("System.Collections.Generic.List<int>")]
     [TestCase("System.Collections.Generic.Dictionary<int, int>")]

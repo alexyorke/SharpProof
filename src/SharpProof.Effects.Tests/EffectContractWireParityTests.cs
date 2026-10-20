@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectContractWireParityTests
+internal sealed class EffectContractWireParityTests
 {
     private static readonly ImmutableArray<(
         EffectRegionKind Region,

@@ -7,7 +7,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class PassiveLoopCutterTests
+internal sealed class PassiveLoopCutterTests
 {
     [TestCase("input")]
     [TestCase("cast")]

@@ -4,7 +4,7 @@ using System.Numerics;
 namespace SharpProof.Verify.Test;
 
 [TestFixture]
-public sealed class CallableTotalReplayTests
+internal sealed class CallableTotalReplayTests
 {
     [TestCase(false)]
     [TestCase(true)]

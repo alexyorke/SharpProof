@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcDefaultArrayTests
+internal sealed class WorkerVcDefaultArrayTests
 {
     [TestCase("int", "0")]
     [TestCase("uint", "0U")]

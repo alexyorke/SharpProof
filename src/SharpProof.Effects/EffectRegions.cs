@@ -1,6 +1,6 @@
 namespace SharpProof.Effects;
 
-public readonly record struct EffectRegionId : IComparable<EffectRegionId>
+internal readonly record struct EffectRegionId : IComparable<EffectRegionId>
 {
     public EffectRegionId(EffectRegionKind kind, int ordinal = 0)
     {
@@ -61,7 +61,7 @@ public readonly record struct EffectRegionId : IComparable<EffectRegionId>
     }
 }
 
-public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
+internal readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
 {
     private readonly ImmutableArray<EffectRegionId> _regions;
 

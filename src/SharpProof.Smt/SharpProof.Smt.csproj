@@ -9,6 +9,11 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+    <!-- Child process compiled at test time against this assembly. -->
+    <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Verify\SharpProof.Verify.csproj" />

@@ -6,21 +6,21 @@
 
 namespace SharpProof.Contracts;
 
-public enum BoundContractKind
+internal enum BoundContractKind
 {
     Requires,
     Ensures,
     Assume
 }
 
-public enum BoundContractEvidence
+internal enum BoundContractEvidence
 {
     CompilerBoundInvocation,
     ClosedAttribute,
     Companion
 }
 
-public enum BoundContractVariableRole
+internal enum BoundContractVariableRole
 {
     Receiver,
     Parameter,
@@ -28,7 +28,7 @@ public enum BoundContractVariableRole
     PreState
 }
 
-public enum ContractBindingFailure
+internal enum ContractBindingFailure
 {
     None,
     ContractApiUnavailable,
@@ -47,7 +47,7 @@ public enum ContractBindingFailure
     UnsupportedTarget
 }
 
-public sealed class BoundContractClause
+internal sealed class BoundContractClause
 {
     internal BoundContractClause(
         BoundContractKind kind,
@@ -73,7 +73,7 @@ public sealed class BoundContractClause
     public SyntaxReference? SourceSyntax { get; }
 }
 
-public sealed class BoundContractVariable
+internal sealed class BoundContractVariable
 {
     internal BoundContractVariable(
         ISymbol? symbol,
@@ -96,7 +96,7 @@ public sealed class BoundContractVariable
     public IrVarId? CurrentStateVariable { get; }
 }
 
-public sealed class BoundMethodContracts
+internal sealed class BoundMethodContracts
 {
     internal BoundMethodContracts(
         IMethodSymbol target,

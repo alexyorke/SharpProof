@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCaseSource(nameof(GenericArrayReturnCases))]
     public async Task GenericScalarDefaultsUseTheEstablishedScalarRepresentation(string element, bool local, bool correct)

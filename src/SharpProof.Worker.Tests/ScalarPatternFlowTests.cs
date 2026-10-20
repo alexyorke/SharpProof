@@ -14,7 +14,7 @@ namespace SharpProof.Worker.Test;
 // value with constants; each outcome is checked against CLR execution.
 [TestFixture]
 [NonParallelizable]
-public sealed class ScalarPatternFlowTests
+internal sealed class ScalarPatternFlowTests
 {
     private const string Prelude = "using SharpProof.Attributes; public static class C { public static int State; ";
 

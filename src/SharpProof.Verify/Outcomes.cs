@@ -4,7 +4,7 @@ namespace SharpProof.Verify;
     "Design",
     "CA1008",
     Justification = "The sparse numeric values are part of the proof-outcome contract.")]
-public enum AbstentionReason
+internal enum AbstentionReason
 {
     UnsupportedEncoding = 3,
     ResourceLimit = 4,
@@ -19,25 +19,25 @@ public enum AbstentionReason
     CounterexampleNotReplayable = 13
 }
 
-public abstract class ProofOutcome
+internal abstract class ProofOutcome
 {
     private protected ProofOutcome()
     {
     }
 }
 
-public sealed partial class ProvenOutcome : ProofOutcome
+internal sealed partial class ProvenOutcome : ProofOutcome
 {
 }
 
-public sealed partial class ValidatedModel
+internal sealed partial class ValidatedModel
 {
 }
 
-public sealed partial class RefutedOutcome : ProofOutcome
+internal sealed partial class RefutedOutcome : ProofOutcome
 {
 }
 
-public sealed partial class UnknownOutcome : ProofOutcome
+internal sealed partial class UnknownOutcome : ProofOutcome
 {
 }

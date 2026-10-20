@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Specs;
 
-public sealed partial class SpecInstantiationResult
+internal sealed partial class SpecInstantiationResult
 {
     private SpecInstantiationResult(
         SpecInstantiationStatus status,
@@ -25,13 +25,13 @@ public sealed partial class SpecInstantiationResult
     public SpecInstantiationFailure? Failure { get; }
 }
 
-public sealed partial record SpecInstantiationFailure(
+internal sealed partial record SpecInstantiationFailure(
     SpecInstantiationFailureKind Kind,
     SpecVarId? Variable,
     string Detail
 );
 
-public static partial class ApiSpecInstantiator
+internal static partial class ApiSpecInstantiator
 {
     private sealed partial class Instantiation
     {

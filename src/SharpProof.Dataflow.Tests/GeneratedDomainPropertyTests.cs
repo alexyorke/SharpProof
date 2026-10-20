@@ -366,7 +366,7 @@ internal static class GeneratedDomainSamples
     }
 }
 
-public abstract class GeneratedDomainPropertyTests<T>
+internal abstract class GeneratedDomainPropertyTests<T>
 {
     protected abstract IAbstractDomain<T> Domain { get; }
     protected abstract int Seed { get; }
@@ -391,7 +391,7 @@ public abstract class GeneratedDomainPropertyTests<T>
 }
 
 [TestFixture]
-public sealed class GeneratedIntervalDomainPropertyTests :
+internal sealed class GeneratedIntervalDomainPropertyTests :
     GeneratedDomainPropertyTests<IntervalValue>
 {
     protected override int Seed => 0x51A2;
@@ -443,7 +443,7 @@ public sealed class GeneratedIntervalDomainPropertyTests :
 }
 
 [TestFixture]
-public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
+internal sealed class GeneratedSequenceCardinalityDomainPropertyTests :
     GeneratedDomainPropertyTests<SequenceCardinalityValue>
 {
     protected override int Seed => 0x7E91;
@@ -476,7 +476,7 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
 }
 
 [TestFixture]
-public sealed class GeneratedNullnessDomainPropertyTests :
+internal sealed class GeneratedNullnessDomainPropertyTests :
     GeneratedDomainPropertyTests<NullnessValue>
 {
     protected override int Seed => 0x19F3;

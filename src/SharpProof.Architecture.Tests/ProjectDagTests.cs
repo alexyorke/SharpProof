@@ -15,7 +15,7 @@ public sealed class ProjectDagTests
             new("ConsoleLoggingAnalyzer", []),
             new("DefensiveCodingAnalyzer", []),
             new("SharpProof.Analyzer", ["SharpProof.Analyzer.Core"]),
-            new("SharpProof.Analyzer.Core", ["SharpProof.Compiler.Semantics"]),
+            new("SharpProof.Analyzer.Core", ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"]),
             new("SharpProof.Compiler.Semantics", ["SharpProof.Contracts", "SharpProof.Effects"]),
             new("SharpProof.Attributes", []),
             new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
@@ -54,13 +54,13 @@ public sealed class ProjectDagTests
             new("SharpProof.Smt", ["SharpProof.Verify"]),
             new("SharpProof.Specs", ["SharpProof.Ir"]),
             new("SharpProof.Tool", ["SharpProof.Worker.Protocol"]),
-            new("SharpProof.Verify", ["SharpProof.Specs"]),
+            new("SharpProof.Verify", ["SharpProof.Ir"]),
             new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
-                "SharpProof.Dataflow",
                 "SharpProof.Host",
                 "SharpProof.Logging",
-                "SharpProof.Smt"
+                "SharpProof.Smt",
+                "SharpProof.Specs"
             ]),
             new("SharpProof.Worker.Protocol", []),
         ]);

@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Contracts;
 
-public sealed partial class ContractClauseOccurrence
+internal sealed partial class ContractClauseOccurrence
 {
     internal ContractClauseOccurrence(
         BoundContractKind kind,
@@ -28,7 +28,7 @@ public sealed partial class ContractClauseOccurrence
     public IInvocationOperation Invocation { get; }
 }
 
-public sealed partial class ContractClauseInventory
+internal sealed partial class ContractClauseInventory
 {
     internal ContractClauseInventory(
         IMethodSymbol callable,
@@ -52,7 +52,7 @@ public sealed partial class ContractClauseInventory
     public ImmutableArray<ContractClauseOccurrence> Clauses { get; }
 }
 
-public sealed partial class ContractBindingResult
+internal sealed partial class ContractBindingResult
 {
     private ContractBindingResult(BoundMethodContracts? contracts, ContractBindingFailure failure)
     {

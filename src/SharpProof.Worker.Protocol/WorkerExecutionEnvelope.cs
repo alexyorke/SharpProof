@@ -1,6 +1,6 @@
 namespace SharpProof.Worker.Protocol;
 
-public static class WorkerExecutionEnvelope
+internal static class WorkerExecutionEnvelope
 {
     public const long MaximumProducerElapsedMilliseconds = 922337203685477L;
     public const int CleanupReserveMilliseconds = 100;

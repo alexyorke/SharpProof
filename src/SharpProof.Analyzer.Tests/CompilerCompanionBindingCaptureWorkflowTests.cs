@@ -11,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class CompilerCompanionBindingCaptureWorkflowTests
+internal sealed class CompilerCompanionBindingCaptureWorkflowTests
 {
     [TestCase("missing", ContractBindingFailure.MissingCompanion)]
     [TestCase("ambiguous", ContractBindingFailure.AmbiguousCompanion)]

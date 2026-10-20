@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Specs;
 
-public sealed partial class ApiSpecLookupResult
+internal sealed partial class ApiSpecLookupResult
 {
     public ApiSpecLookupResult(ApiSpecLookupStatus status, ResolvedApiSpec? spec, ApiSpecLookupFailure? failure)
     {
@@ -18,16 +18,16 @@ public sealed partial class ApiSpecLookupResult
     public ApiSpecLookupFailure? Failure { get; }
 }
 
-public sealed partial record ApiSpecResolutionFailure(
+internal sealed partial record ApiSpecResolutionFailure(
     SpecId Spec,
     string WitnessIdentifier,
     ApiSpecResolutionFailureKind Kind,
     string Detail
 );
 
-public sealed partial record ResolvedApiSpec(ApiSpecTemplate Template, ISymbol Symbol);
+internal sealed partial record ResolvedApiSpec(ApiSpecTemplate Template, ISymbol Symbol);
 
-public sealed partial record ApiSpecLookupFailure(
+internal sealed partial record ApiSpecLookupFailure(
     ApiSpecLookupFailureKind Kind,
     string SymbolIdentifier,
     string Detail

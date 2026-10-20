@@ -7,7 +7,7 @@ using SharpProof.Testing;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class TotalCompanionIntrinsicValidationTests
+internal sealed class TotalCompanionIntrinsicValidationTests
 {
     [TestCase("_ = Contract.Result<int>();", ContractBindingFailure.ResultOutsideEnsures)]
     [TestCase("_ = Contract.Old(value);", ContractBindingFailure.OldOutsideEnsures)]

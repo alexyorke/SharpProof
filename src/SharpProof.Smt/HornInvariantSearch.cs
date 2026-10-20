@@ -6,7 +6,7 @@ namespace SharpProof.Smt;
 // integer reading, where bitvector arithmetic does not wrap; only bitvector
 // and boolean clauses are searched. A proposal is a guess: callers keep only
 // what the proof kernel then proves over bitvectors.
-public static class HornInvariantSearch
+internal static class HornInvariantSearch
 {
     public static ImmutableDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, ImmutableArray<VerificationQuery> clauses,
         ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)

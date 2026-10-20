@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrHeapReplayTests
+internal sealed class IrHeapReplayTests
 {
     [TestCase(false, false)]
     [TestCase(false, true)]

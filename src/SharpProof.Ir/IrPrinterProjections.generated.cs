@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Ir;
 
-public sealed partial class IrPrinter
+internal sealed partial class IrPrinter
 {
     private string Format(IrTerm term, int depth)
     {

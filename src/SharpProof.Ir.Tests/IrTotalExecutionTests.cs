@@ -5,7 +5,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrTotalExecutionTests
+internal sealed class IrTotalExecutionTests
 {
     [Test]
     public void AssignmentObservationsRetainApproximationStateAtEachCheckpoint()

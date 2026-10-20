@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     private static JsonSerializerOptions CreateOptions()
     {

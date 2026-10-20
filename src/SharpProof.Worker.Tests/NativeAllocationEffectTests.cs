@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeAllocationEffectTests
+internal sealed class NativeAllocationEffectTests
 {
     [Test]
     public void DelegateNullEmissionDistinguishesEscapingAndErasedConstruction()

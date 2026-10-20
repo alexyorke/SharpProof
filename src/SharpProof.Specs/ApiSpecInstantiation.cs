@@ -1,12 +1,12 @@
 namespace SharpProof.Specs;
 
-public enum SpecInstantiationStatus
+internal enum SpecInstantiationStatus
 {
     Succeeded,
     Failed
 }
 
-public enum SpecInstantiationFailureKind
+internal enum SpecInstantiationFailureKind
 {
     MissingSubstitution,
     ForeignVariable,
@@ -16,7 +16,7 @@ public enum SpecInstantiationFailureKind
     InvalidExpression
 }
 
-public sealed partial class SpecInstantiationResult
+internal sealed partial class SpecInstantiationResult
 {
     internal static SpecInstantiationResult Succeeded(
         ImmutableArray<IrTerm> postconditions,
@@ -38,7 +38,7 @@ public sealed partial class SpecInstantiationResult
     }
 }
 
-public static partial class ApiSpecInstantiator
+internal static partial class ApiSpecInstantiator
 {
     public static SpecInstantiationResult InstantiatePostconditions(
         ApiSpecTemplate template, IrFactory factory,

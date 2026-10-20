@@ -7,7 +7,7 @@ internal enum DataflowAnalysisFailure
     IterationLimit
 }
 
-public sealed class ForwardDataflowAnalysisOptions(
+internal sealed class ForwardDataflowAnalysisOptions(
     int widenAfter = ForwardDataflowAnalysisOptions.DefaultWidenAfter,
     int maxIterations = ForwardDataflowAnalysisOptions.DefaultMaximumIterations)
 {
@@ -24,7 +24,7 @@ public sealed class ForwardDataflowAnalysisOptions(
     } = ArgumentNullGuard.RequirePositive(maxIterations, nameof(maxIterations));
 }
 
-public sealed class DataflowAnalysisResult<T>
+internal sealed class DataflowAnalysisResult<T>
 {
     internal DataflowAnalysisResult(
         ImmutableArray<T> inputStates,
@@ -70,7 +70,7 @@ public sealed class DataflowAnalysisResult<T>
 /// degrade gracefully can catch it specifically instead of every
 /// <see cref="InvalidOperationException"/>.
 /// </summary>
-public sealed class DataflowConvergenceException : InvalidOperationException
+internal sealed class DataflowConvergenceException : InvalidOperationException
 {
     public DataflowConvergenceException()
         : this("The dataflow analysis did not converge within its iteration limit.")
@@ -94,7 +94,7 @@ public sealed class DataflowConvergenceException : InvalidOperationException
 /// <summary>
 /// Deterministic, round-based forward worklist solver.
 /// </summary>
-public static class ForwardDataflowAnalysis
+internal static class ForwardDataflowAnalysis
 {
     public static DataflowAnalysisResult<T> Analyze<T>(
         DataflowGraph<T> graph,

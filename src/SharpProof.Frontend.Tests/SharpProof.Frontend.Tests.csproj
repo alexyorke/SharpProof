@@ -6,7 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\eng\testing\TestCompilation.cs" Link="TestCompilation.cs" />
-    <Compile Include="..\SharpProof.Ir\ImmutableDictionaryCapture.cs" Link="ImmutableDictionaryCapture.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />

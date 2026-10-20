@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class EmptyArrayCacheControlTests
+internal sealed class EmptyArrayCacheControlTests
 {
     [TestCase("[ZeroAllocations]", "return 7;", WorkerClaimOutcome.Proven)]
     [TestCase("[ZeroAllocations]", "return new Cell[0].Length;", WorkerClaimOutcome.Refuted)]

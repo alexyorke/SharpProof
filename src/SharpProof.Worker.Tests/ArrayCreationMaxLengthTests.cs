@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // OutOfMemoryException ("Array dimensions exceeded supported range") whatever
 // memory is free, so a nonnegative length alone does not make creation safe.
 [TestFixture]
-public sealed class ArrayCreationMaxLengthTests
+internal sealed class ArrayCreationMaxLengthTests
 {
     [TestCase("public static byte[] Target(int n) { Contract.Requires(n >= 0); return new byte[n]; }")]
     [TestCase("public static int Target(int n) { Contract.Requires(n >= 0); return new long[n].Length; }")]

@@ -13,7 +13,7 @@ using Program = SharpProof.Worker.Launcher.Program;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-public sealed class LauncherArgumentTests
+internal sealed class LauncherArgumentTests
 {
     private const string SarifProjectDirectory = "/source";
     private const string ValidInputHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

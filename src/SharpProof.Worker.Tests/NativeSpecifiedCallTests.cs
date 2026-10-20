@@ -9,7 +9,7 @@ namespace SharpProof.Worker.Test;
 // An API specification narrows an opaque call to its declared facets; a call
 // without one, or a dispatched call, may do anything.
 [TestFixture]
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [Test]
     public async Task SpecifiedPureCallsProveEveryEffectClaim()

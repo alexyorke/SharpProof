@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using SharpProof.Specs;
 
 namespace SharpProof.Verify.Test;
 
@@ -11,17 +10,11 @@ public sealed class VerificationBoundaryTests
     {
         var factory = new IrFactory();
         var goal = FalseGoal(factory);
-        var spec = ApiSpecTable.Default.Templates[0].Id;
 
         Assert.That(new SourceLocationId(42).ToString(), Is.EqualTo("location42"));
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
         {
             _ = new SourceLocationId(-1);
-        }));
-        Assert.That(new SpecJustification(spec).Spec, Is.EqualTo(spec));
-        Assert.Throws<ArgumentException>((Action)(() =>
-        {
-            _ = new SpecJustification(default);
         }));
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
         {

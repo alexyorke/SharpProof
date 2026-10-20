@@ -3,7 +3,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
 
-public sealed class IntegralConvertInitializationReplayTests
+internal sealed class IntegralConvertInitializationReplayTests
 {
     [TestCase("System_Boolean")]
     [TestCase("System_SByte")]

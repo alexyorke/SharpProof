@@ -5,7 +5,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class WorkerTests
+internal sealed partial class WorkerTests
 {
     [TestCase(false)]
     [TestCase(true)]

@@ -57,7 +57,7 @@ try {
     $escapedProtocol = [Security.SecurityElement]::Escape($protocolPath)
     [IO.File]::WriteAllText($fixtureProject, @"
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><AssemblyName>SharpProof.Tool.ConsumerFixture</AssemblyName></PropertyGroup>
   <ItemGroup><Reference Include="SharpProof.Worker.Protocol"><HintPath>$escapedProtocol</HintPath></Reference></ItemGroup>
 </Project>
 "@)

@@ -35,7 +35,7 @@ internal static partial class CSharpOperationSemantics
     }
 }
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly ImmutableHashSet<ISymbol>.Builder _defaultDictionaries = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
     private readonly ImmutableHashSet<CaptureId>.Builder _defaultDictionaryCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();

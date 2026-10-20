@@ -6,7 +6,7 @@ using SharpProof.Verify;
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
-public sealed class InactiveConcatLengthBoundaryTests
+internal sealed class InactiveConcatLengthBoundaryTests
 {
     [TestCase(1, BackendCheckStatus.Satisfiable, BackendFailureReason.None)]
     [TestCase(800_000_000, BackendCheckStatus.Unknown, BackendFailureReason.ResourceLimit)]

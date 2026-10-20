@@ -15,7 +15,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerTcbEdgeCaseTests
+internal sealed class WorkerTcbEdgeCaseTests
 {
     private const string CacheFileSuffix = VerificationCache.CacheFileSuffix;
 

@@ -1,6 +1,6 @@
 namespace SharpProof.Specs;
 
-public sealed partial class ApiSpecTable
+internal sealed partial class ApiSpecTable
 {
     private static readonly SpecEffect DefinedEffects =
         Enum.GetValues(typeof(SpecEffect))

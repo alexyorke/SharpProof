@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace SharpProof.Fuzz;
 
-public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
+internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
 {
     public const int DefaultCases = 1000;
     public const int MaximumCases = 1_000_000;
@@ -93,7 +93,7 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
     }
 }
 
-public sealed class FuzzUsageException : Exception
+internal sealed class FuzzUsageException : Exception
 {
     public FuzzUsageException()
     {

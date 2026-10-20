@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class InactiveConcatWorkflowControlTests
+internal sealed class InactiveConcatWorkflowControlTests
 {
     [TestCase(false, false, WorkerClaimOutcome.Proven)]
     [TestCase(false, true, WorkerClaimOutcome.Refuted)]

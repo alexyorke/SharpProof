@@ -5,7 +5,7 @@ using SharpProof.Fuzz;
 namespace SharpProof.Fuzz.Test;
 
 [TestFixture]
-public sealed class Pr275NestedCSharpStructuralCandidateTests
+internal sealed class Pr275NestedCSharpStructuralCandidateTests
 {
     [TestCaseSource(nameof(NestedExpressions))]
     public void ActualNestedCandidatesRetainCompiledCSharpAndIrAgreement(

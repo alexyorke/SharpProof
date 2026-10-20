@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // Length is not the intrinsic sequence length that single-dimensional arrays
 // and strings lower to.
 [TestFixture]
-public sealed class MultidimensionalArrayLengthTests
+internal sealed class MultidimensionalArrayLengthTests
 {
     [TestCase("int Target(int[,] a)", "a != null", "Contract.Result<int>() == 1", "return a.Length;")]
     [TestCase("int Target(int[,] a)", "a != null && a.Length == 1", "Contract.Result<int>() == 0", "return 1;")]

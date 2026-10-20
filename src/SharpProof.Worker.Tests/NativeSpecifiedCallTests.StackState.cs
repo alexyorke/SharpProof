@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.Stack<int>() { }; data.Push(17); return data.Count + data.Pop();", 18)]
     [TestCase("var data = new System.Collections.Generic.Stack<int>(); data.Push(17); data.Push(data.Pop() + 1); return data.Pop() + data.Count;", 18)]

@@ -9,7 +9,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractInvocationMaterializationBoundaryTests
+internal sealed class ContractInvocationMaterializationBoundaryTests
 {
     private static readonly ImmutableArray<bool> BooleanValues = [false, true];
     private static readonly ImmutableArray<BoundContractKind> FullKinds =

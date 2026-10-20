@@ -12,6 +12,8 @@
     <Compile Include="..\..\eng\shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+             Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
@@ -34,7 +36,14 @@
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <InternalsVisibleTo Include="SharpProof.Testing.Test" />
+    <InternalsVisibleTo Include="SharpProof.Verify.Test" />
+    <!-- Child process compiled at test time against this assembly. -->
+    <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs" Link="ArgumentNullGuard.cs" />

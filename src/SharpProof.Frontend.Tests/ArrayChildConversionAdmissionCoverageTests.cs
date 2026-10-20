@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class ArrayChildConversionAdmissionCoverageTests
+internal sealed class ArrayChildConversionAdmissionCoverageTests
 {
     [TestCase("receiver", FrontendAbstention.UnsupportedOperationKind)]
     [TestCase("index", FrontendAbstention.ConversionMayChangeValue)]

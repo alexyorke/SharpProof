@@ -1,6 +1,6 @@
 namespace SharpProof.Effects;
 
-public sealed record EffectSummary
+internal sealed record EffectSummary
 {
     private EffectSummary(bool isBottom)
     {
@@ -149,7 +149,7 @@ public sealed record EffectSummary
     }
 }
 
-public sealed class EffectSummaryDomain : ClosedAbstractDomain<EffectSummary>
+internal sealed class EffectSummaryDomain : ClosedAbstractDomain<EffectSummary>
 {
     public static EffectSummaryDomain Instance { get; } = new();
 

@@ -8,23 +8,23 @@ using System.Text.Json.Serialization;
 
 namespace SharpProof.Worker.Protocol;
 
-public static class WorkerProtocolVersions
+internal static class WorkerProtocolVersions
 {
     public const string Current = "13";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
-public static class WorkerCacheVersions
+internal static class WorkerCacheVersions
 {
     public const int Current = 15;
 }
 
-public static class WorkerManifestVersions
+internal static class WorkerManifestVersions
 {
     public const int Current = 5;
 }
 
-public static class WorkerLauncherDefaults
+internal static class WorkerLauncherDefaults
 {
     public const int TerminationGraceMilliseconds = 1000;
     public const int MaximumTerminationGraceMilliseconds = 300000;
@@ -32,7 +32,7 @@ public static class WorkerLauncherDefaults
     public const int ResultPublicationTimeoutMilliseconds = 30_000;
 }
 
-public sealed record WorkerVerifyRequest
+internal sealed record WorkerVerifyRequest
 {
     [JsonRequired]
     public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
@@ -48,7 +48,7 @@ public sealed record WorkerVerifyRequest
     public WorkerAssumptionPolicy AssumptionPolicy { get; init; } = WorkerAssumptionPolicy.Allow;
 }
 
-public sealed record WorkerFileReference
+internal sealed record WorkerFileReference
 {
     [JsonRequired]
     public string Path { get; init; } = string.Empty;
@@ -56,7 +56,7 @@ public sealed record WorkerFileReference
     public string Sha256 { get; init; } = string.Empty;
 }
 
-public enum WorkerFeatureSet
+internal enum WorkerFeatureSet
 {
     Unspecified = 0,
     Effects = 1,
@@ -64,7 +64,7 @@ public enum WorkerFeatureSet
     All = 3
 }
 
-public enum WorkerVerifyPolicy
+internal enum WorkerVerifyPolicy
 {
     Unspecified = 0,
     Advisory = 1,
@@ -72,7 +72,7 @@ public enum WorkerVerifyPolicy
     RequireProven = 3
 }
 
-public enum WorkerAssumptionPolicy
+internal enum WorkerAssumptionPolicy
 {
     Unspecified = 0,
     Allow = 1,
@@ -80,7 +80,7 @@ public enum WorkerAssumptionPolicy
     Error = 3
 }
 
-public sealed class WorkerBudgets
+internal sealed class WorkerBudgets
 {
     public const int MaximumParallelism = 4;
     public const uint DefaultQueryRlimit = SharpProof.Configuration.SolverDefaults.QueryRlimit;
@@ -103,7 +103,7 @@ public sealed class WorkerBudgets
     public int MaximumExpressionDepth { get; set; } = DefaultMaximumExpressionDepth;
 }
 
-public sealed record WorkerCacheOptions
+internal sealed record WorkerCacheOptions
 {
     public const bool DefaultEnabled = true;
     public const long DefaultMaximumBytes = 536870912L;
@@ -115,28 +115,28 @@ public sealed record WorkerCacheOptions
     public long MaximumBytes { get; init; } = DefaultMaximumBytes;
 }
 
-public enum WorkerSelectedFeature
+internal enum WorkerSelectedFeature
 {
     Unspecified = 0,
     Effects = 1,
     Contracts = 2
 }
 
-public enum WorkerSelectionReason
+internal enum WorkerSelectionReason
 {
     Unspecified = 0,
     ExplicitAnnotation = 1,
     DiscoveredPostcondition = 2
 }
 
-public enum WorkerClaimKind
+internal enum WorkerClaimKind
 {
     Unspecified = 0,
     Postcondition = 1,
     Effect = 2
 }
 
-public enum WorkerClaimEvidence
+internal enum WorkerClaimEvidence
 {
     Unspecified = 0,
     DirectClause = 1,
@@ -145,7 +145,7 @@ public enum WorkerClaimEvidence
     Attribute = 4
 }
 
-public enum WorkerEffectContractKind
+internal enum WorkerEffectContractKind
 {
     Unspecified = 0,
     EnforcePure = 1,
@@ -156,7 +156,7 @@ public enum WorkerEffectContractKind
     EffectContract = 6
 }
 
-public sealed record WorkerSourceLocation
+internal sealed record WorkerSourceLocation
 {
     [JsonRequired]
     public string Path { get; init; } = string.Empty;
@@ -170,7 +170,7 @@ public sealed record WorkerSourceLocation
     public int Column { get; init; }
 }
 
-public sealed record WorkerCallableManifestEntry
+internal sealed record WorkerCallableManifestEntry
 {
     [JsonRequired]
     public string CallableId { get; init; } = string.Empty;
@@ -190,7 +190,7 @@ public sealed record WorkerCallableManifestEntry
     public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
-public sealed record WorkerClaimManifestEntry
+internal sealed record WorkerClaimManifestEntry
 {
     [JsonRequired]
     public string ClaimId { get; init; } = string.Empty;
@@ -208,7 +208,7 @@ public sealed record WorkerClaimManifestEntry
     public WorkerSourceLocation Location { get; init; } = new();
 }
 
-public sealed record WorkerClaimManifest
+internal sealed record WorkerClaimManifest
 {
     [JsonRequired]
     public int SchemaVersion { get; init; } = WorkerManifestVersions.Current;
@@ -222,7 +222,7 @@ public sealed record WorkerClaimManifest
     public ImmutableArray<WorkerClaimManifestEntry> Claims { get; set; } = [];
 }
 
-public enum WorkerRunStatus
+internal enum WorkerRunStatus
 {
     Unspecified = 0,
     Complete = 1,
@@ -231,7 +231,7 @@ public enum WorkerRunStatus
     Failed = 4
 }
 
-public enum WorkerRunFailureReason
+internal enum WorkerRunFailureReason
 {
     Unspecified = 0,
     None = 1,
@@ -246,14 +246,14 @@ public enum WorkerRunFailureReason
     ContainmentFailure = 10
 }
 
-public enum WorkerCallableCoverage
+internal enum WorkerCallableCoverage
 {
     Unspecified = 0,
     Complete = 1,
     Incomplete = 2
 }
 
-public enum WorkerCallableCoverageReason
+internal enum WorkerCallableCoverageReason
 {
     Unspecified = 0,
     None = 1,
@@ -267,7 +267,7 @@ public enum WorkerCallableCoverageReason
     InfrastructureFailure = 9
 }
 
-public enum WorkerClaimOutcome
+internal enum WorkerClaimOutcome
 {
     Unspecified = 0,
     Proven = 1,
@@ -275,7 +275,7 @@ public enum WorkerClaimOutcome
     Unknown = 3
 }
 
-public enum WorkerEffectEvidenceCertainty
+internal enum WorkerEffectEvidenceCertainty
 {
     Unspecified = 0,
     IncompleteMayEffectSummary = 1,
@@ -287,7 +287,7 @@ public enum WorkerEffectEvidenceCertainty
 }
 
 [Flags]
-public enum WorkerEffectSet : long
+internal enum WorkerEffectSet : long
 {
     None = 0L,
     ReadsReceiverState = 1L,
@@ -310,7 +310,7 @@ public enum WorkerEffectSet : long
 }
 
 [Flags]
-public enum WorkerEffectCapabilitySet
+internal enum WorkerEffectCapabilitySet
 {
     None = 0,
     IO = 1,
@@ -329,14 +329,14 @@ public enum WorkerEffectCapabilitySet
     AllKnown = 8191
 }
 
-public enum WorkerVacuityKind
+internal enum WorkerVacuityKind
 {
     None = 0,
     ContradictoryPreconditions = 1,
     NoModeledNormalReturn = 2
 }
 
-public enum WorkerClaimReason
+internal enum WorkerClaimReason
 {
     Unspecified = 0,
     None = 1,
@@ -361,7 +361,7 @@ public enum WorkerClaimReason
     SolverIncomplete = 20
 }
 
-public enum WorkerAssumptionKind
+internal enum WorkerAssumptionKind
 {
     Unspecified = 0,
     Precondition = 1,
@@ -372,7 +372,7 @@ public enum WorkerAssumptionKind
     NormalCompletion = 6
 }
 
-public sealed record WorkerAssumptionEvidence
+internal sealed record WorkerAssumptionEvidence
 {
     [JsonRequired]
     public string Id { get; init; } = string.Empty;
@@ -382,7 +382,7 @@ public sealed record WorkerAssumptionEvidence
     public bool Used { get; init; }
 }
 
-public sealed record WorkerCallableResult
+internal sealed record WorkerCallableResult
 {
     [JsonRequired]
     public string CallableId { get; init; } = string.Empty;
@@ -395,7 +395,7 @@ public sealed record WorkerCallableResult
     public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
-public sealed record WorkerClaimResult
+internal sealed record WorkerClaimResult
 {
     [JsonRequired]
     public string ClaimId { get; init; } = string.Empty;
@@ -420,7 +420,7 @@ public sealed record WorkerClaimResult
     public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
-public sealed record WorkerEffectViolationWitness
+internal sealed record WorkerEffectViolationWitness
 {
     [JsonRequired]
     public string Kind { get; init; } = string.Empty;
@@ -437,7 +437,7 @@ public sealed record WorkerEffectViolationWitness
     public WorkerSourceLocation Location { get; init; } = new();
 }
 
-public sealed record WorkerModelValue
+internal sealed record WorkerModelValue
 {
     [JsonRequired]
     public string Variable { get; init; } = string.Empty;
@@ -447,7 +447,7 @@ public sealed record WorkerModelValue
     public string Value { get; init; } = string.Empty;
 }
 
-public enum WorkerCacheStatus
+internal enum WorkerCacheStatus
 {
     Unspecified = 0,
     Disabled = 1,
@@ -458,7 +458,7 @@ public enum WorkerCacheStatus
     Unavailable = 6
 }
 
-public sealed record WorkerVersionSummary
+internal sealed record WorkerVersionSummary
 {
     [JsonRequired]
     public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
@@ -476,7 +476,7 @@ public sealed record WorkerVersionSummary
     public string ApiSpecContentSha256 { get; init; } = WorkerProtocolVersions.EmptySha256;
 }
 
-public sealed record WorkerVerificationSummary
+internal sealed record WorkerVerificationSummary
 {
     [JsonRequired]
     public bool CacheHit { get; init; }
@@ -490,7 +490,7 @@ public sealed record WorkerVerificationSummary
     public long ElapsedMilliseconds { get; init; }
 }
 
-public sealed record WorkerProtocolError
+internal sealed record WorkerProtocolError
 {
     [JsonRequired]
     public string Code { get; init; } = string.Empty;
@@ -498,7 +498,7 @@ public sealed record WorkerProtocolError
     public string Message { get; init; } = string.Empty;
 }
 
-public sealed record WorkerVerifyResponse
+internal sealed record WorkerVerifyResponse
 {
     [JsonRequired]
     public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
@@ -525,7 +525,7 @@ public sealed record WorkerVerifyResponse
     public ImmutableArray<WorkerProtocolError> Errors { get; set; } = [];
 }
 
-public sealed class WorkerProtocolValidationResult
+internal sealed class WorkerProtocolValidationResult
 {
     internal WorkerProtocolValidationResult(IEnumerable<WorkerProtocolError> errors) =>
         Errors = [.. errors];

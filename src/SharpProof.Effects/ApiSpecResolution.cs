@@ -6,7 +6,7 @@ using SharpProof.Effects;
 using SharpProof.Ir;
 namespace SharpProof.Specs;
 
-public enum ApiSpecResolutionFailureKind
+internal enum ApiSpecResolutionFailureKind
 {
     MissingContainingType,
     AmbiguousContainingType,
@@ -16,16 +16,16 @@ public enum ApiSpecResolutionFailureKind
     AmbiguousMember,
     DuplicateResolvedSymbol
 }
-public enum ApiSpecLookupStatus
+internal enum ApiSpecLookupStatus
 {
     Resolved,
     Unknown
 }
-public enum ApiSpecLookupFailureKind
+internal enum ApiSpecLookupFailureKind
 {
     UnspecifiedMember
 }
-public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedApiSpec> specs,
+internal sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedApiSpec> specs,
     ImmutableArray<ApiSpecResolutionFailure> failures)
 {
     private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs =
@@ -96,7 +96,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
         };
     }
 }
-public sealed class ApiSpecResolver(ApiSpecTable table)
+internal sealed class ApiSpecResolver(ApiSpecTable table)
 {
     private static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers =
         EffectContractMappingCatalog.ReferenceFamilyMarkers;

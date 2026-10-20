@@ -20,3 +20,6 @@ dotnet_diagnostic.CA1508.severity = none
 # CA1062 (validate arguments of public methods) is enabled explicitly so the
 # defensive-coding audit keeps its null guards visible in the build.
 dotnet_diagnostic.CA1062.severity = warning
+# Friend assemblies expose internal nullable-attribute polyfills, which can make
+# the BCL [NotNull] annotation ambiguous to the analyzer; name the guards.
+dotnet_code_quality.CA1062.null_check_validation_methods = ThrowIfNull|ThrowIfNullOrEmpty|ThrowIfNullOrWhiteSpace

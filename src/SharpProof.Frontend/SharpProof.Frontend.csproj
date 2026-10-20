@@ -27,6 +27,11 @@
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
   </ItemGroup>
   <Target Name="GenerateSharpProofAttributesPayloadIdentity"
           BeforeTargets="CoreCompile"
