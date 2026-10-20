@@ -50,7 +50,7 @@ internal static class NullableAsyncChecks
             ("NullableSuppression", "static string M(string? x)=>x!;", "Suggestion", "T1 M<T1>(T1? x) where T1 : class"),
             ("NullableLiteral", "static string? M(bool ignored)=>null;", "Suggestion", "string? M<T1>(T1 ignored)"),
             ("NullableDefault", "static int? M(bool ignored)=>default;", "Suggestion", "int? M<T1>(T1 ignored)"),
-            ("NullableNullEquality", "static bool M(string? x,bool ignored)=>x==null;", "Suggestion", "bool M<T1>(string? x, T1 ignored)"),
+            ("NullableNullEquality", "static bool M(string? x,bool ignored)=>x==null;", "Suggestion", "bool M<T1, T2>(T1? x, T2 ignored) where T1 : class"),
             ("NullableNullPattern", "static bool M(string? x,bool ignored)=>x is null;", "Suggestion", "bool M<T1, T2>(T1? x, T2 ignored) where T1 : class"),
             ("NullableNotNullPattern", "static bool M(string? x,bool ignored)=>x is not null;", "Suggestion", "bool M<T1, T2>(T1? x, T2 ignored) where T1 : class"),
             ("NullableConditionalMember", "static int? M(string? x,bool ignored)=>x?.Length;", "Suggestion", "int? M<T1>(string? x, T1 ignored)"),
@@ -72,6 +72,38 @@ internal static class NullableAsyncChecks
             ("NullableCombinedNullPattern", "static bool M(string? x)=>x is null or not null;", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
             ("NullableSwitchNullPattern", "static bool M(string? x)=>x switch {null=>true,_=>false};", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
             ("NullablePropertyNullPattern", "static bool M(ConditionalBox<string> x)=>x is {Value: null};class ConditionalBox<T>{public T? Value;}", "Suggestion", "bool M<T1>(global::Cases.ConditionalBox<T1> x)"),
+
+            ("NullEqualityObject", "static bool M(object? x)=>x==null;", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullInequalityObject", "static bool M(object x)=>null!=x;", "Suggestion", "bool M<T1>(T1 x)"),
+            ("NullEqualityValue", "static bool M(int? x)=>x==null;", "Suggestion", "bool M<T1>(T1? x) where T1 : struct"),
+            ("NullInequalityValue", "static bool M(int? x)=>null!=x;", "Suggestion", "bool M<T1>(T1? x) where T1 : struct"),
+            ("NullEqualityArray", "static bool M(int[]? x)=>x==null;", "Suggestion", "bool M<T1>(T1[]? x)"),
+            ("NullEqualityDelegate", "static bool M(System.Func<int>? x)=>x==null;", "Suggestion", "bool M<T1>(global::System.Func<T1>? x)"),
+            ("NullEqualityTuple", "static bool M((int Value,string Tag)? x)=>x==null;", "Suggestion", "bool M<T1, T2>((T1 Value, T2 Tag)? x)"),
+            ("NullEqualityTypedDefaultControl", "static bool M(int? x)=>x==default(int?);", "Concrete", null),
+            ("NullEqualityDefaultReference", "static bool M(object? x)=>default(object)==x;", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullEqualityConstant", "static bool M(object? x){const object? absent=null;return x==absent;}", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullEqualityParenthesized", "static bool M(int? x)=>((null))==x;", "Suggestion", "bool M<T1>(T1? x) where T1 : struct"),
+            ("NullEqualityAsync", "static async Task<bool> M(Task<int?> x)=>(await x)==null;", "Suggestion", "global::System.Threading.Tasks.Task<bool> M<T1>(global::System.Threading.Tasks.Task<T1?> x) where T1 : struct"),
+            ("NullEqualityConditional", "static bool M(ConditionalBox<int>? x)=>x?.Value==null;class ConditionalBox<T>{public T Value=default!;}", "Suggestion", "bool M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
+            ("NullEqualityTwoValues", "static bool M(int? x,int? y,bool ignored)=>x==y;", "Suggestion", "bool M<T1>(int? x, int? y, T1 ignored)"),
+            ("NullEqualityDynamicControl", "static bool M(dynamic x,int ignored)=>x==null;", "Skipped", null),
+
+            ("NullEqualityContextualDefaultControl", "static bool M(int? x)=>x==default;", "Concrete", null),
+            ("NullEqualityReverseDefaultControl", "static bool M(int? x)=>default!=x;", "Concrete", null),
+            ("NullEqualityNonnullableDefaultControl", "static bool M(int x,int ignored)=>x==default;", "Suggestion", "bool M<T1>(int x, T1 ignored)"),
+            ("NullEqualityUntypedCaller", "static bool M(object? x,int ignored)=>x==null;static bool Use()=>M(null,7);", "Suggestion", "bool M<T1>(object? x, T1 ignored)"),
+            ("NullEqualityUserOperator", "static bool M(EqualityBox<int>? x)=>x==null;class EqualityBox<T>{public static bool operator==(EqualityBox<T>? x,EqualityBox<T>? y)=>true;public static bool operator!=(EqualityBox<T>? x,EqualityBox<T>? y)=>false;public override bool Equals(object? x)=>false;public override int GetHashCode()=>0;}", "Suggestion", "bool M<T1>(global::Cases.EqualityBox<T1>? x)"),
+
+            ("NullEqualityReferenceDefault", "static bool M(object? x)=>x==default;", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullEqualityTypedObject", "static bool M(object x)=>x==(object?)null;", "Suggestion", "bool M<T1>(T1 x) where T1 : class"),
+            ("NullEqualityTypedString", "static bool M(object x)=>x==(string?)null;", "Suggestion", "bool M<T1>(T1 x) where T1 : class"),
+            ("NullEqualityTypedArray", "static bool M(int[] x)=>x==(object?)null;", "Suggestion", "bool M<T1>(T1[] x)"),
+            ("NullEqualityTypedConstant", "static bool M(object x){const object? absent=null;return x==absent;}", "Suggestion", "bool M<T1>(T1 x) where T1 : class"),
+
+            ("NullEqualityNonnullableReferenceDefault", "static bool M(object x)=>x==default;", "Suggestion", "bool M<T1>(T1 x) where T1 : class"),
+            ("NullEqualitySuppressedNull", "static bool M(object x)=>x==((null))!;", "Suggestion", "bool M<T1>(T1 x)"),
+            ("NullEqualitySuppressedReverseNull", "static bool M(object x)=>null! != x;", "Suggestion", "bool M<T1>(T1 x)"),
 
             ("NullableExistingGeneric", "static T? M<T>(T? x)=>x;", "Concrete", null),
             ("NullableExistingConstraints", "static T? M<T>(T? x,int? ignored) where T:class =>x;", "Suggestion", "T? M<T, T1>(T? x, T1? ignored) where T : class where T1 : struct"),
@@ -273,6 +305,14 @@ internal static class NullableAsyncChecks
             public static class RuntimeAwaitExtensions {
                 public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this RuntimeExtensionBox<T> box)=>box.Task.GetAwaiter();
             }
+            public sealed class RuntimeNullEquality<T> {
+                public static int Calls;
+                public static bool operator ==(RuntimeNullEquality<T>? left,RuntimeNullEquality<T>? right){Calls++;return true;}
+                public static bool operator !=(RuntimeNullEquality<T>? left,RuntimeNullEquality<T>? right){Calls++;return false;}
+                public override bool Equals(object? other)=>object.ReferenceEquals(this,other);
+                public override int GetHashCode()=>0;
+            }
+
             public static class RuntimeNullableImports {
                 public static T? Echo<T>(T? x)=>x;
                 public static T? Missing<T>(T x)=>default;
@@ -282,6 +322,14 @@ internal static class NullableAsyncChecks
                 public static bool NullReference(string? x)=>x is null;
                 public static bool NullValue(int? x)=>x is not null;
                 public static async Task<bool> NullAwait(Task<int?> x)=>(await x) is null;
+
+                public static bool EqualTypedNull(object x)=>x==(object?)null;
+                public static bool EqualReference(object? x)=>x==null;
+                public static bool NotEqualValue(int? x)=>null!=x;
+                public static bool EqualTuple((int Value,string Tag)? x)=>x==null;
+                public static bool EqualFactory(System.Func<object?> read)=>read()==null;
+                public static bool EqualCustom(RuntimeNullEquality<int>? x)=>x==null;
+                public static async Task<bool> EqualAwait(Task<int?> x)=>(await x)==null;
 
                 public static int Finalizers;
                 public static int Guarded(int x,bool fail) {
@@ -316,7 +364,7 @@ internal static class NullableAsyncChecks
             """);
         var provider = new HmSignatureCodeFixProvider();
         var applied = 0;
-        for (var round = 0; round < 32; round++)
+        for (var round = 0; round < 40; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false)).GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
@@ -329,8 +377,8 @@ internal static class NullableAsyncChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             applied++;
         }
-        if (applied != 26)
-        { throw new InvalidOperationException($"Expected twenty-six nullable/async/lifetime code fixes; applied {applied}."); }
+        if (applied != 33)
+        { throw new InvalidOperationException($"Expected thirty-three nullable/async/lifetime code fixes; applied {applied}."); }
         var finalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var problems = finalCompilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
         if (problems.Length != 0)
@@ -365,6 +413,50 @@ internal static class NullableAsyncChecks
             || await ((Task<bool>)nullAwait.Invoke(null, new object[] { Task.FromResult<Guid?>(guid) })!).ConfigureAwait(false))
         { throw new InvalidOperationException("Async null patterns changed their result after resumption."); }
         Program.Log.Info("PASS NullableAsyncNullPatternRuntime");
+        var equalReference = probe.GetMethod("EqualReference")!.MakeGenericMethod(typeof(Uri));
+        if (!Equals(equalReference.Invoke(null, new object?[] { null }), true)
+            || !Equals(equalReference.Invoke(null, new object?[] { nullPatternSentinel }), false))
+        { throw new InvalidOperationException("Generic built-in reference null equality changed its result."); }
+        var notEqualValue = probe.GetMethod("NotEqualValue")!.MakeGenericMethod(typeof(Guid));
+        if (!Equals(notEqualValue.Invoke(null, new object?[] { null }), false)
+            || !Equals(notEqualValue.Invoke(null, new object?[] { guid }), true)
+            || !Equals(probe.GetMethod("NotEqualValue")!.MakeGenericMethod(typeof(int)).Invoke(null, new object?[] { 42 }), true))
+        { throw new InvalidOperationException("Generic lifted null inequality changed its result."); }
+        var equalTuple = probe.GetMethod("EqualTuple")!.MakeGenericMethod(typeof(Guid), typeof(Uri));
+        if (!Equals(equalTuple.Invoke(null, new object?[] { null }), true)
+            || !Equals(equalTuple.Invoke(null, new object?[] { (guid, nullPatternSentinel) }), false))
+        { throw new InvalidOperationException("Generic nullable tuple null equality changed its result."); }
+        var nullEvaluations = 0;
+        Func<Uri?> nullFactory = () => { nullEvaluations++; return null; };
+        Func<Uri?> presentFactory = () => { nullEvaluations++; return nullPatternSentinel; };
+        var equalFactory = probe.GetMethod("EqualFactory")!.MakeGenericMethod(typeof(Uri));
+        if (!Equals(equalFactory.Invoke(null, new object?[] { nullFactory }), true)
+            || !Equals(equalFactory.Invoke(null, new object?[] { presentFactory }), false) || nullEvaluations != 2)
+        { throw new InvalidOperationException("Null equality changed operand evaluation."); }
+        var customType = probe.Assembly.GetType("RuntimeNullEquality" + (char)96 + "1")!.MakeGenericType(typeof(Guid));
+        var customValue = Activator.CreateInstance(customType);
+        var customCalls = customType.GetField("Calls")!;
+        if (!Equals(probe.GetMethod("EqualReference")!.MakeGenericMethod(customType).Invoke(null, new object?[] { customValue }), false)
+            || !Equals(customCalls.GetValue(null), 0)
+            || !Equals(probe.GetMethod("EqualCustom")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object?[] { customValue }), true)
+            || !Equals(customCalls.GetValue(null), 1))
+        { throw new InvalidOperationException("Null equality changed user operator dispatch."); }
+        var pendingEquality = new TaskCompletionSource<Guid?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var equalAwait = probe.GetMethod("EqualAwait")!.MakeGenericMethod(typeof(Guid));
+        var pendingEqualityResult = (Task<bool>)equalAwait.Invoke(null, new object[] { pendingEquality.Task })!;
+        if (pendingEqualityResult.IsCompleted)
+        { throw new InvalidOperationException("Null equality completed before its await operand."); }
+        pendingEquality.SetResult(null);
+        if (!await pendingEqualityResult.WaitAsync(cancellationToken).ConfigureAwait(false)
+            || await ((Task<bool>)equalAwait.Invoke(null, new object[] { Task.FromResult<Guid?>(guid) })!).ConfigureAwait(false))
+        { throw new InvalidOperationException("Awaited null equality changed its result."); }
+        var equalTypedNull = probe.GetMethod("EqualTypedNull")!.MakeGenericMethod(typeof(Uri));
+        if (!Equals(equalTypedNull.Invoke(null, new object?[] { null }), true)
+            || !Equals(equalTypedNull.Invoke(null, new object?[] { nullPatternSentinel }), false))
+        { throw new InvalidOperationException("Typed null equality lost its reference constraint or result."); }
+
+        Program.Log.Info("PASS NullableAsyncNullEqualityRuntime");
+
 
         var valueMethod = probe.GetMethod("Value")!.MakeGenericMethod(typeof(Guid));
         if (!Equals(valueMethod.Invoke(null, new object?[] { guid }), guid) || valueMethod.Invoke(null, new object?[] { null }) is not null
@@ -520,6 +612,6 @@ internal static class NullableAsyncChecks
         }
         catch (InvalidOperationException exception) when (ReferenceEquals(exception, marker)) { }
         Program.Log.Info("PASS NullableAsyncFaultPropagation");
-        return 6;
+        return 7;
     }
 }

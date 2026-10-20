@@ -146,6 +146,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Extension calls and array-based params calls | Infer receiver/expanded element types; preserve selected definitions |
 | Local functions | Import schemes; compiler-check retained bodies/captures |
 | Fields, properties and instance calls | Retain receiver/member types conservatively |
+| Built-in null equality/inequality | Infer symbolic operands for null constants and reference defaults; preserve user-operator dispatch |
 | Built-in arithmetic, comparisons, logic, bitwise/unary operators | Retain operand types and C# promotions |
 | Casts, typed default, checked/unchecked | Retain concrete types |
 
@@ -644,3 +645,14 @@ types while keeping their explicit target fixed. Regression checks cover referen
 interface, array, generic and nullable value targets, original boxed inputs, caller
 conversion preservation, single evaluation, and Task/ValueTask operands. IDE fixes
 are executed over both their original domain and additional value/reference types.
+
+Built-in equality and inequality against null preserve symbolic operand types,
+including nullable tuples, arrays, delegates, conditional access and awaited results.
+Nullable defaults retain their type because C# does not permit comparing arbitrary
+`T?` to `default` or `default(int?)` with only a struct constraint. Comparisons between two variable operands
+retain their original operator domain;
+user operators continue through signature and dispatch validation. Runtime fixes
+check single evaluation, suspension and the distinction between built-in null tests
+and overloaded equality. Reference defaults and explicit reference null casts/constants require a class
+constraint when their operand becomes a bare type parameter; array/delegate shapes
+retain their inherent reference identity. Dynamic operand types remain unsupported.

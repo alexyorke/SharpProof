@@ -1449,6 +1449,20 @@ public static partial class Inference
             }
         }
 
+        private static bool IsUntypedNull(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            return expression switch
+            {
+                ParenthesizedExpressionSyntax parentheses => IsUntypedNull(parentheses.Expression),
+                PostfixUnaryExpressionSyntax suppressed when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression) => IsUntypedNull(suppressed.Operand),
+                LiteralExpressionSyntax literal => literal.IsKind(SyntaxKind.NullLiteralExpression),
+                _ => false
+            };
+        }
+
+
         private HmType Binary(BinaryExpressionSyntax binary)
         {
             if (model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol or IFunctionPointerTypeSymbol
@@ -1464,6 +1478,25 @@ public static partial class Inference
             {
                 _ = Expression(binary.Left);
                 return CSharpTypes.Rigid(model.GetTypeInfo(binary, cancellationToken).Type!);
+            }
+
+            if (binary.Kind() is SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression
+                && model.GetOperation(binary, cancellationToken) is IBinaryOperation { OperatorMethod: null } equality)
+            {
+                var leftNull = equality.LeftOperand.ConstantValue is { HasValue: true, Value: null };
+                var rightNull = equality.RightOperand.ConstantValue is { HasValue: true, Value: null };
+                if (leftNull || rightNull)
+                {
+                    var compared = leftNull ? binary.Right : binary.Left;
+                    var value = Expression(compared);
+                    var nullExpression = leftNull ? binary.Left : binary.Right;
+                    var core = ConversionCore(value).Root;
+                    if (!IsUntypedNull(nullExpression) && core.IsVariable
+                        && model.GetTypeInfo(compared, cancellationToken).Type?.IsReferenceType == true)
+                    { RequireKeyword(core, "class"); }
+
+                    return new("bool");
+                }
             }
 
             // Retain original operand types so numeric promotion, boxing and string
