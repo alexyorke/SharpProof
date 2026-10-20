@@ -144,32 +144,44 @@ public static partial class Inference
                 if (target is INamedTypeSymbol { SpecialType: SpecialType.System_Array })
                 { UnifyDeconstructionReceiver(expected, CSharpTypes.Rigid(target)); return; }
             }
-            if (source is INamedTypeSymbol named && target is INamedTypeSymbol targetNamed && TryProjectArgument(named, targetNamed, value) is { } projection)
-            {
-                var projected = ConversionCore(projection.Shape);
-                if (projected.Name == destination.Name && projected.Arguments.Length == destination.Arguments.Length)
-                {
-                    if (projected.NestedTypeName is not null)
-                    { BindSubtype(projection.Type.ContainingType, targetNamed.ContainingType, projected.Arguments[0], destination.Arguments[0], true); }
-                    var projectedArguments = CSharpTypes.OwnArguments(projected);
-                    var destinationArguments = CSharpTypes.OwnArguments(destination);
-                    for (var i = 0; i < projectedArguments.Length; i++)
-                    {
-                        var before = projection.Type.TypeArguments[i];
-                        var after = targetNamed.TypeArguments[i];
-                        if (SymbolEqualityComparer.Default.Equals(before, after))
-                        { UnifyDeconstructionReceiver(destinationArguments[i], projectedArguments[i]); }
-                        else if (targetNamed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
-                        { BindSubtype(before, after, projectedArguments[i], destinationArguments[i], true); }
-                        else if (targetNamed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.In)
-                        { BindSubtype(after, before, destinationArguments[i], projectedArguments[i], true); }
-                        else
-                        { PinConversion(before, after, projectedArguments[i], destinationArguments[i]); }
-                    }
-                    return;
-                }
-            }
+            if (source is INamedTypeSymbol named && target is INamedTypeSymbol targetNamed && TryProjectArgument(named, targetNamed, value) is { } projection
+                && BindProjectedArgument(projection.Type, targetNamed, projection.Shape, destination))
+            { return; }
             PinConversion(source, target, inferred, expected);
+        }
+
+        private bool BindProjectedArgument(INamedTypeSymbol source, INamedTypeSymbol target, HmType projected, HmType destination)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (projected is null)
+            { throw new ArgumentNullException(nameof(projected)); }
+            if (destination is null)
+            { throw new ArgumentNullException(nameof(destination)); }
+            projected = ConversionCore(projected);
+            destination = ConversionCore(destination);
+            if (projected.Name != destination.Name || projected.Arguments.Length != destination.Arguments.Length)
+            { return false; }
+            if (projected.NestedTypeName is not null)
+            { BindSubtype(source.ContainingType, target.ContainingType, projected.Arguments[0], destination.Arguments[0], true); }
+            var projectedArguments = CSharpTypes.OwnArguments(projected);
+            var destinationArguments = CSharpTypes.OwnArguments(destination);
+            for (var i = 0; i < projectedArguments.Length; i++)
+            {
+                var before = source.TypeArguments[i];
+                var after = target.TypeArguments[i];
+                if (SymbolEqualityComparer.Default.Equals(before, after))
+                { UnifyDeconstructionReceiver(destinationArguments[i], projectedArguments[i]); }
+                else if (target.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
+                { BindSubtype(before, after, projectedArguments[i], destinationArguments[i], true); }
+                else if (target.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.In)
+                { BindSubtype(after, before, destinationArguments[i], projectedArguments[i], true); }
+                else
+                { PinConversion(before, after, projectedArguments[i], destinationArguments[i]); }
+            }
+            return true;
         }
 
         private (INamedTypeSymbol Type, HmType Shape)? TryProjectArgument(INamedTypeSymbol source, INamedTypeSymbol target, HmType value)
@@ -180,10 +192,23 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(target)); }
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
+            foreach (var projection in ProjectArguments(source, target, value))
+            { return projection; }
+            return null;
+        }
+
+        private IEnumerable<(INamedTypeSymbol Type, HmType Shape)> ProjectArguments(INamedTypeSymbol source, INamedTypeSymbol target, HmType value)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             var actualMapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             if (!CSharpTypes.MapNamedArguments(source, value, mapping) || !CSharpTypes.MapNamedArguments(source, CSharpTypes.Rigid(source), actualMapping))
-            { return null; }
+            { yield break; }
             var originals = new List<INamedTypeSymbol>();
             var actuals = new List<INamedTypeSymbol>();
             for (var type = source.OriginalDefinition; type is not null; type = type.BaseType)
@@ -194,6 +219,7 @@ public static partial class Inference
             actuals.AddRange(source.AllInterfaces);
             foreach (var actual in actuals)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!SymbolEqualityComparer.Default.Equals(actual.OriginalDefinition, target.OriginalDefinition))
                 { continue; }
                 var conversion = model.Compilation.ClassifyCommonConversion(actual, target);
@@ -203,10 +229,10 @@ public static partial class Inference
                 {
                     if (SymbolEqualityComparer.Default.Equals(original.OriginalDefinition, actual.OriginalDefinition)
                         && SameConversionShape(CSharpTypes.Rigid(original, actualMapping), CSharpTypes.Rigid(actual)))
-                    { return (actual, CSharpTypes.Rigid(original, mapping)); }
+                    { yield return (actual, CSharpTypes.Rigid(original, mapping)); }
                 }
             }
-            return null;
+            yield break;
         }
 
         private static bool SameConversionShape(HmType left, HmType right)

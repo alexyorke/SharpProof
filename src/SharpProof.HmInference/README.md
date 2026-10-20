@@ -493,6 +493,17 @@ element conversions. Integer and nullable-value identity domains stay available;
 reference covariance receives directional bounds. Runtime fixes verify original
 and new reference/value/nullable array domains without copying their arrays.
 
+When multiple variant interface projections have different shapes, their original
+substituted conversions are checked before binding any inference variables.
+Exact implemented interfaces take precedence over variance alternatives. A unique
+remaining projection can be selected through covariance, contravariance
+and nested delegate conversions even when structural equality cannot distinguish
+it. Reversed declarations, inherited and struct receivers, fixed value branches
+and independent calls have regression coverage. Runtime fixes compare explicit
+interface dispatch, boxed argument behavior, reference identity and async results
+with new reference, value and nullable payloads. Distinct viable variance
+alternatives remain unresolved rather than choosing the first declaration.
+
 Enumerator return parameters are mapped through their actual substituted types
 before resolving Current, MoveNext/MoveNextAsync and disposal members. The
 declared enumerator constraints use the original concrete substitutions for

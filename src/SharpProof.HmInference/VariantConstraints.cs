@@ -71,15 +71,33 @@ public static partial class Inference
             var value = ConversionCore(source);
             var destination = ConversionCore(target);
             var key = (value, destination);
-            if (completedVariantConstraints.Contains(key) || value.CSharpSymbol is not INamedTypeSymbol originalSource
-                || ConstraintProjection(value, destination) is null)
+            if (completedVariantConstraints.Contains(key) || value.CSharpSymbol is not INamedTypeSymbol originalSource)
             { return false; }
             if (OriginalConstraintSymbol(target, declared) is not INamedTypeSymbol originalTarget)
             { return false; }
             var conversion = model.Compilation.ClassifyCommonConversion(originalSource, originalTarget);
             if (!conversion.IsImplicit || conversion.IsUserDefined)
             { return false; }
-            BindSubtype(originalSource, originalTarget, source, target, false);
+            // Prefer exact implemented interfaces before comparing variance alternatives.
+            // Discovery does not bind the live inference graph.
+            (INamedTypeSymbol Type, HmType Shape)? selected = null;
+            var identity = false;
+            var ambiguous = false;
+            foreach (var projection in ProjectArguments(originalSource, originalTarget, value))
+            {
+                var exact = model.Compilation.ClassifyCommonConversion(projection.Type, originalTarget).IsIdentity;
+                if (identity && !exact)
+                { continue; }
+                if (exact && !identity)
+                { selected = null; ambiguous = false; identity = true; }
+                if (selected is { } previous && !SameConstraintShape(previous.Shape, projection.Shape))
+                { ambiguous = true; }
+                selected ??= projection;
+            }
+            if (ambiguous || selected is not { } chosen)
+            { return false; }
+            if (!BindProjectedArgument(chosen.Type, originalTarget, chosen.Shape, target))
+            { return false; }
             completedVariantConstraints.Add(key);
             return true;
         }
