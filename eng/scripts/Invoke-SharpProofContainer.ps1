@@ -85,7 +85,7 @@ if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
 # CI collects each coverage shard on its own runner; the gate requires all.
-$coverageShardNames = @('semantic-gates', 'semantic-worker', 'semantic-projects', 'package')
+$coverageShardNames = [Collections.Immutable.ImmutableArray]::Create[string]('semantic-gates', 'semantic-worker', 'semantic-projects', 'package')
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
     throw '-CoveragePhase is supported only for coverage-shard.'
@@ -95,10 +95,10 @@ if ($ReuseTestHarness -and $Command -ne 'package-tests') {
     throw '-ReuseTestHarness is supported only for package-tests.'
 }
 $fastBuildArguments = if ($Fast) {
-    @('-p:RunAnalyzersDuringBuild=false')
+    , [Collections.Immutable.ImmutableArray]::Create[string]('-p:RunAnalyzersDuringBuild=false')
 }
 else {
-    @()
+    , [Collections.Immutable.ImmutableArray[string]]::Empty
 }
 
 # Build the repository-only analyzer once before any project builds. The
@@ -119,21 +119,27 @@ if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-aud
     }
 }
 
-function New-TestInvocationArguments([hashtable]$Additional = @{}) {
-    $arguments = @{ Configuration = $Configuration }
+function New-ContainerArgumentBuilder([Collections.IDictionary]$Values = ([ordered]@{}).AsReadOnly()) {
+    $builder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in $Values.GetEnumerator()) { $builder[[string]$entry.Key] = $entry.Value }
+    return , $builder
+}
+
+function New-TestInvocationArguments([Collections.IDictionary]$Additional = ([ordered]@{}).AsReadOnly()) {
+    $arguments = New-ContainerArgumentBuilder -Values ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
     foreach ($entry in $Additional.GetEnumerator()) {
-        $arguments[$entry.Key] = $entry.Value
+        $arguments[[string]$entry.Key] = $entry.Value
     }
-    if ($NoBuild) { $arguments.NoBuild = $true }
-    if ($ReuseTestHarness) { $arguments.ReuseTestHarness = $true }
-    if ($Fast) { $arguments.Fast = $true }
-    return $arguments
+    if ($NoBuild) { $arguments['NoBuild'] = $true }
+    if ($ReuseTestHarness) { $arguments['ReuseTestHarness'] = $true }
+    if ($Fast) { $arguments['Fast'] = $true }
+    return , $arguments.ToImmutable()
 }
 
 function Invoke-RequiredScript(
     [string]$RelativePath,
     [string]$Failure,
-    [hashtable]$Arguments = @{}) {
+    [Collections.IDictionary]$Arguments = ([ordered]@{}).AsReadOnly()) {
     & (Join-Path $repositoryRoot $RelativePath) @Arguments
     if ($LASTEXITCODE -ne 0) { throw $Failure }
 }
@@ -170,10 +176,10 @@ function Invoke-TestProject([string]$ProjectPath) {
 }
 
 function Invoke-PackageTests {
-    $packageArguments = New-TestInvocationArguments -Additional @{
-        TestFilter    = $TestFilter
-        PackageSource = $PackageSource
-    }
+    $packageArguments = New-TestInvocationArguments -Additional ([ordered]@{
+            TestFilter    = $TestFilter
+            PackageSource = $PackageSource
+        }).AsReadOnly()
     Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofPackageTests.ps1' `
         'Package tests failed.' $packageArguments
 }
@@ -210,19 +216,20 @@ function Invoke-SolutionTests([string]$SolutionPath) {
     Invoke-SharpProofRequiredDotnet ([string[]]@($argumentBuilder.ToImmutable()))
 
     if ($runPackageTestsSeparately) {
-        $packageArguments = @{
-            Configuration = $Configuration
-            PackageSource = $PackageSource
-        }
+        $packageArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
+                Configuration = $Configuration
+                PackageSource = $PackageSource
+            }).AsReadOnly()
         if ($NoBuild) {
-            $packageArguments.NoBuild = $true
+            $packageArgumentBuilder['NoBuild'] = $true
         }
         else {
-            $packageArguments.ReuseTestHarness = $true
+            $packageArgumentBuilder['ReuseTestHarness'] = $true
         }
         if ($Fast) {
-            $packageArguments.Fast = $true
+            $packageArgumentBuilder['Fast'] = $true
         }
+        $packageArguments = $packageArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofPackageTests.ps1' `
             'Package tests failed.' $packageArguments
     }
@@ -257,18 +264,18 @@ function Invoke-SharpProofCoverageAuthorityBuild {
         '.sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
     try {
         Invoke-RequiredScript 'eng/scripts/Get-SharpProofProductionInventory.ps1' `
-            'Coverage build project selection failed.' @{
-            RepositoryRoot = $repositoryRoot
-            Configuration  = 'Release'
-            OutputPath     = $selectionPath
-        }
+            'Coverage build project selection failed.' ([ordered]@{
+                RepositoryRoot = $repositoryRoot
+                Configuration  = 'Release'
+                OutputPath     = $selectionPath
+            }).AsReadOnly()
         $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
-        $projects = @($selection.projects | ForEach-Object { [string]$_.projectPath })
-        if ($projects.Count -eq 0) { throw 'Coverage build project selection is empty.' }
-        [ordered]@{ solution = [ordered]@{
-                path = 'SharpProof.slnx'; projects = $projects
-            }
-        } | ConvertTo-Json -Depth 5 |
+        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($selection.projects | ForEach-Object { [string]$_.projectPath }))
+        if ($projects.Length -eq 0) { throw 'Coverage build project selection is empty.' }
+        ([ordered]@{ solution = ([ordered]@{
+                    path = 'SharpProof.slnx'; projects = $projects
+                }).AsReadOnly()
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
         Invoke-SharpProofRequiredDotnet @('restore', $filterPath, '--locked-mode')
         # Analyzers do not change binaries or PDBs, and the canonical PR build
@@ -294,10 +301,10 @@ function Invoke-DependencyAudit {
         'artifacts/dependency-audit/dependency-audit.json')
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofDependencyAudit.ps1' `
         'Dependency audit failed.' `
-    @{
-        SolutionPath = Join-Path $repositoryRoot 'SharpProof.slnx'
-        NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.config'; OutputPath = $output
-    }
+    ([ordered]@{
+            SolutionPath = Join-Path $repositoryRoot 'SharpProof.slnx'
+            NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.config'; OutputPath = $output
+        }).AsReadOnly()
 }
 
 # Source-only checks that pr runs before its solution build. They need no
@@ -325,11 +332,11 @@ switch ($Command) {
     }
     'format-check' {
         Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
-            'Repository script linting or formatting failed.' @{ VerifyNoChanges = $true }
+            'Repository script linting or formatting failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofScriptTools.ps1' `
             'Script-tool regression tests failed.'
         Invoke-RequiredScript 'eng/scripts/Format-CSharp.ps1' `
-            'Repository formatting check failed.' @{ VerifyNoChanges = $true }
+            'Repository formatting check failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
     }
     'doctor' {
         $doctorTarget = if ($PSBoundParameters.ContainsKey('Target')) { $Target } else { '' }
@@ -345,10 +352,10 @@ switch ($Command) {
     }
     'docs-update' {
         $global:LASTEXITCODE = 0
-        Invoke-RequiredScript 'eng/scripts/Sync-SharpProofDocumentation.ps1' 'Source reference generation failed.' @{
-            Update     = $true
-            OutputPath = (Join-Path $repositoryRoot 'artifacts/docs/source-reference.md')
-        }
+        Invoke-RequiredScript 'eng/scripts/Sync-SharpProofDocumentation.ps1' 'Source reference generation failed.' ([ordered]@{
+                Update     = $true
+                OutputPath = (Join-Path $repositoryRoot 'artifacts/docs/source-reference.md')
+            }).AsReadOnly()
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
         & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofDocumentationUpdater.sh')
@@ -390,28 +397,28 @@ switch ($Command) {
         & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
     'self-apply' {
-        $trackedProjects = @(
-            & git -C $repositoryRoot ls-files -- '*.csproj' |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                ForEach-Object {
-                    Join-Path $repositoryRoot $_
-                } |
-                Sort-Object
-        )
-        if ($LASTEXITCODE -ne 0 -or $trackedProjects.Count -eq 0) {
+        $trackedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                & git -C $repositoryRoot ls-files -- '*.csproj' |
+                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                    ForEach-Object {
+                        Join-Path $repositoryRoot $_
+                    } |
+                    Sort-Object
+            ))
+        if ($LASTEXITCODE -ne 0 -or $trackedProjects.Length -eq 0) {
             throw 'self-apply requires a Git-backed repository with tracked project files.'
         }
 
-        $sourceProjects = @(
-            $trackedProjects |
-                Where-Object {
-                    $relative = [IO.Path]::GetRelativePath(
-                        $repositoryRoot, $_).Replace('\', '/')
-                    $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
-                    -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
-                }
-        )
-        if ($sourceProjects.Count -eq 0) {
+        $sourceProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                $trackedProjects |
+                    Where-Object {
+                        $relative = [IO.Path]::GetRelativePath(
+                            $repositoryRoot, $_).Replace('\', '/')
+                        $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
+                        -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
+                    }
+            ))
+        if ($sourceProjects.Length -eq 0) {
             throw 'self-apply found no source-tree projects to analyze.'
         }
 
@@ -433,7 +440,7 @@ switch ($Command) {
         foreach ($project in $sourceProjects) {
             $ordinal++
             Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
-                $ordinal, $sourceProjects.Count,
+                $ordinal, $sourceProjects.Length,
                 [IO.Path]::GetRelativePath($repositoryRoot, $project))
             Invoke-SharpProofRequiredDotnet @(
                 'build', $project, '--configuration', $Configuration,
@@ -450,7 +457,7 @@ switch ($Command) {
         # cleans its own isolated local feed and temporary build roots.
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofSamples.ps1' `
             'SharpProof self-application sample validation failed.' `
-        @{ Configuration = $Configuration }
+        ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
     }
     'check' {
         & (Join-Path $repositoryRoot 'eng/scripts/Invoke-SharpProofDevCheck.ps1') `
@@ -470,13 +477,14 @@ switch ($Command) {
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-        $prTestArguments = @{
-            Configuration = $Configuration; NoBuild = $true
-            TestFilter = $prTestFilter
-        }
-        $semanticTestArguments = $prTestArguments.Clone()
-        $semanticTestArguments.SemanticCohort = $SemanticCohort
-        $semanticTestArguments.TestResultsDirectory = $TestResultsDirectory
+        $prTestArguments = (New-ContainerArgumentBuilder -Values ([ordered]@{
+                    Configuration = $Configuration; NoBuild = $true
+                    TestFilter = $prTestFilter
+                }).AsReadOnly()).ToImmutable()
+        $semanticTestArgumentBuilder = $prTestArguments.ToBuilder()
+        $semanticTestArgumentBuilder['SemanticCohort'] = $SemanticCohort
+        $semanticTestArgumentBuilder['TestResultsDirectory'] = $TestResultsDirectory
+        $semanticTestArguments = $semanticTestArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofSemanticTests.ps1' `
             'PR semantic validation failed.' $semanticTestArguments
 
@@ -535,12 +543,13 @@ switch ($Command) {
             @changedArguments
     }
     'semantic-tests' {
-        $semanticArguments = New-TestInvocationArguments
-        $semanticArguments.SemanticCohort = $SemanticCohort
-        $semanticArguments.TestResultsDirectory = $TestResultsDirectory
+        $semanticArgumentBuilder = (New-TestInvocationArguments).ToBuilder()
+        $semanticArgumentBuilder['SemanticCohort'] = $SemanticCohort
+        $semanticArgumentBuilder['TestResultsDirectory'] = $TestResultsDirectory
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $semanticArguments.TestFilter = $TestFilter
+            $semanticArgumentBuilder['TestFilter'] = $TestFilter
         }
+        $semanticArguments = $semanticArgumentBuilder.ToImmutable()
         & (Join-Path `
                 $repositoryRoot 'eng/scripts/Invoke-SharpProofSemanticTests.ps1') `
             @semanticArguments
@@ -568,19 +577,20 @@ switch ($Command) {
             throw 'package-consumers requires -PackageSource.'
         }
         Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
-        $consumerArguments = @{
-            Configuration = $Configuration
-            PackageSource = $PackageSource
-        }
+        $consumerArguments = (New-ContainerArgumentBuilder -Values ([ordered]@{
+                    Configuration = $Configuration
+                    PackageSource = $PackageSource
+                }).AsReadOnly()).ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package consumer validation failed.' $consumerArguments
         $toolchain = Get-Content -LiteralPath (Join-Path `
                 $repositoryRoot 'eng/container/toolchain.json') -Raw |
             ConvertFrom-Json
-        $minimumConsumerArguments = $consumerArguments.Clone()
-        $minimumConsumerArguments.ConsumerSdkVersion =
+        $minimumConsumerArgumentBuilder = $consumerArguments.ToBuilder()
+        $minimumConsumerArgumentBuilder['ConsumerSdkVersion'] =
         [string]$toolchain.dotnet.minimumSdkVersion
-        $minimumConsumerArguments.FrameworkConsumersOnly = $true
+        $minimumConsumerArgumentBuilder['FrameworkConsumersOnly'] = $true
+        $minimumConsumerArguments = $minimumConsumerArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Minimum-SDK package consumer validation failed.' `
             $minimumConsumerArguments
@@ -588,7 +598,7 @@ switch ($Command) {
     'samples' {
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofSamples.ps1' `
             'Sample validation failed.' `
-        @{ Configuration = $Configuration; PackageSource = $PackageSource }
+        ([ordered]@{ Configuration = $Configuration; PackageSource = $PackageSource }).AsReadOnly()
     }
     { $_ -in @('corpus', 'corpus-update') } {
         $gateMode = $Command
@@ -610,24 +620,26 @@ switch ($Command) {
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         $coverageRoot = Join-Path $repositoryRoot (
             'artifacts/coverage/container-' + [Guid]::NewGuid().ToString('N'))
-        $coverageCollectionArguments = @{
-            ResultsDirectory = $coverageRoot
-        }
+        $coverageCollectionArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
+                ResultsDirectory = $coverageRoot
+            }).AsReadOnly()
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $coverageCollectionArguments.TestFilter = $TestFilter
+            $coverageCollectionArgumentBuilder['TestFilter'] = $TestFilter
         }
+        $coverageCollectionArguments = $coverageCollectionArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `
             'Coverage collection failed.' $coverageCollectionArguments
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
-        $coverageArguments = @{
-            CoverageRoot  = $coverageRoot
-            ComparisonRef = $comparisonRef
-            SummaryPath   = $summaryPath
-        }
+        $coverageArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
+                CoverageRoot  = $coverageRoot
+                ComparisonRef = $comparisonRef
+                SummaryPath   = $summaryPath
+            }).AsReadOnly()
         if (-not [string]::IsNullOrWhiteSpace(
                 (& git status --porcelain))) {
-            $coverageArguments.IncludeWorkingTree = $true
+            $coverageArgumentBuilder['IncludeWorkingTree'] = $true
         }
+        $coverageArguments = $coverageArgumentBuilder.ToImmutable()
         $coverageValidationTimer = [Diagnostics.Stopwatch]::StartNew()
         try {
             Invoke-RequiredScript 'eng/scripts/Test-SharpProofCoverage.ps1' `
@@ -652,11 +664,11 @@ switch ($Command) {
             -AdditionalBuildArguments @(
             '-p:ContinuousIntegrationBuild=true',
             '-p:RunAnalyzersDuringBuild=false')
-        $coverageShardArguments = @{
-            ResultsDirectory = (Join-Path $repositoryRoot (
-                    'artifacts/coverage/' + $CoveragePhase))
-            CoveragePhase    = $CoveragePhase
-        }
+        $coverageShardArguments = ([ordered]@{
+                ResultsDirectory = (Join-Path $repositoryRoot (
+                        'artifacts/coverage/' + $CoveragePhase))
+                CoveragePhase    = $CoveragePhase
+            }).AsReadOnly()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `
             'Coverage shard collection failed.' $coverageShardArguments
     }
@@ -686,8 +698,8 @@ switch ($Command) {
         # Every shard must contribute reports and must have recorded the same
         # authority as the others. Differences fail closed here, before the
         # validator compares each envelope with the gate's own recomputation.
-        $authorityKeys = [Collections.Generic.List[string]]::new()
-        $authorityFiles = [Collections.Generic.List[string]]::new()
+        $authorityKeyBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $authorityFileBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
         foreach ($shardName in $coverageShardNames) {
             $shardRoot = Join-Path $coverageRoot $shardName
             Assert-SharpProofCoverageShardManifest -Root $shardRoot -Phase $shardName
@@ -695,32 +707,34 @@ switch ($Command) {
             if (-not (Test-Path -LiteralPath $shardAuthorityPath -PathType Leaf)) {
                 throw "Coverage shard '$shardName' is missing its authority evidence."
             }
-            $shardReports = @(Get-ChildItem `
-                    -LiteralPath $shardRoot `
-                    -Recurse `
-                    -Filter '*.cobertura*.xml' `
-                    -File |
-                    Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
-            if ($shardReports.Count -eq 0) {
+            $shardReports = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem `
+                        -LiteralPath $shardRoot `
+                        -Recurse `
+                        -Filter '*.cobertura*.xml' `
+                        -File |
+                        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name }))
+            if ($shardReports.Length -eq 0) {
                 throw "Coverage shard '$shardName' produced no Cobertura reports."
             }
             $shardAuthority = Get-Content `
                 -LiteralPath $shardAuthorityPath `
                 -Raw | ConvertFrom-Json
-            $shardModules = @($shardAuthority.modules | ForEach-Object {
-                    [string]$_.project + ':' + [string]$_.assemblyName + ':' +
-                    [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
-                } | Sort-Object)
-            $shardProjects = @($shardAuthority.projects | ForEach-Object {
-                    [string]$_.name
-                } | Sort-Object)
-            $authorityKeys.Add(
+            $shardModules = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($shardAuthority.modules | ForEach-Object {
+                        [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                        [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+                    } | Sort-Object))
+            $shardProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($shardAuthority.projects | ForEach-Object {
+                        [string]$_.name
+                    } | Sort-Object))
+            $authorityKeyBuilder.Add(
                 [string]$shardAuthority.commit + '|' +
                 [string]$shardAuthority.configuration + '|' +
                 ($shardProjects -join ',') + '|' +
                 ($shardModules -join ','))
-            $authorityFiles.Add($shardAuthorityPath)
+            $authorityFileBuilder.Add($shardAuthorityPath)
         }
+        $authorityKeys = $authorityKeyBuilder.ToImmutable()
+        $authorityFiles = $authorityFileBuilder.ToImmutable()
         if (@($authorityKeys | Select-Object -Unique).Count -ne 1) {
             throw 'Coverage shards recorded different authority evidence; the gate fails closed.'
         }
@@ -729,15 +743,16 @@ switch ($Command) {
             -Destination $mergedAuthorityPath
 
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
-        $coverageArguments = @{
-            CoverageRoot  = $coverageRoot
-            ComparisonRef = $comparisonRef
-            SummaryPath   = $summaryPath
-        }
+        $coverageArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
+                CoverageRoot  = $coverageRoot
+                ComparisonRef = $comparisonRef
+                SummaryPath   = $summaryPath
+            }).AsReadOnly()
         if (-not [string]::IsNullOrWhiteSpace(
                 (& git status --porcelain))) {
-            $coverageArguments.IncludeWorkingTree = $true
+            $coverageArgumentBuilder['IncludeWorkingTree'] = $true
         }
+        $coverageArguments = $coverageArgumentBuilder.ToImmutable()
         $coverageValidationTimer = [Diagnostics.Stopwatch]::StartNew()
         try {
             Invoke-RequiredScript 'eng/scripts/Test-SharpProofCoverage.ps1' `
@@ -755,21 +770,21 @@ switch ($Command) {
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofFuzzCampaign.ps1' `
             'Nightly fuzz campaign failed.' `
-        @{ OutputDirectory = 'artifacts/fuzz/nightly' }
+        ([ordered]@{ OutputDirectory = 'artifacts/fuzz/nightly' }).AsReadOnly()
     }
     'dependency-audit' {
         Invoke-DependencyAudit
     }
     'pack-tool' {
         Invoke-RequiredScript 'eng/scripts/Pack-SharpProofTool.ps1' `
-            'Optional Tool packing failed.' @{ Configuration = $Configuration }
+            'Optional Tool packing failed.' ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
     }
     'tool-consumer' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw 'tool-consumer requires -PackageSource.'
         }
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofToolConsumer.ps1' `
-            'Optional Tool consumer validation failed.' @{ PackageSource = $PackageSource }
+            'Optional Tool consumer validation failed.' ([ordered]@{ PackageSource = $PackageSource }).AsReadOnly()
     }
     'pack' {
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
@@ -807,6 +822,6 @@ switch ($Command) {
             $repositoryCommitProperty)
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
-        @{ PackageSource = $output; ValidatePackageSourceOnly = $true }
+        ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
     }
 }
