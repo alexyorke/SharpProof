@@ -61,9 +61,9 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 - [x] Upper/lower asymptotic expressions and tightness only with both bounds.
 - [x] Amortized costs through checked potential/accounting rules.
-- [ ] Average-case bounds conditional on an explicit validated input model;
+- [x] Average-case bounds conditional on an explicit validated input model;
   never invent a probability distribution from source structure.
-- [ ] Adversarial controls that separate loose upper bounds from tight/expected
+- [x] Adversarial controls that separate loose upper bounds from tight/expected
   results, and report all assumptions in consumer evidence.
 
 ## F. Async, concurrency and performance measurements
@@ -89,7 +89,8 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
-Expected-cost input models are in progress. A parameter-level
+Conditional expected upper bounds are implemented for the admitted single-Boolean
+input model. A parameter-level
 ResourceBooleanInput attribute declares one Boolean marginal using bounded
 integer true/false weights, conditional on the other entry inputs. The compiler
 specializes both immutable entry valuations and retains their maximum as the
@@ -105,11 +106,18 @@ tests. Quality/API, negative fixtures, layout, the 528-path trusted inventory,
 documentation lint and 727 links passed. Layout verifies 2762 sources, 59
 projects and 151 unchanged pinned common files. Broader verification passed all 794 worker/native/protocol/parameter-attribute
 cases, including final record-digest controls, and the full formatting gate.
-The first full analyzer run passed 1449 cases and exposed two fixture issues:
-the documentation example needed its class/using wrapper, and a collector test
-still expected protocol 38. Both are corrected; the full analyzer rerun and
-seven strict-package workflows are running. The expected-cost and adversarial
-rows remain open until those workflows pass.
+Final verification passed all 1451 analyzer tests and seven strict-package
+workflows, including expected-cost JSON/SARIF, accounting and lower/tightness.
+The documentation example is independently compiled as part of the analyzer
+suite. Final documentation lint, 727 links and an edited-file formatting check
+also passed. Implementation 1e33c6a71 and fixture corrections 4b4bc7930 are
+published in draft MR #334.
+
+The completed expected-cost row covers conditional upper expectations under
+the stated Boolean model. It does not establish expected lower bounds or
+tightness. Broader lifetime composition, async/concurrency, coverage and final
+audit remain required. Fresh exact-head CI remains unqualified; the prior
+accounting coverage result below is still the latest completed qualification.
 
 ### Credit-accounting checkpoint
 
