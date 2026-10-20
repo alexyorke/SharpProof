@@ -187,8 +187,7 @@ public sealed class CompilerTotalCallRetirementTests
             }
             """,
             Path.Combine(temporary.FullName, "Subject.cs"),
-            firstReference,
-            secondReference);
+            [firstReference, secondReference]);
         var method = GetCall(compilation, "Verify", "Identity");
         var resolution = new CompilerMetadataResolution.MetadataResolutionContext(compilation);
         for (var lookup = 0; lookup < 2; lookup++)
@@ -242,9 +241,10 @@ public sealed class CompilerTotalCallRetirementTests
     private static CSharpCompilation CreateCompilationWithReferences(
         string source,
         string sourcePath,
-        params MetadataReference[] additionalReferences)
+        ImmutableArray<MetadataReference> additionalReferences)
     {
-        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        if (additionalReferences.IsDefault)
+        { throw new ArgumentNullException(nameof(additionalReferences)); }
         System.ArgumentNullException.ThrowIfNull(source);
         System.ArgumentNullException.ThrowIfNull(sourcePath);
         var compilation = CSharpCompilation.Create(

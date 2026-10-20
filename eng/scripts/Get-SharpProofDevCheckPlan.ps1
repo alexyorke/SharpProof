@@ -14,8 +14,8 @@ $packageManifest = Get-Content -LiteralPath (Join-Path `
 if ([int]$packageManifest.schemaVersion -ne 1) {
     throw 'Unsupported package-project manifest schema.'
 }
-$packageProjects = @($packageManifest.projects)
-if ($packageProjects.Count -ne 3) {
+$packageProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($packageManifest.projects))
+if ($packageProjects.Length -ne 3) {
     throw 'Developer-check plan requires exactly three package projects.'
 }
 

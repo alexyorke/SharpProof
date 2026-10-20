@@ -268,7 +268,7 @@ internal static class OpenSourceCorpusRunner
             includeExternalEffectsFixture: includeExternalEffectsFixture && effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
-            .AddSyntaxTrees(trees);
+            .AddSyntaxTrees(trees.MoveToImmutable());
         AnalyzerGateHost.ThrowIfCompilationHasErrors(
             compilation,
             CorpusExecutionDefaults.MaximumReportedDiagnostics,

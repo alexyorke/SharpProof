@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
@@ -77,13 +78,13 @@ public sealed class AggregateExceptionConstructorTests
         return preparations.Single();
     }
 
-    private static void AssertRuntimeException<TException>(string source, object?[]? arguments = null) where TException : Exception
+    private static void AssertRuntimeException<TException>(string source, ImmutableArray<object?> arguments /* SPINT001: all values valid - default preserves reflection's null argument list */ = default) where TException : Exception
     {
         System.ArgumentNullException.ThrowIfNull(source);
         WithRuntimeTarget(source, target =>
         {
             System.ArgumentNullException.ThrowIfNull(target);
-            var error = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => target.Invoke(null, arguments)));
+            var error = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => target.Invoke(null, arguments.IsDefault ? null : arguments.ToArray())));
             Assert.That(error!.InnerException, Is.TypeOf<TException>());
         });
     }

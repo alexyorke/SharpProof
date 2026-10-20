@@ -55,8 +55,8 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
-        var outputPaths = Present(ResultPath, SarifPath).Select(ResolvePath).ToImmutableArray();
-        var inputPaths = Present(
+        var outputPaths = Present([ResultPath, SarifPath]).Select(ResolvePath).ToImmutableArray();
+        var inputPaths = Present([
                 RequestPath,
                 ManifestPath,
                 InvocationRequestPath,
@@ -64,7 +64,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
                 InvocationManifestPath,
                 WorkerPath,
                 LauncherPath,
-                WorkerProtocolPath)
+                WorkerProtocolPath])
             .Select(ResolvePath)
             .ToImmutableArray();
         var compilerOutputPaths = CompilerOutputPaths
@@ -76,7 +76,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             ? Path.GetDirectoryName(workerFile)
             : null;
         var cachePath = string.IsNullOrWhiteSpace(CachePath) ? null : ResolvePath(CachePath!);
-        var publicationPaths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+        var publicationPaths = Present([RequestPath, ResultPath, ManifestPath, SarifPath])
             .Select(ResolvePath)
             .ToImmutableArray();
         ImmutableArray<string> capturePaths = string.IsNullOrWhiteSpace(CompilerCaptureRequestPath)

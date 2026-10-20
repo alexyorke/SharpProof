@@ -119,11 +119,13 @@ internal static class CompilerTotalCallableLowerer
                 builder.Assign(block, site, parameter.Current, context.Factory.Variable(parameter.Entry));
                 builder.Assign(block, site, parameter.PreState, context.Factory.Variable(parameter.Entry));
             }
-            var mutable = context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Current))
-                .Concat(context.Result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
-            if (mutable.Length == 0)
-            { mutable = [context.Factory.CreateVariable("abstract-body", context.Factory.BooleanType)]; }
-            builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mutable);
+            var havocVariables = ImmutableArray.CreateBuilder<IrVarId>();
+            havocVariables.AddRange(context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Current)));
+            if (context.Result is { } resultId)
+            { havocVariables.Add(resultId); }
+            if (havocVariables.Count == 0)
+            { havocVariables.Add(context.Factory.CreateVariable("abstract-body", context.Factory.BooleanType)); }
+            builder.HavocSnapshot(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, havocVariables.ToImmutable());
             builder.Return(block, site, context.Result is { } returned ? context.Factory.Variable(returned) : null);
             program = builder.Build();
             isBodyAbstraction = true;
@@ -401,7 +403,7 @@ internal static class CompilerTotalCallableLowerer
                 { pending = pending.Push(nested); }
                 if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
                         attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                        CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices"))))
+                        CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))))
                 { return false; }
             }
         }
@@ -503,7 +505,7 @@ internal static class CompilerTotalCallableLowerer
                     { pending = pending.Push(nested); }
                     if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
                             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                            CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices"))) &&
+                            CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))) &&
                         (!NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType)))
                     { return false; }
                 }

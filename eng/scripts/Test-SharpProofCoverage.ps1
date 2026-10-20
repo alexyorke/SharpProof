@@ -46,9 +46,9 @@ function Test-CoverageFloor {
 function Get-OrdinalSortedUniqueStrings {
     param([AllowEmptyCollection()][string[]]$Values)
 
-    $sorted = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    $sorted = [Collections.Immutable.ImmutableSortedSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     foreach ($value in @($Values)) { [void]$sorted.Add($value) }
-    return @($sorted)
+    return @($sorted.ToImmutable())
 }
 
 function Test-ClearlyNonSemanticSourceLine {
@@ -262,14 +262,14 @@ if ($recordedAuthority.schemaVersion -ne 1 -or
         'Coverage authority evidence does not match the exact current ' +
         'commit, evaluated MSBuild inventory, binaries, and portable-PDB universe.')
 }
-$authorityProjectNames = @(
-    $recomputedAuthority.projects |
-        ForEach-Object { [string]$_.name } |
-        Sort-Object)
-$baselineProjectNames = @(
-    $baseline.projects.PSObject.Properties |
-        ForEach-Object { [string]$_.Name } |
-        Sort-Object)
+$authorityProjectNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        $recomputedAuthority.projects |
+            ForEach-Object { [string]$_.name } |
+            Sort-Object))
+$baselineProjectNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        $baseline.projects.PSObject.Properties |
+            ForEach-Object { [string]$_.Name } |
+            Sort-Object))
 if (($authorityProjectNames -join [Environment]::NewLine) -cne
     ($baselineProjectNames -join [Environment]::NewLine)) {
     throw (
@@ -286,13 +286,13 @@ foreach ($authorityProject in $recomputedAuthority.projects) {
 }
 $authorityProjectsByName = $authorityProjectsByName.ToImmutable()
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
-$expectedModuleIdentities = @(
-    $expectedAuthorityModules |
-        ForEach-Object {
-            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
-            [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
-        } |
-        Sort-Object)
+$expectedModuleIdentities = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        $expectedAuthorityModules |
+            ForEach-Object {
+                [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+            } |
+            Sort-Object))
 $expectedModuleIdentityText = $expectedModuleIdentities -join ','
 $expectedAssemblyNames = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::Ordinal)
@@ -629,23 +629,23 @@ function Get-QualifiedDeclarationQueries {
     foreach ($module in $Modules) {
         $project = $Projects[[string]$module.project]
         if (@($project.compile | Where-Object { $_.path -ceq $Path }).Count -eq 0) { continue }
-        $documents = @($module.documents | Where-Object { $_.path -ceq $Path })
-        if ($documents.Count -ne 1) { return }
+        $documents = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($module.documents | Where-Object { $_.path -ceq $Path }))
+        if ($documents.Length -ne 1) { return }
         $document = $documents[0]
-        $recordedModules = @($RecordedAuthority.modules | Where-Object {
-                $_.project -ceq $module.project -and $_.assemblyName -ceq $module.assemblyName -and
-                $_.moduleMvid -ceq $module.moduleMvid -and $_.pdbCodeViewGuid -ceq $module.pdbCodeViewGuid
-            })
-        if ($recordedModules.Count -ne 1) { return }
-        $recordedDocuments = @($recordedModules[0].documents | Where-Object { $_.path -ceq $Path })
-        if ($recordedDocuments.Count -ne 1 -or
+        $recordedModules = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($RecordedAuthority.modules | Where-Object {
+                    $_.project -ceq $module.project -and $_.assemblyName -ceq $module.assemblyName -and
+                    $_.moduleMvid -ceq $module.moduleMvid -and $_.pdbCodeViewGuid -ceq $module.pdbCodeViewGuid
+                }))
+        if ($recordedModules.Length -ne 1) { return }
+        $recordedDocuments = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($recordedModules[0].documents | Where-Object { $_.path -ceq $Path }))
+        if ($recordedDocuments.Length -ne 1 -or
             -not (Test-QualifiedDeclarationDocument -Document $document -RecordedDocument $recordedDocuments[0] `
                     -AssemblyName ([string]$module.assemblyName) -ReportedModuleDocuments $ReportedModuleDocuments `
                     -SourcePath $SourcePath)) { return }
         $queries.Add(([ordered]@{
                     path = $Path; sourcePath = $SourcePath
                     languageVersion     = [string]$project.parseOptions.languageVersion
-                    preprocessorSymbols = @($project.parseOptions.preprocessorSymbols)
+                    preprocessorSymbols = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($project.parseOptions.preprocessorSymbols))
                 }).AsReadOnly())
     }
     return @($queries.ToImmutable())
@@ -697,7 +697,7 @@ function Measure-Coverage {
             coveredLines   = $covered
             coverableLines = $coverable
             linePercent    = [Math]::Round($percent, 2)
-            uncoveredLines = @(Get-OrdinalSortedUniqueStrings -Values @($uncovered.ToImmutable()))
+            uncoveredLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-OrdinalSortedUniqueStrings -Values @($uncovered.ToImmutable())))
         }).AsReadOnly()
 }
 
@@ -910,9 +910,9 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $changedLines = $frozenChangedLines.ToImmutable()
     $changedCovered = 0
     $changedCoverable = 0
-    $changedMetadataFiles = @(Get-OrdinalSortedUniqueStrings -Values @(
-            $changedTcbFiles |
-                Where-Object { -not $coverageTcbFiles.Contains($_) }))
+    $changedMetadataFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-OrdinalSortedUniqueStrings -Values @(
+                $changedTcbFiles |
+                    Where-Object { -not $coverageTcbFiles.Contains($_) })))
     $nonCoverableChangedFiles =
     [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $declarationOnlyChangedFiles =
@@ -1110,7 +1110,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             changedFiles            = $changedTcbFiles.Count
             coverageFiles           = $coverageTcbPaths.Count
             metadataFiles           = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
-            changedMetadataFiles    = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$changedMetadataFiles)
+            changedMetadataFiles    = $changedMetadataFiles
             coveredLines            = $changedCovered
             omittedDeclarationLines = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))))
             unmappedLines           = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))))

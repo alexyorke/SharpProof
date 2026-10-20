@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
@@ -215,15 +216,15 @@ internal static class CompilerMetadataResolution
             } &&
             HasNamespace(
                 containingNamespace,
-                "System",
-                "Runtime",
-                "CompilerServices")));
+                ["System", "Runtime", "CompilerServices"])));
     }
 
     internal static bool HasNamespace(
         INamespaceSymbol value,
-        params string[] segments)
+        ImmutableArray<string> segments)
     {
+        if (segments.IsDefault)
+        { throw new ArgumentNullException(nameof(segments)); }
         for (var index = segments.Length - 1; index >= 0; index--)
         {
             if (value.IsGlobalNamespace ||

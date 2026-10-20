@@ -15,13 +15,13 @@ function Test-SharpProofFacadePackage {
     if ([IO.Path]::GetFileName($PackagePath) -cne "SharpProof.$PackageVersion.nupkg") { throw 'The facade package filename does not match its exact identity.' }
     $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
     try {
-        $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $names = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
         foreach ($entry in $archive.Entries) {
             if (-not $names.Add($entry.FullName)) { throw 'The facade package contains duplicate ZIP entries.' }
             if ([IO.Path]::GetExtension($entry.FullName) -in @('.dll', '.exe', '.pdb')) { throw 'The metadata-only facade must not contain executable payloads or PDBs.' }
         }
-        $nuspecs = @($archive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase) })
-        if ($nuspecs.Count -ne 1) { throw 'The facade package must contain exactly one nuspec.' }
+        $nuspecs = [Collections.Immutable.ImmutableArray]::CreateRange[IO.Compression.ZipArchiveEntry]([IO.Compression.ZipArchiveEntry[]]@($archive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase) }))
+        if ($nuspecs.Length -ne 1) { throw 'The facade package must contain exactly one nuspec.' }
         $stream = $nuspecs[0].Open()
         $settings = [Xml.XmlReaderSettings]::new()
         $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
@@ -33,10 +33,10 @@ function Test-SharpProofFacadePackage {
         finally { $reader.Dispose(); $stream.Dispose() }
         $namespaces = [Xml.XmlNamespaceManager]::new($document.NameTable)
         $namespaces.AddNamespace('n', [string]$document.DocumentElement.NamespaceURI)
-        $repositories = @($document.SelectNodes('/n:package/n:metadata/n:repository', $namespaces))
-        if ($repositories.Count -ne 1 -or $repositories[0].GetAttribute('commit') -cne $RepositoryCommit) { throw 'The facade repository commit does not match its exact source authority.' }
-        $dependencies = @($document.SelectNodes('/n:package/n:metadata/n:dependencies//n:dependency', $namespaces))
-        if ($dependencies.Count -ne 1 -or $dependencies[0].GetAttribute('id') -cne 'SharpProof.Verifier' -or
+        $repositories = [Collections.Immutable.ImmutableArray]::CreateRange[Xml.XmlNode]([Xml.XmlNode[]]@($document.SelectNodes('/n:package/n:metadata/n:repository', $namespaces)))
+        if ($repositories.Length -ne 1 -or $repositories[0].GetAttribute('commit') -cne $RepositoryCommit) { throw 'The facade repository commit does not match its exact source authority.' }
+        $dependencies = [Collections.Immutable.ImmutableArray]::CreateRange[Xml.XmlNode]([Xml.XmlNode[]]@($document.SelectNodes('/n:package/n:metadata/n:dependencies//n:dependency', $namespaces)))
+        if ($dependencies.Length -ne 1 -or $dependencies[0].GetAttribute('id') -cne 'SharpProof.Verifier' -or
             $dependencies[0].GetAttribute('version') -cne "[$PackageVersion]") { throw 'The facade must have exactly one dependency on the exact matching SharpProof.Verifier version.' }
     }
     finally { $archive.Dispose() }
@@ -72,22 +72,23 @@ function Test-SharpProofEmbeddedSources {
     $provider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($stream)
     try {
         $reader = $provider.GetMetadataReader()
-        $embeddedSources = @{}
+        $embeddedSourceBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, Collections.Immutable.ImmutableArray[byte]]()
         foreach ($handle in $reader.CustomDebugInformation) {
             $information = $reader.GetCustomDebugInformation($handle)
             if ($reader.GetGuid($information.Kind) -ne [guid]'0e8a571b-6926-466e-b4ad-8ab04611f5fe') { continue }
             if ($information.Parent.Kind.ToString() -cne 'Document') { throw 'Embedded source is attached to an invalid PDB parent.' }
             $row = [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber($information.Parent)
-            if ($embeddedSources.ContainsKey($row)) { throw 'A PDB document contains duplicate embedded-source records.' }
-            $embeddedSources.Add($row, $reader.GetBlobBytes($information.Value))
+            if ($embeddedSourceBuilder.ContainsKey($row)) { throw 'A PDB document contains duplicate embedded-source records.' }
+            $embeddedSourceBuilder.Add($row, [Collections.Immutable.ImmutableArray]::CreateRange[byte]($reader.GetBlobBytes($information.Value)))
         }
+        $embeddedSources = $embeddedSourceBuilder.ToImmutable()
         $row = 0
         foreach ($documentHandle in $reader.Documents) {
             $row++
             $document = $reader.GetDocument($documentHandle)
             if (-not $embeddedSources.ContainsKey($row)) { throw 'A PDB source document has no embedded source.' }
             if ($reader.GetGuid($document.HashAlgorithm) -ne [guid]'8829d00f-11b8-4213-878b-770e8597ac16') { throw 'A PDB source document does not use SHA256.' }
-            [byte[]]$blob = $embeddedSources[$row]
+            [byte[]]$blob = @($embeddedSources[$row])
             if ($blob.Length -lt 4) { throw 'Embedded source is malformed.' }
             $expectedLength = [BitConverter]::ToInt32($blob, 0)
             if ($expectedLength -lt 0) { throw 'Embedded source declares an invalid length.' }

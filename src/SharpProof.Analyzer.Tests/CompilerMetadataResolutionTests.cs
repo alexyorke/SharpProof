@@ -13,6 +13,24 @@ namespace SharpProof.Analyzer.Test;
 public sealed class CompilerMetadataResolutionTests
 {
     [Test]
+    public void NamespaceVectorsRejectDefaultAndRetainGlobalAndOrdinalMatching()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "namespace System.Runtime.CompilerServices { internal class Subject { } }", []);
+        var nameSpace = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.Subject")!.ContainingNamespace;
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerMetadataResolution.HasNamespace(nameSpace, default)));
+        Assert.That(failure!.ParamName, Is.EqualTo("segments"));
+        Assert.That(CompilerMetadataResolution.HasNamespace(compilation.Assembly.GlobalNamespace,
+            ImmutableArray<string>.Empty), Is.True);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace, []), Is.False);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
+            ["System", "Runtime", "CompilerServices"]), Is.True);
+        Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
+            ["system", "Runtime", "CompilerServices"]), Is.False);
+    }
+
+    [Test]
     public void ReferenceResolutionCachesTheMatchedModuleAndRejectsMissingIdentities()
     {
         var compilation = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []);
@@ -124,11 +142,11 @@ public sealed class CompilerMetadataResolutionTests
             Assert.That(CompilerMetadataResolution.IsReferenceAssembly(ordinary.Assembly),
                 Is.False);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Runtime", "CompilerServices"), Is.True);
+                ["System", "Runtime", "CompilerServices"]), Is.True);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Runtime"), Is.False);
+                ["System", "Runtime"]), Is.False);
             Assert.That(CompilerMetadataResolution.HasNamespace(nameSpace,
-                "System", "Other", "CompilerServices"), Is.False);
+                ["System", "Other", "CompilerServices"]), Is.False);
         }
     }
 }

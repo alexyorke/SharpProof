@@ -56,7 +56,7 @@ foreach ($package in $packages) {
             $rows.Add("$id`t$version`t$($package.Name)`t$hash`t$contentHash")
             if ($inventoryBuilder.ContainsKey($id)) { throw 'Duplicate package identity in release inventory.' }
             $inventoryOrder.Add($id)
-            $inventoryBuilder[$id] = @{ type = 'Direct'; resolved = $version; contentHash = $contentHash }
+            $inventoryBuilder[$id] = ([ordered]@{ type = 'Direct'; resolved = $version; contentHash = $contentHash }).AsReadOnly()
         }
         finally {
             $reader.Dispose()
@@ -67,9 +67,10 @@ foreach ($package in $packages) {
 }
 [IO.File]::WriteAllText((Join-Path $packageRoot 'packages.tsv'), ($rows.ToImmutable() -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 $inventorySnapshot = $inventoryBuilder.ToImmutable()
-$inventory = [ordered]@{}
-foreach ($id in $inventoryOrder.ToImmutable()) { $inventory[$id] = $inventorySnapshot[$id] }
-$lock = @{ version = 1; dependencies = @{ release = $inventory } } | ConvertTo-Json -Depth 10
+$inventoryWireBuilder = [ordered]@{}
+foreach ($id in $inventoryOrder.ToImmutable()) { $inventoryWireBuilder[$id] = $inventorySnapshot[$id] }
+$inventory = $inventoryWireBuilder.AsReadOnly()
+$lock = ([ordered]@{ version = 1; dependencies = ([ordered]@{ release = $inventory }).AsReadOnly() }).AsReadOnly() | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $packageRoot 'packages.lock.json'), $lock + "`n", [Text.UTF8Encoding]::new($false))
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Test-SharpProofPublishedPackages.sh') -Destination $packageRoot
 Write-Output "Recorded identities, original archive SHA-512, and NuGet content hashes for $($packages.Count) unsigned release packages."

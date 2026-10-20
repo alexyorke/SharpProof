@@ -254,7 +254,7 @@ internal static class CompilerScalarIlDecoder
             (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
             !CompilerMetadataResolution.IsReferenceAssembly(method.ContainingAssembly) &&
             !method.GetAttributes().Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
-                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices")));
+                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, ["System", "Runtime", "InteropServices"])));
     }
 
     internal static unsafe bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,

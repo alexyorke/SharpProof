@@ -19,6 +19,28 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [Test]
+    public void PresentPathVectorsRejectDefaultAndPreserveNonblankOrderAndDuplicates()
+    {
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            PresentPathsProbe.Capture(default)));
+        Assert.That(failure!.ParamName, Is.EqualTo("paths"));
+        Assert.That(PresentPathsProbe.Capture(ImmutableArray<string?>.Empty), Is.Empty);
+        ImmutableArray<string?> paths = [null, "", " ", " a ", "b", "a", "b"];
+        Assert.That(PresentPathsProbe.Capture(paths),
+            Is.EqualTo(ImmutableArray.Create(" a ", "b", "a", "b")));
+        Assert.That(paths, Has.Length.EqualTo(7));
+    }
+
+    private abstract class PresentPathsProbe : CancelableBuildTask
+    {
+        internal static ImmutableArray<string> Capture(
+            ImmutableArray<string?> paths /* SPINT001: all values valid - the probe forwards default to the protected method under test */)
+        {
+            return Present(paths);
+        }
+    }
+
     private static readonly string DotNetHost =
         Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
 
