@@ -13,13 +13,13 @@ function Assert-Failure([scriptblock]$Action) {
     if (-not $failed) { throw 'Expected documentation validation to reject this fixture.' }
 }
 try {
-    foreach ($directory in @('src/SharpProof.Package/buildTransitive', 'src/SharpProof.Verifier/buildTransitive', 'src/SharpProof.Attributes', 'src/SharpProof.Gates', 'src/SharpProof.Analyzer.Core/ContractForValidation', 'src/SharpProof.Fuzz', 'eng/scripts', 'docs')) {
+    foreach ($directory in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('src/SharpProof.Package/buildTransitive', 'src/SharpProof.Verifier/buildTransitive', 'src/SharpProof.Attributes', 'src/SharpProof.Gates', 'src/SharpProof.Analyzer.Core/ContractForValidation', 'src/SharpProof.Fuzz', 'eng/scripts', 'docs'))) {
         [IO.Directory]::CreateDirectory((Join-Path $fixture $directory)) | Out-Null
     }
-    foreach ($path in @('src/SharpProof.Package/buildTransitive', 'src/SharpProof.Verifier/buildTransitive', 'src/SharpProof.Attributes')) {
+    foreach ($path in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('src/SharpProof.Package/buildTransitive', 'src/SharpProof.Verifier/buildTransitive', 'src/SharpProof.Attributes'))) {
         Copy-Item -Path (Join-Path $sourceRoot "$path/*") -Destination (Join-Path $fixture $path) -Recurse
     }
-    foreach ($path in @('eng/Versions.props', 'src/SharpProof.Gates/Program.cs', 'eng/scripts/Invoke-SharpProofContainer.ps1', 'src/SharpProof.Fuzz/FuzzOptions.cs', 'src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs', 'src/SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs')) {
+    foreach ($path in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('eng/Versions.props', 'src/SharpProof.Gates/Program.cs', 'eng/scripts/Invoke-SharpProofContainer.ps1', 'src/SharpProof.Fuzz/FuzzOptions.cs', 'src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs', 'src/SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs'))) {
         Copy-Item -LiteralPath (Join-Path $sourceRoot $path) -Destination (Join-Path $fixture $path)
     }
     [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), "# Fixture`n`n[Guide](docs/guide.md#guide)`n")
@@ -35,15 +35,15 @@ try {
     $first = [IO.File]::ReadAllText($generated)
     & $sync -RepositoryRoot $fixture -Update
     if ([IO.File]::ReadAllText($generated) -cne $first) { throw 'Generation is not idempotent.' }
-    $mutations = @(
-        @{ Path = 'src/SharpProof.Package/buildTransitive/SharpProof.props'; Before = '</Project>'; After = '<PropertyGroup><SharpProofDocumentationProbe>enabled</SharpProofDocumentationProbe></PropertyGroup></Project>'; Visible = 'SharpProofDocumentationProbe' },
-        @{ Path = 'src/SharpProof.Attributes/SharpProofEffect.cs'; Before = 'None = 0,'; After = 'DocumentationProbe = 42, None = 0,'; Visible = 'DocumentationProbe' },
-        @{ Path = 'eng/scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' },
-        @{ Path = 'src/SharpProof.Gates/Program.cs'; Before = 'Usage: SharpProof.Gates ['; After = 'Usage: SharpProof.Gates [documentation-probe|'; Visible = 'documentation-probe' },
-        @{ Path = 'src/SharpProof.Fuzz/FuzzOptions.cs'; Before = 'case "--cases":'; After = 'case "--documentation-probe": case "--cases":'; Visible = '--documentation-probe' },
-        @{ Path = 'src/SharpProof.Attributes/PublicAPI.Unshipped.txt'; Before = '#nullable enable'; After = '#nullable enable' + "`n" + 'SharpProof.Attributes.DocumentationProbe'; Visible = 'SharpProof.Attributes.DocumentationProbe' },
-        @{ Path = 'src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs'; Before = 'id: "SP0002"'; After = 'id: "SP9999"'; Visible = 'SP9999' }
-    )
+    $mutations = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            ([ordered]@{ Path = 'src/SharpProof.Package/buildTransitive/SharpProof.props'; Before = '</Project>'; After = '<PropertyGroup><SharpProofDocumentationProbe>enabled</SharpProofDocumentationProbe></PropertyGroup></Project>'; Visible = 'SharpProofDocumentationProbe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'src/SharpProof.Attributes/SharpProofEffect.cs'; Before = 'None = 0,'; After = 'DocumentationProbe = 42, None = 0,'; Visible = 'DocumentationProbe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'eng/scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'src/SharpProof.Gates/Program.cs'; Before = 'Usage: SharpProof.Gates ['; After = 'Usage: SharpProof.Gates [documentation-probe|'; Visible = 'documentation-probe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'src/SharpProof.Fuzz/FuzzOptions.cs'; Before = 'case "--cases":'; After = 'case "--documentation-probe": case "--cases":'; Visible = '--documentation-probe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'src/SharpProof.Attributes/PublicAPI.Unshipped.txt'; Before = '#nullable enable'; After = '#nullable enable' + "`n" + 'SharpProof.Attributes.DocumentationProbe'; Visible = 'SharpProof.Attributes.DocumentationProbe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs'; Before = 'id: "SP0002"'; After = 'id: "SP9999"'; Visible = 'SP9999' }).AsReadOnly()
+        ))
     foreach ($mutation in $mutations) {
         $path = Join-Path $fixture $mutation.Path
         $original = [IO.File]::ReadAllText($path)
