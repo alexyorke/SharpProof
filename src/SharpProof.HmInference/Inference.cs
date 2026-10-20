@@ -1462,7 +1462,8 @@ public static partial class Inference
             { return UserOperator(userBinary.OperatorMethod, [userBinary.LeftOperand, userBinary.RightOperand], userBinary.Type!, userBinary.IsLifted); }
             if (binary.Kind() is SyntaxKind.AsExpression or SyntaxKind.IsExpression)
             {
-                throw new InferenceException("User-defined, null-coalescing and type-test operators are unsupported.");
+                _ = Expression(binary.Left);
+                return CSharpTypes.Rigid(model.GetTypeInfo(binary, cancellationToken).Type!);
             }
 
             // Retain original operand types so numeric promotion, boxing and string

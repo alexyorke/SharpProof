@@ -138,6 +138,7 @@ method/local-function declarations supply schemes instantiated per call.
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
 | Conditionals, return branches and guard returns | Unify results |
 | Declaration, recursive, positional and list patterns | Bind pattern variables; infer structural member/element types and retain implicit protocol selections |
+| Legacy type tests and safe casts | Infer the operand; retain the tested type and reference/nullable cast target, including awaited operands |
 | Pattern switches and switch expressions | Bind section/arm variables and guards; unify results and preserve constant conversion domains |
 | Self-recursive methods | Solve monomorphic recursive references |
 | Resolved method and generic calls | Import signatures; instantiate generic parameters per call |
@@ -637,3 +638,9 @@ values, nullable references, arrays, property patterns, switch expressions, and
 awaited Task/ValueTask results. IDE code-fix runtime checks cover null and non-null
 inputs and suspension before testing an awaited nullable value. Numeric and enum
 constant patterns continue to retain their operand domain.
+
+The binary `value is Type` form and `value as Type` casts infer symbolic operand
+types while keeping their explicit target fixed. Regression checks cover reference,
+interface, array, generic and nullable value targets, original boxed inputs, caller
+conversion preservation, single evaluation, and Task/ValueTask operands. IDE fixes
+are executed over both their original domain and additional value/reference types.
