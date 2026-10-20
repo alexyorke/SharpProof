@@ -81,7 +81,7 @@ internal static class HornInvariantSearch
                 { continue; }
                 var state = states.TryGetValue(relation.Key, out var known)
                     ? known : throw new ArgumentException("Every invariant relation requires a state.");
-                var domain = integer.Domain;
+                var domain = integer.Domain.ToImmutableArray();
                 if (state.Length != domain.Length)
                 { throw new ArgumentException("An invariant state must match its relation's arity."); }
                 var arguments = state.Select((term, ordinal) =>
@@ -271,8 +271,8 @@ internal static class HornInvariantSearch
             var applicationBuilder = ImmutableList.CreateBuilder<Expr>();
             Applications(fact, applicationBuilder);
             var applications = applicationBuilder.ToImmutable();
-            var holds = applications.Select(_ => (Expr)Own(context.MkTrue())).ToArray();
-            return Own(context.MkAnd([(BoolExpr)Own(fact.Substitute([.. applications], holds)), .. applications.Cast<BoolExpr>()]));
+            var holds = applications.Select(_ => (Expr)Own(context.MkTrue())).ToImmutableArray();
+            return Own(context.MkAnd([(BoolExpr)Own(fact.Substitute([.. applications], holds.ToArray())), .. applications.Cast<BoolExpr>()]));
         }
 
         private void Applications(Expr expression, ImmutableList<Expr>.Builder applications)
@@ -347,7 +347,7 @@ internal static class HornInvariantSearch
         {
             expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
-            var arguments = expression.IsApp ? expression.Args : [];
+            var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
             var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);
             switch (nativeKind)
             {

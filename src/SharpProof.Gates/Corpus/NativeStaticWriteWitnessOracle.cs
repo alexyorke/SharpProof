@@ -90,20 +90,21 @@ internal static class NativeStaticWriteWitnessOracle
                 .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == method.MetadataName && !candidate.IsGenericMethod &&
                     candidate.GetParameters().Length == method.Parameters.Length && candidate.GetParameters().Select((parameter, ordinal) =>
                         parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerClrTypeMatcher.Matches(method.Parameters[ordinal].Type, parameter.ParameterType, typeof(int)))).All(match => match)));
-            var values = new object?[method.Parameters.Length];
-            var parameters = callable.GetParameters();
-            for (var ordinal = 0; ordinal < values.Length; ordinal++)
+            var valueBuilder = ImmutableArray.CreateBuilder<object?>(method.Parameters.Length);
+            var parameters = callable.GetParameters().ToImmutableArray();
+            for (var ordinal = 0; ordinal < method.Parameters.Length; ordinal++)
             {
                 if (!evidence.EntryModel.TryGetValue(preparation.Parameters[ordinal].Entry, out var input) ||
-                    !TryValue(parameters[ordinal].ParameterType, input, out values[ordinal]))
+                    !TryValue(parameters[ordinal].ParameterType, input, out var value))
                 { return Gap("UnsupportedWriteInput"); }
+                valueBuilder.Add(value);
             }
             var field = assembly.GetType(CompilerClrTypeMatcher.MetadataName(fieldSymbol.ContainingType), throwOnError: true)!
                 .GetField(fieldSymbol.MetadataName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
                 ?? throw new InvalidDataException("A source write witness has no matching emitted field.");
             var before = field.GetValue(null);
             try
-            { callable.Invoke(null, values); }
+            { callable.Invoke(null, valueBuilder.ToImmutable().ToArray()); }
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             { return new("WriteInvocationThrew", 1); }
             var after = field.GetValue(null);

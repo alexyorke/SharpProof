@@ -65,7 +65,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryBind(method, definition, choice, out var callable))
             { continue; }
-            var parameters = callable!.GetParameters();
+            var parameters = callable!.GetParameters().ToImmutableArray();
             var values = new object?[parameters.Length];
             var aliases = ImmutableDictionary.CreateBuilder<object, object>();
             var concrete = true;
@@ -140,7 +140,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
                 { continue; }
                 var closed = candidate.IsGenericMethodDefinition
                     ? candidate.MakeGenericMethod(Enumerable.Repeat(choice, symbol.Arity).ToArray()) : candidate;
-                var parameters = closed.GetParameters();
+                var parameters = closed.GetParameters().ToImmutableArray();
                 if (parameters.Length == symbol.Parameters.Length && parameters.Select((parameter, ordinal) =>
                         parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (Matches(symbol.Parameters[ordinal].Type, parameter.ParameterType, choice))).All(match => match))
                 {
@@ -185,7 +185,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         System.ArgumentNullException.ThrowIfNull(callable);
         var wrapper = new DynamicMethod("allocation-witness", typeof(void), [typeof(object[])], callable.Module, skipVisibility: true);
         var il = wrapper.GetILGenerator();
-        var parameters = callable.GetParameters();
+        var parameters = callable.GetParameters().ToImmutableArray();
         for (var ordinal = 0; ordinal < parameters.Length; ordinal++)
         {
             il.Emit(OpCodes.Ldarg_0);
