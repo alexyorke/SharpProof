@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -17,7 +18,7 @@ public sealed class KeyValuePairApiSpecResolutionTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Failures, Is.Empty);
-            foreach (var name in new[] { "Key", "Value" })
+            foreach (var name in ImmutableArray.Create("Key", "Value"))
             {
                 var getter = pair.GetMembers(name).OfType<IPropertySymbol>().Single().GetMethod!;
                 Assert.That(resolved.TryGet(getter, out _), Is.True);
@@ -44,7 +45,7 @@ public sealed class KeyValuePairApiSpecResolutionTests
 
     private static CSharpCompilation FrameworkCompilation()
     {
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
         return CSharpCompilation.Create("PairResolution", references: paths.Select(path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)));
     }
 }

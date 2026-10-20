@@ -36,12 +36,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var pairType = typeof(KeyValuePair<,>);
         var getter = pairType.GetProperty(readValue ? "Value" : "Key")!.GetMethod!;
         var body = getter.GetMethodBody();
-        var il = body?.GetILAsByteArray();
+        var il = body?.GetILAsByteArray()?.ToImmutableArray() ?? ImmutableArray<byte>.Empty;
         if (!pairType.IsValueType || pairType.TypeInitializer != null || getter.IsStatic || getter.IsVirtual ||
             getter.GetParameters().Length != 0 || body == null || body.ExceptionHandlingClauses.Count != 0 ||
             il is not { Length: 7 } || il[0] != 0x02 || il[1] != 0x7b || il[6] != 0x2a)
         { return SpecEffect.Unknown; }
-        var field = getter.Module.ResolveField(BitConverter.ToInt32(il, 2), pairType.GetGenericArguments(), Type.EmptyTypes);
+        var field = getter.Module.ResolveField(BitConverter.ToInt32(il.AsSpan(2..)), pairType.GetGenericArguments(), Type.EmptyTypes);
         if (field is not { IsStatic: false, IsInitOnly: true } || field.FieldType != getter.ReturnType ||
             !field.FieldType.IsGenericParameter || field.FieldType.GenericParameterPosition != (readValue ? 1 : 0))
         { return SpecEffect.Unknown; }

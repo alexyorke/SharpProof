@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -40,7 +41,7 @@ public sealed class ConstrainedComparableDomainTests
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
         var callerGraph = ControlFlowGraph.Create(syntax, model)!;
         var invocation = callerGraph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
-            block.Operations.Concat(block.BranchValue is { } branch ? [branch] : [])).SelectMany(operation => operation is null
+            block.Operations.Concat(block.BranchValue is { } branch ? ImmutableArray.Create(branch) : ImmutableArray<IOperation>.Empty)).SelectMany(operation => operation is null
                 ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>().Single();
         bool PrepareCallee(TotalLoweringContext frame)
         {

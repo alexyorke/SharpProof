@@ -2,16 +2,16 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<CaptureId> _managedValueReceiverCaptures = [];
-    private readonly Dictionary<CaptureId, IrTerm> _managedValueCaptureLocations = [];
-    private readonly Dictionary<IOperation, IrTerm> _managedValueLocations = [];
+    private readonly ImmutableHashSet<CaptureId>.Builder _managedValueReceiverCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
+    private readonly ImmutableDictionary<CaptureId, IrTerm>.Builder _managedValueCaptureLocations = ImmutableDictionary.CreateBuilder<CaptureId, IrTerm>();
+    private readonly ImmutableDictionary<IOperation, IrTerm>.Builder _managedValueLocations = ImmutableDictionary.CreateBuilder<IOperation, IrTerm>();
 
     internal void TrackManagedValueReceivers(ControlFlowGraph graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         foreach (var block in graph.Blocks)
         {
-            foreach (var root in block.Operations.Concat(block.BranchValue is { } branch ? [branch] : []))
+            foreach (var root in block.Operations.Concat(block.BranchValue is { } branch ? ImmutableArray.Create(branch) : ImmutableArray<IOperation>.Empty))
             {
                 foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>())
                 {
