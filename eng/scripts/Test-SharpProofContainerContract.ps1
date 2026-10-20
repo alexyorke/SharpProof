@@ -57,13 +57,14 @@ function Assert-SingleMatchingLine {
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
         [AllowEmptyString()]
-        [string[]]$Lines,
+        [Collections.IEnumerable]$Lines,
         [Parameter(Mandatory = $true)][string]$Pattern,
         [Parameter(Mandatory = $true)][string]$Expected,
         [Parameter(Mandatory = $true)][string]$Name)
 
-    $matchingLines = @($Lines | Where-Object { $_ -cmatch $Pattern })
-    if ($matchingLines.Count -cne 1 -or $matchingLines[0] -cne $Expected) {
+    $Lines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Lines))
+    $matchingLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Lines | Where-Object { $_ -cmatch $Pattern }))
+    if ($matchingLines.Length -cne 1 -or $matchingLines[0] -cne $Expected) {
         throw "$Name must occur exactly once as '$Expected'."
     }
 }
@@ -72,21 +73,22 @@ function Get-DockerfileStageLines {
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
-        [string[]]$Lines,
+        [Collections.IEnumerable]$Lines,
         [Parameter(Mandatory = $true)][string]$FromLine)
 
-    $start = [array]::IndexOf($Lines, $FromLine)
+    $Lines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Lines))
+    $start = $Lines.IndexOf($FromLine)
     if ($start -lt 0) {
         throw "Dockerfile stage '$FromLine' was not found."
     }
-    $end = $Lines.Count
-    for ($index = $start + 1; $index -lt $Lines.Count; $index++) {
+    $end = $Lines.Length
+    for ($index = $start + 1; $index -lt $Lines.Length; $index++) {
         if ($Lines[$index] -cmatch '^FROM\s+') {
             $end = $index
             break
         }
     }
-    return @($Lines[($start + 1)..($end - 1)])
+    return , [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Lines[($start + 1)..($end - 1)]))
 }
 
 function Assert-DockerfileAuthority {
@@ -94,41 +96,41 @@ function Assert-DockerfileAuthority {
         [Parameter(Mandatory = $true)][string]$Content,
         [Parameter(Mandatory = $true)]$ToolchainCatalog)
 
-    $lines = @($Content -split "`r?`n")
+    $lines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Content -split "`r?`n"))
     if (@($lines | Where-Object { $_ -cmatch '^\s*#\s*syntax\s*=' }).Count -ne 0) {
         throw (
             'The Dockerfile must use the bundled Dockerfile grammar and must not ' +
             'introduce an unpinned external frontend.')
     }
 
-    $authorities = @(
-        [pscustomobject]@{
-            Argument = 'POWERSHELL_IMAGE'
-            Image    = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
-        },
-        [pscustomobject]@{
-            Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
-        },
-        [pscustomobject]@{
-            Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
-        },
-        [pscustomobject]@{
-            Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
-        },
-        [pscustomobject]@{
-            Argument = 'DOTNET_API_INVENTORY_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
-        },
-        [pscustomobject]@{
-            Argument = 'DOTNET_SDK_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
-        })
+    $authorities = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            ([ordered]@{
+                Argument = 'POWERSHELL_IMAGE'
+                Image    = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
+            }).AsReadOnly(),
+            ([ordered]@{
+                Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
+                Image    = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
+            }).AsReadOnly(),
+            ([ordered]@{
+                Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
+                Image    = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
+            }).AsReadOnly(),
+            ([ordered]@{
+                Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
+                Image    = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
+            }).AsReadOnly(),
+            ([ordered]@{
+                Argument = 'DOTNET_API_INVENTORY_IMAGE'
+                Image    = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
+            }).AsReadOnly(),
+            ([ordered]@{
+                Argument = 'DOTNET_SDK_IMAGE'
+                Image    = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
+            }).AsReadOnly()))
 
     $firstFrom = -1
-    for ($index = 0; $index -lt $lines.Count; $index++) {
+    for ($index = 0; $index -lt $lines.Length; $index++) {
         if ($lines[$index] -cmatch '^FROM\s+') {
             $firstFrom = $index
             break
@@ -142,26 +144,28 @@ function Assert-DockerfileAuthority {
                 [regex]::Escape($_.Argument)
             }) -join '|')
     $argumentPattern = '^ARG\s+(?<argument>' + $authorityArguments + ')(?:=|$)'
-    $declarationsByArgument = @{}
+    $declarationBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
     foreach ($authority in $authorities) {
-        $declarationsByArgument[$authority.Argument] = [pscustomobject]@{
-            DeclarationCount = 0
-            First            = $null
-        }
+        $declarationBuilder[$authority.Argument] = ([ordered]@{
+                DeclarationCount = 0
+                First            = $null
+            }).AsReadOnly()
     }
-    for ($index = 0; $index -lt $lines.Count; $index++) {
+    for ($index = 0; $index -lt $lines.Length; $index++) {
         if ($lines[$index] -cmatch $argumentPattern) {
-            $declarations = $declarationsByArgument[$Matches.argument]
-            $declarations.DeclarationCount++
-            if ($declarations.DeclarationCount -eq 1) {
-                $declarations.First = [pscustomobject]@{
-                    Index = $index
-                    Text  = $lines[$index]
-                }
+            $declarations = $declarationBuilder[$Matches.argument]
+            $first = if ($declarations.DeclarationCount -eq 0) {
+                ([ordered]@{ Index = $index; Text = $lines[$index] }).AsReadOnly()
             }
+            else { $declarations.First }
+            $declarationBuilder[$Matches.argument] = ([ordered]@{
+                    DeclarationCount = $declarations.DeclarationCount + 1
+                    First            = $first
+                }).AsReadOnly()
         }
     }
 
+    $declarationsByArgument = $declarationBuilder.ToImmutable()
     foreach ($authority in $authorities) {
         $declarations = $declarationsByArgument[$authority.Argument]
         $expected = "ARG $($authority.Argument)=$($authority.Image)"
@@ -174,19 +178,19 @@ function Assert-DockerfileAuthority {
         }
     }
 
-    $actualStages = @($lines | Where-Object { $_ -cmatch '^FROM\s+' })
-    $expectedStages = @(
-        'FROM ${POWERSHELL_IMAGE} AS powershell',
-        'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
-        'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
-        'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
-        'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
-        'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
-        'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
-    if ($actualStages.Count -cne $expectedStages.Count) {
+    $actualStages = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($lines | Where-Object { $_ -cmatch '^FROM\s+' }))
+    $expectedStages = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'FROM ${POWERSHELL_IMAGE} AS powershell',
+            'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
+            'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
+            'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+            'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
+            'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
+            'FROM ${DOTNET_SDK_IMAGE} AS toolchain'))
+    if ($actualStages.Length -cne $expectedStages.Length) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
     }
-    for ($index = 0; $index -lt $expectedStages.Count; $index++) {
+    for ($index = 0; $index -lt $expectedStages.Length; $index++) {
         if ($actualStages[$index] -cne $expectedStages[$index]) {
             throw (
                 "Dockerfile stage $index must be '$($expectedStages[$index])'; " +
@@ -287,7 +291,7 @@ function Assert-ComposeAuthority {
         [Parameter(Mandatory = $true)][string]$Content,
         [Parameter(Mandatory = $true)][string]$Platform)
 
-    $lines = @($Content -split "`r?`n")
+    $lines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Content -split "`r?`n"))
     if ($Content.Contains("`t", [System.StringComparison]::Ordinal)) {
         throw 'Compose authority must use spaces, not tabs.'
     }
@@ -302,14 +306,13 @@ function Assert-ComposeAuthority {
         -Expected 'services:' `
         -Name 'Compose services mapping'
 
-    $commonStart = [array]::IndexOf(
-        $lines,
+    $commonStart = $lines.IndexOf(
         'x-sharpproof-common: &sharpproof-common')
-    $servicesStart = [array]::IndexOf($lines, 'services:')
+    $servicesStart = $lines.IndexOf('services:')
     if ($commonStart -ge $servicesStart) {
         throw 'Compose common authority must precede the services mapping.'
     }
-    $commonLines = @($lines[($commonStart + 1)..($servicesStart - 1)])
+    $commonLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($lines[($commonStart + 1)..($servicesStart - 1)]))
     $expectedImage = '  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}'
     Assert-SingleMatchingLine $commonLines '^  image:' $expectedImage 'Compose tooling image'
     Assert-SingleMatchingLine $commonLines '^  platform:' "  platform: $Platform" 'Compose platform'
@@ -320,15 +323,15 @@ function Assert-ComposeAuthority {
         'Compose repository root'
     Assert-SingleMatchingLine $commonLines '^  build:' '  build:' 'Compose build mapping'
 
-    $buildStart = [array]::IndexOf($commonLines, '  build:')
-    $buildEnd = $commonLines.Count
-    for ($index = $buildStart + 1; $index -lt $commonLines.Count; $index++) {
+    $buildStart = $commonLines.IndexOf('  build:')
+    $buildEnd = $commonLines.Length
+    for ($index = $buildStart + 1; $index -lt $commonLines.Length; $index++) {
         if ($commonLines[$index] -cmatch '^  \S') {
             $buildEnd = $index
             break
         }
     }
-    $buildLines = @($commonLines[($buildStart + 1)..($buildEnd - 1)])
+    $buildLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($commonLines[($buildStart + 1)..($buildEnd - 1)]))
     Assert-SingleMatchingLine $buildLines '^    context:' '    context: .' 'Compose build context'
     Assert-SingleMatchingLine `
         $buildLines `
@@ -343,7 +346,7 @@ function Assert-ComposeAuthority {
             [Parameter(Mandatory = $true)][int]$ServiceStart,
             [Parameter(Mandatory = $true)][int]$ServiceEnd)
 
-        $serviceLines = @($lines[($ServiceStart + 1)..($ServiceEnd - 1)])
+        $serviceLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($lines[($ServiceStart + 1)..($ServiceEnd - 1)]))
         Assert-SingleMatchingLine `
             $serviceLines `
             '^    <<:' `
@@ -365,7 +368,7 @@ function Assert-ComposeAuthority {
             if (@($serviceLines | Where-Object { $_ -cmatch '^    platform:' }).Count -ne 0) {
                 throw 'Lint must inherit the canonical platform.'
             }
-            $lintLines = @(Get-Content (Join-Path $repositoryRoot 'eng/lint/Dockerfile'))
+            $lintLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-Content (Join-Path $repositoryRoot 'eng/lint/Dockerfile')))
             Assert-SingleMatchingLine $lintLines '^FROM .* AS lint$' `
                 'FROM canonical_tooling AS lint' 'Lint final stage'
             if (@($lintLines | Where-Object { $_ -cmatch '^FROM ' })[-1] -cne 'FROM canonical_tooling AS lint') {
@@ -383,7 +386,7 @@ function Assert-ComposeAuthority {
     $serviceNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $currentServiceName = $null
     $currentServiceStart = -1
-    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
+    for ($index = $servicesStart + 1; $index -lt $lines.Length; $index++) {
         if ($lines[$index] -cmatch '^\S') {
             if ($currentServiceStart -ge 0) {
                 & $assertService $currentServiceName $currentServiceStart $index
@@ -401,7 +404,7 @@ function Assert-ComposeAuthority {
         }
     }
     if ($currentServiceStart -ge 0) {
-        & $assertService $currentServiceName $currentServiceStart $lines.Count
+        & $assertService $currentServiceName $currentServiceStart $lines.Length
     }
     $serviceNames = $serviceNameBuilder.ToImmutable()
     if ($serviceNames -cnotcontains 'tooling') {
