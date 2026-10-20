@@ -197,12 +197,7 @@ public static partial class Inference
                 after = ReadNestedBuilderStates(probeCompilation, probeRoot, markerName)
                     ?? throw new InferenceException("Nested-layout candidate probe cannot be emitted.");
             }
-            foreach (var index in active)
-            {
-                if (!after.Value.States.TryGetValue(index, out var state))
-                { throw new InferenceException("Nested state-machine correlation changed."); }
-                added |= AddBuilderStorageConstraints(state, variables);
-            }
+            added |= InferLocalLayoutCalls(compilation, proposal, after.Value.States, active, variables);
             return added;
         }
     }

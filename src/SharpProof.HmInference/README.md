@@ -511,12 +511,20 @@ constraints; unused parameters and phantom arguments remain free. Active safe
 and critical completion members are distinguished. Layout probes can temporarily
 strengthen generic constraints when the host compiler enforces them before emit.
 Applied fixes verify actual runtime reference-containing layouts and reject
-managed payload calls. Nested async-function layout correlation remains open.
+managed payload calls.
 
 For C# 10 and later, private layout probes correlate nested async lambdas,
 anonymous delegates and local functions through temporary method attributes.
 Markers stay out of suggestions and applied fixes. Each active state machine
 contributes only its physically stored generic arguments, including multiple
 independent callbacks. Runtime fixes verify callback values, field layouts,
-unmanaged-domain errors and unrestricted unused parameters. Older-language
-nested correlation and generic local-call substitutions remain open.
+unmanaged-domain errors and unrestricted unused parameters.
+
+Generic local-function calls propagate physical storage requirements through
+selected type substitutions, forwarding chains, method groups and recursive
+calls. A finite fixed point tracks source generic symbols; composite structs
+constrain only stored arguments, preserving phantom parameters. Nullable local
+results retain their wrapper and infer unmanaged element constraints. Applied
+fixes exercise new unmanaged payloads and reject managed payloads; CLI and
+packaged analyzer consumers verify Release builds. Older-language nested
+correlation remains open.

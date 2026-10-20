@@ -22,6 +22,10 @@ internal static class BuilderLayoutRuntimeChecks
             .Replace("where A:INotifyCompletion where S:IAsyncStateMachine", "where A:INotifyCompletion where S:unmanaged,IAsyncStateMachine", StringComparison.Ordinal);
         var source = "using System.Linq;\n" + support + unused + """
             public static class BuilderLayoutProbe{
+                public static LayoutTask<int> LocalCall(int value,string ignored){static LayoutTask<U> Forward<U>(U item)=>Local(item);static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Forward(value);}
+                public static LayoutTask<LayoutPayload<int,string>> LocalComposite(LayoutPayload<int,string> value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}
+                public static LayoutTask<int?> LocalNullable(int? value,string ignored){static async LayoutTask<T?> Local<T>(T? item) where T:struct{await new LayoutSignal();return item;}return Local(value);}
+                public static void LocalGroup(Action<Func<int,LayoutTask<int>>> sink,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}sink(Local);}
                 public static void Callback(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async value=>{await new LayoutSignal();return value;});}
                 public static void Parenthesized(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async (value)=>{await new LayoutSignal();return value;});}
                 public static void Anonymous(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(async delegate{await new LayoutSignal();return 23;});}
@@ -53,6 +57,12 @@ internal static class BuilderLayoutRuntimeChecks
                     Func<int,LayoutTask<int>>? first=null;Func<long,LayoutTask<long>>? second=null;
                     BuilderLayoutProbe.Multiple((Func<int,LayoutTask<int>> value)=>first=value,(Func<long,LayoutTask<long>> value)=>second=value,"tag");
                     if(first is null||second is null||CallbackLayout.Managed(first)||CallbackLayout.Managed(second)||first(23).GetAwaiter().GetResult()!=23||second(23L).GetAwaiter().GetResult()!=23L)return false;
+                    Func<int,LayoutTask<int>>? group=null;BuilderLayoutProbe.LocalGroup((Func<int,LayoutTask<int>> value)=>group=value,"tag");
+                    if(group is null||CallbackLayout.Managed(group)||group(23).GetAwaiter().GetResult()!=23)return false;
+                    if(BuilderLayoutProbe.LocalCall(23,"tag").GetAwaiter().GetResult()!=23
+                        ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<int,string>{Value=23},"tag").GetAwaiter().GetResult().Value!=23
+                        ||BuilderLayoutProbe.LocalNullable((int?)23,"tag").GetAwaiter().GetResult()!=23
+                        ||BuilderLayoutProbe.LocalNullable((int?)null,"tag").GetAwaiter().GetResult()is not null)return false;
                     return BuilderLayoutProbe.Value(23,"tag").GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Local(23,"tag").GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Phantom(new LayoutPayload<int,string>{Value=23},"tag").GetAwaiter().GetResult()==23
@@ -73,7 +83,7 @@ internal static class BuilderLayoutRuntimeChecks
         var expectedTrace = (string)before.GetType("LayoutTrace")!.GetField("Value")!.GetValue(null)!;
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 13; round++)
+        for (var round = 0; round < 17; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -93,8 +103,8 @@ internal static class BuilderLayoutRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 10)
-        { throw new InvalidOperationException("Expected ten builder layout fixes; got " + fixes); }
+        if (fixes != 14)
+        { throw new InvalidOperationException("Expected fourteen builder layout fixes; got " + fixes); }
         document = document.Project.AddDocument("NewBuilderLayoutDomains.cs", """
             #nullable enable
             using System;
@@ -110,6 +120,12 @@ internal static class BuilderLayoutRuntimeChecks
                     Func<byte,LayoutTask<byte>>? first=null;Func<decimal,LayoutTask<decimal>>? second=null;
                     BuilderLayoutProbe.Multiple((Func<byte,LayoutTask<byte>> value)=>first=value,(Func<decimal,LayoutTask<decimal>> value)=>second=value,tag);
                     if(first is null||second is null||CallbackLayout.Managed(first)||CallbackLayout.Managed(second)||first(23).GetAwaiter().GetResult()!=23||second(23m).GetAwaiter().GetResult()!=23m)return false;
+                    Func<byte,LayoutTask<byte>>? group=null;BuilderLayoutProbe.LocalGroup((Func<byte,LayoutTask<byte>> value)=>group=value,tag);
+                    if(group is null||CallbackLayout.Managed(group)||group(23).GetAwaiter().GetResult()!=23)return false;
+                    if(BuilderLayoutProbe.LocalCall((byte)23,tag).GetAwaiter().GetResult()!=23
+                        ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<byte,object[]>{Value=23},tag).GetAwaiter().GetResult().Value!=23
+                        ||BuilderLayoutProbe.LocalNullable((decimal?)23m,tag).GetAwaiter().GetResult()!=23m
+                        ||BuilderLayoutProbe.LocalNullable((decimal?)null,tag).GetAwaiter().GetResult()is not null)return false;
                     return BuilderLayoutProbe.Value((byte)23,tag).GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Local((byte)23,tag).GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Phantom(new LayoutPayload<byte,object[]>{Value=23},tag).GetAwaiter().GetResult()==23
@@ -147,9 +163,9 @@ internal static class BuilderLayoutRuntimeChecks
             { throw new InvalidOperationException("State-machine physical layout mismatch: " + entry.Name); }
         }
         Program.Log.Info("PASS BuilderLayoutRuntimeFieldContracts");
-        var invalid = document.Project.AddDocument("InvalidLayoutDomain.cs", "#nullable enable\npublic struct ManagedLayoutPayload{public string? Value;}public static class InvalidLayoutDomain{public static void Bad(){_=BuilderLayoutProbe.Value(\"managed\",0);_=BuilderLayoutProbe.Value(new ManagedLayoutPayload(),0);BuilderLayoutProbe.Callback((System.Func<string,LayoutTask<string>> callback)=>{},0);}}");
+        var invalid = document.Project.AddDocument("InvalidLayoutDomain.cs", "#nullable enable\npublic struct ManagedLayoutPayload{public string? Value;}public static class InvalidLayoutDomain{public static void Bad(){_=BuilderLayoutProbe.Value(\"managed\",0);_=BuilderLayoutProbe.Value(new ManagedLayoutPayload(),0);BuilderLayoutProbe.Callback((System.Func<string,LayoutTask<string>> callback)=>{},0);_=BuilderLayoutProbe.LocalCall(\"managed\",0);_=BuilderLayoutProbe.LocalComposite(new LayoutPayload<ManagedLayoutPayload,string>(),0);_=BuilderLayoutProbe.LocalNullable((ManagedLayoutPayload?)null,0);BuilderLayoutProbe.LocalGroup((System.Func<string,LayoutTask<string>> callback)=>{},0);}}");
         var rejected = (await invalid.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
-        if (rejected.GetDiagnostics(cancellationToken).Count(diagnostic => { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Id == "CS8377"; }) != 3)
+        if (rejected.GetDiagnostics(cancellationToken).Count(diagnostic => { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Id == "CS8377"; }) != 7)
         { throw new InvalidOperationException("Layout constraints must reject managed reference and struct payloads."); }
         Program.Log.Info("PASS BuilderLayoutRejectsManagedPayloadDomains");
         return fixes + 3;

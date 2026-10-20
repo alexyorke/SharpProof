@@ -194,6 +194,26 @@ public static partial class Inference
             return AddBuilderStorageConstraints(state, variables);
         }
 
+        private void InspectUnmanagedStorage(ITypeSymbol type, HashSet<ITypeSymbol> visited, Action<ITypeParameterSymbol> require)
+        {
+            if (type is null)
+            { throw new ArgumentNullException(nameof(type)); }
+            if (visited is null)
+            { throw new ArgumentNullException(nameof(visited)); }
+            if (require is null)
+            { throw new ArgumentNullException(nameof(require)); }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!visited.Add(type))
+            { return; }
+            if (type is ITypeParameterSymbol parameter)
+            { require(parameter); return; }
+            if (type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer or TypeKind.Enum)
+            { return; }
+            if (type is not INamedTypeSymbol { IsValueType: true } value)
+            { throw new InferenceException("Unmanaged state-machine storage contains a managed type."); }
+            foreach (var field in value.GetMembers().OfType<IFieldSymbol>())
+            { if (!field.IsStatic) { InspectUnmanagedStorage(field.Type, visited, require); } }
+        }
         private bool AddBuilderStorageConstraints(INamedTypeSymbol state, Dictionary<HmType, string> variables)
         {
             if (state is null)
@@ -207,24 +227,8 @@ public static partial class Inference
             var byName = variables.ToDictionary(pair => pair.Value, pair => pair.Key, StringComparer.Ordinal);
             var required = new HashSet<HmType>();
             var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-            void Inspect(ITypeSymbol type)
-            {
-                if (type is null)
-                { throw new ArgumentNullException(nameof(type)); }
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!visited.Add(type))
-                { return; }
-                if (type is ITypeParameterSymbol parameter)
-                { if (byName.TryGetValue(parameter.Name, out var variable)) { required.Add(variable); } return; }
-                if (type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer or TypeKind.Enum)
-                { return; }
-                if (type is not INamedTypeSymbol { IsValueType: true } value)
-                { throw new InferenceException("The emitted state machine contains managed storage despite an unmanaged builder requirement."); }
-                foreach (var field in value.GetMembers().OfType<IFieldSymbol>())
-                { if (!field.IsStatic) { Inspect(field.Type); } }
-            }
             foreach (var field in fields)
-            { Inspect(field.Type); }
+            { InspectUnmanagedStorage(field.Type, visited, parameter => { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } if (byName.TryGetValue(parameter.Name, out var variable)) { required.Add(variable); } }); }
             var added = false;
             foreach (var variable in required)
             {
