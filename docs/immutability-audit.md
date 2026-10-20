@@ -4977,3 +4977,7 @@ Thirteen final materializations are individually traced through native formals a
 ### IMM-M504: direct immutable image freezing and scalar string construction
 
 Eight intermediate native image-array copies are removed by freezing exact native MemoryStream buffer spans directly. Expected host error text uses scalar string concatenation over sanitized characters without a mutable char-array materialization. Native emission/reader lifecycles and exact bytes/text remain intact. All nineteen affected worker cases pass; literal/source-unit gates verify 4299/1070 and 1948. Nine coordinates and the remaining nine old materialization entries reconcile, returning C# coordinates to zero Open. The old subset now has 110 unchecked local roots and no unchecked materializations; fresh final collection may add sites and remains required.
+
+### IMM-M505: preserve native attribute identity and array operation subjects
+
+Nine array sites retain required subject behavior: explicit AllowedExceptionsAttribute array identity, Array.Clear mutation, constrained receiver/argument-order mutation, caller-observed floating-array mutation and exact native CLR array-index/domain/read inputs. Each current formal/consumer/assertion is reviewed directly. No code edit or new execution authority is inferred; final collection and remaining ownership/coverage/binding/archive work remain pending.
