@@ -368,9 +368,17 @@ public static partial class Inference
                 for (var i = 0; i < parameters.Length; i++)
                 { HmType.Unify(CopySignature(parameters[i]), CSharpTypes.Rigid(changedSymbol.Parameters[i].Type)); }
                 HmType.Unify(CopySignature(result), CSharpTypes.Rigid(changedSymbol.ReturnType));
+                var beforeArrays = method.DescendantNodes().OfType<ImplicitArrayCreationExpressionSyntax>().ToArray();
+                var afterArrays = changedMethod.DescendantNodes().OfType<ImplicitArrayCreationExpressionSyntax>().ToArray();
+                for (var i = 0; i < beforeArrays.Length; i++)
+                {
+                    if (arrayConstructions.TryGetValue(beforeArrays[i].SpanStart, out var expectedArray))
+                    { HmType.Unify(CopySignature(expectedArray), CSharpTypes.Rigid(changedModel.GetTypeInfo(afterArrays[i], cancellationToken).Type!)); }
+                }
+
             }
             catch (InferenceException)
-            { return new(symbol.Name, "Rejected", "Rendered signature changes a nominal constructor or generic parameter scope."); }
+            { return new(symbol.Name, "Rejected", "Rendered signature or array construction changes a nominal constructor or generic parameter scope."); }
             // Validate statically resolved calls in every supplied file. Merely
             // compiling callers does not preserve conversions or overload selection
             // when this method becomes generic or its result narrows.
@@ -1010,37 +1018,12 @@ public static partial class Inference
                         return Expression(a.Expression);
                     }).ToArray());
                 case ImplicitArrayCreationExpressionSyntax implicitArray:
-                    var inferredElement = HmType.Variable();
-                    foreach (var item in implicitArray.Initializer.Expressions)
-                    {
-                        HmType.Unify(inferredElement, Expression(item));
-                    }
-
-                    return new("[" + new string(',', implicitArray.Commas.Count) + "]", inferredElement);
+                    return ConstructArray(implicitArray, true);
                 case ArrayCreationExpressionSyntax explicitArray:
-                    var createdArray = (IArrayTypeSymbol)model.GetTypeInfo(explicitArray, cancellationToken).Type!;
-                    foreach (var rank in explicitArray.Type.RankSpecifiers)
-                    {
-                        foreach (var size in rank.Sizes.Where(size =>
-                        {
-                            if (size is null)
-                            {
-                                throw new global::System.ArgumentNullException(nameof(size));
-                            }
+                    return ConstructArray(explicitArray, false);
+                case InitializerExpressionSyntax initializer when initializer.IsKind(SyntaxKind.ArrayInitializerExpression):
+                    return ConstructArray(initializer, false);
 
-                            return size is not OmittedArraySizeExpressionSyntax;
-                        }))
-                        {
-                            HmType.Unify(Expression(size), new("int"));
-                        }
-                    }
-
-                    if (explicitArray.Initializer is not null)
-                    {
-                        AnchorInitializer(explicitArray.Initializer, createdArray.ElementType);
-                    }
-
-                    return CSharpTypes.Rigid(createdArray);
                 case CollectionExpressionSyntax collectionSyntax:
                     return CollectionExpression(model.GetOperation(collectionSyntax, cancellationToken) as ICollectionExpressionOperation ?? throw new InferenceException("Unresolved collection expression."));
                 case AnonymousObjectCreationExpressionSyntax anonymous:
@@ -1404,30 +1387,65 @@ public static partial class Inference
             }
         }
 
-        private void AnchorInitializer(InitializerExpressionSyntax initializer, ITypeSymbol element)
+        private readonly Dictionary<int, HmType> arrayConstructions = [];
+
+        private HmType ConstructArray(ExpressionSyntax syntax, bool inferElement)
+        {
+            if (syntax is null)
+            { throw new ArgumentNullException(nameof(syntax)); }
+            var operation = model.GetOperation(syntax, cancellationToken);
+            var creation = operation as IArrayCreationOperation ?? operation?.Parent as IArrayCreationOperation
+                ?? throw new InferenceException("Unresolved array construction.");
+            var type = creation.Type as IArrayTypeSymbol ?? throw new InferenceException("Unresolved array type.");
+            var shape = inferElement ? CSharpTypes.Erase(type) : CSharpTypes.Rigid(type);
+            foreach (var dimension in creation.DimensionSizes)
+            {
+                // Implicit initializer lengths have no user expression to infer.
+                if (syntax is ArrayCreationExpressionSyntax && dimension.Syntax.Parent is ArrayRankSpecifierSyntax)
+                { BindNullableArgument(dimension, CSharpTypes.Rigid(dimension.Type!)); }
+            }
+            if (creation.Initializer is not null)
+            {
+                var hasDefault = BindArrayInitializer(creation.Initializer, shape.Arguments[0]);
+                if (inferElement && hasDefault && shape.Arguments[0].Root.IsVariable)
+                { shape = shape.WithArguments(new HmType(CSharpTypes.NullableParameter, shape.Arguments[0])); }
+            }
+            if (inferElement)
+            { arrayConstructions[syntax.SpanStart] = shape; }
+            return shape;
+        }
+
+        private bool BindArrayInitializer(IArrayInitializerOperation initializer, HmType element)
         {
             if (initializer is null)
-            {
-                throw new global::System.ArgumentNullException(nameof(initializer));
-            }
-
+            { throw new ArgumentNullException(nameof(initializer)); }
             if (element is null)
+            { throw new ArgumentNullException(nameof(element)); }
+            var hasDefault = false;
+            foreach (var value in initializer.ElementValues)
             {
-                throw new global::System.ArgumentNullException(nameof(element));
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                ExpressionSyntax? literal = value.Syntax as ExpressionSyntax;
+                while (literal is ParenthesizedExpressionSyntax parentheses)
+                { literal = parentheses.Expression; }
+                if (literal is LiteralExpressionSyntax && literal.IsKind(SyntaxKind.DefaultLiteralExpression))
+                { hasDefault = true; continue; }
+                if (literal is LiteralExpressionSyntax && literal.IsKind(SyntaxKind.NullLiteralExpression))
+                {
+                    var core = ConversionCore(element);
+                    if (core.IsVariable && value.Type?.IsReferenceType == true)
+                    { RequireKeyword(core, "class"); }
+                    continue;
+                }
 
-            foreach (var item in initializer.Expressions)
-            {
-                if (item is InitializerExpressionSyntax nested)
-                {
-                    AnchorInitializer(nested, element);
-                }
+                if (value is IArrayInitializerOperation nested)
+                { hasDefault |= BindArrayInitializer(nested, element); }
                 else
-                {
-                    HmType.Unify(Expression(item), CSharpTypes.Rigid(element));
-                }
+                { BindNullableArgument(value, element); }
             }
+            return hasDefault;
         }
+
 
         private static void PreserveResultOnly(HmType inferred, HmType declared, HashSet<HmType> inferable)
         {

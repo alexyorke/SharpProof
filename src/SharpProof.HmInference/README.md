@@ -709,3 +709,13 @@ unsupported. Compiler-provided caller-info arguments are compared before and
 after rewriting; imports that change caller line numbers are rejected, and IDE
 formatting falls back to the original expression text when needed to preserve
 CallerArgumentExpression values.
+
+Array initializers use bound element conversions, including boxing, numeric and
+nullable lifting, tuples and user-defined operators. Explicit arrays retain their
+written element type; implicit arrays infer a shared element scheme and recheck
+the rewritten array type. Rectangular, jagged and bare declaration initializers
+are supported. Dimension expressions retain their bound integer endpoints.
+Null elements preserve reference requirements; default elements carry nullable
+annotations that also work for new value-type instantiations. Applied IDE fixes
+verify array shapes, element/conversion order, reference identity, new domains,
+negative dimensions and suspended/faulted/canceled nullable async initializers.
