@@ -75,8 +75,8 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "boundary-emit-diagnostics.txt"),
             string.Join("\n", boundaryEmission.Diagnostics) + "\n");
         Assert.That(boundaryEmission.Success, Is.True, string.Join("\n", boundaryEmission.Diagnostics));
-        var boundaryBytes = await File.ReadAllBytesAsync(boundaryPath);
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes);
+        var boundaryBytes = (await File.ReadAllBytesAsync(boundaryPath)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes.AsMemory());
         var tree = CSharpSyntaxTree.ParseText(SubjectSource, (CSharpParseOptions)external.SyntaxTrees.Single().Options, "Subject.cs");
         var compilation = CSharpCompilation.Create("NullableDefaultBoxingSubject", [tree],
             external.References.Append(MetadataReference.CreateFromFile(boundaryPath)), external.Options);
@@ -165,7 +165,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         bool sameProbeReference;
         try
         {
-            using var boundaryImage = new MemoryStream(boundaryBytes);
+            using var boundaryImage = new MemoryStream(boundaryBytes.ToArray(), writable: false);
             var echoMethod = runtime.LoadFromStream(boundaryImage).GetType("Boundary")!.GetMethod("Echo")!;
             var type = runtime.LoadFromStream(image).GetType("Subject")!;
             var targetMethod = type.GetMethod("Target")!;
@@ -219,7 +219,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
             JsonSerializer.Serialize(rows, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
             $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
-            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256((boundaryBytes).ToImmutableArray())}; " +
+            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
             $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(SubjectSource)).ToImmutableArray())}; " +
             $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}; " +
             $"compiler={typeof(CSharpCompilation).Assembly.GetName().Version}; optimization={compilation.Options.OptimizationLevel}; " +

@@ -4955,3 +4955,11 @@ Six semantic-edge sites are exact typed CLR array inputs/returns or adapter-held
 ### IMM-M499: reconcile existing Analyzer observation migrations
 
 Six old array entries in five Analyzer units already have immutable current roots: concurrency results, encoded source/replacement-image bytes and enum vocabulary. Each current root/consumer is independently reviewed; all five complete current source payloads also match the exact M436 post-migration hashes. The retained M436 full gate passed all 1137 Analyzer cases. This corroborates direct current-source review without a new execution, final-head claim or automatic historical role transfer. Six entries reconcile as migrations, leaving 162 unchecked candidates. C# and PowerShell coordinate rows remain zero Open; remaining ownership/coverage/binding/archive and final collection/workflows remain pending.
+
+### IMM-M500: immutable boxing, diagnostic and foreign-publication observations
+
+Thirteen retained byte/line observations are immutable. Existing native image-copy publication is replaced by direct buffer freezing; redundant freezes are removed. Readonly spans/memory serve hashing, UTF-8 and file consumers; final CLR loading streams are readonly. Actual runtime boxing, physical path, foreign-response and filesystem publication subjects preserve behavior. All fifteen affected actual worker cases pass. Literal/source-unit gates verify 4299/1068 and 1948. Thirteen current coordinates and thirteen old array entries reconcile independently, returning C# coordinates to zero Open and leaving 149 unchecked candidates.
+
+### IMM-M501: supplemental UTF-8 source preservation check
+
+A full scan of all changed C# sources finds three files with non-ASCII text. Their complete non-ASCII character multisets match master, and all three non-ASCII ordinary string literal occurrences retain exact master spelling (the cafe filename and two culture-sensitive filenames). The two existing comment em-dashes also remain intact. This supplements the separate complete raw/interpolated literal proof; it does not claim a general ordinary-literal ordering proof. No source edits were needed. Remaining ownership/coverage/binding/archive and final current collection/exact-head workflows remain pending.

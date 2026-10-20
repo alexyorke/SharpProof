@@ -82,8 +82,8 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "boundary-emit-diagnostics.txt"),
             string.Join("\n", boundaryEmission.Diagnostics) + "\n");
         Assert.That(boundaryEmission.Success, Is.True, string.Join("\n", boundaryEmission.Diagnostics));
-        var boundaryBytes = await File.ReadAllBytesAsync(boundaryPath);
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes);
+        var boundaryBytes = (await File.ReadAllBytesAsync(boundaryPath)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "boundary.dll"), boundaryBytes.AsMemory());
         var tree = CSharpSyntaxTree.ParseText(SubjectSource, (CSharpParseOptions)external.SyntaxTrees.Single().Options, "Subject.cs");
         var compilation = CSharpCompilation.Create("CallerBoxingInterfaceSubject", [tree],
             external.References.Append(MetadataReference.CreateFromFile(boundaryPath)), external.Options);
@@ -175,7 +175,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "caller-emit-diagnostics.txt"),
             string.Join("\n", emission.Diagnostics) + "\n");
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray().ToImmutableArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var probeBuilder = ImmutableArray.CreateBuilder<ProbeObservation>();
@@ -184,7 +184,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         var runtime = new AssemblyLoadContext("InterfaceBoxingOracle", isCollectible: true);
         try
         {
-            using var externalImage = new MemoryStream(boundaryBytes);
+            using var externalImage = new MemoryStream(boundaryBytes.ToArray(), writable: false);
             var boundaryMethod = runtime.LoadFromStream(externalImage).GetType("Boundary")!.GetMethod("Echo")!;
             var type = runtime.LoadFromStream(image).GetType("Subject")!;
             var doubleMethod = type.GetMethod("TargetDouble")!;
@@ -234,7 +234,7 @@ public sealed class CallerBoxingInterfaceAuditTests
             JsonSerializer.Serialize(identityControls, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
             $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}; " +
-            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256((boundaryBytes).ToImmutableArray())}; " +
+            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
             $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(SubjectSource)).ToImmutableArray())}; " +
             $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}; " +
             $"compiler={typeof(CSharpCompilation).Assembly.GetName().Version}; optimization={compilation.Options.OptimizationLevel}; " +

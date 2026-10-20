@@ -26,7 +26,7 @@ internal sealed partial class WorkerTests
         var otherRequest = other.CreateRequest(cacheEnabled: false);
         var originalRequestJson = WorkerProtocolJson.SerializeRequest(request);
         var originalManifestPath = request.CompilerManifest.Path;
-        var artifactBytes = await File.ReadAllBytesAsync(originalManifestPath);
+        var artifactBytes = (await File.ReadAllBytesAsync(originalManifestPath)).ToImmutableArray();
         var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         using var firstWorker = SharpProofWorker.Create(request.Budgets);
         using var otherWorker = SharpProofWorker.Create(otherRequest.Budgets);
@@ -45,10 +45,10 @@ internal sealed partial class WorkerTests
         var privateRequest = Path.Combine(first.DirectoryPath, "private-request.json");
         var privateResult = Path.Combine(first.DirectoryPath, "private-result.json");
         await File.WriteAllTextAsync(privateRequest, originalRequestJson, new UTF8Encoding(false));
-        var privateResultBytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(actual));
-        await File.WriteAllBytesAsync(privateResult, privateResultBytes);
+        var privateResultBytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(actual)).ToImmutableArray();
+        await File.WriteAllBytesAsync(privateResult, privateResultBytes.AsMemory());
         var positive = Arguments("accepted");
-        await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, (artifactBytes).ToImmutableArray(),
+        await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, artifactBytes,
             snapshot.InputHash, Launcher.Program.ExpectedVersions(), actual, TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllBytesAsync(positive.PublishCompilerManifestPath!), Is.EqualTo(artifactBytes));
         var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(positive.PublishResultPath!))
@@ -63,7 +63,7 @@ internal sealed partial class WorkerTests
         var negative = Arguments("rejected");
         // Wrong actual owner at the raw binding boundary; never admitted as first-project evidence.
         Func<Task> reject = () => Launcher.Program.PublishOutputsAsync(negative, negativeRequest,
-            snapshot.CompilerManifest, (artifactBytes).ToImmutableArray(), snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, TestContext.CurrentContext.CancellationToken);
+            snapshot.CompilerManifest, artifactBytes, snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<IOException>(reject);
         Assert.That(File.Exists(negative.PublishRequestPath!), Is.False);
         Assert.That(File.Exists(negative.PublishResultPath!), Is.False);
