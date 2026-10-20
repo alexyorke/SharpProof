@@ -301,7 +301,7 @@ public sealed class ControlFlowLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(mode);
         System.ArgumentNullException.ThrowIfNull(session);
         var template = generated.Body;
-        var parts = mode.Split('-');
+        var parts = mode.Split('-').ToImmutableArray();
         var kind = parts[0];
         var type = parts[1];
         string? methodBody = null;

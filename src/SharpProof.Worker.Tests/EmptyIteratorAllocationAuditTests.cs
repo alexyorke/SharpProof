@@ -190,8 +190,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes);
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
         var preparation = project.Snapshot.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == callableId));
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -199,7 +199,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (artifactBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAllocationInstruction>().ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
@@ -208,7 +208,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             SourceSha256 = sourceHash,
             PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
-            ArtifactSha256 = Hash(artifactBytes),
+            ArtifactSha256 = Hash(artifactBytes.AsSpan()),
             project.Request.CompilerManifest.Sha256,
             ArtifactDigest = project.Bind().ArtifactDigest,
             CacheEnabled = project.Request.Cache.Enabled,
@@ -254,8 +254,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         });
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Bind().ArtifactDigest));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Request.CompilerManifest.Sha256));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Bind().ArtifactDigest));
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(JsonSerializer.Serialize(project.Request.Budgets), Is.EqualTo(JsonSerializer.Serialize(new WorkerBudgets())));
             Assert.That(validation.IsValid, Is.True, JsonSerializer.Serialize(validation.Errors));

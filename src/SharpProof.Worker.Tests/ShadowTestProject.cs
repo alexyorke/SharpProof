@@ -32,12 +32,12 @@ internal sealed class ShadowTestProject : IDisposable
         {
             Artifact = artifact with { Compilation = artifact.Compilation with { ProjectDirectory = _directory.FullName } };
             artifact = Artifact;
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");
-            File.WriteAllBytes(path, bytes);
+            File.WriteAllBytes(path, bytes.AsSpan());
             Request = new WorkerVerifyRequest
             {
-                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
+                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
                 Cache = new WorkerCacheOptions { Enabled = cacheEnabled, Directory = Path.Combine(_directory.FullName, "cache") },
                 Budgets = new WorkerBudgets()
             };

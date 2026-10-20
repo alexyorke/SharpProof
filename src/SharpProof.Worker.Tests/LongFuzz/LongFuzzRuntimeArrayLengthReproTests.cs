@@ -74,10 +74,10 @@ public sealed class LongFuzzRuntimeArrayLengthReproTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [0, 0, new int[9], null];
+            ImmutableArray<object?> arguments = [0, 0, new int[9], null];
             Assert.That((int)type.GetField("State")!.GetValue(null)!, Is.Zero);
-            Assert.That((bool)type.GetMethod("Pre")!.Invoke(null, arguments)!, Is.True);
-            Assert.That((int)type.GetMethod("Target")!.Invoke(null, arguments)!, Is.Zero);
+            Assert.That((bool)type.GetMethod("Pre")!.Invoke(null, arguments.ToArray())!, Is.True);
+            Assert.That((int)type.GetMethod("Target")!.Invoke(null, arguments.ToArray())!, Is.Zero);
             Assert.That((int)type.GetField("State")!.GetValue(null)!, Is.EqualTo(1));
             TestContext.WriteLine("CLR Release witness: x=0 y=0 a=new int[9] s=null; Pre=true return=0 State=1");
         }

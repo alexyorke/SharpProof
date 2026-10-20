@@ -5025,3 +5025,7 @@ Seven directly traced roots retain required native behavior: premeasurement arra
 ### IMM-M514: immutable artifact and metadata observations
 
 Twelve retained artifact, metadata blob and IL observations are immutable. Path character edits use a scoped immutable builder. Actual patch images remain mutable subjects. The final worker gate passes 111 cases; an initial compile failure from redundant span adapters on existing ReadOnlySpan helper parameters is repaired. Literal/source-unit checks verify 4305/1074 and 1948 paths. Twelve independently traced old roots reconcile, leaving eighteen unchecked. Fresh collection, coverage, archive and exact-head gates remain pending.
+
+### IMM-M515: immutable remaining old-census observations
+
+Eighteen retained serialized/encoded bytes, source and template parts, runtime return observations and outer invocation vectors are immutable. Actual nested array subjects and final native invocation/file adapters retain their contracts. Targeted gates pass 138 cases plus five separately selected helper and compiler-option cases. Literal/source-unit checks verify 4305/1075 and 1948 paths. All 524 old-census array roots now have individual migration or native-subject rationales. This closes that inventory only; fresh collection, binding, coverage, archive and exact-head gates remain pending.

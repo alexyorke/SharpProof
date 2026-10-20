@@ -32,8 +32,8 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
     {
         var (source, _, _) = new ContractClaimProgramGenerator(new Random(362)).Program();
         var target = LoadTarget(source);
-        object?[] arguments = [0, 0, new[] { 1 }, null];
-        var exception = Assert.Throws<TargetInvocationException>((Action)(() => { target.Invoke(null, arguments); }));
+        ImmutableArray<object?> arguments = [0, 0, new[] { 1 }, null];
+        var exception = Assert.Throws<TargetInvocationException>((Action)(() => { target.Invoke(null, arguments.ToArray()); }));
         Assert.That(exception!.InnerException, Is.TypeOf<OverflowException>());
     }
 
@@ -44,8 +44,8 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
         Assert.That(source.Split("int.MaxValue", StringSplitOptions.None).Length, Is.EqualTo(2));
         var nearbySource = source.Replace("int.MaxValue", "(int.MaxValue - 1)", StringComparison.Ordinal);
         var target = LoadTarget(nearbySource);
-        object?[] arguments = [0, 0, new[] { 1 }, null];
-        Assert.That(target.Invoke(null, arguments), Is.EqualTo(0));
+        ImmutableArray<object?> arguments = [0, 0, new[] { 1 }, null];
+        Assert.That(target.Invoke(null, arguments.ToArray()), Is.EqualTo(0));
     }
 
     private static MethodInfo LoadTarget(string source)

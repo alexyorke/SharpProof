@@ -357,7 +357,7 @@ public sealed class ContractMatrixLongFuzzTests
     private static async Task RunSpecMaxCase(LongFuzzSession session, int seed, SpecMaxCase item)
     {
         System.ArgumentNullException.ThrowIfNull(session);
-        var state = (int[])RunSpecMaxClr(item.StateSource, item.Anchor);
+        var state = ((int[])RunSpecMaxClr(item.StateSource, item.Anchor)).ToImmutableArray();
         var observed = (int)RunSpecMaxClr(item.ProbeSource, item.Anchor);
         if (state.Length != 2 || state[0] != item.ExpectedMaximum || state[1] != item.ExpectedValue ||
             observed != unchecked(state[0] * 16 + state[1]) ||

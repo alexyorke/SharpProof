@@ -1168,17 +1168,17 @@ public sealed class ScalarDifferentialMatrixTests
                 .. CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
             ];
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var artifactPath = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest.json");
-            File.WriteAllBytes(artifactPath, bytes);
+            File.WriteAllBytes(artifactPath, bytes.AsSpan());
             return new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = artifactPath,
-                    Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
+                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
                 },
                 Cache = new WorkerCacheOptions
                 {

@@ -252,7 +252,7 @@ public sealed class TypedWidthLongFuzzTests
         if (index < core.Length)
         { return core[index]; }
         var template = variableShifts[index - core.Length];
-        var parts = template.Name.Split('/');
+        var parts = template.Name.Split('/').ToImmutableArray();
         var type = parts[0];
         var shift = parts[1];
         var baseCount = int.Parse(parts[2], CultureInfo.InvariantCulture);

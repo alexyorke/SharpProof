@@ -31,7 +31,7 @@ public sealed class OpaqueListValueOracleTests
         using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(), "src/SharpProof.Gates/Corpus/oss-methods.json")));
         var method = corpus.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = corpus.RootElement.GetProperty("files").EnumerateArray().Single(item => item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var lines = file.GetProperty("content").GetString()!.Split('\n');
+        var lines = file.GetProperty("content").GetString()!.Split('\n').ToImmutableArray();
         var swap = string.Join("\n", lines.Skip(method.GetProperty("startLine").GetInt32() - 1)
             .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
         var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new List<T>() { first, second }; data.Swap(0, 1); return Read<T>(data); } static U Read<U>(IList<U> data) => data[0]; " + swap + " }";

@@ -489,8 +489,8 @@ public sealed class PortableIrGraphCodecTests
             fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(
             encoded.Graph,
-            WorkerProtocolJson.Options);
-        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+            WorkerProtocolJson.Options).ToImmutableArray();
+        var hash = Convert.ToHexString(SHA256.HashData(bytes.AsSpan()));
 
         Assert.That(encoded.Graph.Semantics, Is.EqualTo(IrExecutionSemantics.Legacy));
         Assert.That(encoded.Graph.Operations.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan)), Has.All.Null);
@@ -502,7 +502,7 @@ public sealed class PortableIrGraphCodecTests
             Is.EqualTo(
                 "3DAAF8FCCFCD144CF735A4ECEEA0B078B414CC404E203A04BB8D24A6FE49AE29"));
 
-        var previous = JsonNode.Parse(bytes)!;
+        var previous = JsonNode.Parse(bytes.AsSpan())!;
         previous.AsObject().Remove("semantics");
         foreach (var operation in previous["operations"]!.AsArray())
         {
@@ -515,14 +515,14 @@ public sealed class PortableIrGraphCodecTests
                 instruction!.AsObject().Remove("origin");
             }
         }
-        var previousBytes = JsonSerializer.SerializeToUtf8Bytes(previous, WorkerProtocolJson.Options);
-        Assert.That(Convert.ToHexString(SHA256.HashData(previousBytes)),
+        var previousBytes = JsonSerializer.SerializeToUtf8Bytes(previous, WorkerProtocolJson.Options).ToImmutableArray();
+        Assert.That(Convert.ToHexString(SHA256.HashData(previousBytes.AsSpan())),
             Is.EqualTo("369E597B3404366C0029C4B06E0C21DFC18C951557107EC703AE574AC483F51F"));
         TestContext.Progress.WriteLine($"Canonical wire: {bytes.Length} bytes; previous {previousBytes.Length}; " +
             $"{encoded.Graph.Types.Length} types; {encoded.Graph.Terms.Length} terms.");
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
-            bytes,
+            bytes.AsSpan(),
             WorkerProtocolJson.Options)!;
         var decoded = PortableIrGraphCodec.Decode(decodedGraph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var reencoded = PortableIrGraphCodec.Encode(
@@ -531,7 +531,7 @@ public sealed class PortableIrGraphCodecTests
             decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var roundTripBytes = JsonSerializer.SerializeToUtf8Bytes(
             reencoded.Graph,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.Options).ToImmutableArray();
         Assert.That(roundTripBytes, Is.EqualTo(bytes));
     }
 
@@ -554,9 +554,9 @@ public sealed class PortableIrGraphCodecTests
 
         var bytes = JsonSerializer.SerializeToUtf8Bytes(
             graph,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.Options).ToImmutableArray();
         var serialized = JsonSerializer.Deserialize<PortableIrGraph>(
-            bytes,
+            bytes.AsSpan(),
             WorkerProtocolJson.Options)!;
 
         var decoded = PortableIrGraphCodec.Decode(serialized, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -1074,9 +1074,9 @@ public sealed class PortableIrGraphCodecTests
         {
             var bytes = JsonSerializer.SerializeToUtf8Bytes(
                 graph,
-                WorkerProtocolJson.Options);
+                WorkerProtocolJson.Options).ToImmutableArray();
             graph = JsonSerializer.Deserialize<PortableIrGraph>(
-                bytes,
+                bytes.AsSpan(),
                 WorkerProtocolJson.Options)!;
         }
 

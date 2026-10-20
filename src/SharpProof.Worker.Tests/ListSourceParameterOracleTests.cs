@@ -24,7 +24,7 @@ public sealed class ListSourceParameterOracleTests
         using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "src/SharpProof.Gates/Corpus/oss-methods.json")));
         var method = corpus.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = corpus.RootElement.GetProperty("files").EnumerateArray().Single(item => item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var lines = file.GetProperty("content").GetString()!.Split('\n');
+        var lines = file.GetProperty("content").GetString()!.Split('\n').ToImmutableArray();
         var start = method.GetProperty("startLine").GetInt32();
         var end = method.GetProperty("endLine").GetInt32();
         var swap = string.Join("\n", lines.Skip(start - 1).Take(end - start + 1));
