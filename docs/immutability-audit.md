@@ -4951,3 +4951,7 @@ The two GetFields roots migrated in M486/M487 were already present in the fe 524
 ### IMM-M498: native fuzz alias, allocation and callback subjects
 
 Six semantic-edge sites are exact typed CLR array inputs/returns or adapter-held aliases deliberately exposing indexed-versus-enumerated identity mismatch. The ordinary allocation oracle must return its actual native int array, including faulting lengths. A conversion-resource callback deliberately mutates a shared Values array before returning/throwing. All eight are individually traced subjects whose types, identity and writes remain required; no code edit or new execution authority is inferred.
+
+### IMM-M499: reconcile existing Analyzer observation migrations
+
+Six old array entries in five Analyzer units already have immutable current roots: concurrency results, encoded source/replacement-image bytes and enum vocabulary. Each current root/consumer is independently reviewed; all five complete current source payloads also match the exact M436 post-migration hashes. The retained M436 full gate passed all 1137 Analyzer cases. This corroborates direct current-source review without a new execution, final-head claim or automatic historical role transfer. Six entries reconcile as migrations, leaving 162 unchecked candidates. C# and PowerShell coordinate rows remain zero Open; remaining ownership/coverage/binding/archive and final collection/workflows remain pending.
