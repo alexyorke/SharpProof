@@ -13,6 +13,24 @@ internal static partial class CSharpOperationSemantics
             SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ContainingType);
     }
 
+    internal static bool HasRefComparableReceiver(IInvocationOperation invocation)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        return invocation.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax
+        { Expression: Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax member } &&
+            member.Expression.DescendantNodesAndSelf().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.RefExpressionSyntax>().Any();
+    }
+
+    internal static bool IsGenericComparableDeclaration(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return !method.IsStatic && method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.None &&
+            method.ReturnType.SpecialType == SpecialType.System_Int32 && IsFrameworkCollectionMember(method) &&
+            method.OriginalDefinition.GetDocumentationCommentId() == "M:System.IComparable`1.CompareTo(`0)" &&
+            method.ContainingType.TypeArguments.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ContainingType.TypeArguments[0]);
+    }
+
     internal static bool IsIntegerComparerDeclaration(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));

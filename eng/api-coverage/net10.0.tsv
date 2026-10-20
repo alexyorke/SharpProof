@@ -27810,7 +27810,7 @@ System.Runtime	M:System.HttpStyleUriParser.#ctor	Method	unmodeled	-
 System.Runtime	M:System.IAsyncDisposable.DisposeAsync	Method	unmodeled	-
 System.Runtime	M:System.ICloneable.Clone	Method	unmodeled	-
 System.Runtime	M:System.IComparable.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.IComparable`1.CompareTo(`0)	Method	unmodeled	-
+System.Runtime	M:System.IComparable`1.CompareTo(`0)	Method	partially-modeled	intrinsic=constrained-integer-comparable
 System.Runtime	M:System.IConvertible.GetTypeCode	Method	unmodeled	-
 System.Runtime	M:System.IConvertible.ToBoolean(System.IFormatProvider)	Method	unmodeled	-
 System.Runtime	M:System.IConvertible.ToByte(System.IFormatProvider)	Method	unmodeled	-
@@ -33383,8 +33383,8 @@ System.Runtime	P:System.Collections.Generic.IReadOnlyDictionary`2.Item(`0)	Prope
 System.Runtime	P:System.Collections.Generic.IReadOnlyDictionary`2.Keys	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IReadOnlyDictionary`2.Values	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IReadOnlyList`1.Item(System.Int32)	Property	unmodeled	-
-System.Runtime	P:System.Collections.Generic.KeyValuePair`2.Key	Property	unmodeled	-
-System.Runtime	P:System.Collections.Generic.KeyValuePair`2.Value	Property	unmodeled	-
+System.Runtime	P:System.Collections.Generic.KeyValuePair`2.Key	Property	partially-modeled	catalog=bcl.key-value-pair.key;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=Unknown;cardinality=NotApplicable;termination=Terminates;postconditions=0
+System.Runtime	P:System.Collections.Generic.KeyValuePair`2.Value	Property	partially-modeled	catalog=bcl.key-value-pair.value;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=Unknown;cardinality=NotApplicable;termination=Terminates;postconditions=0
 System.Runtime	P:System.Collections.Hashtable.Count	Property	unmodeled	-
 System.Runtime	P:System.Collections.Hashtable.EqualityComparer	Property	unmodeled	-
 System.Runtime	P:System.Collections.Hashtable.IsFixedSize	Property	unmodeled	-

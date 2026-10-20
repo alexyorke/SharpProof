@@ -154,18 +154,20 @@ internal sealed class NativeAliasingBoundaryTests
         Assert.That(await Verify(source), Is.EqualTo(outcome));
     }
 
-    [TestCase("int", "3", "7")]
-    [TestCase("string", "\"before\"", "\"after\"")]
-    public async Task GenericDependentFieldRetainsConservativeCallBoundary(string type, string before, string after)
+    [TestCase("int", "3", "7", "7", WorkerClaimOutcome.Proven)]
+    [TestCase("int", "3", "7", "3", WorkerClaimOutcome.Refuted)]
+    [TestCase("string", "\"before\"", "\"after\"", "\"after\"", WorkerClaimOutcome.Unknown)]
+    public async Task GenericDependentFieldsFollowTheirSpecializedValueDomain(string type, string before, string after, string expected, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(after);
         System.ArgumentNullException.ThrowIfNull(before);
         System.ArgumentNullException.ThrowIfNull(type);
         var source = "using SharpProof.Attributes; public class Cell<T> { public T Value; " +
             "public void Set(T value) { Value = value; } } public static class C { public static " + type + " Target() { " +
-            "Contract.Ensures(Contract.Result<" + type + ">() == " + after + "); var cell = new Cell<" + type +
+            "Contract.Ensures(Contract.Result<" + type + ">() == " + expected + "); var cell = new Cell<" + type +
             ">(); cell.Value = " + before + "; cell.Set(" + after + "); return cell.Value; } }";
-        Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(await Verify(source), Is.EqualTo(outcome));
     }
 
     [TestCase("bool", "false", "true", "cell.Value ? 7 : 3", 7, WorkerClaimOutcome.Proven)]

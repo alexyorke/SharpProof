@@ -345,6 +345,14 @@ escaped mutable bindings receive no implementation guarantee. The executed
 inventory probes retain existing List/array evidence alongside the HashSet probe.
 See the [interface evidence and remaining gaps](gaps.md#verified-hashset-collection-interface-dispatch).
 
+Constrained `IComparable<T>.CompareTo(T)` source helpers now use exact comparison
+semantics when their concrete type is one of the nine audited integer/Char types.
+Managed receiver locations and copied property/temporary values retain CLR argument
+evaluation order. Runtime/IR boundary probes and native proofs/refutations supply
+the partial declaration evidence. The nine ranked open generic corpus calls still
+need concrete entry specialization; custom and boxed implementations remain
+dispatch gaps. See the [verified slice and remaining work](gaps.md#verified-constrained-integer-comparable-calls).
+
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |

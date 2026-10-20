@@ -56,6 +56,13 @@ public sealed partial class DotnetApiInventoryTests
                     () => CheckReferenceIdentityIntrinsic(compilation, false), () => CheckReferenceIdentityIntrinsic(compilation, true));
             }
 
+            if (row.Evidence.Contains("intrinsic=constrained-integer-comparable", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "constrained source helpers with nine exact integer/Char receiver types; all ordered boundary pairs versus actual CLR interface dispatch and a wrong-result control; native generic methods, local functions, preconditions and callback/domain exclusions",
+                    () => CheckConstrainedComparableIntrinsic(compilation, false), () => CheckConstrainedComparableIntrinsic(compilation, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=default-comparer-cached-value", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,

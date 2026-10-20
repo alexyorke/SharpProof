@@ -39,7 +39,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private GuardedExpression? IntegerComparisonClause(IInvocationOperation invocation, TotalParameterState state, int depth)
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod);
+        var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod) || _context.IsConstrainedIntegerComparable(invocation);
         if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
         var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 0)).Value, state, depth + 1);
@@ -64,13 +64,17 @@ internal sealed partial class RoslynTotalExpressionLowerer
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod);
+        if (CSharpOperationSemantics.HasRefComparableReceiver(invocation))
+        { return null; }
+        var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod) || _context.IsConstrainedIntegerComparable(invocation);
         if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
         // Evaluate Default first, retaining cache initialization effects and faults.
         var receiver = LowerBodyValue(invocation.Instance!, block, depth + 1);
         if (!receiver.Classification.IsExact)
         { return Approximate(invocation, receiver.Continuation, receiver.Classification.Abstention); }
+        if (primitive && !_context.IsVariableComparableReceiver(invocation))
+        { receiver = Capture(invocation.Instance!, receiver); }
         block = receiver.Continuation;
         var values = ImmutableArray.CreateBuilder<IrTerm>(primitive ? 1 : 2);
         values.Count = primitive ? 1 : 2;
@@ -90,8 +94,15 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 [new(IrExceptionKind.NullReference, _factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))],
                 FrontendSubsetClassification.Exact), block).Continuation;
         }
+        var left = receiver.Value;
+        if (primitive && _context.IsVariableComparableReceiver(invocation))
+        {
+            if (_context.ManagedValueReceiverLocation(invocation) is not { } location)
+            { return Approximate(invocation, block, FrontendAbstention.UnsupportedOperationKind); }
+            left = location;
+        }
         return new(CSharpOperationSemantics.IntegerComparison(_factory,
-            primitive ? receiver.Value : values[0], primitive ? values[0] : values[1]),
+            primitive ? left : values[0], primitive ? values[0] : values[1]),
             block, FrontendSubsetClassification.Exact);
     }
 }
