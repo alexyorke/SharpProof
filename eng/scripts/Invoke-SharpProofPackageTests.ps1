@@ -258,7 +258,7 @@ function Get-TestMethodTimings {
     $rowsByClass = $script:SharpProofTrxTimingRowsCache[$ResultsRoot]
     $rows = $null
     if (-not $rowsByClass.TryGetValue($ClassName, [ref]$rows)) {
-        return @()
+        return [Collections.Immutable.ImmutableArray[object]]::Empty
     }
     $milliseconds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long](
         [StringComparer]::OrdinalIgnoreCase)
@@ -283,20 +283,20 @@ function Get-TestMethodTimings {
         $milliseconds[$name] += [long][Math]::Ceiling(
             $elapsed.TotalMilliseconds)
     }
-    return @($milliseconds.ToImmutable().GetEnumerator() | ForEach-Object {
-            ([ordered]@{
-                name                = [string]$_.Key
-                elapsedMilliseconds = [long]$_.Value
-            }).AsReadOnly()
-        } | Sort-Object { $_.name })
+    return [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($milliseconds.ToImmutable().GetEnumerator() | ForEach-Object {
+                ([ordered]@{
+                    name                = [string]$_.Key
+                    elapsedMilliseconds = [long]$_.Value
+                }).AsReadOnly()
+            } | Sort-Object { $_.name }))
 }
 
 function Get-DiscoveredTestMethods {
     param(
         [Parameter(Mandatory = $true)][string]$Assembly,
         [Parameter(Mandatory = $true)][string[]]$ClassNames,
-        [Parameter(Mandatory = $true)][hashtable]$MinimumCounts,
-        [Parameter(Mandatory = $true)][hashtable]$Descriptions
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$MinimumCounts,
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$Descriptions
     )
 
     # Discovery must execute in the assembly's dotnet testhost. PowerShell may
@@ -531,10 +531,10 @@ try {
         param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Filter)
 
         $historyFilters = if ($TestFilter -ceq $canonicalPackageFilter) {
-            @("($TestFilter)&($Filter)", $Filter)
+            , [Collections.Immutable.ImmutableArray]::Create[string]("($TestFilter)&($Filter)", $Filter)
         }
         else {
-            @($Filter)
+            , [Collections.Immutable.ImmutableArray]::Create[string]($Filter)
         }
         foreach ($historyFilter in $historyFilters) {
             if ($priorFilterMilliseconds.ContainsKey($historyFilter)) {
@@ -576,16 +576,16 @@ try {
         $discoveredMethods = Get-DiscoveredTestMethods `
             -Assembly $testAssembly `
             -ClassNames @($workerClass, $packageLayoutClass, $verifierDefaultsClass) `
-            -MinimumCounts @{
-            $workerClass           = 40
-            $packageLayoutClass    = 15
-            $verifierDefaultsClass = 4
-        } `
-            -Descriptions @{
-            $workerClass           = 'Worker MSBuild integration'
-            $packageLayoutClass    = 'package-layout'
-            $verifierDefaultsClass = 'verifier-package defaults'
-        }
+            -MinimumCounts ([ordered]@{
+                $workerClass           = 40
+                $packageLayoutClass    = 15
+                $verifierDefaultsClass = 4
+            }).AsReadOnly() `
+            -Descriptions ([ordered]@{
+                $workerClass           = 'Worker MSBuild integration'
+                $packageLayoutClass    = 'package-layout'
+                $verifierDefaultsClass = 'verifier-package defaults'
+            }).AsReadOnly()
         $workerMethods = $discoveredMethods[$workerClass]
         $threeTargetWorkerMethod =
         'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
@@ -727,10 +727,10 @@ try {
             $fixtureStream.Dispose()
         }
         foreach ($fixtureClass in $fixtureClasses) {
-            $classNames = $fixtureClass -split '\|'
-            $classFilters = @($classNames | ForEach-Object {
-                    "FullyQualifiedName~SharpProof.Package.Test.$_"
-                })
+            $classNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]($fixtureClass -split '\|'))
+            $classFilters = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($classNames | ForEach-Object {
+                        "FullyQualifiedName~SharpProof.Package.Test.$_"
+                    }))
             $filter = $classFilters -join '|'
             $estimatedMilliseconds =
             Get-SharpProofHistoricalFilterMilliseconds $filter
@@ -885,9 +885,8 @@ try {
         $nextIsExclusive =
         (($shard -is [Collections.IDictionary] -and $shard.Keys -contains 'Exclusive') -or ($shard -isnot [Collections.IDictionary] -and $shard.PSObject.Properties.Name -contains 'Exclusive')) -and
         [bool]$shard.Exclusive
-        $environment = @{
-            SHARPPROOF_PACKAGE_SOURCE = $feed
-        }
+        $environmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+        $environmentBuilder.Add('SHARPPROOF_PACKAGE_SOURCE', $feed)
         $isolatedOutput = ''
         if ($coverageEnabled) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
@@ -901,7 +900,7 @@ try {
         $directVstest = -not $coverageEnabled -and
         -not $nextIsExclusive
         if ($directVstest) {
-            $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
+            $environmentBuilder.Add('DOTNET_HOST_PATH', $resolvedDotnetHost)
         }
         $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
         if ($directVstest) {
@@ -937,7 +936,7 @@ try {
         $arguments = $coverageArguments
         return ([ordered]@{
                 Arguments   = $arguments
-                Environment = $environment
+                Environment = $environmentBuilder.ToImmutable()
             }).AsReadOnly()
     }.GetNewClosure()
     $testRun = Invoke-SharpProofParallelDotnetTests `
@@ -1002,36 +1001,36 @@ try {
         fast                     = [bool]$Fast
         parallelism              = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-        phases                   = @($phaseTimings.ToImmutable())
-        shards                   = @($shardTimings.ToImmutable() | Sort-Object { $_.name })
+        phases                   = $phaseTimings.ToImmutable()
+        shards                   = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($shardTimings.ToImmutable() | Sort-Object { $_.name }))
         workerMethods            = $workerMethodTimings
         packageLayoutMethods     = $packageLayoutMethodTimings
-        scheduler                = [ordered]@{
-            workerMethods            = @(
-                $priorMethodMilliseconds.GetEnumerator() |
-                    ForEach-Object {
-                        ([ordered]@{
-                            name                = [string]$_.Key
-                            elapsedMilliseconds = [long]$_.Value
-                        }).AsReadOnly()
-                    } | Sort-Object { $_.name })
-                packageLayoutMethods = @(
-                    $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
-                        ForEach-Object {
-                            ([ordered]@{
-                                name                = [string]$_.Key
-                                elapsedMilliseconds = [long]$_.Value
-                            }).AsReadOnly()
-                        } | Sort-Object { $_.name })
-                    filters          = @(
-                        $priorFilterMilliseconds.GetEnumerator() |
+        scheduler                = ([ordered]@{
+                workerMethods            = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                        $priorMethodMilliseconds.GetEnumerator() |
                             ForEach-Object {
                                 ([ordered]@{
-                                    filter              = [string]$_.Key
+                                    name                = [string]$_.Key
                                     elapsedMilliseconds = [long]$_.Value
                                 }).AsReadOnly()
-                            } | Sort-Object { $_.filter })
-                    }
+                            } | Sort-Object { $_.name }))
+                    packageLayoutMethods = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                            $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
+                                ForEach-Object {
+                                    ([ordered]@{
+                                        name                = [string]$_.Key
+                                        elapsedMilliseconds = [long]$_.Value
+                                    }).AsReadOnly()
+                                } | Sort-Object { $_.name }))
+                        filters          = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                                $priorFilterMilliseconds.GetEnumerator() |
+                                    ForEach-Object {
+                                        ([ordered]@{
+                                            filter              = [string]$_.Key
+                                            elapsedMilliseconds = [long]$_.Value
+                                        }).AsReadOnly()
+                                    } | Sort-Object { $_.filter }))
+                        }).AsReadOnly()
                 }).AsReadOnly() | ConvertTo-Json -Depth 5 |
                     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
