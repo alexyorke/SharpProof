@@ -374,7 +374,9 @@ internal sealed partial class ClaimManifestBuilder(
         var selectedSubset = !(analyzerContractsSelected || analyzerEffectsSelected) ||
             (seed.Method.IsAbstract || seed.Method.IsExtern) && analyzerEffectsSelected && !analyzerContractsSelected &&
                 _effectSession.ResolveEffectContract(seed.Method).Kind == EffectContractResolutionKind.Valid ||
-            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration);
+            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration) ||
+            analyzerEffectsSelected && seed.Method.IsAsync &&
+                ResourceForkJoinPlan.TryCreate(seed.Method, _compilation, cancellationToken) is { ConfiguredAwait: true };
         var supported =
             seed.Declaration is
                 MethodDeclarationSyntax or
@@ -401,7 +403,7 @@ internal sealed partial class ClaimManifestBuilder(
             if (ResourceForkJoinPlan.TryCreate(target, _compilation, cancellationToken) is { } taskPlan)
             {
                 metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
-                    taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString()));
+                    taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
             }
             if (resource.Bounds is { } bounds)
             { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }

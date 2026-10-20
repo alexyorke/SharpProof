@@ -78,6 +78,7 @@ internal static class CompilerForkJoinResourceLowering
             children.Add(new(owner, cost.Bounds.Program, arguments.MoveToImmutable()));
         }
         return new(new(callableId, plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(),
-            [.. method.Parameters.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Name)], children.MoveToImmutable()), null);
+            [.. method.Parameters.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Name)], children.MoveToImmutable())
+        { ConfiguredAwait = plan.ConfiguredAwait }, null);
     }
 }

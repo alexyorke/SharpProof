@@ -25,6 +25,7 @@ internal sealed record CompilerForkJoinProjection(
     ImmutableArray<string> RootParameterNames,
     ImmutableArray<CompilerForkJoinChild> Children)
 {
+    public bool ConfiguredAwait { get; init; }
     public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
     public string FrameworkAssemblyIdentity { get; init; } = RepositoryParameterGuard.NotNull(FrameworkAssemblyIdentity, nameof(FrameworkAssemblyIdentity));
     public ImmutableArray<string> RootParameterNames { get; init; } = RootParameterNames.IsDefault

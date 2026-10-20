@@ -173,15 +173,17 @@ public sealed class NativeForkJoinProjectionTests
         Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(expected)));
     }
 
-    [Test]
-    public void ProjectionTransportPreservesComposedSourceCosts()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ProjectionTransportPreservesComposedSourceCosts(bool configuredAwait)
     {
-        var projection = Lower("for(int i=0;i<count;i++){var value=new int[2];}");
+        var projection = Lower("for(int i=0;i<count;i++){var value=new int[2];}") with { ConfiguredAwait = configuredAwait };
         var root = Root(projection);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var payload = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation);
         var decoded = CompilerForkJoinProjectionCodec.Decode(payload, root, cancellation);
         var result = NativeForkJoinSourceCostVerifier.Check(decoded, root, cancellation);
+        Assert.That(decoded.ConfiguredAwait, Is.EqualTo(configuredAwait));
         Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
         Assert.That(result.Upper!.LoopEntries.ToDisplayString(), Is.EqualTo("(max(0, n) + 3)"));
         Assert.That(result.Upper.Elements.ToDisplayString(), Is.EqualTo("((max(0, n) * 2) + 6)"));
@@ -203,6 +205,8 @@ public sealed class NativeForkJoinProjectionTests
     [TestCase("bad-cost")]
     [TestCase("duplicate")]
     [TestCase("duplicate-body")]
+    [TestCase("configured-kind")]
+    [TestCase("missing-configured-kind")]
     public void ProjectionTransportRejectsMalformedOrUnownedChildren(string mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
@@ -215,6 +219,12 @@ public sealed class NativeForkJoinProjectionTests
         var argument = child["arguments"]![0]!.AsObject();
         switch (mutation)
         {
+            case "configured-kind":
+                node["configuredAwait"] = 1;
+                break;
+            case "missing-configured-kind":
+                node.Remove("configuredAwait");
+                break;
             case "version":
                 node["version"] = 99;
                 break;
@@ -257,7 +267,7 @@ public sealed class NativeForkJoinProjectionTests
         }
         var json = node.ToJsonString();
         if (mutation == "duplicate")
-        { json = json.Replace("\"version\":1", "\"version\":1,\"version\":1", StringComparison.Ordinal); }
+        { json = json.Replace("\"version\":2", "\"version\":2,\"version\":2", StringComparison.Ordinal); }
         else if (mutation == "duplicate-body")
         { json = json.Replace("\"effectsCompleteAtEntry\":true", "\"effectsCompleteAtEntry\":true,\"effectsCompleteAtEntry\":true", StringComparison.Ordinal); }
         Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json), root, cancellation); };

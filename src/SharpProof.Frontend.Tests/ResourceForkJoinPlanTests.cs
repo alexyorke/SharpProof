@@ -8,6 +8,52 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ResourceForkJoinPlanTests
 {
+    [Test]
+    public void ConfiguredAsyncRootRejectsACustomMethodBuilder()
+    {
+        const string builder = """
+            public struct B {
+              private System.Runtime.CompilerServices.AsyncTaskMethodBuilder inner;
+              public static B Create() => new B { inner = System.Runtime.CompilerServices.AsyncTaskMethodBuilder.Create() };
+              public Task Task => inner.Task;
+              public void SetResult() => inner.SetResult();
+              public void SetException(System.Exception exception) => inner.SetException(exception);
+              public void SetStateMachine(System.Runtime.CompilerServices.IAsyncStateMachine state) => inner.SetStateMachine(state);
+              public void Start<T>(ref T state) where T : System.Runtime.CompilerServices.IAsyncStateMachine => inner.Start(ref state);
+              public void AwaitOnCompleted<A,T>(ref A awaiter, ref T state)
+                where A : System.Runtime.CompilerServices.INotifyCompletion
+                where T : System.Runtime.CompilerServices.IAsyncStateMachine => inner.AwaitOnCompleted(ref awaiter, ref state);
+              public void AwaitUnsafeOnCompleted<A,T>(ref A awaiter, ref T state)
+                where A : System.Runtime.CompilerServices.ICriticalNotifyCompletion
+                where T : System.Runtime.CompilerServices.IAsyncStateMachine => inner.AwaitUnsafeOnCompleted(ref awaiter, ref state);
+            }
+            """;
+        var (compilation, method) = Create("=> await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false);",
+            "[System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(B))] public static async Task Target(int n)", builder);
+        Assert.That(ResourceForkJoinPlan.TryCreate(method, compilation, TestContext.CurrentContext.CancellationToken), Is.Null);
+    }
+
+    [TestCase("=> await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false);", true)]
+    [TestCase("{ await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false); }", true)]
+    [TestCase("=> await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3)));", false)]
+    [TestCase("=> await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(true);", false)]
+    [TestCase("=> await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(n > 0);", false)]
+    [TestCase("{ Child(n); await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false); }", false)]
+    [TestCase("{ await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false); Child(n); }", false)]
+    [TestCase("{ await Task.CompletedTask.ConfigureAwait(false); await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3))).ConfigureAwait(false); }", false)]
+    public void ConfiguredAsyncRootHasOneClosedFrameworkAwait(string body, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (compilation, method) = Create(body, "public static async Task Target(int n)");
+        var plan = ResourceForkJoinPlan.TryCreate(method, compilation, TestContext.CurrentContext.CancellationToken);
+        Assert.That(plan != null, Is.EqualTo(expected));
+        if (plan != null)
+        {
+            Assert.That(plan.ConfiguredAwait, Is.True);
+            Assert.That(plan.Children, Has.Length.EqualTo(2));
+        }
+    }
+
     [TestCase("=> Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3)));")]
     [TestCase("{ return Task.WhenAll(Task.Run(() => { Child(n); }), Task.Run(() => Child(-1))); }")]
     [TestCase("=> Task.WhenAll(new Task[] { Task.Run(() => Child(n)), Task.Run(() => Child(0)) });")]

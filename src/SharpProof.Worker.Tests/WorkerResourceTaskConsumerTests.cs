@@ -7,11 +7,14 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class WorkerTests
 {
-    [Test]
-    public async Task JoinedTaskSourceLoopCostsReachCacheAndSarifWithValidatedScope()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task JoinedTaskSourceLoopCostsReachCacheAndSarifWithValidatedScope(bool configuredAwait)
     {
         using var project = TestProject.Create("using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }");
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] public static " + (configuredAwait ? "async " : "") +
+            "Task Target(int n) => " + (configuredAwait ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){}} }");
         project.UseNetCoreReferencePack(8);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
@@ -44,7 +47,7 @@ internal sealed partial class WorkerTests
                     claim.ProofCore = [.. claim.ProofCore.Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-task-model:", StringComparison.Ordinal))];
                     break;
                 case "duplicate-model":
-                    claim.ProofCore = [.. claim.ProofCore, "resource-task-model:" + WorkerResourceModels.TaskJoinModel];
+                    claim.ProofCore = [.. claim.ProofCore, "resource-task-model:" + bound.MetadataAssumptions.Single().RuntimeModel];
                     break;
                 case "projection":
                     claim.ProofCore = [.. claim.ProofCore.Select(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.StartsWith("resource-task-projection:", StringComparison.Ordinal) ? "resource-task-projection:bad" : item)];

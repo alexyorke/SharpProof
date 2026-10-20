@@ -105,6 +105,13 @@ one compiler-driver assertion and two artifact golden files still expected schem
 The current source updates those expectations to artifact schema 53 and reruns
 the compiler-driver and golden-worker gates. This failed run produced no newer
 aggregate coverage measurement.
+Published 24cb6d7ed passed all non-coverage workflows and the three semantic
+coverage shards. Its instrumented package shard failed
+LauncherCancellationWhilePublishingPreservesThePreviousPublication at the
+publication-member acquisition readiness assertion after 50 seconds. Aggregation
+was skipped, so c46e073c3 remains the latest complete numeric measurement. The
+fixture failure needs investigation and an exact-head coverage rerun; its cause
+has not been established by the passing local resource package cases.
 
 ### Quantitative-memory feature audit
 
@@ -130,6 +137,42 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Configured async task roots
+
+Extend the closed task-root model to a single authenticated await of
+Task.WhenAll(...).ConfigureAwait(false), with no source work before or after the
+await beyond the existing isolated children. Carry the root execution kind in the
+owned projection, bind a distinct runtime premise for standard async builders
+and configured task awaiting, and preserve the joined-callback source-work scope.
+Reject captured-context, custom awaiter/builder, repeated-await and extra-statement
+shapes. Establish source work first; compiler/framework state-machine allocation
+and live-space costs remain separate required phase F work. Verify admitted and
+unsupported shapes through compiler, native, transport and packaged consumers.
+
+The configured-kind projection uses codec 2 and compiler artifact 54. Protocol 41
+and cache 51 identify the separate runtime-model variant; manifest 6 and resource
+program 8 are unchanged. The initial 39 frontend cases passed. A custom-builder
+control and malformed execution-kind transport cases were then added. The first
+worker attempt exited with code 139 while building the bootstrap analyzer before
+project tests; the direct canonical task entrypoint is being used for the rerun.
+The final frontend gate passed all 40 cases. The first native run passed 59 of
+62 cases; three configured-root failures traced to the existing synchronous
+signature gates. The compiler now prepares a distinct scalar resource entry only
+for the recognized async shape with valid resource-only claims and no functional
+clauses or additional effect contracts. Functional body admission is unchanged.
+The repaired focused worker gate passed all 62 native, transport and cache/SARIF
+cases. The full frontend suite passed 2205 tests, the full analyzer suite passed
+1469, and the combined worker/resource/protocol/compiler-driver/golden gate passed
+960. All three real package cases passed, including strict/advisory policy and
+scope/growth evidence for returned and configured joins. The additional-contract
+control confirms that the async scalar entry does not bypass source contracts.
+Formatting, quality/API compatibility, documentation lint, 728 local links and
+layout passed (2785 sources, 59 projects, 151 pinned common files; 537 trusted
+paths). All local checks for this source-work checkpoint are complete. Native
+state-machine/framework allocation and live-space bounds, remaining phase F
+controls, exact-head CI, unchanged 100% changed-TCB coverage and final audit remain
+required. This does not complete phase F or the roadmap.
 
 ### Native task-root loop results
 

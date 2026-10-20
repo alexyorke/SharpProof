@@ -10,19 +10,21 @@ internal sealed class ResourceForkJoinPlan
     internal const int MaximumChildren = 16;
     internal IInvocationOperation Join { get; }
     internal ImmutableArray<IInvocationOperation> Children { get; }
+    internal bool ConfiguredAwait { get; }
 
-    private ResourceForkJoinPlan(IInvocationOperation join, ImmutableArray<IInvocationOperation> children)
+    private ResourceForkJoinPlan(IInvocationOperation join, ImmutableArray<IInvocationOperation> children, bool configuredAwait)
     {
         Join = RepositoryParameterGuard.NotNull(join, nameof(join));
         RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Array must be initialized.");
         Children = children;
+        ConfiguredAwait = configuredAwait;
     }
 
     internal static ResourceForkJoinPlan? TryCreate(IMethodSymbol method, Compilation? compilation, CancellationToken cancellationToken)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation == null || method is not { IsStatic: true, IsAsync: false, IsGenericMethod: false, MethodKind: MethodKind.Ordinary } ||
+        if (compilation == null || method is not { IsStatic: true, IsGenericMethod: false, MethodKind: MethodKind.Ordinary } ||
             method.IsExtern || method.IsAbstract || method.ContainingType.IsGenericType ||
             !method.ContainingType.StaticConstructors.IsEmpty || method.DeclaringSyntaxReferences.Length != 1 ||
             !ScalarParameters(method) || method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration ||
@@ -39,6 +41,24 @@ internal sealed class ResourceForkJoinPlan
         IOperation? result = declaration.Body is { Statements.Count: 1 } body && body.Statements[0] is ReturnStatementSyntax statement
             ? (model.GetOperation(statement, cancellationToken) as IReturnOperation)?.ReturnedValue
             : declaration.Body == null && declaration.ExpressionBody is { } arrow ? model.GetOperation(arrow.Expression, cancellationToken) : null;
+        if (method.IsAsync)
+        {
+            if (method.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
+                attribute.AttributeClass?.Name == "AsyncMethodBuilderAttribute"))
+            { return null; }
+            result = declaration.Body is { Statements.Count: 1 } asyncBody && asyncBody.Statements[0] is ExpressionStatementSyntax expression
+                ? model.GetOperation(expression.Expression, cancellationToken) : result;
+            var configuredType = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ConfiguredTaskAwaitable");
+            if (configuredType == null || !SymbolEqualityComparer.Default.Equals(configuredType.ContainingAssembly, core) ||
+                result is not IAwaitOperation { Operation: IInvocationOperation { Instance: { } awaited, Arguments.Length: 1 } configure } ||
+                configure.TargetMethod is not { IsStatic: false, IsGenericMethod: false, Name: "ConfigureAwait", Parameters.Length: 1 } configureMethod ||
+                !SymbolEqualityComparer.Default.Equals(configureMethod.ContainingType, task) ||
+                !SymbolEqualityComparer.Default.Equals(configureMethod.ReturnType, configuredType) ||
+                configureMethod.Parameters[0].Type.SpecialType != SpecialType.System_Boolean ||
+                configure.Arguments[0].Value.ConstantValue is not { HasValue: true, Value: false })
+            { return null; }
+            result = awaited;
+        }
         if (result is not IInvocationOperation { Instance: null, Arguments.Length: 1 } join ||
             !FrameworkMethod(join.TargetMethod, task, "WhenAll") || join.TargetMethod.Parameters.Length != 1 ||
             !join.TargetMethod.Parameters[0].IsParams || join.TargetMethod.Parameters[0].Type is not IArrayTypeSymbol { Rank: 1 } arrayType ||
@@ -59,7 +79,7 @@ internal sealed class ResourceForkJoinPlan
             { return null; }
             children.Add(child);
         }
-        return new ResourceForkJoinPlan(join, children.MoveToImmutable());
+        return new ResourceForkJoinPlan(join, children.MoveToImmutable(), method.IsAsync);
     }
 
     private static bool FrameworkMethod(IMethodSymbol method, INamedTypeSymbol task, string name)

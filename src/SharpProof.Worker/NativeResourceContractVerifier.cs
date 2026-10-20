@@ -223,7 +223,7 @@ internal static class NativeResourceContractVerifier
                 result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target,
                     new HashSet<string>(StringComparer.Ordinal) { dependency.AssumptionId });
                 result.ProofCore = ["native-resource:" + claim.ClaimId,
-                    "resource-task-model:" + ResourceTaskCatalog.Model,
+                    "resource-task-model:" + dependency.RuntimeModel,
                     "resource-task-projection:" + WorkerProtocolJson.ComputeSha256(CompilerForkJoinProjectionCodec.Encode(projection, entry, cancellation)),
                     "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
                 result.ResourceBound = Evidence(costs.LoopEntries.ToDisplayString(), null, costs.LoopEntries);

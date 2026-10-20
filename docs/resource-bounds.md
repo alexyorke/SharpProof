@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 40 and cache schema 50 invalidate older responses without this evidence.
+Protocol 41 and cache schema 51 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 40 and cache 50 invalidate prior responses; compiler artifact 53 and
+Protocol 41 and cache 51 invalidate prior responses; compiler artifact 54 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -893,5 +893,54 @@ Unproved comparisons remain Unknown, with no exact violation inferred from an
 upper sum. Task allocation, byte, lifetime and stack metrics remain Unknown until
 framework and compiler-generated storage is modeled. Task lower, tight, expected
 and amortized results remain unavailable. Async/state-machine costs and concurrent
-live-space models remain roadmap work. Protocol 40 and cache 50 identify the
-required execution scope; compiler artifact 53 retains its format.
+live-space models remain roadmap work. Protocol 41 and cache 51 identify the
+required execution scope and configured-await variant; compiler artifact 54
+identifies the projection execution kind.
+
+### Configured async join source work
+
+The admitted async root has exactly one source await of the closed join:
+
+```csharp
+using SharpProof.Attributes;
+using System.Threading.Tasks;
+
+public static class ConfiguredJoinExample
+{
+    [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 3, nameof(n), 1)]
+    public static async Task Process(int n) =>
+        await Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(3)))
+            .ConfigureAwait(false);
+
+    private static void Child(int count)
+    {
+        for (int i = 0; i < count; i++) { }
+    }
+}
+```
+
+The compiler records configured awaiting separately from a returned join. The
+native runtime premise is configured-task-join-source-at-most-once-v1, with a
+separate catalog digest and owning assumption. The source-work scope remains
+joined-isolated-source-callbacks. Synchronous completion and one continuation
+resumption use the same child-work upper sum. A returned-join premise cannot
+prove a configured-await projection, or vice versa.
+
+The catalog binds the immutable runtime source for
+[builder startup](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/AsyncMethodBuilderCore.cs),
+[the Task builder](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/AsyncTaskMethodBuilder.cs),
+[continuation registration](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/AsyncTaskMethodBuilderT.cs),
+and [configured task awaiting](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/TaskAwaiter.cs).
+The standard Task builder and framework configured awaitable are required.
+The async resource entry currently accepts only valid resource claims, with no
+functional clauses or additional source effect contracts. The ordinary functional
+verifier still has no async body program. Additional contracts retain Unknown.
+Custom method builders, captured-context awaiting, true or symbolic configuration,
+extra statements, multiple awaits, custom awaiters and asynchronous children
+remain unsupported. The declared model excludes framework and ambient callback
+work and does not prove state-machine allocation, peak memory or elapsed time.
+Those costs remain explicit Unknown results and required roadmap work.
+
+Projection codec 2 and compiler artifact 54 carry the required execution-kind
+Boolean. Protocol 41 and cache 51 identify the configured runtime-model variant;
+resource program 8 and manifest 6 retain their formats.

@@ -779,7 +779,7 @@ internal static partial class WorkerProtocolJson
         result = ArgumentNullGuard.NotNull(result, nameof(result));
         evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
         var dependencies = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
-            dependency.RuntimeModel == WorkerResourceModels.TaskJoinModel).ToArray();
+            dependency.RuntimeModel is WorkerResourceModels.TaskJoinModel or WorkerResourceModels.ConfiguredTaskJoinModel).ToArray();
         if (evidence.ExecutionScope == WorkerResourceModels.CallableScope)
         {
             return dependencies.Length == 0 && result.ProofCore?.Any(static item => item is not null &&
@@ -789,7 +789,7 @@ internal static partial class WorkerProtocolJson
             evidence.Metric != WorkerResourceMetric.LoopBodyEntries || dependencies.Length != 1 || dependencies[0].WitnessIdentifier != "bcl.task.run-action.when-all-array" ||
             evidence.Asymptotic?.Lower?.UnknownReason is null || evidence.Accounting is not { Length: 0 } ||
             evidence.Expected?.UnknownReason is null || result.ProofCore is null ||
-            result.ProofCore.Count(static item => item is not null && item == "resource-task-model:" + WorkerResourceModels.TaskJoinModel) != 1)
+            result.ProofCore.Count(item => item is not null && item == "resource-task-model:" + dependencies[0].RuntimeModel) != 1)
         { return false; }
         const string prefix = "resource-task-projection:";
         var projections = result.ProofCore.Where(static item => item is not null && item.StartsWith(prefix, StringComparison.Ordinal)).ToArray();

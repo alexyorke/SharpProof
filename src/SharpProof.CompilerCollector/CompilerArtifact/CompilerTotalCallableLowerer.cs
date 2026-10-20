@@ -19,6 +19,21 @@ internal static class CompilerTotalCallableLowerer
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
         context.ModelReceiver();
+        if (target.Method.IsAsync)
+        {
+            // An owned scalar entry for resource projection only. This does not
+            // admit an async functional body or bypass any source contract.
+            if (ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) is not { ConfiguredAwait: true } ||
+                !target.Claims.IsEmpty || target.EffectClaims.IsEmpty ||
+                target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                    !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
+                target.Entry.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary))
+            { return null; }
+            return new(target.Entry.CallableId, context.Factory,
+                [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
+                    new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], []);
+        }
         var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();

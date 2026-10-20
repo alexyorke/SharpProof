@@ -75,6 +75,8 @@ internal sealed class CompilerCallableLowerer
                 resourceUnknown = resource.UnknownReason;
             }
         }
+        if (forkJoin is { ConfiguredAwait: true })
+        { reason = WorkerClaimReason.None; }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };
     }
 

@@ -13,7 +13,7 @@ internal static class NativeResourceTaskBinding
             !ResourceTaskCatalog.IsReviewedReference(projection.FrameworkAssemblyIdentity) ||
             !(target.Compilation.TargetFramework == "net8.0" || (target.Compilation.TargetFramework?.StartsWith("net8.0-", StringComparison.Ordinal) ?? false)))
         { return null; }
-        var id = ResourceTaskCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity);
+        var id = ResourceTaskCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait);
         if (target.Entry.Assumptions is null || target.Entry.Assumptions.Count(assumption => assumption is not null &&
                 assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary) != 1 ||
             target.Compilation.ResourceMetadataReferences is not { Length: > 0 } references || references.Any(static reference => reference is null))
@@ -35,10 +35,10 @@ internal static class NativeResourceTaskBinding
         {
             AssumptionId = id,
             WitnessIdentifier = ResourceTaskCatalog.Witness,
-            CatalogSha256 = ResourceTaskCatalog.ContentSha256,
+            CatalogSha256 = projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredContentSha256 : ResourceTaskCatalog.ContentSha256,
             ReferenceAssembly = projection.FrameworkAssemblyIdentity,
             ReferenceSha256 = hashes.Single(),
-            RuntimeModel = ResourceTaskCatalog.Model,
+            RuntimeModel = projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredModel : ResourceTaskCatalog.Model,
             EvidenceSource = ResourceTaskCatalog.EvidenceSource
         };
     }

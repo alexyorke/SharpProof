@@ -7,18 +7,21 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
-    private static CompilerCallablePreparation TaskRoot(string attributes, string child = "for(int i=0;i<count;i++){}")
+    private static CompilerCallablePreparation TaskRoot(string attributes, string child = "for(int i=0;i<count;i++){}", bool configuredAwait = false)
     {
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentNullException.ThrowIfNull(child);
         return Read(CreateArtifact("using SharpProof.Attributes; using System.Threading.Tasks; public static class C { " +
-            attributes + " public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {" + child + "} }", reviewedRuntime: true));
+            attributes + " public static " + (configuredAwait ? "async " : "") + "Task Target(int n) => " + (configuredAwait ? "await " : "") +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" + (configuredAwait ? ".ConfigureAwait(false)" : "") +
+            "; static void Child(int count) {" + child + "} }", reviewedRuntime: true));
     }
 
-    [Test]
-    public async Task TaskRootPublishesCheckedLoopUpperWithExplicitConditionalScope()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TaskRootPublishesCheckedLoopUpperWithExplicitConditionalScope(bool configuredAwait)
     {
-        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)]");
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)]", configuredAwait: configuredAwait);
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
             new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
@@ -31,10 +34,39 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound.Accounting, Is.Empty);
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
         var dependency = result.ResourceBound.MetadataAssumptions.Single();
-        Assert.That(dependency.RuntimeModel, Is.EqualTo(WorkerResourceModels.TaskJoinModel));
+        Assert.That(target.ForkJoinProjection!.ConfiguredAwait, Is.EqualTo(configuredAwait));
+        Assert.That(dependency.RuntimeModel, Is.EqualTo(configuredAwait ? WorkerResourceModels.ConfiguredTaskJoinModel : WorkerResourceModels.TaskJoinModel));
         Assert.That(result.Assumptions.Single().Id, Is.EqualTo(dependency.AssumptionId));
         Assert.That(result.Assumptions.Single().Used, Is.True);
         Assert.That(result.ProofCore, Has.Some.StartsWith("resource-task-projection:"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TaskRootCannotExchangeConfiguredAndReturnedRuntimePremises(bool configuredAwait)
+    {
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)]", configuredAwait: configuredAwait);
+        Assert.That(target.ForkJoinProjection, Is.Not.Null);
+        target = target with { ForkJoinProjection = target.ForkJoinProjection! with { ConfiguredAwait = !configuredAwait } };
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinRuntimePremiseNotBound"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+    }
+
+    [Test]
+    public async Task ConfiguredTaskResourceEntryDoesNotBypassAdditionalSourceContracts()
+    {
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] [DoesNotThrow]", configuredAwait: true);
+        Assert.That(target.Total, Is.Null);
+        Assert.That(target.TotalEntry, Is.Null);
+        Assert.That(target.ForkJoinProjection, Is.Null);
+        var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
+        var resource = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound != null);
+        Assert.That(resource.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(resource.ResourceBound!.InferredUpperBound, Is.Null);
     }
 
     [TestCase("ArrayAllocations")]
