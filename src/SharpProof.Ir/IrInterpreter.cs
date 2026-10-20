@@ -191,7 +191,8 @@ internal sealed class IrInterpreter(IrFactory factory)
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken,
-        IReadOnlyCollection<IrVarId>? snapshots = null)
+        IReadOnlyCollection<IrVarId>? snapshots = null,
+        Func<IrOpaqueTerm, IrValue?>? concreteOpaqueValueProvider = null)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
@@ -199,7 +200,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         return EvaluateCore(
             term,
             new(variables ?? ImmutableDictionary<IrVarId, IrValue>.Empty, onVariableRead, cancellationToken)
-            { Heap = heap, Snapshots = snapshots });
+            { Heap = heap, Snapshots = snapshots, ConcreteOpaqueValueProvider = concreteOpaqueValueProvider });
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -388,6 +389,11 @@ internal sealed class IrInterpreter(IrFactory factory)
             { return ValidateFieldValue(opaque, initial); }
         }
 
+        if (state.ConcreteOpaqueValueProvider?.Invoke(opaque) is { } observed)
+        {
+            return observed.Type == opaque.Type ? Value(observed) :
+                InvalidValue("The observed opaque value has the wrong type.");
+        }
         return Unsupported(IrUnsupportedReason.OpaqueTerm,
             opaque.Purity == IrOpaquePurity.Pure
                 ? "Pure opaque member " + opaque.Member + " has no concrete implementation."
@@ -919,6 +925,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; set; }
+        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
         internal IReadOnlyCollection<IrVarId>? Snapshots { get; set; }
         internal Dictionary<IrId, IrTerm> SnapshotSelectors { get; } = [];
         internal int SnapshotWork = 4096;

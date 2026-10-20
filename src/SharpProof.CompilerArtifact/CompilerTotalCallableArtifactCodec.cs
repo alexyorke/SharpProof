@@ -222,7 +222,7 @@ internal static class CompilerTotalCallableArtifactCodec
             cancellationToken.ThrowIfCancellationRequested();
             Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
                 IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque && SupportedType(artifact.Graph, term.Type) &&
-                (term.Kind != IrTermKind.Opaque || IsFieldRead(artifact.Graph, term)) &&
+                (term.Kind != IrTermKind.Opaque || IsFieldRead(artifact.Graph, term) || IsDefaultComparerValue(artifact.Graph, term)) &&
                 (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
                 (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
@@ -235,8 +235,19 @@ internal static class CompilerTotalCallableArtifactCodec
                         IrBinaryOperator.StringEquals),
                 "The Total graph contains unsupported term evidence.");
         }
-        // The only opaque term is a pure read of an instance scalar or
-        // reference field through an object receiver.
+        // Opaque values are owned instance field reads or immutable framework
+        // comparer caches. Neither case admits an arbitrary executable call.
+        static bool IsDefaultComparerValue(PortableIrGraph graph, PortableIrTerm term)
+        {
+            graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
+            return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: true } member &&
+                IrOpaqueCallSite.IsDefaultComparerValueName(member.Name) && member.DeclaringType == term.Type &&
+                member.ReturnType == term.Type && member.ParameterTypes.Length == 0 &&
+                term.B == -1 && term.Items.Length == 0 && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
+                PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure && graph.Types[term.Type].Kind == IrTypeKind.Reference;
+        }
+
         static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
         {
             graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));

@@ -93,7 +93,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
             cancellationToken.ThrowIfCancellationRequested();
             _factory.GetVariableInfo(snapshot);
         }
-        var values = new ReplayValues(snapshots);
+        var values = new ReplayValues(snapshots) { ConcreteOpaqueValueProvider = replayOptions?.ConcreteOpaqueValueProvider };
         if (initialValues != null)
         {
             foreach (var pair in initialValues)
@@ -377,7 +377,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
         return _terms.Evaluate(term, values.Current, values.ObserveRead, values.Heap,
-            cancellationToken, values.Snapshots);
+            cancellationToken, values.Snapshots, values.ConcreteOpaqueValueProvider);
     }
 
     internal sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
@@ -388,6 +388,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
         internal IrHeap Heap { get; } = new();
+        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
         internal ImmutableHashSet<IrVarId> Snapshots { get; } = (snapshots ?? throw new System.ArgumentNullException(nameof(snapshots)));
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
