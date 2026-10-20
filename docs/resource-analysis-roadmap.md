@@ -94,8 +94,8 @@ validation and trusted string-length size/contract binding, in addition to the
 expression foundation and packaged SP0060 activation repair. Before the latest
 master merge, verification passed 828 affected worker tests, 748 IR tests and five
 strict native growth/stack/string package workflows. The full analyzer run passed
-1429 cases plus the separately repaired protocol-seal assertion. Post-merge gates
-are running. Independent lower-bound/tightness evidence, amortized accounting and
+1429 cases plus the separately repaired protocol-seal assertion. The combined tree
+then passed 920 worker, 1430 analyzer, 10 architecture and 11 package/closure cases. Independent lower-bound/tightness evidence, amortized accounting and
 validated distributional models remain required.
 
 The previously published stack checkpoint eec823652 passed canonical/package/docs/
@@ -2006,3 +2006,9 @@ The next fetched master commit 101971bba changes only .gitignore for local
 development/scratch outputs. It will be incorporated after committing these
 verified integration repairs; it changes no production or test code. Fresh
 pushed-head CI and unchanged 100% coverage qualification still remain required.
+
+Verified integration repairs are committed in eacbc7951. Ignore-only master
+101971bba merged cleanly in be7073b50; no production/test code changed after the
+passing combined-tree gates. The next publication includes this complete
+checkpoint. Native lower bounds/tightness, broader lifetime composition, amortized
+and validated average-case models, phase F and final coverage/CI remain open.
