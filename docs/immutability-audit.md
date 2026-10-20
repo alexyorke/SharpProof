@@ -1,3 +1,5 @@
+<!-- cspell:words callsites canonicalizer checkpointed exposable fixpoint Fixpoint Hashtable hashtable hashtables lifecycles lowerers materializers microbenchmark multisets narrowings noncyclic nonliteral nonmandatory nonoverwriting nontermination nonvendored ordinally postflight postorder precheck preflights prefreezing premeasurement readback rebindings Rescanning rescans scriptblock Specializer specializer SPINT Tarjan uncompiled unhashed unreviewed worklist worklists workset writeback -->
+
 # Comprehensive immutability audit
 
 Baseline: origin/master, commit 4d456246a4113c6c8f2ff0728ddd03bd684b10e1.
@@ -1033,7 +1035,6 @@ excluded and untouched. The Host/Fuzz detail gap is explicitly unchecked.
   recorded, and strict residual coverage is still open. No missing report is
   counted as an absent violation.
 
-
 ### Syntax residual inventory
 
 `docs/immutability-residuals.tsv` records syntax candidates from all tracked/new
@@ -1132,6 +1133,7 @@ raw/interpolated literal tokens across 340 changed C# files are unchanged.
 The refreshed syntax inventory parses 1,808 tracked/new non-vendored C# files
 and records 4,052 candidates, including 12 explicit program-subject exclusions.
 Evidence: artifacts/immutability-portable-preservation2.log.
+
 ### Compiler artifact and retained helper follow-up
 
 - CompilerArtifact wire records now use init-only properties and immutable array
@@ -1455,7 +1457,7 @@ regressions prove that an observer cannot rewrite a captured environment and tha
 a custom input dictionary comparer survives the snapshot. Those two mutable test
 maps are explicitly classified as subjects, not unresolved construction violations.
 
-Solver model maps, local depth state, unsat-core indices, proposals, rules, text
+Solver model maps, local depth state, `unsat`-core indices, proposals, rules, text
 units, bounds and congruence construction now prefer scoped builders. The shared
 AddUnique builder overload retains strict duplicate rejection. The immutable array
 overlay helper builds a detached result; the distinct explicitly in-place overlay
@@ -1516,7 +1518,6 @@ follow this committed inventory. Numeric/computed constants and other filtered
 binding-sensitive cases still require semantic review; this focused inventory
 is not represented as exhaustive local-constant coverage.
 
-
 ## Master conflict integration checkpoint
 
 Merged source: origin/master e97c6c56d58fba9f5c5c20ac59f4c7f44ff4424a.
@@ -1531,6 +1532,7 @@ combined analyzer/worker test source was split into the two canonical fixtures;
 the immutable fixture updates were transferred to the worker file.
 
 New integration sites requiring adaptation:
+
 - ToolApplicationTests constructs a copied immutable response instead of assigning
   init-only fields.
 - KeyedEntryModelTests accepts the decoder's immutable variable map.
@@ -1563,7 +1565,6 @@ Evidence: immutability-master-layout.log,
 immutability-master-literals.log and immutability-master-script-format.log.
 The comprehensive residual inventories still describe the preceding checkpoint;
 current-path coverage must be refreshed after master integration.
-
 
 ## Current master follow-up coverage
 
@@ -1601,7 +1602,6 @@ as violations merely because they could be given a named constant.
 The tool review's suggested MoveToImmutable for an unconstrained entry builder
 was rejected: capacity need not equal count. Publication must use ToImmutable.
 
-
 ## Optional CLI acceptance fixture integration
 
 Exact pushed commit 77f76ca97 failed optional CLI qualification in CI run
@@ -1616,7 +1616,6 @@ fixture is an API consumer adapter, not a mutable program subject.
 CodeQL C#, Actions and Python checks succeeded on exact pushed commit 77f76ca97.
 The previous Python no-code failure is therefore historical and does not describe
 the current head.
-
 
 ## Builder follow-up validation checkpoint
 
@@ -1655,7 +1654,6 @@ Reference/alias identity must be retained at the element level, which does not b
 itself require a mutable outer cache. No broad agent exclusion is accepted
 without coordinator evidence.
 
-
 ## Fixture ownership follow-up inventory
 
 The coordinator inspected these additional sites and their consumers before edits:
@@ -1680,7 +1678,6 @@ The literal comparison now covers 2,618 raw/interpolated tokens across 552 chang
 C# files, all unchanged. The increase reflects the newly changed tool/frontend
 files entering the comparison, not rewritten program text.
 
-
 ## Fixture and canonical verification checkpoint
 
 IMM-M009 through IMM-M014 are implemented. Thirty-four focused frontend/worker
@@ -1689,8 +1686,8 @@ backend results and an added implementation-reference workflow. A bounded real
 analyzer-pipeline fuzz run passes with seeds 1 and 2: two cases, zero hits,
 compiled=2, manifest=2 and deterministically sorted statistic keys.
 Evidence: immutability-fixture-owned-builders-tests.log,
-immutability-fixture-longfuzz-stats-test.log and
-immutability-longfuzz-stats-check/stats-analyzer-pipeline.json.
+immutability-fixture-`longfuzz`-stats-test.log and
+immutability-`longfuzz`-stats-check/stats-analyzer-pipeline.json.
 
 Exact committed source 5bacb4c2d passes the canonical Release semantic cohort:
 11,679 tests, zero failures/skips across six isolated tasks. Current and exact
@@ -1726,6 +1723,7 @@ and visited membership, and freeze ordered observations before consumers. Preser
 successor push order, reversed child order in exception tracing, iterator laziness,
 default comparers, and reference identity of CFG nodes. Region-ID maps and two
 reachability membership snapshots can be immutable. Status: open, recorded before edits.
+
 ## Contract scoped construction follow-up inventory
 
 IMM-M016: ContractClauseInventoryBuilder.CreateCore accumulates occurrences,
@@ -1741,6 +1739,7 @@ have method-owned substitution/allowed-variable/ordered-clause accumulation. Use
 preserve overwrite versus duplicate rejection, and freeze substitutions before lowerer use
 and clauses before publication. Retained binder pre-state caches remain immutable roots.
 Coordinator inspected callsites and failure paths before edits. Status: open.
+
 ## Worker observation-return follow-up inventory
 
 IMM-M018: Coordinator traced nine helper return shapes in BulkMetadataDefaultWorkBoundaryTests
@@ -1752,6 +1751,7 @@ Use scoped builders and return frozen arrays/maps. Preserve null nontermination 
 initialized empty compile-failure results, JSON element cloning, Ordinal keys, tuple order,
 and inner int[] reflection/SUT arguments. Adapt count assertions and unwrap nullable
 immutable results before LINQ. Status: open, recorded before implementation.
+
 ## Script scoped construction follow-up inventory
 
 IMM-M019: Assert-SharpProofJsonProperties duplicate-name set, Get-SharpProofDevCheckPlan
@@ -1762,6 +1762,7 @@ Use comparer-preserving immutable builders, freeze before JSON/filter/text publi
 and retain required object[] process/scheduler adapters and ordered output records.
 These run in the canonical PowerShell runtime. The Windows PowerShell bootstrap
 eng/build.ps1 is a separate compatibility boundary. Status: open before edits.
+
 ## Builder verification and next construction inventory
 
 IMM-M015 passed 268 focused frontend tests. IMM-M016/M017 passed all 640 ordinary
@@ -1785,6 +1786,7 @@ Use indexed array builders and sorted-set builders, snapshot each sorted pending
 before clearing, and freeze final results. FindReachableBlocks can use a sorted-set
 builder while retaining the DFS immutable stack. Preserve domain callback order,
 widening thresholds, cycle ordering and exception checks. Status: open before edits.
+
 ## Additional worker observation returns
 
 IMM-M022: Twelve return helpers in AliasOnlyConditionalAttributeAuditTests,
@@ -1808,7 +1810,8 @@ IMM-M020 passes 55 companion tests. IMM-M021 passes 118 dataflow tests; a subseq
 Worker dependency build found CA1868 on Contains-before-Add. It is corrected to the
 builder Add Boolean guard, preserving insertion and push order. The bounded worker/fuzz
 rerun is pending. Evidence: immutability-companion-builders-tests.log,
-immutability-dataflow-builders-tests.log, immutability-worker-observation-longfuzz-tests.log.
+immutability-dataflow-builders-tests.log, immutability-worker-observation-`longfuzz`-tests.log.
+
 ## Fuzz/corpus construction follow-up inventory
 
 IMM-M023: StructuralShrinkCandidates.GetCandidates uses rebound candidate/seen roots;
@@ -1822,7 +1825,8 @@ reflection argument arrays. Boolean mode counting can use scalar arithmetic. Sta
 The corrected Worker transitive build has zero warnings/errors; the checksum construction
 test passes. The two Explicit LongFuzz tests were not selected by the name-only filter;
 a category-qualified bounded run is still required. This run is not evidence of their
-execution. Evidence: immutability-worker-observation-longfuzz-tests2.log.
+execution. Evidence: immutability-worker-observation-`longfuzz`-tests2.log.
+
 ## Portable projection input follow-up inventory
 
 IMM-M024: PortableIrModel projection decoder contexts and corresponding Decode* helpers
@@ -1833,6 +1837,7 @@ invalid/default wire rejection, legacy constructor adapters and params IrTerm[]/
 results required by IR APIs. DecodeMember can use the existing GetOrCreateMemberSnapshot
 with immutable parameter types; preserve its preceding wire guard and scope validation.
 Do not normalize default decoder input to empty. Status: open before edits.
+
 ## Script campaign and TCB construction inventory
 
 IMM-M025: Get-SharpProofTcbPaths owns path/visited/pipeline/compile/inventory collections;
@@ -1847,6 +1852,7 @@ Current regenerated syntax inventories cover 1,865 C# files (3,338 candidates) a
 84 PowerShell files (1,133 candidates, zero parse errors). Fifty-two newly added C#
 builder rows are coordinator-verified by exact changed line; 3,089 C# and 1,017 script
 candidates remain open. Counts are syntax coverage, not confirmed violation counts.
+
 ## Verified construction checkpoint
 
 IMM-M020 through IMM-M024 are implemented. The main coordinator reviewed actual
@@ -1860,8 +1866,8 @@ logs as failures/selection gaps, not successes. Current literal preservation cov
 2,737 raw/interpolated tokens across 564 changed C# files, all unchanged.
 Evidence: immutability-worker-return-portable-snapshots-tests2.log,
 immutability-gates-builders-tests.log, immutability-fuzz-shrink-builders-tests.log,
-immutability-worker-observation-longfuzz-tests4.log, immutability-master-literals.log,
-and immutability-observation-longfuzz-check/stats-{compositional,control-flow}.json.
+immutability-worker-observation-`longfuzz`-tests4.log, immutability-master-literals.log,
+and immutability-observation-`longfuzz`-check/stats-{compositional,control-flow}.json.
 
 IMM-M025 passes canonical parsing and direct TCB checks for order, Ordinal equality,
 duplicate paths/projects, and first-error precedence. Campaign and performance
@@ -1869,6 +1875,7 @@ runtime publication remain to be verified against clean committed source/package
 Evidence: immutability-tcb-builders-check.log. No performance improvement is claimed.
 Further production/test/script candidate groups remain open; this is a checkpoint,
 not completion of the comprehensive audit.
+
 ## Second master conflict checkpoint
 
 After pushing 6825da042, master advanced to 6b062e611 (generic source List receiver
@@ -1893,6 +1900,7 @@ Evidence: immutability-second-master-tests.log, immutability-second-master-liter
 immutability-second-master-inventory.log and immutability-second-master-whitespace.log.
 The main coordinator inspected both sides of each conflict and all auto-merged
 List/source-specialization changes. Status: resolved and verified; ready to push.
+
 ## Analyzer and effect fixpoint construction inventory
 
 IMM-M026: EffectSummaryFixpoint.ComputeValidated/HasCycle owns body/edge/predecessor/
@@ -1915,6 +1923,7 @@ publication. Retain immutable traversal stacks and callback lifecycle. Status: o
 The read-only conflict review also found no defect in pushed merge f0e3b6fc8;
 GitHub confirms its exact head is MERGEABLE. Campaign runtime verification uses a
 private clean clone of that exact commit, independently of subsequent edits.
+
 ## IR and finite-domain fixture construction inventory
 
 IMM-M028: Coordinator inspected observer/budget/term lists in IrPurityWriteWitnessTests,
@@ -1939,6 +1948,7 @@ IMM-M027 passes 1,134 Analyzer tests; the M026 build's moved null guard hit CA22
 then was changed to the repository guard helper retaining parameter name body.
 Evidence: immutability-analyzer-scoped-builders-tests.log and
 immutability-effect-fixpoint-builders-tests.log; corrected fixpoint rerun pending.
+
 ## Worker native evidence snapshot inventory
 
 IMM-M029: Coordinator traced completed/pending result maps and effect lookups in
@@ -1959,6 +1969,7 @@ IMM-M026 passes 77 focused Worker tests after the guard fix. IMM-M028 passes all
 485 ordinary IR tests and 118 Dataflow tests, including existing mutation-under-test
 coverage. Evidence: immutability-effect-fixpoint-builders-tests2.log,
 immutability-ir-fixture-builders-tests.log and immutability-dataflow-fixture-builders-tests.log.
+
 ## Analyzer/native verification checkpoint
 
 IMM-M026-M029 are implemented and verified: 1,134 Analyzer tests, 77 fixpoint/identity
@@ -1984,6 +1995,7 @@ The mutable PushChildren stack remains an explicit SUT exception. Agent exclusio
 based only on scoped state, identity caches or local arrays are not accepted: outer
 builders can preserve identity, and immutable snapshots can preserve local read-only use.
 Further reviewed frontend/worker/corpus/script and test-host findings remain open.
+
 ## Corpus observation and allocation cache construction inventory
 
 IMM-M030: Coordinator inspected OpenSourceCorpusRunner diagnostic buckets, native
@@ -2001,6 +2013,7 @@ cache hits, failed-load cleanup and disposal reset. Reflection argument/type arr
 remain explicit native API adapters. The coordinator rejects a blanket mutable-cache
 exclusion based solely on the presence of aliasing or resource lifecycle.
 Status: open before edits.
+
 ## Corpus and consumer publication verification checkpoint
 
 IMM-M030 passes 150 targeted Gates tests with zero warnings/errors. Exact c21e6bcd3
@@ -2026,6 +2039,7 @@ returned result; preserve null resets and budget/cancellation behavior. ForgetOr
 must enumerate the original state while removing from a builder. Alias cycle guards
 may use hash builders. Persistent abstract-state dictionaries remain snapshots for
 joins. Status: open before edits.
+
 ## Additional constant declaration inventory
 
 IMM-M032: Coordinator inspected 16 scalar/enum constant declarations across 12 test
@@ -2038,6 +2052,7 @@ and field counts, and publication grace/expected milliseconds to typed constants
 Keep actual caller-owned exception arrays and captured/mutated variables unchanged.
 The lexical audit does not establish exhaustive CFG coverage; other candidates remain
 open. Status: open before edits.
+
 ## Specification validation and generated input construction inventory
 
 IMM-M033: Coordinator traced ApiSpecTable's validatedTerms through the only internal
@@ -2053,6 +2068,7 @@ all random draws even when sequence values are not referenced, null/empty semant
 value identity and traversal order. CollectVariables visited/output sets are local
 construction guards and can use builders; its DFS stack remains immutable. Status:
 open before edits.
+
 ## Differential oracle construction and identity inventory
 
 IMM-M034: Coordinator traced IrCSharpDifferentialOracle's variable rank/type maps,
@@ -2064,6 +2080,7 @@ sets may use scoped builders retaining ReferenceEqualityComparer.Instance; publi
 runtime arrays into the memo before recursive materialization exactly as before.
 Actual Array.CreateInstance/SetValue reflection subjects and StringBuilder output
 remain native construction adapters. Status: open before edits.
+
 ## Build task path construction inventory
 
 IMM-M035: Coordinator traced InvalidatePublishedResult output/input/compiler/publication
@@ -2079,6 +2096,7 @@ array; BuildTaskTests assert this mutable contract at lines 204-210 and 223-226.
 Preserve that mutable subject and RunVerifier's writable argument adapter for now.
 Public MSBuild setter/ITaskItem[] contracts and process char buffers are required
 framework adapters. Status: open before edits.
+
 ## Script formatter and coverage receipt construction inventory
 
 IMM-M036: Coordinator read Format-Scripts.ps1 and SharpProof.CoverageShardEvidence.ps1.
@@ -2093,6 +2111,7 @@ Coverage observed-assembly membership and per-receipt definitions can use Ordina
 hash/map builders, freezing before final membership and result checks respectively.
 Keep conflict-before-overwrite checks, same-value duplicate allowance, receipt order
 and required architecture assertions. Status: open before edits.
+
 ## Frontend interpreter input map inventory
 
 IMM-M037: Coordinator inspected 27 ToDictionary interpreter input maps across 19
@@ -2107,6 +2126,7 @@ All consumers accept IReadOnlyDictionary. ElementGuardNarrowInput's first enviro
 is deliberately edited between evaluations: use a scoped builder and freeze separately
 for each interpreter call, retaining the shared sequence value identity. No embedded
 source or native mutable input arrays change. Status: open before edits.
+
 ## Frontend reference memo and visit construction inventory
 
 IMM-M038: Coordinator inspected TypedReferenceProgramLoweringTests' two alias roots,
@@ -2118,6 +2138,7 @@ comparison can edit an owned builder and freeze per evaluation. Native input arr
 remain mutation/identity subjects. CompilerElisionContinuationPlannerTests' local
 continuation set can use a hash builder and frozen snapshot before assertion/readout.
 Status: open before edits.
+
 ## Release manifest and evidence construction inventory
 
 IMM-M039: Coordinator read both release exporters. Package manifest TSV rows and ZIP
@@ -2132,6 +2153,7 @@ map builder plus first-insertion order sidecar, retaining later value overwrites
 final ordered value output. Keep ordered JSON records as serializer adapters; preserve
 all package/component/file/relationship/checksum order and exact hashing inputs.
 Status: open before edits.
+
 ## M030-M039 verified implementation checkpoint
 
 M030 corpus tests pass 150; M031 ordinary Analyzer tests pass 1,134; M032-M034 focused
@@ -2163,6 +2185,7 @@ immutability-spec-oracle-constant-tests2.log, immutability-build-task-paths-test
 immutability-frontend-input-alias-builders-tests6.log, immutability-m036-script-tests.log,
 immutability-m039-script-tests.log, immutability-m039-script-format.log,
 immutability-m039-layout.log and immutability-second-master-literals.log.
+
 ## Passive verification-condition builder inventory
 
 IMM-M040: Coordinator traced PassiveCallableVcBuilder's 23 private list/map fields,
@@ -2177,6 +2200,7 @@ assignment overwrites and RHS evaluation before insertion. Heap.Stores, Edge/Exi
 state and fact snapshots remain persistent immutable values; historical returns retain
 their exact heap contents. IrSnapshotReads' immutable selector memo contract remains
 unchanged in this bounded batch. Status: open before edits.
+
 ## Loop cutting and component construction inventory
 
 IMM-M041: Coordinator traced both PassiveLoopCutter files, including DFS/SCC walks,
@@ -2192,16 +2216,18 @@ insertion enumeration directly. Freeze copies before substitution, cells before 
 and graph maps/sets before Encoding/Loop publication. Preserve nullable cell state as
 heap-forgotten. Use existing CallSnapshot for immutable call arguments; Havoc has only
 params-array APIs, so retain those explicit boundary adapters. Status: open before edits.
+
 ## Fuzz statistics observation correction inventory
 
 IMM-M042: The full ordinary Worker run exposed two downstream reflection-based controls
 that still cast LongFuzzSession._counts to Dictionary<string,int> after the earlier
 statistics-builder conversion. Both fail with InvalidCastException before checking
-purity outcomes. Coordinator traced all _counts consumers; only these two casts remain.
+purity outcomes. Coordinator traced all `_counts` consumers; only these two casts remain.
 Expose an immutable Counts snapshot from the test session and read it directly. The
 lock control needs separate snapshots before and after its second RunCase; preserve
 pre-control refutation scalars and post-control proven count. Keep the private builder
 and the session's intended mutable counting behavior. Status: open before edits.
+
 ## Candidate admission and invariant construction inventory
 
 IMM-M043: Coordinator traced PassiveCallableCandidate validation sets/maps and
@@ -2216,6 +2242,7 @@ before output. Freeze entering membership and substitution maps before use; pres
 copy overwrites/null conflict markers, cancellation checks and maximum candidate order.
 State's three direct consumers (Generate, PassiveCallableSolver, checksum evidence)
 only use enumeration/Length/projection and accept immutable vectors. Status: open before edits.
+
 ## Callable projection and entry observation inventory
 
 IMM-M044: Coordinator traced TotalCallableVerifier entry labels/IDs, staged requires/
@@ -2229,6 +2256,7 @@ The two direct fixture consumers can freeze builder labels/IDs, constraint vecto
 callback checks; native IR/runtime invocation argument adapters remain. Their read-only
 prime and callable-target vectors can be immutable. Preserve before/after resource
 accounting and rejection assertions. Status: open before edits.
+
 ## Solver core and Horn state construction inventory
 
 IMM-M045: Coordinator traced PassiveCallableSolver's five local hash sets and Horn
@@ -2241,6 +2269,7 @@ Houdini's successful union currently publishes HashSet insertion order, so prese
 first occurrence with array sidecars alongside builder membership sets. Keep candidate
 removal, proof/witness priorities and cancellation/resource checks unchanged. Status:
 open before edits.
+
 ## Layout validator construction inventory
 
 IMM-M046: Coordinator read Test-SharpProofRepositoryLayout.ps1. Its failure/record/
@@ -2251,6 +2280,7 @@ freeze covered projects after solution discovery and preserve Add's duplicate re
 for names. Keep source traversal, failure first-20 order, static import controls,
 project evaluation order, pinned common validation and JSON report schema unchanged.
 The report's ordered records remain serialization adapters. Status: open before edits.
+
 ## Protocol mutable-subject contract review
 
 IMM-M047: Coordinator verified all 21 remaining ProtocolModel.generated.cs setters
@@ -2268,6 +2298,7 @@ that subject init-only would remove the behavior under test. Preserve it under t
 user's mutable-SUT exception. The generated file is hand-maintained; no active generator
 needs regeneration. Null/default/empty wire-array distinctions remain unchanged.
 Status: verified exclusions from setter removal; no protocol code changes.
+
 ## Frontend receiver, identity and modifier fixture inventory
 
 IMM-M048: Coordinator inspected ArrayReceiverModelOwnershipTests, NullableComparerDomainTests,
@@ -2278,6 +2309,7 @@ input maps may use direct immutable singleton construction without incremental r
 Freeze write observations after synchronous replay; retain the actual array/reference runtime
 subjects and IrValue identities. Method/local syntax vectors can be immutable; the PE image
 byte[] passed to MetadataReference.CreateFromImage remains its native adapter. Status: open before edits.
+
 ## M040-M048 implementation checkpoint and next frontend inventory
 
 Coordinator implementation and read-only reviews confirm builder comparer, insertion-order
@@ -3757,7 +3789,7 @@ IMM-M143 proof: all 30 pinned-Roslyn native/immutable overload controls pass, in
 IMM-M144: Freeze nine inline ordered wire-record scopes across Doctor and fuzz
 campaign/seed evidence. Use OrderedDictionary.AsReadOnly only around unique inline
 backing maps with no mutable alias; retain order and direct dictionary property access,
-remove the pscustomobject cast that would recreate writable note properties, and publish
+remove the `pscustomobject` cast that would recreate writable note properties, and publish
 existing immutable check/run vectors directly. This wrapper is shallow: parsed external
 Doctor configuration remains a separately open nested-value scope. Validate real write
 rejection, baseline JSON/property/filter/measure behavior, Doctor and seed regressions.
@@ -3815,7 +3847,7 @@ IMM-M147: Migrate 97 reviewed Worker H-P test vectors/materializations across th
 
 IMM-M145 verified: complete canonical Release package workflow passed 383 tests with one expected unsupported-host skip across 39 isolated shards; zero failures, build warnings or errors, 87 exact embedded PDB outputs. Independent review confirmed all twenty scopes, guarded forwarding overloads, dynamic cache visibility and native mutable environment boundaries. Formatter patch applied before testing; subsequent explicit-guard corrections preserved guard order. Status: implemented and verified.
 
-IMM-M146 validation correction: the first Fuzz project command omitted the established ordinary semantic category filter. Build passed with zero warnings/errors, but the isolated Coverage console fixture correctly rejected a non-isolated testhost. Stopped only that exact verified task container and rerun with TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus; no source change is justified by this harness failure.
+IMM-M146 validation correction: the first Fuzz project command omitted the established ordinary semantic category filter. Build passed with zero warnings/errors, but the isolated Coverage console fixture correctly rejected a non-isolated `testhost`. Stopped only that exact verified task container and rerun with TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus; no source change is justified by this harness failure.
 
 IMM-M148: Migrate 41 remaining avoidable Smt test collection scopes (38 outer snapshots/maps and three scoped collectors), plus the coupled private WithNativeModel predicate signature. Preserve native expression disposal, active selector ordinal comparison, query/expected order and duplicates, cycle Add Boolean behavior and callback timing. Overlay partial-write tests, native Z3 MkOr adapters and disposal subjects remain mutable by contract. Validate affected Smt tests after formatting and independent review. Status: planned before edits.
 
@@ -4093,7 +4125,6 @@ IMM-M211: Convert Native construction parameter and verifier callback/result col
 
 IMM-M212: Narrow six private Contracts/Frontend input contracts to the immutable values already supplied by every caller. Preserve companion SymbolEqualityComparer maps and optional-null index behavior, source clause guard precedence, reversed finally-chain traversal and exception/unwind ordering. Keep public IrSubstitution caller-view snapshot semantics unchanged. Validate Contracts/Frontend and affected Worker companion/filter controls after M210's captured full snapshot. Status: planned before edits.
 
-
 IMM-M214: Replace the remaining Analyzer validation List sink adapters with diagnostic callbacks and convert their two method-owned test collectors to immutable builders. Preserve diagnostics parameter names, null guard order and ReportRelationship/ReportValidation behavior. Narrow the Analyzer nesting assertion to its actual immutable result vector with an initialized-value guard. Validate Analyzer and the direct Worker companion null/relationship controls. Status: planned before edits.
 
 IMM-M215 ownership checkpoint: main rechecked six Fuzz/Tool rows against source and independent audit: four scoped text/identity memo builders, one frozen Tool explanation builder and one generated long[] CLR invocation subject. Private outer read-only inputs remain actionable. Open C# count is 1,120 at the current coordinate checkpoint; PowerShell remains 565. No blanket exemption for read-only interfaces.
@@ -4104,7 +4135,7 @@ IMM-M210 verified: all 12,351 ordinary Release semantic tests pass across 23 fra
 
 IMM-M216: Freeze partial-read observation history behind an owned immutable builder while retaining actual FillExactly destination buffers and final MemoryStream byte adapters. Replace fatal/timeout test Array.Reverse scratch vectors with immutable snapshots and conditional reversed snapshots, preserving input row order and result classification. Validate compiler stream-fill and fatal/timeout assembly controls. Status: planned before edits.
 
-IMM-M217: Narrow seven coupled private Specs/SMT helper maps to the immutable values supplied by every caller: runtime binding evaluation, validated digest terms, native core active indices and reference-model assertions. Preserve native unsat-core disposal in finally, map comparers, recursive evaluation order and null guards. Validate ordinary Specs/SMT and native core disposal controls. Status: planned before edits.
+IMM-M217: Narrow seven coupled private Specs/SMT helper maps to the immutable values supplied by every caller: runtime binding evaluation, validated digest terms, native core active indices and reference-model assertions. Preserve native `unsat`-core disposal in finally, map comparers, recursive evaluation order and null guards. Validate ordinary Specs/SMT and native core disposal controls. Status: planned before edits.
 
 IMM-M214 first build: the new Worker test builder lacked its explicit System.Collections.Immutable import. Build reported two CS0103 sites and no warnings; no tests ran. Added the import before retry. M216 and M217 source changes are included in the next combined retry snapshot.
 
@@ -4136,7 +4167,7 @@ IMM-M219-M226 first build: canonical analyzers rejected two HashSet-builder Cont
 
 IMM-M227: Replace IR snapshot-selection fixture map/leaf accumulation and wrong-field-type input assembly with owned immutable builders. Freeze input maps before interpreter calls, freeze each binary-tree level, and retain actual mutable IrHeap subjects, source variable identity and ordered tree shape. Preserve separate valid/malformed immutable input snapshots rather than turning those controls into shared construction state. Validate ordinary IR after review/formatting. Status: planned before edits.
 
-IMM-M228: Replace callable replay final-state and approximation-variable root accumulation with owned builders, preserving the original immutable model for pre-state lookup. Freeze final and approximation snapshots before domain checks/read-observer/interpreter evaluation. Narrow entry-constraint inputs to actual immutable callers. Use a local unsat-core hash builder with boolean Add to retain first-occurrence justification order. Validate replay/approximation/old-state/native proof controls after review. Status: planned before edits.
+IMM-M228: Replace callable replay final-state and approximation-variable root accumulation with owned builders, preserving the original immutable model for pre-state lookup. Freeze final and approximation snapshots before domain checks/read-observer/interpreter evaluation. Narrow entry-constraint inputs to actual immutable callers. Use a local `unsat`-core hash builder with boolean Add to retain first-occurrence justification order. Validate replay/approximation/old-state/native proof controls after review. Status: planned before edits.
 
 IMM-M229: Replace Fuzz structural-size visited roots and three source-oracle scenario/binding accumulators with owned immutable builders. Preserve DFS order, variable identity, existing immutable-map Add semantics and native reflection argument subjects. Freeze captured bindings after both sequential lowering calls and before all interpreter/oracle consumers. Validate ordinary Fuzz controls after review/formatting. Status: planned before edits.
 
@@ -4286,7 +4317,7 @@ IMM-M285: PowerShell completeness check identified that the coordinate scanner d
 
 IMM-M286: New M282 guard control reproduced a nullable immutable-array equality trap: Some(default array) has HasValue=true yet operator==null is true, while pattern is null is false. Native net10 controls verify absent/present-default/present-empty states. Replace source-tree and captured-reference absence checks with null patterns, preserving actual absence and rejecting the present-default invalid snapshot. Pin HasValue in the regression fixture and audit all nullable immutable-array null comparisons. Prior semantic/package checkpoints precede this repair; targeted compiler retry required.
 
-IMM-M281-M286 verified checkpoint: four IR,17 Effects and eight Analyzer focused tests pass. The first Worker run exposed the nullable equality regression; after null-pattern repair,112 Worker compiler/codec/guard controls pass with zero failures/skips/build warnings/errors. Eleven original605 gap rows now have passing meaningful controls, with final authenticated coverage still pending. Layout passes2661sources/59projects/151pinnedcommon files; current raw/interpolated literal check preserves4088tokens across945changed C#files; C# and PowerShell formatting patches are empty. Const prototype17 synthetic controls pass; real Effects pilot reviews17sourceunits and186declarations in14seconds, with one BindingPreserved local still requiring role review. This is a measured pilot, not full const or exhaustive migration completion.
+IMM-M281-M286 verified checkpoint: four IR,17 Effects and eight Analyzer focused tests pass. The first Worker run exposed the nullable equality regression; after null-pattern repair,112 Worker compiler/codec/guard controls pass with zero failures/skips/build warnings/errors. Eleven original605 gap rows now have passing meaningful controls, with final authenticated coverage still pending. Layout passes2661sources/59projects/151 pinned common files; current raw/interpolated literal check preserves4088tokens across945changed C#files; C# and PowerShell formatting patches are empty. Const prototype17 synthetic controls pass; real Effects pilot reviews17 source units and186declarations in14seconds, with one BindingPreserved local still requiring role review. This is a measured pilot, not full const or exhaustive migration completion.
 
 IMM-M287 latest-master integration: fetch found9e3b1ade2 (#340 primitive HashSet state and signed callback Count proofs). Resolve three conflicts by combining hashSetOrigins dispatch with existing immutable symbol/capture builders and explicit order, immutable ranking expectations including the new HashSet vector, and signed absolute Count bounds with the existing field-value/read snapshots. Convert the two imported origin sets to compatible owned immutable builders, preserving symbol comparer and mutation lifetime; freeze the imported method-name fixture vector. Actual mutable HashSet/Dictionary oracle subjects remain intact. All imported source fixtures are preserved against new master; full post-merge semantic/package gates pending. Previously found nullable codec/loop/golden comparisons remain a separate next repair.
 
@@ -4294,17 +4325,17 @@ IMM-M287 post-merge build repair: first full build catches two imported IrTerm[]
 
 IMM-M285 discovery verified: canonical AST pass records90 newly discovered collection-shaped parameter signatures across all84 scripts with zero parse failures:85 mutable storage, one enumerable facade, two read-only facades and two immutable controls (including nullable immutable input). Twenty-two positive/negative type controls and five script/function/inline/nested/class parameter scopes pass. All1091 prior rows and every prior status are preserved exactly;1181 total rows and625 Open candidates. Record input signatures before implementation; native argv/environment receivers and mutable timing sinks require individual ownership traces. Scanner construction now uses owned immutable builders instead of repeated root replacement.
 
-IMM-M287 verified after repair: combined canonical semantic suite passes12,450tests across23summaries/sixisolatedtasks with zero failures/skips/buildwarnings/errors. Actual package workflow passes383tests with one expected unsupported-hostskip across39shards. Independent reviews confirm signed Count magnitudes, ordered snapshots, HashSet origin propagation and preserved mutable reentrant comparer/key subjects.
+IMM-M287 verified after repair: combined canonical semantic suite passes12,450tests across23summaries/six isolated tasks with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-host skip across39shards. Independent reviews confirm signed Count magnitudes, ordered snapshots, HashSet origin propagation and preserved mutable reentrant comparer/key subjects.
 
 IMM-M288 nullable semantics and reviewed const candidates: repair remaining present-default equality sites. Built-in portable type metadata rejects Some(default) rather than accepting absence; a direct codec regression pins HasValue and exact rejection. Golden presence checks use null patterns; stack-shape validation explicitly requires initialized arrays. Loop cells use null presence plus the shared initialized-input guard, retaining fail-closed handling and the sole-writer null/initialized invariant; coordinator traced every _cells writer. Convert the semantically proven enum uncertainty marker to const and, after manual capture/binding/SUT review, make the runtime maximum-length oracle local const. The actual CLR allocation and AllocateBytes(int) call remain unchanged. Gates pending; source checkpoint707 precedes this new batch.
 
 IMM-M289 Frontend outer argument vectors: coordinator Roslyn preview checks17files,17parameter/default guards,12outer locals,94scalar Case wrappers,55unchanged reference Case vectors,24StackType calls,15CompiledMethod calls and four final reflection adapters. Preserve original object versus object? element annotations and NUnit single-vector boxing. Keep nested CLR arrays, SameAs/mutation subjects and the nested ElementValues long[] reflection adapter. Coordinator verifies source hashes before applying every preview; syntax and all string/character tokens match. Independent review found no functional defect. Builders are unnecessary for fixed literal vectors; reflection receives a shallow final ToArray adapter. Formatting and full semantic/package gates pending.
 
-IMM-M288-M289 verified checkpoint: all12,451 semantic tests pass across23summaries with zero failures/skips; the actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards. Layout passes2666sourcefiles/59evaluatedprojects/151pinnedcommonfiles. All4090raw/interpolated literal tokens match latest mergedmaster9e3b1ade2 across954changedC#files. Independent nullable/vector reviews found no functional defects. Coordinator reconciles29implemented vector rows,20required nested CLR-array subjects and three owned builder rows; the two reviewed const rows are implemented. Current C# coordinate inventory is914Open, pending lossless coordinate refresh and full semantic const audit.
+IMM-M288-M289 verified checkpoint: all12,451 semantic tests pass across23summaries with zero failures/skips; the actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards. Layout passes2666sourcefiles/59 evaluated projects/151 pinned common files. All4090raw/interpolated literal tokens match latest merged master9e3b1ade2 across954changedC#files. Independent nullable/vector reviews found no functional defects. Coordinator reconciles29implemented vector rows,20required nested CLR-array subjects and three owned builder rows; the two reviewed const rows are implemented. Current C# coordinate inventory is914Open, pending lossless coordinate refresh and full semantic const audit.
 
 IMM-M290 audit quality checkpoint: all19synthetic const controls pass, including native-sized integers; metadata now records semantic source hashes, complete owners, language/defines/nullable context and compilation identity. Explicit enum/parameter/catch/query exclusions close previously silent declaration categories. Binding proof additionally traverses operation trees for member/constructor/argument/operator/conversion targets. Full real-context collection remains pending.
 
-IMM-M292 conflict priority: fresh fetch findsmaster7f6e25f21 (#341 Dictionary capacity construction). Merge-tree identifies one conflict in ApiUsageRankingTests; preserve the new capacity ranking input while keeping immutable expected vectors. The fully passing M288-M289 checkpoint is committed before integration; separate Fuzz validation changes remain unstaged and are not covered by that checkpoint.
+IMM-M292 conflict priority: fresh fetch finds master7f6e25f21 (#341 Dictionary capacity construction). Merge-tree identifies one conflict in ApiUsageRankingTests; preserve the new capacity ranking input while keeping immutable expected vectors. The fully passing M288-M289 checkpoint is committed before integration; separate Fuzz validation changes remain unstaged and are not covered by that checkpoint.
 
 IMM-M292 merge resolution: combine capacityMembers and the revised five-indexer ranking expectation with immutable vectors. Before compilation, coordinator catches imported IrTerm[] constructorValues handoffs to immutable helpers; replace with an exact-length owned builder, evaluate in syntax order, assign parameter-ordinal slots and freeze after evaluation. New Dictionary capacity/alias/negative-capacity CLR subjects remain unchanged. Separate Fuzz working changes are excluded from the merge commit; post-merge validation is pending.
 
@@ -4328,18 +4359,18 @@ IMM-M298 immutable clause validity: replace the atomic lazy integer cache with a
 
 IMM-M296 tracked const-unit manifest: docs/immutability-const-units.tsv lists all1923tracked C#paths, including zero-candidate units, census/current source hashes and compiler-context identities. Exactly1712paths have actual solution compiler census evidence,208physical compiler/runtime subjects retain their input semantics, and three dynamically compiled helper sources have explicit manual local/field review. Source changes are marked rather than silently inheriting old hashes. This manifest scopes const review; it does not claim exhaustive collection mutability coverage or automatic semantic proof for dynamic helpers.
 
-IMM-M291-M298 verified checkpoint: all12494semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards. Clause-inventory focused25tests pass. Layout passes2668sources/59evaluatedprojects/151pinnedcommonfiles; all4097raw/interpolated literal tokens match mergedmaster7f6e25f21 across961changed C#files. C# formatting patch is empty; PowerShell formatter indentation patch was applied before gates. Reconcile24constlocals, readonly validity cache, three logger snapshot properties and15TRX/cache rows. Independently reviewed/coordinator-traced Fuzz, Frontend, package native subjects and stale traversal memo builders are reconciled individually; actionable outer vectors remain Open. Native symbol helper uses an exact20-byte immutable builder and awaits clean exact-commit pack validation. Initial pack attempt correctly refuses the dirty worktree; commit this verified source checkpoint before that native gate. Additional const context manifest records all51actual compilation reports, including two generated-only wrapper projects.
+IMM-M291-M298 verified checkpoint: all12494semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards. Clause-inventory focused25tests pass. Layout passes2668sources/59 evaluated projects/151 pinned common files; all4097raw/interpolated literal tokens match merged master7f6e25f21 across961changed C#files. C# formatting patch is empty; PowerShell formatter indentation patch was applied before gates. Reconcile24 const locals, readonly validity cache, three logger snapshot properties and15TRX/cache rows. Independently reviewed/coordinator-traced Fuzz, Frontend, package native subjects and stale traversal memo builders are reconciled individually; actionable outer vectors remain Open. Native symbol helper uses an exact20-byte immutable builder and awaits clean exact-commit pack validation. Initial pack attempt correctly refuses the dirty worktree; commit this verified source checkpoint before that native gate. Additional const context manifest records all51actual compilation reports, including two generated-only wrapper projects.
 
 IMM-M295 exact-commit native validation passed at2ce34520e: canonical clean pack builds with zero warnings/errors, exports239assembly PDB outputs, creates the three product packages and their required symbol packages, and validates exact portable/embedded symbol pairing, third-party18-component inventory and source digests. This validates the dynamic Add-Type SymbolPackageValidator path that the solution C# build alone does not compile.
 
 IMM-M299/M304 pending batch: immutable codec roots/variables/operations/index mappings replace19read-only facades; identity/block builders freeze once in graph order. Decode metadata default validation stays inside the existing malformed-input/cancellation flow. Nine companion diagnostic/lowered/pack/metadata-reference signatures now take immutable inputs, preserving absence separately from Some(default). Add five codec shape controls and extend pack/ownership/diagnostic-order boundary assertions. C# formatter patch is empty; focused real Worker/compiler tests are running. Broader gates and inventory reconciliation remain pending.
 
-IMM-M305 module snapshots/builders: replace acceptance-cache SetItem publication with a scoped ToBuilder/indexer/freeze; preserve case-insensitive keys and cached snapshot identity. Use owned builders for filtered diagnostics, Git stdout/stderr detail lines, framework XML projection, SDK version output and completed-process snapshots; assembly name is a scalar first-nonempty projection. Capture native SDK exit status immediately after enumeration. All27before/current cache/summary/assembly/Git-error/SDK controls pass. Actual before/current native scheduler workflows pass completion order, reserved slots, failure retention, timeout child cleanup, preparation-failure cleanup and parallel build success/failure. PowerShell formatting checked87scripts/19shellscripts; its10indent-line patch is applied. Combined full gates pending.
+IMM-M305 module snapshots/builders: replace acceptance-cache SetItem publication with a scoped ToBuilder/indexer/freeze; preserve case-insensitive keys and cached snapshot identity. Use owned builders for filtered diagnostics, Git stdout/stderr detail lines, framework XML projection, SDK version output and completed-process snapshots; assembly name is a scalar first-nonempty projection. Capture native SDK exit status immediately after enumeration. All27before/current cache/summary/assembly/Git-error/SDK controls pass. Actual before/current native scheduler workflows pass completion order, reserved slots, failure retention, timeout child cleanup, preparation-failure cleanup and parallel build success/failure. PowerShell formatting checked87scripts/19 shell scripts; its10indent-line patch is applied. Combined full gates pending.
 
 IMM-M306 census evidence hygiene: independent review verifies stored1923-path universe,1857compiled-unit rows/1712distinct paths,211documented absent units, zero unexpected paths and zero stored hash mismatches. Current source has advanced; manifests explicitly distinguish census/current hashes and final real-context collection remains required. Fix the exporter so a partial rerun cannot mix previous TSVs into current results: preserve each prior run directory, publish one fresh run and record exit code. Native controls prove stale rows absent, prior evidence retained and failed-run exit status7 preserved. Existing M296 evidence remains historical declaration-clone proof, not a claim that current source was recollected.
 M296 frozen proof identity: HEAD=37956186b1b0f8a3f8394289ffcfc5fdfe4d236b; workingPatchSha256=f6ddb0bceade85ab1f312c3de7b1c2be4e8ef81859f94cea7679840c59bc7ad4; analyzerSha256=24598081a109a1cbf7e9ba489ea65014055b99e912c99eafe2a32bc4ead9e06f. Per-source and compiler-context hashes are recorded in the tracked manifests.
 
-IMM-M299-M305 verified checkpoint: all12500semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards. Focused compiler/Worker185tests pass. Layout passes2668sources/59evaluatedprojects/151pinnedcommonfiles. All4097raw/interpolated literal tokens match mergedmaster7f6e25f21 across961changed C#files. Reconcile28immutable input signatures and sevenPowerShell builder/projection rows; native symbol pack at2ce is separately validated. Coordinator source-traces25Worker callback/lifecycle/construction rows, preserving actual mutable subjects and owned builders with frozen observation/publication. Current const-unit source hashes are refreshed; final real-context recollection remains pending. Next reviewed previews M307-M310 have not yet been applied to this checkpoint.
+IMM-M299-M305 verified checkpoint: all12500semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards. Focused compiler/Worker185tests pass. Layout passes2668sources/59 evaluated projects/151 pinned common files. All4097raw/interpolated literal tokens match merged master7f6e25f21 across961changed C#files. Reconcile28immutable input signatures and sevenPowerShell builder/projection rows; native symbol pack at2ce is separately validated. Coordinator source-traces25Worker callback/lifecycle/construction rows, preserving actual mutable subjects and owned builders with frozen observation/publication. Current const-unit source hashes are refreshed; final real-context recollection remains pending. Next reviewed previews M307-M310 have not yet been applied to this checkpoint.
 
 IMM-M307/M308 targeted verification: pinned Z3 enumerable overloads accept immutable vectors directly; remove only redundant native adapters, retaining array-only SubstituteVars/MkSub boundaries. Callable selectors remain BoolExpr and meter/cancellation/disposal order is unchanged. Remove the unused mutable-stack traversal overload and migrate its sole test to ImmutableStack; fixed IR fixture vectors/helpers are immutable. All404SMT tests and83focusedIR tests pass.
 
@@ -4353,13 +4384,13 @@ IMM-M315 applied: shared Analyzer assertion/diagnostic and two tuple helper inpu
 
 IMM-M316/M318 applied: MetadataTestSubject and parameter-attribute emitted images own immutable byte snapshots; direct immutable PE readers preserve original bytes and metadata identity. MutateImage keeps its deliberate cloned mutable corruption buffer. Independent review catches obsolete LongLength on ImmutableArray; replace with an explicit long Length value. Assumption mutation fixture uses one clause builder across the switch and freezes once afterward; ID/site/swapped-ID and unchanged-clause graph mutations preserve their original ordering and identities.
 
-IMM-M307-M318 semantic checkpoint passes12501tests across23summaries with zero failures/skips/build warnings/errors. All4215raw/interpolated literal tokens match mergedmaster7f6e25f21 across990changed C#files. Focused new/current cohorts pass83IR,404SMT,30Analyzer,75Frontend,64Worker and7substitution tests. Initial package build catches CA1849 for the now-direct synchronous stable-file read; use sequential awaited ReadAllBytesAsync before freezing each immutable byte value. This repair is package-test-only; actual package workflow retry and layout remain pending. Inventory reconciliation is prepared as83exact IDs,81currentlyOpen, and is not applied before the remaining gates.
+IMM-M307-M318 semantic checkpoint passes12501tests across23summaries with zero failures/skips/build warnings/errors. All4215raw/interpolated literal tokens match merged master7f6e25f21 across990changed C#files. Focused new/current cohorts pass83IR,404SMT,30Analyzer,75Frontend,64Worker and7substitution tests. Initial package build catches CA1849 for the now-direct synchronous stable-file read; use sequential awaited ReadAllBytesAsync before freezing each immutable byte value. This repair is package-test-only; actual package workflow retry and layout remain pending. Inventory reconciliation is prepared as83exact IDs,81currentlyOpen, and is not applied before the remaining gates.
 
 IMM-M317 prepared only: policy/scheduler input previews remove CPU-policy splats, receive immutable policy vectors through readonly interfaces and freeze sorted/selected outer task vectors. Canonical parser checks and50baseline/current comparisons pass, including23CPU policy cases. A first unknown-policy comparison exposes changed error timing; resolve it by performing the method-based policy branch test before indexing argument values. Six baseline/current native scheduler workflow groups pass completion order, reserved-slot exclusion, failure retention, timeout/preparation child cleanup and parallel build success/failure. Four previews remain separate from the source snapshot under current gates.
 
-IMM-M307-M318 verified checkpoint: full semantic suite passes12501tests across23summaries with zero failures/skips/build warnings/errors. After the package-only CA1849 async-read repair, actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards, including14freshness controls and94BuildTask controls. Layout passes2668sourcefiles/59evaluatedprojects/151pinnedcommonfiles. Fixture check preserves4215raw/interpolated literal tokens against mergedmaster7f6e25f21 across990changed C#files. Formatter patch applied before semantic gates; subsequent repair changes only one package-test file-read expression. Coordinator reconciles83exactrows,81previouslyOpen and two prior single-update exceptions now implemented with one shared fixture builder. Current coordinate inventory is735Open C# and603Open PowerShell, with lossless refresh and current authenticated coverage still pending. M317/M319/M320 previews remain unapplied and do not inherit this source checkpoint's test results.
+IMM-M307-M318 verified checkpoint: full semantic suite passes12501tests across23summaries with zero failures/skips/build warnings/errors. After the package-only CA1849 async-read repair, actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards, including14freshness controls and94BuildTask controls. Layout passes2668sourcefiles/59 evaluated projects/151 pinned common files. Fixture check preserves4215raw/interpolated literal tokens against merged master7f6e25f21 across990changed C#files. Formatter patch applied before semantic gates; subsequent repair changes only one package-test file-read expression. Coordinator reconciles83 exact rows,81previouslyOpen and two prior single-update exceptions now implemented with one shared fixture builder. Current coordinate inventory is735Open C# and603Open PowerShell, with lossless refresh and current authenticated coverage still pending. M317/M319/M320 previews remain unapplied and do not inherit this source checkpoint's test results.
 
-IMM-M317/M319/M320/M322 verified checkpoint: all12506semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards. Layout passes2668sources/59evaluatedprojects/151pinnedcommonfiles;4215raw/interpolated tokens match mergedmaster7f6e25f21 across991changed C#files. All14source files were frozen throughout the full gates. Current const-unit source hashes are refreshed; historical compiler proof remains separately identified.
+IMM-M317/M319/M320/M322 verified checkpoint: all12506semantic tests pass across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards. Layout passes2668sources/59 evaluated projects/151 pinned common files;4215raw/interpolated tokens match merged master7f6e25f21 across991changed C#files. All14source files were frozen throughout the full gates. Current const-unit source hashes are refreshed; historical compiler proof remains separately identified.
 
 IMM-M317 replaces policy splats with direct policy branches, accepts immutable vectors through readonly scheduler contracts and freezes sorted/selected outer task vectors. Fifty baseline/current policy/cache controls and six native scheduler groups preserve completion order, slots, failure retention and cleanup. Unknown-policy error timing is preserved by branching before indexing. Shard records remain separately Open.
 
@@ -4371,7 +4402,7 @@ IMM-M322 adds four direct default-input controls for transaction updates, snapsh
 
 IMM-M321 verified byte pipeline:62source files migrate together, including89caller rewrites. Shared/protocol/artifact hash inputs, exact file reader outputs, strict UTF-8 decode, launcher storage/request/publication and atomic async content now use immutable byte roots. Preserve four stream-hash callers, native ReadExact scratch and final netstandard SHA/file array adapters. Existing mutable PE corruption/replacement fixtures keep their mutable subjects, with readonly boundary snapshots. Default arguments preserve parameter exceptions; initialized-empty exact reads and digests have direct controls.
 
-IMM-M321 verification:143focusedWorker and13focusedIR tests pass; full semantic suite passes12509tests across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-hostskip across39isolatedshards. Layout passes2668sources/59evaluatedprojects/151pinnedcommonfiles. All4219raw/interpolated fixture tokens match mergedmaster7f6e25f21 across1002changed C#files. Formatting produces an empty patch; the driver initially rejects that empty patch, then skips application and runs actual tests. Coordinator verifies all62source/preview hashes and reconciles19exact rows, including three superseded native-boundary exceptions and one retained native read scratch buffer. Source remained frozen during gates.
+IMM-M321 verification:143focusedWorker and13focusedIR tests pass; full semantic suite passes12509tests across23summaries with zero failures/skips/build warnings/errors. Actual package workflow passes383tests with one expected unsupported-host skip across39 isolated shards. Layout passes2668sources/59 evaluated projects/151 pinned common files. All4219raw/interpolated fixture tokens match merged master7f6e25f21 across1002changed C#files. Formatting produces an empty patch; the driver initially rejects that empty patch, then skips application and runs actual tests. Coordinator verifies all62source/preview hashes and reconciles19exact rows, including three superseded native-boundary exceptions and one retained native read scratch buffer. Source remained frozen during gates.
 
 IMM-M326 census tooling pilot only:coordinator adds semantic residual observations beside the real compiler const census, with source-sensitive compiler context identities, inferred arrays/builders/facades/generics/ref-like holders, zero-candidate units and explicit duplicate ambiguity. Native synthetic pilot passes22observations across two source units and proves coordinate-shift-stable IDs while source context identity changes. Existing27const/binding and11language-form controls pass after a tool-only Roslyn symbol cast repair. Full current collection, absent-unit conservation, semantic alias/escape review and lossless legacy reconciliation remain required; this pilot does not close source rows or claim exhaustive census completion.
 
@@ -4620,7 +4651,7 @@ Exact controls pass for 72 project/build combinations, three task groups, native
 
 ### IMM-M432: immutable Visual Studio consumer observations
 
-Visual Studio selection/candidate, package-file and reusable build vectors are immutable. Native vswhere/MSBuild adapters retain the exact argument frames and exit-code capture, and command results publish readonly records. Twelve native Linux engine stand-in cases and 24 native vswhere cases preserve versions 17/18, both separators, zero/one/many candidate output, success/failure and exact argv/environment/output. Three file inventories and reusable build construction also match; full script-tool regressions pass with zero formatting changes.
+Visual Studio selection/candidate, package-file and reusable build vectors are immutable. Native `vswhere`/MSBuild adapters retain the exact argument frames and exit-code capture, and command results publish readonly records. Twelve native Linux engine stand-in cases and 24 native `vswhere` cases preserve versions 17/18, both separators, zero/one/many candidate output, success/failure and exact argv/environment/output. Three file inventories and reusable build construction also match; full script-tool regressions pass with zero formatting changes.
 
 Fourteen old rows close (four migrated roots, nine native frames and one scalar false positive), with one separate new result-record attestation. PowerShell now has 195 Open rows; C# remains at zero coordinate rows and coverage at 27 gaps. Native Windows acceptance is not claimed by Linux adapter controls. The complete semantic run at d655f6049 built successfully and is still executing; completed shards are passing, but no final full semantic result is claimed yet. Current-source ownership/census/coverage reconciliation and native package workflows remain pending.
 
@@ -4788,7 +4819,7 @@ Six old coordinates close and seventeen owned records/native observations receiv
 
 ### IMM-M461: immutable authority observations and required XML transformation
 
-The normalizer retains an immutable authority-node inventory while preserving the native document mutation under test. Coverage runsettings RemoveAll remains the required mutable XML transformation before selector insertion; the normalization byte sum is scalar query output.
+The normalizer retains an immutable authority-node inventory while preserving the native document mutation under test. Coverage `runsettings` RemoveAll remains the required mutable XML transformation before selector insertion; the normalization byte sum is scalar query output.
 
 Seven exact native XML success/rejection outcomes and full output bytes match before/after, including preexisting authority, path normalization, foreign paths and malformed input. Actual coverage evidence and full script-tool regressions pass with zero formatting changes. Three old rows close, leaving 58 PowerShell Open observations. Eight collector-byte observations are completing C# verification. Authenticated coverage still has 27 unresolved gaps; full current ownership/archive/binding and final compiler/coverage/native reconciliation remain pending.
 
@@ -4990,7 +5021,7 @@ Project path parts, two modifier-name observations, IR mask observations and two
 
 Nine retained fuzz invocation/CLI argument vectors and two native-integer IL observations are immutable. Native reflection/CLI conversion occurs at the final call; integer/hex readers use readonly spans. Actual native typed inputs, source completion/type-initialization/lone-surrogate semantics, console cancellation and default executable output retain their contracts.
 
-An initial combined filter stopped at the console fixture's mandatory isolated-testhost environment guard before signaling. The corrected repository-style isolated host runs only console/default CLI fixtures with SHARPPROOF_FUZZ_CONSOLE_ISOLATED=1. Actual corrected gates pass 22 ordinary fuzz cases, both isolated CLI cases and 12 frontend cases. Literal/source-unit gates verify 4299/1073 and 1948. Eleven current coordinates and old array entries reconcile independently, returning C# coordinates to zero Open and leaving 84 unchecked local roots before prepared native-subject reviews. Final collection, coverage, binding, archive and exact-head workflows remain pending.
+An initial combined filter stopped at the console fixture's mandatory isolated-`testhost` environment guard before signaling. The corrected repository-style isolated host runs only console/default CLI fixtures with SHARPPROOF_FUZZ_CONSOLE_ISOLATED=1. Actual corrected gates pass 22 ordinary fuzz cases, both isolated CLI cases and 12 frontend cases. Literal/source-unit gates verify 4299/1073 and 1948. Eleven current coordinates and old array entries reconcile independently, returning C# coordinates to zero Open and leaving 84 unchecked local roots before prepared native-subject reviews. Final collection, coverage, binding, archive and exact-head workflows remain pending.
 
 ### IMM-M508: native sequence identity and intentional mutation/race subjects
 
@@ -5036,7 +5067,7 @@ At frozen pushed 15597cebb9ca9a6df0798402e95d517ad27e6aba the actual compiler ac
 
 Full authenticated coverage workflows pass 12924 semantic cases, 21 separately collected attributes cases, two isolated CLI cases and 384 package cases. Six explicit long-fuzz campaigns are not executed by the ordinary selection and one package case intentionally skips on a supported host. These executions pass; strict coverage does not: aggregate 32668/32698 lines (99.91 percent) and changed TCB 4171/4185 (99.67 percent). Thirty aggregate and fourteen changed lines need resolution; collection success is not strict-gate success.
 
-The lossless historical/current archive at this checkpoint conserves 107 raw Git ledger epochs, 299360 complete historical rows, 141679 unique current observations and 299360 no-transfer relations. All raw epoch row fields and Git blobs verify; missing-path tombstones remain. Local archive m519-full-archive-k2p5chzz extends the earlier archive without overwriting it. Later code and ledger changes require a final refresh.
+The lossless historical/current archive at this checkpoint conserves 107 raw Git ledger epochs, 299360 complete historical rows, 141679 unique current observations and 299360 no-transfer relations. All raw epoch row fields and Git blobs verify; missing-path tombstones remain. Local archive `m519-full-archive-k2p5chzz` extends the earlier archive without overwriting it. Later code and ledger changes require a final refresh.
 
 ### IMM-M520: qualify readonly File input against actual target APIs
 
