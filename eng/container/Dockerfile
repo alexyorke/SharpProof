@@ -1,22 +1,24 @@
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc
 ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.319-bookworm-slim@sha256:2f5eb32870b4c0074a3d5b5191a03553bcab7b74463a76a7c0a5f3ef65c90fe5
 ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.426-bookworm-slim@sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f
-ARG DOTNET_API_INVENTORY_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim@sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a
-ARG DOTNET_TEST_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:60d11c2be381e7f90b8bd984472dd2432933858aba55087d5936980cf2071d5a
-ARG POWERSHELL_IMAGE=mcr.microsoft.com/powershell:7.5-ubuntu-24.04@sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81
-
-FROM ${POWERSHELL_IMAGE} AS powershell
-# MCR's 7.5 aliases still contain 7.5.0. Replace them with the verified serviced release.
+# MCR's 7.5 aliases still contain 7.5.0, so install the verified serviced
+# release on the SDK base this build already pulls instead of pulling a
+# PowerShell image only to replace its payload.
+FROM ${DOTNET_SDK_IMAGE} AS powershell
 ADD --checksum=sha256:db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz /tmp/powershell.tar.gz
-RUN rm -rf /opt/microsoft/powershell/7 \
-    && mkdir -p /opt/microsoft/powershell/7 \
+RUN mkdir -p /opt/microsoft/powershell/7 \
     && tar -xzf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7 \
     && chmod +x /opt/microsoft/powershell/7/pwsh \
     && rm /tmp/powershell.tar.gz
-FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime
 FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk
 FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
-FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory
+# The API inventory needs one reviewed reference pack, not a whole SDK image.
+# Its NuGet package holds the SDK-installed pack files byte for byte; only the
+# analyzers, data, and ref folders are installed, omitting packaging metadata.
+FROM powershell AS api-inventory
+ADD --checksum=sha256:645538957cff063262a94e2cca4644611e63e5eef8e4a31fe193e8d061e789c5 https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/9.0.18/microsoft.netcore.app.ref.9.0.18.nupkg /tmp/reference-pack.nupkg
+RUN /opt/microsoft/powershell/7/pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference = "Stop"; $destination = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18"; $archive = [IO.Compression.ZipFile]::OpenRead("/tmp/reference-pack.nupkg"); try { foreach ($entry in $archive.Entries) { if ($entry.FullName -cnotmatch "^(analyzers|data|ref)/" -or $entry.FullName.EndsWith("/")) { continue }; if ($entry.FullName -cmatch "(^|/)\.\.(/|$)") { throw "Unsafe reference pack entry: $($entry.FullName)" }; $path = Join-Path $destination $entry.FullName; [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null; [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $path) } } finally { $archive.Dispose() }' \
+    && rm /tmp/reference-pack.nupkg
 
 FROM ${DOTNET_SDK_IMAGE} AS windows-native
 ARG TARGETOS
@@ -55,7 +57,9 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 
 RUN test "${TARGETOS}" = "linux" && test "${TARGETARCH}" = "amd64"
 COPY --from=powershell /opt/microsoft/powershell/7 /opt/microsoft/powershell/7
-COPY --from=test-runtime /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32
+# The minimum-framework SDK carries the pinned test runtime, byte for byte the
+# same files as the matching runtime image.
+COPY --from=minimum-framework /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32
 COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.319 /usr/share/dotnet/sdk/9.0.319
 # Retain the runtime and targeting packs needed by the minimum portable compiler host.
 COPY --from=minimum-sdk /usr/share/dotnet/shared /usr/share/dotnet/shared
