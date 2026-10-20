@@ -99,14 +99,22 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ### Current coverage qualification
 
+Published `ecdbd2c5c` passed all four coverage shards in run 39485547326.
+Its complete merge-commit measurement (64a90fb395a27dcb1af99f98197603c713672bbf)
+is 5900/6177 changed trusted lines (95.52%, 277 uncovered lines), below the
+unchanged 100% floor. The report is retained under
+`artifacts/resource-ecdb-coverage-evidence` and the failed aggregate log is
+`artifacts/resource-ecdb-coverage-failed.log`. This supersedes the numerical
+measurement below; it does not qualify the subsequent local component or tests.
+
 Published 0da3ee9f9 passed all four coverage shards. Its exact run
 39474925632 aggregated 40 reports for merge commit
 180ab4c467714041cf6af26cefaf6c9f0304bb78, associated with that branch head.
 Changed trusted coverage measured 5882/6169 lines (95.35%, 287 uncovered lines),
 failing the unchanged 100% floor. The full report is retained at
 artifacts/resource-0da3-coverage-evidence/coverage/SharpProof.coverage.json;
-the failed gate log is artifacts/resource-0da3-coverage-failed.log. This is the
-latest complete measurement. All non-coverage checks also passed on that head. It confirms the hosted package lifecycle fix,
+the failed gate log is artifacts/resource-0da3-coverage-failed.log. This is an
+earlier complete measurement. All non-coverage checks also passed on that head. It confirms the hosted package lifecycle fix,
 but does not qualify unfinished features or subsequent local tests.
 
 The following paragraphs retain earlier measurements as history.
@@ -299,6 +307,37 @@ passed. Logs are retained in artifacts with resource-task-source-allocation and
 resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
+
+### Fixed task fault carriers (in progress)
+
+A separate internal component now derives conditional fixed fault-bookkeeping
+allocation envelopes for owned 2..16-child joins. Typed field tables cover
+ContingentProperties, TaskExceptionHolder, ExceptionDispatchInfo's instance and
+embedded DispatchState, and List reference/size/version fields. List envelopes
+include capacity-one starts, AddRange growth, capacity-four starts, later doubling
+and temporary candidate lists that lose publication races. A configured root
+adds its own fault record. This is not a root allocation verdict: exception
+objects and referenced string/trace payloads, compiler/base task carriers and
+runtime premise binding still require complete composition.
+
+The component has numeric boundary cases, pinned-runtime field-signature checks,
+ownership/layout rejection and cancellation controls. All 161 focused worker controls, the broader 933-case worker gate and
+the required structural layout gate passed. All 157 IR memory controls passed,
+including layout rejection for objects/strings and malformed allocation boundaries. No protocol, cache identity or
+public result scope changed, and cumulative root task bytes remain Unknown.
+
+Coverage work separately passed all 14 object-allocation controls: extern
+primitive properties retain conservative storage bounds; unmodeled decimal
+storage, extern constructor bodies and variable-argument constructors publish
+Unknown without partial numeric or dependency evidence.
+
+Full repository formatting, lint/API compatibility and negative fixtures, and
+documentation automation passed. Evidence is retained under artifacts with the
+resource-task-fault-carriers and resource-memory-boundary prefixes. The
+unintentionally selected full developer check was stopped during restoration;
+it is not counted as verification. Only the completed scoped gates above qualify
+this checkpoint. Root cumulative task bytes and the final coverage/audit gates
+remain unfinished.
 
 ### Cumulative task prefix review (in progress)
 

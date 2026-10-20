@@ -14,6 +14,8 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("public class Cell { public int value; public Cell(int n) { value=n; for(int i=0;i<n;i++) { var a=new int[2]; } } }", "var item=new Cell(3);", 120)]
     [TestCase("public class Cell { public int[] data; public Cell(int[] a) { data=a; } }", "var item=new Cell(new int[3]);", 64)]
     [TestCase("public class Cell { public int[] data; }", "var item=new Cell { data=new int[3] };", 64)]
+    [TestCase("public class Cell { public extern int Value {get;set;} }", "var item=new Cell();", 24)]
+    [TestCase("public class Cell { public extern int First {get;set;} public extern int Second {get;set;} public extern int Third {get;set;} }", "var item=new Cell();", 40)]
     public async Task ObjectByteBoundsIncludeInstanceSlotsAndConstructionEffects(string declarations, string body, int upper)
     {
         ArgumentNullException.ThrowIfNull(declarations);
@@ -26,6 +28,24 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
     }
 
+    [TestCase("public class Cell { public extern decimal Value {get;set;} }", "var item=new Cell();")]
+    [TestCase("public class Cell { public extern Cell(); }", "var item=new Cell();")]
+    [TestCase("public class Cell { public Cell(__arglist) {} }", "var item=new Cell(__arglist(n));")]
+    public async Task UnmodeledPropertyStorageOrConstructorBodiesHaveNoPartialByteVerdict(string declarations, string body)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)]", body) + declarations,
+            reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
     [TestCase(23, WorkerClaimOutcome.Refuted)]
     [TestCase(24, WorkerClaimOutcome.Unknown)]
     [TestCase(32, WorkerClaimOutcome.Proven)]

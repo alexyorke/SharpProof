@@ -438,6 +438,98 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(InstanceFields(reader, box), Is.EqualTo(new[] { ("StateMachine", (byte)0x13) }));
     }
 
+    [TestCase(2, false, 1440L)]
+    [TestCase(3, false, 1976L)]
+    [TestCase(4, false, 2512L)]
+    [TestCase(5, false, 3576L)]
+    [TestCase(8, false, 5448L)]
+    [TestCase(9, false, 7592L)]
+    [TestCase(16, false, 13024L)]
+    [TestCase(2, true, 1808L)]
+    [TestCase(16, true, 13392L)]
+    public void FaultCarrierPrefixesIncludeGrowthAndLosingPublicationCandidates(int count, bool configured, long expected)
+    {
+        var (projection, root) = FaultProjection(count, configured);
+        var result = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.BookkeepingUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    [TestCase(1)]
+    [TestCase(17)]
+    public void FaultCarrierPrefixesRejectCountsOutsideTheOwnedJoinDomain(int count)
+    {
+        var (projection, root) = FaultProjection(count, false);
+        var result = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.BookkeepingUpper, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinRootOwnershipInvalid"));
+    }
+
+    [Test]
+    public void FaultCarrierPrefixesRejectIncompatibleLayoutsAndUnownedLaterChildren()
+    {
+        var (projection, root) = FaultProjection(2, false);
+        var incompatible = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, new("CoreCLR", "8.0.32", "x86", 4),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(incompatible.BookkeepingUpper, Is.Null);
+        Assert.That(incompatible.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        var child = projection.Children[1];
+        projection = projection with { Children = [projection.Children[0], child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } }] };
+        var unowned = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(unowned.BookkeepingUpper, Is.Null);
+        Assert.That(unowned.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
+    }
+
+    [Test]
+    public void FaultCarrierPrefixesPreserveCancellation()
+    {
+        var (projection, root) = FaultProjection(2, false);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [Test]
+    public void FaultCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
+    {
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32/System.Private.CoreLib.dll");
+        using var image = new PEReader(stream);
+        var reader = image.GetMetadataReader();
+        var task = RuntimeType(reader, "System.Threading.Tasks", "Task");
+        var contingent = task.GetNestedTypes().Select(reader.GetTypeDefinition).Single(type => reader.GetString(type.Name) == "ContingentProperties");
+        (string, byte)[] expectedContingent = [
+            ("m_capturedContext", 0x12), ("m_completionEvent", 0x12), ("m_exceptionsHolder", 0x12), ("m_cancellationToken", 0x11),
+            ("m_cancellationRegistration", 0x15), ("m_internalCancellationRequested", 0x08), ("m_completionCountdown", 0x08),
+            ("m_exceptionalChildren", 0x15), ("m_parent", 0x12)];
+        Assert.That(InstanceFields(reader, contingent), Is.EqualTo(expectedContingent));
+        (string, byte)[] expectedToken = [("_source", 0x12)];
+        Assert.That(InstanceFields(reader, RuntimeType(reader, "System.Threading", "CancellationToken")), Is.EqualTo(expectedToken));
+        (string, byte)[] expectedHolder = [("m_task", 0x12), ("m_faultExceptions", 0x15), ("m_cancellationException", 0x12), ("m_isHandled", 0x02)];
+        Assert.That(InstanceFields(reader, RuntimeType(reader, "System.Threading.Tasks", "TaskExceptionHolder")), Is.EqualTo(expectedHolder));
+        (string, byte)[] expectedDispatch = [("_exception", 0x12), ("_dispatchState", 0x11)];
+        Assert.That(InstanceFields(reader, RuntimeType(reader, "System.Runtime.ExceptionServices", "ExceptionDispatchInfo")), Is.EqualTo(expectedDispatch));
+        var exception = RuntimeType(reader, "System", "Exception");
+        var state = exception.GetNestedTypes().Select(reader.GetTypeDefinition).Single(type => reader.GetString(type.Name) == "DispatchState");
+        (string, byte)[] expectedState = [("StackTrace", 0x1d), ("DynamicMethods", 0x1d), ("RemoteStackTrace", 0x0e),
+            ("IpForWatsonBuckets", 0x19), ("WatsonBuckets", 0x1d)];
+        Assert.That(InstanceFields(reader, state), Is.EqualTo(expectedState));
+        (string, byte)[] expectedList = [("_items", 0x1d), ("_size", 0x08), ("_version", 0x08)];
+        Assert.That(InstanceFields(reader, RuntimeType(reader, "System.Collections.Generic", "List" + (char)96 + "1")), Is.EqualTo(expectedList));
+        Assert.That(ResourceTaskFaultCarrierCatalog.ContingentFields, Has.Length.EqualTo(9));
+        Assert.That(ResourceTaskFaultCarrierCatalog.HolderFields, Has.Length.EqualTo(4));
+        Assert.That(ResourceTaskFaultCarrierCatalog.DispatchFields, Has.Length.EqualTo(6));
+        Assert.That(ResourceTaskFaultCarrierCatalog.ListFields, Has.Length.EqualTo(3));
+    }
+
+    private static (CompilerForkJoinProjection Projection, CompilerTotalEntryPreparation Root) FaultProjection(int count, bool configured)
+    {
+        var (_, projection, root) = Fixture(configured ? 2 : 0);
+        var child = projection.Children[0];
+        var children = Enumerable.Range(0, count).Select(index => child with
+        { Owner = child.Owner with { CallableId = "root:fork-child:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) } }).ToImmutableArray();
+        return (projection with { Children = children }, root);
+    }
     private static TypeDefinition RuntimeType(MetadataReader reader, string namesp, string name)
     {
         ArgumentNullException.ThrowIfNull(reader);

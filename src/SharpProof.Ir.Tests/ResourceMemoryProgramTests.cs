@@ -701,16 +701,78 @@ public sealed class ResourceMemoryProgramTests
         Assert.That(result.UnknownReason, Is.EqualTo("MemoryControlFlowUnsupported"));
     }
 
-    [Test]
-    public void IncompatibleLayoutCannotSupplyNumbers()
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void IncompatibleLayoutCannotSupplyNumbers(int allocationKind)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
-        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
-        builder.Allocate(entry, factory.CreateOperation(), type, factory.CreateVariable("array", type), factory.Integer(1));
+        var type = allocationKind == 1 ? factory.ObjectType : allocationKind == 2 ? factory.StringType :
+            factory.GetOrCreateSequenceType(factory.IntegerType);
+        builder.Allocate(entry, factory.CreateOperation(), type, factory.CreateVariable("value", type),
+            allocationKind == 1 ? null : factory.Integer(1), allocationKind == 2 ? [factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 65)] : []);
         builder.Return(entry, factory.CreateOperation());
         var result = ResourceMemoryProgram.Evaluate(builder.Build(), new("CoreCLR", "8.0.32", "arm64", 8), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void MalformedStringAllocationsCannotPublishPartialStorage(int mutation)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("text", factory.StringType);
+        var length = mutation == 1 ? factory.Integer(-1) : mutation == 2 ? factory.Integer(factory.GetOrCreateIntegerType(64, signed: true), (long)int.MaxValue + 1) : factory.Integer(1);
+        var fill = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 65);
+        if (mutation != 1)
+        {
+            Action malformed = () =>
+            {
+                builder.Allocate(entry, factory.CreateOperation(), factory.StringType, mutation == 0 ? null : target,
+                    length, mutation == 3 ? [] : mutation == 4 ? [factory.Boolean(true)] : [fill]);
+            };
+            Assert.Throws<ArgumentException>(malformed);
+            return;
+        }
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, mutation == 0 ? null : target,
+            length, [fill]);
+        builder.Return(entry, factory.CreateOperation());
+        var result = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("MemoryStringAllocationUnsupported"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OversizedAndReferenceElementArraysDoNotReceivePrimitiveStorageBounds(bool oversized)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(oversized ? factory.IntegerType : factory.ObjectType);
+        var target = factory.CreateVariable("array", type);
+        if (oversized)
+        {
+            Action allocation = () =>
+            {
+                builder.Allocate(entry, factory.CreateOperation(), type, target,
+                    factory.Integer(factory.GetOrCreateIntegerType(64, signed: true), (long)int.MaxValue + 1));
+            };
+            Assert.Throws<ArgumentException>(allocation);
+            return;
+        }
+        builder.Allocate(entry, factory.CreateOperation(), type, target, factory.Integer(1));
+        builder.Return(entry, factory.CreateOperation());
+        var result = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("MemoryAllocationUnsupported"));
     }
 }
