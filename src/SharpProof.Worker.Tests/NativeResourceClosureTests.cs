@@ -6,6 +6,70 @@ namespace SharpProof.Worker.Test;
 internal sealed partial class NativeResourceContractTests
 {
     [TestCase(false, 4)]
+    [TestCase(false, 5)]
+    [TestCase(false, 6)]
+    [TestCase(true, 4)]
+    [TestCase(true, 5)]
+    [TestCase(true, 6)]
+    public async Task DeferredCaptureRetainsFactoryOwnedArraysWithoutCreatingChildFrames(bool calledFactory, int metric)
+    {
+        var limit = metric == 5 ? 0 : 128;
+        const string body = "{var values=new int[2]; return item => () => n+item+values.Length;}";
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "static System.Func<int,System.Func<int>> Make(int n) " + body +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static System.Func<int,System.Func<int>> Target(int n) " +
+            (calledFactory ? "=> Make(n); }" : body + " }");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [TestCase(false, 0, 4)]
+    [TestCase(false, 0, 5)]
+    [TestCase(false, 0, 6)]
+    [TestCase(false, 1, 4)]
+    [TestCase(false, 1, 5)]
+    [TestCase(false, 1, 6)]
+    [TestCase(false, 2, 4)]
+    [TestCase(false, 2, 5)]
+    [TestCase(false, 2, 6)]
+    [TestCase(true, 0, 4)]
+    [TestCase(true, 0, 5)]
+    [TestCase(true, 0, 6)]
+    [TestCase(true, 1, 4)]
+    [TestCase(true, 1, 5)]
+    [TestCase(true, 1, 6)]
+    [TestCase(true, 2, 4)]
+    [TestCase(true, 2, 5)]
+    [TestCase(true, 2, 6)]
+    public async Task DeferredCaptureFramesBelongToLaterInvocationsRatherThanFactoryStorage(bool calledFactory, int scopeKind, int metric)
+    {
+        var returnType = scopeKind switch
+        {
+            0 => "System.Func<int,System.Func<int>>",
+            1 => "System.Func<System.Func<int>>",
+            2 => "System.Func<System.Func<int,System.Func<int>>>",
+            _ => throw new ArgumentOutOfRangeException(nameof(scopeKind))
+        };
+        var expression = scopeKind switch
+        {
+            0 => "item => () => n+item",
+            1 => "() => {int item=n; return () => item;}",
+            _ => "() => item => () => n+item"
+        };
+        var limit = metric == 5 ? 0 : scopeKind == 2 ? 96 : 88;
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"static {returnType} Make(int n) => {expression}; " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static {returnType} Target(int n) => " +
+            (calledFactory ? "Make(n); }" : expression + "; }");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [TestCase(false, 4)]
     [TestCase(false, 6)]
     [TestCase(true, 4)]
     [TestCase(true, 6)]
@@ -209,12 +273,14 @@ internal sealed partial class NativeResourceContractTests
         }
     }
 
-    [TestCase("System.Func<int,System.Func<int>>", "return k => () => n+k;")]
-    [TestCase("System.Func<System.Func<int>>", "return () => {int k=n; return () => k;};")]
+    [TestCase("System.Func<int,System.Func<int>>", "return k => {System.Func<int> sibling=()=>k; return () => n;};")]
+    [TestCase("System.Func<int,System.Func<int>>", "return k => () => k;")]
+    [TestCase("System.Func<int,System.Func<int>>", "return k => () => n+(++k);")]
+    [TestCase("System.Func<System.Func<int>>", "return () => {int k=n; return () => ++k;};")]
     [TestCase("System.Func<System.Func<int>>", "return () => () => ++n;")]
     [TestCase("System.Func<System.Func<int>>", "return () => {int Read()=>n; return () => Read();};")]
     [TestCase("System.Func<System.Func<System.Threading.Tasks.Task<int>>>", "return () => async () => {await System.Threading.Tasks.Task.CompletedTask; return n;};")]
-    public async Task IntermediateMutableLocalFunctionAndAsyncCaptureScopesRemainUnknown(string returnType, string body)
+    public async Task MutableLocalFunctionAndAsyncCaptureScopesRemainUnknown(string returnType, string body)
     {
         ArgumentNullException.ThrowIfNull(returnType);
         ArgumentNullException.ThrowIfNull(body);

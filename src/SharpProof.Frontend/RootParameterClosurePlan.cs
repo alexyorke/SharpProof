@@ -4,7 +4,8 @@ using SharpProof.Frontend.Host;
 namespace SharpProof.Frontend;
 
 // One root frame and one immediately returned delegate. Nested deferred delegates
-// may capture that same read-only root storage; intermediate capture scopes are rejected.
+// may also capture storage created only by later invocations. Only factory root
+// storage and caches belong to this plan.
 // Broader bodies must model their actual frame placement instead of reusing this rule.
 internal sealed class RootParameterClosurePlan
 {
@@ -86,6 +87,12 @@ internal sealed class RootParameterClosurePlan
                 functions.Add(nested);
             }
         }
+        var functionScopes = new Dictionary<IMethodSymbol, SyntaxNode>(SymbolEqualityComparer.Default);
+        foreach (var function in functions)
+        { functionScopes.Add(function.Symbol, function.Syntax); }
+        var hasDeferredCaptures = false;
+        var rootCacheSlots = 0;
+        var readOnlyCaptures = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
         var captures = ImmutableArray.CreateBuilder<ISymbol>();
         foreach (var function in functions)
         {
@@ -93,18 +100,60 @@ internal sealed class RootParameterClosurePlan
             if (function.Syntax is not ExpressionSyntax expression || model.AnalyzeDataFlow(expression) is not { Succeeded: true } flow ||
                 flow.CapturedInside.IsEmpty || flow.CapturedInside.Length > ResourceAllocationShape.MaximumFields)
             { return null; }
+            var usesRoot = false;
+            var sharesRoot = true;
             foreach (var capture in flow.CapturedInside)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!SymbolEqualityComparer.Default.Equals(capture.ContainingSymbol, method) ||
-                    !(capture is IParameterSymbol || capture is ILocalSymbol local && locals.Contains(local, SymbolEqualityComparer.Default)))
+                readOnlyCaptures.Add(capture);
+                if (!SymbolEqualityComparer.Default.Equals(capture.ContainingSymbol, method))
+                {
+                    hasDeferredCaptures = true;
+                    if (capture is not (IParameterSymbol or ILocalSymbol) ||
+                        capture.ContainingSymbol is not IMethodSymbol definingFunction ||
+                        !functionScopes.TryGetValue(definingFunction, out var scope))
+                    { return null; }
+                    // Captures declared inside this function are initialized by a
+                    // later invocation. Free intermediate captures also live in
+                    // later frames, so their delegates cannot cache on the root.
+                    if (!function.Syntax.Span.Contains(scope.Span))
+                    { sharesRoot = false; }
+                    continue;
+                }
+                if (!(capture is IParameterSymbol || capture is ILocalSymbol local && locals.Contains(local, SymbolEqualityComparer.Default)))
                 { return null; }
+                usesRoot = true;
                 if (!captures.Contains(capture, SymbolEqualityComparer.Default))
                 { captures.Add(capture); }
                 if (captures.Count > ResourceAllocationShape.MaximumFields)
                 { return null; }
             }
+            if (usesRoot && sharesRoot && !SymbolEqualityComparer.Default.Equals(function.Symbol, anonymous.Symbol))
+            { rootCacheSlots++; }
         }
+        // New intermediate-scope admission is limited to one nested chain.
+        // Sibling frames need a separate placement rule; preserve the existing
+        // all-root model without broadening its compiler-storage assumptions.
+        if (hasDeferredCaptures)
+        {
+            for (var index = 1; index < functions.Count; index++)
+            {
+                var parent = functions[index].Parent;
+                var steps = 0;
+                while (parent != null && parent is not IAnonymousFunctionOperation)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (++steps > 4096)
+                    { return null; }
+                    parent = parent.Parent;
+                }
+                if (parent is not IAnonymousFunctionOperation containing ||
+                    !SymbolEqualityComparer.Default.Equals(containing.Symbol, functions[index - 1].Symbol))
+                { return null; }
+            }
+        }
+        if (captures.Count == 0)
+        { return null; }
         // Entry parameter stores and local initializer stores represent every admitted
         // capture write. Reject later writes, including writes inside the lambda.
         var root = declaration.Body is { } methodBody ? model.GetOperation(methodBody, cancellationToken) : value;
@@ -121,7 +170,7 @@ internal sealed class RootParameterClosurePlan
                 _ => null
             };
             var written = target switch { ILocalReferenceOperation local => (ISymbol)local.Local, IParameterReferenceOperation parameter => parameter.Parameter, _ => null };
-            if (written != null && captures.Contains(written, SymbolEqualityComparer.Default))
+            if (written != null && readOnlyCaptures.Contains(written))
             { return null; }
         }
         var fields = ImmutableArray.CreateBuilder<ResourceStorageKind>();
@@ -141,12 +190,12 @@ internal sealed class RootParameterClosurePlan
             { return null; }
             fields.Add(storage);
         }
-        // Roslyn caches each nested capturing delegate on the shared root frame.
+        // Roslyn caches nested delegates whose free captures share the root frame.
         // The reference slot exists at factory entry, but starts null; the cached
         // delegate itself is created by a later invocation of its enclosing body.
-        if (orderedCaptures.Length + functions.Count - 1 > ResourceAllocationShape.MaximumFields)
+        if (orderedCaptures.Length + rootCacheSlots > ResourceAllocationShape.MaximumFields)
         { return null; }
-        for (var index = 1; index < functions.Count; index++)
+        for (var index = 0; index < rootCacheSlots; index++)
         { fields.Add(ResourceStorageKind.Reference); }
         return new(anonymous.Symbol, fields.ToImmutable(), orderedCaptures);
     }

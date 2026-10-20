@@ -3592,10 +3592,15 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
     public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache(int factoryKind)
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
+        var expectedBytes = factoryKind is 3 or 4 ? "88" : factoryKind == 6 ? "128" : "96";
         var source = factoryKind switch
         {
             0 => "using SharpProof.Attributes; public static class Subject { " +
@@ -3606,6 +3611,14 @@ public sealed class PackageLayoutSmokeTests
             2 => "using SharpProof.Attributes; public sealed class Subject { " +
                 "System.Func<System.Func<int>> Make(int value) => () => () => value; " +
                 "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target() => this.Make(3); }",
+            3 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,88)] public static System.Func<int,System.Func<int>> Target(int value) => item => () => value+item; }",
+            4 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,88)] public static System.Func<System.Func<int>> Target(int value) => () => {int item=value; return () => item;}; }",
+            5 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int,System.Func<int>>> Target(int value) => () => item => () => value+item; }",
+            6 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,128)] public static System.Func<int,System.Func<int>> Target(int value) {var values=new int[2]; return item => () => value+item+values.Length;} }",
             _ => throw new ArgumentOutOfRangeException(nameof(factoryKind))
         };
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all");
@@ -3630,11 +3643,11 @@ public sealed class PackageLayoutSmokeTests
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
         JsonAssert.Equal(claim, "outcome", "Proven");
-        JsonAssert.Equal(claim.GetProperty("resourceBound"), "inferredUpperBound", "96");
+        JsonAssert.Equal(claim.GetProperty("resourceBound"), "inferredUpperBound", expectedBytes);
         using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
-        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "inferredUpperBound", "96");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "inferredUpperBound", expectedBytes);
     }
 
     [TestCase(false)]

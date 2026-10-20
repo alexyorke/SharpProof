@@ -593,7 +593,7 @@ models. Object packing intervals remain separate upper and lower bounds; a loose
 upper bound cannot establish an exact violating cost. Closure invocation effects
 and costs require separate admission.
 
-Instance factories may use the same root-frame model when all deferred captures
+Instance factories may use the same root-frame model when factory-owned captures
 belong to their read-only parameters or initialized locals. The returned graph
 must not capture the factory receiver, explicitly or implicitly. Receiver field
 reads inside a lambda remain Unknown. Pure entry/current/pre-state copies of
@@ -602,6 +602,18 @@ reference still requires an ownership model. Under the declared layout, a nested
 scalar root capture retains a 32-byte frame (including its deferred delegate
 cache slot) and a 64-byte outer delegate. Later invocations require separate
 cost proofs.
+
+A single nested chain may also capture read-only parameters or initialized locals
+declared by deferred functions. Those child frames are created by later calls,
+so the factory counts only its root fields and immediately returned delegate.
+A nested delegate reserves a root cache slot only when all its free captures
+belong to the root scope. Under the declared layout, returning
+`item => () => n + item` retains 88 bytes at factory completion; adding an owned
+two-element Int32 array to that root graph retains 128 bytes. An extra cached
+intermediate delegate increases the scalar factory bound to 96 bytes. Independent
+compiled controls measure later child-frame/delegate allocations separately.
+Sibling intermediate scopes, mutable captured bindings, local functions and
+async bodies remain Unknown; later invocations require their own cost proofs.
 
 Direct calls on the current receiver to source methods that are not virtual can
 compose an admitted factory with its caller, for both explicit and implicit this.
@@ -681,7 +693,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 44 invalidate older responses without this evidence.
+Protocol 39 and cache schema 45 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -733,7 +745,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 44 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 45 invalidate prior responses; compiler artifact 52 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

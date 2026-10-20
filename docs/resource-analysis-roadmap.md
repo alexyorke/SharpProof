@@ -89,6 +89,44 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Deferred intermediate capture scopes
+
+Factories now admit a single nested chain with read-only captures declared by
+deferred functions. The planner classifies each captured symbol by its declaring
+function scope, counts only factory-owned root fields, and reserves a root cache
+slot only for nested delegates whose free captures share that root. Child frames
+belong to later invocations. Sibling intermediate scopes, mutable captured
+bindings, local functions, async bodies and factories without an admitted root
+remain Unknown; this does not prove later invocation costs.
+
+Four independent compiled controls check field/cache/parent relationships and
+measure factory and invocation allocations separately. Scalar parameter/local
+scopes allocate 88 bytes at factory completion; a root cache slot makes 96 bytes;
+a captured owned two-element Int32 array makes 128 bytes. Source/native checks
+cover allocated, auxiliary and retained bounds for direct and called factories.
+
+Final verification passed all 620 selected worker/resource/protocol cases,
+782 IR tests, 2165 frontend tests and 1454 analyzer tests. All nine package cases
+passed: seven resource consumer variants plus both deadline/publication controls
+that failed in published-head CI. Quality/API compatibility, negative fixtures,
+full repository formatting, documentation lint and all 728 local links passed.
+An initial IR restore failed with exit 139 before compilation; the serialized
+retry and final suite passed. No production files or projects were added; the
+2769-source/59-project layout and 529-path trusted inventory remain applicable.
+
+Cache 45 invalidates earlier capability results. Protocol 39, compiler artifact
+52, resource program 8, expression 1 and manifest 6 keep their formats. This
+checkpoint still needs publication and exact-head CI. Broader lifetime/call
+composition, phase F and final coverage/audit requirements remain open.
+
+Published head bf8636c2e passed its three semantic coverage shards, but the package
+shard failed in two deadline/publication controls: the output-drain fixture did
+not produce its child-completion marker, and the refutation fixture hit a
+launcher result-publication timeout. The failure log is preserved, and both
+cases are included in the current local package run. This head produced no
+usable aggregate; the latest measured qualification remains 8d73b0049 at
+4734/4953 lines (95.58%, 219 gaps), with the 100% floor unchanged.
+
 ### Current-receiver factory call composition
 
 The source-call extension admits direct calls on the current receiver to methods

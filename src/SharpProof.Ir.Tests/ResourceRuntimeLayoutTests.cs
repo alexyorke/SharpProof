@@ -203,6 +203,100 @@ public sealed class ResourceRuntimeLayoutTests
         Assert.That(ResourceRuntimeLayout.EvidenceSource, Does.Contain(ResourceRuntimeLayout.SourceCommit));
     }
 
+    [Test]
+    public void DeferredParameterCaptureAllocatesASeparateFrameAtInvocation()
+    {
+        Assert.That(Measure(static () => DeferredParameterCapture(7)), Is.EqualTo(88));
+        var outer = DeferredParameterCapture(7);
+        var root = outer.Target;
+        Assert.That(root, Is.Not.Null);
+        var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(1));
+        Assert.That(fields[0].GetValue(root), Is.EqualTo(7));
+        var first = outer(3);
+        var second = outer(4);
+        Assert.That(first.Target, Is.Not.Null.And.Not.SameAs(root));
+        Assert.That(first.Target, Is.Not.SameAs(second.Target));
+        var child = first.Target!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(child, Has.Length.EqualTo(2));
+        Assert.That(child.Any(field => field is null ? throw new ArgumentNullException(nameof(field)) : ReferenceEquals(field.GetValue(first.Target), root)), Is.True);
+        Assert.That(first(), Is.EqualTo(10));
+        Assert.That(second(), Is.EqualTo(11));
+        Assert.That(Measure(() => outer(3)), Is.EqualTo(96));
+    }
+
+    [Test]
+    public void DeferredLocalCaptureDoesNotRetainAnUnneededParentFrame()
+    {
+        Assert.That(Measure(static () => DeferredLocalCapture(7)), Is.EqualTo(88));
+        var outer = DeferredLocalCapture(7);
+        var root = outer.Target;
+        Assert.That(root, Is.Not.Null);
+        var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(1));
+        var inner = outer();
+        Assert.That(inner.Target, Is.Not.Null.And.Not.SameAs(root));
+        var child = inner.Target!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(child, Has.Length.EqualTo(1));
+        Assert.That(child[0].GetValue(inner.Target), Is.EqualTo(7));
+        Assert.That(inner(), Is.EqualTo(7));
+        Assert.That(Measure(() => outer()), Is.EqualTo(88));
+    }
+
+    [Test]
+    public void DeferredIntermediateDelegateCacheLivesOnTheRootBeforeChildFramesExist()
+    {
+        Assert.That(Measure(static () => DeferredIntermediateCache(7)), Is.EqualTo(96));
+        var outer = DeferredIntermediateCache(7);
+        var root = outer.Target;
+        Assert.That(root, Is.Not.Null);
+        var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(2));
+        var cache = fields.Single(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(Func<int, Func<int>>));
+        Assert.That(cache.GetValue(root), Is.Null);
+        var middle = outer();
+        Assert.That(cache.GetValue(root), Is.SameAs(middle));
+        Assert.That((object)outer(), Is.SameAs(middle));
+        var inner = middle(3);
+        Assert.That(inner.Target, Is.Not.Null.And.Not.SameAs(root));
+        Assert.That(inner(), Is.EqualTo(10));
+        Assert.That(Measure(() => middle(3)), Is.EqualTo(96));
+    }
+
+    [Test]
+    public void DeferredCaptureKeepsFactoryOwnedArraysOnTheRootGraph()
+    {
+        Assert.That(Measure(static () => DeferredOwnedArray(7)), Is.EqualTo(128));
+        var outer = DeferredOwnedArray(7);
+        var root = outer.Target;
+        Assert.That(root, Is.Not.Null);
+        var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(2));
+        var array = fields.Single(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int[]));
+        Assert.That(array.GetValue(root), Has.Length.EqualTo(2));
+        Assert.That(outer(3)(), Is.EqualTo(12));
+        Assert.That(Measure(() => outer(3)), Is.EqualTo(96));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int, Func<int>> DeferredOwnedArray(int value)
+    {
+        var values = new int[2];
+        return item => () => value + item + values.Length;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int, Func<int>> DeferredParameterCapture(int value)
+    { return item => () => value + item; }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<Func<int>> DeferredLocalCapture(int value)
+    { return () => { int item = value; return () => item; }; }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<Func<int, Func<int>>> DeferredIntermediateCache(int value)
+    { return () => item => () => value + item; }
+
     private static void CheckMeasured(ResourceAllocationShape shape, Func<object> allocate)
     {
         ArgumentNullException.ThrowIfNull(shape);
