@@ -16,7 +16,25 @@ internal static class UntypedCallerRuntimeChecks
             #nullable enable
             using System;
             using System.Threading.Tasks;
+            public static class GroupSupport{
+                public static Type? LastType;
+                public static int Created;
+                public static Receiver? LastReceiver;
+                public static string Echo(int value)=>"int";
+                public static string Echo(long value)=>"long";
+                public static string GenericEcho<T>(T value){LastType=typeof(T);return "generic";}
+                public static async Task<string?> AsyncEcho<T>(T value){LastType=typeof(T);await Task.Yield();return value is int number&&number==0?null:"async";}
+                public static decimal Decimal(int value)=>value;
+                public static async Task<string[]?> ArrayAsync(int value){await Task.Yield();return value==0?null:new[]{"new"};}
+                public sealed class Receiver{public string Echo<T>(T value){LastType=typeof(T);return "instance";}}
+                public static Receiver MakeReceiver(){Created++;var receiver=new Receiver();LastReceiver=receiver;return receiver;}
+            }
             public static class ContextualProbe{
+                public static Func<int,string> Group(Func<int,string> map,int tag)=>map;
+                public static Func<int,string> GenericGroup(Func<int,string> map,int tag)=>map;
+                public static Func<int,Task<string?>> AsyncGroup(Func<int,Task<string?>> map,int tag)=>map;
+                public static System.Collections.Generic.List<Func<int,string>> GroupCollection(System.Collections.Generic.List<Func<int,string>> maps,int tag)=>maps;
+                public static Func<int,string> InstanceGroup(Func<int,string> map,int tag)=>map;
                 public static object? Shared(object? value,object? hint,object? tag,bool flag)=>flag?value:hint;
                 public static object? SharedTuple((object? Value,object? Hint) pair,object? tag,bool flag)=>flag?pair.Value:pair.Hint;
                 public static async Task<object?> SharedAsync(object? value,object? hint,object? tag,bool flag){await Task.Yield();return flag?value:hint;}
@@ -35,6 +53,17 @@ internal static class UntypedCallerRuntimeChecks
             }
             public static class OriginalContextualRunner{
                 public static bool Run(){
+                    var methodGroup=ContextualProbe.Group(GroupSupport.Echo,0);
+                    if(methodGroup(3)!="int"||methodGroup.Method.GetParameters()[0].ParameterType!=typeof(int))return false;
+                    var genericGroup=ContextualProbe.GenericGroup(GroupSupport.GenericEcho,0);
+                    if(genericGroup(3)!="generic"||GroupSupport.LastType!=typeof(int)||genericGroup.Method.GetGenericArguments()[0]!=typeof(int))return false;
+                    var asyncGroup=ContextualProbe.AsyncGroup(GroupSupport.AsyncEcho,0);
+                    if(asyncGroup(3).GetAwaiter().GetResult()!="async"||GroupSupport.LastType!=typeof(int)||asyncGroup(0).GetAwaiter().GetResult()!=null)return false;
+                    var collectionGroup=ContextualProbe.GroupCollection([GroupSupport.GenericEcho],0);
+                    if(collectionGroup[0](3)!="generic"||GroupSupport.LastType!=typeof(int))return false;
+                    GroupSupport.Created=0;
+                    var instanceGroup=ContextualProbe.InstanceGroup(GroupSupport.MakeReceiver().Echo,0);
+                    if(instanceGroup(3)!="instance"||GroupSupport.Created!=1||GroupSupport.LastType!=typeof(int)||!object.ReferenceEquals(instanceGroup.Target,GroupSupport.LastReceiver))return false;
                     object hint=new object();
                     if(ContextualProbe.Shared(null,(object?)hint,null,true)!=null||!object.ReferenceEquals(ContextualProbe.Shared(null,(object?)hint,null,false),hint))return false;
                     if(ContextualProbe.SharedTuple((null,(object?)hint),null,true)!=null||!object.ReferenceEquals(ContextualProbe.SharedTuple((null,(object?)hint),null,false),hint))return false;
@@ -67,7 +96,7 @@ internal static class UntypedCallerRuntimeChecks
         Verify((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, false, cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 16; round++)
+        for (var round = 0; round < 21; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -87,12 +116,19 @@ internal static class UntypedCallerRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 15)
-        { throw new InvalidOperationException("Expected fifteen contextual caller fixes; got " + fixes); }
+        if (fixes != 20)
+        { throw new InvalidOperationException("Expected twenty contextual caller fixes; got " + fixes); }
         document = document.Project.AddDocument("NewContextualDomains.cs", """
             public static class NewContextualRunner{
                 public static bool Run(){
                     object value=new object();
+                    var methodGroup=ContextualProbe.Group(GroupSupport.Decimal,"tag");
+                    var genericGroup=ContextualProbe.GenericGroup(GroupSupport.Decimal,3m);
+                    var asyncGroup=ContextualProbe.AsyncGroup(GroupSupport.ArrayAsync,"tag");
+                    var collectionGroup=ContextualProbe.GroupCollection([GroupSupport.Decimal],3m);
+                    var instanceGroup=ContextualProbe.InstanceGroup(GroupSupport.Decimal,"tag");
+                    if(methodGroup(7)!=7m||genericGroup(7)!=7m||collectionGroup[0](7)!=7m||instanceGroup(7)!=7m)return false;
+                    if(asyncGroup(7).GetAwaiter().GetResult()?.Length!=1||asyncGroup(0).GetAwaiter().GetResult()!=null)return false;
                     var payload=new[]{"new"};
                     var shared=ContextualProbe.Shared(null,payload,null,false);
                     var sharedTuple=ContextualProbe.SharedTuple((null,payload),null,false);

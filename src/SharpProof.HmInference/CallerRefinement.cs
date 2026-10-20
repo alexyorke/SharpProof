@@ -229,6 +229,15 @@ public static partial class Inference
                 return;
             }
 
+            if (declared is INamedTypeSymbol { TypeKind: TypeKind.Delegate } delegateType
+                && expression is IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax
+                && semantic.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol)
+            {
+                var groupSignature = DelegateSignature(delegateType, inferred);
+                foreach (var input in groupSignature.Inputs)
+                { PinContextualShape(input, pins); }
+                return;
+            }
             if (expression is not AnonymousFunctionExpressionSyntax lambda || declared is not INamedTypeSymbol target)
             { return; }
             if (target.OriginalDefinition.ToDisplayString() == "System.Linq.Expressions.Expression<TDelegate>")

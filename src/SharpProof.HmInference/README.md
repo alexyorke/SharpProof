@@ -602,3 +602,10 @@ and async results when another caller argument already supplies their type.
 The process terminates by strictly removing retained components and supports
 cancellation between trials. It establishes a deletion-minimal retained set,
 without claiming a globally principal type for C# overloads and conversions.
+
+Method-group arguments also retain the delegate input context needed for C#
+output inference. Generic, overloaded, instance and reduced extension groups,
+nullable/custom delegates and groups inside collection expressions have regression
+coverage. Outputs and unrelated parameters remain generic when the supplied calls
+permit it. Applied IDE fixes check overloads, constructed generic arguments,
+receiver evaluation, nullable async results and newly supported output domains.
