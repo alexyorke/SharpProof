@@ -89,12 +89,14 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
-The branch now includes the asymptotic expression foundation and a reproduced
-packaged SP0060 severity-activation repair. Verification passed 748 IR tests,
-1430 analyzer tests and two real packaged complexity consumers. The source guide
-states the scaling model and explicit Unknown boundaries. This phase E foundation
-does not provide native lower-bound/tightness evidence, amortized accounting or
-validated distributional models.
+The branch now includes native asymptotic upper evidence, structured protocol
+validation and trusted string-length size/contract binding, in addition to the
+expression foundation and packaged SP0060 activation repair. Before the latest
+master merge, verification passed 828 affected worker tests, 748 IR tests and five
+strict native growth/stack/string package workflows. The full analyzer run passed
+1429 cases plus the separately repaired protocol-seal assertion. Post-merge gates
+are running. Independent lower-bound/tightness evidence, amortized accounting and
+validated distributional models remain required.
 
 The previously published stack checkpoint eec823652 passed canonical/package/docs/
 security CI, then failed the unchanged 100% changed-trusted-code requirement at
@@ -1957,3 +1959,50 @@ implementation assemblies. They must be merged after this feature checkpoint,
 with new implementation types following the revised visibility policy and affected
 workflows verified on the combined tree. This checkpoint remains unqualified
 until that integration, fresh exact-head CI and unchanged coverage enforcement.
+
+The native feature and progress document are committed in b3be527fb. Latest
+master 11a70a2f1 merged in c9f8174ac after resolving the protocol-model visibility
+conflict. Native resource types and the internal IR budget exception follow the
+new implementation visibility policy. A type-specific CA1064 suppression explains
+that the budget exception is an internal signal; it is not a consumer API.
+
+The merged architecture suite passed all 10 cases, including the compiler-neutral
+worker closure. Merged compilation initially flagged the internal exception's
+design rule; the scoped annotation repaired it. Full merged worker, analyzer and
+strict package checks are running. The separately repaired final-compilation
+protocol test passed before this merge. Both aggregate and changed-trusted-code
+coverage floors remain 100%; upstream declaration-only baseline updates were
+preserved, with no resource-source exclusions added.
+
+Merged quality/compatibility and complete repository formatting passed. Layout
+validates 2747 sources, 59 projects and all 151 pinned common files; documentation
+and 726 local links passed, with 521 trusted paths classified.
+
+The next merged compilation exposed inconsistent partial fixture accessibility:
+master internalized WorkerTests and its enum parameter types, while branch-added
+resource partial declarations were still public. The 13 affected fixture
+declarations now follow the same internal visibility policy; no assertions or
+test cases were removed. The worker/resource/HashSet gate is running again on
+that adaptation. Strict packages must be rerun after it compiles. The merged
+analyzer task stopped in restore with exit 139 before tests; its retry is deferred
+until the current worker task finishes to serialize restore-heavy verification.
+These integration adaptations are not yet qualified or published.
+
+The repaired combined worker gate passed all 920 selected cases, including the
+resource/memory/lifetime/protocol/cache/SARIF families and merged HashSet dispatch.
+The serialized analyzer retry passed all 1430 tests. This confirms the visibility
+repair and current protocol-seal assertion on the integrated tree. The subsequent
+strict package task is running from the same source state. Completion still
+requires its result, publication and fresh exact-head CI; all remaining phase C/E/F
+requirements and the unchanged coverage floor stay open.
+
+Final merged verification passed all 920 selected worker cases, all 1430 analyzer
+tests, all 10 architecture tests and all 11 selected strict package/runtime-closure
+cases. Quality/compatibility, full formatting, documentation, 726 local links,
+2747-source layout and the 521-path trusted inventory passed. This validates the
+internal implementation and partial-fixture adaptations without weakening tests.
+
+The next fetched master commit 101971bba changes only .gitignore for local
+development/scratch outputs. It will be incorporated after committing these
+verified integration repairs; it changes no production or test code. Fresh
+pushed-head CI and unchanged 100% coverage qualification still remain required.

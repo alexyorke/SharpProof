@@ -5,7 +5,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase("var a=new byte[9];", 40)]
     [TestCase("var a=new long[3];", 48)]

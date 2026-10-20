@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase(1, 24)]
     [TestCase(2, 32)]

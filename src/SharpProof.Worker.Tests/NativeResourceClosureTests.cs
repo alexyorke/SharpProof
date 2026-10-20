@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase("int n", "n")]
     [TestCase("byte n", "n")]

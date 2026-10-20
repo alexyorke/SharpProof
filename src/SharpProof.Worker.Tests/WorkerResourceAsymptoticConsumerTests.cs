@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class WorkerTests
+internal sealed partial class WorkerTests
 {
     [TestCase(0, "O(n^2)")]
     [TestCase(1, "O(log(n))")]

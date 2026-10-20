@@ -4,7 +4,7 @@ using System.Runtime.Loader;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase("int[] Target() => new int[1];", 32, 0, 32, 1)]
     [TestCase("int[] Target() { var value = new int[1]; var alias = value; return alias; }", 32, 0, 32, 1)]

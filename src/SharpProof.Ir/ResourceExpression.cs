@@ -46,6 +46,7 @@ internal sealed record ResourceInput
     }
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064:Exceptions should be public", Justification = "Construction-budget signaling is internal to the IR implementation.")]
 internal sealed class ResourceExpressionLimitException : Exception
 {
     public ResourceExpressionLimitException() : base("Resource expression construction budget exceeded.") { }

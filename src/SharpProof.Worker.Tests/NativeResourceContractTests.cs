@@ -9,7 +9,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     private static string Source(string attributes, string body)
     {

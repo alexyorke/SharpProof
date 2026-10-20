@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase("return new System.Action(Callbacks.Run);", "public static class Callbacks { public static void Run() {} }", 64)]
     [TestCase("return new System.Action(Callbacks.Run);", "public static class Callbacks { public static void Run() { var data=new int[100]; } }", 64)]

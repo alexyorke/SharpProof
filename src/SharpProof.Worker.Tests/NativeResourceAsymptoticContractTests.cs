@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeResourceContractTests
+internal sealed partial class NativeResourceContractTests
 {
     [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) {}", "O(n)", 1, 0)]
     [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }", "O(n^2)", 2, 0)]
