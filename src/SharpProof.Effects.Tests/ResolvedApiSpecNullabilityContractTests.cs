@@ -15,7 +15,7 @@ public sealed class ResolvedApiSpecNullabilityContractTests
         Assert.That(method!.IsPublic, Is.True);
         Assert.That(method.IsStatic, Is.False);
         Assert.That(method.ReturnType, Is.EqualTo(typeof(bool)));
-        var parameters = method.GetParameters();
+        var parameters = method.GetParameters().ToImmutableArray();
         Assert.That(parameters, Has.Length.EqualTo(2));
         var output = parameters[1];
         Assert.That(output.Name, Is.EqualTo("spec"));

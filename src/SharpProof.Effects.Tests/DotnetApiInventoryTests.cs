@@ -29,7 +29,7 @@ public sealed partial class DotnetApiInventoryTests
         var baselinePath = Path.Combine(baselineDirectory, "net10.0.tsv");
         var manifestPath = Path.Combine(baselineDirectory, "net10.0.manifest.json");
         var manifest = JsonSerializer.Serialize(new { schemaVersion = 1, sdkVersion = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "global.json"))).RootElement.GetProperty("sdk").GetProperty("version").GetString(), pack = "Microsoft.NETCore.App.Ref", version = DotnetApiInventory.PackVersion, framework = DotnetApiInventory.Framework, catalogSha256 = ApiSpecTable.Default.ContentSha256, assemblies = files.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (new { name = Path.GetFileName(path), sha256 = DotnetApiInventory.Fingerprint(path) })) }, JsonOptions) + "\n";
-        var before = File.Exists(baselinePath) ? File.ReadAllLines(baselinePath) : [];
+        var before = File.Exists(baselinePath) ? File.ReadAllLines(baselinePath).ToImmutableArray() : ImmutableArray<string>.Empty;
         var delta = DotnetApiInventory.Compare(before, current);
         var output = Path.Combine(root, "artifacts", "api-coverage");
         Directory.CreateDirectory(output);

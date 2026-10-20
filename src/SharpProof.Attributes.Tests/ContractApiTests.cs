@@ -196,7 +196,7 @@ internal sealed class ContractApiTests
     [Test]
     public void PublicEffectVocabularyContainsNoAnalysisState()
     {
-        var names = Enum.GetNames<SharpProofEffect>();
+        var names = Enum.GetNames<SharpProofEffect>().ToImmutableArray();
 
         Assert.That(names, Does.Not.Contain("Unknown"));
         Assert.That(names, Does.Not.Contain("DirectCall"));

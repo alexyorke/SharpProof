@@ -139,7 +139,7 @@ internal sealed class PublicApiDocumentationTests
             name += "``" + method.GetGenericArguments().Length;
         }
 
-        var parameters = method.GetParameters();
+        var parameters = method.GetParameters().ToImmutableArray();
         var parameterList = parameters.Length == 0
             ? string.Empty
             : "(" + string.Join(

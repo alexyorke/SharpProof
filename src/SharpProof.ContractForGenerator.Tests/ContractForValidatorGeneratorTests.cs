@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.ContractForGenerator.Test;
 
 [TestFixture]
@@ -1962,7 +1963,7 @@ public sealed class ContractForValidatorGeneratorTests
         var files = Directory.GetFiles(
             Path.Combine(root, "src/SharpProof.ContractForGenerator"),
             "*.cs",
-            SearchOption.AllDirectories);
+            SearchOption.AllDirectories).ToImmutableArray();
         ImmutableArray<string> forbidden = [
             "ToDisplayString(",
             "SyntaxFactory.",

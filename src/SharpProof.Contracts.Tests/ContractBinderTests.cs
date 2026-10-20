@@ -1878,7 +1878,7 @@ internal sealed class ContractBinderTests
         var files = Directory.GetFiles(
             Path.Combine(root, "src/SharpProof.Contracts"),
             "*.cs",
-            SearchOption.AllDirectories);
+            SearchOption.AllDirectories).ToImmutableArray();
         var forbidden = ImmutableArray.Create("SyntaxFactory.",
             "ParseExpression(",
             "ParseStatement(",
