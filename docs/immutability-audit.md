@@ -5017,3 +5017,7 @@ All 64 selected freshly packed capture/probe/launcher/NaN/environment cases pass
 ### IMM-M513: immutable native observations and scoped CLR construction builders
 
 Three retained SMT child vectors, public-key mismatch input, completed-response bytes and conditional metadata/IL observations are immutable. Type and invocation argument construction uses scoped immutable builders; native expression handles/disposal and final CLR parameter frames preserve behavior. A missing UTF-8 readonly span adapter is repaired before the final worker gate. Actual gates pass 83 SMT, one specs and ten worker cases. Literal/source-unit gates verify 4305/1074 and 1948. Nine current coordinates and old array entries reconcile independently, returning C# coordinates to zero Open and leaving 37 unchecked roots before prepared native-subject review. Final coverage/binding/compiler collection, archive reconciliation and exact-head workflows remain pending.
+
+### IMM-M516: preserve remaining actual native mutation and measurement subjects
+
+Seven directly traced roots retain required native behavior: premeasurement array cloning/reset, covariant delegate-store failure, exact-length stream destinations, explicit PE/IL mutation delegates, a runtime field's actual int-array alias, and a bounded negative metadata patch image. Current writers/consumers and following concrete assertions are inspected individually. No code edits, new execution or performance authority are inferred.
