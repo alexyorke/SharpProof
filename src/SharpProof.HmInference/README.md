@@ -687,3 +687,14 @@ iterator methods. IDE runtime checks compare interface selection against competi
 patterns, iteration effects, early exit and exception cleanup. Async checks suspend
 both MoveNextAsync and DisposeAsync, preserve faults/cancellation, and verify
 deferred iterator execution and early disposal of inner enumerators.
+
+Instance method suggestions also check supplied calls through unresolved dynamic
+receivers. Potentially applicable accessible calls block generalization, including
+conditional calls and explicit type arguments matching either the old or proposed
+arity. Argument names, required/optional/params slots, reference modifiers,
+accessibility and known sealed receiver types exclude incompatible targets.
+User/runtime conversions retain their resulting receiver type, and nullable value
+boxing uses its underlying type. A cross-file runtime regression demonstrates that
+an unchecked generic rewrite changes existing binder failures into successful
+calls; protected analysis preserves those failures and an existing successful call,
+while an unrelated instance method still receives a working generic IDE fix.

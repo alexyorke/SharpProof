@@ -480,8 +480,8 @@ public static partial class Inference
                 { return new(symbol.Name, "Rejected", "Generalization changes resource disposal or its implicit await."); }
                 if (!PreservesInterpolationBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes interpolation handler construction or append selection."); }
-                if (!PreservesDynamicBindings(beforeRoot, afterRoot, beforeModel, afterModel))
-                { return new(symbol.Name, "Rejected", "Generalization changes a dynamic binding context or method group."); }
+                if (!PreservesDynamicBindings(beforeRoot, afterRoot, beforeModel, afterModel, symbol, changedSymbol))
+                { return new(symbol.Name, "Rejected", "Cannot prove that generalization preserves a dynamic binding context or method group."); }
                 if (!PreservesUserOperations(beforeRoot, afterRoot, beforeModel, afterModel))
                 { return new(symbol.Name, "Rejected", "Generalization changes a selected user operator or conversion."); }
             }

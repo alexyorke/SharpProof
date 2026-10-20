@@ -55,7 +55,85 @@ public static partial class Inference
             }
         }
 
-        private bool PreservesDynamicBindings(SyntaxNode before, SyntaxNode after, SemanticModel beforeModel, SemanticModel afterModel)
+        private bool HasUnresolvedDynamicReceiverCall(IDynamicInvocationOperation invocation, IMethodSymbol originalRoot,
+            IMethodSymbol changedRoot, SemanticModel semantic)
+        {
+            if (invocation is null)
+            { throw new ArgumentNullException(nameof(invocation)); }
+            if (originalRoot is null)
+            { throw new ArgumentNullException(nameof(originalRoot)); }
+            if (changedRoot is null)
+            { throw new ArgumentNullException(nameof(changedRoot)); }
+            if (semantic is null)
+            { throw new ArgumentNullException(nameof(semantic)); }
+            if (originalRoot.IsStatic || originalRoot.ContainingType.IsRefLikeType
+                || invocation.Operation is not IDynamicMemberReferenceOperation { Instance.Type: IDynamicTypeSymbol } member
+                || member.MemberName != originalRoot.Name)
+            { return false; }
+            var enclosing = semantic.GetEnclosingSymbol(invocation.Syntax.SpanStart, cancellationToken);
+            ISymbol context = enclosing is INamedTypeSymbol owner ? owner
+                : enclosing?.ContainingType is { } containing ? containing : semantic.Compilation.Assembly;
+            if (!semantic.Compilation.IsSymbolAccessibleWithin(originalRoot, context))
+            { return false; }
+            if (member.TypeArguments.Length != 0 && member.TypeArguments.Length != originalRoot.Arity
+                && member.TypeArguments.Length != changedRoot.Arity)
+            { return false; }
+            var receiver = member.Instance!;
+            while (receiver is IConversionOperation { OperatorMethod: null } conversion
+                && (conversion.Operand.Type is not IDynamicTypeSymbol || conversion.Type is IDynamicTypeSymbol))
+            { receiver = conversion.Operand; }
+            if (receiver.ConstantValue is { HasValue: true, Value: null })
+            { return false; }
+            var receiverType = receiver.Type as INamedTypeSymbol;
+            if (receiverType is { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            { receiverType = receiverType.TypeArguments[0] as INamedTypeSymbol; }
+            if (receiverType is { IsSealed: true } known)
+            {
+                var reachable = false;
+                for (var ancestor = known; ancestor is not null; ancestor = ancestor.BaseType)
+                { reachable |= SymbolEqualityComparer.Default.Equals(ancestor.OriginalDefinition, originalRoot.ContainingType.OriginalDefinition); }
+                foreach (var contract in known.AllInterfaces)
+                { reachable |= SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, originalRoot.ContainingType.OriginalDefinition); }
+                if (!reachable)
+                { return false; }
+            }
+            if (invocation.Syntax is not InvocationExpressionSyntax syntax)
+            { return true; }
+            var parameters = originalRoot.Parameters;
+            var hasParams = parameters.Length != 0 && parameters[parameters.Length - 1].IsParams;
+            if (!hasParams && syntax.ArgumentList.Arguments.Count > parameters.Length)
+            { return false; }
+            var supplied = new bool[parameters.Length];
+            for (var i = 0; i < syntax.ArgumentList.Arguments.Count; i++)
+            {
+                var argument = syntax.ArgumentList.Arguments[i];
+                var index = i;
+                if (argument.NameColon is { } named)
+                {
+                    index = -1;
+                    for (var j = 0; j < parameters.Length; j++)
+                    { if (parameters[j].Name == named.Name.Identifier.ValueText) { index = j; break; } }
+                    if (index < 0)
+                    { return false; }
+                }
+                if (index >= parameters.Length)
+                {
+                    if (!hasParams)
+                    { return false; }
+                    index = parameters.Length - 1;
+                }
+                if (parameters[index].RefKind == RefKind.None && argument.RefKindKeyword.RawKind != 0)
+                { return false; }
+                supplied[index] = true;
+            }
+            for (var i = 0; i < parameters.Length; i++)
+            { if (!parameters[i].IsOptional && !parameters[i].IsParams && !supplied[i]) { return false; } }
+            return true;
+        }
+
+
+        private bool PreservesDynamicBindings(SyntaxNode before, SyntaxNode after, SemanticModel beforeModel, SemanticModel afterModel,
+            IMethodSymbol originalRoot, IMethodSymbol changedRoot)
         {
             var originals = DynamicSites(before, beforeModel).ToArray();
             var candidates = DynamicSites(after, afterModel).ToArray();
@@ -65,6 +143,9 @@ public static partial class Inference
             {
                 var original = originals[i];
                 var candidate = candidates[i];
+                if (original.Operation is IDynamicInvocationOperation invocation
+                    && HasUnresolvedDynamicReceiverCall(invocation, originalRoot, changedRoot, beforeModel))
+                { return false; }
                 if (original.Operation.Kind != candidate.Operation.Kind)
                 { return false; }
                 var originalChildren = original.Operation.ChildOperations.ToArray();

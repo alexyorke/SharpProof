@@ -76,6 +76,26 @@ internal static class DynamicChecks
             ("DynamicForeachIterator", "static System.Collections.Generic.IEnumerable<dynamic> M(dynamic values,int tag){foreach(var item in values)yield return item;}", "Suggestion", "global::System.Collections.Generic.IEnumerable<dynamic> M<T1>(dynamic values, T1 tag)"),
             ("DynamicForeachAsyncIterator", "static async System.Collections.Generic.IAsyncEnumerable<dynamic> M(System.Collections.Generic.IAsyncEnumerable<dynamic> values,int tag){await foreach(var item in values)yield return item;}", "Suggestion", "global::System.Collections.Generic.IAsyncEnumerable<dynamic> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<dynamic> values, T1 tag)"),
 
+            ("DynamicReceiverRebinding", "public int M(int value)=>value;static dynamic Use(dynamic target)=>target.M(\"changed\");", "Rejected", null),
+            ("DynamicReceiverNewArity", "public int M(int value)=>value;static dynamic Use(dynamic target)=>target.M<int>(1);", "Rejected", null),
+            ("DynamicReceiverOptional", "public int M(int value,int tag=0)=>value;static dynamic Use(dynamic target)=>target.M(value:\"changed\");", "Rejected", null),
+            ("DynamicReceiverParams", "public int M(int value,params object[] rest)=>value;static dynamic Use(dynamic target)=>target.M(\"changed\",1,2);", "Rejected", null),
+            ("DynamicReceiverConditional", "public int M(int value)=>value;static dynamic? Use(dynamic? target)=>target?.M(\"changed\");", "Rejected", null),
+            ("DynamicReceiverStaticControl", "public static int M(int value)=>value;static dynamic Use(dynamic target)=>target.M(\"changed\");", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("DynamicReceiverArityControl", "public int M(int value)=>value;static dynamic Use(dynamic target)=>target.M<int,string>(1);", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("DynamicReceiverCountControl", "public int M(int value)=>value;static dynamic Use(dynamic target)=>target.M(1,2);", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("DynamicReceiverNameControl", "public int M(int value)=>value;static dynamic Use(dynamic target)=>target.M(other:\"changed\");", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("DynamicReceiverPrivateControl", "private int M(int value)=>value;}class Other{static dynamic Use(dynamic target)=>target.M(\"changed\");}class Tail{", "Suggestion", "T1 M<T1>(T1 value)"),
+
+            ("DynamicReceiverKnownSealedControl", "public int M(int value)=>value;static dynamic Use(Other target)=>((dynamic)target).M(\"changed\");sealed class Other{public Func<string,string> M=>value=>value;}", "Suggestion", "T1 M<T1>(T1 value)"),
+            ("DynamicReceiverKnownDerived", "public int M(int value)=>value;static dynamic Use(Derived target)=>((dynamic)target).M(\"changed\");sealed class Derived:Cases{}", "Rejected", null),
+            ("DynamicReceiverUserConversion", "public int M(int value)=>value;static dynamic Use(Other target)=>((dynamic)(Cases)target).M(\"changed\");sealed class Other{public static explicit operator Cases(Other value)=>new Cases();}", "Rejected", null),
+            ("DynamicReceiverRuntimeConversion", "public int M(int value)=>value;static dynamic Use(Other target)=>((dynamic)(Cases)(dynamic)target).M(\"changed\");sealed class Other{public static explicit operator Cases(Other value)=>new Cases();}", "Rejected", null),
+            ("DynamicReceiverNullableBox", "struct Box{public int M(int value)=>value;}static dynamic Use(Box? target)=>((dynamic)target!).M(\"changed\");", "Rejected", null),
+            ("DynamicReceiverExistingArity", "public int M<T>(int value)=>value;static dynamic Use(dynamic target)=>target.M<int>(1);", "Rejected", null),
+            ("DynamicReceiverAddedArity", "public int M<T>(int value)=>value;static dynamic Use(dynamic target)=>target.M<int,string>(\"changed\");", "Rejected", null),
+            ("DynamicReceiverRefControl", "public int M(int value)=>value;static dynamic Use(dynamic target,ref int value)=>target.M(ref value);", "Suggestion", "T1 M<T1>(T1 value)"),
+
             ("DynamicNullComparison", "static bool M(dynamic value,int tag)=>value==null;", "Suggestion", "bool M<T1>(dynamic value, T1 tag)")
         ];
         var failures = new List<string>();
@@ -96,7 +116,8 @@ internal static class DynamicChecks
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
         return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false)
-            + await EnumerationRuntime(cancellationToken).ConfigureAwait(false);
+            + await EnumerationRuntime(cancellationToken).ConfigureAwait(false)
+            + await ReceiverRuntime(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
@@ -515,6 +536,86 @@ internal static class DynamicChecks
         Program.Log.Info("PASS DynamicEnumerationInterfaceProtocolsAndFailureCleanup");
         Program.Log.Info("PASS DynamicElementAsyncEnumerationSuspensionFaultAndCancellation");
         return 4;
+    }
+
+
+    private static async Task<int> ReceiverRuntime(CancellationToken cancellationToken)
+    {
+        const string targetSource = """
+            #nullable enable
+            public class ReceiverTarget {
+                public int Rebound(int value)=>value;
+                public int Rebound(string value)=>value.Length;
+                public int Accept(int value)=>value;
+            }
+            """;
+        const string callerSource = """
+            #nullable enable
+            public static class ReceiverCaller {
+                public static object Call()=>Invoke(new ReceiverTarget());
+                public static dynamic Invoke(dynamic target)=>target.Rebound(1.5);
+                public static object CallExplicit()=>InvokeExplicit(new ReceiverTarget());
+                public static dynamic InvokeExplicit(dynamic target)=>target.Rebound<int>(1);
+                public static int Good()=>new ReceiverTarget().Rebound(3);
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "DynamicReceiver", "DynamicReceiver", LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: Program.Compile([]).References));
+        var targetDocument = project.AddDocument("ReceiverTarget.cs", targetSource);
+        var callerDocument = targetDocument.Project.AddDocument("ReceiverCaller.cs", callerSource);
+        var document = callerDocument.Project.GetDocument(targetDocument.Id)!;
+        var beforeCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var before = Load(beforeCompilation, cancellationToken);
+        var unsafeCompilation = Program.Compile([
+            CSharpSyntaxTree.ParseText(targetSource.Replace("public int Rebound(int value)=>value;", "public T Rebound<T>(T value)=>value;", StringComparison.Ordinal), cancellationToken: cancellationToken),
+            CSharpSyntaxTree.ParseText(callerSource, cancellationToken: cancellationToken)]);
+        var unsafeCandidate = Load(unsafeCompilation, cancellationToken);
+        var changedCaller = unsafeCandidate.GetType("ReceiverCaller")!;
+        if (!Equals(changedCaller.GetMethod("Call")!.Invoke(null, null), 1.5)
+            || !Equals(changedCaller.GetMethod("CallExplicit")!.Invoke(null, null), 1))
+        { throw new InvalidOperationException("Dynamic receiver regression did not reproduce the unsafe candidate behavior."); }
+        var diagnostics = await beforeCompilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false))
+            .GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+        var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+        var candidates = diagnostics.Where(diagnostic =>
+        {
+            ArgumentNullException.ThrowIfNull(diagnostic);
+            return diagnostic.Id == "HM0001" && diagnostic.Location.SourceTree == root.SyntaxTree
+                && root.FindNode(diagnostic.Location.SourceSpan).AncestorsAndSelf().OfType<MethodDeclarationSyntax>().FirstOrDefault()?.Parent
+                    is ClassDeclarationSyntax { Identifier.ValueText: "ReceiverTarget" };
+        }).ToArray();
+        if (candidates.Length != 1 || root.FindNode(candidates[0].Location.SourceSpan).AncestorsAndSelf().OfType<MethodDeclarationSyntax>().First().Identifier.ValueText != "Accept")
+        { throw new InvalidOperationException("Unresolved dynamic receiver either exposed an unsafe fix or suppressed an unrelated method."); }
+        var actions = new List<CodeAction>();
+        var provider = new HmSignatureCodeFixProvider();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(document, candidates[0], (action, _) =>
+        { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+        var operations = await actions.Single().GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+        document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        var after = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
+        foreach (var assembly in new[] { before, after })
+        {
+            var caller = assembly.GetType("ReceiverCaller")!;
+            foreach (var name in new[] { "Call", "CallExplicit" })
+            {
+                try
+                {
+                    caller.GetMethod(name)!.Invoke(null, null);
+                    throw new InvalidOperationException("Dynamic receiver call stopped preserving its original binding failure.");
+                }
+                catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException?.GetType().FullName == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException") { }
+            }
+            if (!Equals(caller.GetMethod("Good")!.Invoke(null, null), 3))
+            { throw new InvalidOperationException("An existing successful instance call changed."); }
+        }
+        var target = Activator.CreateInstance(after.GetType("ReceiverTarget")!)!;
+        var marker = new Uri("https://example.invalid/dynamic-receiver");
+        if (!ReferenceEquals(after.GetType("ReceiverTarget")!.GetMethod("Accept")!.MakeGenericMethod(typeof(Uri)).Invoke(target, [marker]), marker))
+        { throw new InvalidOperationException("An unrelated instance fix lost its new generic domain."); }
+        Program.Log.Info("PASS UnresolvedDynamicReceiverRebindingProof");
+        Program.Log.Info("PASS CrossFileDynamicReceiverProtectionAndUnrelatedIdeFix");
+        return 2;
     }
 
 
