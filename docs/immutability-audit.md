@@ -4847,3 +4847,9 @@ Actual release-evidence, attestation policy, facade and full script-tool regress
 ### IMM-M472: verify current native ingress and immutable scheduling boundaries
 
 Native Git argv and dotnet CLI ingress remain compatibility frames. Current project/reference vectors are immutable. Actual canonical Git line/path queries, an Effects changed-project plan and dotnet version output capture pass. Three seed schedules publish readonly records and detached immutable seed vectors; mutating the ingress afterward cannot alter the publication. Executing the actual campaign-summary assignment and completion helper preserves serialized evidence bytes with immutable runs and a readonly record. This is scoped ownership verification, not a complete fuzz campaign. Eight old coordinates close independently, leaving ten PowerShell Open rows, all in optional-tool consumer qualification.
+
+### IMM-M473: immutable optional-tool acceptance observations
+
+Package, archive-entry, native-output and manifest-path inventories are immutable. Doctor and explanation observations use immutable JsonDocument content with deterministic disposal. Native CLI binding, manifest parser shape validation and actual stored/malformed evidence subjects retain their contracts.
+
+One optional tool package set is built in a private checkout at a273c28cd. Actual baseline/current consumers both install the exact version and execute help, doctor, stored failure explanation, malformed evidence rejection and exact local manifest pinning. Full script-tool regressions pass. Ten old coordinates close independently, leaving zero PowerShell coordinates Open. This is not exhaustive final authority: remaining array ownership, fresh binding/coverage/compiler collection, archive extension and final native gates remain required.
