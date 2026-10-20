@@ -39,8 +39,10 @@ runs:
     # pinned byte-for-byte in toolchain.json and the toolchain stage
     # re-verifies them, so a cached payload is exactly what a fresh compile
     # must produce. The key covers the stage text, its base image, the build
-    # recipe, and the catalog. Default-branch entries are readable by every
-    # pull request; pull-request entries stay scoped to their own branch.
+    # recipe, and the catalog's z3 section, the only part the stage reads
+    # (verify-output.py), so unrelated catalog edits keep the cache.
+    # Default-branch entries are readable by every pull request;
+    # pull-request entries stay scoped to their own branch.
     # Scheduled runs and release tags always compile from source, so the
     # recipe keeps proving it reproduces the pins and releases never ship a
     # cached payload.
@@ -54,7 +56,8 @@ runs:
             grep '^ARG DOTNET_SDK_IMAGE=' eng/container/Dockerfile
             awk '/^FROM / { stage = ($0 == "FROM ${DOTNET_SDK_IMAGE} AS windows-native") } stage' \
               eng/container/Dockerfile
-            git ls-files --stage eng/container/windows-native eng/container/toolchain.json
+            git ls-files --stage eng/container/windows-native
+            jq --sort-keys --compact-output .z3 eng/container/toolchain.json
           } | sha256sum | cut -c1-64
         )"
         echo "key=sharpproof-windows-native-${recipe}" >> "$GITHUB_OUTPUT"
