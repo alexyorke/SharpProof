@@ -20,7 +20,7 @@ function Write-Probe([string]$RelativePath, [string]$Content) {
 }
 
 function Assert-NativeRejection([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$Expected) {
-    $output = @(& $Executable @Arguments 2>&1)
+    $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& $Executable @Arguments 2>&1))
     $exitCode = $LASTEXITCODE
     if ($exitCode -eq 0 -or ($output -join "`n") -notmatch $Expected) {
         throw "$Name did not reject the intended defect (exit $exitCode): $($output -join ' ')"
@@ -58,19 +58,19 @@ x^2
 $$
 '@
     [IO.File]::AppendAllText($validMarkdown, "`n")
-    $output = @(& node (Join-Path $repositoryRoot 'eng/lint/markdownlint.mjs') $validMarkdown 2>&1)
+    $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& node (Join-Path $repositoryRoot 'eng/lint/markdownlint.mjs') $validMarkdown 2>&1))
     if ($LASTEXITCODE -ne 0) { throw "Valid Markdown/math failed: $($output -join ' ')" }
     $spelling = Write-Probe 'spelling.md' "# Zzxqvspellmistakke`n"
     Assert-NativeRejection 'CSpell' 'cspell' @('lint', '--config', (Join-Path $repositoryRoot 'cspell.json'), '--no-progress', $spelling) 'Unknown word'
     $powershell = Write-Probe 'invalid.ps1' '$PID = 1'
     Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
-    $findings = @(Invoke-ScriptAnalyzer -Path $powershell -Settings (Join-Path $repositoryRoot 'eng/lint/PSScriptAnalyzerSettings.psd1'))
+    $findings = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Invoke-ScriptAnalyzer -Path $powershell -Settings (Join-Path $repositoryRoot 'eng/lint/PSScriptAnalyzerSettings.psd1')))
     if (@($findings | Where-Object RuleName -EQ 'PSAvoidAssignmentToAutomaticVariable').Count -eq 0) {
         throw 'PSScriptAnalyzer accepted assignment to an automatic variable.'
     }
     Write-Host 'PSScriptAnalyzer rejects its negative fixture.'
 
-    $output = @(& node (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofLinkRetries.mjs') 2>&1)
+    $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& node (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofLinkRetries.mjs') 2>&1))
     if ($LASTEXITCODE -ne 0) { throw "Link retry regressions failed: $($output -join ' ')" }
     Write-Host ($output -join "`n")
 
@@ -83,8 +83,8 @@ $$
     & git init --quiet $runnerRoot
     if ($LASTEXITCODE -ne 0) { throw 'Cannot initialize runner regression repository.' }
     Assert-NativeRejection 'Lint runner' 'pwsh' @('-NoLogo', '-NoProfile', '-File', $runnerPath, '-Category', 'Shell') 'Repository quality checks failed'
-    $runnerResults = @(Get-Content (Join-Path $runnerRoot 'artifacts/lint/results.json') -Raw | ConvertFrom-Json)
-    if ($runnerResults.Count -ne 1 -or $runnerResults[0].passed) { throw 'Runner did not preserve the failed result.' }
+    $runnerResults = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-Content (Join-Path $runnerRoot 'artifacts/lint/results.json') -Raw | ConvertFrom-Json))
+    if ($runnerResults.Length -ne 1 -or $runnerResults[0].passed) { throw 'Runner did not preserve the failed result.' }
 
     $compose = Get-Content (Join-Path $repositoryRoot 'compose.yaml') -Raw
     $invalidCompose = Write-Probe 'invalid-compose.yaml' $compose.Replace(
@@ -94,19 +94,19 @@ $$
         '-NoLogo', '-NoProfile', '-File', (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofContainerContract.ps1'),
         '-ComposePath', $invalidCompose, '-AuthorityOnly') 'Lint base'
 
-    foreach ($version in @('baseline', 'current')) {
+    foreach ($version in [Collections.Immutable.ImmutableArray]::Create[string]('baseline', 'current')) {
         $project = Write-Probe "$version/ApiProbe.csproj" '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><EnablePackageValidation>true</EnablePackageValidation></PropertyGroup></Project>'
         $code = if ($version -eq 'baseline') { 'public class Contract { public void Existing() {} }' } else { 'public class Contract {}' }
         Write-Probe "$version/Contract.cs" $code | Out-Null
-        $output = @(& dotnet restore $project --configfile (Join-Path $repositoryRoot 'NuGet.config') 2>&1)
+        $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& dotnet restore $project --configfile (Join-Path $repositoryRoot 'NuGet.config') 2>&1))
         if ($LASTEXITCODE -ne 0) { throw ($output -join "`n") }
-        $output = @(& dotnet pack $project --configuration Release --no-restore --output (Join-Path $scratchRoot "$version-packages") 2>&1)
+        $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& dotnet pack $project --configuration Release --no-restore --output (Join-Path $scratchRoot "$version-packages") 2>&1))
         if ($LASTEXITCODE -ne 0) { throw ($output -join "`n") }
     }
-    $baseline = @(Get-ChildItem (Join-Path $scratchRoot 'baseline-packages') -Filter '*.nupkg')
-    $current = @(Get-ChildItem (Join-Path $scratchRoot 'current-packages') -Filter '*.nupkg')
-    if ($baseline.Count -ne 1 -or $current.Count -ne 1) { throw 'API fixtures did not produce exactly two packages.' }
-    $output = @(& apicompat package $baseline[0].FullName --baseline-package $baseline[0].FullName 2>&1)
+    $baseline = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem (Join-Path $scratchRoot 'baseline-packages') -Filter '*.nupkg'))
+    $current = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem (Join-Path $scratchRoot 'current-packages') -Filter '*.nupkg'))
+    if ($baseline.Length -ne 1 -or $current.Length -ne 1) { throw 'API fixtures did not produce exactly two packages.' }
+    $output = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& apicompat package $baseline[0].FullName --baseline-package $baseline[0].FullName 2>&1))
     if ($LASTEXITCODE -ne 0) { throw "Identical API packages failed: $($output -join ' ')" }
     Assert-NativeRejection 'ApiCompat' 'apicompat' @('package', $current[0].FullName, '--baseline-package', $baseline[0].FullName) 'CP0002'
 }
