@@ -11,7 +11,7 @@ try {
     $discoveryRoot = Join-Path $taskRoot 'discovery'
     [IO.Directory]::CreateDirectory($discoveryRoot) | Out-Null
     # Reverse assembly/file order so enumeration cannot stand in for sorting.
-    foreach ($entry in @(@{ File = 'a'; Assembly = 'Z'; Id = '2' }, @{ File = 'z'; Assembly = 'A'; Id = '1' })) {
+    foreach ($entry in @(([ordered]@{ File = 'a'; Assembly = 'Z'; Id = '2' }).AsReadOnly(), ([ordered]@{ File = 'z'; Assembly = 'A'; Id = '1' }).AsReadOnly())) {
         $assembly = $entry.Assembly
         $id = $entry.Id
         $trx = @"
@@ -21,11 +21,11 @@ try {
         [IO.File]::WriteAllText((Join-Path $discoveryRoot ($assembly + '.Test.dll.discovery.dump')), "<test-run><test-case id='$id' fullname='Fixture.Case$assembly' /></test-run>")
     }
     [IO.File]::WriteAllLines((Join-Path $taskRoot 'discovered-tests.txt'), [string[]]@('Fixture.CaseA', 'Fixture.CaseZ'))
-    $cases = @(Read-SharpProofCanonicalCases -Root $fixture)
+    $cases = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Read-SharpProofCanonicalCases -Root $fixture))
     if ($cases.Count -ne 2 -or $cases[0].assembly -cne 'A.Test.dll' -or $cases[1].assembly -cne 'Z.Test.dll') {
         throw 'Canonical TRX case ordering depends on file enumeration.'
     }
-    $discovery = @(Read-SharpProofCanonicalDiscovery -Root $fixture)
+    $discovery = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Read-SharpProofCanonicalDiscovery -Root $fixture))
     if ($discovery.Count -ne 2 -or $discovery[0].assembly -cne 'A.Test.dll' -or $discovery[1].assembly -cne 'Z.Test.dll') {
         throw 'Canonical NUnit case ordering depends on file enumeration.'
     }
@@ -38,12 +38,12 @@ try {
         throw "Canonical evidence accepted an invalid fixture: $Expected"
     }
     $encodedCollision = [Collections.Immutable.ImmutableArray]::Create[object](
-        [ordered]@{ assembly = 'A'; fullyQualifiedName = [string][char]1 },
-        [ordered]@{ assembly = 'A'; fullyQualifiedName = '\u0001' })
+        ([ordered]@{ assembly = 'A'; fullyQualifiedName = [string][char]1 }).AsReadOnly(),
+        ([ordered]@{ assembly = 'A'; fullyQualifiedName = '\u0001' }).AsReadOnly())
     Assert-CanonicalFailure { Get-SharpProofTrxDiscoveryNames -Discovery @($encodedCollision) } 'Distinct NUnit case names collide under the actual TRX serializer encoding.'
     $repeatedNames = [Collections.Immutable.ImmutableArray]::Create[object](
-        [ordered]@{ assembly = 'A'; fullyQualifiedName = 'Same' },
-        [ordered]@{ assembly = 'A'; fullyQualifiedName = 'Same' })
+        ([ordered]@{ assembly = 'A'; fullyQualifiedName = 'Same' }).AsReadOnly(),
+        ([ordered]@{ assembly = 'A'; fullyQualifiedName = 'Same' }).AsReadOnly())
     if (@(Get-SharpProofTrxDiscoveryNames -Discovery @($repeatedNames)).Count -ne 2) {
         throw 'Canonical discovery lost parameterized name multiplicity.'
     }

@@ -33,8 +33,8 @@ try {
 </TestRun>
 '@
     [IO.File]::WriteAllText((Join-Path $taskRoot 'fixture.trx'), $receipt)
-    $expected = @([pscustomobject]@{ Name = 'fixture'; Target = 'fixture.csproj' })
-    $completed = @([pscustomobject]@{ Test = $expected[0]; ExitCode = 0 })
+    $expected = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@([pscustomobject]@{ Name = 'fixture'; Target = 'fixture.csproj' }))
+    $completed = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(([ordered]@{ Test = $expected[0]; ExitCode = 0 }).AsReadOnly()))
     Save-SharpProofCoverageCohort -Root $temporary -Expected $expected -Completed $completed
     if (-not (Test-Path -LiteralPath (Join-Path $temporary 'coverage-cohort.json') -PathType Leaf)) {
         throw 'The collision-suffixed collector attachment did not complete its cohort.'
@@ -84,12 +84,12 @@ try {
     # Same-second VSTest runs may reuse deployment and attachment names. Each
     # project's receipt must resolve its own attachment under its task root.
     $isolatedRoot = Join-Path $temporary 'isolated-projects'
-    $isolatedExpected = @('first', 'second' | ForEach-Object {
-            [pscustomobject]@{ Name = $_; Target = $_ + '.csproj' }
-        })
-    $isolatedCompleted = @($isolatedExpected | ForEach-Object {
-            [pscustomobject]@{ Test = $_; ExitCode = 0 }
-        })
+    $isolatedExpected = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@('first', 'second' | ForEach-Object {
+                ([ordered]@{ Name = $_; Target = $_ + '.csproj' }).AsReadOnly()
+            }))
+    $isolatedCompleted = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($isolatedExpected | ForEach-Object {
+                ([ordered]@{ Test = $_; ExitCode = 0 }).AsReadOnly()
+            }))
     foreach ($task in $isolatedExpected) {
         $projectRoot = Join-Path $isolatedRoot $task.Name
         $deploymentRoot = Join-Path $projectRoot 'same-second/In/attachments'
@@ -118,12 +118,12 @@ try {
     '<TestDefinitions>' + $definitions + '</TestDefinitions><Results>' + $results + '</Results></TestRun>'
     $architectureReceiptPath = Join-Path $architectureRoot 'architecture.trx'
     [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt)
-    $architectureExpected = @([pscustomobject]@{
-            Name         = 'architecture'
-            Target       = 'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj'
-            EvidenceKind = 'ArchitectureOnly'
-        })
-    $architectureCompleted = @([pscustomobject]@{ Test = $architectureExpected[0]; ExitCode = 0 })
+    $architectureExpected = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@([pscustomobject]@{
+                Name         = 'architecture'
+                Target       = 'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj'
+                EvidenceKind = 'ArchitectureOnly'
+            }))
+    $architectureCompleted = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(([ordered]@{ Test = $architectureExpected[0]; ExitCode = 0 }).AsReadOnly()))
     $saveArchitecture = {
         Save-SharpProofCoverageCohort -Root $temporary -Expected $architectureExpected -Completed $architectureCompleted
     }

@@ -138,7 +138,7 @@ function Save-SharpProofCoverageCohort {
             }
         }
     }
-    [ordered]@{ schemaVersion = 1; tasks = @($expectedNames) } |
+    ([ordered]@{ schemaVersion = 1; tasks = $expectedNames }).AsReadOnly() |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Root 'coverage-cohort.json') -Encoding utf8NoBOM
 }
 
@@ -149,16 +149,16 @@ function Save-SharpProofCoverageShardManifest {
                 Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
                     $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
                 Sort-Object FullName | ForEach-Object {
-                    [ordered]@{
+                    ([ordered]@{
                         path   = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
                         sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-                    }
+                    }).AsReadOnly()
                 }))
     if (@($files | Where-Object { Test-SharpProofCoverageReportName -Path $_.path }).Count -eq 0 -or
         @($files | Where-Object { $_.path -like '*/coverage-cohort.json' }).Count -ne 1) {
         throw "Coverage shard '$Phase' has no complete cohort evidence."
     }
-    [ordered]@{ schemaVersion = 1; phase = $Phase; files = @($files) } |
+    ([ordered]@{ schemaVersion = 1; phase = $Phase; files = $files }).AsReadOnly() |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Root 'coverage-shard.json') -Encoding utf8NoBOM
 }
 
