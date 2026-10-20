@@ -338,7 +338,7 @@ public sealed class ApiUsageRankingTests
         var getter = comparer.GetMembers("Default").OfType<IPropertySymbol>().Single();
         var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         inventoryBuilder[compare.ContainingAssembly.Name + "\t" + compare.GetDocumentationCommentId()] = "partially-modeled";
-        inventoryBuilder[getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "unmodeled";
+        inventoryBuilder[getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "partially-modeled";
         var inventory = inventoryBuilder.ToImmutable();
         var siteBuilder = ImmutableArray.CreateBuilder<Site>();
         var gapBuilder = ImmutableArray.CreateBuilder<string>();
@@ -348,6 +348,7 @@ public sealed class ApiUsageRankingTests
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call" && site.Status == "partially-modeled")), Is.EqualTo(2));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(4));
+        Assert.That(sites.Where(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Access == "read").All(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.True);
     }
 
     [Test]

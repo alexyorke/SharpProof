@@ -881,7 +881,8 @@ internal sealed class PassiveCallableVcBuilder
                 _entryFieldReferences[term.Id] = term;
             }
             return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||
-                term is IrOpaqueTerm && !IrFieldSites.IsFieldRead(_factory, term) && !IrInvariantRelations.IsRelation(_factory, term) ||
+                term is IrOpaqueTerm opaque && !IrFieldSites.IsFieldRead(_factory, term) && !IrInvariantRelations.IsRelation(_factory, term) &&
+                    IrOpaqueCallSite.DefaultComparerValueKind(_factory, opaque) == null ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
                 term is IrCastTerm cast && _factory.GetTypeInfo(cast.Operand.Type).Kind != IrTypeKind.Integer &&
                     !(cast.Type == _factory.ObjectType && _factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||

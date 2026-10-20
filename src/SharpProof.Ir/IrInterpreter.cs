@@ -192,14 +192,15 @@ internal sealed class IrInterpreter(IrFactory factory)
     internal IrEvaluationResult Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, IrHeap? heap, CancellationToken cancellationToken,
-        ImmutableHashSet<IrVarId>? snapshots = null)
+        ImmutableHashSet<IrVarId>? snapshots = null,
+        Func<IrOpaqueTerm, IrValue?>? concreteOpaqueValueProvider = null)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(
             term,
-            new(SnapshotVariables(variables), onVariableRead, snapshots, heap, cancellationToken));
+            new(SnapshotVariables(variables), onVariableRead, snapshots, heap, concreteOpaqueValueProvider, cancellationToken));
     }
 
     private static ImmutableDictionary<IrVarId, IrValue> SnapshotVariables(
@@ -400,6 +401,11 @@ internal sealed class IrInterpreter(IrFactory factory)
             { return ValidateFieldValue(opaque, initial); }
         }
 
+        if (state.ConcreteOpaqueValueProvider?.Invoke(opaque) is { } observed)
+        {
+            return observed.Type == opaque.Type ? Value(observed) :
+                InvalidValue("The observed opaque value has the wrong type.");
+        }
         return Unsupported(IrUnsupportedReason.OpaqueTerm,
             opaque.Purity == IrOpaquePurity.Pure
                 ? "Pure opaque member " + opaque.Member + " has no concrete implementation."
@@ -927,6 +933,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         Action<IrVarId>? onVariableRead,
         ImmutableHashSet<IrVarId>? snapshots,
         IrHeap? heap,
+        Func<IrOpaqueTerm, IrValue?>? concreteOpaqueValueProvider,
         CancellationToken cancellationToken)
     {
         internal ImmutableDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
@@ -937,6 +944,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         internal IrHeap? Heap { get; } = heap;
         internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots;
         internal ImmutableDictionary<IrId, IrTerm> SnapshotSelectors { get; set; } = ImmutableDictionary<IrId, IrTerm>.Empty;
+        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; } = concreteOpaqueValueProvider;
         internal int SnapshotWork = 4096;
     }
 }

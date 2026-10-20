@@ -34,12 +34,13 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
         try
         {
             _solver = _runner.Context.MkSolver();
-            _encoder = new BvEncoder(_runner.Context, factory, _owner);
+            _encoder = new BvEncoder(_runner.Context, factory, _owner, concreteOpaqueValueProvider: term => term is null ? throw new ArgumentNullException(nameof(term)) : ConcreteOpaqueValueProvider?.Invoke(term));
         }
         catch { _runner.Dispose(); throw; }
     }
 
     public long ConsumedResourceCount => Interlocked.Read(ref _consumedResourceCount);
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; init; }
 
     public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
     {

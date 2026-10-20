@@ -45,9 +45,9 @@ internal sealed class PassiveCallableSolver : IDisposable
         { throw new ArgumentException("A bounded witness encoding cannot own a proof session.", nameof(plan)); }
         ArgumentOutOfRangeException.ThrowIfLessThan(methodRlimit, queryRlimit);
         _queryRlimit = queryRlimit;
-        _session = new(plan.Factory, new IrSmtBackendOptions(queryRlimit));
+        _session = new(plan.Factory, new IrSmtBackendOptions(queryRlimit)) { ConcreteOpaqueValueProvider = plan.ObserveFrameworkOpaqueValue };
         _budget = new(() => ConsumedResourceCount, queryRlimit, methodRlimit);
-        _kernel = new(_session);
+        _kernel = new(_session) { ConcreteOpaqueValueProvider = plan.ObserveFrameworkOpaqueValue };
     }
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan, ISmtBackend backend,
@@ -57,7 +57,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (plan.IsBoundedSearch)
         { throw new ArgumentException("A bounded witness encoding cannot own a proof session.", nameof(plan)); }
         _budget = ArgumentNullGuard.NotNull(resourceBudget, nameof(resourceBudget));
-        _kernel = new(ArgumentNullGuard.NotNull(backend, nameof(backend)));
+        _kernel = new(ArgumentNullGuard.NotNull(backend, nameof(backend))) { ConcreteOpaqueValueProvider = plan.ObserveFrameworkOpaqueValue };
         _readConsumedResourceCount = readConsumedResourceCount;
     }
 
@@ -167,10 +167,10 @@ internal sealed class PassiveCallableSolver : IDisposable
         {
             // A resource-exhausted native session is retired. Retry the smaller
             // witness query in a fresh context, charging the same method meter.
-            using var prefixSession = new CallableSolverSession(_plan.Factory, new IrSmtBackendOptions(_queryRlimit));
+            using var prefixSession = new CallableSolverSession(_plan.Factory, new IrSmtBackendOptions(_queryRlimit)) { ConcreteOpaqueValueProvider = _plan.ObserveFrameworkOpaqueValue };
             ProofOutcome prefixOutcome;
             try
-            { prefixOutcome = await new ProofKernel(prefixSession).VerifyAsync(prefix, cancellationToken).ConfigureAwait(false); }
+            { prefixOutcome = await new ProofKernel(prefixSession) { ConcreteOpaqueValueProvider = _plan.ObserveFrameworkOpaqueValue }.VerifyAsync(prefix, cancellationToken).ConfigureAwait(false); }
             finally
             { _auxiliaryResources += prefixSession.ConsumedResourceCount; }
             if (!_budget.IsExceeded && prefixOutcome is RefutedOutcome refutedPrefix)

@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,583 declarations have no catalog/audited-intrinsic evidence, and 90 have partial
+55,582 declarations have no catalog/audited-intrinsic evidence, and 91 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,583 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,582 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -851,6 +851,30 @@ Remaining: Clear, CopyTo, IsReadOnly, other collection interfaces, reference/cus
 equality domains, arbitrary incoming dispatch, precise initialization/growth faults
 and pure membership clauses. Keep these in work items A and S.
 
+## Comparer normal return cache
+
+The signed .NET 10 framework `Comparer<T>.Default` getter now has a stable,
+non-null normal result for each runtime type. Runtime type identity erases tuple
+names, nullable annotations and dynamic/object spelling. Source helper type
+arguments preserve the constructed cache identity.
+
+Initialization remains an opaque call with its previous exception, allocation,
+write, synchronization and capability uncertainty. This slice does not establish
+purity, zero allocation, termination, arbitrary comparer callback behavior or
+support for the getter as a pure contract expression. Earlier comparison models
+retain their existing guarded primitive domain.
+
+Local verification covers 6,413 worker, 2,144 frontend, 496 IR, 412 solver,
+56 verifier, 483 corpus/gate and 47 inventory tests. Formatting, lint and layout
+also pass; the inventory comparison has zero additions, removals or evidence
+changes after reviewing this one new partial declaration. CI remains the merge gate.
+After integrating master's implementation-visibility refactor, all 244 focused
+worker/payload checks and 47 inventory tests pass again.
+
+Native replay observes only the nine previously audited integer/Char framework
+getters. Other element types can use symbolic normal-result facts, but replay
+continues to abstain when it cannot observe a concrete framework value safely.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -982,7 +1006,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | partially-modeled | L |
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 15 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.Add(`0) | call | 13 | partially-modeled | L |
-| P:System.Collections.Generic.Comparer`1.Default | read | 13 | unmodeled | C |
+| P:System.Collections.Generic.Comparer`1.Default | read | 13 | partially-modeled | C |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | unmodeled-dispatch | A |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 11 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | partially-modeled | L |
@@ -1088,7 +1112,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 90 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 91 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -1169,6 +1193,7 @@ These 90 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
+| P:System.Collections.Generic.Comparer`1.Default | intrinsic=default-comparer-cached-value |
 | P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | P:System.Collections.Generic.HashSet`1.Count | intrinsic=default-primitive-hash-set-state |

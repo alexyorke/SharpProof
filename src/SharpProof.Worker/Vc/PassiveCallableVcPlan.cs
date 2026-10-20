@@ -323,6 +323,7 @@ internal sealed class PassiveCallableVcPlan
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
         {
             ConcreteHavocValueProvider = ReplayFrameworkValue,
+            ConcreteOpaqueValueProvider = ObserveFrameworkOpaqueValue,
             ConcreteLockCompletionProvider = (instruction, receiver) =>
             {
                 ArgumentNullException.ThrowIfNull(instruction);
@@ -339,6 +340,12 @@ internal sealed class PassiveCallableVcPlan
             AssignmentObserver = assignmentObserver,
             NonFreshWritePrefixObserver = nonFreshWritePrefixObserver
         };
+    }
+
+    internal IrValue? ObserveFrameworkOpaqueValue(IrOpaqueTerm term)
+    {
+        ArgumentNullException.ThrowIfNull(term);
+        return ObserveDefaultComparerValue(Factory, term, ReadDefaultComparer);
     }
 
     private IrValue? ReplayFrameworkValue(IrHavocRequest request)
@@ -577,6 +584,21 @@ internal sealed class PassiveCallableVcPlan
         if (value == null)
         { return null; }
         return type == factory.BooleanType ? factory.CreateBooleanValue(false) : factory.CreateReferenceValue(type, value);
+    }
+
+    internal static IrValue? ObserveDefaultComparerValue(IrFactory factory, IrOpaqueTerm term, Func<string, object?> read)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(term);
+        ArgumentNullException.ThrowIfNull(read);
+        if (IrOpaqueCallSite.DefaultComparerValuePrimitive(factory, term) is not { } primitive)
+        { return null; }
+        object? value;
+        try
+        { value = read(primitive); }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException)
+        { return null; }
+        return value == null ? null : factory.CreateReferenceValue(term.Type, value);
     }
 
     internal static object ReadDefaultComparer(string primitive)

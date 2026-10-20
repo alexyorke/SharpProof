@@ -4,6 +4,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
 {
     private readonly ISmtBackend _backend =
         ArgumentNullGuard.NotNull(backend, nameof(backend));
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; init; }
 
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken)
@@ -106,7 +107,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
         }
         return new ProvenOutcome(justifications.ToImmutable());
     }
-    private static ProofOutcome ReplayCounterexample(
+    private ProofOutcome ReplayCounterexample(
         VerificationQuery query,
         BackendCheckResult result,
         CallableReplayContext? replayContext,
@@ -128,18 +129,30 @@ internal sealed class ProofKernel(ISmtBackend backend)
         }
 
         var interpreter = new IrInterpreter(query.Factory);
+        var unavailable = false;
+        var observedCaches = ImmutableDictionary.CreateBuilder<IrMemberId, (object Identity, IrTypeId Type)>();
+        IrValue? Observe(IrOpaqueTerm term)
+        {
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
+            var value = (ConcreteOpaqueValueProvider ?? replayContext?.ReplayOptions?.ConcreteOpaqueValueProvider)?.Invoke(term);
+            if (value == null && IrOpaqueCallSite.DefaultComparerValueKind(query.Factory, term) != null)
+            { unavailable = true; }
+            if (value is { Kind: IrValueKind.Reference } && IrOpaqueCallSite.DefaultComparerValueKind(query.Factory, term) != null)
+            { observedCaches[term.Member] = (value.Reference, term.Type); }
+            return value;
+        }
         foreach (var assumption in query.Assumptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evaluated = interpreter.Evaluate(assumption.Predicate,
-                model.Assignments, cancellationToken);
+                model.Assignments, null, null, cancellationToken, concreteOpaqueValueProvider: Observe);
             if (!IsBoolean(evaluated, expected: true))
             {
-                return Unknown(AbstentionReason.CounterexampleReplayFailed);
+                return Unknown(unavailable ? AbstentionReason.CounterexampleNotReplayable : AbstentionReason.CounterexampleReplayFailed);
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, cancellationToken);
+        var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, null, null, cancellationToken, concreteOpaqueValueProvider: Observe);
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch
@@ -154,7 +167,20 @@ internal sealed class ProofKernel(ISmtBackend backend)
 
         if (!IsBoolean(goal, expected: false))
         {
-            return Unknown(AbstentionReason.CounterexampleReplayFailed);
+            return Unknown(unavailable ? AbstentionReason.CounterexampleNotReplayable : AbstentionReason.CounterexampleReplayFailed);
+        }
+        var observedCacheSnapshot = observedCaches.ToImmutable();
+        foreach (var assignment in model.Assignments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (assignment.Value.Kind != IrValueKind.Reference)
+            { continue; }
+            foreach (var observed in observedCacheSnapshot.Values)
+            {
+                if (ReferenceEquals(assignment.Value.Reference, observed.Identity) &&
+                    !IrOpaqueCallSite.IsDefaultComparerValueView(query.Factory, observed.Type, assignment.Value.Type))
+                { return Unknown(AbstentionReason.CounterexampleReplayFailed); }
+            }
         }
         if (replayContext != null && CallableReplayValidator.Validate(
                 query.Factory, replayContext, model.Assignments, cancellationToken) is { } failure)

@@ -1,6 +1,6 @@
 namespace SharpProof.Smt;
 
-internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false)
+internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false, Func<IrOpaqueTerm, IrValue?>? /* SPINT001: all values valid - null leaves framework values symbolic */ concreteOpaqueValueProvider = null)
 {
     private readonly ImmutableDictionary<IrId, Expr>.Builder _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : ImmutableDictionary.CreateBuilder<IrId, Expr>())));
     private readonly ImmutableDictionary<IrVarId, Expr>.Builder _variables = ImmutableDictionary.CreateBuilder<IrVarId, Expr>();
@@ -69,12 +69,38 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 Encode(conditional.WhenTrue, meter), Encode(conditional.WhenFalse, meter))),
             IrCastTerm cast => EncodeCast(cast, meter),
             IrOpaqueTerm field when IrFieldSites.IsFieldRead(factory, field) => EncodeFieldRead(field, meter),
+            IrOpaqueTerm singleton when IrOpaqueCallSite.DefaultComparerValueKind(factory, singleton) != null =>
+                EncodeDefaultComparerValue(singleton, meter),
             IrOpaqueTerm relation when Relations != null && IrInvariantRelations.IsRelation(factory, relation) =>
                 EncodeRelation(relation, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
         _encoded.AddUnique(term.Id, expression);
         return expression;
+    }
+
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; } = concreteOpaqueValueProvider;
+    private readonly ImmutableDictionary<IrMemberId, (IrTypeId Type, Expr Value, IrOpaqueTerm Term)>.Builder _defaultComparers = ImmutableDictionary.CreateBuilder<IrMemberId, (IrTypeId Type, Expr Value, IrOpaqueTerm Term)>();
+    private readonly ImmutableArray<(IrTypeId Type, Expr Value, IrOpaqueTerm Term)>.Builder _defaultComparerOrder = ImmutableArray.CreateBuilder<(IrTypeId Type, Expr Value, IrOpaqueTerm Term)>();
+
+    private Expr EncodeDefaultComparerValue(IrOpaqueTerm term, SmtQueryResourceMeter meter)
+    {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        var value = owner.Own(context.MkConst("defaultComparer" + term.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
+        AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        foreach (var previous in _defaultComparerOrder.ToImmutable())
+        {
+            meter.Consume();
+            // Distinct certified closed class views cannot share an instance
+            // unless one is a base of the other. Open T/U may coincide.
+            if (factory.TryGetClosedClassReferenceBase(term.Type, out _) &&
+                factory.TryGetClosedClassReferenceBase(previous.Type, out _) && !KnownNominalCompatibility(term.Type, previous.Type, meter))
+            { AddDistinctReferenceFact(value, previous.Value); }
+        }
+        _defaultComparers.AddUnique(term.Member, (term.Type, value, term));
+        _defaultComparerOrder.Add((term.Type, value, term));
+        return value;
     }
 
     // Only a Horn search encodes unknown invariants, as uninterpreted relations.

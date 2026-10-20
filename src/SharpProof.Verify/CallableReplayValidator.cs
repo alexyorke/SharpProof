@@ -66,6 +66,7 @@ internal static class CallableReplayValidator
             {
                 SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(),
                 ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider,
+                ConcreteOpaqueValueProvider = context.ReplayOptions?.ConcreteOpaqueValueProvider,
                 ConcreteLockCompletionProvider = context.ReplayOptions?.ConcreteLockCompletionProvider
             };
             var execution = new IrProgramInterpreter(factory).Execute(
@@ -153,7 +154,7 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleNotReplayable;
             }
-            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots);
+            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots, context.ReplayOptions?.ConcreteOpaqueValueProvider);
             if (consumedApproximation || heap?.ConsumedApproximation == true)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -167,7 +168,7 @@ internal static class CallableReplayValidator
                 return AbstentionReason.PostconditionMayBeUndefined;
             }
         }
-        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken, snapshots);
+        var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken, snapshots, context.ReplayOptions?.ConcreteOpaqueValueProvider);
         if (consumedApproximation || heap?.ConsumedApproximation == true)
         {
             return AbstentionReason.CounterexampleNotReplayable;

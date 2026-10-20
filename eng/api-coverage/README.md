@@ -191,8 +191,13 @@ Default identity flows through aliases, compatible joins, CFG captures and
 immutable source parameters. Generic helpers use declaration-owned scalar type
 arguments or proven array element types, including local-function symbol clones.
 Receivers and arguments retain source order, including named arguments. The
-Default getter remains an opaque call with initialization, allocation and exception
-possibilities; wrong-contract replay after that call remains a separate gap.
+Default getter retains opaque initialization, allocation and exception effects.
+For the signed .NET 10 framework declaration, its normal result is a non-null
+cached instance per runtime type. Runtime type identity erases tuple names,
+nullable annotations and dynamic/object spelling. Native replay observes only
+the nine audited integer/Char getters and preserves their aliases in solver
+models and execution; unavailable observations cannot confirm a witness.
+The getter remains unsupported as a pure contract expression.
 Custom comparers, unbound generic types, Boolean and object overloads do not inherit
 integer semantics. The promoted-difference behavior is also visible in the
 [CoreLib implementation](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/SByte.cs).

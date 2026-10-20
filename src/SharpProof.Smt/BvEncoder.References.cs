@@ -293,6 +293,33 @@ internal sealed partial class BvEncoder
         var certifiedTypes = ImmutableDictionary.CreateBuilder<string, IrTypeId>(StringComparer.Ordinal);
         var shared = ImmutableDictionary.CreateBuilder<string, object>(StringComparer.Ordinal);
         var classTypes = ImmutableDictionary.CreateBuilder<string, ImmutableArray<IrTypeId>.Builder>(StringComparer.Ordinal);
+        var cacheTypes = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<IrTypeId>.Builder>(StringComparer.Ordinal);
+        // Preserve observed framework cache aliases in every SSA/object view.
+        // Unavailable observations stay symbolic and cannot confirm a witness.
+        foreach (var cache in _defaultComparerOrder.ToImmutable())
+        {
+            meter.Consume();
+            if (ConcreteOpaqueValueProvider?.Invoke(cache.Term) is not { } observed)
+            { continue; }
+            if (observed.Type != cache.Type || observed.Kind != IrValueKind.Reference)
+            { throw new UnsupportedIrEncodingException(); }
+            using var evaluated = model.Evaluate(cache.Value, true);
+            var token = evaluated.ToString();
+            if (shared.TryGetValue(token, out var previous) && !ReferenceEquals(previous, observed.Reference))
+            { throw new UnsupportedIrEncodingException(); }
+            shared[token] = observed.Reference!;
+            aliases[(cache.Type, token)] = observed;
+            if (!cacheTypes.TryGetValue(token, out var cacheViews))
+            { cacheTypes.Add(token, cacheViews = ImmutableHashSet.CreateBuilder<IrTypeId>()); }
+            cacheViews.Add(cache.Type);
+            if (cache.Type != factory.ObjectType)
+            {
+                if (!classTypes.TryGetValue(token, out var types))
+                { classTypes.Add(token, types = ImmutableArray.CreateBuilder<IrTypeId>()); }
+                if (!types.Contains(cache.Type))
+                { types.Add(cache.Type); }
+            }
+        }
         foreach (var empty in _emptyArrayOrder.ToImmutable())
         {
             meter.Consume();
@@ -369,6 +396,15 @@ internal sealed partial class BvEncoder
             { return factory.CreateNullValue(type); }
             var modelToken = evaluated.ToString();
             var token = modelToken;
+            if (info.Kind == IrTypeKind.Reference && cacheTypes.TryGetValue(token, out var caches))
+            {
+                foreach (var declared in caches)
+                {
+                    meter.Consume();
+                    if (!IrOpaqueCallSite.IsDefaultComparerValueView(factory, declared, type))
+                    { throw new UnsupportedIrEncodingException(); }
+                }
+            }
             // Split an uncertified nominal alias from a built-in. If the query
             // needs that alias, concrete replay rejects the repaired witness;
             // an unrelated field-write witness can still replay successfully.
