@@ -398,7 +398,19 @@ lambda body is not executed during construction. Compiler data-flow facts exclud
 compile-time `nameof` references. Immutable frame certificates retain storage
 through portable IR and reject conflicting class/interface/delegate metadata.
 
-Local captures, nested functions, broader control flow, shared frames, caches,
+Initialized read-only root locals also retain their typed storage and owned
+graphs. Up to 16 nested, synchronous anonymous functions may capture that same
+root storage. Each function must capture root variables; intermediate capture
+scopes and stateless nested caches remain Unknown. The factory allocates its
+frame and immediately returned delegate. Nested delegates are created only when
+their enclosing function is invoked later, outside that factory proof. A scalar
+root such as `() => () => n` retains a 32-byte frame and 64-byte outer
+delegate at factory completion. The frame includes a null reference slot for
+the deferred delegate cache; that slot adds storage before any inner delegate
+instance exists. This does not prove an invocation cost or a
+post-invocation retained graph.
+
+Broader control flow, intermediate-frame sharing, caches, local functions,
 async lambdas and unsupported value fields remain Unknown. In particular, an
 unsupported loop may allocate an entry frame before zero iterations and may add a
 delegate-cache field. Its cost must not be treated as zero merely because the
@@ -649,7 +661,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 41 invalidate older responses without this evidence.
+Protocol 39 and cache schema 42 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -701,7 +713,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 41 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 42 invalidate prior responses; compiler artifact 52 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

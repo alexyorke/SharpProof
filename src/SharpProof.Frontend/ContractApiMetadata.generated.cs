@@ -23,6 +23,7 @@ internal enum ContractApiClauseRole
 internal enum ContractApiAttributeCategory
 {
     Companion,
+    InputModel,
     Closed,
     Effect,
     Control,
@@ -73,6 +74,7 @@ internal static class ContractApiCatalog
     internal const string EnforcePure = AttributesNamespace + ".EnforcePureAttribute";
     internal const string ZeroAllocations = AttributesNamespace + ".ZeroAllocationsAttribute";
     internal const string ResourceUpperBound = AttributesNamespace + ".ResourceUpperBoundAttribute";
+    internal const string ResourceBooleanInput = AttributesNamespace + ".ResourceBooleanInputAttribute";
     internal const string AllowedCapabilities = AttributesNamespace + ".AllowedCapabilitiesAttribute";
     internal const string DoesNotThrow = AttributesNamespace + ".DoesNotThrowAttribute";
     internal const string AllowedExceptions = AttributesNamespace + ".AllowedExceptionsAttribute";
@@ -124,6 +126,11 @@ internal static class ContractApiCatalog
                 "ZeroAllocationsAttribute",
                 ContractApiAttributeCategory.Effect,
                 ContractApiSelectionFeature.Effects),
+            new(
+                ResourceBooleanInput,
+                "ResourceBooleanInputAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
             new(
                 ResourceUpperBound,
                 "ResourceUpperBoundAttribute",
@@ -224,6 +231,7 @@ internal static partial class ContractApiMetadata
     internal const string ZeroAllocations =
         ContractApiCatalog.ZeroAllocations;
     internal const string ResourceUpperBound = ContractApiCatalog.ResourceUpperBound;
+    internal const string ResourceBooleanInput = ContractApiCatalog.ResourceBooleanInput;
     internal const string AllowedCapabilities =
         ContractApiCatalog.AllowedCapabilities;
     internal const string DoesNotThrow =

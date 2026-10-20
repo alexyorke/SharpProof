@@ -5,6 +5,123 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task MultipleDeferredRootDelegatesReserveSeparateCacheSlots(int metric)
+    {
+        var limit = metric == 5 ? 0 : 104;
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static System.Func<System.Func<System.Func<int>>> Target(int n) " +
+            "=> () => () => () => n; }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [Test]
+    public void CompiledMultipleDeferredDelegatesKeepDistinctCachesOnTheSameFrame()
+    {
+        var outer = Create(7);
+        var frame = outer.Target;
+        Assert.That(frame, Is.Not.Null);
+        var fields = frame!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(3));
+        var middle = outer();
+        var inner = middle();
+        Assert.That(middle.Target, Is.SameAs(frame));
+        Assert.That(inner.Target, Is.SameAs(frame));
+        Assert.That((object)outer(), Is.SameAs(middle));
+        Assert.That((object)middle(), Is.SameAs(inner));
+        Assert.That(inner(), Is.EqualTo(7));
+
+        static Func<Func<Func<int>>> Create(int value)
+        {
+            return () => () => () => value;
+        }
+    }
+
+    [TestCase(false, 4)]
+    [TestCase(false, 5)]
+    [TestCase(false, 6)]
+    [TestCase(true, 4)]
+    [TestCase(true, 5)]
+    [TestCase(true, 6)]
+    public async Task NestedRootCapturesKeepDeferredDelegateAllocationsOutsideTheFactory(bool calledFactory, int metric)
+    {
+        var limit = metric == 5 ? 0 : 96;
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "static System.Func<System.Func<int>> Make(int n) => () => () => n; " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static System.Func<System.Func<int>> Target(int n) " +
+            (calledFactory ? "=> Make(n); }" : "=> () => () => n; }");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task NestedRootCapturesRetainOwnedLocalGraphsWithoutAllocatingTheDeferredDelegate(int metric)
+    {
+        var limit = metric == 5 ? 0 : 136;
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static System.Func<System.Func<int>> Target(int n) {{ " +
+            "int captured=n; var values=new int[2]; return () => () => captured+values.Length; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [Test]
+    public void CompiledNestedClosuresShareOneRootFrameAndCreateTheInnerDelegateOnLaterInvocation()
+    {
+        for (var value = -2; value <= 3; value++)
+        {
+            var outer = Create(value);
+            var frame = outer.Target;
+            Assert.That(frame, Is.Not.Null);
+            var fields = frame!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(fields, Has.Length.EqualTo(2));
+            var captured = fields.Single(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int));
+            var cache = fields.Single(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(Func<int>));
+            Assert.That(captured.GetValue(frame), Is.EqualTo(value));
+            Assert.That(cache.GetValue(frame), Is.Null);
+            var inner = outer();
+            Assert.That(cache.GetValue(frame), Is.SameAs(inner));
+            Assert.That((object)outer(), Is.SameAs(inner));
+            Assert.That((object)inner, Is.Not.SameAs(outer));
+            Assert.That(inner.Target, Is.SameAs(frame));
+            Assert.That(inner(), Is.EqualTo(value));
+        }
+
+        static Func<Func<int>> Create(int value)
+        {
+            return () => () => value;
+        }
+    }
+
+    [TestCase("System.Func<int,System.Func<int>>", "return k => () => n+k;")]
+    [TestCase("System.Func<System.Func<int>>", "return () => {int k=n; return () => k;};")]
+    [TestCase("System.Func<System.Func<int>>", "return () => () => ++n;")]
+    [TestCase("System.Func<System.Func<int>>", "return () => {int Read()=>n; return () => Read();};")]
+    [TestCase("System.Func<System.Func<System.Threading.Tasks.Task<int>>>", "return () => async () => {await System.Threading.Tasks.Task.CompletedTask; return n;};")]
+    public async Task IntermediateMutableLocalFunctionAndAsyncCaptureScopesRemainUnknown(string returnType, string body)
+    {
+        ArgumentNullException.ThrowIfNull(returnType);
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,10000)] public static " + returnType + " Target(int n) { " + body + " } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+    }
+
     [TestCase("int n", "n")]
     [TestCase("byte n", "n")]
     [TestCase("char n", "n")]

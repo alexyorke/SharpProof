@@ -154,6 +154,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _builder.FieldStore(entry, _context.FreshWriteSite(graph.OriginalOperation), IrWriteRegion.Field,
                     _context.Factory.Cast(_context.Factory.ObjectType, _context.Factory.Variable(frame)), member, captured);
             }
+            for (var slot = closure.Captures.Length; slot < closure.Fields.Length; slot++)
+            {
+                SpendRegion();
+                var cache = _context.Factory.GetOrCreateMember(_context.Factory.CreateIdentity(), _context.Factory.ObjectType,
+                    IrClosureFrameSite.FieldName(slot), _context.Factory.ObjectType, false);
+                _builder.FieldStore(entry, _context.FreshWriteSite(graph.OriginalOperation), IrWriteRegion.Field,
+                    _context.Factory.Cast(_context.Factory.ObjectType, _context.Factory.Variable(frame)), cache,
+                    _context.Factory.Null(_context.Factory.ObjectType));
+            }
             _expressions.RootClosureFrame = _context.Factory.Variable(frame);
             _expressions.RootClosureFields = fields.ToImmutable();
         }

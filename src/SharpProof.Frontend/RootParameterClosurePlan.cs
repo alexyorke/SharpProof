@@ -3,10 +3,12 @@ using SharpProof.Frontend.Host;
 
 namespace SharpProof.Frontend;
 
-// One root frame, initialized root locals, one returned delegate, no intermediate capture scopes.
+// One root frame and one immediately returned delegate. Nested deferred delegates
+// may capture that same read-only root storage; intermediate capture scopes are rejected.
 // Broader bodies must model their actual frame placement instead of reusing this rule.
 internal sealed class RootParameterClosurePlan
 {
+    internal const int MaximumNestedFunctions = 16;
     internal IMethodSymbol Lambda { get; }
     internal ImmutableArray<ResourceStorageKind> Fields { get; }
     internal ImmutableArray<ISymbol> Captures { get; }
@@ -71,23 +73,37 @@ internal sealed class RootParameterClosurePlan
         if (anonymous == null || anonymous.Symbol.IsAsync)
         { return null; }
         var remaining = 4096;
+        var functions = new List<IAnonymousFunctionOperation> { anonymous };
         foreach (var operation in anonymous.Body.Descendants())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (--remaining < 0 || operation is IAnonymousFunctionOperation or ILocalFunctionOperation)
+            if (--remaining < 0 || operation is ILocalFunctionOperation)
             { return null; }
+            if (operation is IAnonymousFunctionOperation nested)
+            {
+                if (nested.Symbol.IsAsync || functions.Count > MaximumNestedFunctions)
+                { return null; }
+                functions.Add(nested);
+            }
         }
-        if (anonymous.Syntax is not ExpressionSyntax expression || model.AnalyzeDataFlow(expression) is not { Succeeded: true } flow ||
-            flow.CapturedInside.IsEmpty || flow.CapturedInside.Length > ResourceAllocationShape.MaximumFields)
-        { return null; }
         var captures = ImmutableArray.CreateBuilder<ISymbol>();
-        foreach (var capture in flow.CapturedInside)
+        foreach (var function in functions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(capture.ContainingSymbol, method) ||
-                !(capture is IParameterSymbol || capture is ILocalSymbol local && locals.Contains(local, SymbolEqualityComparer.Default)))
+            if (function.Syntax is not ExpressionSyntax expression || model.AnalyzeDataFlow(expression) is not { Succeeded: true } flow ||
+                flow.CapturedInside.IsEmpty || flow.CapturedInside.Length > ResourceAllocationShape.MaximumFields)
             { return null; }
-            captures.Add(capture);
+            foreach (var capture in flow.CapturedInside)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!SymbolEqualityComparer.Default.Equals(capture.ContainingSymbol, method) ||
+                    !(capture is IParameterSymbol || capture is ILocalSymbol local && locals.Contains(local, SymbolEqualityComparer.Default)))
+                { return null; }
+                if (!captures.Contains(capture, SymbolEqualityComparer.Default))
+                { captures.Add(capture); }
+                if (captures.Count > ResourceAllocationShape.MaximumFields)
+                { return null; }
+            }
         }
         // Entry parameter stores and local initializer stores represent every admitted
         // capture write. Reject later writes, including writes inside the lambda.
@@ -125,6 +141,13 @@ internal sealed class RootParameterClosurePlan
             { return null; }
             fields.Add(storage);
         }
+        // Roslyn caches each nested capturing delegate on the shared root frame.
+        // The reference slot exists at factory entry, but starts null; the cached
+        // delegate itself is created by a later invocation of its enclosing body.
+        if (orderedCaptures.Length + functions.Count - 1 > ResourceAllocationShape.MaximumFields)
+        { return null; }
+        for (var index = 1; index < functions.Count; index++)
+        { fields.Add(ResourceStorageKind.Reference); }
         return new(anonymous.Symbol, fields.ToImmutable(), orderedCaptures);
     }
 }

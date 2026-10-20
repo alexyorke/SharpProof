@@ -89,6 +89,26 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+Nested root-capture lifetime support is implemented for the admitted shared-root
+scope. The root-frame planner now checks
+each deferred anonymous function and admits up to 16 nested functions only when
+all captures belong to the same read-only factory scope. Intermediate captures,
+local functions, async functions and unproved placements remain Unknown. The
+factory counts its root frame, deferred delegate cache slots and immediately
+returned delegate; inner instances belong to later invocations. Compiled-frame
+controls exposed the extra cache field, which is now included and initialized
+to null in IR. Corrected frame storage and bare-lambda costs passed all 807
+resource/native/protocol/cache controls, including independently compiled one-
+and two-level cache observations. The published CI found a missing exported
+input-model catalog entry. Its non-selecting category and exact surface snapshot
+are corrected; all 2165 frontend tests, all 1451 analyzer tests and quality/API
+gates passed. Full formatting and three package workflows are completing; their
+results are not claimed yet. Cache 42 invalidates older Unknown results;
+protocol 39, compiler artifact 52 and resource program 8 keep their formats. This
+step does not complete the broader capture/call lifetime requirement in phase C.
+
+### Conditional expected-cost checkpoint
+
 Conditional expected upper bounds are implemented for the admitted single-Boolean
 input model. A parameter-level
 ResourceBooleanInput attribute declares one Boolean marginal using bounded
@@ -116,10 +136,12 @@ published in draft MR #334.
 Latest fetched master 59353cb05 adds constrained integer comparable calls and
 receiver-mutation behavior. Merge 0e4f70ef2 preserves both this branch's initializer
 stores and master's specialized field binding. The local checkpoint above
-predates that merge. Resource/closure/expected-cost, constrained-comparable and
-layout/inventory checks are being repeated on the merged state. Layout passed
-2766 sources, 59 projects and 151 unchanged pinned common files; the trusted
-inventory classifies 529 paths. Exact-head CI must qualify the resulting commit.
+predates that merge. Post-merge verification passed 2070 resource/closure/
+expected-cost/comparable/aliasing/specified-call worker cases and 21 constrained
+comparable frontend cases. Layout passed 2766 sources, 59 projects and 151
+unchanged pinned common files; the trusted inventory classifies 529 paths, and
+documentation checks passed 728 links. Exact-head CI must qualify the resulting
+published commit ce51bfd72; documentation and toolchain-security CI passed.
 
 The completed expected-cost row covers conditional upper expectations under
 the stated Boolean model. It does not establish expected lower bounds or

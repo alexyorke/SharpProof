@@ -9,7 +9,7 @@ internal sealed partial class ResourceBoundsAnalysis
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         body = ArgumentNullGuard.NotNull(body, nameof(body));
-        var expected = body.SemanticModel?.Compilation.GetTypeByMetadataName("SharpProof.Attributes.ResourceBooleanInputAttribute");
+        var expected = body.SemanticModel?.Compilation.GetTypeByMetadataName(ContractApiMetadata.ResourceBooleanInput);
         IParameterSymbol? parameter = null;
         ResourceBooleanDistribution? distribution = null;
         foreach (var candidate in method.Parameters)

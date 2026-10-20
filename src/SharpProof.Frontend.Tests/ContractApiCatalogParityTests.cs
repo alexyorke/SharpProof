@@ -67,6 +67,11 @@ public sealed class ContractApiCatalogParityTests
                         descriptor.Selection,
                         Is.EqualTo(ContractApiSelectionFeature.None));
                     break;
+                case ContractApiAttributeCategory.InputModel:
+                    Assert.That(usage!.ValidOn, Is.EqualTo(AttributeTargets.Parameter));
+                    Assert.That(usage.AllowMultiple, Is.False);
+                    Assert.That(descriptor.Selection, Is.EqualTo(ContractApiSelectionFeature.None));
+                    break;
                 case ContractApiAttributeCategory.Closed:
                     Assert.That(
                         usage!.ValidOn,

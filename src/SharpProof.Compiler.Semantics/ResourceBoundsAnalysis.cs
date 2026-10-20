@@ -260,6 +260,10 @@ internal sealed partial class ResourceBoundsAnalysis
                     Visit(conditional.WhenTrue, depth + 1).Max(
                         conditional.WhenFalse is { } alternative ? Visit(alternative, depth + 1) : Cost.Zero));
                 break;
+            case IAnonymousFunctionOperation anonymous when _rootClosures.Values.Any(closure => closure is null
+                ? throw new ArgumentNullException(nameof(closure)) : SymbolEqualityComparer.Default.Equals(closure.Lambda, anonymous.Symbol)):
+                result = new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate()));
+                break;
             case IDelegateCreationOperation delegateCreation:
                 result = DelegateCreation(delegateCreation, depth);
                 break;
