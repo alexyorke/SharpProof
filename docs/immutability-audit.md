@@ -4947,3 +4947,7 @@ The canonical selected package gate restores/builds/packs one private feed and p
 ### IMM-M497: correct reflection-subset provenance and reconcile existing entries
 
 The two GetFields roots migrated in M486/M487 were already present in the fe 524-site inventory. An earlier filtered discovery pass did not match them, and calling that a query coverage gap was incorrect. Their migration and fourteen-case affected worker verification remain valid. Current source, call ownership and existing stable identities are now matched explicitly; earlier outside-subset claims are retracted and the MR description is corrected. Both existing array entries reconcile as migrations. No absence/completeness or historical status transfer is inferred; final current binding collection remains required.
+
+### IMM-M498: native fuzz alias, allocation and callback subjects
+
+Six semantic-edge sites are exact typed CLR array inputs/returns or adapter-held aliases deliberately exposing indexed-versus-enumerated identity mismatch. The ordinary allocation oracle must return its actual native int array, including faulting lengths. A conversion-resource callback deliberately mutates a shared Values array before returning/throwing. All eight are individually traced subjects whose types, identity and writes remain required; no code edit or new execution authority is inferred.
