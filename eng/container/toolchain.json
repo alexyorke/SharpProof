@@ -12,18 +12,13 @@
     "minimumSdkFrameworkVersion": "8.0.32",
     "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.426-bookworm-slim",
     "minimumSdkFrameworkImageDigest": "sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f",
-    "apiInventorySdkVersion": "9.0.316",
     "apiInventoryPackVersion": "9.0.18",
-    "apiInventoryImage": "mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim",
-    "apiInventoryImageDigest": "sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a",
-    "testRuntimeVersion": "8.0.32",
-    "testRuntimeImage": "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim",
-    "testRuntimeImageDigest": "sha256:60d11c2be381e7f90b8bd984472dd2432933858aba55087d5936980cf2071d5a"
+    "apiInventoryPackUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/9.0.18/microsoft.netcore.app.ref.9.0.18.nupkg",
+    "apiInventoryPackSha256": "645538957cff063262a94e2cca4644611e63e5eef8e4a31fe193e8d061e789c5",
+    "testRuntimeVersion": "8.0.32"
   },
   "powershell": {
     "versionLine": "7.5",
-    "image": "mcr.microsoft.com/powershell:7.5-ubuntu-24.04",
-    "imageDigest": "sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81",
     "version": "7.5.12",
     "archiveUrl": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz",
     "archiveSha256": "db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd"
