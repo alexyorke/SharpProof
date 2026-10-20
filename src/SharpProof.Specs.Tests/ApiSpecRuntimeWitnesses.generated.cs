@@ -11,6 +11,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static ImmutableDictionary<string, RowWitness> CreateWitnesses()
     {
         var witnesses = ImmutableDictionary.CreateBuilder<string, RowWitness>(StringComparer.Ordinal);
+        witnesses.Add("bcl.key-value-pair.key", CreateImmutablePairGetterWitness(false));
+        witnesses.Add("bcl.key-value-pair.value", CreateImmutablePairGetterWitness(true));
         witnesses.Add("bcl.dictionary.count", CreateCollectionCountWitness("Dictionary"));
         witnesses.Add("bcl.list.count", CreateCollectionCountWitness("List"));
         witnesses.Add("bcl.queue.count", CreateCollectionCountWitness("Queue"));

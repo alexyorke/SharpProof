@@ -1157,7 +1157,7 @@ public sealed class ApiSpecTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(templates.Length, Is.EqualTo(29));
+            Assert.That(templates.Length, Is.EqualTo(31));
             Assert.That(
                 templates.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier)),
                 Is.Unique.And.All.Not.Empty);

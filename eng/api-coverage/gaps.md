@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,581 declarations have no catalog/audited-intrinsic evidence, and 92 have partial
+55,579 declarations have no catalog/audited-intrinsic evidence, and 94 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,581 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,579 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -1058,7 +1058,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | partially-modeled | S |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | unmodeled | F |
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | unmodeled | N |
-| P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | unmodeled | O |
+| P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | partially-modeled | O |
 | P:System.Collections.Generic.Queue`1.Count | read | 5 | partially-modeled | S |
 | M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | partially-modeled | E |
 | M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | call | 4 | partially-modeled | L |
@@ -1078,7 +1078,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Math.Sqrt(System.Double) | call | 3 | unmodeled | N |
 | M:System.Object.#ctor | call | 3 | partially-modeled | O |
 | M:System.Object.Equals(System.Object) | call | 3 | unmodeled | O |
-| P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | unmodeled | O |
+| P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | partially-modeled | O |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 2 | unmodeled-domain | S |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | partially-modeled | L |
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | partially-modeled | S |
@@ -1146,9 +1146,27 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | P:System.DateTime.Ticks | read | 1 | unmodeled | O |
 | P:System.DateTime.UtcNow | read | 1 | unmodeled | O |
 
+## Immutable KeyValuePair getter slice
+
+The signed-framework `KeyValuePair<TKey,TValue>.Key` and `.Value` getters now
+have catalog evidence for purity, no allocations, no exceptions and termination. This
+covers the five Value reads and three Key reads in the ranked corpus for these
+facets. Reading an immutable value field executes no equality, hashing or
+formatting callbacks, including for reference, nullable and opaque struct values.
+Runtime witnesses audit the getter field-load IL, default values, distinct signed
+limits and reference identities, and reject deliberately wrong facet claims.
+Native worker checks exercise scalar, reference, nullable, array and opaque struct
+results; negative controls preserve receiver-indexing faults and ambient writes.
+Source-defined same-named structs receive no signed-framework evidence.
+
+These are still partial declarations: constructor behavior, precise result/field
+relationships, nullness and contract clauses about returned values remain open.
+A getter does not remove effects or faults from evaluating its receiver or from
+surrounding code. The single ranked pair-constructor call stays unmodeled.
+
 ## Every declaration with partial evidence
 
-These 92 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 94 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -1231,6 +1249,8 @@ These 92 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
 | P:System.Collections.Generic.Comparer`1.Default | intrinsic=default-comparer-cached-value |
+| P:System.Collections.Generic.KeyValuePair`2.Key | catalog=bcl.key-value-pair.key;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=Unknown;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| P:System.Collections.Generic.KeyValuePair`2.Value | catalog=bcl.key-value-pair.value;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=Unknown;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | P:System.Collections.Generic.HashSet`1.Count | intrinsic=default-primitive-hash-set-state |
