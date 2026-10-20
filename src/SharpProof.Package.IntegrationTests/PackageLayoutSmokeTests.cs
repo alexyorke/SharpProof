@@ -3589,6 +3589,46 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task MainPackagePublishesCheckedLowerBoundsAndAdmittedTightness(int kind)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var dependent = kind == 1;
+        var inner = dependent ? "i" : "n";
+        var metric = kind == 2 ? "AllocatedElements" : "LoopBodyEntries";
+        var body = kind == 2 ? "var a=new int[n];" : "for(int i=0;i<n;i++) { for(int j=0;j<" + inner + ";j++) {} }";
+        var expectedLower = kind == 0 ? "Omega(n^2)" : "Omega(n)";
+        var expectedTight = kind == 0 ? "Theta(n^2)" : "Theta(n)";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",long.MaxValue)] public static void Target(int n) { " + body + " } }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var lower = claim.GetProperty("resourceBound").GetProperty("asymptotic").GetProperty("lower");
+        JsonAssert.Equal(lower, "model", SharpProof.Worker.Protocol.WorkerResourceModels.NormalDomain);
+        JsonAssert.Equal(lower, "lowerBound", expectedLower);
+        if (dependent)
+        {
+            Assert.That(lower.GetProperty("tightBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            JsonAssert.Equal(lower, "tightUnknownReason", "ResourceTightnessUnproved");
+        }
+        else
+        { JsonAssert.Equal(lower, "tightBound", expectedTight); }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic").GetProperty("lower"),
+            "lowerBound", expectedLower);
+    }
     [TestCase(false)]
     [TestCase(true)]
     public async Task MainPackageReportsModeledAsymptoticUpperBoundsWithoutTightness(bool multipleInputs)

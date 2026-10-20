@@ -12,6 +12,56 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeResourceProgramTests
 {
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    [TestCase(7)]
+    [TestCase(8)]
+    [TestCase(9)]
+    [TestCase(10)]
+    public void AllocationSuccessConditioningRequiresTheClosedCompilerChoiceShape(int mutation)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var choiceBlock = builder.CreateBlock();
+        var failure = builder.CreateBlock();
+        var normal = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var site = factory.CreateOperation("allocation");
+        var first = factory.CreateVariable("fails", factory.BooleanType);
+        var second = factory.CreateVariable("other", factory.BooleanType);
+        builder.Assign(entry, site, second, factory.Boolean(false));
+        builder.Goto(entry, site, choiceBlock);
+        var marker = factory.CreateOperation(IrOpaqueCallSite.Describe(mutation == 9 ? IrOpaqueCallEffects.Allocates : IrOpaqueCallEffects.Throws,
+            mutation == 1 ? "foreign" : "array:beyond-maximum-length"));
+        builder.Havoc(choiceBlock, marker, mutation == 3 ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
+            mutation == 2 ? IrHavocOrigin.Input : IrHavocOrigin.Approximation, mutation == 4 ? [first, second] : [first]);
+        builder.Branch(choiceBlock, site, factory.Variable(mutation == 5 ? second : first), failure, normal);
+        if (mutation == 8)
+        { builder.Assign(failure, site, second, factory.Boolean(true)); }
+        builder.Throw(failure, site, mutation == 6 ? IrExceptionKind.DivideByZero : IrExceptionKind.Unknown, exit);
+        if (mutation != 7)
+        {
+            var array = factory.GetOrCreateSequenceType(factory.GetOrCreateIntegerType(32, true));
+            builder.Allocate(normal, mutation is 8 or 10 ? factory.CreateOperation() : site, array,
+                factory.CreateVariable("array", array), factory.Integer(1));
+        }
+        builder.Return(normal, site);
+        builder.Return(exit, site);
+        var owner = new CompilerTotalCallablePreparation("owned", builder.Build(), [], null, []);
+        var resource = ResourceProgram.Array(ResourceExpression.One, ResourceExpression.One);
+        var check = NativeResourceProgramVerifier.Verify(resource, "owned", owner, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.LowerDomainVerified, Is.EqualTo(mutation == 0), check.LowerDomainUnknownReason);
+        Assert.That(check.Cost, Is.Not.Null);
+        Assert.That(check.LowerCost, Is.Not.Null);
+    }
+
     private static CompilerTotalCallablePreparation Owner()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);

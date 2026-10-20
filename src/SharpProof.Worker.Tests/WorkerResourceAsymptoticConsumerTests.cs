@@ -6,6 +6,114 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class WorkerTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task NativeLowerGrowthReachesValidatedCacheAndSarifWithoutInventingTightness(bool dependent)
+    {
+        var inner = dependent ? "i" : "n";
+        using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,long.MaxValue)] public static void Target(int n) { " +
+            "for(int i=0;i<n;i++) { for(int j=0;j<" + inner + ";j++) {} } } }");
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+            second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
+        var lower = second.ClaimResults.Single().ResourceBound!.Asymptotic!.Lower!;
+        Assert.That(lower.LowerBound, Is.EqualTo(dependent ? "Omega(n)" : "Omega(n^2)"), lower.UnknownReason);
+        Assert.That(lower.TightBound, Is.EqualTo(dependent ? null : "Theta(n^2)"));
+        Assert.That(lower.TightUnknownReason, Is.EqualTo(dependent ? "ResourceTightnessUnproved" : null));
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(result => result.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        var record = row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic").GetProperty("lower");
+        Assert.That(record.GetProperty("model").GetString(), Is.EqualTo(WorkerResourceModels.NormalDomain));
+        Assert.That(record.GetProperty("lowerBound").GetString(), Is.EqualTo(lower.LowerBound));
+        Assert.That(record.GetProperty("tightBound").GetString(), Is.EqualTo(lower.TightBound));
+    }
+
+    [Test]
+    public async Task NativeLowerGrowthProtocolRejectsContradictoryAndRecursiveRecords()
+    {
+        using var project = TestProject.Create(AsymptoticConsumerSource(0));
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
+        var bound = response.ClaimResults.Single().ResourceBound!;
+        var original = bound.Asymptotic!;
+        Assert.That(original.Lower!.UnknownReason, Is.Null);
+        var payload = JsonSerializer.SerializeToUtf8Bytes(original, WorkerProtocolJson.Options);
+        for (var mutation = 0; mutation < 17; mutation++)
+        {
+            var parent = JsonSerializer.Deserialize<WorkerResourceAsymptoticEvidence>(payload, WorkerProtocolJson.Options)!;
+            bound.Asymptotic = parent;
+            var lower = parent.Lower!;
+            switch (mutation)
+            {
+                case 0:
+                    parent.Lower = null;
+                    break;
+                case 1:
+                    lower.Model = "foreign";
+                    break;
+                case 2:
+                    lower.InferredBound = null;
+                    break;
+                case 3:
+                    lower.LowerBound = "Theta(n^2)";
+                    break;
+                case 4:
+                    lower.TightBound = null;
+                    break;
+                case 5:
+                    lower.Growth = null;
+                    break;
+                case 6:
+                    lower.Growth!.Lower = lower;
+                    break;
+                case 7:
+                    lower.Growth!.IsZero = true;
+                    break;
+                case 8:
+                    lower.Growth!.PolynomialDegree = 3;
+                    lower.Growth.UpperBound = "O(n^3)";
+                    break;
+                case 9:
+                    lower.Growth!.InputOrdinal = 1;
+                    break;
+                case 10:
+                    lower.UnknownReason = "contradictory";
+                    break;
+                case 11:
+                    lower.Growth!.UnknownReason = "unproved";
+                    break;
+                case 12:
+                    lower.Growth!.LogarithmicDegree = null;
+                    break;
+                case 13:
+                    lower.InferredBound = new string((char)10, 1);
+                    break;
+                case 14:
+                    lower.TightBound = "Theta(1)";
+                    break;
+                case 15:
+                    lower.Growth!.Model = "foreign";
+                    break;
+                default:
+                    lower.TightUnknownReason = "unproved";
+                    break;
+            }
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False, "mutation " + mutation);
+        }
+        bound.Asymptotic = original;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+    }
+
     [TestCase(0, "O(n^2)")]
     [TestCase(1, "O(log(n))")]
     [TestCase(2, "O(n * log(n))")]

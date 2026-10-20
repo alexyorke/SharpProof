@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "36";
+    public const string Current = "37";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 38;
+    public const int Current = 39;
 }
 
 internal static class WorkerManifestVersions
@@ -181,6 +181,7 @@ internal static class WorkerResourceModels
     public const string LifetimeCostModel = AllocationLayout + ":finite-owned-strong-reachability-v1:normal-completion";
     public const int MaximumExpressionBytes = 1024 * 1024;
     public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
+    public const string NormalDomain = "unbounded-scalar-counter-extension-v1:ideal-primitive-allocation";
     public const int MaximumAsymptoticDegree = 4096;
 }
 
@@ -214,6 +215,26 @@ internal sealed class WorkerResourceAsymptoticEvidence
     public string? InputKind { get; set; }
     [JsonRequired]
     public string? InputName { get; set; }
+    [JsonRequired]
+    public string? UnknownReason { get; set; }
+    [JsonRequired]
+    public WorkerResourceLowerAsymptoticEvidence? Lower { get; set; }
+}
+
+internal sealed class WorkerResourceLowerAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; set; } = WorkerResourceModels.NormalDomain;
+    [JsonRequired]
+    public string? InferredBound { get; set; }
+    [JsonRequired]
+    public string? LowerBound { get; set; }
+    [JsonRequired]
+    public string? TightBound { get; set; }
+    [JsonRequired]
+    public string? TightUnknownReason { get; set; }
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Growth { get; set; }
     [JsonRequired]
     public string? UnknownReason { get; set; }
 }

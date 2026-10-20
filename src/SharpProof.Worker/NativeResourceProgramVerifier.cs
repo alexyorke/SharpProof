@@ -13,6 +13,8 @@ internal sealed record NativeResourceProgramCheck(NativeResourceCost? Cost, stri
 {
     internal bool Verified => Cost is not null;
     internal NativeResourceCost? LowerCost { get; init; }
+    internal string? LowerDomainUnknownReason { get; init; }
+    internal bool LowerDomainVerified => Verified && LowerDomainUnknownReason is null;
 }
 
 // This checks the closed resource semantics, not producer-computed bounds.
@@ -41,7 +43,11 @@ internal static class NativeResourceProgramVerifier
         {
             ResourceProgramOwnership.Validate(program, callableId, owner, cancellation);
             var upper = Visit(program, callableId, owner, bindMetadata, cancellation);
-            return new(upper, null) { LowerCost = VisitLower(program, cancellation) };
+            return new(upper, null)
+            {
+                LowerCost = VisitLower(program, cancellation),
+                LowerDomainUnknownReason = NativeResourceNormalDomain.Check(program, owner, cancellation)
+            };
         }
         catch (InvalidDataException exception)
         { return new(null, exception.Message); }

@@ -138,6 +138,17 @@ internal static class NativeResourceContractVerifier
             if (stackUpper != null)
             { result.ProofCore = [.. result.ProofCore, "resource-stack-model:" + NativeResourceStackVerifier.ModelId]; }
             result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
+            var lower = constraint.Metric switch
+            {
+                WorkerResourceMetric.LoopBodyEntries => check.LowerCost?.LoopEntries,
+                WorkerResourceMetric.ArrayAllocations => check.LowerCost?.Arrays,
+                WorkerResourceMetric.AllocatedElements => check.LowerCost?.Elements,
+                _ => null
+            };
+            result.ResourceBound.Asymptotic!.Lower = LowerEvidence(result.ResourceBound.Asymptotic, lower,
+                check.LowerDomainUnknownReason, cancellation);
+            if (result.ResourceBound.Asymptotic.Lower.UnknownReason is null)
+            { result.ProofCore = [.. result.ProofCore, "resource-normal-domain:" + NativeResourceNormalDomain.ModelId]; }
             result.ProofCore = [.. result.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
             metadata.Project(result);
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
@@ -168,6 +179,34 @@ internal static class NativeResourceContractVerifier
             return result;
         }
     }
+    private static WorkerResourceLowerAsymptoticEvidence LowerEvidence(WorkerResourceAsymptoticEvidence upper,
+        ResourceExpression? lower, string? domainReason, CancellationToken cancellation)
+    {
+        upper = ArgumentNullGuard.NotNull(upper, nameof(upper));
+        cancellation.ThrowIfCancellationRequested();
+        var reason = domainReason ?? (lower is null ? "ResourceLowerMetricUnsupported" :
+            upper.UnknownReason is not null ? "ResourceLowerUpperGrowthUnavailable" : null);
+        if (reason != null)
+        { return new() { UnknownReason = reason }; }
+        var growth = AsymptoticEvidence(lower!, cancellation);
+        if (growth.UnknownReason != null)
+        { return new() { UnknownReason = growth.UnknownReason }; }
+        if (growth.IsZero == true && upper.IsZero != true)
+        { return new() { UnknownReason = "ResourcePositiveLowerBoundUnproved" }; }
+        if (growth.InputOrdinal is not null && (growth.InputOrdinal != upper.InputOrdinal || growth.InputKind != upper.InputKind || growth.InputName != upper.InputName))
+        { return new() { UnknownReason = "ResourceLowerInputMismatch" }; }
+        // The nested growth describes the lower formula, not another source claim.
+        growth.Lower = null;
+        return new()
+        {
+            InferredBound = lower!.ToDisplayString(),
+            LowerBound = string.Concat("Omega", growth.UpperBound.AsSpan(1)),
+            TightBound = growth.UpperBound == upper.UpperBound ? string.Concat("Theta", upper.UpperBound.AsSpan(1)) : null,
+            TightUnknownReason = growth.UpperBound == upper.UpperBound ? null : "ResourceTightnessUnproved",
+            Growth = growth
+        };
+    }
+
     private static WorkerResourceAsymptoticEvidence AsymptoticEvidence(ResourceExpression upper, CancellationToken cancellation)
     {
         upper = ArgumentNullGuard.NotNull(upper, nameof(upper));
@@ -181,7 +220,8 @@ internal static class NativeResourceContractVerifier
             InputOrdinal = growth.Input?.Ordinal,
             InputKind = growth.Input?.Kind.ToString(),
             InputName = growth.Input?.DisplayName,
-            UnknownReason = growth.UnknownReason
+            UnknownReason = growth.UnknownReason,
+            Lower = new() { UnknownReason = "ResourceLowerMetricUnsupported" }
         };
     }
 }

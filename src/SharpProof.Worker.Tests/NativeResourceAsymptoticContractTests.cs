@@ -6,6 +6,98 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) {}", "Omega(n)", "Theta(n)")]
+    [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }", "Omega(n^2)", "Theta(n^2)")]
+    [TestCase("LoopBodyEntries", "for(int i=n;i>0;i/=2) {}", "Omega(log(n))", "Theta(log(n))")]
+    [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) { for(int j=n;j>0;j/=2) {} }", "Omega(n * log(n))", "Theta(n * log(n))")]
+    [TestCase("ArrayAllocations", "for(int i=0;i<n;i++) { var a=new int[1]; }", "Omega(n)", "Theta(n)")]
+    [TestCase("AllocatedElements", "for(int i=0;i<n;i++) { var a=new int[2]; }", "Omega(n)", "Theta(n)")]
+    [TestCase("AllocatedElements", "var a=new int[n];", "Omega(n)", "Theta(n)")]
+    [TestCase("LoopBodyEntries", "for(int i=0;i<n;i++) { for(int j=0;j<i;j++) {} }", "Omega(n)", null)]
+    public async Task NativeLowerAndTightGrowthRequireBothBoundsAndAnAdmittedDomain(string metric, string body, string expectedLower, string? expectedTight)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(expectedLower);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric." + metric + ",long.MaxValue)]", body)));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var lower = result.ResourceBound!.Asymptotic!.Lower!;
+        Assert.That(lower.Model, Is.EqualTo(NativeResourceNormalDomain.ModelId));
+        Assert.That(lower.LowerBound, Is.EqualTo(expectedLower), lower.UnknownReason);
+        Assert.That(lower.TightBound, Is.EqualTo(expectedTight));
+        Assert.That(lower.TightUnknownReason, Is.EqualTo(expectedTight is null ? "ResourceTightnessUnproved" : null));
+        Assert.That(lower.InferredBound, Is.Not.Null.And.Not.Empty);
+        Assert.That(lower.Growth!.Lower, Is.Null);
+        Assert.That(lower.UnknownReason, Is.Null);
+        Assert.That(result.ProofCore, Does.Contain("resource-normal-domain:" + NativeResourceNormalDomain.ModelId));
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+    }
+
+    [TestCase("Contract.Requires(n<10); for(int i=0;i<n;i++) {}")]
+    [TestCase("if(n>0) return; for(int i=0;i<n;i++) {}")]
+    [TestCase("int value=1/n; for(int i=0;i<n;i++) {}")]
+    public async Task UnsupportedLowerDomainsKeepNumericUpperProofWithoutPartialLowerEvidence(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,long.MaxValue)]", body)));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var lower = result.ResourceBound!.Asymptotic!.Lower!;
+        Assert.That(lower.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(lower.InferredBound, Is.Null);
+        Assert.That(lower.LowerBound, Is.Null);
+        Assert.That(lower.TightBound, Is.Null);
+        Assert.That(lower.Growth, Is.Null);
+    }
+
+    [TestCase("for(int i=0;i<n;i++) {}", true)]
+    [TestCase("for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }", true)]
+    [TestCase("for(int i=0;i<n;i++) { var a=new int[1]; }", true)]
+    [TestCase("var a=new int[n];", true)]
+    [TestCase("if(n>0) return; for(int i=0;i<n;i++) {}", false)]
+    [TestCase("var a=new int[1]; int value=a[n];", false)]
+    [TestCase("int value=1/n;", false)]
+    [TestCase("int value=n/2;", true)]
+    [TestCase("int divisor=2; int value=n/divisor;", true)]
+    [TestCase("int divisor=2; divisor=n; int value=1/divisor;", false)]
+    [TestCase("byte divisor=unchecked((byte)256); int value=n/divisor;", false)]
+    [TestCase("Contract.Requires(n<10); for(int i=0;i<n;i++) {}", false)]
+    [TestCase("Contract.Requires(true); for(int i=0;i<n;i++) {}", true)]
+    public void NativeLowerDomainAdmitsTotalCounterBodiesAndRejectsUnprovedCompletion(string body, bool admitted)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,long.MaxValue)]", body)));
+        var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        if (check.LowerDomainVerified != admitted)
+        {
+            var printer = new IrPrinter(target.Total!.Program.Factory);
+            var count = 0;
+            foreach (var block in target.Total.Program.Blocks)
+            {
+                TestContext.Out.WriteLine("block " + block.Id);
+                foreach (var instruction in block.Instructions)
+                {
+                    if (++count > 32)
+                    { break; }
+                    var detail = instruction switch
+                    {
+                        IrAllocationInstruction allocation => "length=" + (allocation.Length is null ? "null" : printer.Print(allocation.Length)) + "; type=" + target.Total.Program.Factory.GetTypeInfo(allocation.AllocatedType).Kind + "; initial=" + allocation.InitialValues.Length,
+                        IrAssignInstruction assignment => assignment.Target + "=" + printer.Print(assignment.Value),
+                        IrBranchInstruction branch => printer.Print(branch.Condition),
+                        _ => ""
+                    };
+                    var operation = target.Total.Program.Factory.GetOperationInfo(instruction.Operation);
+                    var description = operation.Description is { } name ? target.Total.Program.Factory.GetString(name) : "null";
+                    TestContext.Out.WriteLine(instruction.Kind + " " + detail + " site=" + instruction.Operation + " " + description + " span=" + operation.SourceSpan);
+                }
+            }
+        }
+        Assert.That(check.LowerDomainVerified, Is.EqualTo(admitted), check.LowerDomainUnknownReason);
+        Assert.That(admitted ? check.LowerDomainUnknownReason is null : !string.IsNullOrWhiteSpace(check.LowerDomainUnknownReason), Is.True);
+    }
+
     [TestCase("for(int i=0;i<n;i++) { for(int j=0;j<n;j++) { var a=new int[1]; } }", 20, 16, 16)]
     [TestCase("for(int i=0;i<n;i++) { for(int j=0;j<i;j++) { var a=new int[1]; } }", 4, 0, 0)]
     [TestCase("for(int i=0;i<n;i++) { Walk(i); }", 4, 0, 0)]

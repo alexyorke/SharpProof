@@ -756,7 +756,7 @@ internal static partial class WorkerProtocolJson
                     dependency.WitnessIdentifier == "runtime-layout.coreclr-x64" && dependency.RuntimeModel == WorkerResourceModels.AllocationLayout)))
         { return false; }
         if (value.Outcome == WorkerClaimOutcome.Proven && value.Vacuity == WorkerVacuityKind.None
-            ? !HasValidResourceAsymptotic(evidence.Asymptotic) : evidence.Asymptotic is not null)
+            ? !HasValidResourceAsymptotic(evidence.Asymptotic) || !HasValidResourceLowerAsymptotic(evidence.Asymptotic?.Lower, evidence.Asymptotic) : evidence.Asymptotic is not null)
         { return false; }
         if (!HasValidResourceMetadata(claim!, value, evidence))
         { return false; }
@@ -770,6 +770,28 @@ internal static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceLowerAsymptotic(WorkerResourceLowerAsymptoticEvidence? evidence, WorkerResourceAsymptoticEvidence? upper)
+    {
+        if (evidence is null || upper is null || evidence.Model != WorkerResourceModels.NormalDomain)
+        { return false; }
+        if (evidence.UnknownReason is { } reason)
+        {
+            return !string.IsNullOrWhiteSpace(reason) && reason.Length <= 256 && !reason.Any(static character => char.IsControl(character)) &&
+                evidence.InferredBound is null && evidence.LowerBound is null && evidence.TightBound is null && evidence.TightUnknownReason is null && evidence.Growth is null;
+        }
+        if (upper.UnknownReason is not null || evidence.Growth is not { Lower: null, UnknownReason: null } growth ||
+            !HasValidResourceAsymptotic(growth) || string.IsNullOrWhiteSpace(evidence.InferredBound) ||
+            evidence.InferredBound!.Length > 16384 || evidence.InferredBound.Any(static character => char.IsControl(character)) ||
+            growth.IsZero != upper.IsZero && (growth.IsZero == true || upper.IsZero == true) ||
+            growth.PolynomialDegree > upper.PolynomialDegree ||
+            growth.PolynomialDegree == upper.PolynomialDegree && growth.LogarithmicDegree > upper.LogarithmicDegree ||
+            growth.InputOrdinal is not null && (growth.InputOrdinal != upper.InputOrdinal || growth.InputKind != upper.InputKind || growth.InputName != upper.InputName))
+        { return false; }
+        return evidence.LowerBound == "Omega" + growth.UpperBound!.Substring(1) &&
+            evidence.TightBound == (growth.UpperBound == upper.UpperBound ? "Theta" + upper.UpperBound!.Substring(1) : null) &&
+            evidence.TightUnknownReason == (growth.UpperBound == upper.UpperBound ? null : "ResourceTightnessUnproved");
+    }
+
     private static bool HasValidResourceAsymptotic(WorkerResourceAsymptoticEvidence? evidence)
     {
         if (evidence is null || evidence.Model != WorkerResourceModels.Asymptotic)

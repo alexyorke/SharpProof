@@ -649,7 +649,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 36 and cache schema 38 invalidate older responses without this evidence.
+Protocol 37 and cache schema 39 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -667,13 +667,43 @@ entries, array counts and element counts. Sequence adds lower costs; a choice
 contributes only a bound valid on both arms. Contradictory or missing certificate
 fields reject the whole proof without partial numeric evidence.
 
-These lower costs are conditional on normal completion. They do not prove that
-normal completion is feasible, that an unbounded family of completing inputs
-exists, or that an upper bound is tight. Early-return bodies and short-circuit
-regions use an explicit upper-only envelope. Recursive prefixes retain a zero
-lower cost until their per-activation size environment is modeled. Consumer
-Omega/Theta evidence is not yet published by this foundation; upper asymptotic
-reporting remains unchanged while the remaining proof obligations are implemented.
+These lower costs are conditional on normal completion. Early-return bodies and
+short-circuit regions use an explicit upper-only envelope. Recursive prefixes
+retain a zero lower cost until their per-activation size environment is modeled.
+
+Native results now carry a required lower-growth record. A separate native domain
+check admits nonnegative scalar inputs, mathematical unbounded loop counters and
+ideal primitive allocations. It tracks immutable single-definition
+snapshots, proves constant and nonnegative allocation guards, and prunes only
+proved branches. Reassigned divisors, narrowing to zero, opaque calls, heap reads,
+nontrivial preconditions, recursion and unsupported instructions produce explicit
+Unknown lower records while preserving a valid numeric upper proof. The model
+identifier reports the counter extension and ideal-allocation assumption;
+physical CLR limits and allocation failures remain outside that model.
+
+For symbolic array extents, the checker recognizes the compiler's closed
+array-size-limit failure choice and selects its success continuation under the
+declared ideal allocation model. The exact marker, Boolean havoc, branch,
+exception kind, source site and following primitive allocation must agree.
+Unrelated or malformed havoc remains Unknown. This rule extends the allocation
+model explicitly; it does not infer a successful physical allocation above the
+CLR limit.
+
+For admitted loop-entry, array-count and element-count claims, the record includes
+the inferred lower formula and an Omega order. Matching lower and upper orders
+produce Theta. Independent nesting proves Theta(n^2); decreasing division proves
+Theta(log(n)); combined independent loops prove Theta(n * log(n)). A dependent
+triangular loop currently proves Omega(n) against O(n^2), with
+ResourceTightnessUnproved instead of a Theta claim. The bound counts logical cost
+units under the selected metric. It does not measure elapsed time.
+
+The lower formula's nested growth descriptor uses the same canonical expression
+grammar as upper growth, with no further nested lower record. Protocol validation
+rejects missing, recursive, contradictory and mismatched input records, larger
+lower orders, partial Unknown records and tightness without matching bounds.
+Protocol 37 and cache 39 invalidate prior responses; compiler artifact 50 and
+resource program 6 retain their current formats. Cache and SARIF preserve the
+lower record and its declared domain.
 
 Intrinsic string lengths are admitted as size inputs and as contract sizes such
 as text.Length. Their identity is bound through the compiler's intrinsic sequence

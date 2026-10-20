@@ -59,7 +59,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## E. Asymptotic and aggregate analysis
 
-- [ ] Upper/lower asymptotic expressions and tightness only with both bounds.
+- [x] Upper/lower asymptotic expressions and tightness only with both bounds.
 - [ ] Amortized costs through checked potential/accounting rules.
 - [ ] Average-case bounds conditional on an explicit validated input model;
   never invent a probability distribution from source structure.
@@ -88,6 +88,38 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+Consumer lower/tightness evidence is implemented and verified for the admitted
+loop-entry, primitive-array-count and element-count model.
+The native normal-domain checker admits nonnegative scalar/counter extensions
+with ideal primitive allocation, immutable snapshot facts and proved guard
+pruning. It rejects finite input contracts, mutable divisors, casts to zero,
+opaque operations, heap reads and upper-only regions. Numeric upper proofs remain
+independent of Unknown lower domains. Native loop, array-count and element-count
+claims publish Omega; Theta requires matching proved orders. Conservative
+dependent-loop results carry ResourceTightnessUnproved. Protocol 37 and cache 39
+invalidate older responses; artifact 50 and program 6 are unchanged. Initial
+verification passed 12 admission controls and 641 native/protocol/cache/SARIF
+cases. Final verification passed all 654 worker cases, 1450 analyzer tests and
+seven strict-package workflows, including a symbolic array extent. Quality/API,
+full formatting with a final edited-file check, layout, documentation lint and
+726 links passed. The new domain checker is classified in the 522-path trusted
+inventory; layout has 2754 sources, 59 projects and 151 unchanged pinned common
+files. Scoped failure-choice tests reject foreign markers, origins, effects,
+variables, exception kinds and allocation sites. The ideal array model selects
+only the checked source-bound size-limit success continuation.
+
+The completed asymptotic row covers this explicit model, with Unknown outside
+admission. Broader lifetime composition, amortized accounting, validated expected
+costs, async/concurrency models, coverage qualification and final audit remain
+required. No expected-cost or amortized result is implied by Omega/Theta evidence.
+
+The previous foundation checkpoint f0d505b0c passed canonical, package, docs and
+security CI. All four coverage shards passed, but aggregate qualification failed
+at 4081/4265 changed trusted-code lines (95.69%, 184 gaps). The 100% floor remains
+unchanged and fresh exact-head CI is required for the consumer extension.
+
+### Foundation and local-capture checkpoints
 
 The lower-bound foundation is implemented: program model 6 adds separate lower array extents
 and loop-rank size envelopes. Native derivation validates ownership and ordering
