@@ -4873,3 +4873,7 @@ Twenty-eight materializations are individually traced through current call sites
 Authentic assembly and SDK metadata byte observations are immutable. Hashing uses readonly spans; PEReader and ModuleMetadata consume immutable image APIs directly. The strong-name payload deliberately altered by indexed XOR remains a mutable corruption subject, and emitted contract images retain a final native file adapter.
 
 All thirteen actual metadata/identity cases pass. Literal conservation verifies 4299 tokens across 1068 changed files and the current manifest conserves 1948 paths. Two migrations and two native/mutable subjects reconcile independently, leaving 366 unchecked array candidates. Remaining coverage/binding/archive and final collection/workflows remain pending.
+
+### IMM-M478: preserve mutable SMT overlay subjects
+
+All seven native buffer sites in ArrayValueOverlayTests are deliberately mutable subjects passed to ApplyArrayObservations. Current assertions require indexed replacement, exact object identity, no-write rejection or preservation of earlier writes before a later failure. Observation entries and immutable overlay inputs are already frozen. This full-unit role trace changes no code and claims no new execution authority. Seven sites close independently, leaving 359 unchecked array candidates; M477 corpus work is still under verification.
