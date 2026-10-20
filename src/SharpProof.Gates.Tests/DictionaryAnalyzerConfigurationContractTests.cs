@@ -95,11 +95,10 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
     [Test]
     public void DictionaryProviderKeepsGlobalConfigurationOutOfFileOptions()
     {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["build_property.SharpProofProfile"] = "strict",
-            ["build_property.SharpProofFeatures"] = "contracts"
-        };
+        var valueBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        valueBuilder.Add("build_property.SharpProofProfile", "strict");
+        valueBuilder.Add("build_property.SharpProofFeatures", "contracts");
+        var values = valueBuilder.ToImmutable();
         var provider = new DictionaryAnalyzerConfigOptionsProvider(values);
         var configuration = CompilerConfiguration.FromOptions(provider);
         var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
