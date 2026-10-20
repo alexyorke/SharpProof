@@ -35,6 +35,20 @@ public sealed class AtomicFileTests : IDisposable
     }
 
     [Test]
+    public void StagedBytesRejectDefaultBeforeCreatingTheFileAndAcceptEmpty()
+    {
+        var temporary = Path.Combine(_root, "staged-empty.tmp");
+        var invalidPath = Assert.Throws<ArgumentNullException>((Action)(() => AtomicFile.WriteStagedBytes(null!, default)));
+        Assert.That(invalidPath!.ParamName, Is.EqualTo("temporary"));
+        var invalidContent = Assert.Throws<ArgumentNullException>((Action)(() => AtomicFile.WriteStagedBytes(temporary, default)));
+        Assert.That(invalidContent!.ParamName, Is.EqualTo("content"));
+        Assert.That(File.Exists(temporary), Is.False);
+        AtomicFile.WriteStagedBytes(temporary, ImmutableArray<byte>.Empty);
+        Assert.That(new FileInfo(temporary).Length, Is.Zero);
+    }
+
+
+    [Test]
     public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination()
     {
         AssertWriteUtf8ReplacementAsync(static (path, content) =>
@@ -88,7 +102,7 @@ public sealed class AtomicFileTests : IDisposable
             stagedBuilder.Add(temporary);
             AtomicFile.WriteStagedBytes(
                 temporary,
-                Encoding.UTF8.GetBytes($"content-{index}\n"));
+                Encoding.UTF8.GetBytes($"content-{index}\n").ToImmutableArray());
         }
         var staged = stagedBuilder.ToImmutable();
 
@@ -150,7 +164,7 @@ public sealed class AtomicFileTests : IDisposable
             Assert.That(Path.GetFileName(temporary).Length, Is.LessThan(255));
             AtomicFile.WriteStagedBytes(
                 temporary,
-                Encoding.UTF8.GetBytes("content"));
+                Encoding.UTF8.GetBytes("content").ToImmutableArray());
             AtomicFile.PublishStaged(temporary, path);
             Assert.That(File.ReadAllText(path), Is.EqualTo("content"));
         }

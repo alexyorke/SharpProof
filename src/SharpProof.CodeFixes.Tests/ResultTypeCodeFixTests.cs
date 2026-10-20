@@ -220,7 +220,7 @@ public sealed class ResultTypeCodeFixTests
         var project = workspace.AddProject("Fixture", LanguageNames.CSharp)
             .WithMetadataReferences(TestMetadataReferences.WithSharpProof)
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithSpecificDiagnosticOptions(new Dictionary<string, ReportDiagnostic> { ["SP0024"] = ReportDiagnostic.Error }));
+                .WithSpecificDiagnosticOptions(ImmutableDictionary<string, ReportDiagnostic>.Empty.WithComparers(StringComparer.Ordinal).Add("SP0024", ReportDiagnostic.Error)));
         return project.AddDocument("Fixture.cs", SourceText.From(Source(expression)));
     }
 

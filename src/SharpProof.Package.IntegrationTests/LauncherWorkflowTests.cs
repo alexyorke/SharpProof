@@ -73,7 +73,7 @@ public sealed class LauncherWorkflowTests
     {
         System.ArgumentNullException.ThrowIfNull(invalid);
         using var directory = new TempDirectory("sharpproof-direct-invalid-");
-        var arguments = invalid == "missing" ? [] : Arguments(directory.FullName);
+        ImmutableArray<string> arguments = invalid == "missing" ? [] : Arguments(directory.FullName);
         arguments = invalid switch
         {
             "unknown" => [.. arguments, "--unknown", "value"],
@@ -92,11 +92,12 @@ public sealed class LauncherWorkflowTests
     public async Task PreManifestTimeoutIsPromotedOnlyWhenItsRequestAuthorityIsValid(bool invalidAuthority, bool requireProven)
     {
         using var directory = new TempDirectory("sharpproof-pre-manifest-timeout-");
-        var arguments = Arguments(directory.FullName);
+        var argumentBuilder = Arguments(directory.FullName).ToBuilder();
         if (requireProven)
         {
-            arguments[Array.IndexOf(arguments, "--verify-policy") + 1] = "require-proven";
+            argumentBuilder[argumentBuilder.IndexOf("--verify-policy") + 1] = "require-proven";
         }
+        var arguments = argumentBuilder.ToImmutable();
         var exit = await Program.RunMain(arguments, (request, _) =>
             request is null ? throw new System.ArgumentNullException(nameof(request)) : (Task.FromResult(WorkerResultAssembler.Create(
                 WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
@@ -271,7 +272,7 @@ public sealed class LauncherWorkflowTests
         }
     }
 
-    private static string[] Arguments(string directory)
+    private static ImmutableArray<string> Arguments(string directory)
     {
         System.ArgumentNullException.ThrowIfNull(directory);
         var manifest = new WorkerClaimManifest();

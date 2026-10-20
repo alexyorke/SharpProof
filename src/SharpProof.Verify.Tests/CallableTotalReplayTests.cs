@@ -204,12 +204,13 @@ public sealed class CallableTotalReplayTests
             .VerifyCallableAsync(Query(factory, [parameter, flag]), context, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static VerificationQuery Query(IrFactory factory, IrVarId[] variables)
+    private static VerificationQuery Query(IrFactory factory, ImmutableArray<IrVarId> variables)
     {
-        System.ArgumentNullException.ThrowIfNull(variables, nameof(variables));
+        if (variables.IsDefault)
+        { throw new ArgumentNullException(nameof(variables)); }
         System.ArgumentNullException.ThrowIfNull(factory);
         return new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
-            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
     }
 
     private sealed class StubBackend(BackendModel model) : ISmtBackend

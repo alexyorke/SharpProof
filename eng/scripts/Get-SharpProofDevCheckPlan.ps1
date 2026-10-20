@@ -28,12 +28,12 @@ function Add-Command {
         [Parameter(Mandatory)][bool]$NoBuild
     )
 
-    $commands.Add([ordered]@{
-            id            = $Id
-            phase         = $Phase
-            configuration = $CommandConfiguration
-            noBuild       = $NoBuild
-        })
+    $commands.Add(([ordered]@{
+                id            = $Id
+                phase         = $Phase
+                configuration = $CommandConfiguration
+                noBuild       = $NoBuild
+            }).AsReadOnly())
 }
 
 Add-Command 'restore' 'restore' $Configuration $false
@@ -48,9 +48,9 @@ foreach ($project in $packageProjects) {
         'package-pack:' + $packageId) 'package-tests' 'Release' $true
 }
 
-[ordered]@{
+([ordered]@{
     schemaVersion = 1
     command       = 'check'
     configuration = $Configuration
     commands      = @($commands.ToImmutable())
-} | ConvertTo-Json -Depth 5
+}).AsReadOnly() | ConvertTo-Json -Depth 5

@@ -88,7 +88,7 @@ public sealed class DiagnosticTransportLinuxPathWorkflowAuditTests
         var publishedResultPath = Path.Combine(evidenceDirectory, "published-result.json");
         var publishedManifestPath = Path.Combine(evidenceDirectory, "published-manifest.json");
         var sarifPath = Path.Combine(evidenceDirectory, "published.sarif");
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             "verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
             "--request", Path.Combine(evidenceDirectory, "private-request.json"),
             "--result", Path.Combine(evidenceDirectory, "private-result.json"),

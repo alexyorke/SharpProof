@@ -143,12 +143,12 @@ if (-not $NoBuild) {
         '.sharpproof-semantic-build-' +
         [Guid]::NewGuid().ToString('N') + '.slnf')
     try {
-        [pscustomobject]@{
+        ([ordered]@{
             solution = [ordered]@{
                 path     = 'SharpProof.slnx'
                 projects = @($semanticBuildProjects)
             }
-        } | ConvertTo-Json -Depth 4 |
+        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
             Set-Content `
                 -LiteralPath $semanticBuildFilter `
                 -Encoding utf8NoBOM
@@ -309,22 +309,22 @@ if (-not $ArchitectureOnly) {
                     'SharpProof.Architecture.Tests.csproj')) {
                 continue
             }
-            $taskBuilder.Add([pscustomobject]@{
-                    Name                         = 'semantic-' + (
-                        [IO.Path]::GetFileNameWithoutExtension(
-                            $project)).ToLowerInvariant()
-                    Target                       = Join-Path $repositoryRoot $project
-                    Filter                       = $semanticFilter
-                    ProjectParallelism           = 0
-                    IsolateOutput                = $false
-                    Slots                        = [Math]::Min($parallelism, 2)
-                    DefaultEstimatedMilliseconds = 30000L
-                })
+            $taskBuilder.Add(([ordered]@{
+                        Name                         = 'semantic-' + (
+                            [IO.Path]::GetFileNameWithoutExtension(
+                                $project)).ToLowerInvariant()
+                        Target                       = Join-Path $repositoryRoot $project
+                        Filter                       = $semanticFilter
+                        ProjectParallelism           = 0
+                        IsolateOutput                = $false
+                        Slots                        = [Math]::Min($parallelism, 2)
+                        DefaultEstimatedMilliseconds = 30000L
+                    }).AsReadOnly())
         }
     }
     else {
         $taskBuilder.Add(
-            [pscustomobject]@{
+            ([ordered]@{
                 Name                         = 'semantic-projects'
                 Target                       = $semanticSolutionFilter
                 Filter                       = $semanticFilter
@@ -335,95 +335,95 @@ if (-not $ArchitectureOnly) {
                 # coverage widths retain their existing reservation.
                 Slots                        = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
-            })
+            }).AsReadOnly())
     }
     if ($coverageEnabled) {
-        $taskBuilder.Add([pscustomobject]@{
-                Name                         = 'semantic-gates'
-                Target                       = Join-Path $repositoryRoot $gatesProject
-                Filter                       = $semanticFilter
-                ProjectParallelism           = 0
-                IsolateOutput                = $false
-                Slots                        = $parallelism
-                DefaultEstimatedMilliseconds = 500000L
-            })
+        $taskBuilder.Add(([ordered]@{
+                    Name                         = 'semantic-gates'
+                    Target                       = Join-Path $repositoryRoot $gatesProject
+                    Filter                       = $semanticFilter
+                    ProjectParallelism           = 0
+                    IsolateOutput                = $false
+                    Slots                        = $parallelism
+                    DefaultEstimatedMilliseconds = 500000L
+                }).AsReadOnly())
     }
     $workerDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $workerDescriptorBuilder.AddRange([object[]]@(
-            [pscustomobject]@{
+            ([ordered]@{
                 Name                         = 'worker-claim-manifest'
                 Filter                       = $claimTaskFilter
                 Slots                        = [Math]::Min($parallelism, 2)
                 DefaultEstimatedMilliseconds = 30000L
-            },
-            [pscustomobject]@{
+            }).AsReadOnly(),
+            ([ordered]@{
                 Name                         = 'worker-compiler-manifest'
                 Filter                       = $manifestTaskFilter
                 Slots                        = [Math]::Min($parallelism, 4)
                 DefaultEstimatedMilliseconds = 50000L
-            },
-            [pscustomobject]@{
+            }).AsReadOnly(),
+            ([ordered]@{
                 Name                         = 'worker-core'
                 Filter                       = $workerCoreTaskFilter
                 Slots                        = [Math]::Min($parallelism, 2)
                 DefaultEstimatedMilliseconds = 50000L
-            }))
+            }).AsReadOnly()))
     if ($coverageEnabled) {
         # The fixed-deadline native check retains its existing process hint,
         # while reserving the scheduler so competing test processes cannot overlap.
-        $workerDescriptorBuilder.Add([pscustomobject]@{
-                Name                         = 'worker-fixed-checksum'
-                Filter                       = $checksumTaskFilter
-                Slots                        = $parallelism
-                ProcessSlots                 = [Math]::Min($parallelism, 2)
-                DefaultEstimatedMilliseconds = 10000L
-            })
+        $workerDescriptorBuilder.Add(([ordered]@{
+                    Name                         = 'worker-fixed-checksum'
+                    Filter                       = $checksumTaskFilter
+                    Slots                        = $parallelism
+                    ProcessSlots                 = [Math]::Min($parallelism, 2)
+                    DefaultEstimatedMilliseconds = 10000L
+                }).AsReadOnly())
     }
     # The remainder is the longest Worker task in every mode (about five
     # minutes uninstrumented on a four-CPU runner), so it always runs as two
     # complementary halves that the scheduler can overlap.
     $workerDescriptorBuilder.AddRange([object[]]@(
-            [pscustomobject]@{
+            ([ordered]@{
                 Name                         = 'worker-remainder-heavy'
                 Filter                       = $workerRemainderHeavyTaskFilter
                 Slots                        = [Math]::Min($parallelism, 2)
                 DefaultEstimatedMilliseconds = 160000L
-            },
-            [pscustomobject]@{
+            }).AsReadOnly(),
+            ([ordered]@{
                 Name                         = 'worker-remainder-other'
                 Filter                       = $workerRemainderOtherTaskFilter
                 Slots                        = [Math]::Min($parallelism, 2)
                 DefaultEstimatedMilliseconds = 160000L
-            }))
+            }).AsReadOnly()))
     $workerTaskDescriptors = $workerDescriptorBuilder.ToImmutable()
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
-        $taskBuilder.Add([pscustomobject]@{
-                Name                         = $descriptor.Name
-                Target                       = $testProject
-                Filter                       = $descriptor.Filter
-                ProjectParallelism           = 0
-                IsolateOutput                = $true
-                Slots                        = $descriptor.Slots
-                ProcessSlots                 = $(if ($descriptor.PSObject.Properties.Name -contains 'ProcessSlots') {
-                        $descriptor.ProcessSlots
-                    }
-                    else { $descriptor.Slots })
-                DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
-            })
+        $taskBuilder.Add(([ordered]@{
+                    Name                         = $descriptor.Name
+                    Target                       = $testProject
+                    Filter                       = $descriptor.Filter
+                    ProjectParallelism           = 0
+                    IsolateOutput                = $true
+                    Slots                        = $descriptor.Slots
+                    ProcessSlots                 = $(if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'ProcessSlots') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'ProcessSlots'))) {
+                            $descriptor.ProcessSlots
+                        }
+                        else { $descriptor.Slots })
+                    DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
+                }).AsReadOnly())
     }
 }
 if ($architectureShardingEnabled) {
-    $taskBuilder.Add([pscustomobject]@{
-            Name                         = 'architecture'
-            EvidenceKind                 = 'ArchitectureOnly'
-            Target                       = Join-Path $repositoryRoot (
-                'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj')
-            Filter                       = $semanticFilter
-            ProjectParallelism           = 0
-            IsolateOutput                = $false
-            Slots                        = 1
-            DefaultEstimatedMilliseconds = 10000L
-        })
+    $taskBuilder.Add(([ordered]@{
+                Name                         = 'architecture'
+                EvidenceKind                 = 'ArchitectureOnly'
+                Target                       = Join-Path $repositoryRoot (
+                    'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj')
+                Filter                       = $semanticFilter
+                ProjectParallelism           = 0
+                IsolateOutput                = $false
+                Slots                        = 1
+                DefaultEstimatedMilliseconds = 10000L
+            }).AsReadOnly())
 }
 if ($CoverageTaskGroup -ne 'All') {
     $gatesTaskNames = @('semantic-gates')
@@ -447,20 +447,23 @@ if ($CoverageTaskGroup -ne 'All') {
         throw "Coverage task group '$CoverageTaskGroup' selected no tasks."
     }
 }
+$estimatedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($task in $taskBuilder) {
-    $task | Add-Member -NotePropertyName EstimatedMilliseconds `
-        -NotePropertyValue $(if ($priorDurations.ContainsKey($task.Name)) {
-            [long]$priorDurations[$task.Name]
-        }
-        else {
-            [long]$task.DefaultEstimatedMilliseconds
-        })
+    $properties = [ordered]@{}
+    foreach ($key in $task.Keys) { $properties[$key] = $task[$key] }
+    $properties['EstimatedMilliseconds'] = if ($priorDurations.ContainsKey($task.Name)) {
+        [long]$priorDurations[$task.Name]
+    }
+    else {
+        [long]$task.DefaultEstimatedMilliseconds
+    }
+    $estimatedTaskBuilder.Add($properties.AsReadOnly())
 }
-$taskSnapshot = $taskBuilder.ToImmutable()
+$taskSnapshot = $estimatedTaskBuilder.ToImmutable()
 $orderedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($orderedTask in ($taskSnapshot | Sort-Object `
-        @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-        @{ Expression = 'Name'; Descending = $false }) ) {
+        @{ Expression = { $_.EstimatedMilliseconds }; Descending = $true }, `
+        @{ Expression = { $_.Name }; Descending = $false }) ) {
     $orderedTaskBuilder.Add($orderedTask)
 }
 $tasks = $orderedTaskBuilder.ToImmutable()
@@ -501,7 +504,7 @@ try {
     $prepareSemanticTest = {
         param([object]$task)
 
-        $processSlots = if ($task.PSObject.Properties.Name -contains 'ProcessSlots') {
+        $processSlots = if ((($task -is [Collections.IDictionary] -and $task.Keys -contains 'ProcessSlots') -or ($task -isnot [Collections.IDictionary] -and $task.PSObject.Properties.Name -contains 'ProcessSlots'))) {
             $task.ProcessSlots
         }
         else { $task.Slots }
@@ -568,7 +571,7 @@ try {
             $argumentBuilder.Add("/logger:trx;LogFilePrefix=$($task.Name)")
             $argumentBuilder.Add('/ResultsDirectory:' + (
                     Join-Path $resultsRoot $task.Name))
-            if ($task.PSObject.Properties.Name -contains 'RunSettings') {
+            if ((($task -is [Collections.IDictionary] -and $task.Keys -contains 'RunSettings') -or ($task -isnot [Collections.IDictionary] -and $task.PSObject.Properties.Name -contains 'RunSettings'))) {
                 $argumentBuilder.Add('/Settings:' + $task.RunSettings)
             }
             $arguments = $argumentBuilder.ToImmutable()
@@ -595,10 +598,10 @@ try {
                 -Settings $resolvedCoverageSettings
             $arguments = $coverageArguments
         }
-        return [pscustomobject]@{
-            Arguments   = $arguments
-            Environment = $environment
-        }
+        return ([ordered]@{
+                Arguments   = $arguments
+                Environment = $environment
+            }).AsReadOnly()
     }.GetNewClosure()
     $testRun = Invoke-SharpProofParallelDotnetTests `
         -Tests $tasks `
@@ -609,11 +612,11 @@ try {
         -Label 'Semantic test' `
         -Quiet:$Quiet
     foreach ($result in @($testRun.Completed)) {
-        $timings.Add([pscustomobject]@{
-                name                = $result.Test.Name
-                elapsedMilliseconds = $result.ElapsedMilliseconds
-                exitCode            = $result.ExitCode
-            })
+        $timings.Add(([ordered]@{
+                    name                = $result.Test.Name
+                    elapsedMilliseconds = $result.ElapsedMilliseconds
+                    exitCode            = $result.ExitCode
+                }).AsReadOnly())
     }
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
@@ -649,7 +652,7 @@ finally {
     try {
         $temporaryTiming =
         $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-        [pscustomobject]@{
+        ([ordered]@{
             schemaVersion            = 1
             command                  = 'semantic-tests'
             configuration            = $Configuration
@@ -659,8 +662,8 @@ finally {
             coverageTaskGroup        = $CoverageTaskGroup
             parallelism              = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-            tasks                    = @($timingSnapshot | Sort-Object name)
-        } | ConvertTo-Json -Depth 5 |
+            tasks                    = @($timingSnapshot | Sort-Object { $_.name })
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
         Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
     }

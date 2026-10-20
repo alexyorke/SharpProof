@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
@@ -20,7 +21,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void UnknownOptionIsRejected()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--project-wall-milliseconds",
             "100"
@@ -34,7 +35,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void SarifRequiresTheAtomicPublicationTriple()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--publish-sarif", "result.sarif"
         ];
@@ -48,7 +49,7 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void CompletePublicationAcceptsSarif()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--publish-request", "published-request.json",
             "--publish-result", "published-result.json",
@@ -102,7 +103,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void CustomArgumentsProjectEveryRequestValueExactly()
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--query-rlimit", "101",
             "--method-rlimit", "102",
@@ -245,7 +246,7 @@ public sealed class LauncherArgumentTests
     [TestCase(300_001)]
     public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)
     {
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             .. ValidArguments(),
             "--termination-grace-ms",
             graceMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)
@@ -1583,9 +1584,10 @@ public sealed class LauncherArgumentTests
         };
     }
 
-    private static void AssertRequestProjectionRejects(string[] arguments)
+    private static void AssertRequestProjectionRejects(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
@@ -1594,7 +1596,7 @@ public sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
-    private static string[] ProjectionArguments(
+    private static ImmutableArray<string> ProjectionArguments(
         string worker = "worker.dll",
         string request = "request.json",
         string result = "result.json",
@@ -1606,7 +1608,7 @@ public sealed class LauncherArgumentTests
         System.ArgumentNullException.ThrowIfNull(request);
         System.ArgumentNullException.ThrowIfNull(result);
         System.ArgumentNullException.ThrowIfNull(worker);
-        string[] cacheArguments = cacheDirectory == null
+        ImmutableArray<string> cacheArguments = cacheDirectory == null
             ? []
             : cacheEnabled.HasValue
                 ? [
@@ -1627,7 +1629,7 @@ public sealed class LauncherArgumentTests
         ];
     }
 
-    private static string[] ValidArguments()
+    private static ImmutableArray<string> ValidArguments()
     {
         return ProjectionArguments(compilerManifest: "compiler-manifest.json");
     }

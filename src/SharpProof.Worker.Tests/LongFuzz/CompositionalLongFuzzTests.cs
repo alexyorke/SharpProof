@@ -198,7 +198,7 @@ public sealed class CompositionalLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(scope);
         var plainBody = scope.Template.Replace("@@", operation.Expression, StringComparison.Ordinal);
         var body = recover ? "try { " + plainBody + " } catch (Exception) { Mark(5); return 5; }" : plainBody;
-        var inputs = new[] { operation.Anchor }.Concat(s_inputs).Distinct().ToArray();
+        var inputs = s_inputs.Prepend(operation.Anchor).Distinct().ToImmutableArray();
         var probeSource = Source("", body);
         rememberSource(probeSource);
         var probe = RunClr(probeSource, inputs);
@@ -299,9 +299,10 @@ public sealed class CompositionalLongFuzzTests
     }
 
     private static bool CheckRecovery(LongFuzzSession session, int seed, string pair, string plainBody,
-        int[] inputs, ImmutableArray<Observation> recovered, string recoveredSource)
+        ImmutableArray<int> inputs, ImmutableArray<Observation> recovered, string recoveredSource)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(pair);
         System.ArgumentNullException.ThrowIfNull(plainBody);
         System.ArgumentNullException.ThrowIfNull(recoveredSource);
@@ -441,9 +442,10 @@ public sealed class CompositionalLongFuzzTests
                 optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static ClrResult RunClr(string source, int[] inputs)
+    private static ClrResult RunClr(string source, ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
         var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();

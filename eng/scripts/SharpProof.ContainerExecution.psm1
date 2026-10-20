@@ -435,10 +435,10 @@ function Invoke-SharpProofTimedPhase {
     finally {
         $timer.Stop()
         if ($completed -or $RecordOnFailure) {
-            $Timings.Add([pscustomobject]@{
-                    name                = $Name
-                    elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
-                })
+            $Timings.Add(([ordered]@{
+                        name                = $Name
+                        elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+                    }).AsReadOnly())
         }
     }
 }
@@ -908,15 +908,15 @@ function Invoke-SharpProofParallelDotnetBuilds {
             $started = Start-SharpProofParallelProcess `
                 -StartInfo $startInfo `
                 -FailureMessage "Could not start build $name."
-            $running.Add([pscustomobject]@{
-                    Name                = $name
-                    Arguments           = $effectiveArguments
-                    SharedCompilationId = $sharedCompilationId
-                    Process             = $started.Process
-                    StartedUtc          = $started.StartedUtc
-                    StandardOutput      = $started.StandardOutput
-                    StandardError       = $started.StandardError
-                })
+            $running.Add(([ordered]@{
+                        Name                = $name
+                        Arguments           = $effectiveArguments
+                        SharedCompilationId = $sharedCompilationId
+                        Process             = $started.Process
+                        StartedUtc          = $started.StartedUtc
+                        StandardOutput      = $started.StandardOutput
+                        StandardError       = $started.StandardError
+                    }).AsReadOnly())
         }
 
         foreach ($active in $running.ToImmutable()) {
@@ -1015,10 +1015,10 @@ function Invoke-SharpProofParallelDotnetTests {
             throw (
                 "Parallel $Label entries require a name and valid slot count.")
         }
-        $pending.Add([pscustomobject]@{
-                Test  = $test
-                Slots = $slots
-            })
+        $pending.Add(([ordered]@{
+                    Test  = $test
+                    Slots = $slots
+                }).AsReadOnly())
     }
 
     $running = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
@@ -1040,8 +1040,7 @@ function Invoke-SharpProofParallelDotnetTests {
                 $test = $next.Test
                 $invocation = & $Prepare $test
                 if ($null -eq $invocation -or
-                    $invocation.PSObject.Properties.Name -notcontains
-                    'Arguments') {
+                    (($invocation -is [Collections.IDictionary] -and $invocation.Keys -notcontains 'Arguments') -or ($invocation -isnot [Collections.IDictionary] -and $invocation.PSObject.Properties.Name -notcontains 'Arguments'))) {
                     throw "The $Label preparation did not return arguments."
                 }
                 $startInfo = New-SharpProofParallelProcessStartInfo `
@@ -1049,8 +1048,7 @@ function Invoke-SharpProofParallelDotnetTests {
                     -WorkingDirectory $RepositoryRoot `
                     -Arguments @($invocation.Arguments) `
                     -Environment $(if (
-                        $invocation.PSObject.Properties.Name -contains
-                        'Environment') {
+                        (($invocation -is [Collections.IDictionary] -and $invocation.Keys -contains 'Environment') -or ($invocation -isnot [Collections.IDictionary] -and $invocation.PSObject.Properties.Name -contains 'Environment'))) {
                         $invocation.Environment
                     }
                     else {
@@ -1059,15 +1057,15 @@ function Invoke-SharpProofParallelDotnetTests {
                 $started = Start-SharpProofParallelProcess `
                     -StartInfo $startInfo `
                     -FailureMessage "Could not start $Label '$($test.Name)'."
-                $running.Add([pscustomobject]@{
-                        Test           = $test
-                        Slots          = $next.Slots
-                        Process        = $started.Process
-                        ExitTask       = $started.Process.WaitForExitAsync()
-                        StartedUtc     = $started.StartedUtc
-                        StandardOutput = $started.StandardOutput
-                        StandardError  = $started.StandardError
-                    })
+                $running.Add(([ordered]@{
+                            Test           = $test
+                            Slots          = $next.Slots
+                            Process        = $started.Process
+                            ExitTask       = $started.Process.WaitForExitAsync()
+                            StartedUtc     = $started.StartedUtc
+                            StandardOutput = $started.StandardOutput
+                            StandardError  = $started.StandardError
+                        }).AsReadOnly())
                 $activeSlots += $next.Slots
             }
 
@@ -1121,13 +1119,13 @@ function Invoke-SharpProofParallelDotnetTests {
                     $failures.Add(
                         "$($active.Test.Name) exited $exitCode.")
                 }
-                $completed.Add([pscustomobject]@{
-                        Test                = $active.Test
-                        ElapsedMilliseconds = $elapsed
-                        ExitCode            = $exitCode
-                        StandardOutput      = [string]$stdout
-                        StandardError       = [string]$stderr
-                    })
+                $completed.Add(([ordered]@{
+                            Test                = $active.Test
+                            ElapsedMilliseconds = $elapsed
+                            ExitCode            = $exitCode
+                            StandardOutput      = [string]$stdout
+                            StandardError       = [string]$stderr
+                        }).AsReadOnly())
                 [void]$running.Remove($active)
                 $activeSlots -= $active.Slots
                 Stop-SharpProofParallelProcess -Process $active.Process
@@ -1140,10 +1138,10 @@ function Invoke-SharpProofParallelDotnetTests {
         }
     }
 
-    return [pscustomobject]@{
-        Completed = $completed.ToImmutable()
-        Failures  = $failures.ToImmutable()
-    }
+    return ([ordered]@{
+            Completed = $completed.ToImmutable()
+            Failures  = $failures.ToImmutable()
+        }).AsReadOnly()
 }
 
 function New-SharpProofParallelProcessStartInfo {
@@ -1195,12 +1193,12 @@ function Start-SharpProofParallelProcess {
         $process.Dispose()
         throw $FailureMessage
     }
-    return [pscustomobject]@{
-        Process        = $process
-        StartedUtc     = $process.StartTime.ToUniversalTime()
-        StandardOutput = $process.StandardOutput.ReadToEndAsync()
-        StandardError  = $process.StandardError.ReadToEndAsync()
-    }
+    return ([ordered]@{
+            Process        = $process
+            StartedUtc     = $process.StartTime.ToUniversalTime()
+            StandardOutput = $process.StandardOutput.ReadToEndAsync()
+            StandardError  = $process.StandardError.ReadToEndAsync()
+        }).AsReadOnly()
 }
 
 function Stop-SharpProofParallelProcess {
@@ -1257,19 +1255,19 @@ function New-SharpProofCoverageContext {
     if ($CreateResultsDirectory -and $enabled) {
         [IO.Directory]::CreateDirectory($results) | Out-Null
     }
-    return [pscustomobject]@{
-        Enabled            = $enabled
-        Settings           = $settings
-        Results            = $results
-        IsolatedOutputRoot = if ($enabled) {
-            Join-Path $RepositoryRoot (
-                '.sharpproof-coverage-output-' +
-                [Guid]::NewGuid().ToString('N'))
-        }
-        else {
-            ''
-        }
-    }
+    return ([ordered]@{
+            Enabled            = $enabled
+            Settings           = $settings
+            Results            = $results
+            IsolatedOutputRoot = if ($enabled) {
+                Join-Path $RepositoryRoot (
+                    '.sharpproof-coverage-output-' +
+                    [Guid]::NewGuid().ToString('N'))
+            }
+            else {
+                ''
+            }
+        }).AsReadOnly()
 }
 
 function Remove-SharpProofOwnedDirectory {

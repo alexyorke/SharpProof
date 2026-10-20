@@ -44,10 +44,10 @@ internal static class AtomicFile
         throw new IOException("Could not allocate a SharpProof staging path.");
     }
 
-    internal static void WriteStagedBytes(string temporary, byte[] content)
+    internal static void WriteStagedBytes(string temporary, ImmutableArray<byte> content)
     {
         temporary = RepositoryParameterGuard.NotNull(temporary, nameof(temporary));
-        ArgumentNullGuard.NotNull(content, nameof(content));
+        RepositoryParameterGuard.ThrowIfMissing(content.IsDefault, nameof(content));
         using var stream = new FileStream(
             temporary,
             FileMode.CreateNew,
@@ -55,7 +55,7 @@ internal static class AtomicFile
             FileShare.None,
             4096,
             useAsync: false);
-        stream.Write(content, 0, content.Length);
+        stream.Write(content.ToArray(), 0, content.Length);
         stream.Flush(true);
     }
 
@@ -111,7 +111,7 @@ internal static class AtomicFile
         content = RepositoryParameterGuard.NotNull(content, nameof(content));
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
         using var staged = new StagedFile(PrepareStaged(path));
-        WriteStagedBytes(staged.Temporary.FullName, Utf8.GetBytes(content));
+        WriteStagedBytes(staged.Temporary.FullName, Utf8.GetBytes(content).ToImmutableArray());
         PublishStaged(staged.Temporary.FullName, path);
     }
 

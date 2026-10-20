@@ -102,7 +102,7 @@ try {
             [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 1), [Text.UTF8Encoding]::new($false))
             Set-Location $consumer
             $restoreMilliseconds = Invoke-MeasuredDotnet "$iteration-$variant-restore" @('restore', 'Consumer.csproj', '--packages', $cache)
-            $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null })
+            $measurements.Add(([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null }).AsReadOnly())
             foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
                 if ($scenario -eq 'small-edit') {
                     [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 2), [Text.UTF8Encoding]::new($false))
@@ -127,7 +127,7 @@ try {
                     }
                     $cacheStatus = [string]$result.summary.cacheStatus
                 }
-                $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = $scenario; elapsedMilliseconds = $elapsed; claims = $claims; proven = $proven; incomplete = $incomplete; cacheStatus = $cacheStatus })
+                $measurements.Add(([ordered]@{ iteration = $iteration; variant = $variant; scenario = $scenario; elapsedMilliseconds = $elapsed; claims = $claims; proven = $proven; incomplete = $incomplete; cacheStatus = $cacheStatus }).AsReadOnly())
             }
         }
     }
@@ -136,25 +136,25 @@ try {
 finally {
     Set-Location $originalLocation
     $measurementSnapshot = $measurements.ToImmutable()
-    $report = [ordered]@{
-        schemaVersion            = 2
-        completed                = $completed
-        measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
-        source                   = [ordered]@{
-            commit            = $sourceCommit
-            hasTrackedChanges = $trackedChanges.Count -gt 0
-            harnessSha256     = $harnessHash
-        }
-        packageVersion           = [string]$identity.Version
-        packageRepositoryCommits = @($identity.RepositoryCommits)
-        sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
-        platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
-        processorCount           = [Environment]::ProcessorCount
-        iterations               = $Iterations
-        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
-        packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
-        measurements             = @($measurementSnapshot)
-    }
+    $report = ([ordered]@{
+            schemaVersion            = 2
+            completed                = $completed
+            measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
+            source                   = ([ordered]@{
+                    commit            = $sourceCommit
+                    hasTrackedChanges = $trackedChanges.Count -gt 0
+                    harnessSha256     = $harnessHash
+                }).AsReadOnly()
+            packageVersion           = [string]$identity.Version
+            packageRepositoryCommits = @($identity.RepositoryCommits)
+            sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
+            platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+            processorCount           = [Environment]::ProcessorCount
+            iterations               = $Iterations
+            scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
+            packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { ([ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }).AsReadOnly() })
+            measurements             = @($measurementSnapshot)
+        }).AsReadOnly()
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM
     Write-Host "Consumer performance report: $reportPath"

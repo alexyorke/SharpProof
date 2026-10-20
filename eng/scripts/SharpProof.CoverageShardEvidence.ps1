@@ -24,9 +24,9 @@ function Save-SharpProofCoverageCohort {
         if ($receipts.Count -eq 0) { throw "Coverage task '$name' has no TRX receipt." }
         $descriptors = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Expected | Where-Object { $_.Name -ceq $name }))
         $descriptor = if ($descriptors.Length -eq 0) { $null } else { $descriptors[0] }
-        $target = if ($descriptor.PSObject.Properties.Name -contains 'Target') { [string]$descriptor.Target } else { $ProjectPath }
+        $target = if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'Target') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'Target'))) { [string]$descriptor.Target } else { $ProjectPath }
         $architectureEvidence = $false
-        if ($descriptor.PSObject.Properties.Name -contains 'EvidenceKind') {
+        if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'EvidenceKind') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'EvidenceKind'))) {
             if ([string]$descriptor.EvidenceKind -cne 'ArchitectureOnly' -or
                 $name -cne 'architecture' -or
                 $target.Replace('\', '/') -cnotmatch '(^|/)src/SharpProof\.Architecture\.Tests/SharpProof\.Architecture\.Tests\.csproj$') {

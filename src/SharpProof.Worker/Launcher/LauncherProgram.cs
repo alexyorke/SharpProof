@@ -33,18 +33,19 @@ internal static class Program
             return 125;
         }
         using var cancellation = new ConsoleCancellationScope();
-        return await RunMain(args, verify: null, validatePreflight: null,
+        cancellation.Token.ThrowIfCancellationRequested();
+        return await RunMain(args.ToImmutableArray(), verify: null, validatePreflight: null,
             cancellation.Token).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
-        string[] args,
+        ImmutableArray<string> args,
         Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify,
         Action<LauncherArguments>? validatePreflight,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        args = ArgumentNullGuard.NotNull(args, nameof(args));
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Log.Error(
@@ -688,10 +689,10 @@ internal sealed partial class LauncherArguments
         _values = values;
     }
 
-    internal static bool TryParse(string[] args, out LauncherArguments arguments)
+    internal static bool TryParse(ImmutableArray<string> args, out LauncherArguments arguments)
     {
         arguments = null!;
-        args = ArgumentNullGuard.NotNull(args, nameof(args));
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         if (args.Length < 3 ||
             !string.Equals(
                 args[0],

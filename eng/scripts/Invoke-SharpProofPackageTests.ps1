@@ -455,10 +455,10 @@ try {
         if ($Fast) {
             $testHarnessBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $buildBuilder.Add([pscustomobject]@{
-                Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
-                Arguments = $testHarnessBuildArgumentBuilder.ToImmutable()
-            })
+        $buildBuilder.Add(([ordered]@{
+                    Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
+                    Arguments = $testHarnessBuildArgumentBuilder.ToImmutable()
+                }).AsReadOnly())
     }
     # The Release test-harness project references Verifier with no output
     # assembly, so its build already materializes the complete package
@@ -475,10 +475,10 @@ try {
         if ($Fast) {
             $packageProductBuildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
-        $buildBuilder.Add([pscustomobject]@{
-                Name      = 'package-products-release'
-                Arguments = $packageProductBuildArgumentBuilder.ToImmutable()
-            })
+        $buildBuilder.Add(([ordered]@{
+                    Name      = 'package-products-release'
+                    Arguments = $packageProductBuildArgumentBuilder.ToImmutable()
+                }).AsReadOnly())
     }
     $builds = $buildBuilder.ToImmutable()
     if ($builds.Length -gt 0) {
@@ -935,10 +935,10 @@ try {
             -Enabled $coverageEnabled `
             -Settings $resolvedCoverageSettings
         $arguments = $coverageArguments
-        return [pscustomobject]@{
-            Arguments   = $arguments
-            Environment = $environment
-        }
+        return ([ordered]@{
+                Arguments   = $arguments
+                Environment = $environment
+            }).AsReadOnly()
     }.GetNewClosure()
     $testRun = Invoke-SharpProofParallelDotnetTests `
         -Tests $orderedShards `
@@ -953,12 +953,12 @@ try {
         Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject
     }
     foreach ($result in @($testRun.Completed)) {
-        $shardTimings.Add([pscustomobject]@{
-                name                = $result.Test.Name
-                filter              = $result.Test.Filter
-                elapsedMilliseconds = $result.ElapsedMilliseconds
-                exitCode            = $result.ExitCode
-            })
+        $shardTimings.Add(([ordered]@{
+                    name                = $result.Test.Name
+                    filter              = $result.Test.Filter
+                    elapsedMilliseconds = $result.ElapsedMilliseconds
+                    exitCode            = $result.ExitCode
+                }).AsReadOnly())
     }
     $failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($failure in @($testRun.Completed | Where-Object {
@@ -969,10 +969,10 @@ try {
             $failure.Test.Filter)
     }
     $testPhase.Stop()
-    $phaseTimings.Add([pscustomobject]@{
-            name                = 'test-shards'
-            elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
-        })
+    $phaseTimings.Add(([ordered]@{
+                name                = 'test-shards'
+                elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
+            }).AsReadOnly())
 
     $campaign.Stop()
     $workerMethodTimings = Get-TestMethodTimings `
@@ -995,7 +995,7 @@ try {
     $priorFilterMilliseconds = $priorFilterMillisecondsBuilder.ToImmutable()
     $temporaryTiming =
     $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    [pscustomobject]@{
+    ([ordered]@{
         schemaVersion            = 1
         command                  = 'package-tests'
         configuration            = $Configuration
@@ -1003,36 +1003,36 @@ try {
         parallelism              = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
         phases                   = @($phaseTimings.ToImmutable())
-        shards                   = @($shardTimings.ToImmutable() | Sort-Object name)
+        shards                   = @($shardTimings.ToImmutable() | Sort-Object { $_.name })
         workerMethods            = $workerMethodTimings
         packageLayoutMethods     = $packageLayoutMethodTimings
         scheduler                = [ordered]@{
             workerMethods            = @(
                 $priorMethodMilliseconds.GetEnumerator() |
                     ForEach-Object {
-                        [pscustomobject]@{
+                        ([ordered]@{
                             name                = [string]$_.Key
                             elapsedMilliseconds = [long]$_.Value
-                        }
-                    } | Sort-Object name)
+                        }).AsReadOnly()
+                    } | Sort-Object { $_.name })
                 packageLayoutMethods = @(
                     $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
                         ForEach-Object {
-                            [pscustomobject]@{
+                            ([ordered]@{
                                 name                = [string]$_.Key
                                 elapsedMilliseconds = [long]$_.Value
-                            }
-                        } | Sort-Object name)
+                            }).AsReadOnly()
+                        } | Sort-Object { $_.name })
                     filters          = @(
                         $priorFilterMilliseconds.GetEnumerator() |
                             ForEach-Object {
-                                [pscustomobject]@{
+                                ([ordered]@{
                                     filter              = [string]$_.Key
                                     elapsedMilliseconds = [long]$_.Value
-                                }
-                            } | Sort-Object filter)
+                                }).AsReadOnly()
+                            } | Sort-Object { $_.filter })
                     }
-                } | ConvertTo-Json -Depth 5 |
+                }).AsReadOnly() | ConvertTo-Json -Depth 5 |
                     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 

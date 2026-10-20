@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 
 namespace SharpProof.Verify.Test;
@@ -156,7 +157,7 @@ public sealed class ProofKernelTests
                 ]))))
             .VerifyAsync(new VerificationQuery(factory, [], goal, [text]), TestContext.CurrentContext.CancellationToken);
 
-        ProofOutcome[] outcomes = [missing, wrongType, unsupported];
+        ImmutableArray<ProofOutcome> outcomes = [missing, wrongType, unsupported];
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
         Assert.That(
             outcomes.Cast<UnknownOutcome>()
@@ -303,13 +304,8 @@ public sealed class ProofKernelTests
     public async Task BackendFailuresStayTypedAndUncacheable()
     {
         var fixture = CreateFixture();
-        foreach (var pair in new[] {
-                     (BackendFailureReason.UnsupportedEncoding, AbstentionReason.UnsupportedEncoding),
-                     (BackendFailureReason.ResourceLimit, AbstentionReason.ResourceLimit),
-                     (BackendFailureReason.Timeout, AbstentionReason.Timeout),
-                     (BackendFailureReason.Unavailable, AbstentionReason.BackendUnavailable),
-                     (BackendFailureReason.InfrastructureFailure, AbstentionReason.InfrastructureFailure)
-                 })
+        foreach (var pair in ImmutableArray.Create((BackendFailureReason.UnsupportedEncoding, AbstentionReason.UnsupportedEncoding), (BackendFailureReason.ResourceLimit, AbstentionReason.ResourceLimit), (BackendFailureReason.Timeout, AbstentionReason.Timeout), (BackendFailureReason.Unavailable, AbstentionReason.BackendUnavailable), (BackendFailureReason.InfrastructureFailure, AbstentionReason.InfrastructureFailure)
+))
         {
             var outcome = await new ProofKernel(
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
@@ -326,21 +322,18 @@ public sealed class ProofKernelTests
             KeyValuePair.Create(
                 fixture.Variable,
                 fixture.Factory.CreateIntegerValue(0))]);
-        var results = new[]
-        {
-            new BackendCheckResult(
+        var results = ImmutableArray.Create(new BackendCheckResult(
                 BackendCheckStatus.Unknown,
                 [],
                 model,
                 BackendFailureReason.Timeout,
-                default),
-            new BackendCheckResult(
+                default), new BackendCheckResult(
                 BackendCheckStatus.Unknown,
                 [0],
                 null,
                 BackendFailureReason.Timeout,
                 default)
-        };
+);
 
         foreach (var result in results)
         {

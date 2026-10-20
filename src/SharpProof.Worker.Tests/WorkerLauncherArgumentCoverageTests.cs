@@ -93,7 +93,7 @@ public sealed class WorkerLauncherArgumentCoverageTests
         try
         {
             Console.SetError(diagnostic);
-            exitCode = await Launcher.Program.RunMain(arguments.ToImmutable().ToArray(), verify: null, validatePreflight: null,
+            exitCode = await Launcher.Program.RunMain(arguments.ToImmutable(), verify: null, validatePreflight: null,
                 cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally

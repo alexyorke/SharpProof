@@ -40,7 +40,7 @@ function Invoke-LintCheck([string]$Name, [scriptblock]$Check) {
         $passed = $false
         $_.ToString() | Tee-Object -FilePath (Join-Path $reportRoot "$Name.log") -Append | Write-Host
     }
-    $checks.Add([ordered]@{ check = $Name; passed = $passed })
+    $checks.Add(([ordered]@{ check = $Name; passed = $passed }).AsReadOnly())
 }
 
 Invoke-LintCheck 'Workflows' { Invoke-LintNative 'actionlint' @('-oneline') }

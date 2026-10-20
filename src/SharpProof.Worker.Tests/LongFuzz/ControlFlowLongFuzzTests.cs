@@ -248,12 +248,13 @@ public sealed class ControlFlowLongFuzzTests
         var firstLeaf = s_leaves[random.Next(s_leaves.Length)];
         var secondLeaf = random.Next(2) == 0 ? s_leaves[random.Next(s_leaves.Length)] : null;
         var depth = 1 + random.Next(4);
-        var wrappers = new int[depth];
+        var wrapperBuilder = ImmutableArray.CreateBuilder<int>(depth);
         for (var level = 0; level < depth; level++)
         {
-            wrappers[level] = random.Next(s_wrappers.Length);
+            wrapperBuilder.Add(random.Next(s_wrappers.Length));
         }
 
+        var wrappers = wrapperBuilder.ToImmutable();
         var canBreak = false;
         var canContinue = false;
         foreach (var wrapper in wrappers)
