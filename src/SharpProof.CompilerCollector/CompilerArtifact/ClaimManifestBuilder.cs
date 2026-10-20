@@ -398,6 +398,11 @@ internal sealed partial class ClaimManifestBuilder(
                 resourceDeclaration.ExpressionBody is { } arrow ? resourceModel.GetOperation(arrow.Expression, cancellationToken) : null;
             var resource = ResourceBoundsAnalysis.Analyze(target, body, cancellationToken);
             var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
+            if (ResourceForkJoinPlan.TryCreate(target, _compilation, cancellationToken) is { } taskPlan)
+            {
+                metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
+                    taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString()));
+            }
             if (resource.Bounds is { } bounds)
             { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }
             var requiresLifetimeLayout = effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :

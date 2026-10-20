@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 48 invalidate older responses without this evidence.
+Protocol 39 and cache schema 49 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 48 invalidate prior responses; compiler artifact 53 and
+Protocol 39 and cache 49 invalidate prior responses; compiler artifact 53 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -854,3 +854,29 @@ length matcher, not a property name alone. Source calls and constructors preserv
 string-size substitution, including fixed repeated-character string arguments;
 literal sizes count UTF-16 code units. Unmodeled aliases, user-defined Length
 getters and changing non-ranking recursive arguments remain Unknown.
+
+### Task-join runtime premise
+
+The compiler can capture a closed, synchronous `Task.WhenAll` expression with
+2-16 `Task.Run(Action)` children, each calling an admitted static source method
+with Int32 values. The native checker independently verifies child cost programs,
+argument substitution and local ownership. The internal runtime binding model
+`task-join-source-at-most-once-v1` declares callback source work per root invocation
+through join completion, for any ordering or overlap of the isolated callbacks.
+It excludes framework, scheduler and ambient callback work. It supplies no
+framework allocation bound, wall-clock bound or fairness guarantee.
+
+This conditional model is reviewed against the immutable .NET 8.0.32
+[Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs).
+The owning callable must declare the corresponding trusted boundary. Binding
+requires a reviewed framework assembly identity, a net8.0 target and one
+unambiguous captured reference-image digest. Captured reference images describe
+compiler inputs; the deployment must satisfy the declared runtime premise.
+Cancellation-token overloads, asynchronous callbacks, shared mutable captures,
+custom scheduling and unproved child effects remain unsupported.
+
+Task-root claims still return Unknown. This binding is preparation for native
+root scope and metric reporting; publishing task work, async/state-machine costs,
+framework allocations and concurrent live-space bounds remains roadmap work.
+Cache schema 49 identifies the added callable premise; compiler artifact 53 and
+protocol 39 retain their formats.

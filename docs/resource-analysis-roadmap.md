@@ -95,12 +95,13 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ### Current coverage qualification
 
-Published a9f759896 passed all four coverage shards, including the instrumented
-package shard. Aggregate enforcement measured 4978/5213 changed trusted lines
-(95.49%, 235 gaps), failing the unchanged 100% floor. This supersedes the older
-8d73b0049 measurement below. The report and gap inventory are preserved locally.
-The earlier 919673e70 package shard lost its hosted runner before evidence upload;
-a9f759896 produced a complete measurement. No floor or exclusion was changed.
+Published c46e073c3 passed all four coverage shards, including the instrumented
+package shard, and all non-coverage workflows. Aggregate enforcement measured
+5140/5390 changed trusted lines (95.36%, 250 gaps), failing the unchanged 100%
+floor. This supersedes the older a9f759896 measurement (4978/5213, 235 gaps).
+The report and gap inventory are preserved locally. No floor or exclusion was
+changed. The aab335ab9 transport checkpoint has fresh exact-head CI running;
+its documentation and security checks have passed.
 
 ### Quantitative-memory feature audit
 
@@ -126,6 +127,33 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Task runtime premise binding
+
+The compiler now declares the admitted Task.Run(Action)/Task.WhenAll(Task[])
+projection's trusted at-most-once callback-source premise. A native binder checks
+that premise against the owning callable, reviewed framework identity, net8.0
+target and one unambiguous captured reference-image digest. The versioned catalog
+hashes its source pin and scope: isolated callback source work per root invocation
+through join completion, under arbitrary callback overlap. Scheduler, framework
+and ambient callback work are excluded from this source-work model. Reference
+evidence identifies compiler inputs; deployment must satisfy the runtime premise.
+This is not a framework allocation summary. Root task claims remain Unknown.
+
+All 28 focused binding/artifact cases passed, including missing, conflicting,
+foreign and cross-owner evidence, target qualification and cancellation. The full
+selected worker/resource/protocol gate passed 852 tests, and all 1468 analyzer
+tests passed. The packaged task consumer retained its Unknown result. Full
+formatting, quality/API compatibility, documentation lint and 728 links passed.
+Layout passed at 2783 sources, 59 projects and 151 pinned common files; the trusted
+inventory passed at 537 paths. Cache 49 identifies the new callable premise;
+compiler artifact 53, protocol 39 and manifest 6 retain their formats.
+
+The next phase must publish native root results with explicit task scope and
+metric semantics, compare only independently checked upper costs, and preserve
+Unknown for unsupported metrics and unbound premises. Framework/compiler carrier
+allocations, async state machines, concurrent live-space bounds and the remaining
+phase F controls still require implementation and consumer verification.
 
 ### Task-join projection transport
 

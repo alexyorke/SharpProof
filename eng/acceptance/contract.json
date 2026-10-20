@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 48,
+    "schemaVersion": 49,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -286,6 +286,7 @@
           "src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
           "src/SharpProof.Specs/ResourceMetadataCatalog.cs",
           "src/SharpProof.Specs/ResourceLayoutCatalog.cs",
+          "src/SharpProof.Specs/ResourceTaskCatalog.cs",
           "src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
       },
@@ -760,6 +761,7 @@
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",
           "src/SharpProof.Worker/NativeResourceLayoutBinding.cs",
+          "src/SharpProof.Worker/NativeResourceTaskBinding.cs",
           "src/SharpProof.Worker/NativeResourceViolationReplay.cs",
           "src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs",
           "eng/CompilerAdditionalTextStability.cs",
