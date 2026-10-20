@@ -246,4 +246,27 @@ public sealed class NativeResourceAllocationTests
         Action tooMany = () => ResourceProgram.Sequence(pair, pair);
         Assert.Throws<ResourceExpressionLimitException>(tooMany);
     }
+    [TestCase(0, "MalformedResourceActivation")]
+    [TestCase(1, "MalformedResourceActivation")]
+    [TestCase(2, "MalformedResourceAllocation")]
+    [TestCase(3, "MalformedResourceAllocation")]
+    public void DetachedProgramsCannotSmuggleActivationOrManagedAllocationPayloads(int mutation, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
+        var kind = mutation == 0 ? ResourceProgramKind.Activation : mutation == 1 ? ResourceProgramKind.Zero : ResourceProgramKind.AllocateManaged;
+        var activation = mutation < 2 ? new ResourceActivationShape([], false, false) : null;
+        var length = mutation == 3 ? ResourceExpression.One : null;
+        var shape = mutation == 3 ? ResourceAllocationShape.Object([]) : null;
+        var program = (ResourceProgram)constructor.Invoke([kind, length, null, ResourceRepeatKind.Loop,
+            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, activation]);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var counts = NativeResourceProgramVerifier.Verify(program, "owned", Owner(), token);
+        Assert.That(counts.Verified, Is.False);
+        Assert.That(counts.Cost, Is.Null);
+        Assert.That(counts.UnknownReason, Is.EqualTo(expected));
+        var bytes = NativeResourceAllocationVerifier.Verify(program, "owned", Owner(), Layout(), token);
+        Assert.That(bytes.ConditionalUpperBound, Is.Null);
+        Assert.That(bytes.UnknownReason, Is.EqualTo(expected));
+    }
 }

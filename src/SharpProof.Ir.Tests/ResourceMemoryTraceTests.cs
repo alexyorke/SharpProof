@@ -138,4 +138,27 @@ public sealed class ResourceMemoryTraceTests
         Assert.Throws<OperationCanceledException>((Action)(() => ResourceMemoryTrace.Evaluate([], 0, source.Token)));
         Assert.Throws<ArgumentException>((Action)(() => ResourceMemoryTrace.Evaluate(default, 0, TestContext.CurrentContext.CancellationToken)));
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void MemoryVerdictsCannotBeMissingOrContradictory(int mutation)
+    {
+        ResourceMemoryBounds? bounds = mutation == 2 ? new ResourceMemoryBounds(0, 0, 0, 0, 0, 0) : null;
+        var reason = mutation == 0 ? null : mutation == 1 ? " " : "contradiction";
+        Assert.Throws<ArgumentException>((Action)(() => new ResourceMemoryCheck(bounds, reason)));
+    }
+
+    [Test]
+    public void MixedStorageIntervalsKeepEveryPublishedBoundDistinct()
+    {
+        var check = Check(2, Allocate(1, 0, 24, 32), Allocate(2, 1, 32, 40));
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        var bounds = check.Bounds!.Value;
+        Assert.That(bounds.CumulativeLower, Is.EqualTo(new System.Numerics.BigInteger(56)));
+        Assert.That(bounds.CumulativeUpper, Is.EqualTo(new System.Numerics.BigInteger(72)));
+        Assert.That(bounds.PeakAuxiliaryLower, Is.EqualTo(new System.Numerics.BigInteger(24)));
+        Assert.That(bounds.PeakAuxiliaryUpper, Is.EqualTo(new System.Numerics.BigInteger(32)));
+        Assert.That(bounds.RetainedLower, Is.EqualTo(new System.Numerics.BigInteger(32)));
+        Assert.That(bounds.RetainedUpper, Is.EqualTo(new System.Numerics.BigInteger(40)));
+    }
 }

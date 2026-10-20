@@ -2012,3 +2012,48 @@ Verified integration repairs are committed in eacbc7951. Ignore-only master
 passing combined-tree gates. The next publication includes this complete
 checkpoint. Native lower bounds/tightness, broader lifetime composition, amortized
 and validated average-case models, phase F and final coverage/CI remain open.
+
+## Resource transport and memory boundary qualification
+
+Targeted gap work now covers allocation envelopes after base64 expansion, malformed
+root/integer fields, unknown allocation kinds, resource-program enum/arity/depth
+limits, unrelated activation payloads, noncanonical managed-allocation encodings
+and maximum arithmetic transport. Allocation-kind admission is centralized in
+the existing exhaustive dispatch; removing its redundant early kind check does
+not admit any new shape. Invalid storage kinds remain rejected separately.
+
+Detached activation/managed-allocation records must produce no partial native
+costs. Memory results must contain either bounds or an Unknown reason, and mixed
+storage intervals keep cumulative, auxiliary and retained lower/upper values
+distinct. These tests exercise semantic rejection and published projections; they
+do not replace the unchanged coverage requirement.
+
+Focused verification passed all 26 allocation-codec cases, all 63 combined
+allocation/program transport cases, all 92 native allocation/program cases and
+all 23 finite memory-trace cases. Full analyzer and IR suites are running
+sequentially. No coverage percentage improvement is claimed until the aggregate
+report measures this checkpoint.
+
+For published head 2d58b8593, all four coverage shards passed; its aggregate is
+still running. The full phase C/E/F and 100% qualification requirements remain
+open. No baseline floor or resource-source exclusion was changed.
+
+Published native-growth head 2d58b8593 passed all four coverage shards and reached
+aggregate enforcement at 3926/4119 changed trusted lines (95.31%, 193 gaps), failing
+the unchanged 100% floor. Its report and deduplicated gap inventory are preserved.
+The largest remaining groups are memory extraction/replay, call lowering and
+violation replay. This result predates the current transport/ownership/memory
+boundary additions; those additions have no measured aggregate claim yet.
+
+The full analyzer suite for the boundary checkpoint passed all 1450 tests.
+The native allocation/program suite passed 92 tests and the finite memory-trace
+suite passed 23. Quality/compatibility, generated documentation and 726 local
+links passed. The full IR and repository formatting checks are still running.
+All remaining feature scope stays unchanged.
+
+Final boundary qualification passed all 1450 analyzer tests and all 752 IR tests,
+plus the 92 native allocation/program and 23 finite memory-trace cases recorded
+above. Repository quality/API compatibility, full formatting, documentation
+generation and 726 local links passed. No structural project change was made.
+The checkpoint is ready for publication and fresh exact-head coverage measurement;
+it does not claim the 193-gap inventory is closed or any unfinished feature done.

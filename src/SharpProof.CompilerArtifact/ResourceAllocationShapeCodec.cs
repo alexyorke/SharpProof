@@ -53,7 +53,8 @@ internal static class ResourceAllocationShapeCodec
             { throw new InvalidDataException("Allocation shape model is unsupported."); }
             var kind = (ResourceAllocationKind)Integer(root.GetProperty("kind"));
             var storage = (ResourceStorageKind)Integer(root.GetProperty("storage"));
-            if (!Enum.IsDefined(typeof(ResourceAllocationKind), kind) || !Enum.IsDefined(typeof(ResourceStorageKind), storage))
+            // Kind admission is centralized in the exhaustive dispatch below.
+            if (!Enum.IsDefined(typeof(ResourceStorageKind), storage))
             { throw new InvalidDataException("Allocation shape kind is undefined."); }
             var encodedExtent = root.GetProperty("extent");
             if (encodedExtent.ValueKind != JsonValueKind.String)

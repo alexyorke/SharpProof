@@ -170,4 +170,102 @@ public sealed class ResourceTransportBoundaryTests
         Action exceed = () => ResourceExpressionCodec.Encode(PayloadTree(repeated, final + 1), cancellation);
         Assert.Throws<ResourceExpressionLimitException>(exceed);
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    [TestCase(7)]
+    public void ProgramTransportRejectsUnknownKindsArityAndUnrelatedActivationPayloads(int mutation)
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var program = ResourceProgram.Activate(new ResourceActivationShape([], false, false), ResourceProgram.Zero);
+        var root = JsonNode.Parse(ResourceProgramCodec.Encode(program, token))!;
+        var node = root["program"]!;
+        switch (mutation)
+        {
+            case 0:
+                node["kind"] = 999;
+                break;
+            case 1:
+                node["repeatKind"] = 999;
+                break;
+            case 2:
+                node["repeatKind"] = (int)ResourceRepeatKind.TailRecurrence;
+                break;
+            case 3:
+                node["children"] = null;
+                break;
+            case 4:
+                node["children"] = new JsonArray();
+                break;
+            case 5:
+                node["rank"] = new JsonObject();
+                break;
+            case 6:
+                node["activation"]!["variables"] = null;
+                break;
+            case 7:
+                var variables = new JsonArray();
+                for (var index = 0; index <= ResourceActivationShape.MaximumVariables; index++)
+                { variables.Add((int)ResourceStorageKind.Word32); }
+                node["activation"]!["variables"] = variables;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        var payload = Encoding.UTF8.GetBytes(root.ToJsonString());
+        Assert.Throws<InvalidDataException>((Action)(() => ResourceProgramCodec.Decode(payload, token)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ProgramTransportRejectsEmptyAndOversizedEnvelopes(bool oversized)
+    {
+        var payload = oversized ? new byte[ResourceProgramCodec.MaximumPayloadBytes + 1] : [];
+        Assert.Throws<InvalidDataException>((Action)(() => ResourceProgramCodec.Decode(payload, TestContext.CurrentContext.CancellationToken)));
+    }
+
+    [Test]
+    public void ProgramTransportCountsWireDepthInsteadOfAcceptingProducerDepthClaims()
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var root = JsonNode.Parse(ResourceProgramCodec.Encode(ResourceProgram.Zero, token))!;
+        var template = JsonNode.Parse(ResourceProgramCodec.Encode(
+            ResourceProgram.Activate(new ResourceActivationShape([], false, false), ResourceProgram.Zero), token))!["program"]!;
+        var node = root["program"]!.DeepClone();
+        for (var depth = 0; depth < ResourceExpression.MaximumDepth + 1; depth++)
+        {
+            var parent = template.DeepClone();
+            parent["children"] = new JsonArray(node);
+            node = parent;
+        }
+        root["program"] = node;
+        var options = new System.Text.Json.JsonSerializerOptions { MaxDepth = ResourceExpression.MaximumDepth * 3 + 8 };
+        var payload = Encoding.UTF8.GetBytes(root.ToJsonString(options));
+        Assert.That(payload.Length, Is.LessThan(ResourceProgramCodec.MaximumPayloadBytes));
+        Assert.Throws<InvalidDataException>((Action)(() => ResourceProgramCodec.Decode(payload, token)));
+    }
+
+    [Test]
+    public void ManagedAllocationTransportRequiresCanonicalBase64()
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var root = JsonNode.Parse(ResourceProgramCodec.Encode(ResourceProgram.Managed(ResourceAllocationShape.Object([])), token))!;
+        root["program"]!["allocation"] = " " + root["program"]!["allocation"]!.GetValue<string>();
+        Assert.Throws<InvalidDataException>((Action)(() => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(root.ToJsonString()), token)));
+    }
+
+    [TestCase(2, 5)]
+    [TestCase(10, 10)]
+    public void MaximumArithmeticKeepsItsMeaningAcrossTransport(int size, int expected)
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var expression = ResourceExpression.Max(Input(), ResourceExpression.Literal(5));
+        var decoded = ResourceExpressionCodec.Decode(ResourceExpressionCodec.Encode(expression, token), token);
+        Assert.That(decoded, Is.EqualTo(expression));
+        Assert.That(decoded.Evaluate(_ => size, token), Is.EqualTo(new BigInteger(expected)));
+    }
 }

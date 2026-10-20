@@ -161,4 +161,50 @@ public sealed class ResourceAllocationShapeCodecTests
         var roundTrip = ResourceAllocationShapeCodec.Decode(ResourceAllocationShapeCodec.Encode(maximum, cancellation), cancellation);
         Assert.That(roundTrip.Fields, Has.Length.EqualTo(ResourceAllocationShape.MaximumFields));
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void AllocationShapesRejectMalformedRootsIntegersAndUnknownKinds(int mutation)
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var root = JsonNode.Parse(ResourceAllocationShapeCodec.Encode(ResourceAllocationShape.Delegate(), token))!;
+        switch (mutation)
+        {
+            case 0:
+                root = new JsonArray();
+                break;
+            case 1:
+                root["version"] = "1";
+                break;
+            case 2:
+                root["storage"] = 0.5;
+                break;
+            case 3:
+                root["kind"] = long.MaxValue;
+                break;
+            case 4:
+                root["kind"] = 999;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        var payload = Encoding.UTF8.GetBytes(root.ToJsonString());
+        Assert.Throws<InvalidDataException>((Action)(() => ResourceAllocationShapeCodec.Decode(payload, token)));
+    }
+
+    [Test]
+    public void AllocationEnvelopeEnforcesItsOwnBudgetAfterBase64Expansion()
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var extent = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.ArrayLength, new string('n', 13000), 1000));
+        for (var level = 0; level < 6; level++)
+        { extent = ResourceExpression.Add(extent, extent); }
+        var arithmetic = ResourceExpressionCodec.Encode(extent, token);
+        Assert.That(arithmetic.Length, Is.LessThanOrEqualTo(ResourceExpressionCodec.MaximumPayloadBytes));
+        Assert.That(Convert.ToBase64String(arithmetic).Length, Is.GreaterThan(ResourceAllocationShapeCodec.MaximumPayloadBytes));
+        var shape = ResourceAllocationShape.Array(ResourceStorageKind.Byte, extent);
+        Assert.Throws<ResourceExpressionLimitException>((Action)(() => ResourceAllocationShapeCodec.Encode(shape, token)));
+    }
 }
