@@ -218,7 +218,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -237,6 +237,9 @@ param(
 
     # CI runs the package phase of pr in a separate parallel job.
     [switch]$SkipPackageTests,
+
+    # CI runs the source-only repository gates of pr in a separate parallel job.
+    [switch]$SkipRepositoryGates,
 
     [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
@@ -268,6 +271,7 @@ Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|alloca
 [Source](../../src/SharpProof.Fuzz/FuzzOptions.cs)
 
 ```text
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace SharpProof.Fuzz;
@@ -280,9 +284,9 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
     public const int MaximumAllowedParallelism = 4;
     public const int DefaultMaximumParallelism = MaximumAllowedParallelism;
 
-    public static FuzzOptions Parse(IReadOnlyList<string> arguments)
+    public static FuzzOptions Parse(ImmutableArray<string> arguments)
     {
-        if (arguments == null)
+        if (arguments.IsDefault)
         {
             throw new ArgumentNullException(nameof(arguments));
         }
@@ -291,7 +295,7 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
         var seed = DefaultSeed;
         var maximumParallelism = DefaultMaximumParallelism;
 
-        for (var index = 0; index < arguments.Count; index++)
+        for (var index = 0; index < arguments.Length; index++)
         {
             var argument = arguments[index];
             if (argument is "--help" or "-h")
@@ -299,7 +303,7 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
                 throw new FuzzUsageException("");
             }
 
-            if (index + 1 >= arguments.Count)
+            if (index + 1 >= arguments.Length)
             {
                 throw new FuzzUsageException("Missing value for " + argument + ".");
             }

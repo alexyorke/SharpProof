@@ -27,7 +27,7 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds every slot, the two Worker remainder shards dominate the rest, and
+    # holds every slot, the Worker remainder shards dominate the rest, and
     # Projects holds every other task. All keeps the single-runner task set.
     [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
     [string]$CoverageTaskGroup = 'All'
@@ -251,32 +251,26 @@ $workerRemainderFilter = @(
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
-# The measured heavy classes account for about half of the remainder's test
-# time. Complementary filters keep every current and future test in one shard.
-New-Variable -Name workerRemainderHeavyClasses -Option Constant -Value (
-    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-            'WorkerVcShadowSourceGateTests',
-            'NativeWorkerRoutingTests',
-            'TypedMetadataConversionTests',
-            'GoldenWorkerTests',
-            'CompilerTotalCallableArtifactTests',
-            'NativeAllocationEffectTests',
-            'NativePurityEffectTests',
-            'TypedMetadataCallTests',
-            'CompilerReachableSourceTests',
-            'NativeAliasingBoundaryTests',
-            'ScalarPatternFlowTests',
-            'BitwiseOperatorSemanticsTests')))
-$workerRemainderHeavyFilter = @(
-    $workerRemainderHeavyClasses |
-        ForEach-Object {
-            'FullyQualifiedName~' + $workerClassPrefix + $_
-        }) -join '|'
-$workerRemainderOtherFilter = @(
-    $workerRemainderHeavyClasses |
-        ForEach-Object {
-            'FullyQualifiedName!~' + $workerClassPrefix + $_
-        }) -join '&'
+# Preserve the measured upstream class-prefix partition, with an immutable
+# outer vector and immutable ordered prefix groups. The final filter is the
+# complement, so every current and future remainder class selects one shard.
+$workerPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeA'))
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeS', 'C'))
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('W', 'T', 'G', 'F'))
+$workerRemainderShardPrefixes = $workerPrefixGroupBuilder.ToImmutable()
+$workerShardFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$workerComplementFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($prefixes in $workerRemainderShardPrefixes) {
+    $includedPrefixes = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($prefix in $prefixes) {
+        $includedPrefixes.Add('FullyQualifiedName~' + $workerClassPrefix + $prefix)
+        $workerComplementFilterBuilder.Add('FullyQualifiedName!~' + $workerClassPrefix + $prefix)
+    }
+    $workerShardFilterBuilder.Add('(' + ($includedPrefixes.ToImmutable() -join '|') + ')')
+}
+$workerShardFilterBuilder.Add($workerComplementFilterBuilder.ToImmutable() -join '&')
+$workerRemainderShardFilters = $workerShardFilterBuilder.ToImmutable()
 
 $testProject = Join-Path $repositoryRoot (
     'src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
@@ -296,10 +290,11 @@ $checksumTaskFilter = "($workerRemainderTaskFilter)&(FullyQualifiedName=$checksu
 if ($coverageEnabled) {
     $workerRemainderTaskFilter = [string]::Concat($workerRemainderTaskFilter, "&(FullyQualifiedName!=$checksumMethod)")
 }
-$workerRemainderHeavyTaskFilter =
-"($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
-$workerRemainderOtherTaskFilter =
-"($workerRemainderTaskFilter)&($workerRemainderOtherFilter)"
+$workerRemainderNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+for ($index = 1; $index -le $workerRemainderShardFilters.Length; $index++) {
+    $workerRemainderNameBuilder.Add('worker-remainder-' + $index)
+}
+$workerRemainderTaskNames = $workerRemainderNameBuilder.ToImmutable()
 $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
@@ -379,22 +374,15 @@ if (-not $ArchitectureOnly) {
                     DefaultEstimatedMilliseconds = 10000L
                 }).AsReadOnly())
     }
-    # The remainder is the longest Worker task in every mode (about five
-    # minutes uninstrumented on a four-CPU runner), so it always runs as two
-    # complementary halves that the scheduler can overlap.
-    $workerDescriptorBuilder.AddRange([object[]]@(
-            ([ordered]@{
-                Name                         = 'worker-remainder-heavy'
-                Filter                       = $workerRemainderHeavyTaskFilter
-                Slots                        = [Math]::Min($parallelism, 2)
-                DefaultEstimatedMilliseconds = 160000L
-            }).AsReadOnly(),
-            ([ordered]@{
-                Name                         = 'worker-remainder-other'
-                Filter                       = $workerRemainderOtherTaskFilter
-                Slots                        = [Math]::Min($parallelism, 2)
-                DefaultEstimatedMilliseconds = 160000L
-            }).AsReadOnly()))
+    # Retain the upstream four-shard policy and memory-aware slot reservation.
+    for ($index = 0; $index -lt $workerRemainderShardFilters.Length; $index++) {
+        $workerDescriptorBuilder.Add(([ordered]@{
+                    Name                         = $workerRemainderTaskNames[$index]
+                    Filter                       = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
+                    Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+                    DefaultEstimatedMilliseconds = 200000L
+                }).AsReadOnly())
+    }
     $workerTaskDescriptors = $workerDescriptorBuilder.ToImmutable()
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
         $taskBuilder.Add(([ordered]@{
@@ -426,11 +414,10 @@ if ($architectureShardingEnabled) {
             }).AsReadOnly())
 }
 if ($CoverageTaskGroup -ne 'All') {
-    $gatesTaskNames = @('semantic-gates')
-    $workerTaskNames = @(
-        'worker-remainder-heavy',
-        'worker-remainder-other',
-        'worker-fixed-checksum')
+    $gatesTaskNames = [Collections.Immutable.ImmutableArray]::Create[string]('semantic-gates')
+    $workerTaskNameBuilder = $workerRemainderTaskNames.ToBuilder()
+    $workerTaskNameBuilder.Add('worker-fixed-checksum')
+    $workerTaskNames = $workerTaskNameBuilder.ToImmutable()
     # Capture the name first: inside switch, $_ is the switch value.
     $taskSnapshot = $taskBuilder.ToImmutable()
     $selectedTasks = @($taskSnapshot | Where-Object {
@@ -438,7 +425,7 @@ if ($CoverageTaskGroup -ne 'All') {
             switch ($CoverageTaskGroup) {
                 'Gates' { $taskName -cin $gatesTaskNames }
                 'Worker' { $taskName -cin $workerTaskNames }
-                'Projects' { $taskName -cnotin ($gatesTaskNames + $workerTaskNames) }
+                'Projects' { $taskName -cnotin $gatesTaskNames -and $taskName -cnotin $workerTaskNames }
             }
         })
     $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()

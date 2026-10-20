@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -20,6 +20,9 @@ param(
 
     # CI runs the package phase of pr in a separate parallel job.
     [switch]$SkipPackageTests,
+
+    # CI runs the source-only repository gates of pr in a separate parallel job.
+    [switch]$SkipRepositoryGates,
 
     [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
@@ -74,6 +77,9 @@ if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
 }
 if ($SkipPackageTests -and $Command -notin @('pr', 'pr-gates')) {
     throw '-SkipPackageTests is supported only for pr and pr-gates.'
+}
+if ($SkipRepositoryGates -and $Command -notin @('pr', 'pr-gates')) {
+    throw '-SkipRepositoryGates is supported only for pr and pr-gates.'
 }
 if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
@@ -294,6 +300,25 @@ function Invoke-DependencyAudit {
     }
 }
 
+# Source-only checks that pr runs before its solution build. They need no
+# build output, so CI runs them beside the canonical build instead of before it.
+function Invoke-RepositoryGates {
+    Invoke-PipelineCommand 'docs' $Configuration
+    & (Join-Path $repositoryRoot `
+            'eng/scripts/Test-SharpProofContainerContract.ps1')
+    & (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofRepositoryLayout.ps1') -EvaluateProjects
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofThirdPartyInventoryRegression.ps1' `
+        'Third-party inventory regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofFacadePackageRegression.ps1' `
+        'Metadata facade package regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofEmbeddedSymbolsRegression.ps1' `
+        'Embedded symbol package regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
+        'Release SBOM and attestation policy regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPublicApiGovernance.ps1' `
+        'Public API governance controls failed.'
+}
+
 switch ($Command) {
     'lint' {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofLint.ps1')
@@ -335,7 +360,7 @@ switch ($Command) {
     'pr' {
         & $PSCommandPath -Command 'pr-gates' -Configuration 'Release' `
             -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory `
-            -SkipPackageTests:$SkipPackageTests
+            -SkipPackageTests:$SkipPackageTests -SkipRepositoryGates:$SkipRepositoryGates
     }
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
@@ -431,25 +456,17 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'eng/scripts/Invoke-SharpProofDevCheck.ps1') `
             -Configuration $Configuration
     }
+    'repository-gates' {
+        Invoke-RepositoryGates
+    }
     'pr-gates' {
-        Invoke-PipelineCommand 'docs' $Configuration
         if ($Configuration -ne 'Release') {
             throw "pr-gates requires -Configuration Release. " +
             "Use the test command for Debug validation."
         }
-        & (Join-Path $repositoryRoot `
-                'eng/scripts/Test-SharpProofContainerContract.ps1')
-        & (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofRepositoryLayout.ps1') -EvaluateProjects
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofThirdPartyInventoryRegression.ps1' `
-            'Third-party inventory regressions failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofFacadePackageRegression.ps1' `
-            'Metadata facade package regressions failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofEmbeddedSymbolsRegression.ps1' `
-            'Embedded symbol package regressions failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
-            'Release SBOM and attestation policy regressions failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofPublicApiGovernance.ps1' `
-            'Public API governance controls failed.'
+        if (-not $SkipRepositoryGates) {
+            Invoke-RepositoryGates
+        }
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
