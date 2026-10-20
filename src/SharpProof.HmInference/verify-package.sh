@@ -224,6 +224,26 @@ for expected in 'PackageLayoutCallback<T1, T2>(global::System.Action<global::Sys
 done
 if grep -Eq 'CS8032|AD0001' "$consumer/release.log"; then tail -60 "$consumer/release.log"; exit 1; fi
 cp "$consumer/release.log" "$evidence/package-layout-release.txt"
+legacy_layout=$(mktemp -d /tmp/hm-package-legacy-layout.XXXXXX)
+cp global.json "$legacy_layout/global.json"
+cp "$consumer/.editorconfig" "$legacy_layout/.editorconfig"
+cp "$consumer/BuilderLayoutSupport.cs" "$legacy_layout/"
+sed 's/static async value=>/async value=>/g' "$consumer/BuilderLayoutProbe.cs" > "$legacy_layout/BuilderLayoutProbe.cs"
+cat > "$legacy_layout/Consumer.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>8.0</LangVersion><Optimize>true</Optimize><RestoreSources>$packages</RestoreSources><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
+  <ItemGroup><PackageReference Include="SharpProof.HmInference" Version="$version" PrivateAssets="all" /></ItemGroup>
+</Project>
+EOF
+for language in 8.0 9.0; do
+  NUGET_PACKAGES="$legacy_layout/packages" dotnet build "$legacy_layout/Consumer.csproj" -c Release -p:LangVersion="$language" -v:normal > "$legacy_layout/$language.log" 2>&1 || { tail -60 "$legacy_layout/$language.log"; exit 1; }
+  for expected in 'PackageLayoutCallback<T1, T2>(global::System.Action<global::System.Func<T1, global::LayoutTask<T1>>> sink, T2 ignored) where T1 : unmanaged' 'PackageLayoutLocalCall<T1, T2>(T1? value, T2 ignored) where T1 : unmanaged'; do
+    if ! grep -Fq "$expected" "$legacy_layout/$language.log"; then tail -60 "$legacy_layout/$language.log"; exit 1; fi
+  done
+  if grep -Eq 'CS8032|AD0001' "$legacy_layout/$language.log"; then tail -60 "$legacy_layout/$language.log"; exit 1; fi
+  cp "$legacy_layout/$language.log" "$evidence/package-layout-csharp-$language.txt"
+done
+
 # A pattern remains valid when the source's disposal interface has no contract member.
 legacy=$(mktemp -d /tmp/hm-pattern-package-consumer.XXXXXX)
 cp "$consumer/Consumer.csproj" "$consumer/.editorconfig" "$consumer/global.json" "$legacy/"
@@ -252,4 +272,4 @@ cp "$legacy/build.log" "$evidence/package-pattern-consumer.txt"
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' 'PASS NuGetPinningPatternsAndFixedBuffers' 'PASS NuGetConstraintNormalization' 'PASS NuGetNullableConstraintImplication' 'PASS NuGetDependentNullableAsyncAndEnumBounds' 'PASS NuGetShapeSelectedInterfaceProjection' 'PASS NuGetSubstitutedParameterEnumerators' 'PASS NuGetRigidParameterEnumeratorTags' 'PASS NuGetBuilderStateMachineResultConstraint' 'PASS NuGetUnmanagedStateMachinePhysicalLayout' 'PASS NuGetNestedUnmanagedStateMachineLayouts' 'PASS NuGetGenericLocalNullableLayouts' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' 'PASS NuGetPinningPatternsAndFixedBuffers' 'PASS NuGetConstraintNormalization' 'PASS NuGetNullableConstraintImplication' 'PASS NuGetDependentNullableAsyncAndEnumBounds' 'PASS NuGetShapeSelectedInterfaceProjection' 'PASS NuGetSubstitutedParameterEnumerators' 'PASS NuGetRigidParameterEnumeratorTags' 'PASS NuGetBuilderStateMachineResultConstraint' 'PASS NuGetUnmanagedStateMachinePhysicalLayout' 'PASS NuGetNestedUnmanagedStateMachineLayouts' 'PASS NuGetGenericLocalNullableLayouts' 'PASS NuGetCSharp8NestedAsyncLayouts' 'PASS NuGetCSharp9NestedAsyncLayouts' | tee "$evidence/package-checks.txt"

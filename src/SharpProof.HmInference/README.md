@@ -526,5 +526,14 @@ calls. A finite fixed point tracks source generic symbols; composite structs
 constrain only stored arguments, preserving phantom parameters. Nullable local
 results retain their wrapper and infer unmanaged element constraints. Applied
 fixes exercise new unmanaged payloads and reject managed payloads; CLI and
-packaged analyzer consumers verify Release builds. Older-language nested
-correlation remains open.
+packaged analyzer consumers verify Release builds.
+
+For C# 8 and 9, portable debug metadata correlates nested async functions using
+temporary local constants. The constants generate no state-machine fields and
+remain private to probes; original language options and anonymous delegate
+parameter lists are preserved. Block and expression bodies, mixed builders,
+repeated local names, generic owners, hidden lines and unencoded source trees
+have regression coverage. Incomplete marker correlation rejects a candidate. Applied C# 8 IDE fixes compare runtime traces and new
+nullable/unmanaged domains. CLI and fresh NuGet consumers exercise both language
+versions. C# 7.3 retains its compiler restriction on generic unmanaged constructed
+state machines.

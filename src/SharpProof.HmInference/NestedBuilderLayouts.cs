@@ -14,6 +14,7 @@ public static partial class Inference
             private readonly string name = name ?? throw new ArgumentNullException(nameof(name));
             private readonly SemanticModel semantic = semantic ?? throw new ArgumentNullException(nameof(semantic));
             private int next;
+            internal int Count => next;
 
             private AttributeListSyntax Mark(int index)
             {
@@ -97,8 +98,11 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(root)); }
             if (markerName is null)
             { throw new ArgumentNullException(nameof(markerName)); }
+            if (root.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: < LanguageVersion.CSharp10 })
+            { return ReadLegacyBuilderStates(compilation, root, markerName); }
             var semantic = compilation.GetSemanticModel(root.SyntaxTree);
-            var marked = (MethodDeclarationSyntax)new LayoutMarker(markerName, semantic, cancellationToken).Visit(root)!;
+            var marker = new LayoutMarker(markerName, semantic, cancellationToken);
+            var marked = (MethodDeclarationSyntax)marker.Visit(root)!;
             var tree = root.SyntaxTree;
             var replacement = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(root, marked), tree.Options);
             compilation = compilation.ReplaceSyntaxTree(tree, replacement);
@@ -148,6 +152,8 @@ public static partial class Inference
                 { Namespace(child); }
             }
             Namespace(assembly.GlobalNamespace);
+            if (states.Count != marker.Count)
+            { throw new InferenceException("Emitted metadata omitted an async layout marker."); }
             return (metadata, states);
         }
 
@@ -160,8 +166,6 @@ public static partial class Inference
             if (variables is null)
             { throw new ArgumentNullException(nameof(variables)); }
             var added = InferRootBuilderLayoutConstraints(compilation, proposal, variables);
-            if (proposal.SyntaxTree.Options is not CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp10 })
-            { return added; }
             var originalRoot = currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) as MethodDeclarationSyntax
                 ?? throw new InferenceException("Missing original nested-layout method.");
             var potential = false;

@@ -370,6 +370,7 @@ internal static class Program
         passed += await NullableAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ResourceChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await BuilderLayoutChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await LegacyBuilderLayoutChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await CustomBuilderChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ConversionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ConstraintFlowChecks.Run(cancellationToken).ConfigureAwait(false);

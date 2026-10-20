@@ -12,7 +12,7 @@ internal static class BuilderLayoutRuntimeChecks
 {
     private static readonly string[] Runners = ["OriginalBuilderLayoutRunner", "NewBuilderLayoutRunner"];
 
-    internal static async Task<int> Run(CancellationToken cancellationToken)
+    internal static async Task<int> Run(LanguageVersion languageVersion, CancellationToken cancellationToken)
     {
         var support = BuilderLayoutChecks.Support;
         var first = support.IndexOf("public struct LayoutBuilder<T>", StringComparison.Ordinal);
@@ -20,7 +20,13 @@ internal static class BuilderLayoutRuntimeChecks
         var unused = support[first..last].Replace("LayoutBuilder", "UnusedLayoutBuilder", StringComparison.Ordinal)
             .Replace("where S:unmanaged,IAsyncStateMachine", "where S:IAsyncStateMachine", StringComparison.Ordinal)
             .Replace("where A:INotifyCompletion where S:IAsyncStateMachine", "where A:INotifyCompletion where S:unmanaged,IAsyncStateMachine", StringComparison.Ordinal);
-        var source = "using System.Linq;\n" + support + unused + """
+        var legacyTask = "";
+        if (languageVersion < LanguageVersion.CSharp10)
+        {
+            unused = unused.Replace("LayoutTask<T>", "UnusedLayoutTask<T>", StringComparison.Ordinal);
+            legacyTask = "[AsyncMethodBuilder(typeof(UnusedLayoutBuilder<>))] public readonly struct UnusedLayoutTask<T>{private readonly T value;public UnusedLayoutTask(T value){this.value=value;}public LayoutAwaiter<T> GetAwaiter(){LayoutTrace.Value+=\"awaiter;\";return new LayoutAwaiter<T>(value);}}";
+        }
+        var source = "using System.Linq;\n" + support + unused + legacyTask + """
             public static class BuilderLayoutProbe{
                 public static LayoutTask<int> LocalCall(int value,string ignored){static LayoutTask<U> Forward<U>(U item)=>Local(item);static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Forward(value);}
                 public static LayoutTask<LayoutPayload<int,string>> LocalComposite(LayoutPayload<int,string> value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}
@@ -62,7 +68,7 @@ internal static class BuilderLayoutRuntimeChecks
                     if(BuilderLayoutProbe.LocalCall(23,"tag").GetAwaiter().GetResult()!=23
                         ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<int,string>{Value=23},"tag").GetAwaiter().GetResult().Value!=23
                         ||BuilderLayoutProbe.LocalNullable((int?)23,"tag").GetAwaiter().GetResult()!=23
-                        ||BuilderLayoutProbe.LocalNullable((int?)null,"tag").GetAwaiter().GetResult()is not null)return false;
+                        ||BuilderLayoutProbe.LocalNullable((int?)null,"tag").GetAwaiter().GetResult()!=null)return false;
                     return BuilderLayoutProbe.Value(23,"tag").GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Local(23,"tag").GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Phantom(new LayoutPayload<int,string>{Value=23},"tag").GetAwaiter().GetResult()==23
@@ -73,8 +79,12 @@ internal static class BuilderLayoutRuntimeChecks
                 }
             }
             """;
+        if (languageVersion < LanguageVersion.CSharp9)
+        { source = source.Replace("static async value=>", "async value=>", StringComparison.Ordinal).Replace("static async (value)=>", "async (value)=>", StringComparison.Ordinal); }
+        if (languageVersion < LanguageVersion.CSharp10)
+        { source = source.Replace("[AsyncMethodBuilder(typeof(UnusedLayoutBuilder<>))] public static async LayoutTask<int> Free", "public static async UnusedLayoutTask<int> Free", StringComparison.Ordinal); }
         using var workspace = new AdhocWorkspace();
-        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "BuilderLayoutRuntime", "BuilderLayoutRuntime", LanguageNames.CSharp,
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "BuilderLayoutRuntime", "BuilderLayoutRuntime", LanguageNames.CSharp, parseOptions: new CSharpParseOptions(languageVersion),
             compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, optimizationLevel: OptimizationLevel.Release), metadataReferences: Program.Compile([]).References));
         var document = project.AddDocument("BuilderLayoutRuntime.cs", source);
         var before = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
@@ -125,7 +135,7 @@ internal static class BuilderLayoutRuntimeChecks
                     if(BuilderLayoutProbe.LocalCall((byte)23,tag).GetAwaiter().GetResult()!=23
                         ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<byte,object[]>{Value=23},tag).GetAwaiter().GetResult().Value!=23
                         ||BuilderLayoutProbe.LocalNullable((decimal?)23m,tag).GetAwaiter().GetResult()!=23m
-                        ||BuilderLayoutProbe.LocalNullable((decimal?)null,tag).GetAwaiter().GetResult()is not null)return false;
+                        ||BuilderLayoutProbe.LocalNullable((decimal?)null,tag).GetAwaiter().GetResult()!=null)return false;
                     return BuilderLayoutProbe.Value((byte)23,tag).GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Local((byte)23,tag).GetAwaiter().GetResult()==23
                         &&BuilderLayoutProbe.Phantom(new LayoutPayload<byte,object[]>{Value=23},tag).GetAwaiter().GetResult()==23
@@ -136,8 +146,11 @@ internal static class BuilderLayoutRuntimeChecks
                 }
             }
             """);
-        if ((await document.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString().Contains("__HmLayout_", StringComparison.Ordinal))
-        { throw new InvalidOperationException("A private layout probe leaked into the code fix."); }
+        foreach (var sourceDocument in document.Project.Documents)
+        {
+            if ((await sourceDocument.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString().Contains("__HmLayout_", StringComparison.Ordinal))
+            { throw new InvalidOperationException("A private layout probe leaked into the code fix."); }
+        }
         var after = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
         foreach (var runner in Runners)
         {

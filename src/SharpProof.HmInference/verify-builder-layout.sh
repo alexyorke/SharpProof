@@ -24,3 +24,14 @@ for expected in 'LayoutCallback<T1, T2>(global::System.Action<global::System.Fun
 done
 cp "$fixture/project.log" /workspace/SharpProof/artifacts/hm-inference/builder-layout-cli.txt
 printf '%s\n' 'PASS CliUnmanagedStateMachinePhysicalLayout' 'PASS CliNestedUnmanagedStateMachineLayouts' 'PASS CliGenericLocalNullableLayouts'
+
+
+for language in 8.0 9.0; do
+  sed -i 's/static async value=>/async value=>/g' "$fixture/Input.cs"
+  dotnet "$output" --project "$fixture/Layout.csproj" --configuration Release --property "LangVersion=$language" > "$fixture/legacy-$language.log" 2>&1 || { tail -40 "$fixture/legacy-$language.log"; exit 1; }
+  for expected in 'LayoutCallback<T1, T2>(global::System.Action<global::System.Func<T1, global::LayoutTask<T1>>> sink, T2 ignored) where T1 : unmanaged' 'LayoutLocalCall<T1, T2>(T1? value, T2 ignored) where T1 : unmanaged'; do
+    if ! grep -Fq "$expected" "$fixture/legacy-$language.log"; then tail -40 "$fixture/legacy-$language.log"; exit 1; fi
+  done
+  cp "$fixture/legacy-$language.log" "/workspace/SharpProof/artifacts/hm-inference/builder-layout-csharp-$language-cli.txt"
+  printf '%s\n' "PASS CliCSharp"$language"NestedAsyncLayouts"
+done

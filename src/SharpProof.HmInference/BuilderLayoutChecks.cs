@@ -10,10 +10,10 @@ internal static class BuilderLayoutChecks
         using System;
         using System.Runtime.CompilerServices;
         [AsyncMethodBuilder(typeof(LayoutBuilder<>))]
-        public readonly struct LayoutTask<T>(T value){public LayoutAwaiter<T> GetAwaiter(){LayoutTrace.Value+="awaiter;";return new(value);}}
-        public readonly struct LayoutAwaiter<T>(T value):INotifyCompletion{public bool IsCompleted=>true;public T GetResult(){LayoutTrace.Value+="get;";return value;}public void OnCompleted(Action action)=>action();}
+        public readonly struct LayoutTask<T>{private readonly T value;public LayoutTask(T value){this.value=value;}public LayoutAwaiter<T> GetAwaiter(){LayoutTrace.Value+="awaiter;";return new LayoutAwaiter<T>(value);}}
+        public readonly struct LayoutAwaiter<T>:INotifyCompletion{private readonly T value;public LayoutAwaiter(T value){this.value=value;}public bool IsCompleted=>true;public T GetResult(){LayoutTrace.Value+="get;";return value;}public void OnCompleted(Action action)=>action();}
         public struct LayoutBuilder<T>{
-            private T result;public static LayoutBuilder<T> Create()=>default;public LayoutTask<T> Task=>new(result);
+            private T result;public static LayoutBuilder<T> Create()=>default;public LayoutTask<T> Task=>new LayoutTask<T>(result);
             public void SetResult(T value){LayoutTrace.Value+="result;";result=value;}public void SetException(Exception exception)=>throw exception;public void SetStateMachine(IAsyncStateMachine state){}
             public void Start<S>(ref S state) where S:unmanaged,IAsyncStateMachine{LayoutTrace.Value+="start;";state.MoveNext();}
             public void AwaitOnCompleted<A,S>(ref A awaiter,ref S state) where A:INotifyCompletion where S:IAsyncStateMachine=>awaiter.OnCompleted(state.MoveNext);
@@ -25,7 +25,7 @@ internal static class BuilderLayoutChecks
         public readonly struct LayoutCriticalAwaiter:ICriticalNotifyCompletion{public bool IsCompleted=>true;public void GetResult(){}public void OnCompleted(Action action)=>action();public void UnsafeOnCompleted(Action action)=>action();}
         public struct LayoutPayload<T,Tag>{public T Value;}
         public static class LayoutUse{public static void Consume<T,Tag>(LayoutPayload<T,Tag> value){LayoutTrace.Value+="consume;";}}
-        public readonly struct LayoutEmptyAwaitable<T>{public LayoutAwaiter<T> GetAwaiter()=>new(default!);}
+        public readonly struct LayoutEmptyAwaitable<T>{public LayoutAwaiter<T> GetAwaiter()=>new LayoutAwaiter<T>(default!);}
         public static class LayoutTrace{public static string Value="";}
         """;
 
@@ -97,7 +97,7 @@ internal static class BuilderLayoutChecks
         if (Program.Results(untyped, cancellationToken).Single(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; }).Status == "Suggestion")
         { throw new InvalidOperationException("An untyped registration caller cannot infer newly introduced callback type arguments."); }
         Program.Log.Info("PASS NestedLayoutPreservesUntypedRegistrationCaller");
-        var runtimeChecks = await BuilderLayoutRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        var runtimeChecks = await BuilderLayoutRuntimeChecks.Run(LanguageVersion.CSharp13, cancellationToken).ConfigureAwait(false);
         return tests.Length + runtimeChecks + 2;
     }
 }
