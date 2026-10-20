@@ -84,24 +84,24 @@ Invoke-SharpProofTimedPhase -Name 'restore' -Timings $timings -Action {
 }
 Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
     $builds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
-    $builds.Add([pscustomobject]@{
-            Name      = 'solution-' +
-            ([string]$solutionBuildCommand.configuration).ToLowerInvariant()
-            Arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                    'build', 'SharpProof.slnx', '-c',
-                    [string]$solutionBuildCommand.configuration,
-                    '--no-restore'))
-        })
-    if ($packageProductBuild) {
-        $builds.Add([pscustomobject]@{
-                Name      = 'package-products-release'
+    $builds.Add(([ordered]@{
+                Name      = 'solution-' +
+                ([string]$solutionBuildCommand.configuration).ToLowerInvariant()
                 Arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                        'build',
-                        'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
-                        '-c', [string]$packageProductBuildCommands[0].configuration,
-                        '--no-restore',
-                        '-p:GeneratePackageOnBuild=false'))
-            })
+                        'build', 'SharpProof.slnx', '-c',
+                        [string]$solutionBuildCommand.configuration,
+                        '--no-restore'))
+            }).AsReadOnly())
+    if ($packageProductBuild) {
+        $builds.Add(([ordered]@{
+                    Name      = 'package-products-release'
+                    Arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                            'build',
+                            'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
+                            '-c', [string]$packageProductBuildCommands[0].configuration,
+                            '--no-restore',
+                            '-p:GeneratePackageOnBuild=false'))
+                }).AsReadOnly())
     }
     Invoke-SharpProofParallelDotnetBuilds `
         -Builds ($builds.ToImmutable()) `
@@ -116,11 +116,11 @@ Invoke-SharpProofTimedPhase -Name 'semantic-tests' -Timings $timings -Action {
         -TimeoutSeconds $TimeoutSeconds
 }
 Invoke-SharpProofTimedPhase -Name 'package-tests' -Timings $timings -Action {
-    $packageArguments = @{
-        Configuration  = $Configuration
-        TimeoutSeconds = $TimeoutSeconds
-    }
-    $packageArguments.NoBuild = $true
+    $packageArguments = ([ordered]@{
+            Configuration  = $Configuration
+            TimeoutSeconds = $TimeoutSeconds
+            NoBuild        = $true
+        }).AsReadOnly()
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }
@@ -132,13 +132,13 @@ $timingOutput = Join-Path $timingDirectory (
     'dev-check-' + $Configuration.ToLowerInvariant() + '.json')
 $temporaryTiming =
 $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-[pscustomobject]@{
+([ordered]@{
     schemaVersion            = 1
     command                  = 'check'
     configuration            = $Configuration
     totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-    phases                   = @($timings.ToImmutable())
-} | ConvertTo-Json -Depth 5 |
+    phases                   = $timings.ToImmutable()
+}).AsReadOnly() | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
 Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 
