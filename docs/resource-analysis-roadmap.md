@@ -79,7 +79,8 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] End-to-end runtime/allocation benchmark workflow, with input scales,
   units, environmental identity and comparable baselines. Measurements must
   remain distinguishable from proofs and must not establish Big-O by themselves.
-- [ ] Cancellation, exceptional completion, shared-state and repeated-entry controls.
+- [x] Cancellation, exceptional completion, shared-state and repeated-entry controls
+  for the admitted task model; unsupported execution shapes remain Unknown.
 
 ## Delivery and verification
 
@@ -172,10 +173,11 @@ unproved closure placement and arbitrary dispatch remain explicit Unknown
 boundaries. Phase C's feature checkbox records these implemented models; it does
 not waive those boundaries or the separate 100% coverage and final-audit gates.
 
-The remaining feature implementation is phase F: async/state-machine costs,
-native fork/join work/allocation/live-space composition, and their cancellation,
-exception, shared-state and repeated-entry controls. The task-join source planner
-below is only its admission foundation. The MR remains draft.
+The remaining feature implementation is phase F's cumulative task allocation
+composition and completion of its concurrency controls. Source loop work and
+normal-completion compiler/runtime storage now have native root proofs. These
+declared models and their unsupported boundaries are described below. Coverage
+qualification and the final audit remain open; the MR remains draft.
 
 ### Package coverage memory containment (in progress)
 
@@ -186,11 +188,47 @@ the earlier unconfirmed inference. The state is retained as
 `artifacts/resource-7f-container-state/package.json`; the failed log is
 `artifacts/resource-7f-coverage-failed.log`. No aggregate report was produced.
 
-Investigate and bound package test concurrency, including its nested NUnit pool,
-under the same four-CPU/12-GiB/4-GiB-scratch Docker budget. Preserve the complete
-case set, assertion deadlines, authority evidence, instrumentation and coverage
-floors. Verify comparable full package coverage completion and elapsed time
-before claiming the containment repair successful.
+The first containment experiment used one outer shard and one nested NUnit
+worker under the same four-CPU/12-GiB/4-GiB-scratch Docker budget. A live Docker
+process listing showed many idle Roslyn compiler-server processes accumulating.
+Package workspaces assign unique compiler pipe IDs but do not end their servers
+when disposing each workspace. That probe was deliberately stopped after 708
+seconds to test the lifecycle correction; its 130-case layout group passed in
+10 minutes 13 seconds. Exit 143 records the stop, not a test failure or OOM.
+
+The second experiment disabled shared compilation in coverage consumer
+workspaces, retaining the serial configuration. It passed nine groups (458
+passing cases and one existing skipped case) but exceeded the unchanged
+1200-second suite deadline. End-to-end time was 1280.36 seconds; exit 1 records
+the deadline failure. Serial execution is therefore rejected, not shipped.
+
+The current candidate restores the original shard and NUnit concurrency and
+collector settings. Only coverage consumer processes set
+UseSharedCompilation=false to avoid retaining one-off compiler servers. All
+case selection, assertion deadlines, instrumentation, authority evidence and
+coverage floors remain unchanged. A fresh full probe uses the same Docker
+budget. Its completion and elapsed-time verification are pending; no full-phase
+containment success is claimed yet.
+
+The same reporter confirms that 0e420a470's package phase also ended with Docker
+oomKilled true and exit 137. Its three semantic shards, canonical build/package
+gates and platform consumers passed. Package reproducibility was still running
+at this checkpoint. The second local probe passed its 130-case layout group in
+13 minutes 15 seconds, with no failed or skipped cases, before the later suite
+deadline. These are partial results, not a full coverage-phase pass.
+
+### Concurrency rejection and repeated verification controls
+
+New compiler-to-worker controls require Unknown without numeric bounds or
+metadata proof dependencies when a callback throws explicitly, accesses shared
+state, locks, performs an interlocked mutation or calls cancellation operations.
+Repeated verification alternates an invalid later child with a valid owned
+projection, checking that rejection cannot poison or accumulate the next
+invocation's normal-storage bound. Frontend controls also reject exception
+regions and roots that launch several joins or launch joins in a loop. These
+tests passed the 35-case worker task gate and all 44 frontend planner cases.
+Targeted C# formatting also passed. These controls reject unmodeled behavior;
+they do not establish cancellation or exceptional-path allocation bounds.
 
 ### Root lifetime publication
 

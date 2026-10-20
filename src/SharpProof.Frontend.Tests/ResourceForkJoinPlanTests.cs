@@ -82,6 +82,10 @@ public sealed class ResourceForkJoinPlanTests
     [TestCase("=> Task.WhenAll(Task.Run(() => { return; }), Task.Run(() => Child(n)));")]
     [TestCase("=> Task.WhenAll(Task.Run(MethodGroup), Task.Run(() => Child(n)));")]
     [TestCase("=> Task.WhenAll(Task.Run(() => Value(n)), Task.Run(() => Child(n)));")]
+    [TestCase("{ try { return Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(n))); } catch { return Task.CompletedTask; } }")]
+    [TestCase("{ try { return Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(n))); } finally { Child(n); } }")]
+    [TestCase("{ _ = Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(n))); return Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(n))); }")]
+    [TestCase("{ for(int i=0;i<n;i++) { _ = Task.WhenAll(Task.Run(() => Child(n)), Task.Run(() => Child(n))); } return Task.CompletedTask; }")]
     public void UnsupportedShapesHaveNoPlan(string body)
     {
         ArgumentNullException.ThrowIfNull(body);

@@ -42,6 +42,65 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ProofCore, Has.Some.StartsWith("resource-task-projection:"));
     }
 
+    [TestCase("throw new System.InvalidOperationException();", "")]
+    [TestCase("Shared++;", "static int Shared;")]
+    [TestCase("lock(Gate) { Shared++; }", "static readonly object Gate = new(); static int Shared;")]
+    [TestCase("System.Threading.Interlocked.Increment(ref Shared);", "static int Shared;")]
+    [TestCase("System.Threading.CancellationToken.None.ThrowIfCancellationRequested();", "")]
+    public async Task TaskChildrenWithUnmodeledCompletionOrSharedStatePublishNoResourceProof(string child, string extra)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        ArgumentNullException.ThrowIfNull(extra);
+        var target = Read(CreateArtifact("using SharpProof.Attributes; using System.Threading.Tasks; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)] " +
+            "[ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes,1000)] " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] " +
+            "public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); " +
+            "static void Child(int count) {" + child + "} " + extra + "}", reviewedRuntime: true, x64: true));
+        Assert.That(target.ForkJoinProjection, Is.Null);
+        var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(results, Has.Length.EqualTo(4));
+        foreach (var result in results)
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.ResourceBound!.UnknownReason, Is.Not.Null.And.Not.Empty);
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task RepeatedTaskVerificationKeepsBoundsPerInvocationAndDoesNotCacheAnInvalidChild(bool configured)
+    {
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes,1000)]",
+            configuredAwait: configured, x64: true);
+        var projection = target.ForkJoinProjection!;
+        var child = projection.Children[1];
+        var invalid = target with
+        {
+            ForkJoinProjection = projection with
+            { Children = [projection.Children[0], child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } }] }
+        };
+        string? firstBound = null;
+        for (var invocation = 0; invocation < 4; invocation++)
+        {
+            var rejected = (await NativeEffectClaims.VerifyAsync(invalid, CallableEntryFeasibility.Feasible,
+                new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+            Assert.That(rejected.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(rejected.ResourceBound!.InferredUpperBound, Is.Null);
+            var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+                new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+            firstBound ??= result.ResourceBound!.InferredUpperBound;
+            Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(firstBound));
+            Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(3));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task TaskRootCannotExchangeConfiguredAndReturnedRuntimePremises(bool configuredAwait)
