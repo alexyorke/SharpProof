@@ -551,10 +551,9 @@ foreach ($report in $reports) {
             # once per validation, then merge hits for every overlapping start.
             [object]$credits = $null
             if (-not $fileCredits.TryGetValue($number, [ref]$credits)) {
-                $nativeCredits = Resolve-SharpProofCoverageLineCredits `
+                $credits = Resolve-SharpProofCoverageLineCredits `
                     -Ranges $permittedLineRanges[$sourceKey] `
                     -Number $number -SourcePath $sourceKey
-                $credits = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]$nativeCredits)
                 $fileCredits.Add($number, $credits)
             }
             # Only store direct hits after the same source and PDB-range validation.

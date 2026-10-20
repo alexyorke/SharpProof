@@ -311,28 +311,24 @@ function Initialize-SharpProofFixtureRepository {
     )
 
     [IO.Directory]::CreateDirectory($RepositoryRoot) | Out-Null
-    $initArguments = if ([string]::IsNullOrEmpty($InitialBranch)) {
-        @()
+    $initArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    if (-not [string]::IsNullOrEmpty($InitialBranch)) {
+        $initArguments.Add('-c')
+        $initArguments.Add("init.defaultBranch=$InitialBranch")
     }
-    else {
-        @('-c', "init.defaultBranch=$InitialBranch")
-    }
-    Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
-        $initArguments + @('-C', $RepositoryRoot, 'init', '--quiet'))
+    $initArguments.AddRange([string[]]@('-C', $RepositoryRoot, 'init', '--quiet'))
+    Invoke-SharpProofCheckedCommand -Command 'git' -Arguments ([string[]]@($initArguments.ToImmutable()))
     Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
         '-C', $RepositoryRoot, 'config', 'user.email', $UserEmail)
     Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
         '-C', $RepositoryRoot, 'config', 'user.name', 'SharpProof Fixture')
 
     if (-not [string]::IsNullOrEmpty($CommitMessage)) {
-        $addArguments = if ($Paths.Count -eq 0) {
-            @('--', '.')
-        }
-        else {
-            @('--') + $Paths
-        }
-        Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
-            @('-C', $RepositoryRoot, 'add') + $addArguments)
+        $addArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $addArguments.AddRange([string[]]@('-C', $RepositoryRoot, 'add', '--'))
+        if ($Paths.Count -eq 0) { $addArguments.Add('.') }
+        else { $addArguments.AddRange($Paths) }
+        Invoke-SharpProofCheckedCommand -Command 'git' -Arguments ([string[]]@($addArguments.ToImmutable()))
         Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
             '-C', $RepositoryRoot, 'commit', '--quiet', '-m', $CommitMessage)
     }
@@ -544,13 +540,13 @@ function Get-SharpProofCpuBudget {
 }
 
 function ConvertTo-SharpProofImmutablePolicy {
-    param([Parameter(Mandatory = $true)][hashtable]$Values)
+    param([Parameter(Mandatory = $true)][Collections.IDictionary]$Values)
     $result = [System.Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase).ToBuilder()
     foreach ($entry in $Values.GetEnumerator()) {
-        $immutableValue = if ($entry.Value -is [hashtable]) {
+        $immutableValue = if ($entry.Value -is [Collections.IDictionary]) {
             ConvertTo-SharpProofImmutablePolicy -Values $entry.Value
         }
-        elseif ($entry.Value -is [array]) {
+        elseif ($entry.Value -is [array] -or $entry.Value -is [Collections.Immutable.ImmutableArray[string]]) {
             , ([System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$entry.Value))
         }
         else { $entry.Value }
@@ -560,31 +556,31 @@ function ConvertTo-SharpProofImmutablePolicy {
 }
 
 New-Variable -Scope Script -Name SharpProofParallelismPolicies -Option Constant -Value (
-    ConvertTo-SharpProofImmutablePolicy -Values @{
-        'test-project' = @{
-            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-            DivisorProperty   = 'testProjectCpuDivisor'
-            InvalidMessage    = 'The test-project CPU divisor must be positive.'
-        }
-        semantic       = @{
-            OverrideVariables = @(
-                'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
-                'SHARPPROOF_TEST_PROJECT_PARALLELISM')
-            AllVisible        = $true
-        }
-        package        = @{
-            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-            PercentProperty   = 'packageTestCpuPercent'
-            InvalidMessage    =
-            'The package-test CPU percentage must be between 1 and 100.'
-        }
-        build          = @{
-            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-            PercentProperty   = 'buildCpuPercent'
-            InvalidMessage    =
-            'The build CPU percentage must be between 1 and 100.'
-        }
-    })
+    ConvertTo-SharpProofImmutablePolicy -Values ([ordered]@{
+            'test-project' = ([ordered]@{
+                    OverrideVariables = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('SHARPPROOF_TEST_PROJECT_PARALLELISM'))
+                    DivisorProperty   = 'testProjectCpuDivisor'
+                    InvalidMessage    = 'The test-project CPU divisor must be positive.'
+                }).AsReadOnly()
+            semantic       = ([ordered]@{
+                    OverrideVariables = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+                            'SHARPPROOF_TEST_PROJECT_PARALLELISM'))
+                    AllVisible        = $true
+                }).AsReadOnly()
+            package        = ([ordered]@{
+                    OverrideVariables = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('SHARPPROOF_TEST_PROJECT_PARALLELISM'))
+                    PercentProperty   = 'packageTestCpuPercent'
+                    InvalidMessage    =
+                    'The package-test CPU percentage must be between 1 and 100.'
+                }).AsReadOnly()
+            build          = ([ordered]@{
+                    OverrideVariables = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('SHARPPROOF_TEST_PROJECT_PARALLELISM'))
+                    PercentProperty   = 'buildCpuPercent'
+                    InvalidMessage    =
+                    'The build CPU percentage must be between 1 and 100.'
+                }).AsReadOnly()
+        }).AsReadOnly())
 
 function Get-SharpProofConfiguredParallelism {
     param(
@@ -900,11 +896,11 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 -FileName 'dotnet' `
                 -WorkingDirectory $RepositoryRoot `
                 -Arguments $effectiveArguments `
-                -Environment @{
-                UseSharedCompilation      = 'true'
-                SharedCompilationId       = $sharedCompilationId
-                'MSBUILDDISABLENODEREUSE' = '1'
-            }
+                -Environment ([ordered]@{
+                    UseSharedCompilation      = 'true'
+                    SharedCompilationId       = $sharedCompilationId
+                    'MSBUILDDISABLENODEREUSE' = '1'
+                }).AsReadOnly()
             $started = Start-SharpProofParallelProcess `
                 -StartInfo $startInfo `
                 -FailureMessage "Could not start build $name."
@@ -1333,6 +1329,7 @@ function Resolve-SharpProofCoverageLineCredits {
         [string]$SourcePath
     )
 
+    $Ranges = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($Ranges))
     $permitted = $false
     $credits = [Collections.Immutable.ImmutableHashSet[int]]::Empty.ToBuilder()
     foreach ($range in $Ranges) {
@@ -1351,7 +1348,7 @@ function Resolve-SharpProofCoverageLineCredits {
     }
     # An empty array is a permitted line with no creditable start, not a miss.
     # Keep all overlapping starts; a single nearest range loses valid credit.
-    return , ([int[]]@($credits.ToImmutable()))
+    return , [Collections.Immutable.ImmutableArray]::CreateRange[int]($credits.ToImmutable())
 }
 
 function New-SharpProofIsolatedTestOutput {
