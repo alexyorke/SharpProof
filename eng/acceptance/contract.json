@@ -786,6 +786,7 @@
           "src/SharpProof.Frontend/GlobalUsings.cs",
           "src/SharpProof.Frontend/RoslynTypeMapper.cs",
           "src/SharpProof.Frontend/RootParameterClosurePlan.cs",
+          "src/SharpProof.Frontend/ResourceForkJoinPlan.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
           "src/SharpProof.Ir/AnalysisDefaults.cs",

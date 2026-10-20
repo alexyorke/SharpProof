@@ -89,6 +89,39 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Structured task-work admission foundation
+
+Phase F starts with compiler recognition of a closed Task.Run/Task.WhenAll
+pattern: one returned join, authenticated framework APIs, two to sixteen source
+callbacks, scalar arguments, and no additional parent statements. Async lambdas,
+arbitrary delegates, cancellation overloads, foreign methods and shared captured
+locals remain outside this first admission. The next native integration must
+prove total logical callback work across all child prefixes, keep generic
+functional verification separate, bind runtime/reference evidence, and report
+Unknown for allocation/liveness/state-machine costs until their models exist.
+
+Source admission is implemented and passed 31 cases, including source-defined
+framework names, missing/foreign compilations, the child-count limit, cancellation,
+unsupported callbacks and root initialization/signature controls. The full frontend
+suite passed all 2196 tests. Layout passed at 2773 sources, 59 projects and all 151
+pinned common files. Recognition alone publishes no numeric claims and enables no
+new worker capability; existing native Unknown behavior remains in force.
+Quality/API compatibility, negative fixtures, documentation lint, 728 links and
+the 531-path trusted inventory passed. Full repository formatting is still running.
+
+Next add dedicated resource projection/ownership, native composition, schema/cache
+identity and packaged consumer evidence. Task scheduling, join carriers, delegate
+and state-machine allocations must have their own reviewed costs; they must never
+inherit the zero-allocation Math metadata summaries. Child source bodies still
+require independent effect and resource admission. All unchecked C/F and final
+coverage requirements remain open throughout this foundation.
+
+The next runtime evidence source is the [pinned Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs).
+Its Action overload of Run selects the default scheduler and denies child
+attachment. WhenAll uses a completion promise with a remaining-child count.
+These source facts guide the pending model; this checkpoint does not bind them
+as native assumptions or assign their allocation cost.
+
 ### Parametric memory upper envelopes
 
 The next phase C step targets primitive arrays whose extent depends on scalar
