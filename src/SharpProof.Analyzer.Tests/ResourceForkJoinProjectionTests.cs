@@ -236,6 +236,32 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(capture.Shapes, Is.Null);
         Assert.That(capture.UnknownReason, Is.EqualTo(reason));
     }
+    [TestCase("short", (int)ResourceStorageKind.Word16)]
+    [TestCase("char", (int)ResourceStorageKind.Word16)]
+    [TestCase("long", (int)ResourceStorageKind.Word64)]
+    [TestCase("double", (int)ResourceStorageKind.Word64)]
+    public void CarrierCaptureIncludesPrimitiveFieldsFromUncalledOverloads(string type, int storage)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        var (compilation, method) = Create("", "public static Task Root(" + type +
+            " value) => Task.Run(()=>System.GC.KeepAlive(value));");
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Shapes, Is.Not.Null);
+        Assert.That(capture.Shapes!.MatchedCallbacks, Is.EqualTo(3));
+        Assert.That(capture.Shapes.CallbackFrames.SelectMany(static frame =>
+            frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.Fields), Does.Contain((ResourceStorageKind)storage));
+    }
+
+    [Test]
+    public void UnmodeledCapturedValuesInAnOverloadPreventPartialCarrierEvidence()
+    {
+        var (compilation, method) = Create("", "public static Task Root(decimal value) => Task.Run(()=>System.GC.KeepAlive(value));");
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Shapes, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierCallbackStorageUnsupported"));
+    }
+
     private static (CSharpCompilation Compilation, IMethodSymbol Method) Create(string body, string extra = "", string imports = "")
     {
         ArgumentNullException.ThrowIfNull(body);

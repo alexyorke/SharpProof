@@ -308,6 +308,24 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
+### Normal completion and carrier admission controls
+
+Direct normal-domain controls now exercise all six integer comparisons through
+immutable snapshots, both Boolean short-circuit operators and negation,
+positive-divisor admission, value-preserving integer conversions, declared
+preconditions, budget exhaustion, missing returns, body abstraction and
+cancellation. Their unsupported branch is deliberately reachable if the
+checker selects the wrong edge, so success requires the stated guard fact.
+Separate compiler controls inspect primitive fields in uncalled overloads and
+require an unmodeled decimal capture to reject the entire carrier record.
+All 32 compiler projection/capture controls passed, as did the 960-case native
+worker gate containing all 27 direct normal-domain controls. Full formatting
+and the structural layout gate also passed. Evidence is retained under artifacts
+with the resource-normal-domain-boundaries, resource-carrier-overload-boundaries
+and resource-domain-carrier-boundaries prefixes. These additions do not change
+public verdicts or complete cumulative task runtime-byte analysis. A new full
+coverage report is still required before claiming any coverage improvement.
+
 ### Fixed task fault carriers (in progress)
 
 A separate internal component now derives conditional fixed fault-bookkeeping
