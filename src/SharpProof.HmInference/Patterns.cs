@@ -38,8 +38,11 @@ public static partial class Inference
                     break;
                 case IDiscardPatternOperation or ITypePatternOperation:
                     break;
+                case IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } }:
+                    // Null patterns test presence without selecting a concrete operand domain.
+                    break;
                 case IConstantPatternOperation or IRelationalPatternOperation:
-                    // Numeric promotions, enum constants and null tests retain their domain.
+                    // Numeric promotions and enum constants retain their domain.
                     UnifyDeconstructionReceiver(CSharpTypes.Rigid(pattern.InputType), input);
                     break;
                 case INegatedPatternOperation negated:

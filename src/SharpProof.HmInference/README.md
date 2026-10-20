@@ -631,3 +631,9 @@ and new value/reference payloads. Consumer checks cover CLI and packaged analysi
 Conditional conversions use the non-null branch receiver type, including struct
 boxing. Reference lifting remains nullable inside coalescing even when contextual
 type symbols omit the annotation; compiler-hosted consumer checks cover this.
+
+Null and negated-null patterns preserve symbolic input types, including nullable
+values, nullable references, arrays, property patterns, switch expressions, and
+awaited Task/ValueTask results. IDE code-fix runtime checks cover null and non-null
+inputs and suspension before testing an awaited nullable value. Numeric and enum
+constant patterns continue to retain their operand domain.

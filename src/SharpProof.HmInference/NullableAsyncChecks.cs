@@ -51,8 +51,8 @@ internal static class NullableAsyncChecks
             ("NullableLiteral", "static string? M(bool ignored)=>null;", "Suggestion", "string? M<T1>(T1 ignored)"),
             ("NullableDefault", "static int? M(bool ignored)=>default;", "Suggestion", "int? M<T1>(T1 ignored)"),
             ("NullableNullEquality", "static bool M(string? x,bool ignored)=>x==null;", "Suggestion", "bool M<T1>(string? x, T1 ignored)"),
-            ("NullableNullPattern", "static bool M(string? x,bool ignored)=>x is null;", "Suggestion", "bool M<T1>(string? x, T1 ignored)"),
-            ("NullableNotNullPattern", "static bool M(string? x,bool ignored)=>x is not null;", "Suggestion", "bool M<T1>(string? x, T1 ignored)"),
+            ("NullableNullPattern", "static bool M(string? x,bool ignored)=>x is null;", "Suggestion", "bool M<T1, T2>(T1? x, T2 ignored) where T1 : class"),
+            ("NullableNotNullPattern", "static bool M(string? x,bool ignored)=>x is not null;", "Suggestion", "bool M<T1, T2>(T1? x, T2 ignored) where T1 : class"),
             ("NullableConditionalMember", "static int? M(string? x,bool ignored)=>x?.Length;", "Suggestion", "int? M<T1>(string? x, T1 ignored)"),
             ("NullableConditionalIndexer", "static int? M(int[]? x,int i,bool ignored)=>x?[i];", "Suggestion", "T1? M<T1, T2>(T1[]? x, int i, T2 ignored) where T1 : struct"),
             ("NullableConditionalCall", "static string? M(string? x,bool ignored)=>x?.Trim();", "Suggestion", "string? M<T1>(string? x, T1 ignored)"),
@@ -62,6 +62,17 @@ internal static class NullableAsyncChecks
             ("NullableCoalesceAssignmentBoth", "static int? M(int? x,int? y)=>x??=y;", "Suggestion", "T1? M<T1>(T1? x, T1? y) where T1 : struct"),
             ("NullableCoalesceAssignmentConversion", "static long M(long? x,int y,bool ignored)=>x??=y;", "Suggestion", "long M<T1>(long? x, int y, T1 ignored)"),
             ("NullableWideningCoalesce", "static long M(int? x,long y,bool ignored)=>x??y;", "Suggestion", "long M<T1>(int? x, long y, T1 ignored)"),
+            ("NullableValueNullPattern", "static bool M(int? x)=>x is null;", "Suggestion", "bool M<T1>(T1? x) where T1 : struct"),
+            ("NullableValueNotNullPattern", "static bool M(int? x)=>x is not null;", "Suggestion", "bool M<T1>(T1? x) where T1 : struct"),
+            ("NullableArrayNullPattern", "static bool M(int[]? x)=>x is null;", "Suggestion", "bool M<T1>(T1[]? x)"),
+            ("NullableMemberNullPattern", "static bool M(ConditionalBox<string>? x)=>x?.Value is null;class ConditionalBox<T>{public T Value=default!;}", "Suggestion", "bool M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : class"),
+            ("AsyncNullableNullPattern", "static async Task<bool> M(Task<int?> x)=>(await x) is null;", "Suggestion", "global::System.Threading.Tasks.Task<bool> M<T1>(global::System.Threading.Tasks.Task<T1?> x) where T1 : struct"),
+            ("AsyncNullableNotNullPattern", "static async Task<bool> M(ValueTask<string?> x)=>(await x) is not null;", "Suggestion", "global::System.Threading.Tasks.Task<bool> M<T1>(global::System.Threading.Tasks.ValueTask<T1?> x) where T1 : class"),
+
+            ("NullableCombinedNullPattern", "static bool M(string? x)=>x is null or not null;", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullableSwitchNullPattern", "static bool M(string? x)=>x switch {null=>true,_=>false};", "Suggestion", "bool M<T1>(T1? x) where T1 : class"),
+            ("NullablePropertyNullPattern", "static bool M(ConditionalBox<string> x)=>x is {Value: null};class ConditionalBox<T>{public T? Value;}", "Suggestion", "bool M<T1>(global::Cases.ConditionalBox<T1> x)"),
+
             ("NullableExistingGeneric", "static T? M<T>(T? x)=>x;", "Concrete", null),
             ("NullableExistingConstraints", "static T? M<T>(T? x,int? ignored) where T:class =>x;", "Suggestion", "T? M<T, T1>(T? x, T1? ignored) where T : class where T1 : struct"),
             ("AsyncTaskResult", "static async Task<int> M(Task<int> task)=>await task;", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task<T1> task)"),
@@ -268,6 +279,10 @@ internal static class NullableAsyncChecks
                 public static T?[] Array<T>(T x)=>new T?[]{x};
                 public static Task<T?> Async<T>(Task<T?> task)=>task;
             }            public static class NullableAsyncProbe {
+                public static bool NullReference(string? x)=>x is null;
+                public static bool NullValue(int? x)=>x is not null;
+                public static async Task<bool> NullAwait(Task<int?> x)=>(await x) is null;
+
                 public static int Finalizers;
                 public static int Guarded(int x,bool fail) {
                     try { if(fail) throw new System.InvalidOperationException(); return x; }
@@ -314,8 +329,8 @@ internal static class NullableAsyncChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             applied++;
         }
-        if (applied != 23)
-        { throw new InvalidOperationException($"Expected twenty-three nullable/async/lifetime code fixes; applied {applied}."); }
+        if (applied != 26)
+        { throw new InvalidOperationException($"Expected twenty-six nullable/async/lifetime code fixes; applied {applied}."); }
         var finalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var problems = finalCompilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
         if (problems.Length != 0)
@@ -331,6 +346,26 @@ internal static class NullableAsyncChecks
         { throw new InvalidOperationException(string.Join("\n", emitted.Diagnostics)); }
         var probe = System.Reflection.Assembly.Load(image.ToArray()).GetType("NullableAsyncProbe")!;
         var guid = Guid.NewGuid();
+        var nullReference = probe.GetMethod("NullReference")!.MakeGenericMethod(typeof(Uri));
+        var nullPatternSentinel = new Uri("https://example.com");
+        if (!Equals(nullReference.Invoke(null, new object?[] { null }), true)
+            || !Equals(nullReference.Invoke(null, new object?[] { nullPatternSentinel }), false))
+        { throw new InvalidOperationException("Generic reference null patterns changed their result."); }
+        var nullValue = probe.GetMethod("NullValue")!.MakeGenericMethod(typeof(Guid));
+        if (!Equals(nullValue.Invoke(null, new object?[] { null }), false)
+            || !Equals(nullValue.Invoke(null, new object?[] { guid }), true))
+        { throw new InvalidOperationException("Generic nullable value patterns changed their result."); }
+        var nullAwait = probe.GetMethod("NullAwait")!.MakeGenericMethod(typeof(Guid));
+        var pendingNull = new TaskCompletionSource<Guid?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nullResult = (Task<bool>)nullAwait.Invoke(null, new object[] { pendingNull.Task })!;
+        if (nullResult.IsCompleted)
+        { throw new InvalidOperationException("Async null pattern completed before its operand."); }
+        pendingNull.SetResult(null);
+        if (!await nullResult.WaitAsync(cancellationToken).ConfigureAwait(false)
+            || await ((Task<bool>)nullAwait.Invoke(null, new object[] { Task.FromResult<Guid?>(guid) })!).ConfigureAwait(false))
+        { throw new InvalidOperationException("Async null patterns changed their result after resumption."); }
+        Program.Log.Info("PASS NullableAsyncNullPatternRuntime");
+
         var valueMethod = probe.GetMethod("Value")!.MakeGenericMethod(typeof(Guid));
         if (!Equals(valueMethod.Invoke(null, new object?[] { guid }), guid) || valueMethod.Invoke(null, new object?[] { null }) is not null
             || !Equals(probe.GetMethod("Fallback")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object?[] { null, guid }), guid))
@@ -485,6 +520,6 @@ internal static class NullableAsyncChecks
         }
         catch (InvalidOperationException exception) when (ReferenceEquals(exception, marker)) { }
         Program.Log.Info("PASS NullableAsyncFaultPropagation");
-        return 5;
+        return 6;
     }
 }
