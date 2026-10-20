@@ -55,7 +55,7 @@
   "worker": {
     "protocolVersion": 39,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 52,
+    "compilerArtifactSchemaVersion": 53,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 47,
+    "schemaVersion": 48,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -789,6 +789,7 @@
           "src/SharpProof.Frontend/ResourceForkJoinPlan.cs",
           "src/SharpProof.CompilerCollector/CompilerArtifact/CompilerForkJoinResourceLowering.cs",
           "src/SharpProof.CompilerArtifact/CompilerForkJoinProjection.cs",
+          "src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.cs",
           "src/SharpProof.Worker/NativeForkJoinSourceCostVerifier.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",

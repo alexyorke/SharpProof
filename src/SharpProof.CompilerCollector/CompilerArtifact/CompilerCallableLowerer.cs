@@ -54,11 +54,16 @@ internal sealed class CompilerCallableLowerer
         var reason = Classify(target, total != null, cancellationToken);
         ResourceProgram? resourceProgram = null;
         string? resourceUnknown = null;
+        CompilerForkJoinProjection? forkJoin = null;
         if (target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
         {
             if (total is null || total.IsBodyAbstraction)
-            { resourceUnknown = "ResourceOwnerUnavailable"; }
+            {
+                resourceUnknown = "ResourceOwnerUnavailable";
+                if (entry != null && ResourceForkJoinPlan.TryCreate(target.Method, _compilation, cancellationToken) != null)
+                { forkJoin = CompilerForkJoinResourceLowering.Lower(target.Method, _compilation, target.Entry.CallableId, cancellationToken).Projection; }
+            }
             else if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel is null || target.Method.MethodKind != MethodKind.Ordinary)
             { resourceUnknown = "UnsupportedResourceCallable"; }
             else
@@ -70,7 +75,7 @@ internal sealed class CompilerCallableLowerer
                 resourceUnknown = resource.UnknownReason;
             }
         }
-        return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown };
+        return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };
     }
 
     private WorkerClaimReason Classify(ManifestCallableTarget target, bool hasTotal, CancellationToken cancellationToken)

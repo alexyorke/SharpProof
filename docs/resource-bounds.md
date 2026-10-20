@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 47 invalidate older responses without this evidence.
+Protocol 39 and cache schema 48 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 47 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 48 invalidate prior responses; compiler artifact 53 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

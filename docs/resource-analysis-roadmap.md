@@ -127,6 +127,30 @@ native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
 
+### Task-join projection transport
+
+Add a closed, bounded projection codec for compiler-neutral root/child data,
+ordinary Total child bodies, cost programs and formal argument maps. Decode must
+bind the expected root identity and input count, enforce child identities and
+resource-only roles, reject duplicate/unknown/missing properties and malformed
+maps, and validate child cost input ownership. Round-trip transport must preserve
+native source-cost composition. This codec is not source authentication or a
+runtime premise. The validated projection is now a separate compiler callable
+artifact field, bound to its resource claim/root entry and rejected beside an
+ordinary functional body. The producer retains framework and child metadata
+reference evidence. Compiler artifact 53 and cache 48 identify this transport;
+protocol 39 and manifest 6 are unchanged. Task-join claims remain Unknown while
+runtime premises and the remaining phase F models are incomplete.
+
+The full worker/resource/protocol gate passed all 825 tests, and the full analyzer
+suite passed all 1468. All five package cases passed: a real task consumer kept
+its Unknown result, and four parametric memory cases retained their published
+behavior. Full formatting, quality/API compatibility and negative fixtures passed.
+Layout passed at 2780 sources, 59 projects and 151 pinned common files; the
+trusted inventory passed at 535 paths. Documentation generation and 728 links
+passed. The codec includes payload, depth and instruction budgets, closed property
+sets, ordinary Total body decoding, cost input ownership and malformed-data tests.
+
 ### Native task-join source-cost composition
 
 Projection data now lives in the compiler-neutral artifact assembly and retains

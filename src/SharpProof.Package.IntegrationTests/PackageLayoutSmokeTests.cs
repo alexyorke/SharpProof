@@ -3589,6 +3589,27 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
+    [Test]
+    public async Task MainPackageTransportsTaskChildrenWhileRootModelIsUnavailable()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Unknown");
+        var bound = claim.GetProperty("resourceBound");
+        Assert.That(bound.GetProperty("unknownReason").GetString(), Is.Not.Null.And.Not.Empty);
+        Assert.That(bound.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
     [TestCase(5, false)]
     [TestCase(6, false)]
     [TestCase(5, true)]

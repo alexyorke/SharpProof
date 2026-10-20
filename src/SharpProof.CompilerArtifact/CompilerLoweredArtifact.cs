@@ -27,6 +27,8 @@ internal static partial class CompilerLoweredArtifact
             EffectClaims = preparation.EffectClaims.ToArray(),
             ResourceProgram = resource.Program,
             ResourceUnknownReason = resource.Unknown,
+            ForkJoinProjection = preparation.ForkJoinProjection is { } forkJoin
+                ? CompilerForkJoinProjectionCodec.Encode(forkJoin, preparation.TotalEntry ?? throw new InvalidDataException("Fork-join root entry is missing."), cancellationToken) : null,
             Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken),
             TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken)
         };
@@ -115,6 +117,15 @@ internal static partial class CompilerLoweredArtifact
 
         var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
         var resource = DecodeResource(artifact, entry, claims, total, cancellationToken);
+        var totalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken);
+        CompilerForkJoinProjection? forkJoin = null;
+        if (artifact.ForkJoinProjection is { } payload)
+        {
+            if (total != null || totalEntry == null || !claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
+            { throw new InvalidDataException("Fork-join projection has no owning resource entry."); }
+            forkJoin = CompilerForkJoinProjectionCodec.Decode(payload, totalEntry, cancellationToken);
+        }
         return new CompilerCallablePreparation(entry, artifact.FailureReason)
         {
             EffectClaims = DecodeEffects(artifact, claims, cancellationToken),
@@ -122,7 +133,8 @@ internal static partial class CompilerLoweredArtifact
             Total = total,
             ResourceProgram = resource.Program,
             ResourceUnknownReason = resource.Unknown,
-            TotalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken)
+            ForkJoinProjection = forkJoin,
+            TotalEntry = totalEntry
         };
     }
 

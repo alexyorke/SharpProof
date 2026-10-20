@@ -173,6 +173,112 @@ public sealed class NativeForkJoinProjectionTests
         Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(expected)));
     }
 
+    [Test]
+    public void ProjectionTransportPreservesComposedSourceCosts()
+    {
+        var projection = Lower("for(int i=0;i<count;i++){var value=new int[2];}");
+        var root = Root(projection);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var payload = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation);
+        var decoded = CompilerForkJoinProjectionCodec.Decode(payload, root, cancellation);
+        var result = NativeForkJoinSourceCostVerifier.Check(decoded, root, cancellation);
+        Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
+        Assert.That(result.Upper!.LoopEntries.ToDisplayString(), Is.EqualTo("(max(0, n) + 3)"));
+        Assert.That(result.Upper.Elements.ToDisplayString(), Is.EqualTo("((max(0, n) * 2) + 6)"));
+        Assert.That(decoded.Children[0].Owner.Program.Factory, Is.Not.SameAs(projection.Children[0].Owner.Program.Factory));
+    }
+
+    [TestCase("version")]
+    [TestCase("root")]
+    [TestCase("missing")]
+    [TestCase("extra")]
+    [TestCase("child-id")]
+    [TestCase("child-effects")]
+    [TestCase("child-role")]
+    [TestCase("unowned-cost")]
+    [TestCase("bad-input")]
+    [TestCase("ambiguous")]
+    [TestCase("integer-kind")]
+    [TestCase("extra-argument")]
+    [TestCase("bad-cost")]
+    [TestCase("duplicate")]
+    [TestCase("duplicate-body")]
+    public void ProjectionTransportRejectsMalformedOrUnownedChildren(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var projection = Lower("for(int i=0;i<count;i++){}");
+        var root = Root(projection);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var payload = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation);
+        var node = System.Text.Json.Nodes.JsonNode.Parse(payload)!.AsObject();
+        var child = node["children"]![0]!.AsObject();
+        var argument = child["arguments"]![0]!.AsObject();
+        switch (mutation)
+        {
+            case "version":
+                node["version"] = 99;
+                break;
+            case "root":
+                node["root"] = "other";
+                break;
+            case "missing":
+                node.Remove("framework");
+                break;
+            case "extra":
+                node["extra"] = true;
+                break;
+            case "child-id":
+                child["owner"] = "other";
+                break;
+            case "child-effects":
+                child["body"]!["effectsCompleteAtEntry"] = false;
+                break;
+            case "child-role":
+                child["body"]!["result"] = 0;
+                break;
+            case "unowned-cost":
+                child["body"]!["parameters"] = new System.Text.Json.Nodes.JsonArray();
+                break;
+            case "bad-input":
+                argument["input"] = 50;
+                break;
+            case "ambiguous":
+                argument["constant"] = 3;
+                break;
+            case "integer-kind":
+                argument["parameter"] = "0";
+                break;
+            case "extra-argument":
+                argument["extra"] = true;
+                break;
+            case "bad-cost":
+                child["cost"] = "invalid-base64!";
+                break;
+        }
+        var json = node.ToJsonString();
+        if (mutation == "duplicate")
+        { json = json.Replace("\"version\":1", "\"version\":1,\"version\":1", StringComparison.Ordinal); }
+        else if (mutation == "duplicate-body")
+        { json = json.Replace("\"effectsCompleteAtEntry\":true", "\"effectsCompleteAtEntry\":true,\"effectsCompleteAtEntry\":true", StringComparison.Ordinal); }
+        Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json), root, cancellation); };
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
+    [Test]
+    public void ProjectionTransportRejectsOversizedPayloadsAndHonorsCancellation()
+    {
+        var projection = Lower("");
+        var root = Root(projection);
+        Action oversized = () => { _ = CompilerForkJoinProjectionCodec.Decode(new byte[CompilerForkJoinProjectionCodec.MaximumPayloadBytes + 1], root, TestContext.CurrentContext.CancellationToken); };
+        Assert.Throws<InvalidDataException>(oversized);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action encode = () => { _ = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation.Token); };
+        Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode([], root, cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(encode);
+        Assert.Throws<OperationCanceledException>(decode);
+    }
+
     private static CompilerTotalEntryPreparation Root(CompilerForkJoinProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);

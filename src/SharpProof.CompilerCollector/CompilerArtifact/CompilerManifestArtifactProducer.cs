@@ -78,19 +78,28 @@ internal static class CompilerManifestArtifactProducer
         foreach (var callable in callables)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var pending = new Stack<ResourceProgram>();
             if (callable.ResourceProgram is { } payload)
+            { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
+            if (callable.ForkJoinProjection is { } forkPayload)
             {
-                var pending = new Stack<ResourceProgram>();
-                pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken));
-                while (pending.Count > 0)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var program = pending.Pop();
-                    if (program.Metadata is { } reference)
-                    { resourceAssemblies.Add(reference.AssemblyIdentity); }
-                    foreach (var child in program.Children)
-                    { pending.Push(child); }
-                }
+                var entry = discovery.Manifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+                    candidate.CallableId == callable.CallableId);
+                var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
+                    ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
+                var projection = CompilerForkJoinProjectionCodec.Decode(forkPayload, root, cancellationToken);
+                resourceAssemblies.Add(projection.FrameworkAssemblyIdentity);
+                foreach (var child in projection.Children)
+                { pending.Push(child.Cost); }
+            }
+            while (pending.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var program = pending.Pop();
+                if (program.Metadata is { } reference)
+                { resourceAssemblies.Add(reference.AssemblyIdentity); }
+                foreach (var child in program.Children)
+                { pending.Push(child); }
             }
         }
         if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :

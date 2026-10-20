@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 52;
+    internal const int Current = 53;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -61,6 +61,7 @@ internal sealed record CompilerCallablePreparation(
     internal CompilerTotalEntryPreparation? TotalEntry { get; init; }
     internal ResourceProgram? ResourceProgram { get; init; }
     internal string? ResourceUnknownReason { get; init; }
+    internal CompilerForkJoinProjection? ForkJoinProjection { get; init; }
 }
 
 internal sealed record CompilerTotalEntryPreparation(string CallableId, IrFactory Factory,
@@ -207,6 +208,8 @@ internal sealed class CompilerCallableArtifact
     public byte[]? ResourceProgram { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ResourceUnknownReason { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public byte[]? ForkJoinProjection { get; set; }
 }
 
 internal sealed class CompilerEffectClaimArtifact
