@@ -21,6 +21,10 @@ concurrency:
 env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+  # Public Linux runners have 16 GB RAM. Keep the container and its charged
+  # scratch below that host capacity so Docker enforces the resource boundary.
+  SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
+  SHARPPROOF_TMPFS_SIZE: 4g
 
 # Four shards run on separate runners: "semantic-gates" (the Gates project),
 # "semantic-worker" (the Worker remainder shards), "semantic-projects" (every

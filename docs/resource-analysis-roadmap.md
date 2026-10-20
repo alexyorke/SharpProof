@@ -156,7 +156,7 @@ native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
 
-### Coverage container limits (in progress)
+### Coverage container limits
 
 The failed-job retry of b2584a9d7 passed the same 125-case package-layout group,
 then the host shell reported that its docker compose process was killed; the job
@@ -170,6 +170,16 @@ limits to 12 GiB with 4 GiB scratch, retaining the existing four CPUs, test
 selection, deadlines and coverage floor. Verify the resolved Compose settings,
 a representative instrumented package fixture group under those limits, and fresh
 exact-head CI. No host resource monitor or per-process memory budget is added.
+Compose resolved the proposed settings to 12884901888 bytes, four CPUs and a
+4 GiB scratch mount. A fresh private Release checkout of source b2584a9d7 passed
+all 94 BuildTaskTests with static managed instrumentation under those limits
+(about 66 seconds for the test phase, four package lanes). The earlier isolated
+publication-cancellation case also passed with and without instrumentation.
+Workflow/quality/API compatibility checks passed. The coverage workflow now sets
+those Docker limits explicitly; its default local Compose limits and all test,
+deadline, artifact and 100% coverage requirements are unchanged. This is a local
+representative validation, not proof that the full hosted coverage job will pass.
+Fresh exact-head CI remains required.
 
 ### Joined child storage envelopes
 
