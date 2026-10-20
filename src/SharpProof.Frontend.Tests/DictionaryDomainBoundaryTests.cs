@@ -27,12 +27,14 @@ public sealed class DictionaryDomainBoundaryTests
     [TestCase("argument", 254)]
     [TestCase("value", 254)]
     [TestCase("unsupported-member", 0)]
+    [TestCase("capacity", 254)]
     public void UnsupportedOrOverDeepAccessNeverEmitsDictionaryStores(string shape, int depth)
     {
         ArgumentNullException.ThrowIfNull(shape);
         var body = shape switch
         {
             "receiver" => "return data.Count;",
+            "capacity" => "return new System.Collections.Generic.Dictionary<int, int>(key + 0).Count;",
             "argument" => "return data.ContainsKey(key + 0) ? 1 : 0;",
             "value" => "data[0] = value + 0; return 0;",
             "unsupported-member" => "data.Clear(); return 0;",
@@ -45,6 +47,7 @@ public sealed class DictionaryDomainBoundaryTests
             "receiver" => syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!,
             "argument" or "unsupported-member" => syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single(),
             "value" => syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single(),
+            "capacity" => syntax.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Last(),
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
         };
         var builder = new IrProgramBuilder(context.Factory);
@@ -137,7 +140,7 @@ public sealed class DictionaryDomainBoundaryTests
     }
 
     [TestCase("new System.Collections.Generic.Dictionary<int, decimal>()", true, true)]
-    [TestCase("new System.Collections.Generic.Dictionary<int, decimal>(3)", false, false)]
+    [TestCase("new System.Collections.Generic.Dictionary<int, decimal>(3)", true, true)]
     [TestCase("new System.Collections.Generic.Dictionary<int, decimal>((System.Collections.Generic.IEqualityComparer<int>)null)", false, false)]
     [TestCase("new System.Collections.Generic.Dictionary<int, decimal> { }", false, true)]
     public void OpaqueValueEmptyCreationAndDefaultReceiverAreDistinctFacts(string expression, bool syntaxEmpty, bool trackedDefaultComparer)

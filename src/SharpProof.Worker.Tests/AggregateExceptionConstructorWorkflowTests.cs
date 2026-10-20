@@ -8,7 +8,8 @@ internal sealed class AggregateExceptionConstructorWorkflowTests
 {
     [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(\"outer\", (System.Exception)null); }", WorkerClaimOutcome.Unknown)]
     [TestCase("[DoesNotThrow] public static object Target(System.Exception inner) { return new System.AggregateException(\"outer\", inner); }", WorkerClaimOutcome.Unknown)]
-    [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(); }", WorkerClaimOutcome.Proven)]
+    [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(); }", WorkerClaimOutcome.Unknown)]
+    [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(\"outer\"); }", WorkerClaimOutcome.Proven)]
     [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(\"outer\", new System.Exception()); }", WorkerClaimOutcome.Proven)]
     [TestCase("[DoesNotThrow] public static object Target() { return new System.Exception(\"outer\", (System.Exception)null); }", WorkerClaimOutcome.Proven)]
     [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.ArgumentNullException(\"inner\"); }", WorkerClaimOutcome.Refuted)]

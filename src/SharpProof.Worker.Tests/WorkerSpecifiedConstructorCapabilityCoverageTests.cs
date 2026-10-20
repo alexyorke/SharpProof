@@ -7,10 +7,12 @@ internal sealed partial class WorkerTests
 {
     [TestCase(false)]
     [TestCase(true)]
-    public async Task ShippedConstructorSpecificationPreservesDeclaredCapabilityBound(bool synchronizing)
+    [TestCase(true, true)]
+    public async Task ShippedConstructorSpecificationPreservesDeclaredCapabilityBound(bool synchronizing, bool explicitMessage = false)
     {
         var capability = synchronizing ? "SharpProofCapability.Synchronization" : "SharpProofCapability.None";
-        var construction = synchronizing ? "new System.InvalidOperationException()" : "new System.InvalidOperationException(\"failed\")";
+        var resourceMessage = synchronizing && !explicitMessage;
+        var construction = resourceMessage ? "new System.InvalidOperationException()" : "new System.InvalidOperationException(\"failed\")";
         using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
             "[AllowedCapabilities(" + capability + ")] public static void Caller() { " + construction + "; } }");
         var request = project.CreateRequest(cacheEnabled: false);
@@ -21,8 +23,8 @@ internal sealed partial class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.Errors, Is.Empty);
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), WorkerProtocolJson.SerializeResponse(response));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.Outcome, Is.EqualTo(resourceMessage ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven), WorkerProtocolJson.SerializeResponse(response));
+            Assert.That(result.Reason, Is.EqualTo(resourceMessage ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }

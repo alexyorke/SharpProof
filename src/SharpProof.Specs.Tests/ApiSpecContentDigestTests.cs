@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 8 pins the stable strong-name identity of contract APIs.
+        // Version 9 removes unconditional resource-constructor callback guarantees.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("8"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("9"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "9e661fa8bd365791d02e7e9aab183a049c0a3ebbf8aea4da67fe111e8ecbd5d0"));
+                "e2b952334c6c2a3f6d1a9b04954bc1d8515a25e6d5f2d031f7ffedfc3bbe0adb"));
         }
     }
 

@@ -67,11 +67,13 @@ internal sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayEffects("[DoesNotThrow, ZeroAllocations, EnforcePure]", "object left, object right",
             "return object.ReferenceEquals(left, right);", true, true, true, "bool");
     }
-    [Test]
-    public async Task ReferenceEqualsApiRetainsArgumentFaults()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReferenceEqualsApiRetainsArgumentFaults(bool explicitMessage)
     {
         await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<bool>()); try { return object.ReferenceEquals(Throw(), null); } " +
             "catch (System.InvalidOperationException) { return true; }", WorkerClaimOutcome.Proven, "bool",
-            "static object Throw() { throw new System.InvalidOperationException(); }");
+            explicitMessage ? "static object Throw() { throw new System.InvalidOperationException(\"message\"); }"
+                : "static object Throw() { throw new System.InvalidOperationException(); }");
     }
 }

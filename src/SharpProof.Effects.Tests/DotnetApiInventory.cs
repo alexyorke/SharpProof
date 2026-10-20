@@ -133,6 +133,10 @@ internal static class DotnetApiInventory
         { evidence.Add("intrinsic=concrete-queue-state"); }
         if (CSharpOperationSemantics.IsHashSetStateDeclaration(symbol))
         { evidence.Add("intrinsic=default-primitive-hash-set-state"); }
+        if (CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(symbol))
+        { evidence.Add("intrinsic=guarded-exception-message-construction"); }
+        if (CSharpOperationSemantics.IsExceptionResourceLockDeclaration(symbol))
+        { evidence.Add("intrinsic=guarded-exception-resource-synchronization"); }
 
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
@@ -141,8 +145,10 @@ internal static class DotnetApiInventory
             if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)" or
                 "P:System.Collections.Generic.Dictionary`2.Item(`0)")
             { evidence.Add("intrinsic=opaque-dictionary-value-storage"); }
-            if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.#ctor" or "P:System.Collections.Generic.Dictionary`2.Count")
+            if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.#ctor" or "M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)" or "P:System.Collections.Generic.Dictionary`2.Count")
             { evidence.Add("intrinsic=fresh-default-dictionary-construction-state"); }
+            if (symbol.OriginalDefinition.GetDocumentationCommentId() == "M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)")
+            { evidence.Add("intrinsic=capacity-dictionary-construction-state"); }
         }
 
         if (symbol is IMethodSymbol method)

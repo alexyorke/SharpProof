@@ -16,6 +16,23 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=guarded-exception-message-construction", StringComparison.Ordinal))
+            {
+                var resource = row.Evidence.Contains("intrinsic=guarded-exception-resource-synchronization", StringComparison.Ordinal);
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "null, empty and explicit messages; reverse named arguments; allocation retained; compiled CLR/IR normal-path agreement and deliberately wrong result; guarded resource-lock shape where applicable; native callback effects, message preconditions and runtime lock/culture oracles in ExceptionConstruction and ExceptionResourceLock tests",
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, false) && (!resource || CheckExceptionMessageIntrinsic(compilation, row.Id, false, resourceOnly: true)),
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, true) || resource && CheckExceptionMessageIntrinsic(compilation, row.Id, true, resourceOnly: true));
+            }
+
+            if (row.Evidence.Contains("intrinsic=guarded-exception-resource-synchronization", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "exact default/parameter-name/null-message overload; explicit allocation and conditional resource-lock IR retained; CLR/IR normal-path agreement and wrong-result control; pinned-runtime IL hashes, actual lock identity and culture callback lock ownership checked by ExceptionResourceLockOracleTests; native resource synchronization witnesses and unsupported module/prefix controls",
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, false, resourceOnly: true),
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, true, resourceOnly: true));
+            }
+
             if (row.Evidence.Contains("intrinsic=typed-sz-array-clear-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
@@ -47,21 +64,28 @@ public sealed partial class DotnetApiInventoryTests
                 var genericKeys = row.Evidence.Contains("intrinsic=fresh-default-dictionary-construction-state", StringComparison.Ordinal);
                 var constructorOrigin = row.Evidence.Contains("intrinsic=constructor-origin-dictionary-state", StringComparison.Ordinal);
                 var opaqueStorage = row.Evidence.Contains("intrinsic=opaque-dictionary-value-storage", StringComparison.Ordinal);
-                var opaqueState = row.Id is "M:System.Collections.Generic.Dictionary`2.#ctor" or
+                var capacity = row.Evidence.Contains("intrinsic=capacity-dictionary-construction-state", StringComparison.Ordinal);
+                var opaqueState = row.Id is "M:System.Collections.Generic.Dictionary`2.#ctor" or "M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)" or
                     "M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)" or "P:System.Collections.Generic.Dictionary`2.Count";
                 var scope = "compiled Int32-key dictionary state with scalar/reference values, aliases, identity/null, Count and membership; nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests" +
                     (opaqueState ? "; empty generic-value construction/Count/membership versus decimal runtime without value interpretation" : "") +
                     (genericKeys ? "; generic-key constructor/Count normal state versus string runtime, with initialization effects retained" : "") +
                     (constructorOrigin ? "; immutable generic source-helper Add/get/set/ContainsKey/Count share constructor-origin storage versus runtime; default-comparer heap guard retained after publication" : "") +
-                    (opaqueStorage ? "; generic opaque Add/get/set copy distinct atoms and decimal CLR bits through direct and source-helper storage" : "");
+                    (opaqueStorage ? "; generic opaque Add/get/set copy distinct atoms and decimal CLR bits through direct and source-helper storage" : "") +
+                    (capacity ? "; capacity constructor state checked with scalar, opaque and generic keys, source-helper aliases, normal-path uncertainty and wrong-result controls" : "");
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, scope,
-                    () => CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true) &&
+                    () => (!capacity || CheckDictionaryStateIntrinsic(compilation, false, capacity: true) &&
+                        CheckDictionaryStateIntrinsic(compilation, false, opaqueValues: true, capacity: true) &&
+                        CheckDictionaryStateIntrinsic(compilation, false, genericKeys: true, capacity: true) &&
+                        CheckDictionaryStateIntrinsic(compilation, false, sourceParameters: true, capacity: true)) &&
+                        CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true) &&
                         (!opaqueState || CheckDictionaryStateIntrinsic(compilation, false, opaqueValues: true)) &&
                         (!genericKeys || CheckDictionaryStateIntrinsic(compilation, false, genericKeys: true)) &&
                         (!constructorOrigin || CheckDictionaryStateIntrinsic(compilation, false, sourceParameters: true) &&
                             CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true, sourceParameters: true)) &&
                         (!opaqueStorage || CheckOpaqueDictionaryStorageIntrinsic(compilation, false) && CheckOpaqueDictionaryStorageIntrinsic(compilation, false, direct: true)),
-                    () => CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true) ||
+                    () => capacity && CheckDictionaryStateIntrinsic(compilation, true, capacity: true) ||
+                        CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true) ||
                         opaqueState && CheckDictionaryStateIntrinsic(compilation, true, opaqueValues: true) ||
                         genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true) ||
                         constructorOrigin && (CheckDictionaryStateIntrinsic(compilation, true, sourceParameters: true) ||

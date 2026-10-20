@@ -212,7 +212,7 @@ internal sealed class ApiSpecTemplate
 internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "8";
+    public const string DefaultTableVersion = "9";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -246,6 +246,7 @@ internal sealed partial class ApiSpecTable
         var evidenceDocumented = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-api-contract");
         var evidenceObserved = new SpecEvidence(SpecEvidenceKind.Observed, "supported-runtime-observation");
         var evidenceTypeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
+        var evidenceExceptionCulture = new SpecEvidence(SpecEvidenceKind.Observed, "dotnet-resource-message-culture-callback-boundary");
         return [
             CollectionCountDeclaration("bcl.dictionary.count", "System.Collections.Generic.Dictionary`2", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
@@ -336,12 +337,12 @@ internal sealed partial class ApiSpecTable
                     false, 0, IrTypeKind.Reference, [], null,
                     assemblySetFramework),
                 new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.WritesReceiverState | SpecEffect.ReadsAmbientState | SpecEffect.Synchronization, evidenceObserved),
-                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
-                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceExceptionCulture),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -352,12 +353,12 @@ internal sealed partial class ApiSpecTable
                     false, 0, IrTypeKind.Reference, [IrTypeKind.String], null,
                     assemblySetFramework),
                 new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
-                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
-                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceExceptionCulture),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
