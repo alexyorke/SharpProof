@@ -6,7 +6,7 @@ using LauncherProgram = SharpProof.Worker.Launcher.Program;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ProtocolEffectWitnessContractMatrixTests
+internal sealed class Wave8ProtocolEffectWitnessContractMatrixTests
 {
     private static IEnumerable<TestCaseData> ContractCases()
     {

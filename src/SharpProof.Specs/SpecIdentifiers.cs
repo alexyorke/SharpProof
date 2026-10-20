@@ -1,6 +1,6 @@
 namespace SharpProof.Specs;
 
-public readonly struct SpecId : IEquatable<SpecId>
+internal readonly struct SpecId : IEquatable<SpecId>
 {
     internal SpecId(long scope, int value)
     {
@@ -48,7 +48,7 @@ public readonly struct SpecId : IEquatable<SpecId>
     }
 }
 
-public readonly struct SpecVarId : IEquatable<SpecVarId>
+internal readonly struct SpecVarId : IEquatable<SpecVarId>
 {
     internal SpecVarId(SpecId spec, int value)
     {

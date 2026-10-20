@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public readonly record struct ScopedIrId<TTag>
+internal readonly record struct ScopedIrId<TTag>
     where TTag : struct, IIrIdentifierTag
 {
     internal ScopedIrId(long scope, int value)

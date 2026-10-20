@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Four-point nullness domain.
 /// </summary>
-public sealed class NullnessDomain : CanonicalAbstractDomain<NullnessValue>
+internal sealed class NullnessDomain : CanonicalAbstractDomain<NullnessValue>
 {
     public static NullnessDomain Instance { get; } = new();
 

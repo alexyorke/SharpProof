@@ -1,6 +1,6 @@
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     private static string CreateManifestPayload(WorkerClaimManifest manifest)
     {

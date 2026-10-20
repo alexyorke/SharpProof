@@ -16,7 +16,7 @@ using SharpProof.Worker;
 
 namespace SharpProof.Fuzz;
 
-public sealed record TotalProgramFuzzCoverage(int Cases, int Agreements, int NativeProofs, int NativeRefutations,
+internal sealed record TotalProgramFuzzCoverage(int Cases, int Agreements, int NativeProofs, int NativeRefutations,
     int WrappedBodies, int CheckedBodies, int FinallyBodies, int SourceCalls, int BooleanBodies,
     int LoopBodies, int ReferenceBodies, int ExceptionalExits, int TypeMask, int ArrayReadBodies)
 {

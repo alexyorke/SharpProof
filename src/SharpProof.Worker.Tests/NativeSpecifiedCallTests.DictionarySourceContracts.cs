@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("int", "17", "31", "Contract.Result<int>() == Contract.Old(data[key])", "ReadAndSet(data, 1, 31) * 100 + data[1]", 1731)]
     [TestCase("object", "first", "second", "object.ReferenceEquals(Contract.Result<T>(), Contract.Old(data[key]))", "object.ReferenceEquals(ReadAndSet(data, 1, second), first) && object.ReferenceEquals(data[1], second) ? 1 : 0", 1)]

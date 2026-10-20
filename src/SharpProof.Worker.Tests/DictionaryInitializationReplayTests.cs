@@ -3,7 +3,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
 
-public sealed class DictionaryInitializationReplayTests
+internal sealed class DictionaryInitializationReplayTests
 {
     [TestCase("System_SByte")]
     [TestCase("System_Byte")]

@@ -6,7 +6,7 @@ using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Fuzz.Test;
 
-public sealed class FuzzDomainBehaviorTests
+internal sealed class FuzzDomainBehaviorTests
 {
     [TestCase(IrExecutionSemantics.Legacy, false)]
     [TestCase(IrExecutionSemantics.Total, true)]

@@ -11,10 +11,15 @@
              Link="ArgumentNullGuard.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+             Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Dataflow.Test" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>

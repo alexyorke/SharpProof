@@ -1,20 +1,20 @@
 namespace SharpProof.Ir;
 
-public abstract partial class IrInstruction
+internal abstract partial class IrInstruction
 {
     public bool IsTerminal => Kind is IrInstructionKind.Branch
         or IrInstructionKind.Goto or IrInstructionKind.Return
         or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit;
 }
 
-public sealed partial class IrBasicBlock
+internal sealed partial class IrBasicBlock
 {
     internal IIrTerminator ControlFlow { get; }
 
     public IrInstruction Terminator => ControlFlow.Instruction;
 }
 
-public sealed partial class IrProgram
+internal sealed partial class IrProgram
 {
     internal IrProgram(
         IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)

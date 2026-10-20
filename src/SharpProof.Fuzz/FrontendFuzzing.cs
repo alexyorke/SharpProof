@@ -14,7 +14,7 @@ using SharpProof.Testing;
 
 namespace SharpProof.Fuzz;
 
-public enum GeneratedExpressionType
+internal enum GeneratedExpressionType
 {
     Boolean,
     Integer,
@@ -23,7 +23,7 @@ public enum GeneratedExpressionType
     Reference
 }
 
-public enum GeneratedExpressionKind
+internal enum GeneratedExpressionKind
 {
     BooleanLiteral,
     IntegerLiteral,
@@ -58,7 +58,7 @@ public enum GeneratedExpressionKind
     Conditional
 }
 
-public sealed class GeneratedCSharpExpression
+internal sealed class GeneratedCSharpExpression
 {
     private GeneratedCSharpExpression(
         GeneratedExpressionKind kind,
@@ -613,7 +613,7 @@ public sealed class GeneratedCSharpExpression
     }
 }
 
-public sealed record GeneratedCSharpCase(
+internal sealed record GeneratedCSharpCase(
     GeneratedCSharpExpression Expression,
     long Left,
     long Right,
@@ -652,7 +652,7 @@ public sealed record GeneratedCSharpCase(
     public GeneratedCSharpExpression Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
 }
 
-public sealed class SmallCSharpCaseGenerator(int seed)
+internal sealed class SmallCSharpCaseGenerator(int seed)
 {
     private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
@@ -872,7 +872,7 @@ public sealed class SmallCSharpCaseGenerator(int seed)
     }
 }
 
-public sealed record FrontendDifferentialResult(
+internal sealed record FrontendDifferentialResult(
     FuzzOracleStatus Status,
     string Detail,
     IrExceptionKind? ExceptionKind = null)
@@ -880,7 +880,7 @@ public sealed record FrontendDifferentialResult(
     public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-public sealed record FrontendSemanticEdgeCase(
+internal sealed record FrontendSemanticEdgeCase(
     string ReturnType,
     string Parameters,
     string Expression,
@@ -894,7 +894,7 @@ public sealed record FrontendSemanticEdgeCase(
     public IReadOnlyList<object?> Arguments { get; init; } = Arguments ?? throw new System.ArgumentNullException(nameof(Arguments));
 }
 
-public sealed record FrontendSemanticEdgeResult(
+internal sealed record FrontendSemanticEdgeResult(
     FuzzOracleStatus Status,
     FrontendSubsetDecision? ActualDecision,
     FrontendAbstention? ActualAbstention,
@@ -904,7 +904,7 @@ public sealed record FrontendSemanticEdgeResult(
     public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-public static class FrontendDifferentialOracle
+internal static class FrontendDifferentialOracle
 {
     private const string SemanticEdgeMethodPrefix = "EdgeTarget";
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
@@ -1916,7 +1916,7 @@ public static class FrontendDifferentialOracle
     }
 }
 
-public static class CSharpStructuralShrinker
+internal static class CSharpStructuralShrinker
 {
     public static GeneratedCSharpCase Minimize(
         GeneratedCSharpCase generated,

@@ -156,16 +156,10 @@
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
-      "sharpproof.specs": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
-        }
-      },
       "sharpproof.verify": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "SharpProof.Ir": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },

@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.List<int>() { 17, 23 }; return Read<int>(data, 0);", "static T Read<T>(System.Collections.Generic.IList<T> data, int index) => data[index];", 17)]
     [TestCase("var data = new System.Collections.Generic.List<int>() { 17, 23 }; Swap<int>(data, 0, 1); return data[0] * 100 + data[1];", "static void Swap<T>(System.Collections.Generic.IList<T> data, int first, int second) { if (data.Count < 2 || first == second) return; var item = data[first]; data[first] = data[second]; data[second] = item; }", 2317)]

@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Reduced interval and congruence domain over signed 64-bit integers.
 /// </summary>
-public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
+internal sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
 {
     public static IntervalDomain Instance { get; } = new();
     private IntervalDomain()

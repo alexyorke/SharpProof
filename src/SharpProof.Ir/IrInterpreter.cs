@@ -73,7 +73,7 @@ internal static class IrScalarOperations
     }
 }
 
-public sealed partial class IrValue
+internal sealed partial class IrValue
 {
     // Computed string values carry contents, but hash-consed terms do not
     // model distinct runtime allocations. Preserve this fact through values
@@ -127,7 +127,7 @@ public sealed partial class IrValue
     }
 }
 
-public sealed partial class IrEvaluationResult
+internal sealed partial class IrEvaluationResult
 {
     internal static IrEvaluationResult FromValue(IrValue value)
     {
@@ -148,7 +148,7 @@ public sealed partial class IrEvaluationResult
     }
 }
 
-public sealed class IrInterpreter(IrFactory factory)
+internal sealed class IrInterpreter(IrFactory factory)
 {
     /// <summary>
     /// Ceiling on term nesting evaluated recursively, matching the verifier's

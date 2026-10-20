@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // OutOfMemoryException whatever memory is free, so String.Concat of operands
 // whose total length exceeds it throws although each operand exists.
 [TestFixture]
-public sealed class StringConcatenationMaxLengthTests
+internal sealed class StringConcatenationMaxLengthTests
 {
     [TestCase("public static string Target(string a, string b) { return a + b; }")]
     [TestCase("public static string Target(string a, string b) { Contract.Requires(a != null && b != null); return a + b; }")]

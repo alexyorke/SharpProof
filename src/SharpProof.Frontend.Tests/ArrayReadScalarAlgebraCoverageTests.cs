@@ -9,7 +9,7 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class ArrayReadScalarAlgebraCoverageTests
+internal sealed class ArrayReadScalarAlgebraCoverageTests
 {
     [TestCase("sbyte", (sbyte)0, false)]
     [TestCase("sbyte", (sbyte)-1, false)]

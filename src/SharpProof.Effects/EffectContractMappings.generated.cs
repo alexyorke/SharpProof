@@ -7,7 +7,7 @@
 namespace SharpProof.Effects;
 
 [Flags]
-public enum EffectAllocationKind
+internal enum EffectAllocationKind
 {
     None = 0,
     Managed = 1,
@@ -17,7 +17,7 @@ public enum EffectAllocationKind
 }
 
 [Flags]
-public enum EffectCapabilityKind
+internal enum EffectCapabilityKind
 {
     None = 0,
     IO = 1,
@@ -37,7 +37,7 @@ public enum EffectCapabilityKind
     Unknown = 16383
 }
 
-public enum EffectTermination
+internal enum EffectTermination
 {
     Bottom = 0,
     Terminates = 1,
@@ -45,7 +45,7 @@ public enum EffectTermination
     Unknown = 3
 }
 
-public enum EffectCompleteness
+internal enum EffectCompleteness
 {
     Complete = 0,
     Incomplete = 1
@@ -83,7 +83,7 @@ internal enum EffectDirectEventKind
 }
 
 [Flags]
-public enum EffectUncertainty
+internal enum EffectUncertainty
 {
     None = 0,
     DirectCall = 1,
@@ -97,7 +97,7 @@ public enum EffectUncertainty
 }
 
 [Flags]
-public enum EffectContractKind : long
+internal enum EffectContractKind : long
 {
     None = 0,
     ReadsReceiverState = 1,
@@ -119,7 +119,7 @@ public enum EffectContractKind : long
 }
 
 [Flags]
-public enum EffectContractCapabilityKind
+internal enum EffectContractCapabilityKind
 {
     None = 0,
     IO = 1,
@@ -137,7 +137,7 @@ public enum EffectContractCapabilityKind
     NativeInterop = 4096
 }
 
-public enum EffectRegionKind
+internal enum EffectRegionKind
 {
     Receiver = 0,
     Parameter = 1,
@@ -159,7 +159,7 @@ internal readonly record struct EffectContractResolution(
     ImmutableArray<EffectContractInvalidAttribute> InvalidAttributes = default
 );
 
-public readonly record struct EffectProjection(
+internal readonly record struct EffectProjection(
     EffectContractKind Effects,
     EffectContractCapabilityKind Capabilities,
     bool IsComplete

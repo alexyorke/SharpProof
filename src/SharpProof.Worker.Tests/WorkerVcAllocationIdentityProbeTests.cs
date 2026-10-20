@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcAllocationIdentityProbeTests
+internal sealed class WorkerVcAllocationIdentityProbeTests
 {
     [TestCase("new int[1]", "new bool[1]", false, WorkerClaimOutcome.Proven)]
     [TestCase("new int[1]", "new object()", false, WorkerClaimOutcome.Proven)]

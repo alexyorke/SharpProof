@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeMutationBoundaryTests
+internal sealed class NativeMutationBoundaryTests
 {
     [TestCase("System.Func<object>", false, "")]
     [TestCase("System.Action<string>", false, "")]

@@ -3,7 +3,7 @@ using SharpProof.Roslyn;
 
 namespace SharpProof.Effects;
 
-public readonly record struct EffectCapabilitySet
+internal readonly record struct EffectCapabilitySet
 {
     private const EffectCapabilityKind UnknownMarker =
         EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown;
@@ -101,7 +101,7 @@ internal static class EffectDirectEventKinds
     }
 }
 
-public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
+internal readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
 {
     private const int MembershipIndexThreshold = 4;
     private readonly ImmutableArray<INamedTypeSymbol> _types;

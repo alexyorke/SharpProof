@@ -5,7 +5,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CalleeInitializationControlTests
+internal sealed class CalleeInitializationControlTests
 {
     [TestCase("public static int State = 1;")]
     [TestCase("static C() { }")]

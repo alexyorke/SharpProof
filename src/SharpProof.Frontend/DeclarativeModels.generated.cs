@@ -5,7 +5,7 @@
 #nullable enable
 namespace SharpProof.Frontend;
 
-public sealed partial class FrontendLoweringResult
+internal sealed partial class FrontendLoweringResult
 {
     internal readonly struct StorageTag
     {
@@ -26,7 +26,7 @@ public sealed partial class FrontendLoweringResult
     public ImmutableArray<FrontendVariableBinding> Variables { get; }
 }
 
-public sealed partial class FrontendProgramLoweringResult
+internal sealed partial class FrontendProgramLoweringResult
 {
     internal readonly struct StorageTag
     {

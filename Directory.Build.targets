@@ -32,7 +32,7 @@
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <!-- Test frameworks discover fixtures through reflection; test awaits do not
          expose a reusable library synchronization-context contract. -->
-    <NoWarn>$(NoWarn);CA1515;CA2007;CA5394</NoWarn>
+    <NoWarn>$(NoWarn);CA1515;CA1812;CA2007;CA5394</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">

@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcDefaultFieldTests
+internal sealed class WorkerVcDefaultFieldTests
 {
     [TestCase("public int Value;", "return cell.Value;", 0, 0, WorkerClaimOutcome.Proven)]
     [TestCase("public bool Value;", "return cell.Value ? 1 : 0;", 0, 0, WorkerClaimOutcome.Proven)]

@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.List<int>(); return data.Count;", 0)]
     [TestCase("var data = new System.Collections.Generic.List<decimal>(); return data.Count;", 0)]

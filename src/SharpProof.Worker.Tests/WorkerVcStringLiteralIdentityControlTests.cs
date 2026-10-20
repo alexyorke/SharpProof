@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcStringLiteralIdentityControlTests
+internal sealed class WorkerVcStringLiteralIdentityControlTests
 {
     [TestCase(true, WorkerClaimOutcome.Proven)]
     [TestCase(false, WorkerClaimOutcome.Refuted)]

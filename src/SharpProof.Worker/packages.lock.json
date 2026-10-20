@@ -15,9 +15,6 @@
           "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
         }
       },
-      "sharpproof.dataflow": {
-        "type": "Project"
-      },
       "sharpproof.host": {
         "type": "Project"
       },
@@ -43,7 +40,7 @@
       "sharpproof.verify": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.worker.protocol": {

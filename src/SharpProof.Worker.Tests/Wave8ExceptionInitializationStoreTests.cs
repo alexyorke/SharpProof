@@ -10,7 +10,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ExceptionInitializationStoreTests
+internal sealed class Wave8ExceptionInitializationStoreTests
 {
     [TestCase("cctor-boxing", WorkerClaimOutcome.Proven)]
     [TestCase("module-boxing", WorkerClaimOutcome.Proven)]

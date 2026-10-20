@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public static class IrSubstitution
+internal static class IrSubstitution
 {
     public static IrTerm Substitute(
         IrFactory factory,

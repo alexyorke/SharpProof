@@ -62,12 +62,6 @@
         "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
         }
-      },
-      "sharpproof.specs": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
-        }
       }
     }
   }

@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeAliasingBoundaryTests
+internal sealed class NativeAliasingBoundaryTests
 {
     internal const string DistinctSealedFieldSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
         "public sealed class Holder { public A First; public B Second; } public static class C { public static bool Target(Holder holder) { " +

@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class WorkerTests
+internal sealed partial class WorkerTests
 {
     private static readonly string[] EntryLockContradictoryCore = ["requires:0", "requires:1"];
 

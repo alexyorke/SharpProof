@@ -206,7 +206,6 @@
                         '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Fuzz' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Specs.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Testing' OR

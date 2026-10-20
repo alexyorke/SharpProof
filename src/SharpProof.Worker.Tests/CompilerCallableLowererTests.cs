@@ -15,7 +15,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CompilerCallableLowererTests
+internal sealed class CompilerCallableLowererTests
 {
     [Test]
     public void OrdinaryConsumerWithoutOptionalContractApiMapsItsActualBindingFailure()

@@ -7,7 +7,7 @@ using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class AnalyzerCoreInterpreterCoverageTests
+internal sealed class AnalyzerCoreInterpreterCoverageTests
 {
     [TestCase(IrBinaryOperator.NotEqual, 1, 4)]
     [TestCase(IrBinaryOperator.NotEqual, 4, 1)]

@@ -9,7 +9,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("System.Collections.Generic.IList<int> alias = values; return alias[0];")]
     [TestCase("System.Collections.Generic.IList<int> alias = values; System.Collections.Generic.IList<int> second = alias; return second[0];")]

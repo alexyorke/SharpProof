@@ -3,7 +3,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
 
-public sealed class ExceptionResourceLockReplayTests
+internal sealed class ExceptionResourceLockReplayTests
 {
     [TestCase(true)]
     [TestCase(false)]

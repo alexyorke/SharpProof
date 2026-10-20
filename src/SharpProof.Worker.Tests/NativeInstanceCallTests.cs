@@ -9,7 +9,7 @@ namespace SharpProof.Worker.Test;
 // Nonvirtual source members inline on a reference receiver, which is checked
 // for null after the arguments. Inside the callee, `this` is never null.
 [TestFixture]
-public sealed class NativeInstanceCallTests
+internal sealed class NativeInstanceCallTests
 {
     private const string Nodes = """
         public class Node<TKey, TValue> {
