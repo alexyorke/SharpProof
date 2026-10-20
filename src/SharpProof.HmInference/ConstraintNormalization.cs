@@ -101,10 +101,10 @@ public static partial class Inference
                 if (requirement.Type is null || ConversionCore(requirement.Variable).IsVariable || ConversionCore(requirement.Type).CSharpSymbol is not INamedTypeSymbol required)
                 { continue; }
                 // Class inheritance and invariant interfaces determine argument
-                // equality. Variant interfaces require directional bounds instead.
+                // equality. Variant interfaces contribute directional conversion bounds.
                 if (required.TypeKind == TypeKind.Interface && required.OriginalDefinition.TypeParameters.Any(parameter =>
                     { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return parameter.Variance != VarianceKind.None; }))
-                { continue; }
+                { expanded |= BindVariantConstraint(requirement.Variable, requirement.Type, required); continue; }
                 if (ConstraintProjection(requirement.Variable, requirement.Type) is { } projection)
                 { HmType.Unify(projection, ConversionCore(requirement.Type)); }
             }

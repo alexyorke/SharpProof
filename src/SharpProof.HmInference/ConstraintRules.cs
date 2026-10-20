@@ -44,6 +44,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(variable)); }
             if (mapping is null)
             { throw new ArgumentNullException(nameof(mapping)); }
+            if (actual is not null)
+            { RecordConstraintArgument(variable, actual); }
             if (parameter.HasUnmanagedTypeConstraint)
             { RequireKeyword(variable, "unmanaged"); }
             else if (parameter.HasValueTypeConstraint)

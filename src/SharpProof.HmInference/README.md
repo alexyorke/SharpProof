@@ -479,6 +479,20 @@ implementations have regression coverage, and applied IDE fixes verify interface
 dispatch, helper effects and nullable payload domains. Genuinely ambiguous
 projections remain unresolved until other constraints distinguish them.
 
+Constructed receivers constrained by variant interfaces contribute directional
+conversion bounds when their projection is unambiguous. Original generic
+arguments are retained per call before following inference substitutions.
+Covariance and contravariance preserve their directions through nested arrays,
+interfaces and delegates. Identity cases share variables without excluding value
+types; differing reference arguments acquire class bounds, keeping boxing out of
+reference variance. Nullable arguments, inherited/struct receivers, mixed variance
+and repeated calls have regression coverage. Applied IDE fixes compare dispatch,
+reference identity, nullable and async results, and newly admitted domains.
+Array receivers use the same substituted interface endpoints before classifying
+element conversions. Integer and nullable-value identity domains stay available;
+reference covariance receives directional bounds. Runtime fixes verify original
+and new reference/value/nullable array domains without copying their arrays.
+
 Enumerator return parameters are mapped through their actual substituted types
 before resolving Current, MoveNext/MoveNextAsync and disposal members. The
 declared enumerator constraints use the original concrete substitutions for

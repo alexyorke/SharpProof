@@ -59,7 +59,16 @@ public static partial class Inference
                 if (source.CSharpSymbol is { } original && (original is IArrayTypeSymbol
                     || original.TypeKind == TypeKind.Delegate && declared.TypeKind == TypeKind.Delegate))
                 {
-                    BindSubtype(original, declared, source, target, true);
+                    ITypeSymbol? endpoint = declared;
+                    if (declared is INamedTypeSymbol { TypeKind: TypeKind.Interface } contract
+                        && contract.OriginalDefinition.TypeParameters.Any(parameter =>
+                            { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return parameter.Variance != VarianceKind.None; }))
+                    {
+                        endpoint = OriginalConstraintSymbol(requirement.Type, declared);
+                        if (endpoint is null)
+                        { continue; }
+                    }
+                    BindSubtype(original, endpoint, source, target, true);
                     inferredConstraints.RemoveAt(i);
                     changed = true;
                     continue;
