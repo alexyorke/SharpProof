@@ -407,7 +407,7 @@ internal sealed class MetadataTestSubject : IDisposable
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
             Image = ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
             ImagePath = Path.Combine(_directory.FullName, "implementation.dll");
-            File.WriteAllBytes(ImagePath, Image.ToArray());
+            File.WriteAllBytes(ImagePath, Image.AsSpan());
             using var runtimeImage = new MemoryStream(Image.ToArray(), writable: false);
             var assembly = _runtime.LoadFromStream(runtimeImage);
             Method = assembly.GetType("Library")!.GetMethod("Target")!;

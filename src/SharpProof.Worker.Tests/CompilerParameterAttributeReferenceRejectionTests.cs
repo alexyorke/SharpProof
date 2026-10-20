@@ -105,7 +105,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
                     Assert.That((flags & AssemblyFlags.Retargetable) != 0, Is.EqualTo(retargetable));
                 }
                 attributePath = Path.Combine(directory.FullName, foreignName + ".dll");
-                await File.WriteAllBytesAsync(attributePath, attributeImage.Value.ToArray());
+                await File.WriteAllBytesAsync(attributePath, attributeImage.Value.AsMemory());
                 libraryReferences = TestMetadataReferences.WithoutSharpProof.Add(MetadataReference.CreateFromFile(attributePath));
             }
 
@@ -113,7 +113,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             var library = Create(libraryName, LibrarySource, libraryReferences);
             var libraryImage = Emit(library);
             var libraryPath = Path.Combine(directory.FullName, libraryName + ".dll");
-            await File.WriteAllBytesAsync(libraryPath, libraryImage.ToArray());
+            await File.WriteAllBytesAsync(libraryPath, libraryImage.AsMemory());
             var libraryReference = MetadataReference.CreateFromFile(libraryPath);
             var consumer = Create("OrdinaryParameterConsumer_" + kind, ConsumerSource,
                 TestMetadataReferences.WithSharpProof.Add(libraryReference));
