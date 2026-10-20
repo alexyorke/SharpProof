@@ -53,7 +53,6 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
-.env
 .baseline-check/
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -299,6 +298,55 @@ FodyWeavers.xsd
 .dotnet/
 .tools/
 .packages/
+
+# Local environment files; keep shareable examples and templates.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
+
+# Local editor state and temporary merge/backup files.
+.idea/
+.fleet/
+.history/
+*.sln.iml
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# Operating-system metadata.
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Repository-local caches, virtual environments, and scratch worktrees.
+/.cache/
+/.nuget/
+/.venv/
+/venv/
+/tmp/
+/temp/
+/.worktrees/
+/worktrees/
+
+# Reports and crash dumps emitted in the repository root.
+/coverage/
+/coverage-report/
+/*.sarif
+/*.dmp
+/*.dump
 
 # Keep the complete pinned Arcade tree, including cross/arm patches.
 !/eng/common/**
