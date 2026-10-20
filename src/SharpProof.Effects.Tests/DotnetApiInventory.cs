@@ -175,6 +175,8 @@ internal static class DotnetApiInventory
             {
                 evidence.Add("intrinsic=default-integer-comparer-only");
             }
+            if (CSharpOperationSemantics.IsGenericComparableDeclaration(method))
+            { evidence.Add("intrinsic=constrained-integer-comparable"); }
 
             if (CSharpOperationSemantics.IsStringEqualsCall(method))
             {

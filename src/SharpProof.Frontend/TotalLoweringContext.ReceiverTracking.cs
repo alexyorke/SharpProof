@@ -312,6 +312,18 @@ internal sealed partial class TotalLoweringContext
             operation is IFlowCaptureReferenceOperation capture && _defaultComparerCaptures.Contains(capture.Id);
     }
 
+    internal bool IsConstrainedIntegerComparable(IInvocationOperation invocation)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        if (invocation.Instance?.Type is not ITypeParameterSymbol receiver ||
+            !CSharpOperationSemantics.IsGenericComparableDeclaration(invocation.TargetMethod) ||
+            CSharpOperationSemantics.HasRefComparableReceiver(invocation))
+        { return false; }
+        var element = KnownScalarType(receiver);
+        return CSharpOperationSemantics.IsComparisonIntegerType(element) &&
+            SymbolEqualityComparer.Default.Equals(element, KnownScalarType(invocation.TargetMethod.ContainingType.TypeArguments[0]));
+    }
+
     internal bool IsIntegerComparerType(ITypeSymbol? type)
     {
         return type is INamedTypeSymbol { TypeArguments.Length: 1 } named &&

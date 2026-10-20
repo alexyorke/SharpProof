@@ -26,7 +26,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | partially-modeled |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | 8 | 0 | 9 | 0 | partially-modeled |
-| M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled |
+| M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | 4 | 0 | 8 | 0 | partially-modeled |
 | M:System.Action`1.Invoke(`0) | call | 7 | 6 | 0 | 7 | 0 | unmodeled |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | 5 | 0 | 7 | 0 | partially-modeled |

@@ -44,7 +44,8 @@ internal sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task IntegerComparisonPreservesReceiverAndArgumentEvaluationOrder()
     {
-        await CheckComparisonContract("int", "var saved = left; return saved.CompareTo(saved = right);", WorkerClaimOutcome.Proven);
+        await CheckComparisonContract("int", "var saved = left; return saved.CompareTo(saved = right);", WorkerClaimOutcome.Proven, "0");
+        await CheckComparisonContract("int", "var saved = left; return saved.CompareTo(saved = right);", WorkerClaimOutcome.Refuted);
         await CheckComparisonContract("int", "var saved = right; return System.Collections.Generic.Comparer<int>.Default.Compare(y: saved, x: saved = left);", WorkerClaimOutcome.Proven);
     }
 
