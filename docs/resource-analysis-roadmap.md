@@ -138,6 +138,12 @@ resolve the full-phase failure. All three semantic shards passed; aggregation
 was skipped. The failure log is retained locally as
 `artifacts/resource-3795-coverage-failed.log`. No OOM cause is asserted from the
 exit code alone, and no coverage requirement or test deadline was weakened.
+The 41ae18f82 coverage run repeated the package-phase exit 137 with the container
+PowerShell process reported killed. All three semantic shards passed, but no
+new aggregate report was produced. Its log is retained as
+`artifacts/resource-41ae-coverage-failed.log`. The failure remains unresolved;
+Docker state evidence is needed to distinguish causes before changing limits
+or test concurrency again.
 
 ### Quantitative-memory feature audit
 
@@ -163,6 +169,31 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Native compiler-carrier storage
+
+The native checker independently validates captured root ownership, callback
+counts, typed fields, state-machine kind and aggregate budgets. It derives
+closure, delegate and source task-array storage under the conditional layout.
+Debug state-machine classes count as direct objects; Release value fields are
+returned separately for the future runtime async-box model. Shared frames and
+cached delegates are conservatively counted more than once. Any invalid later
+carrier
+returns Unknown without a partial storage bound.
+
+All 1003 worker/resource/protocol/compiler-driver/golden cases passed, including
+29 new carrier cases with numeric checks, real Debug/Release compiler emissions,
+malformed ownership/fields, incompatible layout, budgets and cancellation.
+Full C# formatting and quality/API compatibility with negative fixtures passed.
+The corrected numeric test literal also passed targeted whitespace verification.
+Layout checked 2788 sources, 59 projects and 151 unchanged pinned common files;
+the inventory includes 539 trusted paths, and documentation checked 728 links.
+Logs are retained under `artifacts/resource-native-carrier-*`.
+
+This remains an internal component. Closed transport, root collector attachment,
+reviewed runtime Task/async-box storage, lifetime composition, consumer controls
+and coverage closure are still required. Root task memory claims remain Unknown;
+no public API or wire format changed.
 
 ### Emitted compiler carrier shapes
 

@@ -794,6 +794,7 @@
           "src/SharpProof.CompilerArtifact/CompilerForkJoinProjection.cs",
           "src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.cs",
           "src/SharpProof.Worker/NativeForkJoinSourceCostVerifier.cs",
+          "src/SharpProof.Worker/NativeTaskCarrierStorageVerifier.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
           "src/SharpProof.Ir/AnalysisDefaults.cs",
