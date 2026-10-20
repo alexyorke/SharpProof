@@ -1,0 +1,51 @@
+{
+  "ArchiveSummary": {
+    "PinnedHead": "ffd99c168cbb5dbdebff1ba765ca7cdc8f382521",
+    "Epochs": 109,
+    "HistoricalRows": 305435,
+    "CurrentObservations": 141860,
+    "CurrentUnits": 1887,
+    "SourceAuthorities": 75179,
+    "SourceBlobs": 3036,
+    "HistoricalRelations": {
+      "MissingPathTombstone": 29021,
+      "ChangedSource": 148048,
+      "OutsideSelectedContext": 3632,
+      "ExactSourceLocationCandidateRequiresScannerReplay": 73521,
+      "Ambiguous": 2037,
+      "UnrepresentedForm": 49175,
+      "OutsideCurrentSelectedCSharpUniverse": 1
+    },
+    "CurrentUnmatched": 140458,
+    "CurrentLocationCandidates": 1402,
+    "StatusTransfers": 0,
+    "InitialEpoch": {
+      "EpochOrdinal": 1,
+      "CommitSha": "d0be2e21b0f6c3a1c868a1f129a3f33ef2826719",
+      "LedgerGitBlob": "593a78e6ae7f75220bc0b33450a8c518b8664899",
+      "LedgerSha256": "2eefcb8c4931d2e1ded0dcc9c567fa5cf743478bb536f6c01d2b8ae60da417c0",
+      "Rows": 4135,
+      "Paths": 845
+    },
+    "FinalEpoch": {
+      "EpochOrdinal": 109,
+      "CommitSha": "ffd99c168cbb5dbdebff1ba765ca7cdc8f382521",
+      "LedgerGitBlob": "691bd8e6116cdbbb88470e0901448b80bb08b4e1",
+      "LedgerSha256": "a2676a1efbd5afdb0c38f0e7ef9ddce6f6a4f9c892d93078b29782482b728b3e",
+      "Rows": 3049,
+      "Paths": 717
+    },
+    "RenameAuthority": "No rename inferred; missing paths retain tombstones",
+    "Scope": "Lossless historical/current union. Exact coordinates are candidates only; no unknown-scanner status transfers."
+  },
+  "Verification": "All raw Git ledger blobs, row fields, current keys and no-transfer relations verified by IMM-M527 independent verifier.",
+  "OutsideUniverseQualification": "One current tracked Directory.Build.props ledger observation is outside the selected C# universe; it has exact current Git/source hash authority and is not treated as a physically missing path.",
+  "ArchiveEvidenceSha256": {
+    "reconciliation-summary.json": "4bcdea915c713d37eb15580f3968155c92b151984bd15ce0317b54b661936c17",
+    "legacy-rows.tsv.gz": "5856f29248cc26af59a1edd8e6bff5685a8fdf2330ccbd63ea71a7e711f1f158",
+    "current-observations.tsv.gz": "84fbe17d3d77732c3e35713b28173d2838a0e2f3c9ad768903f11309db6252bb",
+    "historical-current-relations.tsv.gz": "c5f8afa5b9a4762f861e52c2f33bb2503864cc747e7f46e27b03a38bef09101f",
+    "source-authority.tsv.gz": "3d5bbf02feb0b123275f71d54e79008cfad64b4ae785a1386d76ffea4f7a75a7",
+    "unmatched-current.tsv.gz": "c142ecced38607f492fc8b3abacf8f274e8b1793bf9945a5578b1cfd9d901fe3"
+  }
+}
