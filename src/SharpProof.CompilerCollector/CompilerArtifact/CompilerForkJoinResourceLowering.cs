@@ -1,0 +1,111 @@
+namespace SharpProof.CompilerArtifact;
+
+// These compiler-owned children are resource projections, never a replacement
+// for the root callable's functional Total program. No numeric result is
+// published until the native worker checks the children and runtime model.
+internal sealed record CompilerForkJoinArgument(int ParameterOrdinal, int? RootParameterOrdinal, int? Constant);
+
+internal sealed record CompilerForkJoinChild(
+    CompilerTotalCallablePreparation Owner,
+    ResourceProgram Cost,
+    ImmutableArray<CompilerForkJoinArgument> Arguments)
+{
+    public CompilerTotalCallablePreparation Owner { get; init; } = RepositoryParameterGuard.NotNull(Owner, nameof(Owner));
+    public ResourceProgram Cost { get; init; } = RepositoryParameterGuard.NotNull(Cost, nameof(Cost));
+    public ImmutableArray<CompilerForkJoinArgument> Arguments { get; init; } = Arguments.IsDefault
+        ? throw new ArgumentException("Arguments must be initialized.", nameof(Arguments)) : Arguments;
+}
+
+internal sealed record CompilerForkJoinProjection(
+    string RootCallableId,
+    string FrameworkAssemblyIdentity,
+    ImmutableArray<CompilerForkJoinChild> Children)
+{
+    public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string FrameworkAssemblyIdentity { get; init; } = RepositoryParameterGuard.NotNull(FrameworkAssemblyIdentity, nameof(FrameworkAssemblyIdentity));
+    public ImmutableArray<CompilerForkJoinChild> Children { get; init; } = Children.IsDefault
+        ? throw new ArgumentException("Children must be initialized.", nameof(Children)) : Children;
+}
+
+internal sealed record CompilerForkJoinProjectionResult(CompilerForkJoinProjection? Projection, string? UnknownReason);
+
+internal static class CompilerForkJoinResourceLowering
+{
+    internal const string ModelId = "fork-join-source-child-projection-v1";
+
+    internal static CompilerForkJoinProjectionResult Lower(IMethodSymbol method, CSharpCompilation compilation,
+        string callableId, CancellationToken cancellationToken)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        if (string.IsNullOrWhiteSpace(callableId))
+        { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
+        cancellationToken.ThrowIfCancellationRequested();
+        var plan = ResourceForkJoinPlan.TryCreate(method, compilation, cancellationToken);
+        if (plan == null)
+        { return new(null, "ForkJoinShapeUnsupported"); }
+        if (!CompilerTotalCallableLowerer.HasNoEffectEntryInitialization(compilation, method.ContainingType, cancellationToken))
+        { return new(null, "ForkJoinEntryInitializationUnknown"); }
+        var children = ImmutableArray.CreateBuilder<CompilerForkJoinChild>(plan.Children.Length);
+        var remaining = TotalBodyLowering.MaximumWork;
+        foreach (var invocation in plan.Children)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var child = invocation.TargetMethod;
+            if (!CompilerTotalCallableLowerer.HasNoEffectEntryInitialization(compilation, child.ContainingType, cancellationToken))
+            { return new(null, "ForkJoinEntryInitializationUnknown"); }
+            var declaration = (MethodDeclarationSyntax)child.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
+            var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
+            var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), child)
+            { CaptureResourceLoopEntries = true };
+            var contracts = new ContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
+            if (!contracts.IsSuccess || !contracts.Clauses.IsEmpty)
+            { return new(null, "ForkJoinChildContractsUnsupported"); }
+            var graph = TotalBodyLowering.CreateGraph(declaration, child, model, cancellationToken);
+            if (graph == null)
+            { return new(null, "ForkJoinChildBodyUnavailable"); }
+            var lowered = TotalBodyLowering.Lower(compilation, graph, context, cancellationToken);
+            if (!lowered.IsExact || lowered.ConstructionLimitExceeded || !lowered.SourceInitializationEffectsComplete)
+            { return new(null, "ForkJoinChildLoweringIncomplete"); }
+            if (!lowered.CallPreconditions.IsEmpty)
+            { return new(null, "ForkJoinChildContractsUnsupported"); }
+            foreach (var block in lowered.Program.Blocks)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                remaining -= block.Instructions.Length;
+                if (remaining < 0)
+                { return new(null, "ForkJoinProjectionBudgetExceeded"); }
+                foreach (var instruction in block.Instructions)
+                {
+                    if (instruction is IrCallInstruction or IrStoreInstruction ||
+                        instruction is IrWriteInstruction { Region: not (IrWriteRegion.Local or IrWriteRegion.Parameter) } ||
+                        instruction is IrHavocInstruction { HavocKind: not IrHavocKind.Variables })
+                    { return new(null, "ForkJoinSharedEffectsUnknown"); }
+                }
+            }
+            var body = declaration.Body is { } blockBody ? model.GetOperation(blockBody, cancellationToken) :
+                model.GetOperation(declaration.ExpressionBody!.Expression, cancellationToken);
+            var cost = ResourceBoundsAnalysis.Analyze(child, body, cancellationToken);
+            if (cost.Bounds == null)
+            { return new(null, "ForkJoinChildCostUnknown:" + cost.UnknownReason); }
+            var arguments = ImmutableArray.CreateBuilder<CompilerForkJoinArgument>(invocation.Arguments.Length);
+            foreach (var argument in invocation.Arguments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var parameter = argument.Parameter!;
+                arguments.Add(argument.Value is IParameterReferenceOperation root
+                    ? new(parameter.Ordinal, root.Parameter.Ordinal, null)
+                    : new(parameter.Ordinal, null, (int)argument.Value.ConstantValue.Value!));
+            }
+            var owner = new CompilerTotalCallablePreparation(
+                callableId + ":fork-child:" + children.Count.ToString(CultureInfo.InvariantCulture),
+                lowered.Program,
+                [.. context.Parameters.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
+                    new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], null, [])
+            { EffectsCompleteAtEntry = true };
+            children.Add(new(owner, cost.Bounds.Program, arguments.MoveToImmutable()));
+        }
+        return new(new(callableId, plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), children.MoveToImmutable()), null);
+    }
+}

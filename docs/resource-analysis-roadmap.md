@@ -93,6 +93,15 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Current coverage qualification
+
+Published a9f759896 passed all four coverage shards, including the instrumented
+package shard. Aggregate enforcement measured 4978/5213 changed trusted lines
+(95.49%, 235 gaps), failing the unchanged 100% floor. This supersedes the older
+8d73b0049 measurement below. The report and gap inventory are preserved locally.
+The earlier 919673e70 package shard lost its hosted runner before evidence upload;
+a9f759896 produced a complete measurement. No floor or exclusion was changed.
+
 ### Quantitative-memory feature audit
 
 Phase C now has compiler, native-worker, protocol, consumer and independent
@@ -117,6 +126,30 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Task-join child projection
+
+The compiler now lowers each authenticated callback into a separate exact Total
+program and cost program, preserving symbol-bound scalar argument mappings.
+It rejects incomplete lowering, child preconditions/contracts, entry initialization,
+shared field effects and aggregate IR budget excess. Failure returns an Unknown
+reason with no partial child list. All 1468 analyzer tests passed, including 14
+projection cases for loops, allocations, source calls, named arguments, shared
+state, module initialization, direct/transitive contracts, cancellation and budget
+controls. Layout passed at 2776 sources, 59 projects and all 151 pinned common
+files; the trusted inventory passed at 532 paths. Quality/API compatibility,
+negative fixtures, full formatting and 728 documentation links passed.
+
+The projection stays distinct from an ordinary callable's functional proof. The
+native cost kernel checks cost semantics and input ownership; source provenance
+requires the compiler envelope. The shadow-body decoder intentionally cannot
+carry entry-effect authority, so child codec controls use the ordinary Total
+codec. All three native child round-trip/input-ownership controls passed; the
+existing 778 native/resource/protocol cases also passed.
+No root bound is published until dedicated artifact ownership, root input
+substitution/composition and runtime assumptions are integrated. Async state-machine,
+framework allocation/liveness and concurrency controls remain required. This is
+an implementation step toward phase F, not its completion.
 
 ### Structured task-work admission foundation
 
