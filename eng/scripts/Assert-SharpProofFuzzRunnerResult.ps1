@@ -40,11 +40,11 @@ function Read-SharpProofBoundedJsonDocument {
     }
 
     $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
-    return [pscustomobject]@{
-        Document = [Text.Json.JsonDocument]::Parse($json)
-        Bytes    = $bytes
-        Json     = $json
-    }
+    return ([ordered]@{
+            Document = [Text.Json.JsonDocument]::Parse($json)
+            Bytes    = [Collections.Immutable.ImmutableArray]::CreateRange[byte]($bytes)
+            Json     = $json
+        }).AsReadOnly()
 }
 
 function Get-ExactJsonInt32 {
@@ -303,7 +303,7 @@ function Assert-SharpProofFuzzRunnerResult {
         '.' + [IO.Path]::GetFileName($Path) + '.' +
         [Guid]::NewGuid().ToString('N') + '.validated.tmp')
     try {
-        [IO.File]::WriteAllBytes($temporary, $bytes)
+        [IO.File]::WriteAllBytes($temporary, [byte[]]@($bytes))
         [IO.File]::Move($temporary, $Path, $true)
     }
     finally {
