@@ -60,7 +60,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 ## E. Asymptotic and aggregate analysis
 
 - [x] Upper/lower asymptotic expressions and tightness only with both bounds.
-- [ ] Amortized costs through checked potential/accounting rules.
+- [x] Amortized costs through checked potential/accounting rules.
 - [ ] Average-case bounds conditional on an explicit validated input model;
   never invent a probability distribution from source structure.
 - [ ] Adversarial controls that separate loose upper bounds from tight/expected
@@ -89,7 +89,8 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
-Credit-potential accounting is in progress. Program 7 adds a typed credit loop
+Credit-potential accounting is implemented for the admitted unit-spend model.
+Program 7 adds a typed credit loop
 with initial credit, fixed deposit, width and overflow mode. The native worker
 checks nonnegative potential and derives the total unit-spend budget from the
 outer rank. Source extraction protects the credit against other writes and
@@ -105,12 +106,23 @@ controls passed three cases. The two new package accounting cases first exposed
 an incorrect test expectation: the canonical spend formula is max(0, n), which
 preserves zero iterations for negative n. Both expectations were corrected.
 
-Docker Desktop exited before the corrected package rerun, full analyzer run,
-full formatting check and added byte-allocation source control finished. Their
-logs contain no terminal test summaries; they are unverified, not passed. The
-750-case run predates the added byte control. Resume those four checks after
-container tooling is available, then qualify fresh exact-head CI. The accounting
-row remains open until its consumer workflows and broader verification pass.
+Docker Desktop exited during verification. After recovery, the merged branch
+passed all 1450 analyzer tests, 12 focused source accounting controls including
+layout-bound allocated bytes, and both corrected strict-package consumer cases.
+Together with the earlier 750 worker and 756 IR cases, these verify the admitted
+accounting behavior and its cache/SARIF/package projection. The full formatting
+gate also passed after recovery, and the final documentation check passed 727
+local links.
+
+Implementation commit f3203c870 was followed by merge e7b781538 of latest fetched
+master cf42dd52d (CI critical-path changes). Draft MR #334 targets this checkpoint.
+Fresh CI is running on e7b781538; documentation CI passed. Coverage qualification
+and final CI remain open. The 100% changed trusted-code floor is unchanged.
+
+The completed accounting row covers fixed positive deposits and positive-guard,
+unit-spend drains under its stated model. It does not imply arbitrary potential
+synthesis or expected-cost results. Broader lifetime composition, validated
+expected costs, async/concurrency, coverage and final audit remain required.
 
 ### Lower/tightness checkpoint
 
