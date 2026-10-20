@@ -94,9 +94,9 @@ public sealed class ConditionalMetadataSymbolReaderTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures",
             "Windows.Media.Capture.CameraCaptureUIContract.winmd");
-        var bytes = File.ReadAllBytes(path);
+        var bytes = File.ReadAllBytes(path).ToImmutableArray();
         Assert.That(bytes, Has.Length.EqualTo(3072));
-        Assert.That(Convert.ToHexString(SHA256.HashData(bytes)),
+        Assert.That(Convert.ToHexString(SHA256.HashData(bytes.AsSpan())),
             Is.EqualTo("5F9EE2BFF39D954EDFDB88E985B7F6F42CBB6DB98D6D2EFE05DB9035B66856FB"));
         return ModuleMetadata.CreateFromImage(bytes);
     }

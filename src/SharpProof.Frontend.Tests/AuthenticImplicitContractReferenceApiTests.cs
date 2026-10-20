@@ -19,10 +19,9 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         // ResolveMissingAssemblies. Neither consumer is enrolled as proof input.
         var loaded = typeof(SharpProof.Attributes.Contract).Assembly;
         var attributesPath = loaded.Location;
-        var attributesBytes = File.ReadAllBytes(attributesPath);
-        var attributesHash = Convert.ToHexString(SHA256.HashData(attributesBytes));
-        using (var image = new MemoryStream(attributesBytes, writable: false))
-        using (var pe = new PEReader(image))
+        var attributesBytes = File.ReadAllBytes(attributesPath).ToImmutableArray();
+        var attributesHash = Convert.ToHexString(SHA256.HashData(attributesBytes.AsSpan()));
+        using (var pe = new PEReader(attributesBytes))
         {
             var reader = pe.GetMetadataReader();
             Assert.That(reader.GetGuid(reader.GetModuleDefinition().Mvid),

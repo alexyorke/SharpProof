@@ -4867,3 +4867,9 @@ The canonical formatter checks all 87 PowerShell and 19 shell files. Two new exp
 ### IMM-M476: direct review of final native file-write adapters
 
 Twenty-eight materializations are individually traced through current call sites and adjacent image/native stream producers. Each inline native byte array is passed immediately to File.WriteAllBytes or File.WriteAllBytesAsync; no mutable collection owner is retained or published. The actual backing file remains a filesystem/native authority subject. These sites remain final interop adapters rather than fixture ownership roots. No code changes or new test authority are inferred. Current source hashes and explicit pending final binding recollection are retained per row. The array inventory now has 370 unchecked candidates; this is independent role review, not automatic historical status transfer.
+
+### IMM-M475: freeze authentic frontend metadata images
+
+Authentic assembly and SDK metadata byte observations are immutable. Hashing uses readonly spans; PEReader and ModuleMetadata consume immutable image APIs directly. The strong-name payload deliberately altered by indexed XOR remains a mutable corruption subject, and emitted contract images retain a final native file adapter.
+
+All thirteen actual metadata/identity cases pass. Literal conservation verifies 4299 tokens across 1068 changed files and the current manifest conserves 1948 paths. Two migrations and two native/mutable subjects reconcile independently, leaving 366 unchecked array candidates. Remaining coverage/binding/archive and final collection/workflows remain pending.
