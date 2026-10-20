@@ -207,7 +207,8 @@ public sealed class EffectBoundaryCoverageTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        var reference = MetadataReference.CreateFromImage(image.ToArray());
+        var emittedImage = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        var reference = MetadataReference.CreateFromImage(emittedImage);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.Unspecified), Is.False);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreRuntime), Is.True);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack), Is.False);

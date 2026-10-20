@@ -389,7 +389,7 @@ public sealed class RequiresAndControlTests
         return new TestCaseData(
                 source,
                 mode,
-                enabledIds.ToArray(),
+                enabledIds,
                 allowCompilationErrors,
                 expectedId,
                 expectedCount)
@@ -400,12 +400,13 @@ public sealed class RequiresAndControlTests
     public async Task ReportsExpectedDiagnostics(
         string source,
         string? mode,
-        string[] enabledIds,
+        ImmutableArray<string> enabledIds,
         bool allowCompilationErrors,
         string? expectedId,
         int expectedCount)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        { throw new ArgumentNullException(nameof(enabledIds)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             source,

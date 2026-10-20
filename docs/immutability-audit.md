@@ -4923,3 +4923,9 @@ Twelve final CLI/reflection/load materializations are individually traced throug
 ### IMM-M493: direct reflection and assembly-load adapter review
 
 Ten current MethodInfo.Invoke or Assembly.Load calls are individually traced with their supplied frame and adjacent producer. Immutable argument/image evidence or native emitted-image producers retain only final runtime-required object/byte-array frames. No mutable observation owner is published. This role review changes no code and claims no new execution or historical transfer. The old array subset has 213 unchecked candidates; M490 and final expanded reflection/binding collection remain pending.
+
+### IMM-M490: immutable diagnostic fixture transport and emitted metadata observations
+
+Diagnostic case data carries its immutable ID vector directly into immutable NUnit test-method ingress; no mutable vector copy is retained by the fixture. Actual NUnit discovery/invocation passes all 49 RequiresAndControl cases. The generic-attribute metadata fixture freezes its emitted bytes from the native stream buffer and passes the immutable image directly to Roslyn; all 17 effects boundary cases pass. Native TestCaseData envelopes and emission streams retain required framework/lifecycle contracts.
+
+Literal/source-unit gates verify 4299/1068 and 1948. Two current coordinates and two old array materializations close independently, returning C# coordinates to zero Open and leaving 211 unchecked array candidates. PowerShell coordinates remain zero Open; remaining coverage, expanded reflection/binding/compiler collection, ownership/archive and final exact-head gates remain pending.
