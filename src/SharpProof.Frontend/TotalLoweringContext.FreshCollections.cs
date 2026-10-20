@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false, bool hashSetOrigins = false)
     {
@@ -116,6 +116,11 @@ public sealed partial class TotalLoweringContext
             operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return false; }
+            // A null alternative cannot dispatch to a different implementation.
+            // HashSet body operations check the receiver after argument evaluation
+            // and before accessing comparer or membership state.
+            if (hashSetOrigins && operation.Type?.IsReferenceType == true && operation.ConstantValue is { HasValue: true, Value: null })
+            { return true; }
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || identityOnly && conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { return Resolve(conversion.Operand, depth + 1); }

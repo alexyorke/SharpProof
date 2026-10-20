@@ -5,13 +5,13 @@ using SharpProof.Verify;
 
 namespace SharpProof.Fuzz;
 
-public enum FiniteDomainSatisfiability
+internal enum FiniteDomainSatisfiability
 {
     Satisfiable,
     Unsatisfiable
 }
 
-public sealed record FiniteDomainDifferentialResult(
+internal sealed record FiniteDomainDifferentialResult(
     FuzzOracleStatus Status,
     FiniteDomainSatisfiability Expected,
     FiniteDomainSatisfiability? Actual,
@@ -21,7 +21,7 @@ public sealed record FiniteDomainDifferentialResult(
     public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-public static class FiniteDomainSmtDifferentialOracle
+internal static class FiniteDomainSmtDifferentialOracle
 {
     private const int MaximumAssignmentCount = 65_536;
     private static readonly bool[] BooleanDomain = [false, true];
@@ -553,7 +553,7 @@ public static class FiniteDomainSmtDifferentialOracle
 
 }
 
-public static class IrStructuralShrinker
+internal static class IrStructuralShrinker
 {
     public static async Task<IrTerm> MinimizeAsync(
         IrFactory factory,

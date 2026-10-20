@@ -5,7 +5,7 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class FieldCompoundChildAdmissionCoverageTests
+internal sealed class FieldCompoundChildAdmissionCoverageTests
 {
     [TestCase(false, FrontendAbstention.ConversionMayChangeValue)]
     [TestCase(true, FrontendAbstention.None)]

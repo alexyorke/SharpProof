@@ -4,7 +4,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Testing;
 
-public static class DifferentialFormatting
+internal static class DifferentialFormatting
 {
     public static string Describe(IrEvaluationResult result)
     {

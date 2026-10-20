@@ -4,7 +4,7 @@ using System.Threading.Channels;
 
 namespace SharpProof.Worker;
 
-public sealed class SharpProofWorker : IDisposable
+internal sealed class SharpProofWorker : IDisposable
 {
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;

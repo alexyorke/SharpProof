@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class WorkerTests
+internal sealed partial class WorkerTests
 {
     [TestCase("")]
     [TestCase("not-a-sha256")]

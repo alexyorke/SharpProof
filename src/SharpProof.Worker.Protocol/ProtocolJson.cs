@@ -5,7 +5,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     internal const string CompilerDiagnosticCodePrefix = "compiler.";
     internal const int MaximumJsonBytes = 16 * 1024 * 1024;

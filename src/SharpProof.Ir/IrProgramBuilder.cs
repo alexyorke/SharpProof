@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public sealed class IrProgramBuilder(IrFactory factory)
+internal sealed class IrProgramBuilder(IrFactory factory)
 {
     private static long s_nextScope;
     private readonly IrFactory _factory =

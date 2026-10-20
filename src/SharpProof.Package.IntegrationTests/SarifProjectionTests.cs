@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-public sealed class SarifProjectionTests
+internal sealed class SarifProjectionTests
 {
     [TestCase("/../../workspace/consumer/./src/../Subject.cs", "file:///workspace/consumer/Subject.cs")]
     [TestCase("/workspace/consumer/src/../../Subject.cs", "file:///workspace/Subject.cs")]

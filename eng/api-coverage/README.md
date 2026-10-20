@@ -327,10 +327,18 @@ initialization replay. See the
 Fresh parameterless List instances also have shared Count, Add and scalar/reference
 indexed state through proven concrete/IList/ICollection aliases. CFG initializers
 use the same paths. Initialization/cache writes, possible growth allocation,
-unknown failure effects and bounds callbacks remain visible. Incoming receivers,
-subclasses, unsupported element domains, compound updates and other List operations
-keep conservative fallback. See the
+unknown failure effects and bounds callbacks remain visible. Arbitrary incoming interfaces, reimplemented subclass interfaces and operations
+outside the declared slices keep conservative fallback. See the
 [owned List evidence and remaining gaps](gaps.md#verified-owned-list-state-and-interface-aliases).
+
+Default-origin HashSet instances now share signed Count and primitive membership
+state through proven `ICollection<T>` aliases and immutable generic source helpers.
+Interface Add retains its void result; Contains and Remove share concrete HashSet
+storage. Nullable joins preserve receiver faults and argument evaluation order.
+Unknown implementations, custom comparers, reimplemented subclass interfaces and
+escaped mutable bindings receive no implementation guarantee. The executed
+inventory probes retain existing List/array evidence alongside the HashSet probe.
+See the [interface evidence and remaining gaps](gaps.md#verified-hashset-collection-interface-dispatch).
 
 ### Highest remaining priorities
 
@@ -338,11 +346,11 @@ keep conservative fallback. See the
 | --- | ---: | --- |
 | `IList<T>.Item` | 56 reads, 13 writes | Scalar array receivers and fresh List aliases are supported; establish actual corpus receiver identity and other implementations |
 | `Dictionary<TKey,TValue>.Item` | 40 reads, 1 write | Key/value state plus arbitrary comparer callback effects and exceptions |
-| `ICollection<T>.Count` | 40 reads | Scalar array and fresh exact List provenance implemented; establish the remaining corpus receivers |
+| `ICollection<T>.Count` | 40 reads | Scalar array, exact List and default-origin HashSet provenance implemented; establish the remaining corpus receivers |
 | `Array.Length` | 32 reads | Existing contextual array lowering; the absence of a blanket catalog row is not absence of all support |
 | `Comparer<T>.Compare` | 26 calls | Resolve comparer implementation and its callback behavior |
 | `Dictionary.Add / ContainsKey` | 22 calls each | Comparer callbacks, dictionary state, allocation, and exception conditions |
-| `HashSet<T>.Contains` | 16 calls | Comparer callbacks and set membership state |
+| `HashSet<T>.Contains` | 15 calls | Default primitive state is modeled; establish remaining comparer and element domains |
 
 Prioritize by real call sites, then choose a sound semantic slice. Add or extend the
 model, runtime and native regression tests, then update the reviewed inventory. Do

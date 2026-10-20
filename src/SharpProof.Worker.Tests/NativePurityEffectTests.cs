@@ -7,7 +7,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativePurityEffectTests
+internal sealed class NativePurityEffectTests
 {
     [TestCase("var y = x; y++; x += y; return x;")]
     [TestCase("while (x > 0) x--; return x;")]

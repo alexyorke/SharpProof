@@ -10,7 +10,7 @@ using SharpProof.Testing;
 
 namespace SharpProof.Fuzz;
 
-public sealed record FuzzFailure(
+internal sealed record FuzzFailure(
     int Case,
     int Seed,
     string Oracle,
@@ -33,7 +33,7 @@ internal readonly record struct FuzzCaseClassification(
     bool HasMismatch,
     bool HasAbstention);
 
-public sealed record FrontendFuzzCoverage(
+internal sealed record FrontendFuzzCoverage(
     int TextParameters,
     int StringLiterals,
     int NullStrings,
@@ -91,7 +91,7 @@ public sealed record FrontendFuzzCoverage(
     }
 }
 
-public sealed record FuzzSummary(
+internal sealed record FuzzSummary(
     int SchemaVersion,
     int Cases,
     int Seed,
@@ -147,7 +147,7 @@ public sealed record FuzzSummary(
         PartialSmtAgreements == Cases;
 }
 
-public static class FuzzRunner
+internal static class FuzzRunner
 {
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;

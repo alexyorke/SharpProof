@@ -11,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
-public sealed class NativeEffectOracleGateTests
+internal sealed class NativeEffectOracleGateTests
 {
     [Test]
     public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()

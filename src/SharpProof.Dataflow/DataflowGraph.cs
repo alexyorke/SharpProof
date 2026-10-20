@@ -10,14 +10,14 @@ namespace SharpProof.Dataflow;
 /// noncanonical results retain the normalizing
 /// <see cref="IAbstractDomain{T}.Join"/> fallback.
 /// </remarks>
-public sealed class DataflowBlock<T>(int id, Func<T, T> transfer)
+internal sealed class DataflowBlock<T>(int id, Func<T, T> transfer)
 {
     public int Id { get; } = ArgumentNullGuard.RequireNonnegative(id, nameof(id));
     public Func<T, T> Transfer { get; } =
         ArgumentNullGuard.NotNull(transfer, nameof(transfer));
 }
 
-public readonly record struct DataflowEdge(int SourceId, int TargetId)
+internal readonly record struct DataflowEdge(int SourceId, int TargetId)
 {
     public int SourceId { get; } =
         ArgumentNullGuard.RequireNonnegative(SourceId, nameof(SourceId));
@@ -28,7 +28,7 @@ public readonly record struct DataflowEdge(int SourceId, int TargetId)
 /// <summary>
 /// Small, language-neutral control-flow graph with contiguous block identifiers.
 /// </summary>
-public sealed class DataflowGraph<T>
+internal sealed class DataflowGraph<T>
 {
     private readonly ImmutableArray<ImmutableArray<int>> _predecessors;
     private readonly ImmutableArray<ImmutableArray<int>> _successors;

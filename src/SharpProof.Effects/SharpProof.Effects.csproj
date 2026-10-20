@@ -13,6 +13,8 @@
              Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NullableAttributes.cs"
              Link="Polyfills\NullableAttributes.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+             Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
@@ -25,5 +27,8 @@
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Specs.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>

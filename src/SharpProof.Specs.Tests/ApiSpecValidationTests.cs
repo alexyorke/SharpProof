@@ -6,7 +6,7 @@ using SharpProof.Specs;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
-public sealed class ApiSpecValidationTests
+internal sealed class ApiSpecValidationTests
 {
     private static readonly SpecEvidence Evidence = new(
         SpecEvidenceKind.Documented,

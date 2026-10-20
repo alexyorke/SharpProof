@@ -6,7 +6,7 @@ using static SharpProof.Testing.ApiSpecTestFacets;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
-public sealed class ApiSpecInstantiationCoverageTests
+internal sealed class ApiSpecInstantiationCoverageTests
 {
     private static readonly SpecEvidence Evidence =
         new(SpecEvidenceKind.Observed, "instantiation-coverage");

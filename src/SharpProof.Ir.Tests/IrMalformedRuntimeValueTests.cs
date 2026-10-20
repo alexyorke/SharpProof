@@ -6,7 +6,7 @@ namespace SharpProof.Ir.Test;
 // Malformed values only enter rejection tests; they never create owned IR
 // terms, programs, solver witnesses, or proof evidence.
 [TestFixture]
-public sealed class IrMalformedRuntimeValueTests
+internal sealed class IrMalformedRuntimeValueTests
 {
     [TestCase(IrUnaryOperator.Not, "Boolean negation requires a boolean value.")]
     [TestCase(IrUnaryOperator.Negate, "Integer negation requires an integer value.")]

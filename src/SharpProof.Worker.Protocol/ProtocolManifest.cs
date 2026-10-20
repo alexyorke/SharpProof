@@ -1,6 +1,6 @@
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     public static void Canonicalize(WorkerClaimManifest manifest)
     {

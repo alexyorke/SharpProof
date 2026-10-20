@@ -6,7 +6,7 @@ namespace SharpProof.Frontend.Host;
 /// <summary>
 /// The single audited boundary for obtaining Roslyn semantic models.
 /// </summary>
-public static class CompilationModelProvider
+internal static class CompilationModelProvider
 {
     private static readonly ConditionalWeakTable<
         Compilation,

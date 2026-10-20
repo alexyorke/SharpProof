@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public sealed partial class ContractBinder
+internal sealed partial class ContractBinder
 {
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;

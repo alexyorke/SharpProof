@@ -799,6 +799,7 @@
           "eng/shared/Polyfills/IsExternalInit.cs",
           "eng/shared/Polyfills/NotNullAttribute.cs",
           "eng/shared/Polyfills/NullableAttributes.cs",
+          "eng/shared/Polyfills/EmbeddedAttribute.cs",
           "src/SharpProof.Worker/GlobalUsings.cs",
           "src/SharpProof.Worker/MethodResourceBudget.cs",
           "src/SharpProof.CompilerCollector/CompilerCollectorDiagnosticDescriptors.cs",

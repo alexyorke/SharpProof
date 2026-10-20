@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 // impossible exit a typed return, or the whole manifest fails to decode.
 [TestFixture]
 [NonParallelizable]
-public sealed class ConstantLoopFinallyExitTests
+internal sealed class ConstantLoopFinallyExitTests
 {
     [TestCase("[DoesNotThrow]", "", "while (true) { try { return x; } finally { x = 1; } }", WorkerClaimOutcome.Proven)]
     [TestCase("[DoesNotThrow]", "", "while (true) { try { return 10 / x; } finally { x = 1; } }", WorkerClaimOutcome.Refuted)]

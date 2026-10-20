@@ -9,4 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Testing.Test" />
+  </ItemGroup>
 </Project>

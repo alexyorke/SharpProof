@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(0); return data.Count;", 0)]
     [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(17); var alias = data; alias.Add(17, 23); data[17] = 29; return alias.Count * 100 + data[17];", 129)]

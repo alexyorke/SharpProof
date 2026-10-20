@@ -7,7 +7,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractClauseSubstitutionMatrixTests
+internal sealed class ContractClauseSubstitutionMatrixTests
 {
     public static IEnumerable<TestCaseData> CheckedLongCases()
     {

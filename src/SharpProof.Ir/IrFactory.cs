@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public sealed class IrFactory
+internal sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();

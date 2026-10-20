@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeCandidateSemanticsAdmissionTests
+internal sealed class NativeCandidateSemanticsAdmissionTests
 {
     [TestCase(IrExecutionSemantics.Legacy)]
     [TestCase(IrExecutionSemantics.Total)]

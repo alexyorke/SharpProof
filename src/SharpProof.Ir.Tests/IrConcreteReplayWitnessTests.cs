@@ -3,7 +3,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Ir.Test;
 
-public sealed class IrConcreteReplayWitnessTests
+internal sealed class IrConcreteReplayWitnessTests
 {
     [TestCase(false)]
     [TestCase(true)]

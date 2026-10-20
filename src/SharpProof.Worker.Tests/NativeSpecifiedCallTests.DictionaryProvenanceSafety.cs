@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("change.Change(data);", "Mutator change", "Mutator change", ", change", "public abstract class Mutator { public abstract void Change(System.Collections.Generic.Dictionary<int, int> data); }")]
     [TestCase("change();", "System.Action change", "System.Action change", ", change", "")]

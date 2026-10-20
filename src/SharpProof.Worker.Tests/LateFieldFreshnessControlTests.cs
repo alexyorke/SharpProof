@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class LateFieldFreshnessControlTests
+internal sealed class LateFieldFreshnessControlTests
 {
     [TestCase("int[]", "var fresh = new int[1]; box.Data = fresh; return fresh == box.Data;", true, WorkerClaimOutcome.Proven)]
     [TestCase("int[]", "var fresh = new int[1]; box.Data = fresh; return fresh == box.Data;", false, WorkerClaimOutcome.Refuted)]

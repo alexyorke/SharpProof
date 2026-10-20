@@ -3,7 +3,7 @@ using System.Numerics;
 namespace SharpProof.Verify;
 
 /// <summary>The concrete IR and contract state checked before a callable is refuted.</summary>
-public sealed class CallableReplayContext(
+internal sealed class CallableReplayContext(
     IrProgram? program,
     bool isTrivial,
     ImmutableDictionary<IrVarId, IrVarId> parameterBindings,

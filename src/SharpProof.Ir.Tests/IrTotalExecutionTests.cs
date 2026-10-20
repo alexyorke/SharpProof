@@ -5,7 +5,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrTotalExecutionTests
+internal sealed class IrTotalExecutionTests
 {
     [TestCase(0, 100, IrProgramExecutionStatus.Returned, 0)]
     [TestCase(3, 100, IrProgramExecutionStatus.Returned, 1)]

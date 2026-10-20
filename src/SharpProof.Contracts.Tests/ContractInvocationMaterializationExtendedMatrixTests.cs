@@ -9,7 +9,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractInvocationMaterializationExtendedMatrixTests
+internal sealed class ContractInvocationMaterializationExtendedMatrixTests
 {
     private static readonly bool[] BooleanValues = [false, true];
     private static readonly BoundContractKind[] BooleanClauseKinds =

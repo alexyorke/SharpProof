@@ -1,7 +1,7 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectValueValidationTests
+internal sealed class EffectValueValidationTests
 {
     [Test]
     public void ContractMetadataIntegerConversionRejectsInvalidValues()

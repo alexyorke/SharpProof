@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcStringObjectIdentityTests
+internal sealed class WorkerVcStringObjectIdentityTests
 {
     [TestCase("object first = value; object second = value; return first == second;", true, true, WorkerClaimOutcome.Proven)]
     [TestCase("object first = value; object second = value; return first == second;", false, true, WorkerClaimOutcome.Refuted)]

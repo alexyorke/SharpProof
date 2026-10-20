@@ -10,10 +10,19 @@
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
+    <InternalsVisibleTo Include="SharpProof.Effects" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Specs.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\eng\shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs" Link="Polyfills\NotNullAttribute.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+             Link="Polyfills\EmbeddedAttribute.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />
   </ItemGroup>
 </Project>

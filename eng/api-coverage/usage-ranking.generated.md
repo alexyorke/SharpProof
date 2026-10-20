@@ -85,7 +85,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 1 | 1 | 0 | 1 | 0 | partially-modeled |
 | M:System.Collections.Generic.HashSet`1.IsSupersetOf(System.Collections.Generic.IEnumerable{`0}) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 1 | 1 | 0 | 1 | 0 | partially-modeled |
-| M:System.Collections.Generic.ICollection`1.Remove(`0) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
+| M:System.Collections.Generic.ICollection`1.Remove(`0) | call | 1 | 1 | 0 | 1 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.KeyValuePair`2.#ctor(`0,`1) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.#ctor(System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable{`0}) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |

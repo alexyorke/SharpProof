@@ -6,7 +6,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ClosedContractAttributeBindingAdditionalDomainTests
+internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
 {
     private static readonly long[] PredicateInputs = [-1L, 2L, 4L];
     private static readonly string[] MarkerNames = ["MarkerAttribute", "PositiveAttribute"];

@@ -46,7 +46,7 @@ internal sealed record ResourceInput
     }
 }
 
-public sealed class ResourceExpressionLimitException : Exception
+internal sealed class ResourceExpressionLimitException : Exception
 {
     public ResourceExpressionLimitException() : base("Resource expression construction budget exceeded.") { }
     public ResourceExpressionLimitException(string? message) : base(message) { }

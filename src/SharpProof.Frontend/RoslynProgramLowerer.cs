@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Frontend;
 
-public sealed class RoslynProgramLowerer(IrFactory factory)
+internal sealed class RoslynProgramLowerer(IrFactory factory)
 {
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));

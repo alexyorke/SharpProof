@@ -11,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeExceptionConstraintTests
+internal sealed class NativeExceptionConstraintTests
 {
     [TestCase("System.OverflowException", false)]
     [TestCase("System.DivideByZeroException", false)]

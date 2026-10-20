@@ -9,7 +9,7 @@ namespace SharpProof.Worker.Test;
 // Instance field reads (and properties that only return a field) run no code.
 // Their one fault is a null receiver; the value read is an approximation.
 [TestFixture]
-public sealed class NativeFieldReadTests
+internal sealed class NativeFieldReadTests
 {
     private const string Cell = "public class Cell { public int Value; public volatile int Shared; " +
         "private int _count; public int Count { get { return _count; } } public bool Flag { get; set; } " +

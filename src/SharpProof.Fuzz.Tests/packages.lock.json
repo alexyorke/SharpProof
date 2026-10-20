@@ -198,17 +198,17 @@
       "sharpproof.verify": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.worker": {
         "type": "Project",
         "dependencies": {
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
           "SharpProof.Host": "[1.0.0-preview.1, )",
           "SharpProof.Logging": "[1.0.0-preview.1, )",
-          "SharpProof.Smt": "[1.0.0-preview.1, )"
+          "SharpProof.Smt": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.worker.protocol": {
