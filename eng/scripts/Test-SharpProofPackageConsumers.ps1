@@ -70,12 +70,12 @@ function Resolve-SharpProofPackageSource {
         $repositoryCommit -notmatch '^[0-9a-f]{40}$') {
         throw 'Could not resolve the package-source checkout commit.'
     }
-    $facade = @($identities | Where-Object Id -EQ 'SharpProof')[0]
+    $facade = @($identities | Where-Object { $_.Id -eq 'SharpProof' })[0]
     $null = Test-SharpProofFacadePackage -PackagePath $facade.Path `
         -PackageVersion $versions[0] -RepositoryCommit $repositoryCommit
     foreach ($packageId in $expectedIds) {
-        $main = @($identities | Where-Object Id -EQ $packageId)[0]
-        $symbols = @($symbolIdentities | Where-Object Id -EQ $packageId)[0]
+        $main = @($identities | Where-Object { $_.Id -eq $packageId })[0]
+        $symbols = @($symbolIdentities | Where-Object { $_.Id -eq $packageId })[0]
         $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $main.Path `
             -SymbolPackagePath $symbols.Path `

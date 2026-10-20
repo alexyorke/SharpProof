@@ -107,7 +107,7 @@ function Get-SharpProofPackageIdentity {
         }
     }
 
-    return [pscustomobject][ordered]@{
+    return ([ordered]@{
         Id               = $id.InnerText
         Version          = $version.InnerText
         Path             = $Path
@@ -118,7 +118,7 @@ function Get-SharpProofPackageIdentity {
         else {
             $repositoryCommit.ToLowerInvariant()
         }
-    }
+    }).AsReadOnly()
 }
 
 function Get-SharpProofPackageIdentitySet {
@@ -132,15 +132,15 @@ function Get-SharpProofPackageIdentitySet {
 
     $identityBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($file in $Files) {
-        $identityBuilder.Add([pscustomobject][ordered]@{
+        $identityBuilder.Add(([ordered]@{
                 File     = $file
                 Identity = Get-SharpProofPackageIdentity `
                     -Path $file.FullName `
                     -RequireRepository:$RequireRepository
-            })
+            }).AsReadOnly())
     }
     $identities = $identityBuilder.ToImmutable()
-    foreach ($extension in @('.nupkg', '.snupkg')) {
+    foreach ($extension in [Collections.Immutable.ImmutableArray]::Create[string]('.nupkg', '.snupkg')) {
         $actualIds = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
                 $identities |
                     Where-Object { $_.File.Extension -eq $extension } |
@@ -166,7 +166,7 @@ function Get-SharpProofPackageIdentitySet {
             "found '$($versions -join ', ')'.")
     }
 
-    return [pscustomobject][ordered]@{
+    return ([ordered]@{
         Identities        = $identities
         Version           = [string]$versions[0]
         RepositoryCommits = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
@@ -175,7 +175,7 @@ function Get-SharpProofPackageIdentitySet {
                     Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
                     Sort-Object -Unique
             ))
-    }
+    }).AsReadOnly()
 }
 
 Export-ModuleMember -Function @(
