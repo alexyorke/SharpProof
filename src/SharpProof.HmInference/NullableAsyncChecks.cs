@@ -13,6 +13,27 @@ internal static class NullableAsyncChecks
     {
         (string Name, string Source, string Status, string? Signature)[] tests =
         [
+            ("ConditionalField", "static int? M(ConditionalBox<int>? x)=>x?.Value;class ConditionalBox<T>{public T Value=default!;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
+            ("ConditionalReferenceProperty", "static string? M(ConditionalBox<string>? x)=>x?.Value;class ConditionalBox<T>{public T Value=>default!;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : class"),
+            ("ConditionalMethod", "static int? M(ConditionalBox<int>? x)=>x?.Read();class ConditionalBox<T>{public T Read()=>default!;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
+            ("ConditionalIndexer", "static int? M(ConditionalBox<int>? x,int i)=>x?[i];class ConditionalBox<T>{public T this[int i]=>default!;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x, int i) where T1 : struct"),
+            ("ConditionalDelegate", "static string? M(System.Func<int,string>? map,int value)=>map?.Invoke(value);", "Suggestion", "T2? M<T1, T2>(global::System.Func<T1, T2>? map, T1 value) where T2 : class"),
+            ("ConditionalAction", "static void M(System.Action<int>? sink,int value){sink?.Invoke(value);}", "Suggestion", "void M<T1>(global::System.Action<T1>? sink, T1 value)"),
+            ("ConditionalChain", "static int? M(ConditionalBox<int>? x)=>x?.Next?.Value;class ConditionalBox<T>{public T Value=default!;public ConditionalBox<T>? Next;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
+            ("ConditionalAsyncFallback", "static async Task<int> M(ConditionalBox<int>? x,int fallback)=>await(x?.ReadAsync()??Task.FromResult(fallback));class ConditionalBox<T>{public Task<T> ReadAsync()=>Task.FromResult(default(T)!);}", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::Cases.ConditionalBox<T1>? x, T1 fallback)"),
+            ("ConditionalNullableStruct", "static int? M(ConditionalBox<int>? x)=>x?.Value;struct ConditionalBox<T>{public T Value;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
+            ("ConditionalNullableTuple", "static int? M((int Value,string Tag)? x)=>x?.Value;", "Suggestion", "T1? M<T1, T2>((T1 Value, T2 Tag)? x) where T1 : struct"),
+            ("ConditionalAnnotatedResult", "static string? M(ConditionalBox<string?>? x)=>x?.Value;class ConditionalBox<T>{public T Value=default!;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1?>? x) where T1 : class"),
+            ("ConditionalArrayIndex", "static int? M(int[]? x,System.Index index)=>x?[index];", "Suggestion", "T1? M<T1>(T1[]? x, global::System.Index index) where T1 : struct"),
+            ("ConditionalArrayRange", "static int[]? M(int[]? x,System.Range range)=>x?[range];", "Suggestion", "T1[]? M<T1>(T1[]? x, global::System.Range range)"),
+            ("ConditionalEvent", "class ConditionalBox<T>{public event System.Action<T>? Changed;public static System.Action<int>? M(ConditionalBox<int>? x)=>x?.Changed;}", "Suggestion", "global::System.Action<T1>? M<T1>(global::Cases.ConditionalBox<T1>? x)"),
+            ("ConditionalExtension", "static int? M(ConditionalBox<int>? x)=>x?.Read();} class ConditionalBox<T>{public T Value=default!;}static class ConditionalExt{public static T Read<T>(this ConditionalBox<T> x)=>x.Value;}class Tail{", "Suggestion", "T1? M<T1>(global::ConditionalBox<T1>? x) where T1 : struct"),
+            ("ConditionalUntypedNullCaller", "static int? M(ConditionalBox<int>? x)=>x?.Value;static int? Use()=>M(null);class ConditionalBox<T>{public T Value=default!;}", "Rejected", null),
+            ("ConditionalUntypedDelegateCaller", "static string? M(System.Func<int,string>? map,int value)=>map?.Invoke(value);static string? Use()=>M(null,0);", "Suggestion", "string? M<T1>(global::System.Func<T1, string>? map, T1 value)"),
+            ("ConditionalBoxedExtension", "static int? M(ConditionalStruct<int>? x,int ignored)=>x?.Read();}interface IConditionalValue<T>{T Value{get;}}struct ConditionalStruct<T>:IConditionalValue<T>{public T Value=>default!;}static class ConditionalExtensions{public static T Read<T>(this IConditionalValue<T> x)=>x.Value;}class Tail{", "Suggestion", "T1? M<T1, T2>(global::ConditionalStruct<T1>? x, T2 ignored) where T1 : struct"),
+            ("ConditionalBoxedLiftedCaller", "static int? M(ConditionalStruct<int>? x,int ignored)=>x?.Read();static int? Use()=>M(new ConditionalStruct<int>(),0);}interface IConditionalValue<T>{T Value{get;}}struct ConditionalStruct<T>:IConditionalValue<T>{public T Value=>default!;}static class ConditionalExtensions{public static T Read<T>(this IConditionalValue<T> x)=>x.Value;}class Tail{", "Suggestion", "int? M<T1>(global::ConditionalStruct<int>? x, T1 ignored)"),
+            ("ConditionalReferenceFallback", "static string M(ConditionalBox<string>? x,string fallback)=>x?.Read()??fallback;class ConditionalBox<T>{public T Read()=>default!;}", "Suggestion", "T1 M<T1>(global::Cases.ConditionalBox<T1>? x, T1 fallback) where T1 : class"),
+            ("ConditionalAnnotatedDeclaration", "static string? M(ConditionalBox<string>? x)=>x?.Value;class ConditionalBox<T>{public T? Value;}", "Suggestion", "T1? M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : class"),
             ("NullableReferenceIdentity", "static string? M(string? x)=>x;", "Suggestion", "T1? M<T1>(T1? x) where T1 : class"),
             ("NullableValueIdentity", "static int? M(int? x)=>x;", "Suggestion", "T1? M<T1>(T1? x) where T1 : struct"),
             ("NullableArray", "static int[]? M(int[]? x)=>x;", "Suggestion", "T1[]? M<T1>(T1[]? x)"),
@@ -162,7 +183,8 @@ internal static class NullableAsyncChecks
         { Program.Log.Info("PASS CrossFileAwaitHelperGeneralization"); }
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
-        return tests.Length + 1 + await CodeFixRuntime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + 1 + await CodeFixRuntime(cancellationToken).ConfigureAwait(false)
+            + await ConditionalAccessRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
     }
 
     private const string SupportFixtures = """

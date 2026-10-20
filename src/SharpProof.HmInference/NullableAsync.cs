@@ -11,6 +11,62 @@ public static partial class Inference
     {
         private INamedTypeSymbol? asyncReturn;
 
+        private readonly Stack<(ITypeSymbol Type, HmType Value)> conditionalReceivers = new();
+
+        private (ITypeSymbol Type, HmType Value) ConditionalReceiver()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (conditionalReceivers.Count == 0)
+            { throw new InferenceException("Unresolved conditional receiver."); }
+            return conditionalReceivers.Peek();
+        }
+
+        private HmType ConditionalBinding(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            var receiver = ConditionalReceiver();
+            var operation = model.GetOperation(expression, cancellationToken);
+            if (expression is ElementBindingExpressionSyntax binding && receiver.Type is IArrayTypeSymbol indexedArray)
+            {
+                var element = HmType.Variable();
+                HmType.Unify(receiver.Value, new("[" + new string(',', indexedArray.Rank - 1) + "]", element));
+                foreach (var argument in binding.ArgumentList.Arguments)
+                { Anchor(argument.Expression); }
+                var indexType = binding.ArgumentList.Arguments.Count == 1 ? model.GetTypeInfo(binding.ArgumentList.Arguments[0].Expression, cancellationToken).Type : null;
+                return indexType is INamedTypeSymbol { Name: "Range" } range && range.ContainingNamespace.ToDisplayString() == "System" ? receiver.Value : element;
+            }
+            if (operation is IEventReferenceOperation referencedEvent)
+            {
+                var mapping = PatternOwnerMapping(referencedEvent.Event.ContainingType, receiver.Value, receiver.Type);
+                return CSharpTypes.Rigid(referencedEvent.Event.OriginalDefinition.Type, mapping);
+            }
+            if (operation is IPropertyReferenceOperation property)
+            {
+                if (receiver.Type is IArrayTypeSymbol array && property.Property.Name is "Length" or "LongLength" or "Rank")
+                {
+                    HmType.Unify(receiver.Value, new("[" + new string(',', array.Rank - 1) + "]", HmType.Variable()));
+                    return CSharpTypes.Rigid(property.Type!);
+                }
+                var mapping = PatternOwnerMapping(property.Property.ContainingType, receiver.Value, receiver.Type);
+                BindArguments(property.Arguments, property.Property.OriginalDefinition.Parameters.Select(parameter =>
+                { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray());
+                return CSharpTypes.Rigid(property.Property.OriginalDefinition.Type, mapping);
+            }
+            if (operation is IFieldReferenceOperation field)
+            {
+                if (receiver.Type is INamedTypeSymbol { IsTupleType: true } tuple)
+                {
+                    for (var i = 0; i < tuple.TupleElements.Length; i++)
+                    { if (tuple.TupleElements[i].Name == field.Field.Name) { return receiver.Value.Root.Arguments[i]; } }
+                }
+                return PatternSymbolType(field.Field, receiver.Value, receiver.Type);
+            }
+            throw new InferenceException("Unresolved conditional member binding.");
+        }
+
+
+
         private void SetAsyncReturn(IMethodSymbol method)
         {
             if (method is null)
@@ -341,7 +397,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expression)); }
             if (expression.WhenNotNull is ElementBindingExpressionSyntax binding
                 && model.GetTypeInfo(expression.Expression, cancellationToken).Type is IArrayTypeSymbol array
-                && model.GetOperation(binding, cancellationToken) is IArrayElementReferenceOperation)
+                && model.GetOperation(binding, cancellationToken) is IArrayElementReferenceOperation arrayAccess
+                && SymbolEqualityComparer.Default.Equals(array.ElementType, arrayAccess.Type))
             {
                 var element = HmType.Variable();
                 var receiver = Expression(expression.Expression).Root;
@@ -359,7 +416,7 @@ public static partial class Inference
                     RequireKeyword(element, "struct");
                     return new(CSharpTypes.NullableValue, element);
                 }
-                if (result.IsReferenceType && result.NullableAnnotation == NullableAnnotation.Annotated)
+                if (result.IsReferenceType)
                 {
                     if (array.ElementType.NullableAnnotation == NullableAnnotation.Annotated)
                     { HmType.Unify(element, CSharpTypes.Erase(array.ElementType)); return element; }
@@ -368,12 +425,43 @@ public static partial class Inference
                 }
                 return element;
             }
-            Anchor(expression.Expression);
-            foreach (var argument in expression.WhenNotNull.DescendantNodesAndSelf().OfType<ArgumentSyntax>())
+            var original = model.GetTypeInfo(expression.Expression, cancellationToken).Type
+                ?? throw new InferenceException("Untyped conditional receiver.");
+            var value = Expression(expression.Expression).Root;
+            if (original is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
             {
-                Anchor(argument.Expression);
+                original = nullable.TypeArguments[0];
+                if (value.Name != CSharpTypes.NullableValue)
+                { throw new InferenceException("Invalid nullable receiver shape."); }
+                value = value.Arguments[0];
             }
-            return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped conditional access."));
+            else
+            { value = ConversionCore(value); }
+            HmType bound;
+            conditionalReceivers.Push((original, value));
+            try
+            { bound = Expression(expression.WhenNotNull); }
+            finally { conditionalReceivers.Pop(); }
+            var resultType = model.GetTypeInfo(expression, cancellationToken).Type
+                ?? throw new InferenceException("Untyped conditional access.");
+            var boundType = model.GetTypeInfo(expression.WhenNotNull, cancellationToken).Type
+                ?? throw new InferenceException("Untyped conditional member.");
+            if (resultType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+                && boundType is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            {
+                RequireKeyword(bound, "struct");
+                return new(CSharpTypes.NullableValue, bound);
+            }
+            if (boundType.IsReferenceType)
+            {
+                // Conditional access can produce null even when contextual type
+                // info carries a non-annotated symbol (for example inside ??).
+                var reference = ConversionCore(bound);
+                if (reference.IsVariable)
+                { RequireKeyword(reference, "class"); }
+                return new(CSharpTypes.NullableReference, reference);
+            }
+            return bound;
         }
 
         private void ImportNullableConstraints(HmType[] parameters, HmType result)

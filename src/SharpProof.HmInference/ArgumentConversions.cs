@@ -21,8 +21,13 @@ public static partial class Inference
             if (inferred is null)
             { throw new ArgumentNullException(nameof(inferred)); }
             if (operation is not IConversionOperation { Conversion.IsIdentity: false } conversion || operation.Syntax is not ExpressionSyntax expression
-                || model.GetTypeInfo(expression, cancellationToken).Type is not ITypeSymbol source || conversion.Type is not ITypeSymbol target
-                || SymbolEqualityComparer.Default.Equals(source, target))
+                || conversion.Type is not ITypeSymbol target)
+            { return false; }
+            var operand = conversion.Operand;
+            while (operand is IConversionOperation nested)
+            { operand = nested.Operand; }
+            var source = operand is IConditionalAccessInstanceOperation ? operand.Type : model.GetTypeInfo(expression, cancellationToken).Type;
+            if (source is null || SymbolEqualityComparer.Default.Equals(source, target))
             { return false; }
             BindConvertedArgument(source, target, inferred, expected);
             conversionTargets.Add((expected, target));

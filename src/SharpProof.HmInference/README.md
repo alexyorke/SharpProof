@@ -619,3 +619,15 @@ including ref returns and nested function-pointer inputs. Typed pointer/delegate
 controls retain full generality. IDE fixes verify nominal types, expression-tree
 delegate types, nullable async callbacks, pointer identity, ref aliasing and new
 output domains. Callers with no remaining generic component still reject.
+
+Conditional access infers member, method, delegate and indexer types from the
+non-null receiver rather than anchoring the entire expression. Receiver frames
+support nested chains, extension calls, nullable structs/tuples and event reads.
+Value/reference lifting retains the required constraints without duplicating an
+existing nullable wrapper; array slices retain their array shape. IDE fixes check
+null short-circuiting, argument/getter order, async fallback, reference identity
+and new value/reference payloads. Consumer checks cover CLI and packaged analysis.
+
+Conditional conversions use the non-null branch receiver type, including struct
+boxing. Reference lifting remains nullable inside coalescing even when contextual
+type symbols omit the annotation; compiler-hosted consumer checks cover this.

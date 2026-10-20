@@ -904,6 +904,8 @@ public static partial class Inference
                 case IsPatternExpressionSyntax pattern:
                     Pattern(pattern.Pattern, Expression(pattern.Expression));
                     return new("bool");
+                case MemberBindingExpressionSyntax or ElementBindingExpressionSyntax:
+                    return ConditionalBinding(expression);
                 case ConditionalAccessExpressionSyntax conditionalAccess:
                     return ConditionalAccess(conditionalAccess);
                 case PostfixUnaryExpressionSyntax suppressed when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression):
@@ -1547,7 +1549,8 @@ public static partial class Inference
             {
                 var receiver = invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Invoke" } member
                     ? member.Expression : invocation.Expression;
-                var signature = DelegateSignature(called.ContainingType, Expression(receiver));
+                var receiverValue = operation.Instance is IConditionalAccessInstanceOperation ? ConditionalReceiver().Value : Expression(receiver);
+                var signature = DelegateSignature(called.ContainingType, receiverValue);
                 BindArguments(operation, signature.Inputs);
                 return signature.Output;
             }
@@ -1562,10 +1565,12 @@ public static partial class Inference
             {
                 if (invocation.Expression is MemberAccessExpressionSyntax member)
                 { instanceReceiver = member.Expression; }
-                else if (operation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance })
+                else if (operation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } and not IConditionalAccessInstanceOperation)
                 { throw new InferenceException("Implicit instance calls are unsupported."); }
             }
-            var variables = ReceiverMapping(called, instanceReceiver);
+            var variables = operation.Instance is IConditionalAccessInstanceOperation
+                ? PatternOwnerMapping(called.ContainingType, ConditionalReceiver().Value, ConditionalReceiver().Type)
+                : ReceiverMapping(called, instanceReceiver);
             var definition = called.OriginalDefinition;
             var explicitArguments = invocation.Expression is GenericNameSyntax generic ? generic.TypeArgumentList.Arguments
                 : invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax name } ? name.TypeArgumentList.Arguments : default;
@@ -1682,6 +1687,13 @@ public static partial class Inference
         }
         private HmType BoundExpression(IOperation value)
         {
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            var operand = value;
+            while (operand is IConversionOperation conversion)
+            { operand = conversion.Operand; }
+            if (operand is IConditionalAccessInstanceOperation)
+            { return ConditionalReceiver().Value; }
             return value.Syntax is ExpressionSyntax expression ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");
         }
     }
