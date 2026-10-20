@@ -97,6 +97,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private readonly Dictionary<ISymbol, BigInteger> _localInitialConstants = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, Bound?> _scalarArguments = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, Bound?> _arrayArguments = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, Bound?> _stringArguments = new(SymbolEqualityComparer.Default);
     private readonly HashSet<ISymbol> _activeMethods = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _assumptions = new(StringComparer.Ordinal);
     private ResolvedApiSpecTable? _resourceSpecifications;
@@ -295,7 +296,7 @@ internal sealed partial class ResourceBoundsAnalysis
             case IArrayElementReferenceOperation element when Primitive(element.Type):
                 result = Visit(element.ArrayReference, depth + 1).Add(Sequence(element.Indices, depth));
                 break;
-            case IPropertyReferenceOperation property when IsArrayLength(property):
+            case IPropertyReferenceOperation property when IsArrayLength(property) || IsStringLength(property):
                 result = Visit(property.Instance!, depth + 1);
                 break;
             case IPropertyReferenceOperation property when !property.Property.IsStatic && property.Instance != null && property.Arguments.IsEmpty &&
@@ -355,6 +356,12 @@ internal sealed partial class ResourceBoundsAnalysis
             property.Instance?.Type is IArrayTypeSymbol { Rank: 1, IsSZArray: true };
     }
 
+    private static bool IsStringLength(IPropertyReferenceOperation property)
+    {
+        property = ArgumentNullGuard.NotNull(property, nameof(property));
+        return property.Instance?.Type?.SpecialType == SpecialType.System_String && CSharpOperationSemantics.IsLength(property);
+    }
+
     private Bound? Size(IOperation operation)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
@@ -373,6 +380,7 @@ internal sealed partial class ResourceBoundsAnalysis
             IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int64 =>
                 Bound.Parameter(parameter.Parameter, ResourceInputKind.NonNegativeScalar),
             IPropertyReferenceOperation property when IsArrayLength(property) => ArraySize(property.Instance!),
+            IPropertyReferenceOperation property when IsStringLength(property) => StringSize(property.Instance!),
             ILocalReferenceOperation local when _counters.TryGetValue(local.Local, out var bound) => bound,
             IConversionOperation conversion when conversion.Conversion.IsNumeric && !conversion.Conversion.IsUserDefined &&
                 conversion.Type?.SpecialType == SpecialType.System_Int64 &&

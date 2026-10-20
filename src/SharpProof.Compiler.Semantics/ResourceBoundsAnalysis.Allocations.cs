@@ -115,6 +115,7 @@ internal sealed partial class ResourceBoundsAnalysis
             { return Unknown("UnboundConstructorArgument"); }
             _scalarArguments.Add(parameter, Size(argument.Value));
             _arrayArguments.Add(parameter, ArraySize(argument.Value));
+            _stringArguments.Add(parameter, StringSize(argument.Value));
         }
         _activeMethods.Add(constructor);
         try
@@ -149,6 +150,7 @@ internal sealed partial class ResourceBoundsAnalysis
             {
                 _scalarArguments.Remove(parameter);
                 _arrayArguments.Remove(parameter);
+                _stringArguments.Remove(parameter);
             }
         }
 

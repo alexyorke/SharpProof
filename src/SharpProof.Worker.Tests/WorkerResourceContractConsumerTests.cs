@@ -92,6 +92,10 @@ public sealed partial class WorkerTests
             second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
         var claim = second.ClaimResults.Single();
         var evidence = claim.ResourceBound!;
+        evidence.Asymptotic = new WorkerResourceAsymptoticEvidence { UpperBound = "O(1)", PolynomialDegree = 0, LogarithmicDegree = 0, IsZero = false };
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        evidence.Asymptotic = null;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
         Assert.That(evidence.ObservedLowerBound, Is.EqualTo("3"));
         Assert.That(evidence.EvaluatedUpperBound, Is.EqualTo("2"));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));

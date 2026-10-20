@@ -18,20 +18,25 @@ internal static class ResourceUpperBoundContract
         { return coefficient == 0 ? new((ResourceCostMetric)metricValue, upper) : null; }
         if (arguments[2].Value is not string size || string.IsNullOrWhiteSpace(size) || coefficient == 0)
         { return null; }
-        var arrayLength = size.EndsWith(".Length", StringComparison.Ordinal);
-        var name = arrayLength ? size.Substring(0, size.Length - ".Length".Length) : size;
+        var sequenceLength = size.EndsWith(".Length", StringComparison.Ordinal);
+        var name = sequenceLength ? size.Substring(0, size.Length - ".Length".Length) : size;
         var parameter = method.Parameters.FirstOrDefault(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Name == name);
         if (parameter is null || parameter.RefKind != RefKind.None || parameter.Name.Length == 0 ||
             parameter.Name.Length > ResourceExpression.MaximumTextLength || parameter.Name.Any(static value => char.IsControl(value)))
         { return null; }
         ResourceInputKind inputKind;
         long maximum;
-        if (arrayLength && parameter.Type is IArrayTypeSymbol { IsSZArray: true, Rank: 1 })
+        if (sequenceLength && parameter.Type is IArrayTypeSymbol { IsSZArray: true, Rank: 1 })
         {
             inputKind = ResourceInputKind.ArrayLength;
             maximum = int.MaxValue;
         }
-        else if (!arrayLength && parameter.Type.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64)
+        else if (sequenceLength && parameter.Type.SpecialType == SpecialType.System_String)
+        {
+            inputKind = ResourceInputKind.StringLength;
+            maximum = int.MaxValue;
+        }
+        else if (!sequenceLength && parameter.Type.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64)
         {
             inputKind = ResourceInputKind.NonNegativeScalar;
             maximum = parameter.Type.SpecialType == SpecialType.System_Int32 ? int.MaxValue : long.MaxValue;

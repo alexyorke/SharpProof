@@ -12,9 +12,20 @@ internal sealed class ResourceAsymptoticGrowth
     internal string? Order { get; }
     internal ResourceInput? Input { get; }
     internal string? UnknownReason { get; }
+    internal int? PolynomialDegree { get; }
+    internal int? LogarithmicDegree { get; }
+    internal bool? IsZero { get; }
 
-    private ResourceAsymptoticGrowth(string? order, ResourceInput? input, string? unknownReason)
-    { Order = order; Input = input; UnknownReason = unknownReason; }
+    private ResourceAsymptoticGrowth(string? order, ResourceInput? input, string? unknownReason,
+        int? polynomialDegree = null, int? logarithmicDegree = null, bool? isZero = null)
+    {
+        Order = order;
+        Input = input;
+        UnknownReason = unknownReason;
+        PolynomialDegree = polynomialDegree;
+        LogarithmicDegree = logarithmicDegree;
+        IsZero = isZero;
+    }
 
     internal static ResourceAsymptoticGrowth Analyze(ResourceExpression expression, CancellationToken cancellation)
     {
@@ -25,7 +36,7 @@ internal sealed class ResourceAsymptoticGrowth
         try
         {
             var growth = Visit(expression, 1);
-            return new(Display(growth), input, null);
+            return new(Display(growth), input, null, growth.Polynomial, growth.Logarithmic, growth.Zero);
         }
         catch (InvalidDataException exception)
         { return new(null, null, exception.Message); }

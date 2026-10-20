@@ -88,7 +88,8 @@ internal static class NativeResourceContractVerifier
                     "resource-memory-model:" + ResourceMemoryTrace.ModelId,
                     "resource-memory-program:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(
                         PortableIrGraphCodec.Encode(owner.Program, [], cancellation).Graph))];
-                memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null);
+                memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null, memoryUpper);
+                memoryResult.ProofCore = [.. memoryResult.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
                 lifetimeLayout.Project(memoryResult);
                 return memoryResult;
             }
@@ -136,7 +137,8 @@ internal static class NativeResourceContractVerifier
                 "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram, cancellation))];
             if (stackUpper != null)
             { result.ProofCore = [.. result.ProofCore, "resource-stack-model:" + NativeResourceStackVerifier.ModelId]; }
-            result.ResourceBound = Evidence(upper.ToDisplayString(), null);
+            result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
+            result.ProofCore = [.. result.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
             metadata.Project(result);
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
             { layout.Project(result); }
@@ -145,7 +147,7 @@ internal static class NativeResourceContractVerifier
         catch (InvalidDataException) { return Unknown("MalformedResourceEvidence", WorkerClaimReason.UnsupportedContract); }
         catch (ResourceExpressionLimitException) { return Unknown("ResourceProofBudgetExceeded", WorkerClaimReason.ResourceLimit); }
 
-        WorkerResourceBoundEvidence Evidence(string? inferred, string? reason)
+        WorkerResourceBoundEvidence Evidence(string? inferred, string? reason, ResourceExpression? upper = null)
         {
             return new()
             {
@@ -153,7 +155,8 @@ internal static class NativeResourceContractVerifier
                 CostModel = constraint.CostModel,
                 DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256(constraint.UpperBound),
                 InferredUpperBound = inferred,
-                UnknownReason = reason
+                UnknownReason = reason,
+                Asymptotic = upper is null ? null : AsymptoticEvidence(upper, cancellation)
             };
         }
 
@@ -164,5 +167,21 @@ internal static class NativeResourceContractVerifier
             result.ResourceBound = Evidence(null, reason);
             return result;
         }
+    }
+    private static WorkerResourceAsymptoticEvidence AsymptoticEvidence(ResourceExpression upper, CancellationToken cancellation)
+    {
+        upper = ArgumentNullGuard.NotNull(upper, nameof(upper));
+        var growth = ResourceAsymptoticGrowth.Analyze(upper, cancellation);
+        return new()
+        {
+            UpperBound = growth.Order is { } order ? "O(" + order + ")" : null,
+            PolynomialDegree = growth.PolynomialDegree,
+            LogarithmicDegree = growth.LogarithmicDegree,
+            IsZero = growth.IsZero,
+            InputOrdinal = growth.Input?.Ordinal,
+            InputKind = growth.Input?.Kind.ToString(),
+            InputName = growth.Input?.DisplayName,
+            UnknownReason = growth.UnknownReason
+        };
     }
 }

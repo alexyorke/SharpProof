@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "33";
+    public const string Current = "34";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 35;
+    public const int Current = 36;
 }
 
 public static class WorkerManifestVersions
@@ -180,6 +180,8 @@ public static class WorkerResourceModels
     public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
     public const string LifetimeCostModel = AllocationLayout + ":finite-owned-strong-reachability-v1:normal-completion";
     public const int MaximumExpressionBytes = 1024 * 1024;
+    public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
+    public const int MaximumAsymptoticDegree = 4096;
 }
 
 public sealed class WorkerResourceConstraint
@@ -192,6 +194,28 @@ public sealed class WorkerResourceConstraint
     public int ExpressionModel { get; set; } = WorkerResourceModels.Expression;
     [JsonRequired]
     public byte[] UpperBound { get; set; } = [];
+}
+
+public sealed class WorkerResourceAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; set; } = WorkerResourceModels.Asymptotic;
+    [JsonRequired]
+    public string? UpperBound { get; set; }
+    [JsonRequired]
+    public int? PolynomialDegree { get; set; }
+    [JsonRequired]
+    public int? LogarithmicDegree { get; set; }
+    [JsonRequired]
+    public bool? IsZero { get; set; }
+    [JsonRequired]
+    public int? InputOrdinal { get; set; }
+    [JsonRequired]
+    public string? InputKind { get; set; }
+    [JsonRequired]
+    public string? InputName { get; set; }
+    [JsonRequired]
+    public string? UnknownReason { get; set; }
 }
 
 public sealed class WorkerResourceBoundEvidence
@@ -216,6 +240,8 @@ public sealed class WorkerResourceBoundEvidence
     public string? EvaluatedUpperBound { get; set; }
     [JsonRequired]
     public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; set; } = [];
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Asymptotic { get; set; }
 }
 
 public sealed class WorkerResourceMetadataAssumption

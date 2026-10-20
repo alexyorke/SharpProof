@@ -620,5 +620,34 @@ zero.
 The diagnostic message labels these as upper bounds of the unbounded formula
 extension. A tight source-cost classification requires an independent lower-bound
 proof as well as the upper bound; this feature does not publish Theta results.
-Native claim evidence, lower-bound derivation, amortized accounting and validated
-distributional models remain tracked in the full roadmap.
+Lower-bound derivation, amortized accounting and validated distributional models
+remain tracked in the full roadmap.
+
+## Native asymptotic upper evidence
+
+Non-vacuous native Proven resource results now carry an asymptotic record derived
+from the worker's owned inferred upper expression. This uses the same single-input
+unbounded formula extension as SP0060. The record includes its model, canonical
+upper order, polynomial/logarithmic degrees, zero flag and input ordinal/kind/name
+when present. The proof core records the growth model, and cache/SARIF projection
+preserves that evidence.
+
+A numeric upper-bound proof can remain Proven while its growth record is Unknown,
+for example when the inferred formula depends on two independent inputs. Such a
+record contains its reason and no partial order, degree or input data. Numeric
+Unknown results and finite numeric refutations publish no asymptotic proof; a
+single observed violation cannot establish an asymptotic lower bound.
+
+Protocol 34 and cache schema 36 invalidate older responses without this evidence.
+Validation requires a complete growth record for non-vacuous numeric proofs,
+canonical order text matching its structured degrees, valid input identities,
+and mutually exclusive known/Unknown fields. It rejects growth records attached
+to numeric refutations or Unknown claims. Compiler artifact 48, manifest 6,
+resource program/evidence 5 and expression model 1 remain unchanged.
+
+Intrinsic string lengths are admitted as size inputs and as contract sizes such
+as text.Length. Their identity is bound through the compiler's intrinsic sequence
+length matcher, not a property name alone. Source calls and constructors preserve
+string-size substitution, including fixed repeated-character string arguments;
+literal sizes count UTF-16 code units. Unmodeled aliases, user-defined Length
+getters and changing non-ranking recursive arguments remain Unknown.

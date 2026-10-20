@@ -15,6 +15,26 @@ internal sealed partial class ResourceBoundsAnalysis
         return null;
     }
 
+    private Bound? StringSize(IOperation operation)
+    {
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
+        if (operation.Type?.SpecialType != SpecialType.System_String)
+        { return null; }
+        if (operation is IParameterReferenceOperation parameter)
+        {
+            return _stringArguments.TryGetValue(parameter.Parameter, out var argument) ? argument :
+                Bound.Parameter(parameter.Parameter, ResourceInputKind.StringLength);
+        }
+        if (operation.ConstantValue is { HasValue: true } constant)
+        { return constant.Value is string text ? Bound.Number(text.Length) : constant.Value is null ? Bound.Zero : null; }
+        if (operation is IObjectCreationOperation creation && CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
+        {
+            return Size(creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) :
+                argument.Parameter!.Ordinal == 1).Value);
+        }
+        return null;
+    }
+
     private Cost Call(IInvocationOperation invocation, int depth)
     {
         invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
@@ -61,6 +81,7 @@ internal sealed partial class ResourceBoundsAnalysis
             { return Unknown("UnboundCallArgument"); }
             _scalarArguments.Add(parameter, Size(argument.Value));
             _arrayArguments.Add(parameter, ArraySize(argument.Value));
+            _stringArguments.Add(parameter, StringSize(argument.Value));
         }
         _activeMethods.Add(target);
         try
@@ -72,6 +93,7 @@ internal sealed partial class ResourceBoundsAnalysis
             {
                 _scalarArguments.Remove(parameter);
                 _arrayArguments.Remove(parameter);
+                _stringArguments.Remove(parameter);
             }
         }
     }

@@ -3610,6 +3610,55 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(build.Output, Does.Contain(multipleInputs ? "loops Unknown" : "loops O(n^2) [n=NonNegativeScalar(n)]"));
         Assert.That(build.Output, Does.Not.Contain("Theta("));
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task MainPackagePublishesNativeAsymptoticUpperEvidence(int kind)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var multipleInputs = kind == 1;
+        var body = multipleInputs ? "for(int i=0;i<n;i++) {} for(int j=0;j<m;j++) {}" :
+            "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }";
+        if (kind == 2)
+        { body = "for(int i=0;i<text.Length;i++) {}"; }
+        var parameters = kind == 2 ? "string text" : "int n,int m";
+        var bound = kind == 2 ? "0," + JsonSerializer.Serialize("text.Length") + ",1" : "long.MaxValue";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { [ResourceUpperBound(ResourceMetric.LoopBodyEntries," + bound +
+            ")] public static void Target(" + parameters + ") { " + body + " } }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var growth = claim.GetProperty("resourceBound").GetProperty("asymptotic");
+        JsonAssert.Equal(growth, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Asymptotic);
+        if (multipleInputs)
+        {
+            JsonAssert.Equal(growth, "unknownReason", "AsymptoticMultipleInputs");
+            Assert.That(growth.GetProperty("upperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(growth.GetProperty("polynomialDegree").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(growth.GetProperty("inputOrdinal").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        }
+        else
+        {
+            JsonAssert.Equal(growth, "upperBound", kind == 2 ? "O(n)" : "O(n^2)");
+            Assert.That(growth.GetProperty("polynomialDegree").GetInt32(), Is.EqualTo(kind == 2 ? 1 : 2));
+            Assert.That(growth.GetProperty("logarithmicDegree").GetInt32(), Is.Zero);
+            Assert.That(growth.GetProperty("inputOrdinal").GetInt32(), Is.Zero);
+            JsonAssert.Equal(growth, "inputName", kind == 2 ? "text" : "n");
+            JsonAssert.Equal(growth, "inputKind", kind == 2 ? "StringLength" : "NonNegativeScalar");
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic"),
+            "model", SharpProof.Worker.Protocol.WorkerResourceModels.Asymptotic);
+    }
     [Test]
     public async Task MainPackageProvesNativeResourceBoundsAndPublishesMetricEvidence()
     {

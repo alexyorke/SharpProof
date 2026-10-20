@@ -8,16 +8,16 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class ResourceAsymptoticGrowthTests
 {
-    [TestCase(0, "0")]
-    [TestCase(1, "1")]
-    [TestCase(2, "n")]
-    [TestCase(3, "n^2")]
-    [TestCase(4, "n * log(n)")]
-    [TestCase(5, "log(n)")]
-    [TestCase(6, "log(n)^2")]
-    [TestCase(7, "n")]
-    [TestCase(8, "n^2")]
-    public void ClosedPolynomialLogarithmicExpressionsHaveCheckedGrowth(int kind, string expected)
+    [TestCase(0, "0", 0, 0, true)]
+    [TestCase(1, "1", 0, 0, false)]
+    [TestCase(2, "n", 1, 0, false)]
+    [TestCase(3, "n^2", 2, 0, false)]
+    [TestCase(4, "n * log(n)", 1, 1, false)]
+    [TestCase(5, "log(n)", 0, 1, false)]
+    [TestCase(6, "log(n)^2", 0, 2, false)]
+    [TestCase(7, "n", 1, 0, false)]
+    [TestCase(8, "n^2", 2, 0, false)]
+    public void ClosedPolynomialLogarithmicExpressionsHaveCheckedGrowth(int kind, string expected, int polynomial, int logarithmic, bool zero)
     {
         ArgumentNullException.ThrowIfNull(expected);
         var token = TestContext.CurrentContext.CancellationToken;
@@ -39,6 +39,9 @@ public sealed class ResourceAsymptoticGrowthTests
         var growth = ResourceAsymptoticGrowth.Analyze(expression, token);
         Assert.That(growth.UnknownReason, Is.Null);
         Assert.That(growth.Order, Is.EqualTo(expected));
+        Assert.That(growth.PolynomialDegree, Is.EqualTo(polynomial));
+        Assert.That(growth.LogarithmicDegree, Is.EqualTo(logarithmic));
+        Assert.That(growth.IsZero, Is.EqualTo(zero));
         Assert.That(growth.Input?.Ordinal, Is.EqualTo(kind < 2 ? null : (int?)0));
     }
 
@@ -55,6 +58,9 @@ public sealed class ResourceAsymptoticGrowthTests
         Assert.That(growth.Order, Is.Null);
         Assert.That(growth.Input, Is.Null);
         Assert.That(growth.UnknownReason, Is.EqualTo(reason));
+        Assert.That(growth.PolynomialDegree, Is.Null);
+        Assert.That(growth.LogarithmicDegree, Is.Null);
+        Assert.That(growth.IsZero, Is.Null);
     }
 
     [Test]

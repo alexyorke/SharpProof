@@ -1893,3 +1893,67 @@ finite owned graph model is implemented and tested, but the previously named
 broader capture/call lifetime composition remains required. The earlier statement
 that phase C was fully complete overstated that evidence; admission limits do not
 make this remaining requested work optional.
+
+## Native asymptotic upper evidence
+
+Native resource proofs now classify the owned inferred upper expression and
+publish structured growth evidence. The record contains the versioned extension
+model, canonical upper order, polynomial/logarithmic degrees, zero status and
+source input identity. Growth Unknown results keep the numeric proof while
+withholding all partial growth data. Numeric Unknown/refuted outcomes do not
+publish asymptotic proofs; observed finite lower bounds do not become universal
+asymptotic lower bounds.
+
+Protocol 34 and cache 36 reject prior responses. Strict validation requires the
+record for non-vacuous native proofs, checks canonical syntax against structured
+fields, checks bounded degrees/input shape, and rejects contradictory known/Unknown
+records or growth evidence on refutations. Compiler artifact 48, manifest 6,
+resource program/evidence 5 and expression model 1 remain unchanged.
+
+The first native build found formatting violations in the expanded classifier
+constructor. Canonical whitespace formatting repaired them. The representative
+native, cache/SARIF and malformed-record run then passed all 17 tests. Broader
+resource/memory/lifetime/protocol regressions, the full IR suite with structured
+field assertions, and strict packaged growth/stack workflows are in progress.
+This implements native upper evidence; independent lower bounds, tightness,
+amortized rules, validated average-case models, broader phase C lifetime
+composition and phase F remain required.
+
+The published foundation head 691b72875 has no coverage qualification result:
+its coverage workflow was cancelled. The latest numerical gap inventory remains
+stack head eec823652 at 3720/3910 changed trusted lines (95.14%, 190 gaps).
+The unchanged 100% floor and fresh exact-head CI remain mandatory.
+
+The broader native run passed 819 of 820 cases and found that string-length
+inputs were still rejected before growth classification. Array-length input
+ownership already passed. The repair uses the existing trusted intrinsic
+sequence-length matcher, admits string-length contract sizes, and preserves
+source-call/constructor string-size substitution. Fixed repeated-character
+strings and literals retain their actual size expressions; bindings are removed
+after each call. A focused follow-up passed all 24 native/consumer controls,
+including direct/callee/constructor string lengths and repeated calls with
+different literal sizes. Added controls require Unknown for fake Length getters,
+unsupported aliases and changing non-ranking recursive string arguments.
+
+Four real strict package growth/stack cases passed before adding the new packaged
+string-length case. The IR task's first attempt stopped in restore with exit 139;
+after confirming its process had terminated, a fresh isolated CLI/cache retry
+passed all 748 tests. The final broad worker gate, full analyzer suite and five
+strict packaged growth/stack/string workflows are now running. No floor or
+coverage exclusion changed.
+
+Final feature verification passed all 828 affected worker tests, all 748 IR tests
+and five actual strict package workflows (known growth, independent-input Unknown,
+string-length contracts, and both stack metrics). The full analyzer run passed
+1429 cases and identified one stale final-compilation protocol assertion expecting
+33; it now expects 34 and its isolated check is in progress. Quality/compatibility,
+documentation generation and 725 local links passed. Layout validates 2745 source
+files, 59 projects and all 151 pinned common files. The authoritative production
+inventory validates all 520 trusted paths. Complete repository formatting passed.
+
+Latest fetched master advanced by two commits: 1cdf105b0 adds proven HashSet
+ICollection dispatch, and 11a70a2f1 trims verifier references and internalizes
+implementation assemblies. They must be merged after this feature checkpoint,
+with new implementation types following the revised visibility policy and affected
+workflows verified on the combined tree. This checkpoint remains unqualified
+until that integration, fresh exact-head CI and unchanged coverage enforcement.

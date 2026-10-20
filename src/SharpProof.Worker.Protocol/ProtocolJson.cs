@@ -755,6 +755,9 @@ public static partial class WorkerProtocolJson
                 !evidence.MetadataAssumptions.Any(static dependency => dependency is not null &&
                     dependency.WitnessIdentifier == "runtime-layout.coreclr-x64" && dependency.RuntimeModel == WorkerResourceModels.AllocationLayout)))
         { return false; }
+        if (value.Outcome == WorkerClaimOutcome.Proven && value.Vacuity == WorkerVacuityKind.None
+            ? !HasValidResourceAsymptotic(evidence.Asymptotic) : evidence.Asymptotic is not null)
+        { return false; }
         if (!HasValidResourceMetadata(claim!, value, evidence))
         { return false; }
         return value.Outcome switch
@@ -767,6 +770,40 @@ public static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceAsymptotic(WorkerResourceAsymptoticEvidence? evidence)
+    {
+        if (evidence is null || evidence.Model != WorkerResourceModels.Asymptotic)
+        { return false; }
+        if (evidence.UnknownReason is { } reason)
+        {
+            return !string.IsNullOrWhiteSpace(reason) && reason.Length <= 256 && !reason.Any(static character => char.IsControl(character)) &&
+                evidence.UpperBound is null && evidence.PolynomialDegree is null && evidence.LogarithmicDegree is null &&
+                evidence.IsZero is null && evidence.InputOrdinal is null && evidence.InputKind is null && evidence.InputName is null;
+        }
+        if (evidence.PolynomialDegree is not (>= 0 and <= WorkerResourceModels.MaximumAsymptoticDegree) ||
+            evidence.LogarithmicDegree is not (>= 0 and <= WorkerResourceModels.MaximumAsymptoticDegree) ||
+            evidence.IsZero is not { } zero)
+        { return false; }
+        var polynomial = evidence.PolynomialDegree.Value;
+        var logarithmic = evidence.LogarithmicDegree.Value;
+        if (zero && (polynomial != 0 || logarithmic != 0))
+        { return false; }
+        var hasInput = evidence.InputOrdinal is not null || evidence.InputKind is not null || evidence.InputName is not null;
+        if (hasInput && (evidence.InputOrdinal is not >= 0 ||
+            evidence.InputKind is not ("NonNegativeScalar" or "ArrayLength" or "StringLength") ||
+            string.IsNullOrWhiteSpace(evidence.InputName) || evidence.InputName!.Length > 16384 ||
+            evidence.InputName.Any(static character => char.IsControl(character))) ||
+            !hasInput && (polynomial != 0 || logarithmic != 0))
+        { return false; }
+        var power = polynomial == 0 ? "" : polynomial == 1 ? "n" :
+            "n^" + polynomial.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var log = logarithmic == 0 ? "" : logarithmic == 1 ? "log(n)" :
+            "log(n)^" + logarithmic.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var order = zero ? "0" : power.Length == 0 ? log.Length == 0 ? "1" : log :
+            log.Length == 0 ? power : power + " * " + log;
+        return evidence.UpperBound == "O(" + order + ")";
+    }
+
     private static bool HasValidResourceMetadata(WorkerClaimManifestEntry claim, WorkerClaimResult result, WorkerResourceBoundEvidence evidence)
     {
         claim = ArgumentNullGuard.NotNull(claim, nameof(claim));

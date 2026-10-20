@@ -30,8 +30,8 @@ public enum ResourceMetric
 /// <summary>Requires a native proof of a resource upper bound.</summary>
 /// <remarks>
 /// The mathematical bound is constant plus coefficient times the nonnegative entry size.
-/// A size is an Int32/Int64 parameter name or an array parameter followed by .Length.
-/// Negative scalars and null arrays have entry size zero. Cumulative metrics include exceptional execution prefixes.
+/// A size is an Int32/Int64 parameter name or an array/string parameter followed by .Length.
+/// Negative scalars and null arrays/strings have entry size zero. Cumulative metrics include exceptional execution prefixes.
 /// This is a static contract; it does not execute the method or insert runtime checks.
 /// Unsupported operations produce Unknown. These metrics do not measure elapsed time,
 /// physical heap residency or stack memory. Logical peak/retained metrics describe normal completion under their declared model.
@@ -70,7 +70,7 @@ public sealed class ResourceUpperBoundAttribute : Attribute
     /// <value>The nonnegative constant term in the mathematical bound.</value>
     public long Constant { get; }
     /// <summary>Gets the entry size name, or null for a constant bound.</summary>
-    /// <value>The scalar parameter name or array length, or null for a constant bound.</value>
+    /// <value>The scalar parameter name or array/string length, or null for a constant bound.</value>
     public string? SizeParameter { get; }
     /// <summary>Gets the nonnegative size coefficient.</summary>
     /// <value>The positive size multiplier, or zero for a constant bound.</value>
