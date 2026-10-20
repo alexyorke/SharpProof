@@ -4863,3 +4863,7 @@ All 54 initial targeted effects/frontend/specs/worker tests pass. The additional
 ### IMM-M474: complete repository script-format verification
 
 The canonical formatter checks all 87 PowerShell and 19 shell files. Two new export/identity changes require whitespace formatting, applied after verifying that their non-whitespace bytes are identical. A second complete check formats zero files. Native workflow evidence for these changes remains the named M468/M470 regressions; no behavioral edit or historical status transfer is introduced.
+
+### IMM-M476: direct review of final native file-write adapters
+
+Twenty-eight materializations are individually traced through current call sites and adjacent image/native stream producers. Each inline native byte array is passed immediately to File.WriteAllBytes or File.WriteAllBytesAsync; no mutable collection owner is retained or published. The actual backing file remains a filesystem/native authority subject. These sites remain final interop adapters rather than fixture ownership roots. No code changes or new test authority are inferred. Current source hashes and explicit pending final binding recollection are retained per row. The array inventory now has 370 unchecked candidates; this is independent role review, not automatic historical status transfer.
