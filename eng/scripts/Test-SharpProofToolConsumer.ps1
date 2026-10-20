@@ -109,7 +109,7 @@ File.WriteAllText(args[0], WorkerProtocolJson.SerializeResponse(response));
     if (-not $manifest.ContainsKey('tools') -or $manifest.tools -isnot [Collections.IDictionary]) {
         throw 'Local tool manifest has no tool registrations.'
     }
-    $toolKeys = @($manifest.tools.Keys | Where-Object { $_ -ieq 'SharpProof.Tool' })
+    $toolKeys = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($manifest.tools.Keys | Where-Object { $_ -ieq 'SharpProof.Tool' })))
     if ($manifest.tools.Count -ne 1 -or $toolKeys.Count -ne 1) { throw 'Local manifest must register only SharpProof.Tool.' }
     $registeredTool = $manifest.tools[$toolKeys[0]]
     if ($registeredTool.version -cne $version -or @($registeredTool.commands).Count -ne 1 -or

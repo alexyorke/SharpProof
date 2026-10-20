@@ -76,18 +76,18 @@ try {
             platform      = [string]$catalog.platform
             version       = [string]$z3.version
             sourceUrl     = [string]$z3.archiveUrl
-            files         = @(
-                ([ordered]@{
-                    name   = 'libz3.so'
-                    bytes  = [int64]$z3.libraryBytes
-                    sha256 = [string]$z3.librarySha256
-                }).AsReadOnly(),
-                ([ordered]@{
-                    name   = 'Microsoft.Z3.dll'
-                    bytes  = [int64]$z3.managedAssemblyBytes
-                    sha256 = [string]$z3.managedAssemblySha256
-                }).AsReadOnly()
-            )
+            files         = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(
+                        ([ordered]@{
+                            name   = 'libz3.so'
+                            bytes  = [int64]$z3.libraryBytes
+                            sha256 = [string]$z3.librarySha256
+                        }).AsReadOnly(),
+                        ([ordered]@{
+                            name   = 'Microsoft.Z3.dll'
+                            bytes  = [int64]$z3.managedAssemblyBytes
+                            sha256 = [string]$z3.managedAssemblySha256
+                        }).AsReadOnly()
+                    )))
         }).AsReadOnly()
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $payloadDirectory 'payload.json') -Encoding utf8NoBOM
 }
@@ -131,11 +131,11 @@ try {
         version           = [string]$z3.version
         sourceUrl         = [string]$linuxArm64.archiveUrl
         sourceMetadataUrl = [string]$linuxArm64.sourceMetadataUrl
-        files             = @(([ordered]@{
-                    name   = 'libz3.so'
-                    bytes  = [int64]$linuxArm64.libraryBytes
-                    sha256 = [string]$linuxArm64.librarySha256
-                }).AsReadOnly())
+        files             = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(([ordered]@{
+                            name   = 'libz3.so'
+                            bytes  = [int64]$linuxArm64.libraryBytes
+                            sha256 = [string]$linuxArm64.librarySha256
+                        }).AsReadOnly())))
     }).AsReadOnly() | ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath (Join-Path $linuxArm64PayloadDirectory 'payload.json') -Encoding utf8NoBOM
 }

@@ -44,10 +44,12 @@ public sealed class IrMalformedRuntimeValueTests
         var left = factory.CreateVariable("left", factory.BooleanType);
         var right = factory.CreateVariable("right", factory.BooleanType);
         var term = factory.Binary(operation, factory.Variable(left), factory.Variable(right));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateBooleanValue(operation == IrBinaryOperator.AndAlso)).SetItem(right, factory.CreateBooleanValue(true));
-        Assert.That(new IrInterpreter(factory).Evaluate(term, values).Value!.Boolean, Is.True);
-        values = values.SetItem(leftMalformed ? left : right, Malformed(factory.BooleanType, factory.CreateIntegerValue(1)));
-        AssertRejected(factory, term, values, diagnostic);
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[left] = factory.CreateBooleanValue(operation == IrBinaryOperator.AndAlso);
+        values[right] = factory.CreateBooleanValue(true);
+        Assert.That(new IrInterpreter(factory).Evaluate(term, values.ToImmutable()).Value!.Boolean, Is.True);
+        values[leftMalformed ? left : right] = Malformed(factory.BooleanType, factory.CreateIntegerValue(1));
+        AssertRejected(factory, term, values.ToImmutable(), diagnostic);
     }
 
     [TestCase(IrBinaryOperator.StringConcat, "String concatenation requires string values.")]
@@ -59,15 +61,17 @@ public sealed class IrMalformedRuntimeValueTests
         var left = factory.CreateVariable("left", factory.StringType);
         var right = factory.CreateVariable("right", factory.StringType);
         var term = factory.Binary(operation, factory.Variable(left), factory.Variable(right));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateStringValue("same")).SetItem(right, factory.CreateStringValue("same"));
-        var valid = new IrInterpreter(factory).Evaluate(term, values);
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[left] = factory.CreateStringValue("same");
+        values[right] = factory.CreateStringValue("same");
+        var valid = new IrInterpreter(factory).Evaluate(term, values.ToImmutable());
         Assert.That(valid.Status, Is.EqualTo(IrEvaluationStatus.Value));
         if (operation == IrBinaryOperator.StringEquals)
         { Assert.That(valid.Value!.Boolean, Is.True); }
         else
         { Assert.That(valid.Value!.String, Is.EqualTo("samesame")); }
-        values = values.SetItem(left, Malformed(factory.StringType, factory.CreateBooleanValue(true)));
-        AssertRejected(factory, term, values, diagnostic);
+        values[left] = Malformed(factory.StringType, factory.CreateBooleanValue(true));
+        AssertRejected(factory, term, values.ToImmutable(), diagnostic);
     }
 
     [Test]
@@ -77,10 +81,12 @@ public sealed class IrMalformedRuntimeValueTests
         var left = factory.CreateVariable("left", factory.StringType);
         var right = factory.CreateVariable("right", factory.StringType);
         var term = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateStringValue("same")).SetItem(right, factory.CreateStringValue("same"));
-        Assert.That(new IrInterpreter(factory).Evaluate(term, values).Value!.Boolean, Is.True);
-        values = values.SetItem(left, Malformed(factory.StringType, factory.CreateBooleanValue(true)));
-        AssertRejected(factory, term, values, "Equality requires values with compatible runtime kinds.");
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[left] = factory.CreateStringValue("same");
+        values[right] = factory.CreateStringValue("same");
+        Assert.That(new IrInterpreter(factory).Evaluate(term, values.ToImmutable()).Value!.Boolean, Is.True);
+        values[left] = Malformed(factory.StringType, factory.CreateBooleanValue(true));
+        AssertRejected(factory, term, values.ToImmutable(), "Equality requires values with compatible runtime kinds.");
     }
 
     [Test]
@@ -89,10 +95,11 @@ public sealed class IrMalformedRuntimeValueTests
         var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var term = factory.Conditional(factory.Variable(flag), factory.Integer(1), factory.Integer(2));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(true));
-        Assert.That(new IrInterpreter(factory).Evaluate(term, values).Value!.Integer, Is.EqualTo(1));
-        values = values.SetItem(flag, Malformed(factory.BooleanType, factory.CreateIntegerValue(1)));
-        AssertRejected(factory, term, values, "A conditional guard requires a boolean value.");
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[flag] = factory.CreateBooleanValue(true);
+        Assert.That(new IrInterpreter(factory).Evaluate(term, values.ToImmutable()).Value!.Integer, Is.EqualTo(1));
+        values[flag] = Malformed(factory.BooleanType, factory.CreateIntegerValue(1));
+        AssertRejected(factory, term, values.ToImmutable(), "A conditional guard requires a boolean value.");
     }
 
     [Test]
@@ -101,10 +108,11 @@ public sealed class IrMalformedRuntimeValueTests
         var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         var term = factory.Length(factory.Variable(text));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(text, factory.CreateStringValue("abc"));
-        Assert.That(new IrInterpreter(factory).Evaluate(term, values).Value!.Integer, Is.EqualTo(3));
-        values = values.SetItem(text, Malformed(factory.StringType, factory.CreateBooleanValue(true)));
-        AssertRejected(factory, term, values, "Length requires a string or sequence value.");
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[text] = factory.CreateStringValue("abc");
+        Assert.That(new IrInterpreter(factory).Evaluate(term, values.ToImmutable()).Value!.Integer, Is.EqualTo(3));
+        values[text] = Malformed(factory.StringType, factory.CreateBooleanValue(true));
+        AssertRejected(factory, term, values.ToImmutable(), "Length requires a string or sequence value.");
     }
 
     [TestCase(true, "Sequence access requires a sequence value.")]
@@ -117,10 +125,12 @@ public sealed class IrMalformedRuntimeValueTests
         var sequence = factory.CreateVariable("sequence", type);
         var index = factory.CreateVariable("index", factory.IntegerType);
         var term = factory.SequenceAccess(factory.Variable(sequence), factory.Variable(index));
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])).SetItem(index, factory.CreateIntegerValue(0));
-        Assert.That(new IrInterpreter(factory).Evaluate(term, values).Value!.Integer, Is.EqualTo(3));
-        values = values.SetItem(sequenceMalformed ? sequence : index, Malformed(sequenceMalformed ? type : factory.IntegerType, factory.CreateBooleanValue(true)));
-        AssertRejected(factory, term, values, diagnostic);
+        var values = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        values[sequence] = factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]);
+        values[index] = factory.CreateIntegerValue(0);
+        Assert.That(new IrInterpreter(factory).Evaluate(term, values.ToImmutable()).Value!.Integer, Is.EqualTo(3));
+        values[sequenceMalformed ? sequence : index] = Malformed(sequenceMalformed ? type : factory.IntegerType, factory.CreateBooleanValue(true));
+        AssertRejected(factory, term, values.ToImmutable(), diagnostic);
     }
 
     private static IrValue Malformed(IrTypeId declaredType, IrValue payload)

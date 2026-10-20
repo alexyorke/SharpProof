@@ -19,7 +19,7 @@ if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw 'The installe
 $selection = @('-latest', '-products', '*', '-version', "[$MajorVersion.0,$($MajorVersion + 1).0)", '-requires', 'Microsoft.Component.MSBuild')
 $installationJson = (& $vswhere @selection -format json -utf8 | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'vswhere could not enumerate the requested Visual Studio major version.' }
-$installations = @($installationJson | ConvertFrom-Json)
+$installations = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($installationJson | ConvertFrom-Json)))
 if ($installations.Count -ne 1 -or ([version]$installations[0].installationVersion).Major -ne $MajorVersion) {
     throw "No exact Visual Studio $MajorVersion installation with MSBuild was selected."
 }

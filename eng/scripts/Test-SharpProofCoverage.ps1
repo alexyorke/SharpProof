@@ -769,16 +769,16 @@ $changedTcb = ([ordered]@{
         changedFiles            = 0
         coverageFiles           = 0
         metadataFiles           = 0
-        changedMetadataFiles    = @()
+        changedMetadataFiles    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
         coveredLines            = 0
-        omittedDeclarationLines = @()
-        unmappedLines           = @()
+        omittedDeclarationLines = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
+        unmappedLines           = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
         coverableLines          = 0
         linePercent             = 100.0
         minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
-        declarationOnlyFiles    = @()
-        nonCoverableFiles       = @()
-        uncoveredLines          = @()
+        declarationOnlyFiles    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
+        nonCoverableFiles       = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
+        uncoveredLines          = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@()))
         passed                  = $true
     }).AsReadOnly()
 if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
@@ -1110,19 +1110,19 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             changedFiles            = $changedTcbFiles.Count
             coverageFiles           = $coverageTcbPaths.Count
             metadataFiles           = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
-            changedMetadataFiles    = $changedMetadataFiles
+            changedMetadataFiles    = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$changedMetadataFiles)
             coveredLines            = $changedCovered
-            omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
-            unmappedLines           = @(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))
+            omittedDeclarationLines = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))))
+            unmappedLines           = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))))
             coverableLines          = $changedCoverable
             linePercent             = $changedPercent
             minimumLinePercent      = [double]$baseline.minimumChangedTcbLinePercent
-            declarationOnlyFiles    = @(Get-OrdinalSortedUniqueStrings `
-                    -Values @($declarationOnlyChangedFiles))
-            nonCoverableFiles       = @(Get-OrdinalSortedUniqueStrings `
-                    -Values @($nonCoverableChangedFiles))
-            uncoveredLines          = @(Get-OrdinalSortedUniqueStrings `
-                    -Values @($uncoveredChangedLines))
+            declarationOnlyFiles    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings `
+                            -Values @($declarationOnlyChangedFiles))))
+            nonCoverableFiles       = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings `
+                            -Values @($nonCoverableChangedFiles))))
+            uncoveredLines          = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-OrdinalSortedUniqueStrings `
+                            -Values @($uncoveredChangedLines))))
             passed                  = $nonCoverableChangedFiles.Count -eq 0 -and
             (Test-CoverageFloor `
                 -CoveredLines $changedCovered `
@@ -1140,7 +1140,7 @@ $summary = ([ordered]@{
             -FailureMessage 'Could not resolve the current repository commit.' `
             -TrimOutput
         reportCount   = $reports.Count
-        reportFiles   = @($reportFiles | Sort-Object { $_.path })
+        reportFiles   = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($reportFiles | Sort-Object { $_.path })))
         authority     = ([ordered]@{
                 schemaVersion      = 1
                 commit             = [string]$recomputedAuthority.commit
@@ -1154,7 +1154,7 @@ $summary = ([ordered]@{
                 minimumLinePercent = $aggregateMinimum
                 passed             = $aggregatePassed
             }).AsReadOnly()
-        projects      = @($projects)
+        projects      = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($projects)))
         changedTcb    = $changedTcb
         passed        = $aggregatePassed -and
         @($projects | Where-Object { -not $_.passed }).Count -eq 0 -and

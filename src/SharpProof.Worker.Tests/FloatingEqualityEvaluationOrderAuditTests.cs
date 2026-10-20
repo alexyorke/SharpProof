@@ -78,8 +78,8 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = image.ToArray().ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("FloatingEqualityEvaluationOrder_" + valueType, isCollectible: true);
         try
@@ -96,7 +96,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
                 var observation = $"type={valueType}; witness={witness}; CLR={result}; " +
                     $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
                     $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
-                    $"PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}";
+                    $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
                 observationBuilder.Add(observation);
                 Assert.That(result, Is.EqualTo(1234), observation);
             }

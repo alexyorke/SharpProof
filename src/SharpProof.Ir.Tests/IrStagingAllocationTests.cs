@@ -67,7 +67,7 @@ public sealed class IrStagingAllocationTests
 
     private static Guid Identity(int value)
     {
-        return new Guid(value, 0, 0, new byte[8]);
+        return new Guid(value, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     private static string Name(string directory, Guid identity)

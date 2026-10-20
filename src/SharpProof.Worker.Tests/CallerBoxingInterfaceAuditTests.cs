@@ -175,8 +175,8 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "caller-emit-diagnostics.txt"),
             string.Join("\n", emission.Diagnostics) + "\n");
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = image.ToArray().ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var probeBuilder = ImmutableArray.CreateBuilder<ProbeObservation>();
         var observationBuilder = ImmutableArray.CreateBuilder<RuntimeObservation>();
@@ -233,7 +233,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "identity-control-measurements.json"),
             JsonSerializer.Serialize(identityControls, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
-            $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}; " +
+            $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}; " +
             $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256((boundaryBytes).ToImmutableArray())}; " +
             $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(SubjectSource)).ToImmutableArray())}; " +
             $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}; " +

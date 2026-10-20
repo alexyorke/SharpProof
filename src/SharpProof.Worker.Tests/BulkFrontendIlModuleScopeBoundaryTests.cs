@@ -71,11 +71,11 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             type.CreateType();
             using var emitted = new MemoryStream();
             builder.Save(emitted);
-            var image = emitted.ToArray();
+            var image = emitted.ToArray().ToImmutableArray();
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
-            await File.WriteAllBytesAsync(imagePath, image, TestContext.CurrentContext.CancellationToken);
+            await File.WriteAllBytesAsync(imagePath, image.AsMemory(), TestContext.CurrentContext.CancellationToken);
 
-            using var runtimeImage = new MemoryStream(image, writable: false);
+            using var runtimeImage = new MemoryStream(image.ToArray(), writable: false);
             var runtimeAssembly = runtime.LoadFromStream(runtimeImage);
             var runtimeMethod = runtimeAssembly.GetType(typeName)!.GetMethod(methodName)!;
             foreach (var input in Inputs)
@@ -107,8 +107,7 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
                 Assert.That(rootMethod.Invoke(null, [input]), Is.EqualTo(input));
             }
 
-            using var savedImage = new MemoryStream(image, writable: false);
-            using var pe = new PEReader(savedImage);
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var savedScopeName = reader.GetString(reader.GetModuleDefinition().Name);
             Assert.That(savedScopeName.Length, Is.EqualTo(moduleScopeLength));
@@ -136,8 +135,8 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
-            Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
-            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image))));
+            Assert.That(captured.SizeBytes, Is.EqualTo((long)image.Length));
+            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image.AsSpan()))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
             Assert.That(captured.Name, Is.EqualTo(savedScopeName));

@@ -94,11 +94,11 @@ public sealed class CanonicalHashWriterTests
     [Test]
     public void StreamFramesPreserveByteArrayIdentity()
     {
-        byte[] bytes = [0, 1, 2, 3];
+        ImmutableArray<byte> bytes = [0, 1, 2, 3];
         using var arrayWriter = new CanonicalHashWriter();
         using var streamWriter = new CanonicalHashWriter();
-        using var stream = new MemoryStream(bytes, writable: false);
-        var expected = arrayWriter.Add(bytes.ToImmutableArray()).Finish();
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
+        var expected = arrayWriter.Add(bytes).Finish();
 
         Assert.That(
             streamWriter.Add(stream).Finish(),
@@ -117,9 +117,10 @@ public sealed class CanonicalHashWriterTests
         AssertStreamGrowthFails([]);
     }
 
-    private static void AssertStreamGrowthFails(byte[] initial)
+    private static void AssertStreamGrowthFails(ImmutableArray<byte> initial)
     {
-        System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
+        if (initial.IsDefault)
+        { throw new ArgumentNullException(nameof(initial)); }
         using var writer = new CanonicalHashWriter();
         using var stream = new GrowingStream(initial);
 
@@ -175,10 +176,11 @@ public sealed class CanonicalHashWriterTests
     {
         private bool _grown;
 
-        internal GrowingStream(byte[] initial)
+        internal GrowingStream(ImmutableArray<byte> initial)
         {
-            System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
-            Write(initial);
+            if (initial.IsDefault)
+            { throw new ArgumentNullException(nameof(initial)); }
+            Write(initial.AsSpan());
             Position = 0;
         }
 

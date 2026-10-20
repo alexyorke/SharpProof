@@ -52,5 +52,5 @@ foreach ($project in $packageProjects) {
     schemaVersion = 1
     command       = 'check'
     configuration = $Configuration
-    commands      = @($commands.ToImmutable())
+    commands      = $commands.ToImmutable()
 }).AsReadOnly() | ConvertTo-Json -Depth 5

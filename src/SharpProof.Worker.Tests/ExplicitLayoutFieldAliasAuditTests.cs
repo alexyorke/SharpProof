@@ -60,7 +60,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         System.ArgumentNullException.ThrowIfNull(scenario);
         var settings = Settings(scenario);
         var source = Source(settings);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var evidenceDirectory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "explicit-layout-field-alias-audit",
@@ -80,9 +80,9 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = image.ToArray().ToImmutableArray();
         var imageHash = Hash(imageBytes);
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("ExplicitLayoutFieldAlias_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         int actualReturn;
@@ -130,7 +130,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             var storedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 3))!;
             var returnedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 9))!;
             var baseConstructor = constructor.Module.ResolveMethod(BitConverter.ToInt32(constructorIl, 2))!;
-            using var pe = new PEReader(new MemoryStream(imageBytes, writable: false));
+            using var pe = new PEReader(imageBytes);
             var metadata = pe.GetMetadataReader();
             var cellHandle = MetadataTokens.TypeDefinitionHandle(cellType.MetadataToken & 0x00ffffff);
             var observedHandle = MetadataTokens.FieldDefinitionHandle(observed.MetadataToken & 0x00ffffff);
@@ -321,8 +321,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -331,7 +331,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request,
+            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request,
             Program.ExpectedVersions());
         var callable = artifact.Callables.Single();
         var manifestClaim = artifact.Manifest.Claims.Single();
@@ -445,10 +445,11 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             .Replace("__STORED_VALUE__", settings.StoredValue.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static async Task Save(string directory, string fileName, object value)

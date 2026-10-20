@@ -29,14 +29,14 @@ public sealed class HashEncodingRepresentationTests
     public void StreamDigestUsesOnlyTheRemainingBytesAndKeepsTheStreamOpen()
     {
         RecordBinding(nameof(StreamDigestUsesOnlyTheRemainingBytesAndKeepsTheStreamOpen));
-        byte[] bytes = [88, 97, 98, 99];
-        using var stream = new MemoryStream(bytes, writable: false);
+        ImmutableArray<byte> bytes = [88, 97, 98, 99];
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         stream.Position = 1;
         var actual = IrHashEncoding.ComputeSha256Hex(stream);
-        byte[] suffix = [97, 98, 99];
+        ImmutableArray<byte> suffix = [97, 98, 99];
 
         Assert.That(actual, Is.EqualTo(AbcDigest));
-        Assert.That(actual, Is.EqualTo(IrHashEncoding.ComputeSha256Hex((suffix).ToImmutableArray())));
+        Assert.That(actual, Is.EqualTo(IrHashEncoding.ComputeSha256Hex(suffix)));
         Assert.That(stream.Position, Is.EqualTo(stream.Length));
         Assert.That(stream.CanRead, Is.True);
         Assert.That(IrHashEncoding.ComputeSha256Hex(stream), Is.EqualTo(EmptyDigest));
@@ -48,8 +48,8 @@ public sealed class HashEncodingRepresentationTests
     public void DigestTextValidationMatchesTheCanonicalLowercaseRepresentation()
     {
         RecordBinding(nameof(DigestTextValidationMatchesTheCanonicalLowercaseRepresentation));
-        byte[] bytes = [97, 98, 99];
-        var actual = IrHashEncoding.ComputeSha256Hex((bytes).ToImmutableArray());
+        ImmutableArray<byte> bytes = [97, 98, 99];
+        var actual = IrHashEncoding.ComputeSha256Hex(bytes);
 
         Assert.That(actual, Is.EqualTo(AbcDigest));
         Assert.That(IrHashEncoding.IsSha256(actual), Is.True);

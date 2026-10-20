@@ -46,8 +46,8 @@ public sealed class EnumEqualityCompatibilityAuditTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, caseName + ".oracle.dll"), imageBytes);
+        var imageBytes = image.ToArray().ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, caseName + ".oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("EnumEqualityCompatibility_" + caseName, isCollectible: true);
         string runtimeObservation;
@@ -60,7 +60,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
             runtimeObservation = $"operator={comparison}; argument=Choice.Second; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
                 $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
-                $"PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}";
+                $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".clr.txt"), runtimeObservation + "\n");
             Assert.That(actual, Is.EqualTo(expectedRuntime), runtimeObservation);

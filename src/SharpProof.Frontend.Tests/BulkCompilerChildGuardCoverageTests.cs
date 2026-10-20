@@ -29,10 +29,11 @@ public sealed class BulkCompilerChildGuardCoverageTests
         var exact = lowerer.Lower(supportedOperation);
         Assert.That(exact.IsExact, Is.True);
         var capture = lowerer.CreateCaptureBindings().Single();
-        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(capture, factory.CreateStringValue("word"));
-        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment).Value!.Boolean, Is.False);
-        environment = environment.SetItem(capture, factory.CreateNullValue(factory.StringType));
-        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment).Value!.Boolean, Is.True);
+        var environment = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        environment[capture] = factory.CreateStringValue("word");
+        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment.ToImmutable()).Value!.Boolean, Is.False);
+        environment[capture] = factory.CreateNullValue(factory.StringType);
+        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment.ToImmutable()).Value!.Boolean, Is.True);
     }
 
     [Test]

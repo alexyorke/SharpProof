@@ -161,8 +161,8 @@ function Assert-ConsumerEvidence([string]$Outcome) {
     $request = Get-Content -LiteralPath $requestPath -Raw | ConvertFrom-Json
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $compiler = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    $claims = @($result.claimResults)
-    $manifestClaims = @($result.manifest.claims)
+    $claims = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.claimResults)))
+    $manifestClaims = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.manifest.claims)))
     if ($result.runStatus -cne 'Complete' -or $result.failureReason -cne 'None' -or
         $claims.Count -ne 1 -or $manifestClaims.Count -ne 1 -or
         $claims[0].outcome -cne $Outcome -or $claims[0].vacuity -cne 'None' -or
@@ -183,10 +183,10 @@ function Assert-ConsumerEvidence([string]$Outcome) {
     }
     if ($result.manifest.hash -cne $compiler.manifest.hash) { throw 'Published response claim-manifest hash differs from the compiler manifest.' }
     if ($result.inputHash -notmatch '^[0-9a-f]{64}$') { throw 'Published response input hash is malformed.' }
-    $callables = @($result.callableResults)
+    $callables = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.callableResults)))
     if ($callables.Count -ne 1 -or $callables[0].coverage -cne 'Complete') { throw 'The selected callable was not completely verified.' }
     if ($Outcome -ceq 'Refuted') {
-        $model = @($claims[0].model)
+        $model = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($claims[0].model)))
         if ($model.Count -ne 1 -or $model[0].variable -cne 'parameter:0' -or $model[0].kind -cne 'Integer') { throw 'The refutation has no exact identity-input counterexample.' }
         # Returning zero violates Identity for every nonzero Int64 input.
         $counterexample = [long]0
@@ -306,8 +306,8 @@ public static class Program
     if (-not (Test-Path -LiteralPath (Join-Path $applicationOutput 'SharpProof.Attributes.dll') -PathType Leaf)) {
         throw 'The downstream application did not receive the attribute runtime assembly.'
     }
-    $nativeFiles = @(Get-ChildItem -LiteralPath $applicationOutput -Recurse -File |
-            Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })
+    $nativeFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-ChildItem -LiteralPath $applicationOutput -Recurse -File |
+                    Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })))
     if ($nativeFiles.Count -ne 0) { throw 'Verifier native build-tool payloads leaked into application runtime output.' }
     $run = Invoke-ConsumerCommand -WorkingDirectory $downstream -Arguments @(
         'run', '--project', 'Application.csproj', '-c', 'Release', '--no-build', '--no-restore')

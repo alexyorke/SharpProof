@@ -140,7 +140,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = image.ToArray().ToImmutableArray();
         var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
             ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
                 ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
@@ -148,8 +148,8 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         TestCompilation.AssertNoErrors(runtimeCompilation);
         using var runtimeImage = new MemoryStream();
         Assert.That(runtimeCompilation.Emit(runtimeImage).Success, Is.True);
-        var runtimeBytes = runtimeImage.ToArray();
-        var runtimeMethod = Assembly.Load(runtimeBytes).GetType("Subject")!.GetMethod("CountUp")!;
+        var runtimeBytes = runtimeImage.ToArray().ToImmutableArray();
+        var runtimeMethod = Assembly.Load(runtimeBytes.ToArray()).GetType("Subject")!.GetMethod("CountUp")!;
         foreach (var input in RuntimeInputs)
         {
             Assert.That(runtimeMethod.Invoke(null, [input]), Is.EqualTo(input));
@@ -173,7 +173,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         await File.WriteAllTextAsync(Path.Combine(output, "source.cs.txt"), Source, new UTF8Encoding(false));
         await File.WriteAllTextAsync(Path.Combine(output, "artifact.json"), artifactJson, new UTF8Encoding(false));
-        await File.WriteAllBytesAsync(Path.Combine(output, "native-image.dll"), imageBytes);
+        await File.WriteAllBytesAsync(Path.Combine(output, "native-image.dll"), imageBytes.AsMemory());
         var checks = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
         var reads = ImmutableArray.CreateBuilder<long>();
         var budgetReads = ImmutableArray.CreateBuilder<BudgetRead>();
@@ -275,8 +275,8 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 captureComplete = true,
                 sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Source))),
                 artifactSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(artifactJson))),
-                imageSha256 = Convert.ToHexString(SHA256.HashData(imageBytes)),
-                runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeBytes)),
+                imageSha256 = Convert.ToHexString(SHA256.HashData(imageBytes.AsSpan())),
+                runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeBytes.AsSpan())),
                 callableId = preparation.Entry.CallableId,
                 claimId = ownedClaim,
                 runtimeInputs = RuntimeInputs,

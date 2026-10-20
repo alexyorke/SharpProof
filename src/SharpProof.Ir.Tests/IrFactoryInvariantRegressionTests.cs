@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -149,8 +150,8 @@ public sealed class IrFactoryInvariantRegressionTests
         var parameterTypes = Enumerable.Repeat(
                 factory.IntegerType,
                 argumentCount)
-            .ToArray();
-        var member = factory.GetOrCreateMember(
+            .ToImmutableArray();
+        var member = factory.GetOrCreateMemberSnapshot(
             factory.CreateIdentity(),
             factory.ObjectType,
             "M",

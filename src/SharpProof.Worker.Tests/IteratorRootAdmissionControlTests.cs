@@ -49,12 +49,12 @@ public sealed class IteratorRootAdmissionControlTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True);
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = image.ToArray().ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
         var context = new AssemblyLoadContext("IteratorRootControl_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var runtimeImage = new MemoryStream(bytes);
+            using var runtimeImage = new MemoryStream(bytes.ToArray());
             var method = context.LoadFromStream(runtimeImage).GetType("Subject")!.GetMethod("Target")!;
             Delegate target = referenceReturn ? method.CreateDelegate<Func<IEnumerable<int>?>>() : method.CreateDelegate<Func<int>>();
             for (var repeat = 0; repeat < WarmupIterations; repeat++)
@@ -69,12 +69,11 @@ public sealed class IteratorRootAdmissionControlTests
             { Assert.That(s_sequence, Is.Null); }
             else
             { Assert.That(s_integer, Is.EqualTo(7)); }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var mvid = metadata.GetGuid(metadata.GetModuleDefinition().Mvid);
             var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
-            var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
+            var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!.ToImmutableArray();
             Assert.That(method.Module.ModuleVersionId, Is.EqualTo(mvid));
             Assert.That(target.Method.Module.ModuleVersionId, Is.EqualTo(mvid));
             Assert.That(target.Method.MetadataToken, Is.EqualTo(method.MetadataToken));
@@ -100,7 +99,7 @@ public sealed class IteratorRootAdmissionControlTests
             {
                 ReferenceReturn = referenceReturn,
                 SourceSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
-                PeSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                PeSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan())),
                 Compiler = typeof(CSharpCompilation).Assembly.FullName,
                 CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
                 Symbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
@@ -127,7 +126,7 @@ public sealed class IteratorRootAdmissionControlTests
                 PeMvid = mvid,
                 MethodToken = method.MetadataToken,
                 DelegateMethodToken = target.Method.MetadataToken,
-                Il = Convert.ToHexStringLower(il),
+                Il = Convert.ToHexStringLower(il.AsSpan()),
                 CacheEnabled = project.Request.Cache.Enabled,
                 project.Request.Budgets,
                 HasTotal = preparation.Total != null,

@@ -146,14 +146,14 @@ finally {
                     harnessSha256     = $harnessHash
                 }).AsReadOnly()
             packageVersion           = [string]$identity.Version
-            packageRepositoryCommits = @($identity.RepositoryCommits)
+            packageRepositoryCommits = $identity.RepositoryCommits
             sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
             platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
             processorCount           = [Environment]::ProcessorCount
             iterations               = $Iterations
             scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
-            packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { ([ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }).AsReadOnly() })
-            measurements             = @($measurementSnapshot)
+            packages                 = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($packageFiles | Sort-Object Name | ForEach-Object { ([ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }).AsReadOnly() })))
+            measurements             = $measurementSnapshot
         }).AsReadOnly()
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM
