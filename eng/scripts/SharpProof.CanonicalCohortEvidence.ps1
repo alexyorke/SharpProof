@@ -256,7 +256,7 @@ function Assert-SharpProofCanonicalCohorts {
             (@($receipt.projects) -join "`n") -cne ($expectedProjects -join "`n")) {
             throw 'Canonical cohort does not match this attempt and the complete project partition.'
         }
-        $expectedTasks = if ($cohort -eq 'Gates') { @('semantic-projects') }
+        $expectedTasks = if ($cohort -eq 'Gates') { @('gates-corpus', 'gates-remainder-1', 'gates-remainder-2', 'gates-remainder-3') }
         else { @('semantic-projects', 'worker-claim-manifest', 'worker-compiler-manifest', 'worker-core', 'worker-remainder-1', 'worker-remainder-2', 'worker-remainder-3', 'worker-remainder-4') | Sort-Object }
         if ((@($receipt.expectedTasks) -join "`n") -cne ($expectedTasks -join "`n") -or
             (@($receipt.completedTasks) -join "`n") -cne ($expectedTasks -join "`n") -or

@@ -27,8 +27,9 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds every slot, the Worker remainder shards dominate the rest, and
-    # Projects holds every other task. All keeps the single-runner task set.
+    # holds the Gates corpus task and shards, the Worker remainder shards
+    # dominate the rest, and Projects holds every other task. All keeps the
+    # single-runner task set.
     [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
     [string]$CoverageTaskGroup = 'All'
 )
@@ -108,8 +109,8 @@ if ($CoverageTaskGroup -ne 'All' -and -not $coverageEnabled) {
     throw 'Coverage task groups require coverage collection.'
 }
 if ($coverageEnabled) {
-    # The corpus verifier starts its own worker pool and must run in a separate
-    # task that reserves every slot. Attributes has its own collector stage.
+    # Gates runs as its own task set below; its corpus verifier task reserves
+    # every slot. Attributes has its own collector stage.
     # Architecture XML/DAG checks retain a separate strict noninstrumented TRX task.
     $semanticProjects = @($semanticProjects | Where-Object {
             $_ -cne $gatesProject -and
@@ -288,11 +289,46 @@ $workerRemainderTaskNames = @(
     for ($index = 1; $index -le $workerRemainderShardFilters.Count; $index++) {
         'worker-remainder-' + $index
     })
+# Gates runs in one NUnit thread, so wherever it runs apart from the other
+# projects it is split like the Worker remainder. Its corpus verifier classes
+# and Corpus-category tests run the whole reviewed corpus through the
+# verifier's own two-worker pool, so they share one task. The remaining
+# classes hold about three minutes of single-CPU time uninstrumented and run
+# in class name prefix shards; the last shard is the complement of the listed
+# prefixes, so every current and future class runs in exactly one task.
+$gatesShardingEnabled =
+$semanticProjectShardingEnabled -or $SemanticCohort -eq 'Gates'
+$gatesClassPrefix = 'SharpProof.Gates.Test.'
+$gatesCorpusClasses = @(
+    'CorpusSnapshotWorkflowTests',
+    'GatesCommandWorkflowTests')
+$gatesCorpusFilter = (@($gatesCorpusClasses | ForEach-Object {
+            'FullyQualifiedName~' + $gatesClassPrefix + $_
+        }) + 'TestCategory=Corpus') -join '|'
+$gatesRemainderFilter = (@($gatesCorpusClasses | ForEach-Object {
+            'FullyQualifiedName!~' + $gatesClassPrefix + $_
+        }) + 'TestCategory!=Corpus') -join '&'
+$gatesRemainderShardPrefixes = @(
+    , @('NativeEffectOracleGate')
+    , @('NativeEffectOracleSelection', 'CorpusGate'))
+$gatesRemainderShardFilters = @(
+    foreach ($prefixes in $gatesRemainderShardPrefixes) {
+        '(' + (@($prefixes | ForEach-Object {
+                    'FullyQualifiedName~' + $gatesClassPrefix + $_
+                }) -join '|') + ')'
+    }
+    @($gatesRemainderShardPrefixes | ForEach-Object { $_ } | ForEach-Object {
+            'FullyQualifiedName!~' + $gatesClassPrefix + $_
+        }) -join '&')
+$gatesRemainderTaskNames = @(
+    for ($index = 1; $index -le $gatesRemainderShardFilters.Count; $index++) {
+        'gates-remainder-' + $index
+    })
 $tasks = [Collections.Generic.List[object]]::new()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
         foreach ($project in $semanticProjects) {
-            if ($project -eq (
+            if ($project -ceq $gatesProject -or $project -eq (
                     'src/SharpProof.Architecture.Tests/' +
                     'SharpProof.Architecture.Tests.csproj')) {
                 continue
@@ -310,7 +346,7 @@ if (-not $ArchitectureOnly) {
                 })
         }
     }
-    else {
+    elseif ($SemanticCohort -ne 'Gates') {
         $tasks.Add(
             [pscustomobject]@{
                 Name                         = 'semantic-projects'
@@ -325,15 +361,33 @@ if (-not $ArchitectureOnly) {
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
             })
     }
-    if ($coverageEnabled) {
+    # The corpus task reserves the verifier pool and its test host, and every
+    # slot under coverage. Each other Gates shard keeps about one CPU busy;
+    # instrumented processes use more memory, so coverage keeps two at a time.
+    $gatesTaskDescriptors = @(
+        [pscustomobject]@{
+            Name                         = 'gates-corpus'
+            Filter                       = "($gatesCorpusFilter)&($semanticFilter)"
+            Slots                        = $(if ($coverageEnabled) { $parallelism } else { [Math]::Min($parallelism, 3) })
+            DefaultEstimatedMilliseconds = 250000L
+        })
+    for ($index = 0; $index -lt $gatesRemainderShardFilters.Count; $index++) {
+        $gatesTaskDescriptors += [pscustomobject]@{
+            Name                         = $gatesRemainderTaskNames[$index]
+            Filter                       = "($gatesRemainderFilter)&($semanticFilter)&$($gatesRemainderShardFilters[$index])"
+            Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+            DefaultEstimatedMilliseconds = 100000L
+        }
+    }
+    foreach ($descriptor in $(if ($gatesShardingEnabled) { $gatesTaskDescriptors } else { @() })) {
         $tasks.Add([pscustomobject]@{
-                Name                         = 'semantic-gates'
+                Name                         = $descriptor.Name
                 Target                       = Join-Path $repositoryRoot $gatesProject
-                Filter                       = $semanticFilter
+                Filter                       = $descriptor.Filter
                 ProjectParallelism           = 0
-                IsolateOutput                = $false
-                Slots                        = $parallelism
-                DefaultEstimatedMilliseconds = 500000L
+                IsolateOutput                = $true
+                Slots                        = $descriptor.Slots
+                DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
             })
     }
     $workerTaskDescriptors = @(
@@ -407,7 +461,7 @@ if ($architectureShardingEnabled) {
         })
 }
 if ($CoverageTaskGroup -ne 'All') {
-    $gatesTaskNames = @('semantic-gates')
+    $gatesTaskNames = @('gates-corpus') + $gatesRemainderTaskNames
     $workerTaskNames = $workerRemainderTaskNames + @('worker-fixed-checksum')
     # Capture the name first: inside switch, $_ is the switch value.
     $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
@@ -515,9 +569,9 @@ try {
         $isolatedOutput = ''
         if ($coverageEnabled -and $task.IsolateOutput) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                -SourceDirectory (Join-Path $repositoryRoot (
-                    'artifacts/bin/SharpProof.Worker.Tests/' + $Configuration +
-                    '/net10.0')) `
+                -SourceDirectory (Split-Path -Parent (
+                    Get-SharpProofTestAssemblyPath `
+                        -ProjectPath $task.Target -Configuration $Configuration)) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
                     $task.Name + '/' + $Configuration + '/net10.0'))
