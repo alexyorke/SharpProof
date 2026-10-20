@@ -73,7 +73,7 @@ public sealed class Pr275CoreRequiredInputTests
             fixture.Compilation,
             CompilerConfiguration.AdvisoryAll,
             TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
         AssertArgumentNull(
             "method",
@@ -86,7 +86,7 @@ public sealed class Pr275CoreRequiredInputTests
             () => ClosedContractDiagnostics.Validate(fixture.Method, session, null!));
 
         ClosedContractDiagnostics.Validate(fixture.Method, session, diagnostics.Add);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(diagnostics.ToImmutable(), Is.Empty);
     }
 
     [Test]

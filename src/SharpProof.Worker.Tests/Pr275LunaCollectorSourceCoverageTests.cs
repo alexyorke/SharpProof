@@ -129,7 +129,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                 MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet))
             .ToImmutableArray();
         var artifact = CreateArtifact(compilation, discovery);
-        var callables = artifact.Callables.ToDictionary(
+        var callables = artifact.Callables.ToImmutableDictionary(
             item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
             StringComparer.Ordinal);
 

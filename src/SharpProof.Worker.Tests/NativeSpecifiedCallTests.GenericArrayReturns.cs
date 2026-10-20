@@ -112,14 +112,18 @@ internal sealed partial class NativeSpecifiedCallTests
                 _ => throw new ArgumentOutOfRangeException(nameof(element))
             };
             var all = Array.CreateInstance(runtimeElement, boundaries.Length);
-            var inputs = new List<Array?> { null, Array.CreateInstance(runtimeElement, 0), all };
+            var inputBuilder = ImmutableArray.CreateBuilder<Array?>();
+            inputBuilder.Add(null);
+            inputBuilder.Add(Array.CreateInstance(runtimeElement, 0));
+            inputBuilder.Add(all);
             for (var ordinal = 0; ordinal < boundaries.Length; ordinal++)
             {
                 all.SetValue(boundaries[ordinal], ordinal);
                 var single = Array.CreateInstance(runtimeElement, 1);
                 single.SetValue(boundaries[ordinal], 0);
-                inputs.Add(single);
+                inputBuilder.Add(single);
             }
+            var inputs = inputBuilder.ToImmutable();
             var arrayType = factory.GetVariableInfo(context.Parameters[0].Entry).Type;
             var elementType = factory.GetTypeInfo(arrayType).ElementType!.Value;
             foreach (var values in inputs)

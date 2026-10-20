@@ -447,7 +447,7 @@ public sealed class ScalarDifferentialMatrixTests
                         Is.EqualTo(input),
                         $"{item.MethodName}({Format(input)}, {chooseFirst})");
                     AssertIntegerReturn(
-                        ExecuteIr(target, input, chooseFirst),
+                        ExecuteIr(target, [input, chooseFirst]),
                         Convert.ToInt64(input, CultureInfo.InvariantCulture),
                         $"{item.MethodName}({Format(input)}, {chooseFirst})");
                 }
@@ -486,7 +486,7 @@ public sealed class ScalarDifferentialMatrixTests
                         Is.EqualTo(expected),
                         $"{comparisonName}({Format(left)}, {Format(right)})");
                     AssertIntegerReturn(
-                        ExecuteIr(comparisonTarget, left, right),
+                        ExecuteIr(comparisonTarget, [left, right]),
                         expected,
                         $"{comparisonName}({Format(left)}, {Format(right)})");
                 }
@@ -544,7 +544,7 @@ public sealed class ScalarDifferentialMatrixTests
                     Is.EqualTo(expected),
                     $"{item.MethodName}({Format(input)})");
                 AssertIntegerReturn(
-                    ExecuteIr(target, input),
+                    ExecuteIr(target, [input]),
                     expected,
                     $"{item.MethodName}({Format(input)})");
             }
@@ -592,7 +592,7 @@ public sealed class ScalarDifferentialMatrixTests
                     StringComparison.Ordinal)));
             var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
-            var execution = ExecuteIr(target, item.Inputs.ToArray());
+            var execution = ExecuteIr(target, item.Inputs);
             if (item.ExpectedException == null)
             {
                 using (Assert.EnterMultipleScope())
@@ -938,9 +938,10 @@ public sealed class ScalarDifferentialMatrixTests
 
     private static IrProgramExecutionResult ExecuteIr(
         CompilerCallablePreparation target,
-        params object[] inputs)
+        ImmutableArray<object> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         var total = target.Total ??
             throw new InvalidOperationException(
                 $"Callable '{target.Entry.CallableId}' has no Total program.");

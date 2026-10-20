@@ -119,7 +119,7 @@ internal sealed partial class NativeSpecifiedCallTests
         {
             var assembly = load.LoadFromStream(emitted);
             var runtime = assembly.GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int[]?, int, int, int, int>>();
-            foreach (var values in new int[]?[] { null, [], [17], [11, 23], [-1, 0, 7] })
+            foreach (var values in ImmutableArray.Create<int[]?>(null, [], [17], [11, 23], [-1, 0, 7]))
             {
                 foreach (var first in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                 {

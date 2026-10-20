@@ -382,7 +382,7 @@ internal sealed class WorkerTcbEdgeCaseTests
             directory,
             inputHash,
             differentManifest ? new string('c', 64) : manifest.Hash,
-            differentManifest ? [] : null,
+            differentManifest ? ImmutableArray<WorkerCallableResult>.Empty : null,
             []);
         var cache = new VerificationCache(directory, 1024 * 1024);
 
@@ -458,10 +458,11 @@ internal sealed class WorkerTcbEdgeCaseTests
         string directory,
         string inputHash,
         string manifestHash,
-        WorkerCallableResult[]? callableResults,
-        WorkerClaimResult[] claimResults)
+        ImmutableArray<WorkerCallableResult>? callableResults,
+        ImmutableArray<WorkerClaimResult> claimResults)
     {
-        System.ArgumentNullException.ThrowIfNull(claimResults, nameof(claimResults));
+        if (claimResults.IsDefault)
+        { throw new ArgumentNullException(nameof(claimResults)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(inputHash);
         System.ArgumentNullException.ThrowIfNull(manifestHash);

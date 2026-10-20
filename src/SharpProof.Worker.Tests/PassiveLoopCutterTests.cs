@@ -181,14 +181,14 @@ internal sealed class PassiveLoopCutterTests
             factory.Variable(subject.Parameter.Current), factory.Integer(1)));
         builder.Goto(body, subject.Site, header);
         builder.Return(exit, subject.Site, factory.PureOpaque(value, factory.Variable(c.Current)));
-        var requires = new List<PassiveContractClause>();
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
         foreach (var parameter in ImmutableArray.Create(a, b, c))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(factory.ObjectType)), factory.Boolean(true), subject.Site)); }
         foreach (var pair in ImmutableArray.Create((a, b), (a, c), (b, c)))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(pair.Item1.Entry), factory.Variable(pair.Item2.Entry)), factory.Boolean(true), subject.Site)); }
         requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         var candidate = new PassiveCallableCandidate("changing-heap-receiver", builder.Build(), [a, b, c, subject.Parameter], subject.Result,
-            [.. requires], [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
+            requires.ToImmutable(), [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
         return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(a.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(b.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(c.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)), headerSite);
     }
 
@@ -249,15 +249,13 @@ internal sealed class PassiveLoopCutterTests
         builder.Throw(body, subject.Site, IrExceptionKind.Overflow, header);
         builder.Return(exit, subject.Site, array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
             : factory.PureOpaque(field, factory.Variable(owner.Current)));
-        var requires = new List<PassiveContractClause>
-        {
-            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(ownerType)), factory.Boolean(true), subject.Site),
-            new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site)
-        };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(ownerType)), factory.Boolean(true), subject.Site));
+        requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
         var candidate = new PassiveCallableCandidate("exception-loop-heap", builder.Build(), [owner, subject.Parameter], subject.Result,
-            [.. requires],
+            requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
         return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner.Entry, array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
                 : factory.CreateReferenceValue(ownerType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)));
