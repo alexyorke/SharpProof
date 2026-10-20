@@ -86,10 +86,24 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds.Elements.Text, Is.EqualTo("10"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CurrentReceiverSourceCallsSubstituteSizesAndChargeCalleeAllocations(bool explicitThis)
+    {
+        var result = AnalyzeSource("public class C { public void Root(int n) { " +
+            (explicitThis ? "this.Leaf(n);" : "Leaf(n);") +
+            " } void Leaf(int count) { for(int i=0;i<count;i++) {var a=new int[2];} } }");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.LoopIterations.Text, Is.EqualTo("max(0, n)"));
+        Assert.That(result.Bounds.Arrays.Text, Is.EqualTo("max(0, n)"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("(max(0, n) * 2)"));
+    }
+
     [TestCase("public static void Root() { Root(); }", "RecursiveCostUnknown")]
     [TestCase("public static void Root() { Leaf(); } static void Leaf() { Root(); }", "RecursiveCostUnknown")]
     [TestCase("public static void Root() { System.Console.WriteLine(1); }", "OpaqueCall")]
-    [TestCase("public void Root() { Leaf(); } void Leaf() {}", "UnsupportedCall")]
+    [TestCase("public void Root() { Leaf(); } public virtual void Leaf() {}", "UnsupportedCall")]
+    [TestCase("public void Root(C target) { target.Leaf(); } void Leaf() {}", "UnsupportedCall")]
     [TestCase("static int[] Hidden = new int[4]; public static void Root() { Leaf(); } static void Leaf() {}", "CallTypeInitializationUnknown")]
     [TestCase("public static void Root(int n) { Leaf(n+1); } static void Leaf(int x) { for(int i=0; i<x; i++) {} }", "UnsupportedLoopBound")]
     [TestCase("public static void Root(int n) { Leaf(ref n); } static void Leaf(ref int x) {}", "UnsupportedCall")]

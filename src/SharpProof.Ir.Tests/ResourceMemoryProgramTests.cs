@@ -7,6 +7,74 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [Test]
+    public void OwnedCopyChainsPreservePeakStorageThroughTheirLastRead()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var first = factory.CreateVariable("first", type);
+        var alias = factory.CreateVariable("alias", type);
+        var second = factory.CreateVariable("second", type);
+        var final = factory.CreateVariable("final", type);
+        builder.Allocate(entry, factory.CreateOperation(), type, first, factory.Integer(1));
+        builder.Assign(entry, factory.CreateOperation(), alias, factory.Variable(first));
+        builder.Allocate(entry, factory.CreateOperation(), type, second, factory.Integer(3));
+        builder.Assign(entry, factory.CreateOperation(), final, factory.Variable(alias));
+        builder.Return(entry, factory.CreateOperation());
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(72, 72, 72, 72, 0, 0)));
+    }
+
+    [Test]
+    public void UnownedCopyCannotSilentlyReplaceAnExistingOwnedRoot()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var input = factory.CreateVariable("input", type);
+        var current = factory.CreateVariable("current", type);
+        var alias = factory.CreateVariable("alias", type);
+        builder.Allocate(entry, factory.CreateOperation(), type, current, factory.Integer(1));
+        builder.Assign(entry, factory.CreateOperation(), current, factory.Variable(input));
+        builder.Assign(entry, factory.CreateOperation(), alias, factory.Variable(current));
+        builder.Return(entry, factory.CreateOperation());
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("UnownedMemoryReference"));
+    }
+
+    [TestCase(2, false)]
+    [TestCase(2, true)]
+    [TestCase(17, false)]
+    [TestCase(17, true)]
+    public void BorrowedCopyChainsRemainUnownedOnlyWhenTheirFinalAliasIsObserved(int length, bool observed)
+    {
+        if (length < 2 || length > 17)
+        { throw new ArgumentOutOfRangeException(nameof(length)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var current = factory.CreateVariable("input", factory.ObjectType);
+        for (var index = 0; index < length; index++)
+        {
+            var next = factory.CreateVariable("copy" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), factory.ObjectType);
+            builder.Assign(entry, factory.CreateOperation(), next, factory.Variable(current));
+            current = next;
+        }
+        builder.Return(entry, factory.CreateOperation(), observed ? factory.Variable(current) : null);
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        if (observed)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("UnownedMemoryReference"));
+        }
+        else
+        { Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(0, 0, 0, 0, 0, 0))); }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void BorrowedInputCopiesNeedOwnershipOnlyWhenObserved(bool observed)

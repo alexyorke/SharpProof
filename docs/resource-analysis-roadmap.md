@@ -89,6 +89,37 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Current-receiver factory call composition
+
+The source-call extension admits direct calls on the current receiver to methods
+that are not virtual, preserving argument binding and shared cost-analysis budgets. Virtual,
+overriding and arbitrary receiver calls remain outside this admission. Finite
+memory extraction now follows pure-copy liveness backward so unread receiver
+entry/current/pre-state chains do not invent owned input graphs. Any observed
+alias still requires ownership. New controls cover explicit and implicit this,
+borrowed copy chains and virtual/arbitrary receiver rejection. The initial
+liveness implementation incorrectly removed an owned graph's last read; the
+existing 72-byte peak regression caught that change. The repaired rule preserves
+all owned reads/roots and rejects unowned overwrites of existing owned roots.
+All 778 IR tests and all 594 selected worker/resource/protocol cases passed on
+the guarded implementation. All three packaged-consumer variants passed,
+including the current-receiver call with constant argument substitution and
+strict/advisory JSON/SARIF controls. The full analyzer suite found the obsolete
+instance-call rejection expectation; supported-call assertions and separate
+virtual/arbitrary receiver rejection cases replace it. The complete analyzer
+suite then passed all 1454 tests. Quality/API compatibility, negative fixtures,
+full repository formatting, documentation lint and all 728 local links passed.
+There are no new production files or projects; the prior 2769-source layout and
+529-path trusted inventory remain applicable. Exact pushed-head CI and aggregate
+coverage qualification remain required. Cache 44 invalidates
+earlier capability results. This remains part of phase C; all other unchecked
+roadmap and qualification requirements remain.
+
+Published instance-factory head 8d73b0049 passed all four coverage shards but
+failed the unchanged aggregate floor at 4734/4953 changed trusted lines (95.58%,
+219 gaps). Its report is preserved separately from predecessor f72dbc694.
+The new current-receiver changes have no measured aggregate claim yet.
+
 ### Instance factory lifetime extension
 
 Instance factories now use the shared-root closure model only when deferred

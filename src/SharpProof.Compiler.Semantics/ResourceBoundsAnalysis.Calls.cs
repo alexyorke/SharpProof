@@ -46,7 +46,10 @@ internal sealed partial class ResourceBoundsAnalysis
         { return Unknown("RecursiveCostUnknown"); }
         if (_compilation is null || target.DeclaringSyntaxReferences.IsEmpty)
         { return MetadataCall(invocation, depth); }
-        if (!target.IsStatic || invocation.Instance is not null || target.IsAsync || target.IsAbstract || target.IsExtern ||
+        if ((target.IsStatic ? invocation.Instance is not null :
+                invocation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } ||
+                !target.ContainingType.IsReferenceType) || target.IsVirtual || target.IsOverride ||
+            target.IsAsync || target.IsAbstract || target.IsExtern ||
             target.IsGenericMethod || target.ContainingType.IsGenericType || target.ReducedFrom is not null ||
             target.MethodKind != MethodKind.Ordinary || target.ReturnsByRef || target.ReturnsByRefReadonly ||
             (!target.ReturnsVoid && !SupportedType(target.ReturnType)) ||

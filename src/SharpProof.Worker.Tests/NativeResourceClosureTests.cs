@@ -5,6 +5,43 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase(false, 4)]
+    [TestCase(false, 6)]
+    [TestCase(true, 4)]
+    [TestCase(true, 6)]
+    public async Task VirtualOrArbitraryReceiverFactoryCallsRemainUnknown(bool virtualCall, int metric)
+    {
+        var source = "using SharpProof.Attributes; public class C { " +
+            (virtualCall ? "public virtual " : "public ") +
+            "System.Func<System.Func<int>> Make(int n) => () => () => n; " +
+            $"[ResourceUpperBound((ResourceMetric){metric},1024)] public System.Func<System.Func<int>> Target(C other,int n) => " +
+            (virtualCall ? "Make(n); }" : "other.Make(n); }");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+    }
+
+    [TestCase(false, 4)]
+    [TestCase(false, 5)]
+    [TestCase(false, 6)]
+    [TestCase(true, 4)]
+    [TestCase(true, 5)]
+    [TestCase(true, 6)]
+    public async Task CurrentReceiverCallsComposeReceiverIndependentFactoryLifetimes(bool explicitThis, int metric)
+    {
+        var limit = metric == 5 ? 0 : 96;
+        var source = "using SharpProof.Attributes; public sealed class C { " +
+            "System.Func<System.Func<int>> Make(int n) => () => () => n; " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public System.Func<System.Func<int>> Target(int n) => " +
+            (explicitThis ? "this.Make(n); }" : "Make(n); }");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
     [Test]
     public void CompiledInstanceFactoryDoesNotRetainItsUnusedReceiver()
     {

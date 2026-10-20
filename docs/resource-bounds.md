@@ -603,6 +603,16 @@ scalar root capture retains a 32-byte frame (including its deferred delegate
 cache slot) and a 64-byte outer delegate. Later invocations require separate
 cost proofs.
 
+Direct calls on the current receiver to source methods that are not virtual can
+compose an admitted factory with its caller, for both explicit and implicit this.
+Argument costs are
+charged once and callee parameter sizes are substituted under the shared analysis
+budget. Unobserved borrowed receiver-copy chains require no owned input graph;
+all owned copy reads and roots retain the declared last-use behavior. Observed
+borrowed aliases and unowned overwrites of existing owned roots remain Unknown.
+Virtual, overriding and arbitrary receiver calls remain outside this resource
+admission.
+
 ### Logical source stack contracts
 
 `SourceActivationDepth` bounds simultaneous logical source activations.
@@ -671,7 +681,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 43 invalidate older responses without this evidence.
+Protocol 39 and cache schema 44 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -723,7 +733,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 43 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 44 invalidate prior responses; compiler artifact 52 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

@@ -3589,18 +3589,25 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache(bool instanceFactory)
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache(int factoryKind)
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        var source = instanceFactory
-            ? "using SharpProof.Attributes; public sealed class Subject { " +
-                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target(int value) => () => () => value; }"
-            : "using SharpProof.Attributes; public static class Subject { " +
+        var source = factoryKind switch
+        {
+            0 => "using SharpProof.Attributes; public static class Subject { " +
                 "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
-                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }";
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }",
+            1 => "using SharpProof.Attributes; public sealed class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target(int value) => () => () => value; }",
+            2 => "using SharpProof.Attributes; public sealed class Subject { " +
+                "System.Func<System.Func<int>> Make(int value) => () => () => value; " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target() => this.Make(3); }",
+            _ => throw new ArgumentOutOfRangeException(nameof(factoryKind))
+        };
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,

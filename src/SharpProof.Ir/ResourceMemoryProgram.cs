@@ -62,6 +62,26 @@ internal static class ResourceMemoryProgram
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         instructions = ArgumentNullGuard.NotNull(instructions, nameof(instructions));
         layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        var unreadCopies = new HashSet<int>();
+        var liveCopies = new Dictionary<IrVarId, int>();
+        for (var index = instructions.Count - 1; index >= 0; index--)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (instructions[index] is IrAssignInstruction { Value: IrVariableTerm } copy)
+            {
+                if (!liveCopies.Remove(copy.Target))
+                { unreadCopies.Add(index); continue; }
+            }
+            var readCount = 0;
+            foreach (var term in IrInstructionFacts.ReadTerms(instructions[index]))
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (++readCount > ResourceMemoryTrace.MaximumEvents)
+                { return Unknown("MemoryProgramBudgetExceeded"); }
+                if (!ReadVariables(term, factory, liveCopies, index, 0))
+                { return Unknown("MemoryScalarEffectUnsupported"); }
+            }
+        }
         var lastUse = new Dictionary<IrVarId, int>();
         for (var index = 0; index < instructions.Count; index++)
         {
@@ -199,10 +219,13 @@ internal static class ResourceMemoryProgram
                     values[target] = ++nextObject;
                     trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, slot, 0, lower, upper));
                     break;
-                // A pure copy into an unread local cannot retain an input graph.
+                // Unobserved pure-copy chains need no borrowed-input ownership.
+                // Preserve all owned copy reads and roots under the last-use model.
                 // In particular, compiler entry/current/pre-state receiver copies
                 // need no ownership fact when the method never observes them.
-                case IrAssignInstruction { Value: IrVariableTerm } deadCopy when !lastUse.ContainsKey(deadCopy.Target):
+                case IrAssignInstruction { Value: IrVariableTerm } deadCopy when unreadCopies.Contains(index) &&
+                    !values.ContainsKey(deadCopy.Target) &&
+                    !TryReference(deadCopy.Value, factory, values, out _, fields: referenceFields):
                     break;
                 case IrAssignInstruction assignment:
                     if (factory.GetTypeInfo(assignment.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
