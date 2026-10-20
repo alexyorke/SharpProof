@@ -125,23 +125,48 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
 
             return parameter.WithType(shape.ParameterList.Parameters[index].Type!.WithTriviaFrom(parameter.Type!));
         }), method.ParameterList.Parameters.GetSeparators()))).WithAdditionalAnnotations(Formatter.Annotation);
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-        var changedRoot = Inference.AddRequiredExternAliases((CompilationUnitSyntax)root!.ReplaceNode(method, replacement), replacement, model, cancellationToken);
-        var changed = document.WithSyntaxRoot(changedRoot);
-        var formatted = await Formatter.FormatAsync(changed, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
-        var formattedRoot = (await formatted.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
-        var formattedModel = (await formatted.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
-        if (Inference.PreservesCallerInfoArguments(root!, model, formattedRoot, formattedModel, cancellationToken))
-        { return formatted; }
-        var unformattedRoot = changedRoot.ReplaceNodes(changedRoot.GetAnnotatedNodes(Formatter.Annotation), (original, rewritten) =>
+        var roots = Inference.RewriteMethodParts(method, replacement, model, cancellationToken);
+        var solution = document.Project.Solution;
+        var originals = new Dictionary<DocumentId, (SyntaxNode Root, SemanticModel Model)>();
+        foreach (var entry in roots)
         {
-            if (original is null)
-            { throw new ArgumentNullException(nameof(original)); }
-            if (rewritten is null)
-            { throw new ArgumentNullException(nameof(rewritten)); }
-            return rewritten.WithoutAnnotations(Formatter.Annotation);
-        });
-        return changed.WithSyntaxRoot(unformattedRoot);
+            var originalDocument = document.Project.GetDocument(entry.Key);
+            if (originalDocument is null)
+            { return document; }
+            var originalRoot = (await originalDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var originalModel = (await originalDocument.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
+            originals.Add(originalDocument.Id, (originalRoot, originalModel));
+            var root = entry.Value.ReplaceNodes(entry.Value.GetAnnotatedNodes("HM.PartialRewrite"), (before, rewritten) =>
+            {
+                if (before is null)
+                { throw new ArgumentNullException(nameof(before)); }
+                if (rewritten is null)
+                { throw new ArgumentNullException(nameof(rewritten)); }
+                return rewritten.WithoutAnnotations("HM.PartialRewrite").WithAdditionalAnnotations(Formatter.Annotation);
+            });
+            solution = solution.WithDocumentSyntaxRoot(originalDocument.Id, root);
+        }
+        foreach (var entry in originals)
+        {
+            var changed = solution.GetDocument(entry.Key)!;
+            var changedRoot = (await changed.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var formatted = await Formatter.FormatAsync(changed, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var formattedRoot = (await formatted.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var formattedModel = (await formatted.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
+            if (Inference.PreservesCallerInfoArguments(entry.Value.Root, entry.Value.Model, formattedRoot, formattedModel, cancellationToken))
+            { solution = formatted.Project.Solution; continue; }
+            var unformattedRoot = changedRoot.ReplaceNodes(changedRoot.GetAnnotatedNodes(Formatter.Annotation), (original, rewritten) =>
+            {
+                if (original is null)
+                { throw new ArgumentNullException(nameof(original)); }
+                if (rewritten is null)
+                { throw new ArgumentNullException(nameof(rewritten)); }
+                return rewritten.WithoutAnnotations(Formatter.Annotation);
+            });
+            solution = solution.WithDocumentSyntaxRoot(entry.Key, unformattedRoot);
+        }
+        return solution.GetDocument(document.Id)!;
+
     }
 
     private sealed class SequentialFixAll : FixAllProvider
@@ -193,6 +218,9 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                     continue;
                 }
 
+                var diagnosticRoot = (await original.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+                var originalMethods = diagnosticRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+                var currentMethods = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
                 var methods = diagnostics.Where(d =>
                 {
                     if (d is null)
@@ -200,7 +228,7 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                         throw new global::System.ArgumentNullException(nameof(d));
                     }
 
-                    return d.Id == "HM0001" && d.Location.IsInSource && root.FullSpan.Contains(d.Location.SourceSpan);
+                    return d.Id == "HM0001" && d.Location.IsInSource && diagnosticRoot.FullSpan.Contains(d.Location.SourceSpan);
                 }).Select(d =>
                 {
                     if (d is null)
@@ -208,8 +236,9 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                         throw new global::System.ArgumentNullException(nameof(d));
                     }
 
-                    var target = root.FindToken(d.Location.SourceSpan.Start).Parent?.FirstAncestorOrSelf<MethodDeclarationSyntax>();
-                    return target?.Identifier.Span == d.Location.SourceSpan ? target : null;
+                    var target = diagnosticRoot.FindToken(d.Location.SourceSpan.Start).Parent?.FirstAncestorOrSelf<MethodDeclarationSyntax>();
+                    var ordinal = target is null ? -1 : Array.IndexOf(originalMethods, target);
+                    return target?.Identifier.Span == d.Location.SourceSpan && ordinal >= 0 && ordinal < currentMethods.Length ? currentMethods[ordinal] : null;
                 }).Where(method => method is not null).Cast<MethodDeclarationSyntax>().Distinct().ToArray();
                 var annotations = methods.ToDictionary(method =>
                 {

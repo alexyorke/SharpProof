@@ -149,7 +149,7 @@ public static partial class Inference
             foreach (var tree in model.Compilation.SyntaxTrees)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var afterTree = tree == originalTree ? changedTree : tree;
+                var afterTree = replacementTrees.TryGetValue(tree, out var replacementTree) ? replacementTree : tree == originalTree ? changedTree : tree;
                 var calls = tree.GetRoot(cancellationToken).DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
                 var afterCalls = afterTree.GetRoot(cancellationToken).DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
                 var semantic = model.Compilation.GetSemanticModel(tree);
@@ -163,7 +163,7 @@ public static partial class Inference
                     }))
                     { continue; }
                     if (semantic.GetOperation(calls[i], cancellationToken) is not IInvocationOperation call
-                        || !SymbolEqualityComparer.Default.Equals((call.TargetMethod.ReducedFrom ?? call.TargetMethod).OriginalDefinition, originalMethod.OriginalDefinition))
+                        || !SameMethodDefinition(call.TargetMethod, originalMethod))
                     { continue; }
                     foreach (var argument in call.Arguments)
                     {

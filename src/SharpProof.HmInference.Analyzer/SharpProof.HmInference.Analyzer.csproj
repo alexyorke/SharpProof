@@ -10,6 +10,7 @@
     <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" />
     <Compile Include="../SharpProof.HmInference/DynamicOperations.cs" Link="DynamicOperations.cs" />
     <Compile Include="../SharpProof.HmInference/AliasImports.cs" Link="AliasImports.cs" />
+    <Compile Include="../SharpProof.HmInference/PartialMethods.cs" Link="PartialMethods.cs" />
     <Compile Include="../SharpProof.HmInference/Inference.cs" Link="Inference.cs" />
     <Compile Include="../SharpProof.HmInference/CallerRefinement.cs" Link="CallerRefinement.cs" />
     <Compile Include="../SharpProof.HmInference/NullableAsync.cs" Link="NullableAsync.cs" />

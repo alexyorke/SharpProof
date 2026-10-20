@@ -106,7 +106,7 @@ public static partial class Inference
                 var originalMethod = PinningMethod(beforeModel, original);
                 var candidateMethod = PinningMethod(afterModel, candidate);
                 requiresPinningEmission |= originalMethod is not null
-                    && SymbolEqualityComparer.Default.Equals(originalMethod.OriginalDefinition, currentMethod?.OriginalDefinition);
+                    && SameMethodDefinition(originalMethod, currentMethod);
                 if (!SameAwaitMethod(originalMethod, candidateMethod, changedMethod, changedTree))
                 { return false; }
             }

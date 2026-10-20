@@ -251,7 +251,7 @@ public static partial class Inference
             { return false; }
             for (var i = 0; i < left.Length; i++)
             {
-                if (left[i].Method is { } selected && SymbolEqualityComparer.Default.Equals((selected.ReducedFrom ?? selected).OriginalDefinition, currentMethod?.OriginalDefinition))
+                if (left[i].Method is { } selected && SameMethodDefinition(selected, currentMethod))
                 { requiresInterpolationEmission = true; }
                 if (left[i].Kind != right[i].Kind || !SameAwaitMethod(left[i].Method, right[i].Method, changedMethod, changedTree))
                 { return false; }

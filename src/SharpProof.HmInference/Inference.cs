@@ -112,9 +112,11 @@ public static partial class Inference
             var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
             if (symbol.IsVararg)
             { return new(symbol.Name, "Concrete", "C# vararg methods cannot declare type parameters."); }
-            if (symbol.IsExtern || method.Modifiers.Any(SyntaxKind.PartialKeyword))
+            if (symbol.PartialImplementationPart is not null || method.Body is null && method.ExpressionBody is null && method.Modifiers.Any(SyntaxKind.PartialKeyword))
+            { return new(symbol.Name, "Concrete", "Partial declarations are inferred through their implementation."); }
+            if (symbol.IsExtern)
             {
-                throw new InferenceException("Extern and partial root methods are unsupported.");
+                throw new InferenceException("Extern root methods retain their runtime signatures.");
             }
 
             if (IsRequiredBuilderMember(symbol) && IsUsedBuilderMember(symbol))
@@ -196,6 +198,12 @@ public static partial class Inference
                 {
                     reserved.Add(parameter.Name);
                 }
+            }
+
+            if (symbol.PartialDefinitionPart?.DeclaringSyntaxReferences.SingleOrDefault()?.GetSyntax(cancellationToken) is MethodDeclarationSyntax counterpart)
+            {
+                foreach (var token in counterpart.DescendantTokens())
+                { if (token.IsKind(SyntaxKind.IdentifierToken)) { reserved.Add(token.ValueText); } }
             }
 
             var nextName = 1;
@@ -297,21 +305,30 @@ public static partial class Inference
             var tree = method.SyntaxTree;
             var candidateMarker = new SyntaxAnnotation("HM.Candidate");
             candidate = candidate.WithAdditionalAnnotations(candidateMarker);
+            IReadOnlyDictionary<SyntaxTree, CompilationUnitSyntax> candidateRoots = RewriteMethodParts(method, candidate, model, cancellationToken);
             SyntaxTree CandidateTree()
             {
-                var root = (CompilationUnitSyntax)tree.GetRoot(cancellationToken).ReplaceNode(method, candidate);
-                return tree.WithRootAndOptions(AddRequiredExternAliases(root, candidate, model, cancellationToken), tree.Options);
+                candidateRoots = RewriteMethodParts(method, candidate, model, cancellationToken);
+                return tree.WithRootAndOptions(candidateRoots[tree], tree.Options);
             }
             var changed = CandidateTree();
             Compilation ReplaceCandidate(SyntaxTree replacement)
             {
                 if (replacement is null)
                 { throw new ArgumentNullException(nameof(replacement)); }
-                var rewritten = model.Compilation.ReplaceSyntaxTree(tree, replacement);
-                if (model.Compilation.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
-                { rewritten = rewritten.WithOptions(rewritten.Options.WithSyntaxTreeOptionsProvider(new CandidateTreeOptions(sourceOptions, tree, replacement))); }
+                var rewritten = model.Compilation;
+                replacementTrees.Clear();
+                foreach (var entry in candidateRoots)
+                {
+                    var updatedTree = entry.Key == tree ? replacement : entry.Key.WithRootAndOptions(entry.Value, entry.Key.Options);
+                    rewritten = rewritten.ReplaceSyntaxTree(entry.Key, updatedTree);
+                    replacementTrees[entry.Key] = updatedTree;
+                    if (rewritten.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
+                    { rewritten = rewritten.WithOptions(rewritten.Options.WithSyntaxTreeOptionsProvider(new CandidateTreeOptions(sourceOptions, entry.Key, updatedTree))); }
+                }
                 return rewritten;
             }
+
             var changedCompilation = ReplaceCandidate(changed);
             if (needsBuilderEmission)
             {
@@ -386,7 +403,7 @@ public static partial class Inference
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var beforeModel = model.Compilation.GetSemanticModel(sourceTree);
-                var afterTree = sourceTree == tree ? changed : sourceTree;
+                var afterTree = replacementTrees.TryGetValue(sourceTree, out var replacedTree) ? replacedTree : sourceTree;
                 var afterModel = changedCompilation.GetSemanticModel(afterTree);
                 var beforeRoot = sourceTree.GetRoot(cancellationToken);
                 var afterRoot = afterTree.GetRoot(cancellationToken);
@@ -419,7 +436,7 @@ public static partial class Inference
                     var after = (afterModel.GetOperation(changedCalls[i], cancellationToken) as IInvocationOperation)?.TargetMethod
                         ?? afterModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
                     var definition = (before?.ReducedFrom ?? before)?.OriginalDefinition;
-                    if (SymbolEqualityComparer.Default.Equals(definition, symbol.OriginalDefinition) && after?.DeclaringSyntaxReferences.Any(reference =>
+                    if (SameMethodDefinition(definition, symbol) && after is not null && ImplementationMethod(after).DeclaringSyntaxReferences.Any(reference =>
                     {
                         if (reference is null)
                         { throw new ArgumentNullException(nameof(reference)); }
@@ -450,8 +467,8 @@ public static partial class Inference
                         ?? (IMethodSymbol)beforeModel.GetSymbolInfo(beforeGroups[i], cancellationToken).Symbol!;
                     var after = (afterModel.GetOperation(afterGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
                         ?? (IMethodSymbol)afterModel.GetSymbolInfo(afterGroups[i], cancellationToken).Symbol!;
-                    if (SymbolEqualityComparer.Default.Equals(before.OriginalDefinition, symbol.OriginalDefinition)
-                        && after.DeclaringSyntaxReferences.Any(reference =>
+                    if (SameMethodDefinition(before, symbol)
+                        && ImplementationMethod(after).DeclaringSyntaxReferences.Any(reference =>
                         {
                             if (reference is null)
                             { throw new ArgumentNullException(nameof(reference)); }
@@ -1610,7 +1627,8 @@ public static partial class Inference
                 BindArguments(operation, signature.Inputs);
                 return signature.Output;
             }
-            if (SymbolEqualityComparer.Default.Equals(called, currentMethod))
+            if (SameMethodDefinition(called, currentMethod) && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod!.ContainingType)
+                && Enumerable.SequenceEqual<ITypeSymbol>(called.TypeArguments, currentMethod.TypeParameters, SymbolEqualityComparer.Default))
             {
                 BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray());
                 return currentFunction.Arguments[currentFunction.Arguments.Length - 1];

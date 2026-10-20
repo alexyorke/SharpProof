@@ -719,3 +719,13 @@ Null elements preserve reference requirements; default elements carry nullable
 annotations that also work for new value-type instantiations. Applied IDE fixes
 verify array shapes, element/conversion order, reference identity, new domains,
 negative dimensions and suspended/faulted/canceled nullable async initializers.
+
+Partial methods infer from their implementation and rewrite both signatures as
+one candidate. The IDE fix updates both documents, preserving each part's
+existing generic names, constraints and trivia. Definitions emit no duplicate
+suggestion. Same-file and separate-file checks cover nullable/async methods,
+recursion, supplied calls and method groups, callbacks, ref returns and iterators.
+Project Fix All tracks later methods after a partner-file edit. Async partial
+methods without an emitted state-machine attribute use a portable-PDB layout
+probe when a custom builder requires unmanaged storage; temporary constraints
+are mirrored to both signatures. IDE application requires editable source parts.

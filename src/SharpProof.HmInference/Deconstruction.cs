@@ -203,8 +203,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(changedMethod)); }
             if (changedTree is null)
             { throw new ArgumentNullException(nameof(changedTree)); }
-            if (before.Method is not null && after.Method is not null && SymbolEqualityComparer.Default.Equals(before.Method.OriginalDefinition, currentMethod?.OriginalDefinition)
-                && after.Method.DeclaringSyntaxReferences.Any(reference =>
+            if (before.Method is not null && after.Method is not null && SameMethodDefinition(before.Method, currentMethod)
+                && ImplementationMethod(after.Method).DeclaringSyntaxReferences.Any(reference =>
                 {
                     if (reference is null)
                     { throw new ArgumentNullException(nameof(reference)); }
