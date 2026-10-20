@@ -4937,3 +4937,9 @@ Ten current MethodInfo.Invoke or Assembly.Load calls are individually traced wit
 ### IMM-M495: preserve actual reference-array and payload-corruption subjects
 
 Six typed-reference fixture sites are the actual compiled CLR array/index/length/identity subjects, including deliberately distinct clones and shared aliases. Their native types and object identity must remain intact. Two Linux/macOS contract images are deliberately extended or XOR-modified before size/digest rejection. These eight direct subject traces change no code and claim no new execution, including macOS platform execution. The old array subset has 193 unchecked candidates; final coverage/binding/reflection/compiler collection, ownership/archive and exact-head gates remain pending.
+
+### IMM-M496: immutable package workflow byte and task observations
+
+Eleven retained package byte observations and three awaited restore/build result inventories are immutable. JSON/file consumers use readonly memory; redundant byte freezing is removed. Actual filesystem/publication subjects, concurrent build behavior and final MSBuild ITaskItem-array binding on RunVerifier remain intact.
+
+The canonical selected package gate restores/builds/packs one private feed and passes 77 WorkerMsBuild cases with zero failures and one expected VerificationFailsExplicitlyOnUnsupportedHosts skip on supported Linux amd64. One isolated shard runs with configured parallelism 28. Source and HEAD remain fixed during the gate at 62a3e058a with the dirty fixture explicitly included; this is selected workflow authority, not full-package or exact-final-head authority. Literal/source-unit gates pass 4299/1068 and 1948. Fourteen current coordinates and fifteen old array roles reconcile independently, returning C# coordinates to zero Open and leaving 178 unchecked candidates before the separately prepared reflection provenance correction.

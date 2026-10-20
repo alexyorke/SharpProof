@@ -398,13 +398,13 @@ public sealed class WorkerMsBuildIntegrationTests
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
         await AssertPublicationBindingAsync(request, response);
-        var manifestBytes = await File.ReadAllBytesAsync(project.CompilerManifestPath);
-        using var manifestDocument = JsonDocument.Parse(manifestBytes);
+        var manifestBytes = (await File.ReadAllBytesAsync(project.CompilerManifestPath)).ToImmutableArray();
+        using var manifestDocument = JsonDocument.Parse(manifestBytes.AsMemory());
         Assert.That(response.Errors, Is.Empty);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray()),
+                WorkerProtocolJson.ComputeSha256(manifestBytes),
                 Is.EqualTo(request.CompilerManifest.Sha256));
             JsonAssert.Equal(manifestDocument.RootElement, "manifest.hash", response.Manifest.Hash);
             Assert.That(
@@ -874,7 +874,7 @@ public sealed class WorkerMsBuildIntegrationTests
             "net8.0", "stale-result.sarif");
         var baseline = await BuildOkAsync(project.BuildAsync(
             verify: true, [("SharpProofVerifySarifFile", sarifPath)]));
-        var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
+        var stableResult = (await File.ReadAllBytesAsync(project.ResultPath)).ToImmutableArray();
 
         await AssertInvalidatedAsync(
 [            ("_SharpProofCompilerManifestPath",
@@ -901,7 +901,7 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 throw new System.ArgumentException("Array must be initialized.", nameof(properties));
             }
-            await File.WriteAllBytesAsync(project.ResultPath, stableResult);
+            await File.WriteAllBytesAsync(project.ResultPath, stableResult.AsMemory());
             await File.WriteAllTextAsync(sarifPath, "stale");
 
             var propertyBuilder = properties.ToBuilder();
@@ -957,10 +957,10 @@ public sealed class WorkerMsBuildIntegrationTests
             // Every project and compiler-owned path is independent, so run the
             // negative builds together instead of serializing six full builds.
             var projects = collisionProjects.ToImmutable();
-            var builds = await Task.WhenAll(projects.Select(
+            var builds = (await Task.WhenAll(projects.Select(
                 static item => item.Project.BuildAsync(
                     verify: true,
-                    item.Properties)));
+                    item.Properties)))).ToImmutableArray();
             for (var index = 0; index < projects.Length; index++)
             {
                 var (collision, project, _) = projects[index];
@@ -995,7 +995,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var incremental = ConsumerProject.Create(IdentitySource);
         var baseline = await BuildOkAsync(incremental.BuildAsync(verify: true, []));
         var targetPath = incremental.CompilerOutputPath("target");
-        var targetBytes = await File.ReadAllBytesAsync(targetPath);
+        var targetBytes = (await File.ReadAllBytesAsync(targetPath)).ToImmutableArray();
 
         var rejected = await incremental.BuildAsync(
             verify: true, [("SharpProofVerifyResultFile", targetPath)]);
@@ -1396,15 +1396,15 @@ public sealed class WorkerMsBuildIntegrationTests
             Path.DirectorySeparatorChar;
         var secondIntermediate = Path.Combine(project.Root, "obj-second") +
             Path.DirectorySeparatorChar;
-        var restores = await Task.WhenAll(
+        var restores = (await Task.WhenAll(
             project.RestoreAsync([("BaseIntermediateOutputPath", firstIntermediate)]),
-            project.RestoreAsync([("BaseIntermediateOutputPath", secondIntermediate)]));
+            project.RestoreAsync([("BaseIntermediateOutputPath", secondIntermediate)]))).ToImmutableArray();
         Assert.That(restores, Has.All.Matches<BuildResult>(
             static restore => restore.ExitCode == 0));
 
-        var builds = await Task.WhenAll(
+        var builds = (await Task.WhenAll(
             BuildAsync("first", "effects"),
-            BuildAsync("second", "contracts"));
+            BuildAsync("second", "contracts"))).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1979,8 +1979,8 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var collisionWorker = project.CollisionWorkerPath;
         var collisionCompanion = await StageCollisionWorkerAsync(project);
-        var workerBytes = await File.ReadAllBytesAsync(collisionWorker);
-        var companionBytes = await File.ReadAllBytesAsync(collisionCompanion);
+        var workerBytes = (await File.ReadAllBytesAsync(collisionWorker)).ToImmutableArray();
+        var companionBytes = (await File.ReadAllBytesAsync(collisionCompanion)).ToImmutableArray();
         var privateManifest = project.CopyCompilerManifestForInvocation();
         var failed = await project.RunVerificationTargetAsync(
 [("_SharpProofCompilerManifestPath", privateManifest), ("SharpProofWorkerPath", collisionWorker), ("_SharpProofTestWorkerPath", collisionWorker), ("SharpProofVerifyResultFile", collisionCompanion), ("_SharpProofSkipTestInvalidation", "true")]);
@@ -2010,8 +2010,8 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var collisionWorker = project.CollisionWorkerPath;
         var collisionCompanion = await StageCollisionWorkerAsync(project);
-        var expectedWorkerBytes = await File.ReadAllBytesAsync(collisionWorker);
-        var expectedBytes = await File.ReadAllBytesAsync(collisionCompanion);
+        var expectedWorkerBytes = (await File.ReadAllBytesAsync(collisionWorker)).ToImmutableArray();
+        var expectedBytes = (await File.ReadAllBytesAsync(collisionCompanion)).ToImmutableArray();
         var symbolicAlias = Path.Combine(
             Path.GetDirectoryName(project.ResultPath)!,
             "symlinked-result.json");
@@ -2068,10 +2068,10 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
 
-        var stableRequest = await File.ReadAllBytesAsync(project.RequestPath);
-        var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
-        var stableManifest = await File.ReadAllBytesAsync(
-            project.CompilerManifestPath);
+        var stableRequest = (await File.ReadAllBytesAsync(project.RequestPath)).ToImmutableArray();
+        var stableResult = (await File.ReadAllBytesAsync(project.ResultPath)).ToImmutableArray();
+        var stableManifest = (await File.ReadAllBytesAsync(
+            project.CompilerManifestPath)).ToImmutableArray();
         foreach (var cachePath in ImmutableArray.Create(project.ResultPath, project.RequestPath, project.CompilerManifestPath, WorkerOutputPath()))
         {
             var failed = await project.RunVerificationTargetAsync(
@@ -2986,12 +2986,12 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             System.ArgumentNullException.ThrowIfNull(path);
             Assert.That(File.Exists(path), Is.True, path);
-            var bytes = await File.ReadAllBytesAsync(path);
-            using var document = JsonDocument.Parse(bytes);
+            var bytes = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
+            using var document = JsonDocument.Parse(bytes.AsMemory());
             var root = document.RootElement;
             var manifest = root.GetProperty("manifest");
             var artifact = new CompilerManifestArtifact(
-                bytes.ToImmutableArray(),
+                bytes,
                 root.GetProperty("compilation").GetProperty("projectDirectory").GetString() ?? string.Empty,
                 root.GetProperty("features").Deserialize<WorkerFeatureSet>(WorkerProtocolJson.Options),
                 manifest.GetProperty("hash").GetString() ?? string.Empty,
