@@ -13,6 +13,21 @@ internal static class LocalFunctionChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("LocalObjectIdentityReturn", "\n#nullable enable\nstatic object M(object value,bool ignored){object Local()=>value;_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : notnull"),
+            ("LocalAsyncObjectIdentityReturn", "\n#nullable enable\nstatic object M(object value,bool ignored){async Task<object> Local(){await Task.Yield();return value;}_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : notnull"),
+            ("LocalAwaitedObjectIdentityReturn", "\n#nullable enable\nstatic Task<object> M(Task<object> value,bool ignored){async Task<object> Local()=>await value;_=Local();return value;}", "global::System.Threading.Tasks.Task<T1> M<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 ignored) where T1 : notnull"),
+            ("LocalNullableObjectReturn", "\n#nullable enable\nstatic object? M(object? value,bool ignored){object? Local()=>value;_=Local();return value;}", "T1? M<T1, T2>(T1? value, T2 ignored) where T1 : class"),
+            ("LocalValueTaskObjectReturn", "\n#nullable enable\nstatic object M(object value,bool ignored){async ValueTask<object> Local(){await Task.Yield();return value;}_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : notnull"),
+            ("LocalInterfaceReturn", "\n#nullable enable\nstatic IComparable M(IComparable value,bool ignored){IComparable Local()=>value;_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : global::System.IComparable"),
+            ("LocalBaseReturn", "\n#nullable enable\nclass Base{}static Base M(Base value,bool ignored){Base Local()=>value;_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : global::Cases.Base"),
+            ("LocalArrayReturn", "\n#nullable enable\nstatic object[] M(object[] value,bool ignored){object[] Local()=>value;_=Local();return value;}", "T1[] M<T1, T2>(T1[] value, T2 ignored) where T1 : class"),
+            ("LocalTupleReturn", "\n#nullable enable\nstatic (object left,int right) M((object left,int right) value,bool ignored){(object left,int right) Local()=>value;_=Local();return value;}", "(T1 left, int right) M<T1, T2>((T1 left, int right) value, T2 ignored) where T1 : notnull"),
+            ("LocalCovariantDelegateReturn", "\n#nullable enable\nstatic Func<object> M(Func<object> value,bool ignored){Func<object> Local()=>value;_=Local();return value;}", "global::System.Func<T1> M<T1, T2>(global::System.Func<T1> value, T2 ignored) where T1 : class"),
+            ("LocalInvariantReturn", "\n#nullable enable\nstatic List<object> M(List<object> value,bool ignored){List<object> Local()=>value;_=Local();return value;}", "global::System.Collections.Generic.List<object> M<T1>(global::System.Collections.Generic.List<object> value, T1 ignored)"),
+            ("LocalContravariantReturn", "\n#nullable enable\nstatic Action<string> M(Action<string> value,bool ignored){Action<string> Local()=>value;_=Local();return value;}", "global::System.Action<string> M<T1>(global::System.Action<string> value, T1 ignored)"),
+            ("LocalReferenceReturn", "\n#nullable enable\nclass Box<T>{public T Value=default!;}static Box<object> M(Box<object> value,bool ignored){ref object Local()=>ref value.Value;_=Local();return value;}", "global::Cases.Box<object> M<T1>(global::Cases.Box<object> value, T1 ignored)"),
+            ("LocalMultipleObjectReturns", "\n#nullable enable\nstatic object M(object value,bool flag,bool ignored){object Local(){if(flag)return value;return new object();}_=Local();return value;}", "T1 M<T1, T2>(T1 value, bool flag, T2 ignored) where T1 : notnull"),
+            ("LocalIteratorObjectReturn", "\n#nullable enable\nstatic object M(object value,bool ignored){IEnumerable<object> Local(){yield return value;}foreach(var item in Local()){}return value;}", "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : notnull"),
             ("LocalCapture", "static int M(int value,bool ignored){int Local()=>value;return Local();}", "int M<T1>(int value, T1 ignored)"),
             ("LocalStore", "static int M(int value,bool ignored){void Local(){value=1;}Local();return value;}", "int M<T1>(int value, T1 ignored)"),
             ("LocalCapturedLocal", "static int M(int value,bool ignored){var copy=value;int Local()=>copy;return Local();}", "int M<T1>(int value, T1 ignored)"),
@@ -42,7 +57,7 @@ internal static class LocalFunctionChecks
             { throw new InvalidOperationException(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
             Program.Log.Info("PASS " + test.Name);
         }
-        return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false) + await LocalReturnRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)

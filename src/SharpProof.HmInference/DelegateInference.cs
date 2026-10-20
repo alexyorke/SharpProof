@@ -56,6 +56,13 @@ public static partial class Inference
                 { result = nested.iteratorReturn is not null ? nested.IteratorBody(body) : noValue ? nested.VoidBody(body) : nested.Block(body); }
                 else
                 { return; }
+                if (!noValue && symbol.RefKind == RefKind.None && nested.iteratorReturn is null)
+                {
+                    var declared = nested.asyncReturn is { Arity: 1 } task ? task.TypeArguments[0] : symbol.ReturnType;
+                    var fixedReturn = CSharpTypes.Rigid(declared);
+                    nested.BindDeclaredLocalReturn(result, fixedReturn, declared, false);
+                    result = fixedReturn;
+                }
                 result = nested.iteratorReturn is not null ? nested.WrapIteratorResult() : nested.WrapAsyncResult(result);
                 HmType.Unify(result, CSharpTypes.Rigid(symbol.ReturnType));
             }
@@ -66,6 +73,70 @@ public static partial class Inference
             inferredConstraints.AddRange(nested.inferredConstraints);
             conversionBounds.AddRange(nested.conversionBounds);
             needsBuilderEmission |= nested.needsBuilderEmission;
+        }
+        private void BindDeclaredLocalReturn(HmType inferred, HmType expected, ITypeSymbol declared, bool referenceOnly)
+        {
+            if (inferred is null)
+            { throw new ArgumentNullException(nameof(inferred)); }
+            if (expected is null)
+            { throw new ArgumentNullException(nameof(expected)); }
+            if (declared is null)
+            { throw new ArgumentNullException(nameof(declared)); }
+            cancellationToken.ThrowIfCancellationRequested();
+            inferred = ConversionCore(inferred);
+            expected = ConversionCore(expected);
+            if (inferred.IsVariable && declared is not IDynamicTypeSymbol)
+            {
+                if (declared.SpecialType == SpecialType.System_Object)
+                {
+                    if (referenceOnly)
+                    { RequireKeyword(inferred, declared.NullableAnnotation == NullableAnnotation.NotAnnotated ? "class" : "class?"); }
+                    else if (declared.NullableAnnotation == NullableAnnotation.NotAnnotated)
+                    { RequireKeyword(inferred, "notnull"); }
+                    return;
+                }
+                if (declared is INamedTypeSymbol named && (named.TypeKind == TypeKind.Interface
+                    || named is { TypeKind: TypeKind.Class, IsSealed: false }
+                    && named.SpecialType is not (SpecialType.System_Array or SpecialType.System_ValueType)
+                    && (named.SpecialType is not (SpecialType.System_Enum or SpecialType.System_Delegate or SpecialType.System_MulticastDelegate)
+                        || model.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp7_3 })))
+                {
+                    if (referenceOnly)
+                    { RequireKeyword(inferred, declared.NullableAnnotation == NullableAnnotation.NotAnnotated ? "class" : "class?"); }
+                    RequireType(inferred, declared, preserveObliviousAnnotations: true);
+                    return;
+                }
+            }
+            if (!inferred.IsVariable && inferred.Name == expected.Name && inferred.Arguments.Length == expected.Arguments.Length)
+            {
+                if (declared is IArrayTypeSymbol array && inferred.Arguments.Length == 1)
+                {
+                    BindDeclaredLocalReturn(inferred.Arguments[0], expected.Arguments[0], array.ElementType, true);
+                    return;
+                }
+                if (declared is INamedTypeSymbol { IsTupleType: true } tuple && !referenceOnly)
+                {
+                    for (var i = 0; i < tuple.TupleElements.Length; i++)
+                    { BindDeclaredLocalReturn(inferred.Arguments[i], expected.Arguments[i], tuple.TupleElements[i].Type, false); }
+                    return;
+                }
+                if (declared is INamedTypeSymbol { IsGenericType: true, IsTupleType: false } constructed)
+                {
+                    if (inferred.NestedTypeName is not null)
+                    { HmType.Unify(inferred.Arguments[0], expected.Arguments[0]); }
+                    var values = CSharpTypes.OwnArguments(inferred);
+                    var targets = CSharpTypes.OwnArguments(expected);
+                    for (var i = 0; i < values.Length; i++)
+                    {
+                        if (constructed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
+                        { BindDeclaredLocalReturn(values[i], targets[i], constructed.TypeArguments[i], true); }
+                        else
+                        { HmType.Unify(values[i], targets[i]); }
+                    }
+                    return;
+                }
+            }
+            HmType.Unify(inferred, expected);
         }
         private static (HmType[] Inputs, HmType Output) DelegateSignature(INamedTypeSymbol declared, HmType inferred)
         {

@@ -187,6 +187,34 @@ public static partial class Inference
                     { inferred = inferred.Arguments[0].Root; }
                     return inferred;
                 }
+                SyntaxNode slot = expression;
+                while (true)
+                {
+                    if (slot.Parent is ParenthesizedExpressionSyntax parentheses)
+                    { slot = parentheses; }
+                    else if (slot.Parent is ArgumentSyntax { Parent: TupleExpressionSyntax tuple })
+                    { slot = tuple; }
+                    else
+                    { break; }
+                }
+                var declaration = slot.Parent switch
+                {
+                    ArrowExpressionClauseSyntax { Parent: LocalFunctionStatementSyntax local } => local,
+                    ReturnStatementSyntax or YieldStatementSyntax => slot.Ancestors().FirstOrDefault(owner =>
+                    {
+                        if (owner is null)
+                        { throw new ArgumentNullException(nameof(owner)); }
+                        return owner is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or MethodDeclarationSyntax;
+                    }) as LocalFunctionStatementSyntax,
+                    _ => null
+                };
+                if (declaration is not null && (iteratorReturn is null || slot.Parent is YieldStatementSyntax)
+                    && model.GetDeclaredSymbol(declaration, cancellationToken) is { RefKind: RefKind.None })
+                {
+                    var fixedReturn = CSharpTypes.Rigid(converted);
+                    BindDeclaredLocalReturn(inferred, fixedReturn, converted, false);
+                    return fixedReturn;
+                }
                 return inferred;
             }
             if (converted is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
