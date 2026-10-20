@@ -445,3 +445,12 @@ fixed bodies and generalized implicit helpers undergo compiler emission checks.
 Fixed-size buffers have read/store coverage through ref parameters, pointers and
 managed owners. Applied IDE fixes verify storage and dispatch, null/empty sources,
 compacting GC pinning, unrelated managed tags and new unmanaged element domains.
+Constraint normalization removes self dependencies, merges mutually dependent
+inference variables, keeps the strongest compatible base-class requirement and
+relates arguments through generic bases and invariant interfaces. It repeats when
+unification exposes another simplification. Cyclic groups retain their incoming
+and outgoing requirements; ordinary acyclic bounds and F-bounded interfaces stay
+separate. Runtime IDE-fix checks compare helper effects, values and reference
+identity in original/new domains and reject invalid base/value domains. General
+directional lower bounds, nullable constraint implication and ambiguous multiple
+interface projections remain open.

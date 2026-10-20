@@ -128,6 +128,8 @@ public static partial class Inference
             }));
             PreserveResultOnly(result, CSharpTypes.Rigid(symbol.ReturnType), inferable);
             CompleteArgumentConversions(inferable);
+            ImportConstructedConstraints(symbol.ReturnType, result);
+            NormalizeConstraints();
             var variables = new Dictionary<HmType, string>();
             var reserved = new HashSet<string>(method.DescendantTokens().Where((SyntaxToken /* SPINT001: all values valid - IsKind accepts every SyntaxToken including default. */ token) => token.IsKind(SyntaxKind.IdentifierToken)).Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.ValueText));
             for (var owner = symbol.ContainingType; owner is not null; owner = owner.ContainingType)
@@ -195,7 +197,6 @@ public static partial class Inference
                 throw new InferenceException("A result-only type variable cannot be inferred at a C# call site.");
             }
 
-            ImportConstructedConstraints(symbol.ReturnType, result);
             var constraintPosition = method.ConstraintClauses.Count == 0 ? method.ParameterList.Span.End : method.ConstraintClauses[method.ConstraintClauses.Count - 1].Span.End;
             var nullableAnnotations = (model.GetNullableContext(constraintPosition) & NullableContext.AnnotationsEnabled) != 0;
             var nullableConstraints = NullableConstraints(parameters, result, variables, nullableAnnotations);

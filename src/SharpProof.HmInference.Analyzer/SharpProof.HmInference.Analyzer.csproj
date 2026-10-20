@@ -27,6 +27,7 @@
     <Compile Include="../SharpProof.HmInference/Deconstruction.cs" Link="Deconstruction.cs" />
     <Compile Include="../SharpProof.HmInference/StructuredFlow.cs" Link="StructuredFlow.cs" />
     <Compile Include="../SharpProof.HmInference/ConstraintRules.cs" Link="ConstraintRules.cs" />
+    <Compile Include="../SharpProof.HmInference/ConstraintNormalization.cs" Link="ConstraintNormalization.cs" />
     <Compile Include="../SharpProof.HmInference/NominalTypes.cs" Link="NominalTypes.cs" />
     <Compile Include="../SharpProof.HmInference/CSharpTypes.cs" Link="CSharpTypes.cs" />
     <Compile Include="../SharpProof.HmInference/Types.cs" Link="Types.cs" />
