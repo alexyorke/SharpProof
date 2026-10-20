@@ -102,7 +102,7 @@ floor. This supersedes the older a9f759896 measurement (4978/5213, 235 gaps).
 The report and gap inventory are preserved locally. No floor or exclusion was
 changed. The aab335ab9 coverage run reached a test failure before aggregation:
 one compiler-driver assertion and two artifact golden files still expected schema 52.
-The current source updates those expectations to artifact schema 53 and reruns
+The current source updates those expectations to artifact schema 54 and reruns
 the compiler-driver and golden-worker gates. This failed run produced no newer
 aggregate coverage measurement.
 Published 24cb6d7ed passed all non-coverage workflows and the three semantic
@@ -131,6 +131,14 @@ process killed and the job ended with code 137. No newer aggregate measurement
 was produced. The Docker-limit mismatch and its bounded validation are tracked
 below; no further blind retry was started.
 
+The 3795ebdc7 coverage run also failed in the package phase with exit code 137,
+after package creation and before a test-result summary. The shell reported the
+container PowerShell process killed. The 12 GB container limit therefore did not
+resolve the full-phase failure. All three semantic shards passed; aggregation
+was skipped. The failure log is retained locally as
+`artifacts/resource-3795-coverage-failed.log`. No OOM cause is asserted from the
+exit code alone, and no coverage requirement or test deadline was weakened.
+
 ### Quantitative-memory feature audit
 
 Phase C now has compiler, native-worker, protocol, consumer and independent
@@ -155,6 +163,39 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Emitted compiler carrier shapes
+
+The compiler collector now captures generated callback-frame and async
+state-machine fields from an actual emission, preserving module hash, compiler
+identity and root ownership. Debug class state machines and Release value-type
+state machines have distinct captured shapes. The capture supplies typed fields,
+not byte totals. Framework-owned attributes and supported builder/awaiter value
+fields are authenticated; unknown fields, custom layouts, metadata mismatches,
+source/image budgets and emission failures produce explicit Unknown reasons.
+Emission metadata is cached per collector instance; cancellation propagates.
+
+All 1475 analyzer tests passed, including six new cases covering Debug/Release
+shapes, cancellation recovery, emission errors and oversized source. Full C#
+formatting passed. Quality/API
+compatibility and negative fixtures passed. Documentation checked 728 links;
+layout checked 2786 sources, 59 projects and 151 pinned common files. The trusted
+inventory includes 538 classified paths. Logs are retained under
+`artifacts/resource-carrier-*`.
+
+This is an internal compiler-carrier component. It is not yet attached to root
+projections or transported to the worker. Native byte derivation, reviewed
+runtime carriers and normal-completion lifetime composition remain required.
+Root memory claims remain Unknown, and no wire version or public API changed.
+
+Runtime-carrier review must distinguish the successful join path from faulted
+completion. The pinned
+[Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs)
+allocates a non-generic WhenAll promise and registers it on each child. Faulted
+or canceled children introduce additional storage. Multiple continuations can
+allocate lists. A normal-completion storage model must state its ambient-context,
+debugging/tracing, caller-continuation and scheduler ownership premises, and
+must not reuse that model as a cumulative exception-prefix guarantee.
 
 ### Coverage container limits
 

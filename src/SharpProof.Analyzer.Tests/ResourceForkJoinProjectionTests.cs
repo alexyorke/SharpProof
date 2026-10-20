@@ -110,6 +110,63 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinShapeUnsupported"));
     }
 
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, true)]
+    public void CarrierCaptureUsesEmittedFields(OptimizationLevel optimization, bool configured)
+    {
+        var (initial, _) = Compile("using System.Threading.Tasks; public static class C { public static " +
+            (configured ? "async Task" : "Task") + " Root(int n) => " + (configured ? "await " : "") +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {} }");
+        var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Shapes, Is.Not.Null);
+        Assert.That(capture.Shapes!.RootCallableId, Is.EqualTo("root"));
+        Assert.That(capture.Shapes.ModuleSha256, Has.Length.EqualTo(64));
+        Assert.That(capture.Shapes.CompilerIdentity, Does.Contain("Microsoft.CodeAnalysis.CSharp"));
+        Assert.That(capture.Shapes.MatchedCallbacks, Is.EqualTo(2));
+        Assert.That(capture.Shapes.CallbackFrames.SelectMany(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.Fields),
+            Does.Contain(ResourceStorageKind.Word32));
+        Assert.That(capture.Shapes.StateMachine != null, Is.EqualTo(configured));
+        if (configured)
+        {
+            Assert.That(capture.Shapes.StateMachine!.IsValueType, Is.EqualTo(optimization == OptimizationLevel.Release));
+            Assert.That(capture.Shapes.StateMachine.Fields, Does.Contain(ResourceStorageKind.Reference));
+        }
+    }
+
+    [Test]
+    public void CarrierCapturePreservesCancellationAndRejectsEmissionErrors()
+    {
+        var (compilation, method) = Create("");
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action capture = () => { _ = collector.Capture(method, "root", cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(capture);
+        Assert.That(collector.Capture(method, "root", TestContext.CurrentContext.CancellationToken).Shapes, Is.Not.Null);
+        var broken = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText("public class Broken { Missing value; }", (CSharpParseOptions)compilation.SyntaxTrees.First().Options));
+        var brokenMethod = broken.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var failure = new CompilerTaskCarrierCollector(broken).Capture(brokenMethod, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(failure.Shapes, Is.Null);
+        Assert.That(failure.UnknownReason, Is.EqualTo("TaskCarrierEmissionFailed"));
+    }
+
+    [Test]
+    public void CarrierCaptureReturnsUnknownBeforeOversizedEmission()
+    {
+        var (initial, _) = Create("");
+        var compilation = initial.AddSyntaxTrees(CSharpSyntaxTree.ParseText("/*" + new string('x', 1024 * 1024) + "*/", (CSharpParseOptions)initial.SyntaxTrees.First().Options));
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Shapes, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierEmissionBudgetExceeded"));
+    }
+
     private static (CSharpCompilation Compilation, IMethodSymbol Method) Create(string body, string extra = "", string imports = "")
     {
         ArgumentNullException.ThrowIfNull(body);

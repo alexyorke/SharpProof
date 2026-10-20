@@ -1,0 +1,223 @@
+using System.IO;
+
+namespace SharpProof.CompilerArtifact;
+
+// Import private generated fields from a real emission. This metadata is source
+// evidence; it supplies neither a physical layout nor an allocation verdict.
+internal sealed class CompilerTaskCarrierCollector
+{
+    internal const int MaximumImageBytes = 16 * 1024 * 1024;
+    internal const int MaximumCallbacks = 64;
+    private readonly CSharpCompilation _compilation;
+    private IAssemblySymbol? _assembly;
+    private string? _moduleHash;
+    private string? _emissionFailure;
+
+    internal CompilerTaskCarrierCollector(CSharpCompilation compilation)
+    { _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation)); }
+
+    internal CompilerTaskCarrierCapture Capture(IMethodSymbol method, string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation);
+        if (plan is null || string.IsNullOrWhiteSpace(callableId))
+        { return Unknown("TaskCarrierRootUnsupported"); }
+        if (!EnsureEmission(cancellation))
+        { return Unknown(_emissionFailure ?? "TaskCarrierEmissionUnavailable"); }
+        var type = _assembly!.GetTypeByMetadataName(MetadataName(method.ContainingType));
+        if (type is null)
+        { return Unknown("TaskCarrierRootMetadataUnavailable"); }
+        var roots = type.GetMembers(method.MetadataName).OfType<IMethodSymbol>().Where(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+            candidate.IsStatic && candidate.Arity == 0 && candidate.Parameters.Length == method.Parameters.Length &&
+            candidate.Parameters.All(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
+                parameter.Type.SpecialType == SpecialType.System_Int32)).ToArray();
+        if (roots.Length != 1)
+        { return Unknown("TaskCarrierRootMetadataAmbiguous"); }
+        var framework = plan.Join.TargetMethod.ContainingAssembly.Identity.ToString();
+        CompilerTaskCarrierType? stateMachine = null;
+        if (plan.ConfiguredAwait)
+        {
+            var attributes = roots[0].GetAttributes().Where(attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
+                attribute.AttributeClass is { Name: "AsyncStateMachineAttribute" } attributeType &&
+                NamespaceName(attributeType.ContainingNamespace) == "System.Runtime.CompilerServices" &&
+                attributeType.ContainingAssembly.Identity.ToString() == framework).ToArray();
+            if (attributes.Length != 1 || attributes[0].ConstructorArguments.Length != 1 ||
+                attributes[0].ConstructorArguments[0].Value is not INamedTypeSymbol state ||
+                !Generated(state, framework) || !Inside(state, type) || Shape(state, framework, cancellation) is not { } shape)
+            { return Unknown("TaskCarrierStateMachineUnavailable"); }
+            stateMachine = shape;
+        }
+        var frames = ImmutableArray.CreateBuilder<CompilerTaskCarrierType>();
+        var callbacks = 0;
+        var pending = new Stack<INamedTypeSymbol>();
+        pending.Push(type);
+        var remaining = ResourceExpression.MaximumNodes;
+        while (pending.Count != 0)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (--remaining < 0)
+            { return Unknown("TaskCarrierMetadataBudgetExceeded"); }
+            var current = pending.Pop();
+            foreach (var nested in current.GetTypeMembers())
+            { pending.Push(nested); }
+            foreach (var callback in current.GetMembers().OfType<IMethodSymbol>())
+            {
+                if (!callback.MetadataName.StartsWith("<" + method.MetadataName + ">b__", StringComparison.Ordinal))
+                { continue; }
+                if (++callbacks > MaximumCallbacks || !Generated(current, framework) && !Generated(callback, framework))
+                { return Unknown("TaskCarrierCallbackMetadataUnsupported"); }
+                if (!callback.IsStatic)
+                {
+                    if (Shape(current, framework, cancellation) is not { } frame)
+                    { return Unknown("TaskCarrierCallbackStorageUnsupported"); }
+                    frames.Add(frame);
+                }
+            }
+        }
+        // Overloads with the same metadata name may contribute extra generated
+        // callbacks. Keeping them gives an upper envelope, never fewer sites.
+        if (callbacks < plan.Children.Length)
+        { return Unknown("TaskCarrierCallbackMetadataIncomplete"); }
+        return new(new(callableId, _moduleHash!, typeof(CSharpCompilation).Assembly.FullName!, callbacks,
+            frames.ToImmutable(), stateMachine), null);
+    }
+
+    private bool EnsureEmission(CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (_assembly != null || _emissionFailure != null)
+        { return _assembly != null; }
+        var sourceBytes = 0L;
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            sourceBytes += tree.GetText(cancellation).Length;
+            if (sourceBytes > 1024 * 1024)
+            { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
+        }
+        using var stream = new CarrierImageStream();
+        Microsoft.CodeAnalysis.Emit.EmitResult emission;
+        try
+        { emission = _compilation.Emit(stream, cancellationToken: cancellation); }
+        catch (InvalidDataException)
+        { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
+        cancellation.ThrowIfCancellationRequested();
+        if (!emission.Success)
+        { _emissionFailure = "TaskCarrierEmissionFailed"; return false; }
+        if (stream.Length > MaximumImageBytes)
+        { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
+        var image = stream.ToArray();
+        var reference = MetadataReference.CreateFromImage(image);
+        var inspection = CSharpCompilation.Create("SharpProof.TaskCarrierInspection", references: _compilation.References.Append(reference),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithMetadataImportOptions(MetadataImportOptions.All));
+        _assembly = inspection.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+        _moduleHash = HashEncoding.ComputeSha256Hex(image);
+        if (_assembly is null)
+        { _emissionFailure = "TaskCarrierEmissionMetadataUnavailable"; }
+        return _assembly != null;
+    }
+
+    private static CompilerTaskCarrierType? Shape(INamedTypeSymbol type, string framework, CancellationToken cancellation)
+    {
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        if (!Generated(type, framework) || type.IsGenericType || type.BaseType?.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) ||
+            type.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) : attribute.AttributeClass?.Name == "StructLayoutAttribute"))
+        { return null; }
+        var fields = ImmutableArray.CreateBuilder<ResourceStorageKind>();
+        foreach (var field in type.GetMembers().OfType<IFieldSymbol>())
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (field.IsStatic)
+            { continue; }
+            var storage = field.Type.SpecialType switch
+            {
+                SpecialType.System_Boolean or SpecialType.System_Byte or SpecialType.System_SByte => ResourceStorageKind.Byte,
+                SpecialType.System_Char or SpecialType.System_Int16 or SpecialType.System_UInt16 => ResourceStorageKind.Word16,
+                SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Single => ResourceStorageKind.Word32,
+                SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Double => ResourceStorageKind.Word64,
+                _ => field.Type.IsReferenceType ? ResourceStorageKind.Reference : ResourceStorageKind.Unspecified
+            };
+            if (storage != ResourceStorageKind.Unspecified)
+            { fields.Add(storage); }
+            else if (field.Type is INamedTypeSymbol named && named.ContainingAssembly.Identity.ToString() == framework &&
+                NamespaceName(named.ContainingNamespace) == "System.Runtime.CompilerServices" && named.MetadataName == "AsyncTaskMethodBuilder")
+            { fields.Add(ResourceStorageKind.Reference); }
+            else if (field.Type is INamedTypeSymbol awaiter && awaiter.ContainingAssembly.Identity.ToString() == framework &&
+                awaiter.MetadataName == "ConfiguredTaskAwaiter" && awaiter.ContainingType?.MetadataName == "ConfiguredTaskAwaitable" &&
+                NamespaceName(awaiter.ContainingNamespace) == "System.Runtime.CompilerServices")
+            { fields.Add(ResourceStorageKind.Reference); fields.Add(ResourceStorageKind.Word32); }
+            else
+            { return null; }
+            if (fields.Count > ResourceAllocationShape.MaximumFields)
+            { return null; }
+        }
+        return new(MetadataName(type), type.IsValueType, fields.ToImmutable());
+    }
+
+    private static bool Generated(ISymbol symbol, string framework)
+    {
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        return symbol.GetAttributes().Any(attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
+            attribute.AttributeClass?.Name == "CompilerGeneratedAttribute" &&
+            NamespaceName(attribute.AttributeClass.ContainingNamespace) == "System.Runtime.CompilerServices" &&
+            attribute.AttributeClass.ContainingAssembly.Identity.ToString() == framework);
+    }
+
+    private static bool Inside(INamedTypeSymbol nested, INamedTypeSymbol owner)
+    {
+        nested = ArgumentNullGuard.NotNull(nested, nameof(nested));
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        for (var current = nested.ContainingType; current != null; current = current.ContainingType)
+        { if (SymbolEqualityComparer.Default.Equals(current, owner)) { return true; } }
+        return false;
+    }
+
+    private static string MetadataName(INamedTypeSymbol type)
+    {
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
+        return type.ContainingType is { } owner ? MetadataName(owner) + "+" + type.MetadataName :
+            (type.ContainingNamespace.IsGlobalNamespace ? "" : NamespaceName(type.ContainingNamespace) + ".") + type.MetadataName;
+    }
+
+    private static string NamespaceName(INamespaceSymbol symbol)
+    {
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
+        if (symbol.IsGlobalNamespace)
+        { return string.Empty; }
+        return symbol.ContainingNamespace.IsGlobalNamespace ? symbol.MetadataName :
+            NamespaceName(symbol.ContainingNamespace) + "." + symbol.MetadataName;
+    }
+
+    private static CompilerTaskCarrierCapture Unknown(string reason)
+    { reason = ArgumentNullGuard.NotNull(reason, nameof(reason)); return new(null, reason); }
+
+
+    private sealed class CarrierImageStream : MemoryStream
+    {
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            buffer = ArgumentNullGuard.NotNull(buffer, nameof(buffer));
+            if (count > MaximumImageBytes - Position)
+            { throw new InvalidDataException("Task carrier image exceeds its budget."); }
+            base.Write(buffer, offset, count);
+        }
+
+        public override void WriteByte(byte value)
+        {
+            if (Position >= MaximumImageBytes)
+            { throw new InvalidDataException("Task carrier image exceeds its budget."); }
+            base.WriteByte(value);
+        }
+
+        public override void SetLength(long value)
+        {
+            if (value > MaximumImageBytes)
+            { throw new InvalidDataException("Task carrier image exceeds its budget."); }
+            base.SetLength(value);
+        }
+    }
+}
