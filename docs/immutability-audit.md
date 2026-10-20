@@ -4919,3 +4919,7 @@ Two metadata readers now consume immutable images directly, eliminating avoidabl
 ### IMM-M492: native CLI/reflection envelopes and runtime load frames
 
 Twelve final CLI/reflection/load materializations are individually traced through current native consumers. Their frames preserve exact nested native types, default/null mapping and shared runtime-array aliases. Owned immutable/scoped-builder argument vectors or native image-emission producers remain separate from the final native API envelope. This adapter review changes no code and claims no new execution or historical transfer. The old array subset now has 223 unchecked candidates; M490 diagnostic/metadata fixture migration remains under verification.
+
+### IMM-M493: direct reflection and assembly-load adapter review
+
+Ten current MethodInfo.Invoke or Assembly.Load calls are individually traced with their supplied frame and adjacent producer. Immutable argument/image evidence or native emitted-image producers retain only final runtime-required object/byte-array frames. No mutable observation owner is published. This role review changes no code and claims no new execution or historical transfer. The old array subset has 213 unchecked candidates; M490 and final expanded reflection/binding collection remain pending.
