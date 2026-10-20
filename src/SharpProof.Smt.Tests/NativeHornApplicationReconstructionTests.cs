@@ -195,7 +195,7 @@ public sealed class NativeHornApplicationReconstructionTests
         { return factory.Boolean(false); }
         if (literal is not null || kind is Z3_decl_kind.Z3_OP_ANUM or Z3_decl_kind.Z3_OP_BNUM)
         { return literal; }
-        var arguments = expression.IsApp ? expression.Args : [];
+        var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
         try
         {
             ImmutableArray<IrTerm?> operands = [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (DecodeGround(factory, argument)))];
@@ -215,7 +215,7 @@ public sealed class NativeHornApplicationReconstructionTests
         { throw new ArgumentNullException(nameof(expectedArguments)); }
         System.ArgumentNullException.ThrowIfNull(expression);
         using var declaration = expression.FuncDecl;
-        var arguments = expression.Args;
+        var arguments = expression.Args.ToImmutableArray();
         try
         {
             using (Assert.EnterMultipleScope())

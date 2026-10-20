@@ -679,8 +679,8 @@ public sealed class ApiSpecTests
     [Test]
     public void SharpProofPackageSpecsRejectPublicKeyMismatch()
     {
-        var publicKey = typeof(object).Assembly.GetName().GetPublicKey();
-        Assert.That(publicKey, Is.Not.Null.And.Not.Empty);
+        var publicKey = typeof(object).Assembly.GetName().GetPublicKey()!.ToImmutableArray();
+        Assert.That(publicKey, Is.Not.Empty);
         AssertSharpProofPackageSpecRejected(
             () => CreateSharpProofPackageReference(
                 CreateContractSource(

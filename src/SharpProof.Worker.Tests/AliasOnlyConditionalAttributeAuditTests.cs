@@ -349,7 +349,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
         var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var artifactBytes = Encoding.UTF8.GetBytes(artifactJson);
+        var artifactBytes = Encoding.UTF8.GetBytes(artifactJson).ToImmutableArray();
         await File.WriteAllTextAsync(Path.Combine(directory, "compiler-artifact.json"), artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request));
@@ -360,7 +360,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var roundTripReferences = project.Snapshot.CompilerManifest.Compilation.References;
         await Save(directory, "capture-binding.json", new
         {
-            ArtifactSha256 = Hash(artifactBytes),
+            ArtifactSha256 = Hash(artifactBytes.AsSpan()),
             RequestArtifactSha256 = project.Request.CompilerManifest.Sha256,
             BoundArtifactDigest = bound.ArtifactDigest,
             bound.InputHash,
@@ -405,7 +405,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             WorkerProtocolJson.SerializeResponse(response));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(project.Request);
         var validation = WorkerProtocolJson.ValidateForRequest(response, requestHash,
-            WorkerProgram.ComputeExpectedInputHash(project.Request, (artifactBytes).ToImmutableArray()), artifact.Manifest,
+            WorkerProgram.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest,
             project.Request, WorkerProgram.ExpectedVersions());
         var workerClaim = response.ClaimResults.Single();
         var callableResult = response.CallableResults.Single();
@@ -471,8 +471,8 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             AssumptionPolicy = project.Request.AssumptionPolicy.ToString(),
             ExpectedOutcome = throws ? "Refuted" : "Proven"
         });
-        Assert.That(Hash(artifactBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
-        Assert.That(Hash(artifactBytes), Is.EqualTo(bound.ArtifactDigest));
+        Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Request.CompilerManifest.Sha256));
+        Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(bound.ArtifactDigest));
         Assert.That(bound.InputHash, Is.EqualTo(project.Snapshot.InputHash));
         Assert.That(artifact.Compilation.AssemblyName, Is.EqualTo(callerPe.AssemblyName));
         Assert.That(capturedReference.Aliases, Is.EqualTo(ShadowAliases));
@@ -714,7 +714,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
-        var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
+        var il = (pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
@@ -732,7 +732,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
@@ -741,7 +741,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Guid? resolvedMvid = null;
             if (opcode.OperandType == OperandType.InlineMethod)
             {
-                token = BitConverter.ToInt32(il, offset);
+                token = BitConverter.ToInt32(il.AsSpan(offset..));
                 var member = method.Module.ResolveMethod(token.Value)!;
                 resolved = member.ToString();
                 resolvedMvid = member.Module.ModuleVersionId;
@@ -750,7 +750,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 token, resolved, resolvedMvid));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il.AsSpan()), instructions.ToImmutable());
     }
 
     private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)

@@ -135,7 +135,7 @@ public sealed class NativeCompletedModelInvariantTests
                 var equality = encoder.EncodeBoolean(Equal(factory, factory.Length(term), factory.Integer(int.MaxValue)), meter);
                 Assert.That(equality.FuncDecl.DeclKind, Is.EqualTo(Z3_decl_kind.Z3_OP_EQ));
                 Assert.That(equality.NumArgs, Is.EqualTo(2U));
-                var children = equality.Args;
+                var children = equality.Args.ToImmutableArray();
                 try
                 {
                     using var evaluated = model.Evaluate(children[0], true);
