@@ -9,6 +9,17 @@ internal static class ParameterEnumeratorChecks
     {
         const string support = """
             #nullable enable
+            public class CurrentOnlyBase<T>{public T Current=>default!;}
+            public class SplitAsyncCursor<T>:CurrentOnlyBase<T>{public System.Threading.Tasks.ValueTask<bool> MoveNextAsync()=>new(false);public System.Threading.Tasks.ValueTask DisposeAsync()=>default;}
+            public class TaggedSplitSequence<Tag,E> where E:SplitAsyncCursor<int>{public E GetAsyncEnumerator()=>default!;}
+            public class RefCursorBase<T>{private T value=default!;public ref T Current=>ref value;public bool MoveNext()=>false;}
+            public class TaggedRefSequence<Tag,E> where E:RefCursorBase<int>{public E GetEnumerator()=>default!;}
+            public class TaggedSequence<Tag,E> where E:CursorBase<int>{public E GetEnumerator()=>default!;}
+            public class TaggedInterfaceSequence<Tag,E> where E:System.Collections.Generic.IEnumerator<int>{public E GetEnumerator()=>default!;}
+            public class TaggedAsyncSequence<Tag,E> where E:System.Collections.Generic.IAsyncEnumerator<int>{public E GetAsyncEnumerator()=>default!;}
+            public class TaggedPatternAsyncSequence<Tag,E> where E:AsyncCursorBase<int>{public E GetAsyncEnumerator()=>default!;}
+            public class TaggedExtensionSequence<Tag,E> where E:CursorBase<int>{}
+            public static class TaggedExtensions{public static E GetEnumerator<Tag,E>(this TaggedExtensionSequence<Tag,E> values) where E:CursorBase<int> =>default!;}
             public class CursorBase<T>{public bool MoveNext()=>false;public T Current=>default!;}
             public class Cursor<T>:CursorBase<T>{}
             public class AsyncCursorBase<T>{public System.Threading.Tasks.ValueTask<bool> MoveNextAsync()=>new(false);public T Current=>default!;public System.Threading.Tasks.ValueTask DisposeAsync()=>default;}
@@ -24,6 +35,16 @@ internal static class ParameterEnumeratorChecks
             """;
         (string Name, string Source, string Signature)[] tests =
         [
+            ("RigidEnumeratorExplicitElementConversion", "static long M<E>(TaggedSequence<int,E> values,long seed) where E:CursorBase<int>{foreach(long item in values)seed=item;return seed;}", "long M<E, T1>(global::TaggedSequence<T1, E> values, long seed) where E : CursorBase<int>"),
+            ("RigidEnumeratorRefCurrent", "static int M<E>(TaggedRefSequence<int,E> values,int seed) where E:RefCursorBase<int>{foreach(ref var item in values){item=seed;seed=item;}return seed;}", "int M<E, T1>(global::TaggedRefSequence<T1, E> values, int seed) where E : RefCursorBase<int>"),
+            ("RigidAsyncEnumeratorSplitOwners", "static async System.Threading.Tasks.Task<int> M<E>(TaggedSplitSequence<int,E> values,int seed) where E:SplitAsyncCursor<int>{await foreach(var item in values)seed=item;return seed;}", "global::System.Threading.Tasks.Task<int> M<E, T1>(global::TaggedSplitSequence<T1, E> values, int seed) where E : SplitAsyncCursor<int>"),
+            ("RigidEnumeratorClassTag", "static int M<E>(TaggedSequence<int,E> values,int seed) where E:CursorBase<int>{foreach(var item in values)seed=item;return seed;}", "int M<E, T1>(global::TaggedSequence<T1, E> values, int seed) where E : CursorBase<int>"),
+            ("RigidEnumeratorArrayTag", "static int M<E>(TaggedSequence<int[],E> values,int seed) where E:CursorBase<int>{foreach(var item in values)seed=item;return seed;}", "int M<E, T1>(global::TaggedSequence<T1[], E> values, int seed) where E : CursorBase<int>"),
+            ("RigidEnumeratorInterfaceTag", "static int M<E>(TaggedInterfaceSequence<int,E> values,int seed) where E:System.Collections.Generic.IEnumerator<int>{foreach(var item in values)seed=item;return seed;}", "int M<E, T1>(global::TaggedInterfaceSequence<T1, E> values, int seed) where E : System.Collections.Generic.IEnumerator<int>"),
+            ("RigidEnumeratorChainedTag", "static int M<E,U>(TaggedSequence<int,E> values,int seed) where E:U where U:CursorBase<int>{foreach(var item in values)seed=item;return seed;}", "int M<E, U, T1>(global::TaggedSequence<T1, E> values, int seed) where E : U where U : CursorBase<int>"),
+            ("RigidEnumeratorExtensionTag", "static int M<E>(TaggedExtensionSequence<int,E> values,int seed) where E:CursorBase<int>{foreach(var item in values)seed=item;return seed;}", "int M<E, T1>(global::TaggedExtensionSequence<T1, E> values, int seed) where E : CursorBase<int>"),
+            ("RigidAsyncEnumeratorInterfaceTag", "static async System.Threading.Tasks.Task<int> M<E>(TaggedAsyncSequence<int,E> values,int seed) where E:System.Collections.Generic.IAsyncEnumerator<int>{await foreach(var item in values)seed=item;return seed;}", "global::System.Threading.Tasks.Task<int> M<E, T1>(global::TaggedAsyncSequence<T1, E> values, int seed) where E : System.Collections.Generic.IAsyncEnumerator<int>"),
+            ("RigidAsyncEnumeratorPatternTag", "static async System.Threading.Tasks.Task<int> M<E>(TaggedPatternAsyncSequence<int,E> values,int seed) where E:AsyncCursorBase<int>{await foreach(var item in values)seed=item;return seed;}", "global::System.Threading.Tasks.Task<int> M<E, T1>(global::TaggedPatternAsyncSequence<T1, E> values, int seed) where E : AsyncCursorBase<int>"),
             ("ParameterEnumeratorExtension", "static int M(ExtensionParameterSequence<int,Cursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}", "T1 M<T1>(global::ExtensionParameterSequence<T1, global::Cursor<T1>> values, T1 seed)"),
             ("ParameterAsyncEnumeratorInterface", "static async System.Threading.Tasks.Task<int> M(AsyncInterfaceSequence<int,AsyncInterfaceCursor<int>> values,int seed){await foreach(var item in values)seed=item;return seed;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::AsyncInterfaceSequence<T1, global::AsyncInterfaceCursor<T1>> values, T1 seed)"),
             ("ParameterEnumeratorBase", "static int M(ParameterSequence<int,Cursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}", "T1 M<T1>(global::ParameterSequence<T1, global::Cursor<T1>> values, T1 seed)"),

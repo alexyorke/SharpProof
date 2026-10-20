@@ -18,7 +18,11 @@ public class CliParameterCursor<T>{public bool MoveNext()=>false;public T Curren
 public class CliParameterSequence<T,E> where E:CliParameterCursor<T>{public E GetEnumerator()=>default!;}
 public class CliAsyncParameterCursor<T>{public System.Threading.Tasks.ValueTask<bool> MoveNextAsync()=>new(false);public T Current=>default!;}
 public class CliAsyncParameterSequence<T,E> where E:CliAsyncParameterCursor<T>{public E GetAsyncEnumerator()=>default!;}
+public class CliTaggedParameterSequence<Tag,E> where E:CliParameterCursor<int>{public E GetEnumerator()=>default!;}
+public class CliTaggedAsyncParameterSequence<Tag,E> where E:CliAsyncParameterCursor<int>{public E GetAsyncEnumerator()=>default!;}
 public static class CliBounds{
+    public static int RigidParameterEnumeration<E>(CliTaggedParameterSequence<int,E> values,int seed) where E:CliParameterCursor<int>{foreach(var item in values)seed=item;return seed;}
+    public static async System.Threading.Tasks.Task<int> RigidAsyncParameterEnumeration<E>(CliTaggedAsyncParameterSequence<int,E> values,int seed) where E:CliAsyncParameterCursor<int>{await foreach(var item in values)seed=item;return seed;}
     public static int ParameterEnumeration(CliParameterSequence<int,CliParameterCursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}
     public static async System.Threading.Tasks.Task<int> AsyncParameterEnumeration(CliAsyncParameterSequence<int,CliAsyncParameterCursor<int>> values,int seed){await foreach(var item in values)seed=item;return seed;}
     public static CliProjectionDual<int> ProjectionArray(CliProjectionDual<int> value,int[] other)=>Project(value,other);
@@ -44,10 +48,10 @@ EOF
 dotnet "$output" "$fixture/Input.cs" > "$fixture/source.log" 2>&1 || { tail -35 "$fixture/source.log"; exit 1; }
 dotnet "$output" --project "$fixture/Bounds.csproj" > "$fixture/project.log" 2>&1 || { tail -35 "$fixture/project.log"; exit 1; }
 for log in source project; do
-  for expected in 'ParameterEnumeration<T1>(global::CliParameterSequence<T1, global::CliParameterCursor<T1>> values, T1 seed)' 'AsyncParameterEnumeration<T1>(global::CliAsyncParameterSequence<T1, global::CliAsyncParameterCursor<T1>> values, T1 seed)' 'ProjectionArray<T1>(global::CliProjectionDual<T1> value, T1[] other)' 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
+  for expected in 'RigidParameterEnumeration<E, T1>(global::CliTaggedParameterSequence<T1, E> values, int seed)' 'RigidAsyncParameterEnumeration<E, T1>(global::CliTaggedAsyncParameterSequence<T1, E> values, int seed)' 'ParameterEnumeration<T1>(global::CliParameterSequence<T1, global::CliParameterCursor<T1>> values, T1 seed)' 'AsyncParameterEnumeration<T1>(global::CliAsyncParameterSequence<T1, global::CliAsyncParameterCursor<T1>> values, T1 seed)' 'ProjectionArray<T1>(global::CliProjectionDual<T1> value, T1[] other)' 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
     if ! grep -Fq "$expected" "$fixture/$log.log"; then tail -35 "$fixture/$log.log"; exit 1; fi
   done
 done
 cp "$fixture/source.log" /workspace/SharpProof/artifacts/hm-inference/constraint-cli.txt
 cp "$fixture/project.log" /workspace/SharpProof/artifacts/hm-inference/constraint-project.txt
-printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds' 'PASS CliShapeSelectedInterfaceProjection' 'PASS CliSubstitutedParameterEnumerators'
+printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds' 'PASS CliShapeSelectedInterfaceProjection' 'PASS CliSubstitutedParameterEnumerators' 'PASS CliRigidParameterEnumeratorTags'

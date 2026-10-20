@@ -39,7 +39,13 @@ internal static class ParameterEnumeratorRuntimeChecks
             }
             public class Sequence<T,E> where E:System.Collections.Generic.IEnumerator<T>{private readonly E enumerator;public Sequence(E value)=>enumerator=value;public E GetEnumerator()=>enumerator;}
             public class AsyncSequence<T,E> where E:System.Collections.Generic.IAsyncEnumerator<T>{private readonly E enumerator;public AsyncSequence(E value)=>enumerator=value;public E GetAsyncEnumerator()=>enumerator;}
+            public class TaggedSequence<Tag,E> where E:System.Collections.Generic.IEnumerator<int>{private readonly E enumerator;public TaggedSequence(E value)=>enumerator=value;public E GetEnumerator()=>enumerator;}
+            public class TaggedAsyncSequence<Tag,E> where E:System.Collections.Generic.IAsyncEnumerator<int>{private readonly E enumerator;public TaggedAsyncSequence(E value)=>enumerator=value;public E GetAsyncEnumerator()=>enumerator;}
             public static class ParameterEnumerationProbe{
+                public static int GenericSync<E>(TaggedSequence<int,E> values,int seed) where E:System.Collections.Generic.IEnumerator<int>{foreach(var item in values)seed=item;return seed;}
+                public static int GenericBreak<E>(TaggedSequence<int,E> values,int seed) where E:System.Collections.Generic.IEnumerator<int>{foreach(var item in values){seed=item;break;}return seed;}
+                public static async System.Threading.Tasks.Task<int> GenericAsync<E>(TaggedAsyncSequence<int,E> values,int seed) where E:System.Collections.Generic.IAsyncEnumerator<int>{await foreach(var item in values)seed=item;return seed;}
+                public static async System.Threading.Tasks.Task<int> GenericFault<E>(TaggedAsyncSequence<int,E> values,int seed) where E:System.Collections.Generic.IAsyncEnumerator<int>{await foreach(var item in values){seed=item;throw new System.InvalidOperationException("expected");}return seed;}
                 public static int Sync(Sequence<int,Cursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}
                 public static int Struct(Sequence<int,ValueCursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}
                 public static async System.Threading.Tasks.Task<int> Async(AsyncSequence<int,AsyncCursor<int>> values,int seed){await foreach(var item in values)seed=item;return seed;}
@@ -49,7 +55,13 @@ internal static class ParameterEnumeratorRuntimeChecks
                     ParameterEnumerationTrace.Value="";var items=new[]{11,17,23};
                     if(ParameterEnumerationProbe.Sync(new Sequence<int,Cursor<int>>(new(items)),0)!=23)return false;
                     if(ParameterEnumerationProbe.Struct(new Sequence<int,ValueCursor<int>>(new(items)),0)!=23)return false;
-                    return ParameterEnumerationProbe.Async(new AsyncSequence<int,AsyncCursor<int>>(new(items)),0).GetAwaiter().GetResult()==23;
+                    if(ParameterEnumerationProbe.Async(new AsyncSequence<int,AsyncCursor<int>>(new(items)),0).GetAwaiter().GetResult()!=23)return false;
+                    if(ParameterEnumerationProbe.GenericSync(new TaggedSequence<int,Cursor<int>>(new(items)),0)!=23)return false;
+                    if(ParameterEnumerationProbe.GenericSync(new TaggedSequence<int,ValueCursor<int>>(new(items)),0)!=23)return false;
+                    if(ParameterEnumerationProbe.GenericBreak(new TaggedSequence<int,Cursor<int>>(new(items)),0)!=11)return false;
+                    if(ParameterEnumerationProbe.GenericAsync(new TaggedAsyncSequence<int,AsyncCursor<int>>(new(items)),0).GetAwaiter().GetResult()!=23)return false;
+                    try{ParameterEnumerationProbe.GenericFault(new TaggedAsyncSequence<int,AsyncCursor<int>>(new(items)),0).GetAwaiter().GetResult();return false;}
+                    catch(System.InvalidOperationException exception){return exception.Message=="expected";}
                 }
             }
             """;
@@ -63,7 +75,7 @@ internal static class ParameterEnumeratorRuntimeChecks
         var expectedTrace = (string)before.GetType("ParameterEnumerationTrace")!.GetField("Value")!.GetValue(null)!;
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 6; round++)
+        for (var round = 0; round < 10; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -83,8 +95,8 @@ internal static class ParameterEnumeratorRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 3)
-        { throw new InvalidOperationException("Expected three parameter enumeration fixes; got " + fixes); }
+        if (fixes != 7)
+        { throw new InvalidOperationException("Expected seven parameter enumeration fixes; got " + fixes); }
         document = document.Project.AddDocument("NewParameterEnumerationDomains.cs", """
             #nullable enable
             public static class NewParameterEnumerationRunner{
@@ -92,7 +104,14 @@ internal static class ParameterEnumeratorRuntimeChecks
                     ParameterEnumerationTrace.Value="";var payload=new string('x',3);var items=new string?[]{"first",null,payload};
                     if(!object.ReferenceEquals(ParameterEnumerationProbe.Sync(new Sequence<string?,Cursor<string?>>(new(items)),null),payload))return false;
                     if(!object.ReferenceEquals(ParameterEnumerationProbe.Struct(new Sequence<string?,ValueCursor<string?>>(new(items)),null),payload))return false;
-                    return object.ReferenceEquals(ParameterEnumerationProbe.Async(new AsyncSequence<string?,AsyncCursor<string?>>(new(items)),null).GetAwaiter().GetResult(),payload);
+                    if(!object.ReferenceEquals(ParameterEnumerationProbe.Async(new AsyncSequence<string?,AsyncCursor<string?>>(new(items)),null).GetAwaiter().GetResult(),payload))return false;
+                    var fixedItems=new[]{11,17,23};
+                    if(ParameterEnumerationProbe.GenericSync(new TaggedSequence<string,Cursor<int>>(new(fixedItems)),0)!=23)return false;
+                    if(ParameterEnumerationProbe.GenericSync(new TaggedSequence<decimal,ValueCursor<int>>(new(fixedItems)),0)!=23)return false;
+                    if(ParameterEnumerationProbe.GenericBreak(new TaggedSequence<string,Cursor<int>>(new(fixedItems)),0)!=11)return false;
+                    if(ParameterEnumerationProbe.GenericAsync(new TaggedAsyncSequence<string,AsyncCursor<int>>(new(fixedItems)),0).GetAwaiter().GetResult()!=23)return false;
+                    try{ParameterEnumerationProbe.GenericFault(new TaggedAsyncSequence<string,AsyncCursor<int>>(new(fixedItems)),0).GetAwaiter().GetResult();return false;}
+                    catch(System.InvalidOperationException exception){return exception.Message=="expected";}
                 }
             }
             """);
@@ -103,7 +122,7 @@ internal static class ParameterEnumeratorRuntimeChecks
                 || (string)after.GetType("ParameterEnumerationTrace")!.GetField("Value")!.GetValue(null)! != expectedTrace)
             { throw new InvalidOperationException("ParameterEnumeration fixes changed dispatch, identity or helper effects: " + runner); }
         }
-        Program.Log.Info("PASS ParameterEnumeratorCodeFixIterationDisposalSuspensionIdentityAndNullableDomains");
+        Program.Log.Info("PASS ParameterEnumeratorCodeFixIterationDisposalSuspensionIdentityNullableAndRigidDomains");
         return fixes + 1;
     }
 

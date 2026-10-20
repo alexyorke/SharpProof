@@ -486,3 +486,10 @@ conversion classification, preserving variance while relating inferred payloads.
 Class, struct, inherited, extension and async-interface patterns have regression
 coverage. Applied IDE fixes compare iteration/disposal effects, suspended async
 iteration and nullable payload reference identity in original and new domains.
+
+When an enumerator remains an existing type parameter, its declared constraint
+domain and selected protocol members stay fixed while unrelated collection
+arguments remain inferable. Sync/async, class/interface/chained constraints,
+extensions, ref Current, explicit element conversions and distinct async member
+owners have regression coverage. Runtime IDE fixes verify new tag domains with
+class/struct enumerators, early-break disposal and faults after async suspension.

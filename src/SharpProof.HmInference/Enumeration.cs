@@ -85,7 +85,7 @@ public static partial class Inference
                 HmType.Unify(Expression(loop.Expression), new("[" + new string(',', array.Rank - 1) + "]", element));
                 return element;
             }
-            if (info.GetEnumeratorMethod is null || info.GetEnumeratorMethod.ReturnType is not INamedTypeSymbol
+            if (info.GetEnumeratorMethod is null || info.GetEnumeratorMethod.ReturnType is not (INamedTypeSymbol or ITypeParameterSymbol)
                 || info.CurrentProperty is null)
             {
                 Anchor(loop.Expression);
@@ -94,16 +94,25 @@ public static partial class Inference
             var mapping = EnumerationMapping(loop, info.GetEnumeratorMethod);
             var declaredReturn = info.GetEnumeratorMethod.OriginalDefinition.ReturnType;
             var returned = declaredReturn as INamedTypeSymbol;
-            if (returned is null && info.GetEnumeratorMethod.ReturnType is INamedTypeSymbol actualReturn)
+            var rigidReturn = info.GetEnumeratorMethod.ReturnType is ITypeParameterSymbol;
+            if (returned is null)
             {
                 var shape = CSharpTypes.Rigid(declaredReturn, mapping);
-                if (!CSharpTypes.MapNamedArguments(actualReturn, shape, mapping))
-                { throw new InferenceException("Unresolved substituted enumerator shape."); }
-                BindEnumeratorConstraints(loop, info.GetEnumeratorMethod, actualReturn, declaredReturn, shape, mapping);
-                returned = actualReturn.OriginalDefinition;
+                if (info.GetEnumeratorMethod.ReturnType is INamedTypeSymbol actualReturn)
+                {
+                    if (!CSharpTypes.MapNamedArguments(actualReturn, shape, mapping))
+                    { throw new InferenceException("Unresolved substituted enumerator shape."); }
+                    returned = actualReturn.OriginalDefinition;
+                }
+                else
+                {
+                    // An existing type parameter keeps its declared domain. Its
+                    // protocol members are already bound through those constraints.
+                    HmType.Unify(shape, CSharpTypes.Rigid(info.GetEnumeratorMethod.ReturnType));
+                    returned = info.CurrentProperty.ContainingType;
+                }
+                BindEnumeratorConstraints(loop, info.GetEnumeratorMethod, info.GetEnumeratorMethod.ReturnType, declaredReturn, shape, mapping);
             }
-            if (returned is null)
-            { throw new InferenceException("Unresolved enumerator type."); }
             AddNamedArguments(returned, mapping);
             INamedTypeSymbol? ancestor = returned.OriginalDefinition;
             while (ancestor is not null && !SymbolEqualityComparer.Default.Equals(ancestor.OriginalDefinition, info.CurrentProperty.ContainingType.OriginalDefinition))
@@ -122,10 +131,10 @@ public static partial class Inference
             if (info.IsAsynchronous)
             {
                 if (info.MoveNextMethod is not null)
-                { MapEnumerationOwner(returned, info.MoveNextMethod.ContainingType, mapping); }
+                { if (rigidReturn) { AddNamedArguments(info.MoveNextMethod.ContainingType, mapping); } else { MapEnumerationOwner(returned, info.MoveNextMethod.ContainingType, mapping); } }
                 BindImplicitAwait(loop, info.MoveNextMethod, mapping, true);
                 if (info.DisposeMethod is not null)
-                { MapEnumerationOwner(returned, info.DisposeMethod.ContainingType, mapping); }
+                { if (rigidReturn) { AddNamedArguments(info.DisposeMethod.ContainingType, mapping); } else { MapEnumerationOwner(returned, info.DisposeMethod.ContainingType, mapping); } }
                 BindImplicitAwait(loop, info.DisposeMethod, mapping, false);
             }
             var current = CSharpTypes.Rigid(info.CurrentProperty.OriginalDefinition.Type, mapping);

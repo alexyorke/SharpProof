@@ -32,7 +32,7 @@ public static partial class Inference
             return mapping;
         }
 
-        private void BindEnumeratorConstraints(CommonForEachStatementSyntax loop, IMethodSymbol selected, INamedTypeSymbol actualReturn,
+        private void BindEnumeratorConstraints(CommonForEachStatementSyntax loop, IMethodSymbol selected, ITypeSymbol actualReturn,
             ITypeSymbol declaredReturn, HmType shape, Dictionary<ITypeParameterSymbol, HmType> mapping)
         {
             if (loop is null)
