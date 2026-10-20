@@ -249,7 +249,7 @@ public static partial class Inference
                 return rewritten;
             }
             var changedCompilation = ReplaceCandidate(changed);
-            if (asyncBuilder is not null && symbol.IsAsync)
+            if (needsBuilderEmission)
             {
                 var layoutMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(declaration =>
                 { if (declaration is null) { throw new ArgumentNullException(nameof(declaration)); } return declaration.SpanStart == method.SpanStart; });

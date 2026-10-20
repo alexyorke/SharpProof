@@ -123,7 +123,31 @@ public static partial class Inference
             return active;
         }
 
-        private bool InferBuilderLayoutConstraints(Compilation compilation, MethodDeclarationSyntax proposal, Dictionary<HmType, string> variables)
+        private static MethodDeclarationSyntax StrengthenBuilderLayoutProbe(MethodDeclarationSyntax proposal, Dictionary<HmType, string> variables)
+        {
+            if (proposal is null)
+            { throw new ArgumentNullException(nameof(proposal)); }
+            if (variables is null)
+            { throw new ArgumentNullException(nameof(variables)); }
+            var probe = proposal;
+            foreach (var variable in variables)
+            {
+                if (variable.Key.IsValueType == false)
+                { continue; }
+                var existing = probe.ConstraintClauses.FirstOrDefault(clause =>
+                { if (clause is null) { throw new ArgumentNullException(nameof(clause)); } return clause.Name.Identifier.ValueText == variable.Value; });
+                var retained = existing?.Constraints.Where(constraint =>
+                { if (constraint is null) { throw new ArgumentNullException(nameof(constraint)); } return constraint.ToString() is not ("struct" or "unmanaged" or "notnull" or "new()"); }).Select(constraint =>
+                { if (constraint is null) { throw new ArgumentNullException(nameof(constraint)); } return constraint.ToString(); }).ToArray() ?? [];
+                var declaration = SyntaxFactory.ParseMemberDeclaration("void __Layout<" + variable.Value + ">() where " + variable.Value + " : unmanaged" + (retained.Length == 0 ? "" : ", " + string.Join(", ", retained)) + "{}") as MethodDeclarationSyntax
+                    ?? throw new InferenceException("Cannot construct state-machine layout probe.");
+                probe = probe.WithConstraintClauses(existing is null ? probe.ConstraintClauses.Add(declaration.ConstraintClauses[0])
+                    : probe.ConstraintClauses.Replace(existing, declaration.ConstraintClauses[0]));
+            }
+            return probe;
+        }
+
+        private bool InferRootBuilderLayoutConstraints(Compilation compilation, MethodDeclarationSyntax proposal, Dictionary<HmType, string> variables)
         {
             if (compilation is null)
             { throw new ArgumentNullException(nameof(compilation)); }
@@ -148,21 +172,7 @@ public static partial class Inference
                 // A compiler may enforce the synthesized unmanaged constraint
                 // before exposing its fields. Strengthen only this temporary probe;
                 // the proposal receives requirements derived from actual storage.
-                var probe = proposal;
-                foreach (var variable in variables)
-                {
-                    if (variable.Key.IsValueType == false)
-                    { continue; }
-                    var existing = probe.ConstraintClauses.FirstOrDefault(clause =>
-                    { if (clause is null) { throw new ArgumentNullException(nameof(clause)); } return clause.Name.Identifier.ValueText == variable.Value; });
-                    var retained = existing?.Constraints.Where(constraint =>
-                    { if (constraint is null) { throw new ArgumentNullException(nameof(constraint)); } return constraint.ToString() is not ("struct" or "unmanaged" or "notnull" or "new()"); }).Select(constraint =>
-                    { if (constraint is null) { throw new ArgumentNullException(nameof(constraint)); } return constraint.ToString(); }).ToArray() ?? [];
-                    var declaration = SyntaxFactory.ParseMemberDeclaration("void __Layout<" + variable.Value + ">() where " + variable.Value + " : unmanaged" + (retained.Length == 0 ? "" : ", " + string.Join(", ", retained)) + "{}") as MethodDeclarationSyntax
-                        ?? throw new InferenceException("Cannot construct state-machine layout probe.");
-                    probe = probe.WithConstraintClauses(existing is null ? probe.ConstraintClauses.Add(declaration.ConstraintClauses[0])
-                        : probe.ConstraintClauses.Replace(existing, declaration.ConstraintClauses[0]));
-                }
+                var probe = StrengthenBuilderLayoutProbe(proposal, variables);
                 var sourceTree = proposal.SyntaxTree;
                 var probeTree = sourceTree.WithRootAndOptions(sourceTree.GetRoot(cancellationToken).ReplaceNode(proposal, probe), sourceTree.Options);
                 compilation = compilation.ReplaceSyntaxTree(sourceTree, probeTree);
@@ -181,6 +191,15 @@ public static partial class Inference
             var state = layout.State;
             if (!RequiresUnmanagedMachine(layout.Metadata, state))
             { return false; }
+            return AddBuilderStorageConstraints(state, variables);
+        }
+
+        private bool AddBuilderStorageConstraints(INamedTypeSymbol state, Dictionary<HmType, string> variables)
+        {
+            if (state is null)
+            { throw new ArgumentNullException(nameof(state)); }
+            if (variables is null)
+            { throw new ArgumentNullException(nameof(variables)); }
             var fields = state.GetMembers().OfType<IFieldSymbol>().Where(field =>
             { if (field is null) { throw new ArgumentNullException(nameof(field)); } return !field.IsStatic; }).ToArray();
             if (state.TypeKind != TypeKind.Struct)

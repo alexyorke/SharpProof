@@ -512,3 +512,11 @@ and critical completion members are distinguished. Layout probes can temporarily
 strengthen generic constraints when the host compiler enforces them before emit.
 Applied fixes verify actual runtime reference-containing layouts and reject
 managed payload calls. Nested async-function layout correlation remains open.
+
+For C# 10 and later, private layout probes correlate nested async lambdas,
+anonymous delegates and local functions through temporary method attributes.
+Markers stay out of suggestions and applied fixes. Each active state machine
+contributes only its physically stored generic arguments, including multiple
+independent callbacks. Runtime fixes verify callback values, field layouts,
+unmanaged-domain errors and unrestricted unused parameters. Older-language
+nested correlation and generic local-call substitutions remain open.
