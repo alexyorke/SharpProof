@@ -39,7 +39,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(valueType);
         var source = SourceTemplate.Replace("__VALUE_TYPE__", valueType, StringComparison.Ordinal);
-        var compilation = TestCompilation.Create("FloatingEqualityEvaluationOrder_" + valueType, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingEqualityEvaluationOrder_" + valueType, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();

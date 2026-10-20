@@ -102,7 +102,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("GenericImplicitTypeTest", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericImplicitTypeTest", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();

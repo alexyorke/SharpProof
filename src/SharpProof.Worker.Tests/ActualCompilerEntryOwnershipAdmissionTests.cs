@@ -18,7 +18,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
                 public static int Second(int value) { Contract.Requires(value <= 0); Contract.Ensures(Contract.Result<int>() == value); return value; }
             }
             """;
-        var compilation = TestCompilation.Create("ActualEntryOwnershipAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ActualEntryOwnershipAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

@@ -62,7 +62,7 @@ public sealed class OpaqueStackValueOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Reference, Is.SameAs(expected.Reference)); }
 
-        var compilation = TestCompilation.Create("OpaqueStackValueOracle", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, ImmutableArray.Create(("Probe.cs", source)));
+        var compilation = TestCompilation.CreateExact("OpaqueStackValueOracle", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, ImmutableArray.Create(("Probe.cs", source)));
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

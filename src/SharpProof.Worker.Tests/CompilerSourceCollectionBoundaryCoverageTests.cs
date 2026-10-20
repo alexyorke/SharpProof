@@ -20,7 +20,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             "public static int Root((int,int) pair) { Contract.Ensures(Contract.Result<int>()==1); int a,b; (a,b)=pair;" +
             new string(';', emptyStatements) + "return 1; } }";
-        var compilation = TestCompilation.Create("DeconstructionCollectionBoundary", ("deconstruction.cs", source));
+        var compilation = TestCompilation.CreateExact("DeconstructionCollectionBoundary", [("deconstruction.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, [(3, 4)]);
         var tree = compilation.SyntaxTrees.Single();
@@ -76,7 +76,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         }));
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             "public static int Root() { Contract.Ensures(Contract.Result<int>()==1); H0(); return 1; }\n" + methods + "}";
-        var compilation = TestCompilation.Create("ReachableBodyBoundary", ("call-tree.cs", source));
+        var compilation = TestCompilation.CreateExact("ReachableBodyBoundary", [("call-tree.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, []);
         var tree = compilation.SyntaxTrees.Single();

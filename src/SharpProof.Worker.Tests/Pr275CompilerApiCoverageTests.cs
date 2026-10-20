@@ -11,8 +11,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275CompilerApiCoverageTests
 {
-    private static readonly CSharpCompilation Compilation = TestCompilation.Create(
-        "Pr275CompilerApi", ("Subject.cs", """
+    private static readonly CSharpCompilation Compilation = TestCompilation.CreateExact(
+        "Pr275CompilerApi", [("Subject.cs", """
             using SharpProof.Attributes;
             internal static class Subject {
                 internal static int Identity(int value) {
@@ -20,7 +20,7 @@ public sealed class Pr275CompilerApiCoverageTests
                     return value;
                 }
             }
-            """));
+            """)]);
 
     [TestCase("entry", "compilation")]
     [TestCase("entry", "target")]

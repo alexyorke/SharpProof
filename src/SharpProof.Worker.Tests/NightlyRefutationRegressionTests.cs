@@ -38,8 +38,8 @@ public sealed class NightlyRefutationRegressionTests
         // Compile the same method for the CLR with contracts erased, as the
         // nightly runtime oracle does. Both admitted values throw; the source
         // has no normal-return statement, so this holds for all admitted x.
-        var runtime = TestCompilation.Create("NightlyRefutationRuntime",
-            ("Subject.cs", "#undef SHARPPROOF_CONTRACTS\n" + source));
+        var runtime = TestCompilation.CreateExact("NightlyRefutationRuntime",
+            [("Subject.cs", "#undef SHARPPROOF_CONTRACTS\n" + source)]);
         TestCompilation.AssertNoErrors(runtime);
         using var image = new MemoryStream();
         var emission = runtime.Emit(image);

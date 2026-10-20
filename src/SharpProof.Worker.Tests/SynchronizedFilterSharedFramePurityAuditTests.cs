@@ -62,7 +62,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), source);
 
-        var compilation = TestCompilation.Create("SynchronizedFilterSharedFramePurity_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SynchronizedFilterSharedFramePurity_" + caseName, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();

@@ -101,7 +101,7 @@ public sealed class GenericNullableTypeTestAllocationTests
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("GenericNullableTypeTest", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericNullableTypeTest", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();

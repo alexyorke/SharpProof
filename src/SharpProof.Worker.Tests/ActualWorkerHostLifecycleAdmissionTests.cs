@@ -20,7 +20,7 @@ public sealed class ActualWorkerHostLifecycleAdmissionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("ActualWorkerHostLifecycleAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ActualWorkerHostLifecycleAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

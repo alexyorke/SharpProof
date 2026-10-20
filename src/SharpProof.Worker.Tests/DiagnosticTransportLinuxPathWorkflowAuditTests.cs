@@ -49,7 +49,7 @@ public sealed class DiagnosticTransportLinuxPathWorkflowAuditTests
         Assert.That(expectedUri.LocalPath, Is.EqualTo(sourcePath), "Independent encoded file URI oracle.");
         Assert.That(File.Exists(expectedUri.LocalPath), Is.True);
 
-        var compilation = TestCompilation.Create("DiagnosticTransportLinuxPathAudit",
+        var compilation = TestCompilation.CreateExact("DiagnosticTransportLinuxPathAudit",
             OutputKind.DynamicallyLinkedLibrary, [(sourcePath, Source)]);
         var tree = compilation.SyntaxTrees.Single();
         var attribute = (await tree.GetRootAsync()).DescendantNodes().OfType<AttributeSyntax>().Single();

@@ -135,9 +135,9 @@ public sealed class Pr275CoreRequiredInputTests
 
     private static SourceFixture CreateSourceFixture()
     {
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "Pr275CoreRequiredInput",
-            ("Subject.cs", """
+            [("Subject.cs", """
                 public static class Subject
                 {
                     public static int Target(int value)
@@ -145,7 +145,7 @@ public sealed class Pr275CoreRequiredInputTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot()
             .DescendantNodes()

@@ -20,7 +20,7 @@ public sealed class ActualLauncherResultFileAdmissionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("LauncherResultFileAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LauncherResultFileAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

@@ -32,7 +32,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSessionEntryReservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSessionEntryReservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

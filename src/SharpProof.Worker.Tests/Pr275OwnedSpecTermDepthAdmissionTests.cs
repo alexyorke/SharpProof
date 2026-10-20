@@ -24,7 +24,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
                 public static bool Target() { Contract.Ensures(Contract.Result<bool>() == true); return true; }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSpecTermDepthAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSpecTermDepthAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

@@ -102,7 +102,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit", "nearby-boundaries");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("FloatingPredicateBoundary_" + scenario, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingPredicateBoundary_" + scenario, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

@@ -327,14 +327,14 @@ public sealed class CompilerMetadataBodyAdmissionTests
 
     private static CSharpCompilation CreateGuardCompilation()
     {
-        var compilation = TestCompilation.Create("DefensiveGuardControl", ("Subject.cs", """
+        var compilation = TestCompilation.CreateExact("DefensiveGuardControl", [("Subject.cs", """
             using SharpProof.Attributes;
             public static class Subject
             {
                 [ZeroAllocations]
                 public static int Root() => 1;
             }
-            """));
+            """)]);
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }

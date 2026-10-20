@@ -74,7 +74,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "Subject.cs"), SubjectSource);
         await File.WriteAllTextAsync(Path.Combine(evidence, "Boundary.cs"), BoundarySource);
 
-        var external = TestCompilation.Create("CallerBoxingInterfaceBoundary", ("Boundary.cs", BoundarySource));
+        var external = TestCompilation.CreateExact("CallerBoxingInterfaceBoundary", [("Boundary.cs", BoundarySource)]);
         external = external.WithOptions(external.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var directory = new TempDirectory("sharpproof-interface-boxing");
         var boundaryPath = Path.Combine(directory.FullName, "Boundary.dll");

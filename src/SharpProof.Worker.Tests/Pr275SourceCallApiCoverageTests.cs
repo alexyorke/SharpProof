@@ -12,13 +12,13 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275SourceCallApiCoverageTests
 {
-    private static readonly CSharpCompilation Compilation = TestCompilation.Create(
-        "Pr275SourceCallApi", ("Subject.cs", """
+    private static readonly CSharpCompilation Compilation = TestCompilation.CreateExact(
+        "Pr275SourceCallApi", [("Subject.cs", """
             internal static class Subject {
                 internal static void Caller() { }
                 internal static void Callee() { }
             }
-            """));
+            """)]);
 
     private static bool PrepareCallee(TotalLoweringContext context)
     {

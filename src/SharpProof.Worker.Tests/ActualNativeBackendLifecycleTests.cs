@@ -30,7 +30,7 @@ public sealed class ActualNativeBackendLifecycleTests
     [TestCase(true)]
     public async Task SuppliedActualNativeBackendLifecyclePreservesProofOrTypedFailure(bool disposed)
     {
-        var compilation = TestCompilation.Create("NativeBackendLifecycle", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("NativeBackendLifecycle", [("Subject.cs", Source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var emittedImage = new MemoryStream();
         var emitted = compilation.Emit(emittedImage);

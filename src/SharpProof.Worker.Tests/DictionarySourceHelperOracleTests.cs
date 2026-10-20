@@ -117,7 +117,7 @@ public sealed class DictionarySourceHelperOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Integer, Is.EqualTo(1)); }
 
-        var compilation = TestCompilation.Create("DictionarySourceHelperOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("DictionarySourceHelperOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

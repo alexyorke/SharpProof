@@ -48,7 +48,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
             _ => throw new AssertionException("Unknown source shape")
         };
         var source = "using SharpProof.Attributes;" + extras + "public static class Subject {" + members + "}";
-        var compilation = TestCompilation.Create("EntryTraversalBoundary", ("entry-budget.cs", source));
+        var compilation = TestCompilation.CreateExact("EntryTraversalBoundary", [("entry-budget.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

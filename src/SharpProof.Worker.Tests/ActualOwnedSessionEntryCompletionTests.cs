@@ -36,7 +36,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSessionEntryCompletion", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSessionEntryCompletion", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

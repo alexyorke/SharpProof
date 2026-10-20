@@ -90,7 +90,7 @@ public sealed class CompilerDisjointInputAnalysisTests
     private static (CSharpCompilation Compilation, IMethodSymbol Method, ImmutableArray<byte> Image) Compile(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("OwnedDisjointInputAnalysis", ("disjoint-analysis.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedDisjointInputAnalysis", [("disjoint-analysis.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

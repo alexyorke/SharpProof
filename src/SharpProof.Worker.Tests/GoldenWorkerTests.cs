@@ -847,7 +847,7 @@ public sealed class GoldenWorkerTests
         System.ArgumentNullException.ThrowIfNull(fixture);
         using var directory = new TempDirectory("sharpproof-golden-worker-");
         var sourcePath = Path.Combine(directory.FullName, Path.GetFileName(fixture.RelativePath));
-        var compilation = TestCompilation.Create("GoldenWorker", OutputKind.DynamicallyLinkedLibrary,
+        var compilation = TestCompilation.CreateExact("GoldenWorker", OutputKind.DynamicallyLinkedLibrary,
             [(sourcePath, fixture.Source)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();

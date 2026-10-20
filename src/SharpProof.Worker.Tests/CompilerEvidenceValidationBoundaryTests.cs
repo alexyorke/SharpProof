@@ -19,7 +19,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void ModuleEvidenceRequiresAnMvidBeforeMatchingLoadedAndFileIdentities()
     {
-        var compilation = TestCompilation.Create("ModuleEvidence", ("module.cs", "public static class Subject { public static int Value() => 1; }"));
+        var compilation = TestCompilation.CreateExact("ModuleEvidence", [("module.cs", "public static class Subject { public static int Value() => 1; }")]);
         using var image = Emit(compilation);
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
@@ -45,7 +45,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
             CompilerReferenceModuleEvidence.Match(missingMvid, otherName)))!.Message,
             Is.EqualTo("A compiler reference path does not match its loaded metadata."));
 
-        var changed = TestCompilation.Create("ModuleEvidence", ("module.cs", "public static class Subject { public static int Value() => 2; }"));
+        var changed = TestCompilation.CreateExact("ModuleEvidence", [("module.cs", "public static class Subject { public static int Value() => 2; }")]);
         using var changedImage = Emit(changed);
         using var changedPe = new PEReader(changedImage);
         var changedEvidence = CompilerReferenceModuleEvidence.Capture(changedPe.GetMetadataReader());
@@ -83,7 +83,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void SpecificationBindingSeparatesAuditedTypeKindsFromTotalIntegerWidths()
     {
-        var compilation = TestCompilation.Create("BindingEvidence", ("binding.cs", "public static class Subject { public static int Same(int left, int right) => left; public static long Mixed(int left, long right) => right; }"));
+        var compilation = TestCompilation.CreateExact("BindingEvidence", [("binding.cs", "public static class Subject { public static int Same(int left, int right) => left; public static long Mixed(int left, long right) => right; }")]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = Emit(compilation);
         Assert.That(image.Length, Is.GreaterThan(0));
@@ -119,7 +119,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void OwnedSyntaxEncodingUsesTheOriginalOrdinalPathOrTheMissingOwnerSentinel()
     {
-        var compilation = TestCompilation.Create("SyntaxEvidence", ("syntax.cs", "public static class Subject { public static int First() { int value = 1; return value; } public static int Second() => 2; }"));
+        var compilation = TestCompilation.CreateExact("SyntaxEvidence", [("syntax.cs", "public static class Subject { public static int First() { int value = 1; return value; } public static int Second() => 2; }")]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var root = tree.GetRoot();
@@ -146,7 +146,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void ExceptionProjectionRequiresTheCompleteRuntimeTypeUniverse()
     {
-        var compilation = TestCompilation.Create("ExceptionEvidence", ("exception.cs", "public static class Subject { }"));
+        var compilation = TestCompilation.CreateExact("ExceptionEvidence", [("exception.cs", "public static class Subject { }")]);
         TestCompilation.AssertNoErrors(compilation);
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         var argumentIdentity = CompilerExceptionTypeIdentity.Encode(core.GetTypeByMetadataName("System.ArgumentException")!);

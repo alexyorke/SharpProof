@@ -44,7 +44,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         Directory.CreateDirectory(evidenceDirectory);
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash), "Frozen facet source changed.");
-        var compilation = TestCompilation.Create("GenericTestedTypeFacetControl", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypeFacetControl", [("Subject.cs", Source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();

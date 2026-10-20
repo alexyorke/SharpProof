@@ -45,7 +45,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("FactorCompanionEntryObservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FactorCompanionEntryObservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);

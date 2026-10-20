@@ -295,7 +295,7 @@ public sealed class WorkerVcSourceCallTests
     public void OptionalSourceCallEvidencePreservesEveryLegacySerializedByte(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("SourceCallLegacyPreservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SourceCallLegacyPreservation", [("Subject.cs", source)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);

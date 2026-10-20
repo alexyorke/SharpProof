@@ -51,7 +51,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("FloatingPredicateSoundness_" + valueType, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingPredicateSoundness_" + valueType, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

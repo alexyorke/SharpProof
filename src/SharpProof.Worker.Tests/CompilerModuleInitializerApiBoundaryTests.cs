@@ -17,7 +17,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
     {
         const string validSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public static class Subject { [ModuleInitializer] public static void Initialize() { } [DoesNotThrow] public static int Root() => 1; }";
         const string errorSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public static class Subject { public static int Value { [ModuleInitializer] get => 1; } [DoesNotThrow] public static int Root() => 1; }";
-        var valid = TestCompilation.Create("ModuleInitializerApiBoundary", ("valid.cs", validSource));
+        var valid = TestCompilation.CreateExact("ModuleInitializerApiBoundary", [("valid.cs", validSource)]);
         using var image = new MemoryStream();
         Assert.That(valid.Emit(image).Success, Is.True);
         image.Position = 0;
@@ -95,7 +95,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         };
         var errorSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public class Subject { " +
             member + " [DoesNotThrow] public static int Root() => 1; }";
-        var valid = TestCompilation.Create("ModuleInitializerNonordinary", ("valid.cs", validSource));
+        var valid = TestCompilation.CreateExact("ModuleInitializerNonordinary", [("valid.cs", validSource)]);
         using var image = new MemoryStream();
         Assert.That(valid.Emit(image).Success, Is.True);
         image.Position = 0;

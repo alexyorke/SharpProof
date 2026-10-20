@@ -181,7 +181,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
     private static CSharpCompilation Compile(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("InstructionBoundContract", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("InstructionBoundContract", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }

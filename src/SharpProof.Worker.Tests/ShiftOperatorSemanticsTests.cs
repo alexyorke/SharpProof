@@ -71,7 +71,7 @@ public sealed class ShiftOperatorSemanticsTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("ShiftOperatorSemantics", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ShiftOperatorSemantics", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

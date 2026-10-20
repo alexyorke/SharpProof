@@ -21,7 +21,7 @@ public sealed class Pr275NativeAssumptionMapTests
                 public static int Target(int value) { Contract.Requires(false); return value; }
             }
             """;
-        var compilation = TestCompilation.Create("Pr275MappedAssumptionIds", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("Pr275MappedAssumptionIds", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

@@ -23,7 +23,7 @@ public sealed class ActualNativePolicyBackendAdmissionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("NativePolicyBackendAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("NativePolicyBackendAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

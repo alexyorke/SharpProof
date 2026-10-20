@@ -31,7 +31,7 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static partial class Subject { " +
             "public static int Helper(int value) { Contract.Requires(value > 0); return value + 1; } " +
             declaration + " public static int Property => 2; static Subject() { } }";
-        var compilation = TestCompilation.Create("OwnedMethodBodyGraph", ("owned-body.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedMethodBodyGraph", [("owned-body.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

@@ -39,7 +39,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
             "enum-compatibility");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("EnumEqualityCompatibility_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("EnumEqualityCompatibility_" + caseName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
         Assert.That(warnings, Is.Empty, string.Join("\n", warnings.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));

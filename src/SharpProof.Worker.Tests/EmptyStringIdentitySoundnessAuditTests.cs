@@ -71,7 +71,7 @@ public sealed class EmptyStringIdentitySoundnessAuditTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("EmptyStringIdentitySoundness", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("EmptyStringIdentitySoundness", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

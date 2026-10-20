@@ -29,7 +29,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
                 private static int Invoke<T>(int value) where T : IStaticRoot => T.Root(value);
             }
             """;
-        var compilation = TestCompilation.Create("ExplicitStaticInterface", ("static-interface.cs", source));
+        var compilation = TestCompilation.CreateExact("ExplicitStaticInterface", [("static-interface.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

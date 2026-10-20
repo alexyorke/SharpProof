@@ -62,7 +62,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
         var source = SourceFor(boundary);
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(boundary)), "Frozen boundary source changed.");
-        var compilation = TestCompilation.Create("GenericTypeBoundary_" + boundary, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericTypeBoundary_" + boundary, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();

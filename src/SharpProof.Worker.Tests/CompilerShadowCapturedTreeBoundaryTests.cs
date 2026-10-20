@@ -11,11 +11,11 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
     [Test]
     public void IncompleteCapturedTreeArrayRejectsWholeBatchAfterRealCompleteControl()
     {
-        var compilation = TestCompilation.Create("ShadowCapturedTreeBoundary",
-            ("root.cs", "public static partial class Subject { public static int Root(int value) => Helper(value); }"),
+        var compilation = TestCompilation.CreateExact("ShadowCapturedTreeBoundary",
+            [("root.cs", "public static partial class Subject { public static int Root(int value) => Helper(value); }"),
             ("helper.cs", "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; " +
                 "public static partial class Subject { public static int Helper(int value) { " +
-                "Contract.Requires(value > 0); return value + 1; } }"));
+                "Contract.Requires(value > 0); return value + 1; } }")]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

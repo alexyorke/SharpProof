@@ -55,12 +55,12 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
         string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "CompilerCallableLowererEdgeCaseRegressionTests",
-            (Path.Combine(
+            [(Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     "CompilerCallableLowererEdgeCaseSubject.cs"),
-                source));
+                source)]);
 
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return (compilation, discovery);

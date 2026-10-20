@@ -233,9 +233,9 @@ public sealed class CompilerTotalCallRetirementTests
     private static CSharpCompilation CreateCompilation(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        return TestCompilation.Create(
+        return TestCompilation.CreateExact(
             "CompilerRelationalSummaryProviderTests",
-            ("Subject.cs", source));
+            [("Subject.cs", source)]);
     }
 
     private static CSharpCompilation CreateCompilationWithReferences(

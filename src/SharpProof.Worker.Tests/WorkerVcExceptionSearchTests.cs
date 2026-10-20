@@ -161,7 +161,7 @@ public sealed class WorkerVcExceptionSearchTests
     public void OptionalRegionEvidencePreservesLegacyGraphAndRows(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var compilation = TestCompilation.Create("RegionLegacyPreservation", ("Subject.cs", Source(kind)));
+        var compilation = TestCompilation.CreateExact("RegionLegacyPreservation", [("Subject.cs", Source(kind))]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);

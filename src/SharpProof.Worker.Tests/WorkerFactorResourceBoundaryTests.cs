@@ -75,7 +75,7 @@ public sealed class WorkerFactorResourceBoundaryTests
     {
         System.ArgumentNullException.ThrowIfNull(label);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("FactorTheoremObservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FactorTheoremObservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);

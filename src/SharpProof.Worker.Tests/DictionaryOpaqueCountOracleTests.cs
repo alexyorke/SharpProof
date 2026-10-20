@@ -87,7 +87,7 @@ public sealed class DictionaryOpaqueCountOracleTests
         Check(rejected, approximation: true);
         Assert.That(rejectedInitializations, Is.GreaterThan(0));
 
-        var compilation = TestCompilation.Create("DictionaryOpaqueCountOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("DictionaryOpaqueCountOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

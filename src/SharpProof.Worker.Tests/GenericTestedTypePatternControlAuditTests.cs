@@ -63,7 +63,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen pattern source changed.");
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, form + "-subject.cs"), source);
-        var compilation = TestCompilation.Create("GenericTestedTypePattern_" + form, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypePattern_" + form, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();

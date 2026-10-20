@@ -80,7 +80,7 @@ public sealed class StackStateOracleTests
         var interpreted = new IrProgramInterpreter(factory).Execute(total.Program, null, 10000, choices);
         Assert.That(interpreted.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), interpreted.Unsupported?.Detail);
         Assert.That(interpreted.ConsumedApproximation, Is.True);
-        var compilation = TestCompilation.Create("StackStateOracle", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, ImmutableArray.Create(("Probe.cs", source)));
+        var compilation = TestCompilation.CreateExact("StackStateOracle", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, ImmutableArray.Create(("Probe.cs", source)));
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

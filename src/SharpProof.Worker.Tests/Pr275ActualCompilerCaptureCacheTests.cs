@@ -60,7 +60,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
     {
         var source = $"#line (10,2)-(10,80) {offset} \"original.dsl\"\n" +
             new string(' ', offset) + "public static class Subject { public static int Value() => 7; }\n#line default\n";
-        var compilation = TestCompilation.Create("Pr275ActualEnhancedLine", ("generated.cs", source));
+        var compilation = TestCompilation.CreateExact("Pr275ActualEnhancedLine", [("generated.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);

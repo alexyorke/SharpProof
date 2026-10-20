@@ -67,7 +67,7 @@ public sealed class OpaqueListValueOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Reference, Is.SameAs(expected.Reference)); }
 
-        var compilation = TestCompilation.Create("OpaqueListValueOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("OpaqueListValueOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

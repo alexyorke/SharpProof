@@ -126,7 +126,7 @@ public sealed class ActualNativeProjectionAdmissionTests
     {
         System.ArgumentNullException.ThrowIfNull(assemblyName);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create(assemblyName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact(assemblyName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

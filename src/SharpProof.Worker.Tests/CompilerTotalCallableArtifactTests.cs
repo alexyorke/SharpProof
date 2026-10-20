@@ -1006,7 +1006,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public void TotalOperationDocumentsUseCapturedTreeIdentity(string document)
     {
         System.ArgumentNullException.ThrowIfNull(document);
-        var compilation = TestCompilation.Create("DocumentIdentity", (document, DiamondSource));
+        var compilation = TestCompilation.CreateExact("DocumentIdentity", [(document, DiamondSource)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
@@ -1023,8 +1023,8 @@ public sealed class CompilerTotalCallableArtifactTests
     public void SameSpanTreesKeepDistinctCapturedDocumentsAndMappedReporting()
     {
         const string source = "#line 100 \"mapped.cs\"\n" + DiamondSource;
-        var compilation = TestCompilation.Create("MultipleDocuments", ("shared.cs", source),
-            ("shared.cs", source.Replace("class Subject", "class Another", StringComparison.Ordinal)));
+        var compilation = TestCompilation.CreateExact("MultipleDocuments", [("shared.cs", source),
+            ("shared.cs", source.Replace("class Subject", "class Another", StringComparison.Ordinal))]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
@@ -1241,7 +1241,7 @@ public sealed class CompilerTotalCallableArtifactTests
         int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("TotalArtifact", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("TotalArtifact", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,

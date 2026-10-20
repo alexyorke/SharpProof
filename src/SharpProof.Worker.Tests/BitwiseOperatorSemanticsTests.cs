@@ -72,7 +72,7 @@ public sealed class BitwiseOperatorSemanticsTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("BitwiseOperatorSemantics", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("BitwiseOperatorSemantics", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

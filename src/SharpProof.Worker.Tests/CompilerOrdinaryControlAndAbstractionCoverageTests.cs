@@ -21,7 +21,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             (emptyReason ? "[SharpProofSuppress(\"\")]" : string.Empty) +
             "public static int Root() { Contract.Ensures(Contract.Result<int>()==1); return 1; } }";
-        var compilation = TestCompilation.Create("ControlReasonBoundary", ("control-reason.cs", source));
+        var compilation = TestCompilation.CreateExact("ControlReasonBoundary", [("control-reason.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, false);
         var tree = compilation.SyntaxTrees.Single();

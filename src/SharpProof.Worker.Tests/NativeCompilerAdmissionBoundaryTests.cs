@@ -110,7 +110,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
     private static CompilerCallablePreparation Prepare(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("NativeAdmissionBoundary", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("NativeAdmissionBoundary", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);

@@ -31,8 +31,8 @@ public sealed class CompilerReportingTests
     [Test]
     public void DefaultAdditionalFilesCaptureAsAnEmptyCollection()
     {
-        var compilation = TestCompilation.Create("DefaultAdditionalFiles",
-            ("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var compilation = TestCompilation.CreateExact("DefaultAdditionalFiles",
+            [("Subject.cs", "public static class Subject { public static int Root() => 1; }")]);
         var captured = CompilerCompilationCapture.Capture(compilation,
             Directory.GetCurrentDirectory(), "net8.0", default,
             TestContext.CurrentContext.CancellationToken);
@@ -59,7 +59,7 @@ public sealed class CompilerReportingTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(caseIndex)); }
 
         var paths = CapturedPathCases[caseIndex];
-        var compilation = TestCompilation.Create("DocumentIdentityTests", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, paths.Select((path, index) =>
+        var compilation = TestCompilation.CreateExact("DocumentIdentityTests", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, paths.Select((path, index) =>
             path is null ? throw new System.ArgumentNullException(nameof(path)) : ((path, "public static class Subject" + index + " { public static int Root() => " + index + "; }"))).ToImmutableArray());
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(snapshots.Select(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path)).Distinct(StringComparer.Ordinal).Count(),

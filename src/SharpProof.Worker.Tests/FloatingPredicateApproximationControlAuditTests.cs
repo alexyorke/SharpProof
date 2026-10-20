@@ -68,7 +68,7 @@ public sealed class FloatingPredicateApproximationControlAuditTests
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit", "approximation-controls");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("FloatingPredicateApproximationControl_" + scenario, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FloatingPredicateApproximationControl_" + scenario, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

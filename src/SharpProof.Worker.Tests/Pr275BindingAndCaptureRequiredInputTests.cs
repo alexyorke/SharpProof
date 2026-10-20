@@ -25,8 +25,8 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
 
     private static CSharpCompilation CreateCompilation()
     {
-        return TestCompilation.Create("Pr275RequiredBindingCapture",
-            ("Subject.cs", """
+        return TestCompilation.CreateExact("Pr275RequiredBindingCapture",
+            [("Subject.cs", """
                 using SharpProof.Attributes;
                 internal static class Subject {
                     internal static int Target(int value) {
@@ -35,7 +35,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
                     }
                 }
                 """),
-            ("Other.cs", "internal sealed class Other { }"));
+            ("Other.cs", "internal sealed class Other { }")]);
     }
 
     [Test]

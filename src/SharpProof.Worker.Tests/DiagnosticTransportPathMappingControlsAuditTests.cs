@@ -56,7 +56,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
             Assert.That(targetLines[expectedLine - 1], Is.EqualTo("    [return: Positive]"));
         }
 
-        var compilation = TestCompilation.Create("DiagnosticTransportPathMappingAudit",
+        var compilation = TestCompilation.CreateExact("DiagnosticTransportPathMappingAudit",
             OutputKind.DynamicallyLinkedLibrary, [(input.SourcePath, source)]);
         var tree = compilation.SyntaxTrees.Single();
         var attribute = (await tree.GetRootAsync()).DescendantNodes().OfType<AttributeSyntax>().Single();

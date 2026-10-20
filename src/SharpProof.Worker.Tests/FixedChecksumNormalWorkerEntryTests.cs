@@ -606,7 +606,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(budgets.MaxParallelism, Is.EqualTo(4));
             using var project = WorkerTests.TestProject.Create(Source);
             Assert.That(await File.ReadAllTextAsync(project.SourcePaths.Single(), TestContext.CurrentContext.CancellationToken), Is.EqualTo(Source));
-            var controlCompilation = TestCompilation.Create("FixedChecksumNativeEntryOptions", ("Subject.cs", Source));
+            var controlCompilation = TestCompilation.CreateExact("FixedChecksumNativeEntryOptions", [("Subject.cs", Source)]);
             var parseOptions = (CSharpParseOptions)controlCompilation.SyntaxTrees.Single().Options;
             var compilationOptions = (CSharpCompilationOptions)controlCompilation.Options;
             var ownedCompilation = project.CreateCompilation(parseOptions, compilationOptions);

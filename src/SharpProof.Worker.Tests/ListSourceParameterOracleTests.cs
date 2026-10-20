@@ -44,7 +44,7 @@ public sealed class ListSourceParameterOracleTests
         });
         var interpreted = new IrProgramInterpreter(factory).Execute(program, null, 10000, choices);
         Assert.That(interpreted.ConsumedApproximation, Is.True, "Normal growth and ancillary fault choices are differential evidence, not native replay authority.");
-        var compilation = TestCompilation.Create("ListSourceParameterOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("ListSourceParameterOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
             syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));

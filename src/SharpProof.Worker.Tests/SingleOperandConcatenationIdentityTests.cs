@@ -92,7 +92,7 @@ public sealed class SingleOperandConcatenationIdentityTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("SingleOperandConcatenationIdentity", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SingleOperandConcatenationIdentity", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

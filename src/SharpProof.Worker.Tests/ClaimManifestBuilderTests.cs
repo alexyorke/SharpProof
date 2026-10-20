@@ -2514,7 +2514,7 @@ public sealed class ClaimManifestBuilderTests
     {
         if (sources.IsDefault)
         { throw new ArgumentNullException(nameof(sources)); }
-        return TestCompilation.Create(
+        return TestCompilation.CreateExact(
             "ManifestTests",
             outputKind,
             sources);

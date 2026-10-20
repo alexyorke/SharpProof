@@ -78,7 +78,7 @@ public sealed class ActualMalformedResultProjectionTests
         System.ArgumentNullException.ThrowIfNull(typeName);
         var source = "using SharpProof.Attributes; public static class " + typeName +
             " { public static int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; } }";
-        var compilation = TestCompilation.Create(assemblyName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact(assemblyName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

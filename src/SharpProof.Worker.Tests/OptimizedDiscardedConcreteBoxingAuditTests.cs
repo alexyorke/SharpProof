@@ -84,7 +84,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "Subject.cs"), source);
         await File.WriteAllTextAsync(Path.Combine(evidence, "Boundary.cs"), BoundarySource);
 
-        var external = TestCompilation.Create("OptimizedDiscardBoundary_" + shape, ("Boundary.cs", BoundarySource));
+        var external = TestCompilation.CreateExact("OptimizedDiscardBoundary_" + shape, [("Boundary.cs", BoundarySource)]);
         external = external.WithOptions(external.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var directory = new TempDirectory("sharpproof-optimized-boxing");
         var boundaryPath = Path.Combine(directory.FullName, "Boundary.dll");

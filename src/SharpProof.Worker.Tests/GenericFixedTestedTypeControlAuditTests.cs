@@ -90,7 +90,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen fixed-type subject changed.");
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, form + "-subject.cs"), source);
-        var compilation = TestCompilation.Create("GenericFixedTestedType_" + form, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericFixedTestedType_" + form, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();

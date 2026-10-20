@@ -13,8 +13,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275FrontendRequiredInputTests
 {
-    private static readonly CSharpCompilation ValidCompilation = TestCompilation.Create(
-        "Pr275FrontendRequiredInput", ("Subject.cs", """
+    private static readonly CSharpCompilation ValidCompilation = TestCompilation.CreateExact(
+        "Pr275FrontendRequiredInput", [("Subject.cs", """
             using SharpProof.Attributes;
 
             internal static class Subject
@@ -22,7 +22,7 @@ public sealed class Pr275FrontendRequiredInputTests
                 [EnforcePure]
                 internal static void ThrowException() => throw new System.Exception();
             }
-            """));
+            """)]);
 
     [Test]
     public void NullFrontendInputsReportTheirRequiredParameterNames()

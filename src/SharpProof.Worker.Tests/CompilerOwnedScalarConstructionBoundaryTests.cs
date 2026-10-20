@@ -20,7 +20,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         var bodySource = "var result=value;" + string.Concat(Enumerable.Repeat("result+=1;", statementCount)) + "return result;";
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes;" +
             "public static class Subject { [DoesNotThrow] public static int Root(int value) {" + bodySource + "} }";
-        var compilation = TestCompilation.Create("OwnedScalarConstructionBoundary", ("scalar-boundary.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedScalarConstructionBoundary", [("scalar-boundary.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

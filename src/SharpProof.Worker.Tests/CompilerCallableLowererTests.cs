@@ -659,9 +659,9 @@ internal sealed class CompilerCallableLowererTests
     {
         System.ArgumentNullException.ThrowIfNull(methodName);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "CompilerCallableLowererTests",
-            ("Subject.cs", source));
+            [("Subject.cs", source)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
             candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == methodName));

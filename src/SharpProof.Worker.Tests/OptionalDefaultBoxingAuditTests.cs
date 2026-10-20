@@ -33,7 +33,7 @@ public sealed class OptionalDefaultBoxingAuditTests
             "[EffectContract(SharpProofEffect.None, Complete = true, PreconditionFree = true)] " +
             "[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] " +
             "public static object Echo(" + parameter + ") => value; }";
-        var external = TestCompilation.Create("OptionalBoxingBoundary", ("Boundary.cs", boundarySource));
+        var external = TestCompilation.CreateExact("OptionalBoxingBoundary", [("Boundary.cs", boundarySource)]);
         external = external.WithOptions(external.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var directory = new TempDirectory("sharpproof-optional-boxing");
         var path = Path.Combine(directory.FullName, "Boundary.dll");

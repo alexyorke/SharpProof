@@ -53,8 +53,8 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
 
     private static CompilerManifestArtifact Create()
     {
-        var compilation = TestCompilation.Create("Wave8InitializationCompatibility", ("Subject.cs",
-            "using SharpProof.Attributes; public static class Subject { [DoesNotThrow] public static int Target() { return 7; } }"));
+        var compilation = TestCompilation.CreateExact("Wave8InitializationCompatibility", [("Subject.cs",
+            "using SharpProof.Attributes; public static class Subject { [DoesNotThrow] public static int Target() { return 7; } }")]);
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
         Assert.That(((CSharpParseOptions)compilation.SyntaxTrees.Single().Options).LanguageVersion, Is.EqualTo(LanguageVersion.CSharp12));

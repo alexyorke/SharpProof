@@ -48,7 +48,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
         var evidenceDirectory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "generic-type-values-audit");
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), Source);
-        var compilation = TestCompilation.Create("GenericTestedTypeAllocationOracle", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypeAllocationOracle", [("Subject.cs", Source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();

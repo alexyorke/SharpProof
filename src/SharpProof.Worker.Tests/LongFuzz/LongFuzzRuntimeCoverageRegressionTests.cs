@@ -272,7 +272,7 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(seed == 3000036 ? "Thrower((y + 5))" : "case 1: case 2: State++;"));
-        var compilation = TestCompilation.Create("LongFuzzCoverage" + seed, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LongFuzzCoverage" + seed, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -322,7 +322,7 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(sourceMarker));
-        var compilation = TestCompilation.Create("LongFuzzBoundary" + seed, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LongFuzzBoundary" + seed, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);

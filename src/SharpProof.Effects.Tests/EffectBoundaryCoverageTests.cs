@@ -45,14 +45,14 @@ public sealed class EffectBoundaryCoverageTests
     [Test]
     public void SymbolOrderingHandlesNullEqualAndDistinctSourceSymbols()
     {
-        var first = TestCompilation.Create("Ordering", ("a.cs", "public class C { }")).GetTypeByMetadataName("C")!;
-        var second = TestCompilation.Create("Ordering", ("b.cs", "public class C { }")).GetTypeByMetadataName("C")!;
+        var first = TestCompilation.CreateExact("Ordering", [("a.cs", "public class C { }")]).GetTypeByMetadataName("C")!;
+        var second = TestCompilation.CreateExact("Ordering", [("b.cs", "public class C { }")]).GetTypeByMetadataName("C")!;
         var comparer = EffectSymbolComparer<INamedTypeSymbol>.Instance;
         Assert.That(comparer.Compare(first, first), Is.Zero);
         Assert.That(comparer.Compare(null, first), Is.LessThan(0));
         Assert.That(comparer.Compare(first, null), Is.GreaterThan(0));
         Assert.That(comparer.Compare(first, second), Is.LessThan(0));
-        var later = TestCompilation.Create("Ordering", ("a.cs", "public class D { } public class C { }")).GetTypeByMetadataName("C")!;
+        var later = TestCompilation.CreateExact("Ordering", [("a.cs", "public class D { } public class C { }")]).GetTypeByMetadataName("C")!;
         Assert.That(comparer.Compare(first, later), Is.LessThan(0));
         var methodType = TestCompilation.Create("MethodOrdering", "class C { void A() {} void B() {} }").GetTypeByMetadataName("C")!;
         Assert.That(EffectSymbolComparer<ISymbol>.Instance.Compare(methodType.GetMembers("A").Single(), methodType.GetMembers("B").Single()), Is.LessThan(0));

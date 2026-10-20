@@ -584,7 +584,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
     public async Task UnconstructibleJointTemplatesCannotProduceAnInvariantCertificate()
     {
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        var compilation = TestCompilation.Create("FixedChecksumHoudiniAdmission", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("FixedChecksumHoudiniAdmission", [("Subject.cs", Source)]);
         TestCompilation.AssertNoErrors(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
@@ -632,7 +632,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(output, "source.cs"), Source, new UTF8Encoding(false));
-            var compilation = TestCompilation.Create("FixedChecksumAnchorConstruction", ("Subject.cs", Source));
+            var compilation = TestCompilation.CreateExact("FixedChecksumAnchorConstruction", [("Subject.cs", Source)]);
             TestCompilation.AssertNoErrors(compilation);
             using var image = new MemoryStream();
             var emitted = compilation.Emit(image);

@@ -135,7 +135,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Directory.CreateDirectory(output);
         await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
             "{\"captureComplete\":false,\"stage\":\"setup\",\"coverageClaim\":false}", new UTF8Encoding(false));
-        var compilation = TestCompilation.Create("CountUpNativeResourceObservation", [("Subject.cs", Source)]);
+        var compilation = TestCompilation.CreateExact("CountUpNativeResourceObservation", [("Subject.cs", Source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

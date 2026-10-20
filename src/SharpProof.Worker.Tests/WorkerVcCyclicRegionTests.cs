@@ -164,7 +164,7 @@ public sealed class WorkerVcCyclicRegionTests
     [TestCase(true)]
     public void OptionalCyclicEvidenceKeepsEveryLegacyByteAndFailureRow(bool repeated)
     {
-        var compilation = TestCompilation.Create("CyclicLegacyPreservation", ("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource));
+        var compilation = TestCompilation.CreateExact("CyclicLegacyPreservation", [("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
