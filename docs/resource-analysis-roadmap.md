@@ -317,6 +317,20 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
+### Closure plan admission controls
+
+All 2245 frontend tests passed, including 36 direct compiler-backed closure-plan
+controls. They check primitive field kinds and unsupported numeric captures,
+parameter/local initialization order, assignment/increment/ref/out writes,
+initializer-introduced locals and deferred query captures. Limits cover both
+accepted local/cache-field boundaries and rejected excess storage/traversal,
+plus the 16/17 deferred-function boundary. Actual lambda matching rejects method
+groups, deferred sibling frames cannot reuse the single-chain placement rule,
+and cancellation yields no partial plan. The structural layout gate also passed.
+Evidence is retained under artifacts with the resource-root-closure-boundaries
+prefix. These tests leave public verdicts unchanged; they require a new complete
+coverage report before any coverage improvement can be claimed.
+
 ### Normal completion and carrier admission controls
 
 Direct normal-domain controls now exercise all six integer comparisons through
@@ -367,6 +381,19 @@ this checkpoint. Root cumulative task bytes and the final coverage/audit gates
 remain unfinished.
 
 ### Cumulative task prefix review (in progress)
+
+The pinned [native trace saver](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp#L2143)
+skips shared preallocated exception handles. The
+[managed exception implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Exception.CoreCLR.cs#L141)
+also skips restoring dispatch state for immutable agile exceptions. These guards
+alone do not prove a cumulative byte bound: dispatch capture still requests
+trace copies, and the
+[holder finalization path](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskExceptionHolder.cs#L54)
+can allocate an aggregate exception and event arguments for an unobserved fault.
+Those paths must be accounted for before publishing the complete runtime model.
+The two newly cached managed sources have pinned Git blob IDs and SHA-256 records
+in `artifacts/resource-runtime-fault-review/managed-fault-sources.json`. No numeric
+fault-payload budget or new public result scope is inferred from this review.
 
 The pinned [Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs)
 creates additional fault bookkeeping. In WhenAll, concurrent failed children can
