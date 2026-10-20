@@ -208,6 +208,8 @@ public sealed class ProjectDagTests
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
             allowed |= item.Project == "SharpProof.Logging" &&
                 relative == "eng/logging/RepositoryLogger.cs";
+            allowed |= item.Project == "SharpProof.Gates" &&
+                relative == "eng/scripts/SharpProof.SymbolPackageValidator.cs";
             if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")
             {
                 allowed |= relative.StartsWith("eng/testing/", StringComparison.Ordinal) ||
