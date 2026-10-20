@@ -731,7 +731,13 @@ public sealed class BuildTaskTests
             Assert.That(processId, Is.GreaterThan(0));
             Assert.That(IsProcessRunning(processId), Is.True);
             Assert.That(execution.IsCompleted, Is.False);
-            Assert.That(await execution.WaitAsync(TimeSpan.FromMilliseconds(expectedTimeout + 5_000)), Is.True);
+            // Observe the actual child deadline independently of bounded publication cleanup.
+            var childDeadline = TimeSpan.FromMilliseconds(expectedTimeout + 5_000);
+            while (IsProcessRunning(processId) && elapsed.Elapsed < childDeadline && !execution.IsCompleted)
+            { await System.Threading.Tasks.Task.Delay(10); }
+            Assert.That(IsProcessRunning(processId), Is.False, "The ready verifier child must stop by its process deadline.");
+            Assert.That(await execution.WaitAsync(TimeSpan.FromMilliseconds(
+                WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds + 5_000)), Is.True);
             Assert.That(elapsed.ElapsedMilliseconds, Is.GreaterThanOrEqualTo(expectedTimeout));
             using (Assert.EnterMultipleScope())
             {
@@ -1462,7 +1468,10 @@ public sealed class BuildTaskTests
             start.ArgumentList.Add(Environment.GetCommandLineArgs()[0]);
             start.ArgumentList.Add("descendant");
             using var descendant = Process.Start(start)!;
-            Thread.Sleep(29000);
+            var completion = long.Parse(File.ReadAllText("completion-deadline.txt"), CultureInfo.InvariantCulture);
+            var remaining = completion - Stopwatch.GetTimestamp();
+            if (remaining > 0)
+            { Thread.Sleep(TimeSpan.FromSeconds(remaining / (double)Stopwatch.Frequency)); }
             File.WriteAllText("completed.txt", "completed");
             return 0;
             """);
@@ -1481,6 +1490,10 @@ public sealed class BuildTaskTests
             new TaskItem("--publish-compiler-manifest"), new TaskItem(stable[2])];
         try
         {
+            // Anchor completion to the parent operation so helper startup consumes
+            // the sleep interval rather than delaying completion past the deadline.
+            File.WriteAllText(Path.Combine(directory.FullName, "completion-deadline.txt"),
+                (Stopwatch.GetTimestamp() + Stopwatch.Frequency * 29).ToString(CultureInfo.InvariantCulture));
             Assert.That(task.Execute(), Is.True);
             Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "completed.txt")), Is.EqualTo("completed"),
                 "The verifier child must exit successfully before its process wait times out.");

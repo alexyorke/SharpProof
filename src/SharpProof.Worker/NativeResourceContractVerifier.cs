@@ -75,10 +75,28 @@ internal static class NativeResourceContractVerifier
                 if (context is null)
                 { return Unknown("ResourceLayoutAssumptionsNotBound", WorkerClaimReason.UnsupportedBody); }
                 var memory = ResourceMemoryProgram.Evaluate(owner.Program, context, cancellation);
-                if (memory.Bounds is not { } bounds)
-                { return Unknown(memory.UnknownReason ?? "ResourceMemoryProofUnavailable", WorkerClaimReason.UnsupportedBody); }
-                var memoryUpper = ResourceExpression.Literal(constraint.Metric == WorkerResourceMetric.PeakAuxiliaryBytes
-                    ? bounds.PeakAuxiliaryUpper : bounds.RetainedUpper);
+                NativeResourceMetadataBinding? envelopeMetadata = null;
+                ResourceExpression memoryUpper;
+                if (memory.Bounds is { } bounds)
+                {
+                    memoryUpper = ResourceExpression.Literal(constraint.Metric == WorkerResourceMetric.PeakAuxiliaryBytes
+                        ? bounds.PeakAuxiliaryUpper : bounds.RetainedUpper);
+                }
+                else
+                {
+                    if (target.ResourceProgram is null || !NativeResourceMemoryEnvelope.Admits(owner, cancellation))
+                    { return Unknown(memory.UnknownReason ?? "ResourceMemoryProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                    envelopeMetadata = new(target);
+                    var costs = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, envelopeMetadata.Bind, cancellation);
+                    if (!costs.Verified)
+                    { return Unknown(costs.UnknownReason ?? "ResourceProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                    var allocation = NativeResourceAllocationVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, context, cancellation);
+                    if (allocation.ConditionalUpperBound is not { } cumulativeUpper)
+                    { return Unknown(allocation.UnknownReason ?? "ResourceAllocationProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                    var scalarOutput = owner.Result is not { } output ||
+                        owner.Program.Factory.GetTypeInfo(owner.Program.Factory.GetVariableInfo(output).Type).Kind is IrTypeKind.Integer or IrTypeKind.Boolean;
+                    memoryUpper = constraint.Metric == WorkerResourceMetric.RetainedBytes && scalarOutput ? ResourceExpression.Zero : cumulativeUpper;
+                }
                 if (!ResourceBoundOrder.Proves(memoryUpper, limit, cancellation))
                 { return Unknown("ResourceBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
                 var memoryResult = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
@@ -91,6 +109,13 @@ internal static class NativeResourceContractVerifier
                 memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null, memoryUpper);
                 memoryResult.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedMetricUnsupported" };
                 memoryResult.ProofCore = [.. memoryResult.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
+                if (envelopeMetadata != null)
+                {
+                    memoryResult.ProofCore = [.. memoryResult.ProofCore,
+                        "resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId,
+                        "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram!, cancellation))];
+                    envelopeMetadata.Project(memoryResult);
+                }
                 lifetimeLayout.Project(memoryResult);
                 return memoryResult;
             }

@@ -1,0 +1,169 @@
+using NUnit.Framework;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+internal sealed partial class NativeResourceContractTests
+{
+    [Test]
+    public void EnvelopeRejectsAReferenceReadBeforeItsAllocation()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var value = factory.CreateVariable("value", type);
+        var result = factory.CreateVariable("result", type);
+        builder.Assign(entry, factory.CreateOperation(), result, factory.Variable(value));
+        builder.Allocate(entry, factory.CreateOperation(), type, value, factory.Integer(1));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(result));
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], result, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
+    }
+
+    [Test]
+    public void EnvelopeRejectsReferenceDefinitionsFromAnotherBlock()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var value = factory.CreateVariable("value", type);
+        builder.Allocate(entry, factory.CreateOperation(), type, value, factory.Integer(1));
+        builder.Goto(entry, factory.CreateOperation(), exit);
+        builder.Return(exit, factory.CreateOperation(), factory.Variable(value));
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], value, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
+    }
+
+    [Test]
+    public void EnvelopeRejectsAnOversizedControlFlowGraph()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        for (var index = 0; index <= ResourceMemoryTrace.MaximumEvents / 4; index++)
+        { builder.Return(builder.CreateBlock(), factory.CreateOperation()); }
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], null, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
+    }
+
+    [TestCase(5, "bool", 1)]
+    [TestCase(6, "bool", 1)]
+    [TestCase(5, "byte", 1)]
+    [TestCase(6, "byte", 1)]
+    [TestCase(5, "short", 2)]
+    [TestCase(6, "short", 2)]
+    [TestCase(5, "char", 2)]
+    [TestCase(6, "char", 2)]
+    [TestCase(5, "int", 4)]
+    [TestCase(6, "int", 4)]
+    [TestCase(5, "long", 8)]
+    [TestCase(6, "long", 8)]
+    public async Task ParametricArrayLifetimesUseCheckedCumulativeEnvelopes(int metric, string element, int width)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),{width})] public static {element}[] Target(int n) => new {element}[n]; }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Does.Contain("n"));
+        Assert.That(result.ResourceBound.Asymptotic!.UpperBound, Is.EqualTo("O(n)"));
+        Assert.That(result.ResourceBound.Asymptotic.Lower!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+        Assert.That(result.ResourceBound.MetadataAssumptions.Single().RuntimeModel, Is.EqualTo(ResourceRuntimeLayout.ModelId));
+    }
+
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task ArrayAliasesWithinTheAllocationBlockKeepTheirOwnedOrigin(int metric)
+    {
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] public static int[] Target(int n) " +
+            "{var value=new int[n]; var alias=value; return alias;} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+    }
+
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task LoopTemporariesHaveCumulativeAuxiliaryBoundsAndNoRetainedVoidOutput(int metric)
+    {
+        var declaration = metric == 5
+            ? "[ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes,0,nameof(n),40)]"
+            : "[ResourceUpperBound(ResourceMetric.RetainedBytes,0)]";
+        var source = "using SharpProof.Attributes; public static class C { " + declaration +
+            "public static void Target(int n) {for(int i=0;i<n;i++){var temporary=new int[3];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.Asymptotic!.UpperBound, Is.EqualTo(metric == 5 ? "O(n)" : "O(0)"));
+        if (metric == 6)
+        { Assert.That(result.ResourceBound.InferredUpperBound, Is.EqualTo("0")); }
+    }
+
+    [Test]
+    public async Task ScalarResultsRetainNoOwnedArrayGraph()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,0)] public static int Target(int n) {var value=new int[n]; return n;} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
+    }
+
+    [TestCase(5, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
+    [TestCase(6, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
+    [TestCase(5, "public static int[] Target(int n,int[] input) => input;")]
+    [TestCase(6, "public static int[] Target(int n,int[] input) => input;")]
+    [TestCase(5, "public int[] Target(int n) => new int[n];")]
+    [TestCase(6, "public int[] Target(int n) => new int[n];")]
+    [TestCase(5, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
+    [TestCase(6, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
+    public async Task MemoryEnvelopesRejectBorrowedReceiverAndCrossBlockOrigins(int metric, string method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        var source = "using SharpProof.Attributes; public sealed class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MemoryEnvelopeRequiresAnAvailableVerifiedCumulativeProgram(bool missing)
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,31,nameof(n),4)] public static int[] Target(int n) => new int[n]; }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        target = target with { ResourceProgram = missing ? null : ResourceProgram.MetadataBoundary };
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
+    [Test]
+    public async Task PreciseLifetimeBoundsRemainPreferredOverCumulativeEnvelopes()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes,0)] public static int[] Target(int n) => new int[2]; }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
+        Assert.That(result.ProofCore.Any(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.StartsWith("resource-memory-envelope:", StringComparison.Ordinal)), Is.False);
+    }
+}

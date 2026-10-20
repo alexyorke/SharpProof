@@ -3589,6 +3589,38 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task MainPackagePublishesParametricMemoryEnvelopes(int metric)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] public static int[] Target(int n) => new int[n]; }}", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
+            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Does.Contain("n"));
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(n)");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic"), "upperBound", "O(n)");
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

@@ -442,6 +442,23 @@ public static class BufferFactory
 }
 ```
 
+A conservative fallback also admits parametric primitive arrays in static methods
+with Boolean/integer inputs and locally established array ownership. It checks
+an independent cumulative-byte upper bound, then uses that as an upper envelope
+for auxiliary or retained storage. For example,
+`[ResourceUpperBound(ResourceMetric.RetainedBytes, 31, nameof(n), 4)]` can prove a
+linear upper bound for `int[] Target(int n) => new int[n]` under the declared
+layout. This can be loose: the returned array itself is excluded from auxiliary
+storage, although its cumulative size remains a valid auxiliary upper bound.
+Scalar and void results retain no owned output graph in this admitted family.
+
+The proof core identifies `primitive-array-cumulative-envelope-v1` and binds both
+the typed program and checked cost program. It adds no lower or tight bound.
+Precise lifetime bounds take precedence. Borrowed inputs, receivers, fields,
+opaque calls and reference flow across IR blocks remain Unknown in this fallback;
+compiler-generated guards can also place an otherwise simple reference use
+outside the admitted block. Other precise lifetime families remain available.
+
 Lifetime layout ownership is independent of cumulative-program availability.
 A proven fixed local size can therefore support a native lifetime proof even when
 the count analyzer reports Unknown.
@@ -693,7 +710,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 45 invalidate older responses without this evidence.
+Protocol 39 and cache schema 46 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -745,7 +762,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 45 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 46 invalidate prior responses; compiler artifact 52 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

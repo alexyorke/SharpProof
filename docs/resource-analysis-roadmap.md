@@ -89,6 +89,48 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Parametric memory upper envelopes
+
+The next phase C step targets primitive arrays whose extent depends on scalar
+inputs. When precise finite lifetime extraction is unavailable, independently
+checked cumulative allocated bytes can conservatively bound both peak auxiliary
+and retained owned storage. A separate native admission check must first establish
+closed array ownership: static methods, scalar entry inputs, primitive arrays,
+and reference definitions/uses confined to their IR block. Borrowed inputs,
+fields, opaque calls, unmodeled effects and cross-block reference flow remain
+Unknown in this fallback. Scalar/void results retain no owned output graph.
+
+Reuse the cumulative allocation kernel and declared layout binding; never trust
+a producer-supplied upper bound or claim a tight/lower bound from this transfer.
+Keep the precise lifetime path first. Add native proof-core provenance for the
+transfer, adversarial origin/ownership tests, symbolic source contracts and a
+packaged consumer. Keep all phase C/F and 100% coverage requirements open while
+this admitted family is implemented and qualified.
+The native fallback is implemented and passed all 651 selected worker/resource/
+protocol cases. Parametric Boolean/integer arrays and aliases within the same
+allocation block project linear upper growth. Loop temporaries use their checked
+cumulative envelope; scalar/void outputs retain zero owned bytes. Tests reject
+borrowed/receiver/cross-block origins, reference reads before allocation, oversized
+graphs and absent/unverified cost programs, and preserve the precise path first.
+A scalar array-length case crossed a compiler-generated block boundary and remains
+explicitly Unknown; it is not silently widened into the admitted family.
+
+Layout passed at 2771 source files, 59 projects and all 151 pinned common files.
+The new checker is explicitly trusted; the inventory passed at 530 paths.
+Quality/API compatibility and negative fixtures passed. All four package cases
+passed: two parametric memory projections (strict/advisory and JSON/SARIF O(n))
+and both revised deadline fixtures. Full repository formatting passed. Cache 46 invalidates earlier capability results;
+protocol, artifact, resource-expression/program and manifest formats are unchanged.
+
+Published e55f02609 passed canonical, package, docs and security CI, but coverage
+again failed in deadline controls before a usable aggregate. The output-drain
+helper now anchors completion to the parent operation's monotonic timestamp, so
+startup consumes its wait interval. The active-process test checks child death
+by the original process deadline and grants bounded publication cleanup a separate
+observation window. Production deadlines are unchanged. Both repaired fixtures passed with the
+parametric package cases; exact-head instrumented CI validation remains required. Last measured aggregate remains
+4734/4953 lines (95.58%, 219 gaps); the 100% floor remains unchanged.
+
 ### Deferred intermediate capture scopes
 
 Factories now admit a single nested chain with read-only captures declared by

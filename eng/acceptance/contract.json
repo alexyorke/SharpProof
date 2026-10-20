@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 45,
+    "schemaVersion": 46,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -756,6 +756,7 @@
           "src/SharpProof.Worker/NativeResourceAccountingVerifier.cs",
           "src/SharpProof.Worker/NativeResourceExpectedVerifier.cs",
           "src/SharpProof.Worker/NativeResourceAllocationVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceMemoryEnvelope.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",
           "src/SharpProof.Worker/NativeResourceLayoutBinding.cs",
