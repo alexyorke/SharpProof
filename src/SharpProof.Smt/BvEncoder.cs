@@ -69,12 +69,36 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 Encode(conditional.WhenTrue, meter), Encode(conditional.WhenFalse, meter))),
             IrCastTerm cast => EncodeCast(cast, meter),
             IrOpaqueTerm field when IrFieldSites.IsFieldRead(factory, field) => EncodeFieldRead(field, meter),
+            IrOpaqueTerm singleton when IrOpaqueCallSite.DefaultComparerValueKind(factory, singleton) != null =>
+                EncodeDefaultComparerValue(singleton, meter),
             IrOpaqueTerm relation when Relations != null && IrInvariantRelations.IsRelation(factory, relation) =>
                 EncodeRelation(relation, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
         _encoded.Add(term.Id, expression);
         return expression;
+    }
+
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
+    private readonly Dictionary<IrMemberId, (IrTypeId Type, Expr Value, IrOpaqueTerm Term)> _defaultComparers = [];
+
+    private Expr EncodeDefaultComparerValue(IrOpaqueTerm term, SmtQueryResourceMeter meter)
+    {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        var value = owner.Own(context.MkConst("defaultComparer" + term.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
+        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        foreach (var previous in _defaultComparers.Values)
+        {
+            meter.Consume();
+            // Distinct certified closed class views cannot share an instance
+            // unless one is a base of the other. Open T/U may coincide.
+            if (factory.TryGetClosedClassReferenceBase(term.Type, out _) &&
+                factory.TryGetClosedClassReferenceBase(previous.Type, out _) && !KnownNominalCompatibility(term.Type, previous.Type, meter))
+            { AddDistinctReferenceFact(value, previous.Value); }
+        }
+        _defaultComparers.Add(term.Member, (term.Type, value, term));
+        return value;
     }
 
     // Only a Horn search encodes unknown invariants, as uninterpreted relations.

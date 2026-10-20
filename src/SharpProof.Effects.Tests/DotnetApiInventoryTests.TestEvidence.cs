@@ -54,6 +54,13 @@ public sealed partial class DotnetApiInventoryTests
                     () => CheckReferenceIdentityIntrinsic(compilation, false), () => CheckReferenceIdentityIntrinsic(compilation, true));
             }
 
+            if (row.Evidence.Contains("intrinsic=default-comparer-cached-value", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "non-null cached normal result and repeated getter identity; compiled IR versus CLR and wrong-result control; native primitive, generic helper and runtime type identity controls; initialization effects remain opaque",
+                    () => CheckDefaultComparerValueIntrinsic(compilation, false), () => CheckDefaultComparerValueIntrinsic(compilation, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=integer-comparison", StringComparison.Ordinal) || row.Evidence.Contains("intrinsic=default-integer-comparer-only", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 8/16/32/64 bit and UTF-16 code units; exact promoted differences; named argument reordering; compiled IR versus runtime", () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false), () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));

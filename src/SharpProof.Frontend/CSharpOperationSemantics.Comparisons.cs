@@ -54,6 +54,17 @@ internal static partial class CSharpOperationSemantics
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
             SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, type) ? type.TypeArguments[0] : null;
     }
+    internal static bool IsDefaultComparerValueDeclaration(ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        var getter = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
+        return getter is { IsStatic: true, Parameters.Length: 0, AssociatedSymbol: IPropertySymbol property } &&
+            property.OriginalDefinition.GetDocumentationCommentId() == "P:System.Collections.Generic.Comparer`1.Default" &&
+            IsFrameworkCollectionMember(getter) && getter.ContainingAssembly.Identity.Version.Major == 10 &&
+            getter.ContainingType.BaseType?.SpecialType == SpecialType.System_Object &&
+            SymbolEqualityComparer.Default.Equals(getter.ReturnType, getter.ContainingType);
+    }
+
     internal static bool IsNonnegativeCollectionCount(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));

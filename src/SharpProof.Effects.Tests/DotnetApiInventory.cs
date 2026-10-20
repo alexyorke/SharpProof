@@ -153,6 +153,9 @@ internal static class DotnetApiInventory
             { evidence.Add("intrinsic=capacity-dictionary-construction-state"); }
         }
 
+        if (CSharpOperationSemantics.IsDefaultComparerValueDeclaration(symbol))
+        { evidence.Add("intrinsic=default-comparer-cached-value"); }
+
         if (symbol is IMethodSymbol method)
         {
             if (CSharpOperationSemantics.IsArrayClear(method))
