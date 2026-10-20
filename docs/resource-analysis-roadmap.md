@@ -107,6 +107,12 @@ results are not claimed yet. Cache 42 invalidates older Unknown results;
 protocol 39, compiler artifact 52 and resource program 8 keep their formats. This
 step does not complete the broader capture/call lifetime requirement in phase C.
 
+Nested lifetime implementation d861d40ea was merged with remote branch update
+22fc71906, preserving latest master b0ce85e23 (immutable KeyValuePair getter
+models). Published merge 9036caa5d includes both changes. The 807/2165/1451 local
+results above predate that latest integration; exact-head and relevant spec
+validation are still required. No history was rewritten.
+
 ### Conditional expected-cost checkpoint
 
 Conditional expected upper bounds are implemented for the admitted single-Boolean
