@@ -99,14 +99,22 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ### Current coverage qualification
 
+Published `c1cab0c1e` passed all four coverage shards in run 39504679149.
+The complete merge-commit report (cd7093d7bf7187a8cfc5bc3970629e7c6c1f2946)
+measured 6016/6246 changed trusted lines (96.32%, 230 uncovered lines), below
+the unchanged 100% floor. This is the latest complete measurement, including
+the notification component and replay controls. The report is at
+`artifacts/resource-c1cab-coverage-evidence/coverage/SharpProof.coverage.json`
+and the aggregate failure log is `artifacts/resource-c1cab-coverage-failed.log`.
+The new violation-search controls and cache 55 require their own exact-head CI.
+
 Published merge `373f97c1e` passed all four coverage shards in run 39498435327.
 The complete merge-commit report (8df25f37cf0562bc227c409412468fec0b826dc8)
 measured 5980/6223 changed trusted lines (96.10%, 243 uncovered lines), below
-the unchanged 100% floor. This is the latest complete measurement. The report
+the unchanged 100% floor. This earlier report
 is at `artifacts/resource-373f-coverage-evidence/coverage/SharpProof.coverage.json`
 and its failed aggregate log is `artifacts/resource-373f-coverage-failed.log`.
-The newer notification component, replay controls and trace review in
-`62014feb0` and `9270811a6` are not part of this report and require exact-head CI.
+The notification component and replay controls were not part of this earlier report.
 
 Published `17d4f5cf5` passed all four coverage shards in run 39495448694.
 The complete merge-commit report (0f9d7d9ed44e120005b5b0a2bae5876a312a2cc9)
@@ -334,6 +342,29 @@ passed. Logs are retained in artifacts with resource-task-source-allocation and
 resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
+
+### Violation search entry controls
+
+Six focused controls passed for unsupported metrics, missing layout evidence,
+unproved parametric lifetime envelopes, entry-expression budgets and exact
+threshold/solver candidates. Four additional cases check array/string size
+limits with nullable and non-null entries. Their first fixture used a scalar
+selector for a reference input; decoding rejected it before replay. With the
+required `value.Length` selector, three passed and the non-null string case
+exposed an actual search gap: every sampled string was null.
+
+Search now creates bounded non-null string candidates for nonnegative sample
+sizes, including the empty string. Each candidate still passes entry constraints,
+preconditions and concrete replay before it can refute a bound. Cache schema 55
+invalidates older search results; protocol 43 and compiler artifact 55 remain
+unchanged. All 764 selected native-resource/protocol cases passed. Two further
+array/string controls require positive entry lengths and reject excluded empty
+candidates. All 1151 expanded worker cases passed, including the 12 new
+boundary controls, resource/task checks, protocol and container contracts.
+Final repository formatting passed.
+Layout (2801 files, 59 projects, 151 pinned common files), documentation and
+full quality/API lint gates passed. Runtime byte-prefix scope and the remaining
+roadmap obligations are unchanged.
 
 ### Fault notification construction (in progress)
 

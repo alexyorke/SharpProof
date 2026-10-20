@@ -225,7 +225,9 @@ no violation evidence. A prefix already over the bound remains a violation when
 a later operation throws or concrete replay reaches its step limit.
 
 The search uses bounded small inputs and constant thresholds, then native
-feasibility/allocation models. It cannot prove a bound from samples or establish
+feasibility/allocation models. Reference samples include null, arrays and
+non-null strings of up to 128 elements or UTF-16 code units, including empty
+values. Entry validation still rejects candidates excluded by preconditions. It cannot prove a bound from samples or establish
 that no violating execution exists. Failure to produce an exact witness remains
 Unknown. Loop-body-entry refutations use compiler-owned guard annotations for the
 admitted top-tested C# for/while families. Resource-selected lowering identifies
@@ -714,7 +716,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 43 and cache schema 54 invalidate older responses without this evidence.
+Protocol 43 and cache schema 55 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +768,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 43 and cache 54 invalidate prior responses; compiler artifact 55 and
+Protocol 43 and cache 55 invalidate prior responses; compiler artifact 55 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -901,7 +903,7 @@ and two elements for a two-child join. The result does not measure all managed
 heap allocations. Task cumulative bytes and stack metrics remain Unknown.
 Normal-completion lifetime bounds use the separate
 runtime storage model described below. Task lower, tight, expected and amortized
-results remain unavailable. Protocol 43 and cache 54 identify the
+results remain unavailable. Protocol 43 and cache 55 identify the
 required execution scope and configured-await variant; compiler artifact 55
 identifies the projection execution kind.
 
@@ -950,7 +952,7 @@ work. Lifetime storage uses a separately bound runtime/layout model; this source
 work model does not measure elapsed time.
 
 Projection codec 3 and compiler artifact 55 carry the required execution-kind
-Boolean. Protocol 43 and cache 54 identify the configured runtime-model variant;
+Boolean. Protocol 43 and cache 55 identify the configured runtime-model variant;
 resource program 8 and manifest 6 retain their formats.
 
 ## Compiler carrier evidence
@@ -1002,5 +1004,5 @@ refutation, lower bound, tightness or expected value is invented.
 This model does not change AllocatedBytes: that cumulative metric includes
 exceptional prefixes, while this lifetime model describes successful completion.
 Cumulative task bytes remain Unknown until the necessary prefix/runtime storage
-model is established. Protocol 43 and cache 54 preserve the distinct lifetime
+model is established. Protocol 43 and cache 55 preserve the distinct lifetime
 scope through validated JSON, cache and SARIF evidence.

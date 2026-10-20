@@ -251,6 +251,7 @@ internal static class NativeResourceViolationReplay
                 IrTypeKind.Integer when info.Signed && info.Width is 32 or 64 => factory.CreateIntegerValue(type, (long)size),
                 IrTypeKind.Sequence when size >= 0 => factory.CreateSequenceValue(type,
                     Enumerable.Repeat(factory.GetTypeInfo(info.ElementType!.Value).CreateDefaultValue(factory), Math.Min(size, 128))),
+                IrTypeKind.String when size >= 0 => factory.CreateStringValue(new string('a', Math.Min(size, 128))),
                 _ => info.CreateDefaultValue(factory)
             });
         }
