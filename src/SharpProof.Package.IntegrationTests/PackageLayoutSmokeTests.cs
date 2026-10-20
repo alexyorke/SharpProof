@@ -3652,6 +3652,66 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(6, false)]
     [TestCase(5, true)]
     [TestCase(6, true)]
+    public async Task MainPackagePublishesConditionalTaskLifetimeScope(int metric, bool configured)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},1000)] public static " + (configured ? "async " : "") +
+            "Task Target(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {for(int i=0;i<n;i++){}} }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
+            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", "joined-isolated-normal-completion");
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(1)");
+        Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.EqualTo(3));
+        var storage = bound.GetProperty("metadataAssumptions").EnumerateArray().Single(item =>
+            item.GetProperty("witnessIdentifier").GetString() == "bcl.task.run-action.when-all-array.normal-owned-storage");
+        JsonAssert.Equal(storage, "runtimeModel", configured ? "configured-task-join-normal-owned-storage-v1" : "task-join-normal-owned-storage-v1");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("joined-isolated-normal-completion"));
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", "joined-isolated-normal-completion");
+    }
+
+    [Test]
+    public async Task MainPackagePreservesTaskCumulativePrefixAsUnknown()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int n) {} }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true");
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Unknown");
+        JsonAssert.Equal(claim.GetProperty("resourceBound"), "unknownReason", "ForkJoinResourceMetricUnsupported");
+        Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
     public async Task MainPackagePublishesParametricMemoryEnvelopes(int metric, bool crossBlock)
     {
         var feed = await PackagedProductFeed.GetAsync();

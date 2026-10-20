@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 41 and cache schema 52 invalidate older responses without this evidence.
+Protocol 42 and cache schema 53 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 41 and cache 52 invalidate prior responses; compiler artifact 55 and
+Protocol 42 and cache 53 invalidate prior responses; compiler artifact 55 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -890,10 +890,10 @@ Strict policy rejects the trusted runtime dependency; advisory policy can report
 the conditional proof. Captured inputs do not detect deployment compatibility.
 
 Unproved comparisons remain Unknown, with no exact violation inferred from an
-upper sum. Task allocation, byte, lifetime and stack metrics remain Unknown until
-framework and compiler-generated storage is modeled. Task lower, tight, expected
-and amortized results remain unavailable. Async/state-machine costs and concurrent
-live-space models remain roadmap work. Protocol 41 and cache 52 identify the
+upper sum. Task cumulative allocation, array-count, element-count and stack
+metrics remain Unknown. Normal-completion lifetime bounds use the separate
+runtime storage model described below. Task lower, tight, expected and amortized
+results remain unavailable. Protocol 42 and cache 53 identify the
 required execution scope and configured-await variant; compiler artifact 55
 identifies the projection execution kind.
 
@@ -938,11 +938,11 @@ verifier still has no async body program. Additional contracts retain Unknown.
 Custom method builders, captured-context awaiting, true or symbolic configuration,
 extra statements, multiple awaits, custom awaiters and asynchronous children
 remain unsupported. The declared model excludes framework and ambient callback
-work and does not prove state-machine allocation, peak memory or elapsed time.
-Those costs remain explicit Unknown results and required roadmap work.
+work. Lifetime storage uses a separately bound runtime/layout model; this source
+work model does not measure elapsed time.
 
 Projection codec 3 and compiler artifact 55 carry the required execution-kind
-Boolean. Protocol 41 and cache 52 identify the configured runtime-model variant;
+Boolean. Protocol 42 and cache 53 identify the configured runtime-model variant;
 resource program 8 and manifest 6 retain their formats.
 
 ## Compiler carrier evidence
@@ -960,7 +960,39 @@ A capture failure carries an explicit Unknown reason without discarding the
 independently checked callback source costs. Loop-only selections do not request
 emission. The native compiler-carrier component derives conditional direct
 closure/delegate/task-array bounds from these fields and separates state fields
-embedded in a future runtime async-box model. These internal components do not
-publish task-root memory proofs: reviewed runtime carrier storage, lifetime
-composition and consumer validation remain required. Task-root storage metrics
-continue to return Unknown.
+embedded in the reviewed runtime async-box model. Task-root lifetime proofs
+require both these compiler fields and the separate runtime/layout premises.
+
+## Normal task-join lifetime storage
+
+PeakAuxiliaryBytes and RetainedBytes can prove bounds for the admitted returned
+and configured-async joins under the joined-isolated-normal-completion scope.
+Three owned dependencies are required: callback execution semantics, the normal
+runtime storage catalog, and CoreCLR 8.0.32 x64 layout. The storage catalog states
+successful join completion, default or suppressed execution context, disabled
+debugger/tracing instrumentation, and exclusion of scheduler/global initialization
+and caller-induced storage. These are explicit conditional premises, not runtime
+detection. Strict policy rejects trusted dependencies; advisory policy can report
+the conditional proof.
+
+The reviewed Task instance has two integer and five reference fields; the
+non-generic WhenAll promise adds an integer and reference. The
+[generic Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Future.cs)
+adds its result; VoidTaskResult occupies one byte. The
+[async box](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/AsyncTaskMethodBuilderT.cs)
+adds compiler state and reuses the base Task state field for execution context.
+Possible MoveNext and context callback delegates are conservatively included.
+Byte bounds are derived from typed fields through the layout model.
+
+Peak storage sums independently checked child cumulative storage and all owned
+carriers, covering arbitrary overlap. Retained output excludes private void-child
+storage and conservatively retains all carriers. These upper envelopes need not
+be tight. Missing capture, runtime/layout premises, unsupported fields or unproved
+comparisons return Unknown without partial numeric evidence. No numeric task
+refutation, lower bound, tightness or expected value is invented.
+
+This model does not change AllocatedBytes: that cumulative metric includes
+exceptional prefixes, while this lifetime model describes successful completion.
+Cumulative task bytes remain Unknown until the necessary prefix/runtime storage
+model is established. Protocol 42 and cache 53 preserve the distinct lifetime
+scope through validated JSON, cache and SARIF evidence.

@@ -53,7 +53,7 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 41,
+    "protocolVersion": 42,
     "manifestSchemaVersion": 6,
     "compilerArtifactSchemaVersion": 55,
     "maximumCompilerReferenceModuleBytes": 268435456,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 52,
+    "schemaVersion": 53,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -287,6 +287,7 @@
           "src/SharpProof.Specs/ResourceMetadataCatalog.cs",
           "src/SharpProof.Specs/ResourceLayoutCatalog.cs",
           "src/SharpProof.Specs/ResourceTaskCatalog.cs",
+          "src/SharpProof.Specs/ResourceTaskStorageCatalog.cs",
           "src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
       },
@@ -796,6 +797,7 @@
           "src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.Carriers.cs",
           "src/SharpProof.Worker/NativeForkJoinSourceCostVerifier.cs",
           "src/SharpProof.Worker/NativeTaskCarrierStorageVerifier.cs",
+          "src/SharpProof.Worker/NativeTaskStorageVerifier.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
           "src/SharpProof.Ir/AnalysisDefaults.cs",

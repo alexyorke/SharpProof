@@ -11,7 +11,7 @@ internal sealed record NativeTaskCarrierStorageCheck(ResourceExpression? DirectU
 // execution-context effects and lifetime composition are separate obligations.
 internal static class NativeTaskCarrierStorageVerifier
 {
-    internal const string Model = "emitted-task-compiler-carriers-v1";
+    internal const string Model = WorkerResourceModels.TaskCompilerCarrierModel;
     internal const int MaximumCallbacks = 64;
 
     internal static NativeTaskCarrierStorageCheck Check(CompilerTaskCarrierShapes shapes,

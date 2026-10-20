@@ -7,13 +7,26 @@ internal static class NativeResourceTaskBinding
     internal static WorkerResourceMetadataAssumption? Bind(CompilerCallablePreparation target, CancellationToken cancellation)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
+        return BindCore(target, false, cancellation);
+    }
+
+    internal static WorkerResourceMetadataAssumption? BindStorage(CompilerCallablePreparation target, CancellationToken cancellation)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        return BindCore(target, true, cancellation);
+    }
+
+    private static WorkerResourceMetadataAssumption? BindCore(CompilerCallablePreparation target, bool storage, CancellationToken cancellation)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
         cancellation.ThrowIfCancellationRequested();
         if (target.ForkJoinProjection is not { } projection || target.TotalEntry is not { } entry || target.Total != null ||
             entry.CallableId != target.Entry.CallableId || projection.RootCallableId != entry.CallableId ||
             !ResourceTaskCatalog.IsReviewedReference(projection.FrameworkAssemblyIdentity) ||
             !(target.Compilation.TargetFramework == "net8.0" || (target.Compilation.TargetFramework?.StartsWith("net8.0-", StringComparison.Ordinal) ?? false)))
         { return null; }
-        var id = ResourceTaskCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait);
+        var id = storage ? ResourceTaskStorageCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait) :
+            ResourceTaskCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait);
         if (target.Entry.Assumptions is null || target.Entry.Assumptions.Count(assumption => assumption is not null &&
                 assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary) != 1 ||
             target.Compilation.ResourceMetadataReferences is not { Length: > 0 } references || references.Any(static reference => reference is null))
@@ -34,11 +47,13 @@ internal static class NativeResourceTaskBinding
         return new()
         {
             AssumptionId = id,
-            WitnessIdentifier = ResourceTaskCatalog.Witness,
-            CatalogSha256 = projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredContentSha256 : ResourceTaskCatalog.ContentSha256,
+            WitnessIdentifier = storage ? ResourceTaskStorageCatalog.Witness : ResourceTaskCatalog.Witness,
+            CatalogSha256 = storage ? projection.ConfiguredAwait ? ResourceTaskStorageCatalog.ConfiguredContentSha256 : ResourceTaskStorageCatalog.ContentSha256 :
+                projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredContentSha256 : ResourceTaskCatalog.ContentSha256,
             ReferenceAssembly = projection.FrameworkAssemblyIdentity,
             ReferenceSha256 = hashes.Single(),
-            RuntimeModel = projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredModel : ResourceTaskCatalog.Model,
+            RuntimeModel = storage ? projection.ConfiguredAwait ? ResourceTaskStorageCatalog.ConfiguredModel : ResourceTaskStorageCatalog.Model :
+                projection.ConfiguredAwait ? ResourceTaskCatalog.ConfiguredModel : ResourceTaskCatalog.Model,
             EvidenceSource = ResourceTaskCatalog.EvidenceSource
         };
     }

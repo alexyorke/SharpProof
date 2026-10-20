@@ -780,20 +780,45 @@ internal static partial class WorkerProtocolJson
         evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
         var dependencies = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
             dependency.RuntimeModel is WorkerResourceModels.TaskJoinModel or WorkerResourceModels.ConfiguredTaskJoinModel).ToArray();
+        var storage = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
+            dependency.RuntimeModel is WorkerResourceModels.TaskStorageModel or WorkerResourceModels.ConfiguredTaskStorageModel).ToArray();
+        var tokens = (result.ProofCore ?? []).Where(static item => item is not null && item.StartsWith("resource-task-", StringComparison.Ordinal)).ToArray();
         if (evidence.ExecutionScope == WorkerResourceModels.CallableScope)
-        {
-            return dependencies.Length == 0 && result.ProofCore?.Any(static item => item is not null &&
-                (item.StartsWith("resource-task-model:", StringComparison.Ordinal) || item.StartsWith("resource-task-projection:", StringComparison.Ordinal))) != true;
-        }
-        if (evidence.ExecutionScope != WorkerResourceModels.TaskJoinScope || result.Outcome != WorkerClaimOutcome.Proven ||
-            evidence.Metric != WorkerResourceMetric.LoopBodyEntries || dependencies.Length != 1 || dependencies[0].WitnessIdentifier != "bcl.task.run-action.when-all-array" ||
-            evidence.Asymptotic?.Lower?.UnknownReason is null || evidence.Accounting is not { Length: 0 } ||
-            evidence.Expected?.UnknownReason is null || result.ProofCore is null ||
-            result.ProofCore.Count(item => item is not null && item == "resource-task-model:" + dependencies[0].RuntimeModel) != 1)
+        { return dependencies.Length == 0 && storage.Length == 0 && tokens.Length == 0; }
+        if (result.Outcome != WorkerClaimOutcome.Proven || dependencies.Length != 1 || dependencies[0].WitnessIdentifier != "bcl.task.run-action.when-all-array" ||
+            evidence.Asymptotic?.Lower?.UnknownReason is null || evidence.Accounting is not { Length: 0 } || evidence.Expected?.UnknownReason is null ||
+            !OneTaskToken(tokens, "resource-task-model:", dependencies[0].RuntimeModel))
         { return false; }
         const string prefix = "resource-task-projection:";
-        var projections = result.ProofCore.Where(static item => item is not null && item.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
-        return projections.Length == 1 && IsSha256(projections[0].Substring(prefix.Length));
+        var projections = tokens.Where(static item => item is not null && item.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+        if (projections.Length != 1 || !IsSha256(projections[0].Substring(prefix.Length)))
+        { return false; }
+        if (evidence.ExecutionScope == WorkerResourceModels.TaskJoinScope)
+        { return evidence.Metric == WorkerResourceMetric.LoopBodyEntries && evidence.MetadataAssumptions.Length == 1 && storage.Length == 0 && tokens.Length == 2; }
+        if (evidence.ExecutionScope != WorkerResourceModels.TaskStorageScope ||
+            evidence.Metric is not (WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes) ||
+            evidence.MetadataAssumptions.Length != 3 || storage.Length != 1 || tokens.Length != 4 ||
+            storage[0].WitnessIdentifier != "bcl.task.run-action.when-all-array.normal-owned-storage" ||
+            storage[0].RuntimeModel != (dependencies[0].RuntimeModel == WorkerResourceModels.ConfiguredTaskJoinModel ?
+                WorkerResourceModels.ConfiguredTaskStorageModel : WorkerResourceModels.TaskStorageModel) ||
+            storage[0].ReferenceAssembly != dependencies[0].ReferenceAssembly ||
+            !string.Equals(storage[0].ReferenceSha256, dependencies[0].ReferenceSha256, StringComparison.OrdinalIgnoreCase) ||
+            !OneTaskToken(tokens, "resource-task-storage-model:", storage[0].RuntimeModel) ||
+            !OneTaskToken(tokens, "resource-task-compiler-carriers:", WorkerResourceModels.TaskCompilerCarrierModel))
+        { return false; }
+        var layouts = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
+            dependency.RuntimeModel == WorkerResourceModels.AllocationLayout && dependency.WitnessIdentifier == "runtime-layout.coreclr-x64").ToArray();
+        return layouts.Length == 1 && layouts[0].ReferenceAssembly == dependencies[0].ReferenceAssembly &&
+            string.Equals(layouts[0].ReferenceSha256, dependencies[0].ReferenceSha256, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool OneTaskToken(string[] tokens, string prefix, string value)
+    {
+        tokens = ArgumentNullGuard.NotNull(tokens, nameof(tokens));
+        prefix = ArgumentNullGuard.NotNull(prefix, nameof(prefix));
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        return tokens.Count(item => item is not null && item.StartsWith(prefix, StringComparison.Ordinal)) == 1 &&
+            tokens.Contains(prefix + value, StringComparer.Ordinal);
     }
 
     private static bool HasValidResourceExpected(WorkerClaimResult result, WorkerResourceExpectedEvidence? evidence)

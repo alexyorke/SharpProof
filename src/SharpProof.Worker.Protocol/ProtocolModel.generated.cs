@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "41";
+    public const string Current = "42";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 52;
+    public const int Current = 53;
 }
 
 internal static class WorkerManifestVersions
@@ -174,6 +174,10 @@ internal static class WorkerResourceModels
 {
     public const string CallableScope = "callable-source";
     public const string TaskJoinScope = "joined-isolated-source-callbacks";
+    public const string TaskStorageScope = "joined-isolated-normal-completion";
+    public const string TaskStorageModel = "task-join-normal-owned-storage-v1";
+    public const string ConfiguredTaskStorageModel = "configured-task-join-normal-owned-storage-v1";
+    public const string TaskCompilerCarrierModel = "emitted-task-compiler-carriers-v1";
     public const string TaskJoinModel = "task-join-source-at-most-once-v1";
     public const string ConfiguredTaskJoinModel = "configured-task-join-source-at-most-once-v1";
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";

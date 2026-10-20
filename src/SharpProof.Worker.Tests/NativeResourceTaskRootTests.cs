@@ -1,20 +1,21 @@
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Specs;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
-    private static CompilerCallablePreparation TaskRoot(string attributes, string child = "for(int i=0;i<count;i++){}", bool configuredAwait = false)
+    private static CompilerCallablePreparation TaskRoot(string attributes, string child = "for(int i=0;i<count;i++){}", bool configuredAwait = false, bool x64 = false)
     {
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentNullException.ThrowIfNull(child);
         return Read(CreateArtifact("using SharpProof.Attributes; using System.Threading.Tasks; public static class C { " +
             attributes + " public static " + (configuredAwait ? "async " : "") + "Task Target(int n) => " + (configuredAwait ? "await " : "") +
             "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" + (configuredAwait ? ".ConfigureAwait(false)" : "") +
-            "; static void Child(int count) {" + child + "} }", reviewedRuntime: true));
+            "; static void Child(int count) {" + child + "} }", reviewedRuntime: true, x64: x64));
     }
 
     [TestCase(false)]
@@ -72,8 +73,6 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("ArrayAllocations")]
     [TestCase("AllocatedElements")]
     [TestCase("AllocatedBytes")]
-    [TestCase("PeakAuxiliaryBytes")]
-    [TestCase("RetainedBytes")]
     [TestCase("SourceActivationDepth")]
     [TestCase("SourceStackBytes")]
     public async Task TaskRootDoesNotPublishUnmodeledMetricBounds(string metric)
@@ -86,6 +85,82 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinResourceMetricUnsupported"));
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
         Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+    }
+
+    [TestCase("PeakAuxiliaryBytes", false)]
+    [TestCase("PeakAuxiliaryBytes", true)]
+    [TestCase("RetainedBytes", false)]
+    [TestCase("RetainedBytes", true)]
+    public async Task TaskLifetimePublishesOnlyWithOwnedRuntimeLayoutAndCompilerEvidence(string metric, bool configured)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric." + metric + ",1000)]", configuredAwait: configured, x64: true);
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var memory = NativeTaskStorageVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        var expected = metric == "PeakAuxiliaryBytes" ? memory.PeakUpper : memory.RetainedUpper;
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(expected!.ToDisplayString()));
+        Assert.That(result.ResourceBound.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskStorageScope));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(3));
+        Assert.That(result.Assumptions.Count(static assumption => assumption is not null && assumption.Used), Is.EqualTo(3));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Some.Matches<WorkerResourceMetadataAssumption>(dependency =>
+            dependency is not null && dependency.RuntimeModel == (configured ? ResourceTaskStorageCatalog.ConfiguredModel : ResourceTaskStorageCatalog.Model)));
+        Assert.That(result.ProofCore, Does.Contain("resource-task-compiler-carriers:" + NativeTaskCarrierStorageVerifier.Model));
+        Assert.That(result.ResourceBound.Asymptotic!.UpperBound, Is.EqualTo("O(1)"));
+        Assert.That(result.ResourceBound.Asymptotic.Lower!.UnknownReason, Is.Not.Null);
+        Assert.That(result.ResourceBound.Expected!.UnknownReason, Is.Not.Null);
+        Assert.That(result.ResourceBound.Accounting, Is.Empty);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+    }
+
+    [TestCase("layout", "TaskStorageLayoutPremiseNotBound")]
+    [TestCase("storage-premise", "TaskStorageRuntimePremiseNotBound")]
+    [TestCase("source-premise", "ForkJoinRuntimePremiseNotBound")]
+    [TestCase("missing-capture", "TaskCompilerCarrierEvidenceUnavailable")]
+    [TestCase("failed-capture", "TaskCompilerCarrierEvidenceUnavailable")]
+    [TestCase("later-child", "TaskCompilerCarrierOwnershipUnproved")]
+    [TestCase("later-frame", "TaskCompilerCarrierShapeUnsupported")]
+    [TestCase("bound", "ForkJoinLifetimeBoundComparisonUnproved")]
+    public async Task TaskLifetimeFailuresReturnUnknownWithoutPartialNumericEvidence(string mutation, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        ArgumentNullException.ThrowIfNull(reason);
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes," + (mutation == "bound" ? "100" : "1000") + ")]",
+            x64: mutation != "layout");
+        var projection = target.ForkJoinProjection!;
+        var storageId = ResourceTaskStorageCatalog.AssumptionId(target.Entry.CallableId, projection.FrameworkAssemblyIdentity, false);
+        var sourceId = ResourceTaskCatalog.AssumptionId(target.Entry.CallableId, projection.FrameworkAssemblyIdentity);
+        if (mutation is "storage-premise" or "source-premise")
+        {
+            var id = mutation == "storage-premise" ? storageId : sourceId;
+            target.Entry.Assumptions = target.Entry.Assumptions.Where(assumption => assumption is not null && assumption.Id != id).ToArray();
+        }
+        if (mutation == "missing-capture")
+        { target = target with { ForkJoinProjection = projection with { Carriers = null } }; }
+        if (mutation == "failed-capture")
+        { target = target with { ForkJoinProjection = projection with { Carriers = new(null, "TaskCarrierEmissionFailed") } }; }
+        if (mutation == "later-child")
+        {
+            var child = projection.Children[1];
+            target = target with { ForkJoinProjection = projection with { Children = [projection.Children[0], child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } }] } };
+        }
+        if (mutation == "later-frame")
+        {
+            var capture = projection.Carriers!;
+            var shapes = capture.Shapes!;
+            var frames = shapes.CallbackFrames.SetItem(1, shapes.CallbackFrames[1] with { Fields = [ResourceStorageKind.Unspecified] });
+            target = target with { ForkJoinProjection = projection with { Carriers = capture with { Shapes = shapes with { CallbackFrames = frames } } } };
+        }
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo(reason));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.EffectWitness, Is.Null);
     }
 
     [TestCase("bound", "ForkJoinBoundComparisonUnproved")]

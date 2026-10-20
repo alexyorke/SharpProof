@@ -72,7 +72,8 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## F. Async, concurrency and performance measurements
 
-- [ ] Async/state-machine costs and allocations for an admitted execution model.
+- [x] Async/state-machine storage for the admitted normal-completion task-join
+  model, with conditional peak/retained byte proofs.
 - [ ] Concurrent/fork-join total work, allocation and live-space composition;
   document scheduler/overlap assumptions and return Unknown beyond them.
 - [x] End-to-end runtime/allocation benchmark workflow, with input scales,
@@ -176,18 +177,62 @@ native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
 
-### Reviewed runtime task storage (in progress)
+### Package coverage memory containment (in progress)
 
-Encode the pinned Task, non-generic WhenAll promise, Task-of-void-result and
-async-box instance fields as typed storage data. Derive bytes through the layout
-model, including possible async helper delegates; do not accept a producer byte
-verdict. The box reuses Task state storage for execution context. Compose owned
-compiler/runtime carriers with independently checked child storage under an
-explicit successful-join model with default/suppressed ambient context and
-separate scheduler, debugger/tracing and caller-owned activity. Validate the
-reviewed shapes against the pinned runtime binary. Keep cumulative exceptional
-prefixes unsupported rather than silently narrowing that contract's domain.
-Public root lifetime verdicts still require bound premises and consumer controls.
+At 7f049edd3 the corrected reporter succeeded. All three semantic shards passed;
+the package collector ended with exit 137 and Docker reported oomKilled true,
+with no Docker error. This establishes an actual container OOM event, replacing
+the earlier unconfirmed inference. The state is retained as
+`artifacts/resource-7f-container-state/package.json`; the failed log is
+`artifacts/resource-7f-coverage-failed.log`. No aggregate report was produced.
+
+Investigate and bound package test concurrency, including its nested NUnit pool,
+under the same four-CPU/12-GiB/4-GiB-scratch Docker budget. Preserve the complete
+case set, assertion deadlines, authority evidence, instrumentation and coverage
+floors. Verify comparable full package coverage completion and elapsed time
+before claiming the containment repair successful.
+
+### Root lifetime publication
+
+PeakAuxiliaryBytes and RetainedBytes now publish conditional task-root proofs
+only with owned task-execution, normal-storage and layout dependencies. The
+required joined-isolated-normal-completion scope distinguishes successful joined
+execution from callable-source and callback-work scopes. Proof markers bind the
+compiler-carrier model and projection; consumers require consistent reference
+images across all three dependencies. Missing premises, capture or valid child
+storage produce Unknown without partial numeric evidence. Cumulative task bytes
+remain unsupported because that contract includes exceptional prefixes.
+
+The expanded 1068-case worker/resource/protocol/compiler-driver/golden gate,
+all 1475 analyzer tests and eight packaged task cases passed. Packaged controls
+verify advisory success, strict trusted-assumption rejection and cumulative-byte
+Unknown. JSON/cache/SARIF mutation controls reject scope, model, projection,
+reference and layout laundering. Full formatting, quality/API compatibility,
+negative fixtures and documentation lint passed; the new package tests also
+passed explicit whitespace verification. Layout checked 2791 sources, 59
+projects and 151 pinned common files; the trusted inventory includes 542 paths.
+Documentation checked 728 local links. Logs are retained under
+`artifacts/resource-task-lifetime-*`.
+
+Protocol 42 and cache 53 identify the added verdict domain. Artifact 55,
+projection codec 3, manifest 6 and resource program 8 retain their formats.
+Cumulative prefix/runtime allocation, remaining concurrency controls, full
+coverage qualification and final audit remain required.
+
+### Reviewed runtime task storage
+
+The normal-storage catalog records typed Task, WhenAll and async-box fields
+against the pinned runtime source. Runtime implementation metadata independently
+confirms Task's two integer/five reference fields, the promise's two added fields,
+the generic result field, the one-byte empty VoidTaskResult and the box's single
+state field. The box reuses Task state storage for execution context. Derived
+layout bytes include possible helper delegates and compose compiler carriers
+with separately checked child storage under arbitrary overlap. The retained upper
+envelope excludes private void-child arrays and conservatively keeps carriers.
+Default/suppressed ambient context, disabled debugger/tracing and excluded
+scheduler/global/caller-induced storage are visible model premises, not detected
+deployment facts. The independent field probe is retained as
+`artifacts/resource-runtime-task-field-probe.log`.
 
 ### Coverage diagnostic ownership correction
 

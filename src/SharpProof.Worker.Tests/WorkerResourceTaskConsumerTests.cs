@@ -90,4 +90,90 @@ internal sealed partial class WorkerTests
         Action decodeMissing = () => { _ = WorkerProtocolJson.DeserializeResponse(missing.ToJsonString()); };
         Assert.Throws<JsonException>(decodeMissing);
     }
+    [TestCase("PeakAuxiliaryBytes", false)]
+    [TestCase("PeakAuxiliaryBytes", true)]
+    [TestCase("RetainedBytes", false)]
+    [TestCase("RetainedBytes", true)]
+    public async Task JoinedTaskLifetimeReachesValidatedCacheAndSarifWithNormalScope(string metric, bool configured)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        using var project = TestProject.Create("using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",1000)] public static " + (configured ? "async " : "") +
+            "Task Target(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {for(int i=0;i<n;i++){}} }");
+        project.UseNetCoreReferencePack(8);
+        var options = TestCompilation.CreateOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary)
+            .WithPlatform(Microsoft.CodeAnalysis.Platform.X64);
+        var request = project.CreateRequest(cacheEnabled: true, compilationOptions: options);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+            second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
+        var evidence = second.ClaimResults.Single().ResourceBound!;
+        Assert.That(evidence.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskStorageScope));
+        Assert.That(evidence.MetadataAssumptions, Has.Length.EqualTo(3));
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(WorkerResourceModels.TaskStorageScope));
+        Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("executionScope").GetString(),
+            Is.EqualTo(WorkerResourceModels.TaskStorageScope));
+        var json = WorkerProtocolJson.SerializeResponse(second);
+        foreach (var mutation in new[] { "ordinary-scope", "work-scope", "stripped-task", "storage-model", "compiler-model", "extra-model", "reference", "layout", "lower", "expected", "cumulative" })
+        {
+            var modified = WorkerProtocolJson.DeserializeResponse(json)!;
+            var claim = modified.ClaimResults.Single();
+            var bound = claim.ResourceBound!;
+            switch (mutation)
+            {
+                case "ordinary-scope":
+                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
+                    break;
+                case "work-scope":
+                    bound.ExecutionScope = WorkerResourceModels.TaskJoinScope;
+                    break;
+                case "stripped-task":
+                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
+                    bound.MetadataAssumptions = [];
+                    foreach (var assumption in claim.Assumptions)
+                    { assumption.Used = false; }
+                    break;
+                case "storage-model":
+                    claim.ProofCore = [.. claim.ProofCore.Where(static item => item is not null && !item.StartsWith("resource-task-storage-model:", StringComparison.Ordinal))];
+                    break;
+                case "compiler-model":
+                    claim.ProofCore = [.. claim.ProofCore.Where(static item => item is not null && !item.StartsWith("resource-task-compiler-carriers:", StringComparison.Ordinal))];
+                    break;
+                case "extra-model":
+                    claim.ProofCore = [.. claim.ProofCore, "resource-task-model:foreign"];
+                    break;
+                case "reference":
+                    bound.MetadataAssumptions.Single(static dependency => dependency is not null &&
+                        dependency.RuntimeModel is WorkerResourceModels.TaskStorageModel or WorkerResourceModels.ConfiguredTaskStorageModel).ReferenceSha256 = new string('a', 64);
+                    break;
+                case "layout":
+                    bound.MetadataAssumptions = [.. bound.MetadataAssumptions.Where(static dependency => dependency is not null && dependency.RuntimeModel != WorkerResourceModels.AllocationLayout)];
+                    break;
+                case "lower":
+                    bound.Asymptotic!.Lower!.UnknownReason = null;
+                    break;
+                case "expected":
+                    bound.Expected = null;
+                    break;
+                case "cumulative":
+                    bound.Metric = WorkerResourceMetric.AllocatedBytes;
+                    break;
+                default:
+                    Assert.Fail("Unknown mutation");
+                    break;
+            }
+            var validation = WorkerProtocolJson.Validate(modified);
+            Assert.That(validation.IsValid, Is.False, mutation);
+            Assert.That(validation.Errors.Any(static error => error is not null && error.Code == "response.resource_evidence"), Is.True, mutation);
+        }
+    }
 }

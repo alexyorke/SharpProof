@@ -404,6 +404,12 @@ internal sealed partial class ClaimManifestBuilder(
             {
                 metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
                     taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
+                if (effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                    claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+                {
+                    metadataIds.Add(ResourceTaskStorageCatalog.AssumptionId(callableId,
+                        taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
+                }
             }
             if (resource.Bounds is { } bounds)
             { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }

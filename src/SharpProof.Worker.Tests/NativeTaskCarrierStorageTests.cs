@@ -1,4 +1,8 @@
 using System.Collections.Immutable;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using SharpProof.Specs;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -278,6 +282,138 @@ public sealed class NativeTaskCarrierStorageTests
         return new(Enumerable.Range(0, length).Select(static index => (JsonNode?)JsonValue.Create(3)).ToArray());
     }
 
+    [TestCase(0, 456L)]
+    [TestCase(1, 720L)]
+    [TestCase(2, 696L)]
+    public void ComposesReviewedRuntimeAndCompilerStorage(int stateKind, long expected)
+    {
+        var (shapes, projection, root) = Fixture(stateKind);
+        projection = projection with { Carriers = new(shapes, null) };
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.PeakUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 0,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(result.RetainedUpper, Is.EqualTo(result.PeakUpper));
+    }
+
+    [TestCase(7, 896L)]
+    [TestCase(0, 448L)]
+    [TestCase(-5, 448L)]
+    public void ComposedPeakIncludesEveryChildButRetainedOutputExcludesPrivateArrays(int inputSize, long expectedPeak)
+    {
+        var (compilation, method, projection, root) = Compile(false, OptimizationLevel.Release,
+            "for(int i=0;i<n;i++){var data=new int[2];}");
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        projection = projection with { Carriers = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", cancellation) };
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), cancellation);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.PeakUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputSize, cancellation),
+            Is.EqualTo(new System.Numerics.BigInteger(expectedPeak)));
+        Assert.That(result.RetainedUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputSize, cancellation),
+            Is.EqualTo(new System.Numerics.BigInteger(448)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MissingCompilerEvidenceCannotBecomeAZeroRuntimeBound(bool captureFailed)
+    {
+        var (_, projection, root) = Fixture(0);
+        projection = projection with { Carriers = captureFailed ? new(null, new string('x', 512)) : null };
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.PeakUpper, Is.Null);
+        Assert.That(result.RetainedUpper, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskCompilerCarrierEvidenceUnavailable"));
+    }
+
+    [Test]
+    public void OversizedEmbeddedStateReturnsUnknownWithoutAPartialCarrierBound()
+    {
+        var (shapes, projection, root) = Fixture(2);
+        shapes = shapes with { StateMachine = shapes.StateMachine! with { Fields = Enumerable.Repeat(ResourceStorageKind.Word32, 1017).ToImmutableArray() } };
+        projection = projection with { Carriers = new(shapes, null) };
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.PeakUpper, Is.Null);
+        Assert.That(result.RetainedUpper, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskRuntimeStorageFieldBudgetExceeded"));
+    }
+
+    [Test]
+    public void ComposedStorageHonorsCancellation()
+    {
+        var (shapes, projection, root) = Fixture(0);
+        projection = projection with { Carriers = new(shapes, null) };
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = NativeTaskStorageVerifier.Check(projection, root, Layout(), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [Test]
+    public void RuntimeStorageCatalogHasDistinctOwnedNormalCompletionPremises()
+    {
+        Assert.That(ResourceTaskStorageCatalog.ContentSha256, Has.Length.EqualTo(64));
+        Assert.That(ResourceTaskStorageCatalog.ConfiguredContentSha256, Is.Not.EqualTo(ResourceTaskStorageCatalog.ContentSha256));
+        var id = ResourceTaskStorageCatalog.AssumptionId("root", "assembly", false);
+        Assert.That(ResourceTaskStorageCatalog.AssumptionId("foreign", "assembly", false), Is.Not.EqualTo(id));
+        Assert.That(ResourceTaskStorageCatalog.AssumptionId("root", "foreign", false), Is.Not.EqualTo(id));
+        Assert.That(ResourceTaskStorageCatalog.AssumptionId("root", "assembly", true), Is.Not.EqualTo(id));
+        Assert.That(id, Does.Contain(ResourceTaskStorageCatalog.Witness));
+    }
+
+    [Test]
+    public void ReviewedCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
+    {
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32/System.Private.CoreLib.dll");
+        using var image = new PEReader(stream);
+        var reader = image.GetMetadataReader();
+        var task = RuntimeType(reader, "System.Threading.Tasks", "Task");
+        var taskFields = InstanceFields(reader, task);
+        string[] expectedTaskFields = [
+            "m_taskId", "m_action", "m_stateObject", "m_taskScheduler", "m_stateFlags", "m_continuationObject", "m_contingentProperties"];
+        Assert.That(taskFields.Select(static field => field.Name).Order(StringComparer.Ordinal), Is.EqualTo(expectedTaskFields.Order(StringComparer.Ordinal)));
+        Assert.That(taskFields.Select(static field => field.Kind == 0x08 ? ResourceStorageKind.Word32 :
+            field.Kind is 0x12 or 0x1c ? ResourceStorageKind.Reference : ResourceStorageKind.Unspecified).Order(),
+            Is.EqualTo(ResourceTaskStorageCatalog.TaskFields.Order()));
+        var join = task.GetNestedTypes().Select(reader.GetTypeDefinition).Single(type => reader.GetString(type.Name) == "WhenAllPromise");
+        Assert.That(InstanceFields(reader, join).Select(static field => field.Kind).Order(), Is.EqualTo(new byte[] { 0x08, 0x1c }));
+        Assert.That(ResourceTaskStorageCatalog.JoinFields.Skip(ResourceTaskStorageCatalog.TaskFields.Length).Order(),
+            Is.EqualTo(new[] { ResourceStorageKind.Word32, ResourceStorageKind.Reference }.Order()));
+        Assert.That(InstanceFields(reader, RuntimeType(reader, "System.Threading.Tasks", "Task`1")),
+            Is.EqualTo(new[] { ("m_result", (byte)0x13) }));
+        var voidResult = RuntimeType(reader, "System.Threading.Tasks", "VoidTaskResult");
+        Assert.That(InstanceFields(reader, voidResult), Is.Empty);
+        Assert.That(voidResult.GetLayout().Size, Is.EqualTo(1));
+        var builder = RuntimeType(reader, "System.Runtime.CompilerServices", "AsyncTaskMethodBuilder`1");
+        var box = builder.GetNestedTypes().Select(reader.GetTypeDefinition).Single(type => reader.GetString(type.Name) == "AsyncStateMachineBox`1");
+        Assert.That(InstanceFields(reader, box), Is.EqualTo(new[] { ("StateMachine", (byte)0x13) }));
+    }
+
+    private static TypeDefinition RuntimeType(MetadataReader reader, string namesp, string name)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(namesp);
+        ArgumentNullException.ThrowIfNull(name);
+        return reader.TypeDefinitions.Select(reader.GetTypeDefinition).Single(type =>
+            reader.GetString(type.Namespace) == namesp && reader.GetString(type.Name) == name);
+    }
+
+    private static (string Name, byte Kind)[] InstanceFields(MetadataReader reader, TypeDefinition type)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        if (type.Equals(default(TypeDefinition)))
+        { throw new ArgumentException("A metadata type is required.", nameof(type)); }
+        return type.GetFields().Select(reader.GetFieldDefinition).Where(static field => (field.Attributes & FieldAttributes.Static) == 0)
+            .Select(field =>
+            {
+                var signature = reader.GetBlobReader(field.Signature);
+                Assert.That(signature.ReadSignatureHeader().Kind, Is.EqualTo(SignatureKind.Field));
+                var kind = signature.ReadByte();
+                while (kind is 0x1f or 0x20)
+                { _ = signature.ReadCompressedInteger(); kind = signature.ReadByte(); }
+                return (reader.GetString(field.Name), kind);
+            }).ToArray();
+    }
+
     private static (CompilerTaskCarrierShapes Shapes, CompilerForkJoinProjection Projection, CompilerTotalEntryPreparation Root) Fixture(int stateKind)
     {
         var (_, _, projection, root) = Compile(false, OptimizationLevel.Release);
@@ -290,11 +426,12 @@ public sealed class NativeTaskCarrierStorageTests
     }
 
     private static (CSharpCompilation Compilation, IMethodSymbol Method, CompilerForkJoinProjection Projection, CompilerTotalEntryPreparation Root)
-        Compile(bool configured, OptimizationLevel optimization)
+        Compile(bool configured, OptimizationLevel optimization, string body = "")
     {
+        ArgumentNullException.ThrowIfNull(body);
         var source = "using System.Threading.Tasks; public static class C {public static " + (configured ? "async Task" : "Task") +
             " Root(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(n)))" +
-            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {} }";
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {" + body + "} }";
         var initial = TestCompilation.Create("CarrierStorage", ("Subject.cs", source));
         var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
