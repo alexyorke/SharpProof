@@ -144,8 +144,8 @@ public static partial class Inference
             {
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
-                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029" or "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377"
-                    || diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error && diagnostic.Id is "CS8714" or "CS8634" or "CS8631" or "CS8603" or "CS8604" or "CS8619" or "CS8620" or "CS8625";
+                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029" or "CS0407" or "CS0123" or "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377"
+                    || diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error && diagnostic.Id is "CS8714" or "CS8634" or "CS8631" or "CS8603" or "CS8604" or "CS8619" or "CS8620" or "CS8625" or "CS8621" or "CS8622";
             }).ToArray();
             if (failures.Length == 0)
             { return; }
@@ -204,6 +204,77 @@ public static partial class Inference
                         { ordinal++; }
                         if (ordinal < parameters.Length)
                         { PinContextualArgument(syntax.Expression, argument.Parameter.Type, parameters[ordinal], semantic, pins); }
+                    }
+                }
+                var groupSemantic = changedCompilation.GetSemanticModel(afterTree);
+                var beforeGroups = MethodGroups(tree.GetRoot(cancellationToken), semantic);
+                var afterGroups = MethodGroups(afterTree.GetRoot(cancellationToken), groupSemantic);
+                if (beforeGroups.Length != afterGroups.Length)
+                { continue; }
+                for (var i = 0; i < beforeGroups.Length; i++)
+                {
+                    var groupSpan = afterGroups[i].Parent is CastExpressionSyntax cast ? cast.Span : afterGroups[i].Span;
+                    if (!failures.Any(diagnostic =>
+                    {
+                        if (diagnostic is null)
+                        { throw new ArgumentNullException(nameof(diagnostic)); }
+                        return diagnostic.Location.SourceTree == afterTree && groupSpan.Contains(diagnostic.Location.SourceSpan);
+                    }))
+                    { continue; }
+                    var before = (semantic.GetOperation(beforeGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
+                        ?? semantic.GetSymbolInfo(beforeGroups[i], cancellationToken).Symbol as IMethodSymbol;
+                    var binding = groupSemantic.GetSymbolInfo(afterGroups[i], cancellationToken);
+                    var after = (groupSemantic.GetOperation(afterGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
+                        ?? binding.Symbol as IMethodSymbol
+                        ?? binding.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault(candidate =>
+                        {
+                            if (candidate is null)
+                            { throw new ArgumentNullException(nameof(candidate)); }
+                            return ImplementationMethod(candidate).DeclaringSyntaxReferences.Any(reference =>
+                            {
+                                if (reference is null)
+                                { throw new ArgumentNullException(nameof(reference)); }
+                                return reference.SyntaxTree == changedTree && reference.GetSyntax(cancellationToken).GetAnnotations("HM.Candidate").Any();
+                            });
+                        });
+                    if (before is null || after is null || !SameMethodDefinition(before, originalMethod)
+                        || !ImplementationMethod(after).DeclaringSyntaxReferences.Any(reference =>
+                        {
+                            if (reference is null)
+                            { throw new ArgumentNullException(nameof(reference)); }
+                            return reference.SyntaxTree == changedTree && reference.GetSyntax(cancellationToken).GetAnnotations("HM.Candidate").Any();
+                        }))
+                    { continue; }
+                    // A failed return conversion can expose an unconstructed candidate.
+                    // Its open input parameters do not describe inferred caller arguments.
+                    if (binding.Symbol is null && failures.Any(diagnostic =>
+                    {
+                        if (diagnostic is null)
+                        { throw new ArgumentNullException(nameof(diagnostic)); }
+                        return diagnostic.Id == "CS0407" && diagnostic.Location.SourceTree == afterTree && groupSpan.Contains(diagnostic.Location.SourceSpan);
+                    }))
+                    { CollectSignaturePins(result, CSharpTypes.Rigid(before.ReturnType), CSharpTypes.Rigid(after.ReturnType), null, pins); }
+                    else
+                    { RefineSuppliedSignature(before, after, parameters, result, pins); }
+                    var delegateType = groupSemantic.GetTypeInfo(afterGroups[i], cancellationToken).ConvertedType
+                        ?? (afterGroups[i].Parent is CastExpressionSyntax conversion ? groupSemantic.GetTypeInfo(conversion.Type, cancellationToken).Type : null);
+                    // Method-group symbols omit nullable inference annotations. Use the
+                    // delegate input contract when nullable conversion warnings expose them.
+                    if (failures.Any(diagnostic =>
+                    {
+                        if (diagnostic is null)
+                        { throw new ArgumentNullException(nameof(diagnostic)); }
+                        return diagnostic.Id is "CS8621" or "CS8622"
+                            && diagnostic.Location.SourceTree == afterTree && groupSpan.Contains(diagnostic.Location.SourceSpan);
+                    }) && delegateType is INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                        && invoke.Parameters.Length == before.Parameters.Length)
+                    {
+                        var offset = before.ReducedFrom is null ? 0 : 1;
+                        for (var parameter = 0; parameter < invoke.Parameters.Length; parameter++)
+                        {
+                            CollectSignaturePins(parameters[parameter + offset], CSharpTypes.Rigid(before.Parameters[parameter].Type),
+                                CSharpTypes.Rigid(invoke.Parameters[parameter].Type), parameter + offset, pins);
+                        }
                     }
                 }
             }

@@ -101,8 +101,10 @@ public static partial class Inference
             {
                 if (expression is not (IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax))
                 { continue; }
-                if (semantic.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol
+                var binding = semantic.GetSymbolInfo(expression, cancellationToken);
+                if ((binding.Symbol is IMethodSymbol || binding.CandidateSymbols.OfType<IMethodSymbol>().Any())
                     && (semantic.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate }
+                        || expression.Parent is CastExpressionSyntax cast && semantic.GetTypeInfo(cast.Type, cancellationToken).Type is INamedTypeSymbol { TypeKind: TypeKind.Delegate }
                         || expression.Parent is PrefixUnaryExpressionSyntax address && address.IsKind(SyntaxKind.AddressOfExpression)
                         && semantic.GetTypeInfo(address, cancellationToken).ConvertedType is IFunctionPointerTypeSymbol))
                 { groups.Add(expression); }
