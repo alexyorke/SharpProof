@@ -240,7 +240,7 @@ public sealed class FinalCompilationCollectorTests
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -425,7 +425,7 @@ public sealed class FinalCompilationCollectorTests
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -504,7 +504,7 @@ public sealed class FinalCompilationCollectorTests
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-only-location"),
             captureRawArtifact: true);
         var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
-        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        var unchangedImage = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -1031,14 +1031,14 @@ public sealed class FinalCompilationCollectorTests
             compilation,
             Options(path),
             additional);
-        var first = await File.ReadAllBytesAsync(path);
+        var first = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
         var secondDiagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             additional);
-        var second = await File.ReadAllBytesAsync(path);
+        var second = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            Encoding.UTF8.GetString(first), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Encoding.UTF8.GetString(first.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1333,7 +1333,7 @@ public sealed class FinalCompilationCollectorTests
         var reference = compilation.References
             .OfType<PortableExecutableReference>()
             .First();
-        var image = await File.ReadAllBytesAsync(reference.FilePath!);
+        var image = (await File.ReadAllBytesAsync(reference.FilePath!)).ToImmutableArray();
         var inMemory = MetadataReference.CreateFromImage(image);
 
         var diagnostics = await AnalyzeCollectorAsync(
@@ -1380,7 +1380,7 @@ public sealed class FinalCompilationCollectorTests
             "PatchedReference");
         var patched = PatchAscii(image, "OriginalMarker", "XriginalMarker");
         var backingPath = Path.Combine(workspace.Path, "PatchedReference.dll");
-        await File.WriteAllBytesAsync(backingPath, patched);
+        await File.WriteAllBytesAsync(backingPath, patched.ToArray());
         var mismatched = MetadataReference.CreateFromImage(
             image,
             filePath: backingPath);
@@ -1856,7 +1856,7 @@ public sealed class FinalCompilationCollectorTests
         return SharpProof.Ir.HashEncoding.ToLowerHex(hash.ComputeHash(stream));
     }
 
-    private static byte[] PatchAscii(
+    private static ImmutableArray<byte> PatchAscii(
         ImmutableArray<byte> image,
         string original,
         string replacement)
@@ -1865,18 +1865,21 @@ public sealed class FinalCompilationCollectorTests
         { throw new ArgumentNullException(nameof(image)); }
         System.ArgumentNullException.ThrowIfNull(original);
         System.ArgumentNullException.ThrowIfNull(replacement);
-        var originalBytes = Encoding.ASCII.GetBytes(original);
-        var replacementBytes = Encoding.ASCII.GetBytes(replacement);
+        var originalBytes = Encoding.ASCII.GetBytes(original).ToImmutableArray();
+        var replacementBytes = Encoding.ASCII.GetBytes(replacement).ToImmutableArray();
         Assert.That(replacementBytes, Has.Length.EqualTo(originalBytes.Length));
         var offsets = Enumerable.Range(
                 0, image.Length - originalBytes.Length + 1)
             .Where(offset => image.AsSpan(offset, originalBytes.Length)
-                .SequenceEqual(originalBytes))
+                .SequenceEqual(originalBytes.AsSpan()))
             .ToImmutableArray();
         Assert.That(offsets, Has.Length.EqualTo(1));
-        var patched = image.ToArray();
-        replacementBytes.CopyTo(patched, offsets[0]);
-        return patched;
+        var patched = image.ToBuilder();
+        for (var index = 0; index < replacementBytes.Length; index++)
+        {
+            patched[offsets[0] + index] = replacementBytes[index];
+        }
+        return patched.ToImmutable();
     }
 
     private static ImmutableDictionary<string, string> Options(
