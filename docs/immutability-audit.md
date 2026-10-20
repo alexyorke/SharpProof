@@ -4759,3 +4759,15 @@ All 240 actual dispatch branch constructions and sixteen direct null/empty/one/m
 The script-tool fixture file map and eight case descriptors are readonly; the case vector is immutable. Physical fixture files remain deliberately mutable subjects. All 78 embedded string tokens, including malformed PowerShell/shell snippets and whitespace data, are conserved exactly.
 
 Actual full script-tool regressions pass, including parse/lint/format, extensionless files, spaces, pinned/unpinned Arcade bytes and readonly verification. Actual facade ZIP identity/dependency/provenance, duplicate/archive/payload/DTD regressions pass. Its remaining historical observations are scalar paths or immediate native invalid-input frames. Six old rows close, plus nine independently traced readonly descriptors. PowerShell has 67 Open rows; two M455 C# observations are completing verification. Remaining array/custom-reference/ownership/archive/binding and final compiler/coverage/native gates remain pending.
+
+### IMM-M455: immutable publication and serialized hash bytes
+
+PublicationFile retains immutable UTF8 evidence and writes a readonly span. Protocol bounded hashing retains immutable serialized bytes through size checks and hashing. Native copy/read scratch storage remains mutable by design. The initial check named a nonexistent Host.Tests project; corrected checks target the actual Worker and package integration projects.
+
+All 284 protocol/contract and 77 actual build-task publication cases pass, with one established supported-host skip. Literal conservation verifies 4293 raw/interpolated tokens across 1065 changed C# files. Two new observations close, returning C# coordinate rows to zero Open. The unit manifest marks these two sources changed since the current compiler census.
+
+### IMM-M456: current production/shared-harness array ownership reconciliation
+
+The coordinator independently traced every one of the 61 retained-array/materialization sites outside identified test project directories, including three shared harness adapters. All 61 are reconciled in the array ledger: thirty immutable migrations verified by M437/M442/M450/M455 and thirty-one required mutable/native/public contracts. Preserved cases include writable I/O scratch buffers, actual generated CLR array subjects, reusable allocation measurement frames, mutation-bearing publication argv, shipped public attribute array identity and final native API adapters. Public/native contracts are distinguished from owned immutable observations; no compiler shape or old coordinate automatically determines a role.
+
+The array universe still has 463 unchecked test/harness candidates. PowerShell has 67 Open observations and coverage 27 gaps. These bounded classifications do not establish exhaustive completion; current custom-reference ownership, archive/binding reconciliation and final compiler/coverage/native workflows remain pending.

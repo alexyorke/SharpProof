@@ -260,14 +260,14 @@ internal static partial class WorkerProtocolJson
 
     private static string ComputeBoundedUtf8Hash<T>(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
     {
-        var json = JsonSerializer.SerializeToUtf8Bytes(value, TypeInfo<T>());
+        var json = JsonSerializer.SerializeToUtf8Bytes(value, TypeInfo<T>()).ToImmutableArray();
         if (json.Length > MaximumJsonBytes)
         {
             throw new InvalidDataException(
                 $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        return ComputeSha256((json).ToImmutableArray());
+        return ComputeSha256(json);
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
