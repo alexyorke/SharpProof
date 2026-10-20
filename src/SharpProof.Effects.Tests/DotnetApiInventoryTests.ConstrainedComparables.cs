@@ -48,6 +48,20 @@ public sealed partial class DotnetApiInventoryTests
         Assert.That(Mutate(sbyte.MinValue, sbyte.MaxValue), Is.Zero);
         Assert.That(Mutate(ulong.MinValue, ulong.MaxValue), Is.Zero);
 
+        foreach (var choose in new[] { true, false })
+        {
+            Assert.That(MutateConditional(17, 23, choose), Is.Zero);
+            var data = new[] { 17 };
+            Assert.That(data[0].CompareTo(choose ? (data[0] = 23) : (data[0] = 0)), Is.Zero);
+        }
+
+        static int MutateConditional<T>(T value, T replacement, bool choose) where T : IComparable<T>
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            ArgumentNullException.ThrowIfNull(replacement);
+            return value.CompareTo(choose ? (value = replacement) : (value = default(T)!));
+        }
+
         static int Mutate<T>(T value, T replacement) where T : IComparable<T>
         {
             ArgumentNullException.ThrowIfNull(value);

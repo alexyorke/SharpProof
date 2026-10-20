@@ -13,6 +13,23 @@ namespace SharpProof.Frontend.Test;
 public sealed class ConstrainedComparableDomainTests
 {
     [Test]
+    public void StaticCallsAndConstantFieldsDoNotExposeManagedReceiverLocations()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { const int Value = 17; public static int Target(int value) => Other(value) + Value.CompareTo(23); static int Other(int value) => value; }");
+        var compilation = CSharpCompilation.Create("ComparableCopies", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        foreach (var call in syntax.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            var invocation = (IInvocationOperation)model.GetOperation(call)!;
+            Assert.That(context.IsVariableComparableReceiver(invocation), Is.False);
+            Assert.That(context.ManagedValueReceiverLocation(invocation), Is.Null);
+        }
+    }
+
+    [Test]
     public void ConstructedComparableInstanceFramesRetainTheirScalarParameterDomain()
     {
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target() => new Box<int>().Compare(23); public sealed class Box<T> where T : System.IComparable<T> { public T Value; public int Compare(T replacement) => Value.CompareTo(Value = replacement); } }");

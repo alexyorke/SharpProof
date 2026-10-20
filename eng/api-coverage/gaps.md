@@ -898,7 +898,8 @@ snapshot result while proving zero.
 The inventory executes all 145 ordered scalar boundary pairs against a compiled
 CLR comparison oracle and rejects a deliberately wrong result. Native tests cover
 proofs, replayed refutations, effects, typed preconditions, receiver mutation,
-array reassignment, property copies and field storage. Unsupported Boolean,
+array reassignment, property copies, field storage and conditional argument branches.
+Unsupported Boolean,
 floating-point, decimal, custom, boxed-interface and ref-conditional calls retain
 conservative behavior.
 
@@ -906,7 +907,8 @@ This closes the specialized scalar source-call slice of work item C. All nine
 ranked original corpus calls still enter with open generic types and remain
 `unmodeled-dispatch`; declaration evidence alone does not establish their runtime
 implementation. Concrete entry specialization, arbitrary comparable/comparer
-callbacks, reference-dependent generic field storage, other scalar domains and general managed-reference receivers remain
+callbacks, reference-dependent generic field storage, static-field receiver locations,
+other scalar domains and general managed-reference receivers remain
 work items. No declaration is fully modeled.
 
 ## Cross-cutting gaps previously identified

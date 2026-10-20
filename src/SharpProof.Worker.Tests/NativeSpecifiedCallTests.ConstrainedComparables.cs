@@ -22,6 +22,31 @@ internal sealed partial class NativeSpecifiedCallTests
     }
 
     [Test]
+    public async Task ConstrainedComparableConditionalArgumentsKeepTheirManagedReceiverLocation()
+    {
+        await CheckInterfaceArrayContract("bool choose", "Contract.Ensures(Contract.Result<int>() == 0); return Compare(17, 23, choose);",
+            WorkerClaimOutcome.Proven, members: "static int Compare<T>(T value, T replacement, bool choose) where T : System.IComparable<T> => value.CompareTo(choose ? (value = replacement) : (value = default(T))); ");
+        await CheckInterfaceArrayContract("bool choose", "Contract.Ensures(Contract.Result<int>() == 0); return Compare(new int[] { 17 }, 23, choose);",
+            WorkerClaimOutcome.Proven, members: "static int Compare<T>(T[] data, T replacement, bool choose) where T : System.IComparable<T> => data[0].CompareTo(choose ? (data[0] = replacement) : (data[0] = default(T))); ");
+        await CheckInterfaceArrayContract("bool choose", "Contract.Ensures(Contract.Result<int>() == 0); return new Box<int> { Value = 17 }.Compare(23, choose);",
+            WorkerClaimOutcome.Proven, members: "public sealed class Box<T> where T : System.IComparable<T> { public T Value; public int Compare(T replacement, bool choose) => Value.CompareTo(choose ? (Value = replacement) : (Value = default(T))); }");
+    }
+
+    [Test]
+    public async Task ConstrainedComparableNullSuppressionPreservesVariableClassification()
+    {
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 0); return Compare(17, 23);",
+            WorkerClaimOutcome.Proven, members: "static int Compare<T>(T value, T replacement) where T : System.IComparable<T> => (value!).CompareTo(value = replacement);");
+    }
+
+    [Test]
+    public async Task PrimitiveComparableStaticFieldLocationsRetainTheirUnsupportedBoundary()
+    {
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 0); value = 17; return value.CompareTo(value = 23);",
+            WorkerClaimOutcome.Unknown, members: "static int value;");
+    }
+
+    [Test]
     public async Task ConstrainedIntegerComparableHasNoBoxingAllocationOrCallbackEffects()
     {
         await CheckInterfaceArrayEffects("[DoesNotThrow, ZeroAllocations, EnforcePure]", "int left, int right",
