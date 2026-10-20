@@ -51,6 +51,7 @@ internal static class NativeResourceStackVerifier
                     ResourceExpression.Add(FrameBytes(frame), nested.StorageBytes));
             case ResourceProgramKind.Sequence:
             case ResourceProgramKind.Choice:
+            case ResourceProgramKind.BooleanDistribution:
             case ResourceProgramKind.CreditLoop:
                 if (program.Kind == ResourceProgramKind.CreditLoop)
                 { _ = NativeResourceAccountingVerifier.Budget(program, cancellation); }

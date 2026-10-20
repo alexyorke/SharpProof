@@ -760,6 +760,8 @@ internal static partial class WorkerProtocolJson
         { return false; }
         if (!HasValidResourceMetadata(claim!, value, evidence))
         { return false; }
+        if (!HasValidResourceExpected(value, evidence.Expected))
+        { return false; }
         if (!HasValidResourceAccounting(value, evidence.Accounting))
         { return false; }
         return value.Outcome switch
@@ -772,6 +774,39 @@ internal static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceExpected(WorkerClaimResult result, WorkerResourceExpectedEvidence? evidence)
+    {
+        result = ArgumentNullGuard.NotNull(result, nameof(result));
+        var core = result.ProofCore?.Contains("resource-input-model:" + WorkerResourceModels.Expected, StringComparer.Ordinal) == true;
+        var records = 0;
+        string? record = null;
+        foreach (var item in result.ProofCore ?? [])
+        {
+            if (item?.StartsWith("resource-input-record:", StringComparison.Ordinal) == true)
+            { records++; record = item; }
+        }
+        if (evidence is null)
+        { return !core && records == 0; }
+        if (evidence.Model != WorkerResourceModels.Expected || result.Outcome != WorkerClaimOutcome.Proven || result.Vacuity != WorkerVacuityKind.None)
+        { return false; }
+        if (evidence.UnknownReason is { } reason)
+        {
+            return !core && records == 0 && !string.IsNullOrWhiteSpace(reason) && reason.Length <= 256 && !reason.Any(char.IsControl) &&
+                evidence.InputOrdinal is null && evidence.InputName is null && evidence.TrueWeight is null && evidence.FalseWeight is null &&
+                evidence.FalseUpperBound is null && evidence.TrueUpperBound is null && evidence.UpperBound is null;
+        }
+        return core && records == 1 && record == "resource-input-record:" + ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(evidence, Options)) &&
+            (result.ResourceBound?.Metric is WorkerResourceMetric.LoopBodyEntries or WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements or WorkerResourceMetric.AllocatedBytes) &&
+            evidence.InputOrdinal is >= 0 && ValidText(evidence.InputName, 256) &&
+            evidence.TrueWeight is >= 0 and <= 1000000 && evidence.FalseWeight is >= 0 and <= 1000000 && evidence.TrueWeight + evidence.FalseWeight > 0 &&
+            ValidText(evidence.FalseUpperBound, 16384) && ValidText(evidence.TrueUpperBound, 16384) && ValidText(evidence.UpperBound, 16384);
+
+        static bool ValidText(string? value, int maximum)
+        {
+            return value is not null && !string.IsNullOrWhiteSpace(value) && value.Length <= maximum && !value.Any(char.IsControl);
+        }
+    }
+
     private static bool HasValidResourceAccounting(WorkerClaimResult result, WorkerResourceAccountingEvidence[]? rows)
     {
         result = ArgumentNullGuard.NotNull(result, nameof(result));

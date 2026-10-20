@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope, CreditLoop }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope, CreditLoop, BooleanDistribution }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
 
@@ -67,7 +67,7 @@ internal sealed class ResourceCreditShape(BigInteger initial, BigInteger deposit
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 7;
+    internal const int ModelVersion = 8;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceExpression? LowerLength { get; }
@@ -76,6 +76,7 @@ internal sealed class ResourceProgram
     internal ResourceAllocationShape? Allocation { get; }
     internal ResourceActivationShape? Activation { get; }
     internal ResourceCreditShape? Credit { get; }
+    internal ResourceBooleanDistribution? Distribution { get; }
     internal ResourceRepeatKind RepeatKind { get; }
     internal ImmutableArray<ResourceProgram> Children { get; }
     internal int NodeCount { get; }
@@ -85,7 +86,8 @@ internal sealed class ResourceProgram
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
         ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null,
-        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null, ResourceCreditShape? credit = null)
+        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null, ResourceCreditShape? credit = null,
+        ResourceBooleanDistribution? distribution = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
@@ -97,6 +99,7 @@ internal sealed class ResourceProgram
         Allocation = allocation;
         Activation = activation;
         Credit = credit;
+        Distribution = distribution;
         RepeatKind = repeatKind;
         Children = children;
         var nodes = 1 + (credit is null ? 0 : 2) + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (lowerLength?.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount + rank.LowerInitial.NodeCount + rank.LowerLimit.NodeCount);
@@ -192,5 +195,13 @@ internal sealed class ResourceProgram
         prefix = ArgumentNullGuard.NotNull(prefix, nameof(prefix));
         drain = ArgumentNullGuard.NotNull(drain, nameof(drain));
         return new(ResourceProgramKind.CreditLoop, null, rank, default, [prefix, drain], credit: credit);
+    }
+
+    internal static ResourceProgram WithDistribution(ResourceBooleanDistribution distribution, ResourceProgram whenFalse, ResourceProgram whenTrue)
+    {
+        distribution = ArgumentNullGuard.NotNull(distribution, nameof(distribution));
+        whenFalse = ArgumentNullGuard.NotNull(whenFalse, nameof(whenFalse));
+        whenTrue = ArgumentNullGuard.NotNull(whenTrue, nameof(whenTrue));
+        return new(ResourceProgramKind.BooleanDistribution, null, null, default, [whenFalse, whenTrue], distribution: distribution);
     }
 }

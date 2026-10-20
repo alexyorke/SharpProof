@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 38,
+    "protocolVersion": 39,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 51,
+    "compilerArtifactSchemaVersion": 52,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 40,
+    "schemaVersion": 41,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -310,6 +310,7 @@
           "src/SharpProof.Attributes/SharpProofSuppressAttribute.cs",
           "src/SharpProof.Attributes/SharpProofTrustedAttribute.cs",
           "src/SharpProof.Attributes/ZeroAllocationsAttribute.cs",
+          "src/SharpProof.Attributes/ResourceBooleanInputAttribute.cs",
           "src/SharpProof.Attributes/ResourceUpperBoundAttribute.cs",
           "src/SharpProof.Attributes/SharpProofEffect.cs",
           "src/SharpProof.Attributes/SharpProofCapability.cs"
@@ -390,6 +391,7 @@
           "src/SharpProof.Ir/ResourceMemoryTrace.cs",
           "src/SharpProof.Ir/ResourceMemoryProgram.cs",
           "src/SharpProof.Ir/ResourceMemoryReplay.cs",
+          "src/SharpProof.Ir/ResourceBooleanDistribution.cs",
           "src/SharpProof.Ir/ResourceProgram.cs",
           "src/SharpProof.Ir/ResourceMetadataReference.cs"
         ]
@@ -416,6 +418,7 @@
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Loops.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Accounting.cs",
+          "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.InputModel.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Calls.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Allocations.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Recursion.cs",
@@ -750,6 +753,7 @@
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
           "src/SharpProof.Worker/NativeResourceStackVerifier.cs",
           "src/SharpProof.Worker/NativeResourceAccountingVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceExpectedVerifier.cs",
           "src/SharpProof.Worker/NativeResourceAllocationVerifier.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",

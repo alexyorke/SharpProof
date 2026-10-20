@@ -82,6 +82,7 @@ internal static class NativeResourceProgramVerifier
                 return new(ResourceExpression.Zero, ResourceExpression.One, length);
             case ResourceProgramKind.Sequence:
             case ResourceProgramKind.Choice:
+            case ResourceProgramKind.BooleanDistribution:
                 var left = Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
                 var right = Visit(program.Children[1], callableId, owner, bindMetadata, cancellation);
                 return program.Kind == ResourceProgramKind.Sequence
@@ -139,6 +140,7 @@ internal static class NativeResourceProgramVerifier
                 return new(ResourceExpression.Zero, ResourceExpression.One, lower);
             case ResourceProgramKind.Sequence:
             case ResourceProgramKind.Choice:
+            case ResourceProgramKind.BooleanDistribution:
                 var left = VisitLower(program.Children[0], cancellation);
                 var right = VisitLower(program.Children[1], cancellation);
                 if (program.Kind == ResourceProgramKind.Sequence)

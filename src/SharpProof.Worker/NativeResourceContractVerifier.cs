@@ -89,6 +89,7 @@ internal static class NativeResourceContractVerifier
                     "resource-memory-program:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(
                         PortableIrGraphCodec.Encode(owner.Program, [], cancellation).Graph))];
                 memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null, memoryUpper);
+                memoryResult.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedMetricUnsupported" };
                 memoryResult.ProofCore = [.. memoryResult.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
                 lifetimeLayout.Project(memoryResult);
                 return memoryResult;
@@ -109,11 +110,13 @@ internal static class NativeResourceContractVerifier
             }
             var layout = new NativeResourceLayoutBinding(target);
             ResourceExpression? bytes = null;
+            ResourceRuntimeLayoutContext? expectedLayout = null;
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
             {
                 var context = layout.Bind();
                 if (context is null)
                 { return Unknown("ResourceLayoutAssumptionsNotBound", WorkerClaimReason.UnsupportedBody); }
+                expectedLayout = context;
                 var allocation = NativeResourceAllocationVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, context, cancellation);
                 if (allocation.ConditionalUpperBound is not { } allocationUpper)
                 { return Unknown(allocation.UnknownReason ?? "ResourceAllocationProofUnavailable", WorkerClaimReason.UnsupportedBody); }
@@ -143,6 +146,13 @@ internal static class NativeResourceContractVerifier
                 result.ResourceBound.Accounting = NativeResourceAccountingVerifier.Evidence(target.ResourceProgram, cancellation);
                 if (result.ResourceBound.Accounting.Length != 0)
                 { result.ProofCore = [.. result.ProofCore, "resource-accounting:" + NativeResourceAccountingVerifier.ModelId]; }
+            }
+            result.ResourceBound.Expected = NativeResourceExpectedVerifier.Project(NativeResourceExpectedVerifier.Verify(
+                target.ResourceProgram, (ResourceCostMetric)constraint.Metric, target.Entry.CallableId, owner, expectedLayout, cancellation));
+            if (result.ResourceBound.Expected.UnknownReason is null)
+            {
+                result.ProofCore = [.. result.ProofCore, "resource-input-model:" + NativeResourceExpectedVerifier.ModelId,
+                "resource-input-record:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(result.ResourceBound.Expected, WorkerProtocolJson.Options))];
             }
             var lower = constraint.Metric switch
             {

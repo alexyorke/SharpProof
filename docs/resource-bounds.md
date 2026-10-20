@@ -649,16 +649,16 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 38 and cache schema 40 invalidate older responses without this evidence.
+Protocol 39 and cache schema 41 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
-to numeric refutations or Unknown claims. Compiler artifact 51, manifest 6,
-resource program/evidence 7 and expression model 1 identify the current certificate.
+to numeric refutations or Unknown claims. Compiler artifact 52, manifest 6,
+resource program/evidence 8 and expression model 1 identify the current certificate.
 
 ### Lower size envelopes
 
-Resource program 7 carries lower array extents and lower loop-rank initial/limit
+Resource program 8 carries lower array extents and lower loop-rank initial/limit
 expressions separately from upper size envelopes. The compiler uses exact input
 sizes outside repeated regions and a conservative zero lower envelope for
 repeated counters. Source-call substitution preserves both envelopes. The native
@@ -701,9 +701,58 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 38 and cache 40 invalidate prior responses; compiler artifact 51 and
-resource program 7 retain their current formats. Cache and SARIF preserve the
+Protocol 39 and cache 41 invalidate prior responses; compiler artifact 52 and
+resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
+
+### Conditional expected upper bounds
+
+A Boolean entry parameter can declare an explicit input model:
+
+```csharp
+[ResourceUpperBound(ResourceMetric.AllocatedElements, 0, nameof(n), 7)]
+public static void Process(int n, [ResourceBooleanInput(1, 3)] bool selected)
+{
+    for (int i = 0; i < n; i++)
+    {
+        if (selected) { var a = new int[7]; }
+        else { var b = new int[2]; }
+    }
+}
+```
+
+The weights declare probability 1/4 for true and 3/4 for false, conditional on
+all other entry inputs. This is a user assumption for each invocation. Source
+branch shape, samples and branch frequencies never supply a distribution.
+Only one modeled Boolean parameter is admitted. Each weight must be an integer
+between zero and one million, with a positive total.
+
+The compiler analyzes both immutable entry valuations. The ordinary upper proof
+retains their maximum; the native worker separately derives the ceiling of
+`(falseWeight * falseUpper + trueWeight * trueUpper) / totalWeight`. The example
+has worst-case element bound 7*n and expected upper bound ceil(13*n/4) for
+nonnegative n. Negative scalar entry sizes remain zero. Ceiling preserves an
+integer upper bound; it does not claim that a fractional expected cost is an
+integer. The individual conditional bounds can themselves be conservative.
+
+The declaration models one entry value reused throughout the invocation. It
+does not assert fresh independent draws at each branch or loop iteration. Direct
+parameter guards, negation and constants permit specialization; other supported
+conditions keep their conservative envelope. Both valuations must be proved,
+including a zero-weight arm. Input mutation, multiple modeled parameters,
+invalid weights and unsupported costs produce Unknown. Nontrivial preconditions
+or call-entry restrictions leave the expected record Unknown unless support of
+the declared distribution is proved. They can retain a valid worst-case proof.
+
+Result JSON, cache and SARIF carry expected model, input identity, weights,
+conditional upper formulas and rounded expected upper formula separately from
+worst-case evidence. Known expected records require the input-model proof marker and a canonical
+record digest binding input identity, weights and conditional/expected formulas.
+Unknown expected records contain only their reason and no partial numeric or
+probability fields. Missing declarations report ResourceInputModelNotDeclared.
+The admitted metrics are loop entries, primitive-array allocations, elements and
+layout-bound cumulative bytes. This upper expectation does not establish an
+expected lower bound, tightness, independence, elapsed time or physical residency.
 
 ### Credit potential accounting
 

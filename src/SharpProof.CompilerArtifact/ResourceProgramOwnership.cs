@@ -14,16 +14,25 @@ internal static class ResourceProgramOwnership
         owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
         cancellation.ThrowIfCancellationRequested();
         ResourceExpressionOwnership.Validate(ResourceExpression.Zero, callableId, owner, cancellation);
-        Visit(program, callableId, owner, cancellation);
+        Visit(program, callableId, owner, true, cancellation);
     }
 
     private static void Visit(ResourceProgram program, string callableId,
-        CompilerTotalCallablePreparation owner, CancellationToken cancellation)
+        CompilerTotalCallablePreparation owner, bool root, CancellationToken cancellation)
     {
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
         owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
         cancellation.ThrowIfCancellationRequested();
+        if (program.Kind == ResourceProgramKind.BooleanDistribution)
+        {
+            if (!root || program.Distribution is not { } distribution || program.Children.Length != 2 || program.RepeatKind != ResourceRepeatKind.Loop ||
+                distribution.Ordinal >= owner.Parameters.Length - (owner.HasReceiver ? 1 : 0) ||
+                owner.Program.Factory.GetTypeInfo(owner.Program.Factory.GetVariableInfo(owner.Parameters[distribution.Ordinal].Entry).Type).Kind != IrTypeKind.Boolean)
+            { throw new InvalidDataException("ResourceInputModelOwnershipInvalid"); }
+        }
+        else if (program.Distribution is not null)
+        { throw new InvalidDataException("ResourceInputModelPayloadInvalid"); }
         if (program.Length is { } length)
         { ResourceExpressionOwnership.Validate(length, callableId, owner, cancellation); }
         if (program.Kind == ResourceProgramKind.AllocateArray ? program.LowerLength is null : program.LowerLength is not null)
@@ -56,6 +65,6 @@ internal static class ResourceProgramOwnership
             ResourceExpressionOwnership.Validate(rank.LowerLimit, callableId, owner, cancellation);
         }
         foreach (var child in program.Children)
-        { Visit(child, callableId, owner, cancellation); }
+        { Visit(child, callableId, owner, false, cancellation); }
     }
 }

@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "38";
+    public const string Current = "39";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 40;
+    public const int Current = 41;
 }
 
 internal static class WorkerManifestVersions
@@ -174,7 +174,7 @@ internal static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 7;
+    public const int Program = 8;
     public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
     public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
     public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
@@ -183,6 +183,7 @@ internal static class WorkerResourceModels
     public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
     public const string NormalDomain = "unbounded-scalar-counter-extension-v1:ideal-primitive-allocation";
     public const string Accounting = "nonnegative-credit-potential-v1:unit-spend";
+    public const string Expected = "entry-bernoulli-boolean-v1:conditional-marginal-upper";
     public const int MaximumAsymptoticDegree = 4096;
 }
 
@@ -266,6 +267,30 @@ internal sealed class WorkerResourceBoundEvidence
     public WorkerResourceAsymptoticEvidence? Asymptotic { get; set; }
     [JsonRequired]
     public WorkerResourceAccountingEvidence[] Accounting { get; set; } = [];
+    [JsonRequired]
+    public WorkerResourceExpectedEvidence? Expected { get; set; }
+}
+
+internal sealed class WorkerResourceExpectedEvidence
+{
+    [JsonRequired]
+    public string Model { get; set; } = WorkerResourceModels.Expected;
+    [JsonRequired]
+    public int? InputOrdinal { get; set; }
+    [JsonRequired]
+    public string? InputName { get; set; }
+    [JsonRequired]
+    public int? TrueWeight { get; set; }
+    [JsonRequired]
+    public int? FalseWeight { get; set; }
+    [JsonRequired]
+    public string? FalseUpperBound { get; set; }
+    [JsonRequired]
+    public string? TrueUpperBound { get; set; }
+    [JsonRequired]
+    public string? UpperBound { get; set; }
+    [JsonRequired]
+    public string? UnknownReason { get; set; }
 }
 
 internal sealed class WorkerResourceAccountingEvidence

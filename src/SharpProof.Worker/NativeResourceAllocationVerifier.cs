@@ -56,6 +56,7 @@ internal static class NativeResourceAllocationVerifier
             case ResourceProgramKind.Sequence:
                 return ResourceExpression.Add(Visit(program.Children[0], layout, cancellation), Visit(program.Children[1], layout, cancellation));
             case ResourceProgramKind.Choice:
+            case ResourceProgramKind.BooleanDistribution:
                 return ResourceExpression.Max(Visit(program.Children[0], layout, cancellation), Visit(program.Children[1], layout, cancellation));
             case ResourceProgramKind.Repeat:
                 var rank = program.Rank ?? throw new InvalidDataException("MalformedResourceProgram");

@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 51;
+    internal const int Current = 52;
 }
 
 internal static class CompilerRelationalSummaryVersions

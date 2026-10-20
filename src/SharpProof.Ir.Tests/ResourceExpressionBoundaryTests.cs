@@ -127,8 +127,8 @@ public sealed class ResourceExpressionBoundaryTests
     public void DetachedProgramRecordsMustHaveInitializedNonNullChildren()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
-        Action missing = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, default(ImmutableArray<ResourceProgram>), null, null, null, null, null]);
-        Action nullChild = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, ImmutableArray<ResourceProgram>.Empty.Add(null!), null, null, null, null, null]);
+        Action missing = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, default(ImmutableArray<ResourceProgram>), null, null, null, null, null, null]);
+        Action nullChild = () => constructor.Invoke([ResourceProgramKind.Sequence, null, null, ResourceRepeatKind.Loop, ImmutableArray<ResourceProgram>.Empty.Add(null!), null, null, null, null, null, null]);
         Assert.That(Assert.Throws<TargetInvocationException>(missing)!.InnerException, Is.TypeOf<ArgumentException>());
         Assert.That(Assert.Throws<TargetInvocationException>(nullChild)!.InnerException, Is.TypeOf<ArgumentException>());
     }

@@ -89,6 +89,27 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+Expected-cost input models are in progress. A parameter-level
+ResourceBooleanInput attribute declares one Boolean marginal using bounded
+integer true/false weights, conditional on the other entry inputs. The compiler
+specializes both immutable entry valuations and retains their maximum as the
+ordinary resource proof. A root-only typed distribution carries both programs;
+the native worker checks ownership, derives both costs and computes the ceiling
+of their weighted expectation. Nontrivial input contracts, unsupported costs,
+invalid models and mutations have explicit Unknown boundaries. Protocol records
+separate expected and worst-case upper bounds and bind declared model evidence.
+Protocol 39, cache 41, compiler artifact 52 and resource program 8 invalidate the
+previous formats. Initial verification passed 39 source, independent weighted-execution,
+malformed-certificate, input-support and cache/SARIF controls, plus all 756 IR
+tests. Quality/API, negative fixtures, layout, the 528-path trusted inventory,
+documentation lint and 727 links passed. Layout verifies 2762 sources, 59
+projects and 151 unchanged pinned common files. Final record-digest controls,
+broader worker/protocol and analyzer regressions, full formatting and package
+workflows are still running. The expected-cost and adversarial-control rows
+remain open until verification finishes.
+
+### Credit-accounting checkpoint
+
 Credit-potential accounting is implemented for the admitted unit-spend model.
 Program 7 adds a typed credit loop
 with initial credit, fixed deposit, width and overflow mode. The native worker
@@ -116,7 +137,9 @@ local links.
 
 Implementation commit f3203c870 was followed by merge e7b781538 of latest fetched
 master cf42dd52d (CI critical-path changes). Draft MR #334 targets this checkpoint.
-Fresh CI is running on e7b781538; documentation CI passed. Coverage qualification
+The later progress commit 0a35263ad passed canonical, package, documentation and
+security CI. All four coverage shards passed, but aggregate qualification failed
+at 4503/4715 changed trusted-code lines (95.50%, 212 gaps). Coverage qualification
 and final CI remain open. The 100% changed trusted-code floor is unchanged.
 
 The completed accounting row covers fixed positive deposits and positive-guard,

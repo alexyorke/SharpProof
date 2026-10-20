@@ -3591,6 +3591,43 @@ public sealed class PackageLayoutSmokeTests
     }
     [TestCase(false)]
     [TestCase(true)]
+    public async Task MainPackagePublishesConditionalExpectedCosts(bool elements)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var metric = elements ? "AllocatedElements" : "LoopBodyEntries";
+        var coefficient = elements ? 7 : 1;
+        var body = elements
+            ? "for(int i=0;i<n;i++) { if(selected) {var a=new int[7];} else {var b=new int[2];} }"
+            : "if(selected) { for(int i=0;i<n;i++) {} }";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n)," + coefficient + ")] public static void Target(int n,[ResourceBooleanInput(1,3)] bool selected) { " + body + " } }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        var expected = bound.GetProperty("expected");
+        JsonAssert.Equal(expected, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Expected);
+        JsonAssert.Equal(expected, "inputName", "selected");
+        Assert.That(expected.GetProperty("trueWeight").GetInt32(), Is.EqualTo(1));
+        Assert.That(expected.GetProperty("falseWeight").GetInt32(), Is.EqualTo(3));
+        Assert.That(expected.GetProperty("unknownReason").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(expected.GetProperty("upperBound").GetString(), Is.Not.EqualTo(bound.GetProperty("inferredUpperBound").GetString()));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("expected"),
+            "upperBound", expected.GetProperty("upperBound").GetString()!);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public async Task MainPackagePublishesCheckedCreditAccounting(bool elements)
     {
         var feed = await PackagedProductFeed.GetAsync();

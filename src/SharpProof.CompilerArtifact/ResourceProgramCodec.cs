@@ -52,6 +52,18 @@ internal static class ResourceProgramCodec
         { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(lowerLength, cancellation)); }
         else
         { writer.WriteNullValue(); }
+        writer.WritePropertyName("distribution");
+        if (program.Distribution is { } distribution)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("ordinal", distribution.Ordinal);
+            writer.WriteString("name", distribution.Name);
+            writer.WriteNumber("trueWeight", distribution.TrueWeight);
+            writer.WriteNumber("falseWeight", distribution.FalseWeight);
+            writer.WriteEndObject();
+        }
+        else
+        { writer.WriteNullValue(); }
         writer.WritePropertyName("credit");
         if (program.Credit is { } credit)
         {
@@ -148,7 +160,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "lowerLength", "credit", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
+        Fields(node, "kind", "length", "lowerLength", "credit", "distribution", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -166,13 +178,26 @@ internal static class ResourceProgramCodec
         var metadataNode = node.GetProperty("metadata");
         var activationNode = node.GetProperty("activation");
         var creditNode = node.GetProperty("credit");
+        var distributionNode = node.GetProperty("distribution");
         if (kind != ResourceProgramKind.AllocateArray && (length.ValueKind != JsonValueKind.Null || lowerLength.ValueKind != JsonValueKind.Null) ||
             kind is not (ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged) && allocationNode.ValueKind != JsonValueKind.Null ||
             kind is not (ResourceProgramKind.Repeat or ResourceProgramKind.CreditLoop) && rank.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.CreditLoop && creditNode.ValueKind != JsonValueKind.Null ||
+            kind != ResourceProgramKind.BooleanDistribution && distributionNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Activation && activationNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
+        if (kind == ResourceProgramKind.BooleanDistribution)
+        {
+            if (depth != 0)
+            { throw new InvalidDataException("A probability model must own the root program."); }
+            Fields(distributionNode, "ordinal", "name", "trueWeight", "falseWeight");
+            var distribution = new ResourceBooleanDistribution(Integer(distributionNode.GetProperty("ordinal")),
+                Text(distributionNode.GetProperty("name")), Integer(distributionNode.GetProperty("trueWeight")),
+                Integer(distributionNode.GetProperty("falseWeight")));
+            return ResourceProgram.WithDistribution(distribution, Read(children[0], depth + 1, ref remaining, cancellation),
+                Read(children[1], depth + 1, ref remaining, cancellation));
+        }
         if (kind == ResourceProgramKind.Activation)
         {
             ResourceActivationShape? shape = null;

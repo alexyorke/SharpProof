@@ -131,7 +131,19 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             return new(null, "MissingBody");
         }
-        var analysis = new ResourceBoundsAnalysis(body.SemanticModel?.Compilation, cancellation);
+        return AnalyzeInputModel(method, body, cancellation);
+    }
+
+    private static Result AnalyzeCase(IMethodSymbol method, IOperation body, CancellationToken cancellation,
+        IParameterSymbol? modeledBoolean = null, bool modeledValue = false)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        var analysis = new ResourceBoundsAnalysis(body.SemanticModel?.Compilation, cancellation)
+        {
+            _modeledBoolean = modeledBoolean,
+            _modeledBooleanValue = modeledValue
+        };
         analysis._activeMethods.Add(method);
         try
         {
@@ -238,6 +250,10 @@ internal sealed partial class ResourceBoundsAnalysis
                 break;
             case IInvocationOperation invocation:
                 result = Call(invocation, depth);
+                break;
+            case IConditionalOperation modeled when !modeled.IsRef && FixedBoolean(modeled.Condition) is { } selected:
+                result = Visit(modeled.Condition, depth + 1).Add(selected ? Visit(modeled.WhenTrue, depth + 1)
+                    : modeled.WhenFalse is { } other ? Visit(other, depth + 1) : Cost.Zero);
                 break;
             case IConditionalOperation conditional when !conditional.IsRef:
                 result = Visit(conditional.Condition, depth + 1).Add(

@@ -7,6 +7,105 @@ namespace SharpProof.Worker.Test;
 internal sealed partial class WorkerTests
 {
     [Test]
+    public async Task CheckedExpectedCostsReachCacheAndSarifAndRejectMalformedRecords()
+    {
+        using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedElements,0,nameof(n),7)] public static void Target(int n,[ResourceBooleanInput(1,3)] bool selected) { " +
+            "for(int i=0;i<n;i++) { if(selected) {var a=new int[7];} else {var b=new int[2];} } } }");
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        bool Valid()
+        {
+            return WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+                second.Manifest, request, second.Summary.Versions).IsValid;
+        }
+        Assert.That(Valid(), Is.True);
+        var claim = second.ClaimResults.Single();
+        var bound = claim.ResourceBound!;
+        var original = bound.Expected!;
+        Assert.That(original.Model, Is.EqualTo(WorkerResourceModels.Expected));
+        Assert.That(original.UnknownReason, Is.Null);
+        Assert.That(original.TrueWeight, Is.EqualTo(1));
+        Assert.That(original.FalseWeight, Is.EqualTo(3));
+        Assert.That(original.InputOrdinal, Is.EqualTo(1));
+        Assert.That(original.InputName, Is.EqualTo("selected"));
+        Assert.That(original.FalseUpperBound, Is.Not.EqualTo(original.TrueUpperBound));
+        Assert.That(original.UpperBound, Is.Not.EqualTo(bound.InferredUpperBound));
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        var expected = row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("expected");
+        Assert.That(expected.GetProperty("upperBound").GetString(), Is.EqualTo(original.UpperBound));
+        Assert.That(expected.GetProperty("model").GetString(), Is.EqualTo(original.Model));
+        var payload = JsonSerializer.SerializeToUtf8Bytes(original, WorkerProtocolJson.Options);
+        var core = claim.ProofCore;
+        for (var mutation = 0; mutation < 21; mutation++)
+        {
+            var evidence = JsonSerializer.Deserialize<WorkerResourceExpectedEvidence>(payload, WorkerProtocolJson.Options)!;
+            bound.Expected = evidence;
+            claim.ProofCore = core;
+            switch (mutation)
+            {
+                case 0:
+                    evidence.Model = "foreign";
+                    break;
+                case 1:
+                    evidence.InputOrdinal = -1;
+                    break;
+                case 2:
+                    evidence.InputName = "";
+                    break;
+                case 3:
+                    evidence.InputName = new string((char)10, 1);
+                    break;
+                case 4:
+                    evidence.TrueWeight = -1;
+                    break;
+                case 5:
+                    evidence.TrueWeight = 0;
+                    evidence.FalseWeight = 0;
+                    break;
+                case 6:
+                    evidence.FalseWeight = 1000001;
+                    break;
+                case 7:
+                    evidence.UpperBound = "";
+                    break;
+                case 8:
+                    evidence.FalseUpperBound = null;
+                    break;
+                case 9:
+                    evidence.TrueUpperBound = new string((char)10, 1);
+                    break;
+                case 10:
+                    evidence.UnknownReason = "unknown";
+                    break;
+                case 11:
+                    claim.ProofCore = [.. core.Where(item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-input-model:", StringComparison.Ordinal))];
+                    break;
+                case 12:
+                    bound.Expected = null;
+                    break;
+                case 13:
+                    evidence.UpperBound = new string('n', 16385);
+                    break;
+                default:
+                    evidence.InputName = new string('n', 257);
+                    break;
+            }
+            Assert.That(Valid(), Is.False, "mutation " + mutation);
+        }
+        bound.Expected = original;
+        claim.ProofCore = core;
+        Assert.That(Valid(), Is.True);
+    }
+
+    [Test]
     public async Task CheckedAccountingReachesValidatedCacheAndSarifAndRejectsMalformedRecords()
     {
         using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
