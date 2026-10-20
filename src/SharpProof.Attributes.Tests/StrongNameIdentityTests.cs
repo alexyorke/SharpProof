@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -20,8 +21,7 @@ internal sealed class StrongNameIdentityTests
         var assembly = typeof(Contract).Assembly;
         var identity = assembly.GetName();
         var image = ReadOriginalSignedAssembly();
-        using var stream = new MemoryStream(image, writable: false);
-        using var pe = new PEReader(stream);
+        using var pe = new PEReader(image);
         var corHeader = pe.PEHeaders.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetAssemblyDefinition();
@@ -40,7 +40,7 @@ internal sealed class StrongNameIdentityTests
     [TestCase(true)]
     public void SignatureVerificationRejectsUnsignedOrModifiedPayload(bool modifyMethodBody)
     {
-        var image = ReadOriginalSignedAssembly();
+        var image = ReadOriginalSignedAssembly().ToArray();
         using var pe = new PEReader(new MemoryStream(image, writable: false));
         var corHeader = pe.PEHeaders.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
         if (modifyMethodBody)
@@ -61,10 +61,10 @@ internal sealed class StrongNameIdentityTests
             Array.Clear(image, FileOffset(pe.PEHeaders, corHeader.StrongNameSignatureDirectory.RelativeVirtualAddress),
                 corHeader.StrongNameSignatureDirectory.Size);
         }
-        Assert.That(VerifySignature(image), Is.False);
+        Assert.That(VerifySignature(image.ToImmutableArray()), Is.False);
     }
 
-    private static byte[] ReadOriginalSignedAssembly()
+    private static ImmutableArray<byte> ReadOriginalSignedAssembly()
     {
         // Coverage instrumentation changes the loaded DLL's signed payload. The
         // resource contains the actual build output captured before instrumentation.
@@ -73,14 +73,16 @@ internal sealed class StrongNameIdentityTests
             throw new InvalidDataException("The original signed Attributes build output was not embedded.");
         using var copy = new MemoryStream();
         stream.CopyTo(copy);
-        return copy.ToArray();
+        return ImmutableArray.Create<byte>(copy.GetBuffer().AsSpan(0, checked((int)copy.Length)));
     }
 
-    private static bool VerifySignature(byte[] image)
+    private static bool VerifySignature(ImmutableArray<byte> image)
     {
-        ArgumentNullException.ThrowIfNull(image);
-        using var stream = new MemoryStream(image, writable: false);
-        using var pe = new PEReader(stream);
+        if (image.IsDefault)
+        {
+            throw new ArgumentNullException(nameof(image));
+        }
+        using var pe = new PEReader(image);
         var headers = pe.PEHeaders;
         var corHeader = headers.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
         var metadata = pe.GetMetadataReader();
@@ -100,7 +102,7 @@ internal sealed class StrongNameIdentityTests
 
         // Strong-name hashing omits header alignment padding and the signature
         // blob. PE checksum/certificate directory fields are hashed as zero.
-        var signedImage = (byte[])image.Clone();
+        var signedImage = image.ToArray();
         Array.Clear(signedImage, headers.PEHeaderStartOffset + 64, 4);
         var directoriesOffset = headers.PEHeaderStartOffset + (headers.PEHeader!.Magic == PEMagic.PE32 ? 96 : 112);
         Array.Clear(signedImage, directoriesOffset + 4 * 8, 8);

@@ -19,8 +19,8 @@ if ([Environment]::Version.Major -lt 10) {
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$packages = @(Get-ChildItem -LiteralPath $source -File |
-        Where-Object Extension -In @('.nupkg', '.snupkg'))
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@(Get-ChildItem -LiteralPath $source -File |
+            Where-Object Extension -In ([Collections.Immutable.ImmutableArray]::Create[string]('.nupkg', '.snupkg'))))
 $identities = Get-SharpProofPackageIdentitySet -Files $packages
 $version = [string]$identities.Version
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path

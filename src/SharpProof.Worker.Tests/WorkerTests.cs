@@ -1860,7 +1860,7 @@ internal sealed partial class WorkerTests
     [Test]
     public async Task PartialMethodDiscoveryUsesOnlyTheImplementation()
     {
-        using var project = TestProject.Create(
+        using var project = TestProject.Create([
             (
                 "Definition.cs",
                 """
@@ -1879,7 +1879,7 @@ internal sealed partial class WorkerTests
                         return value;
                     }
                 }
-                """));
+                """)]);
         var request = project.CreateRequest(cacheEnabled: false);
         var compilation = project.CreateCompilation();
         using var backend = new CountingNativeBackend();
@@ -6316,15 +6316,9 @@ internal sealed partial class WorkerTests
         internal static TestProject Create(string source)
         {
             System.ArgumentNullException.ThrowIfNull(source);
-            return Create(("Subject.cs", source));
+            return Create([("Subject.cs", source)]);
         }
 
-        internal static TestProject Create(
-            params (string FileName, string Source)[] sources)
-        {
-            System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
-            return Create(sources.ToImmutableArray());
-        }
 
         internal static TestProject Create(ImmutableArray<(string FileName, string Source)> sources)
         {

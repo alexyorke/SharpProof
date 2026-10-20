@@ -44,7 +44,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     public DifferentialResult Compare(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> variables)
+        ImmutableDictionary<IrVarId, IrValue> variables)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
         variables = ArgumentNullGuard.NotNull(variables, nameof(variables));
@@ -118,7 +118,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     private bool TryCreateProgram(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
+        ImmutableDictionary<IrVarId, IrValue> values,
         out string program,
         out ImmutableArray<IrVarId> orderedVariables,
         out string reason)

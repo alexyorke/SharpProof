@@ -23,8 +23,10 @@ function Invoke-GovernanceBuild {
     param([string]$Name, [string]$ExpectedDiagnostic = '')
     $buildArguments = @('build', (Join-Path $scratch 'src/SharpProof.Attributes/SharpProof.Attributes.csproj'),
         '--configuration', 'Release', '--no-restore', '--nologo', '-t:Rebuild', '-p:UseSharedCompilation=false')
-    $output = @(& dotnet @buildArguments 2>&1)
+    $outputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & dotnet @buildArguments 2>&1 | ForEach-Object { $outputBuilder.Add([string]$_) }
     $exitCode = $LASTEXITCODE
+    $output = $outputBuilder.ToImmutable()
     $text = $output -join "`n"
     [IO.File]::WriteAllText((Join-Path $evidence ($Name + '.log')), $text + "`n")
     if ([string]::IsNullOrEmpty($ExpectedDiagnostic)) {
@@ -36,7 +38,7 @@ function Invoke-GovernanceBuild {
     if ($text -match ': error (?!RS\d{4}:)[A-Z]+\d+:') {
         throw "The '$Name' control encountered a separate compiler, restore, or MSBuild error; see $evidence."
     }
-    $receipts.Add([ordered]@{ name = $Name; exitCode = $exitCode; expectedDiagnostic = $ExpectedDiagnostic })
+    $receipts.Add(([ordered]@{ name = $Name; exitCode = $exitCode; expectedDiagnostic = $ExpectedDiagnostic }).AsReadOnly())
     Write-Host "Public API governance: $Name passed (expected diagnostic: '$ExpectedDiagnostic')."
 }
 
@@ -49,8 +51,10 @@ try {
     if ((Get-Item -LiteralPath $patch).Length -gt 0) {
         Invoke-CheckedGit @('-C', $scratch, 'apply', '--binary', '--whitespace=nowarn', $patch)
     }
-    $untracked = @(& git -C $repository ls-files --others --exclude-standard -z)
+    $untrackedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & git -C $repository ls-files --others --exclude-standard -z | ForEach-Object { $untrackedBuilder.Add([string]$_) }
     if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate untracked source inputs.' }
+    $untracked = $untrackedBuilder.ToImmutable()
     foreach ($relative in (($untracked -join "`n") -split [char]0)) {
         if ([string]::IsNullOrEmpty($relative)) { continue }
         $source = [IO.Path]::GetFullPath((Join-Path $repository $relative))
@@ -65,15 +69,18 @@ try {
     $env:SHARPPROOF_REPO_ROOT = $scratch
     Push-Location $scratch
     try {
-        $restore = @(& dotnet restore src/SharpProof.Attributes/SharpProof.Attributes.csproj --locked-mode --nologo 2>&1)
-        if ($LASTEXITCODE -ne 0) {
+        $restoreBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        & dotnet restore src/SharpProof.Attributes/SharpProof.Attributes.csproj --locked-mode --nologo 2>&1 | ForEach-Object { $restoreBuilder.Add([string]$_) }
+        $restoreExitCode = $LASTEXITCODE
+        $restore = $restoreBuilder.ToImmutable()
+        if ($restoreExitCode -ne 0) {
             [IO.File]::WriteAllLines((Join-Path $evidence 'restore.log'), [string[]]$restore)
             throw "The isolated restore failed; see $evidence."
         }
         Invoke-GovernanceBuild 'baseline'
-        $apiFiles = @('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
-                Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
-            })
+        $apiFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
+                    Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
+                }))
         $apiContentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[byte[]]()
         foreach ($file in $apiFiles) { $apiContentBuilder.Add([IO.File]::ReadAllBytes($file)) }
         $apiContents = $apiContentBuilder.ToImmutable()
@@ -96,7 +103,7 @@ try {
         }
         finally {
             [IO.File]::WriteAllBytes($project, $projectContents)
-            for ($index = 0; $index -lt $apiFiles.Count; $index++) {
+            for ($index = 0; $index -lt $apiFiles.Length; $index++) {
                 [IO.File]::WriteAllBytes($apiFiles[$index], $apiContents[$index])
             }
         }
@@ -109,7 +116,7 @@ try {
         finally { [IO.File]::WriteAllBytes($nullableSource, $nullableContents) }
         Invoke-GovernanceBuild 'restored'
         $receiptSnapshot = $receipts.ToImmutable()
-        [ordered]@{ schemaVersion = 1; controls = @($receiptSnapshot) } | ConvertTo-Json -Depth 4 |
+        ([ordered]@{ schemaVersion = 1; controls = $receiptSnapshot }).AsReadOnly() | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath (Join-Path $evidence 'controls.json') -Encoding utf8NoBOM
     }
     finally { Pop-Location }

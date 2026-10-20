@@ -137,7 +137,7 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(mode);
         using var directory = new TempDirectory("sharpproof-native-metadata-invalid-");
         var path = Path.Combine(directory.FullName, "MetadataTarget.dll");
-        File.WriteAllBytes(path, MetadataClosedAttributeEvidenceTests.CreateImage(mode));
+        File.WriteAllBytes(path, MetadataClosedAttributeEvidenceTests.CreateImage(mode).AsSpan());
         var compilation = CSharpCompilation.Create("MalformedShadowCaller",
             [CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int value) => MetadataTarget.Read(value, value); }",
                 path: "Subject.cs")],

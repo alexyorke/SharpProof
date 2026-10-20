@@ -67,9 +67,9 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
             try
             {
                 var type = context.LoadFromStream(image).GetType("C")!;
-                object?[] arguments = [0, 0, null, new string('x', length)];
-                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                ImmutableArray<object?> arguments = [0, 0, null, new string('x', length)];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
                 Assert.That(result, Is.EqualTo(length));
                 Assert.That(type.GetMethod("Post")!.Invoke(null, [result, 0, 0, 0, 0]), Is.EqualTo(valid));
             }
@@ -111,9 +111,9 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [0, 0, null, "a"];
-            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [0, 0, null, "a"];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
             Assert.That(result, Is.EqualTo(0));
             var state = type.GetField("State")!.GetValue(null);
             Assert.That(state, Is.EqualTo(1));
@@ -194,9 +194,9 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
                 var type = context.LoadFromStream(image).GetType("C")!;
                 var x = useY ? 0 : literal;
                 var y = useY ? literal : 0;
-                object?[] arguments = [x, y, null, null];
-                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                ImmutableArray<object?> arguments = [x, y, null, null];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
                 Assert.That(result, Is.EqualTo(literal));
                 object?[] postArguments = [result, x, y, 0, 0];
                 Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(valid));
@@ -239,9 +239,9 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
         try
         {
             var type = context.LoadFromStream(image).GetType("C")!;
-            object?[] arguments = [7, 0, null, null];
-            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
-            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            ImmutableArray<object?> arguments = [7, 0, null, null];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments.ToArray()), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments.ToArray());
             Assert.That(result, Is.EqualTo(7));
             object?[] postArguments = [result, 7, 0, 0, 0];
             Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(false));

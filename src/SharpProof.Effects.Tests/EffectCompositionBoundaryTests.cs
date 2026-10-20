@@ -7,8 +7,8 @@ public sealed class EffectCompositionBoundaryTests
     [Test]
     public void CallRemappingPreservesDistinctReadAndWriteOwnersAndAmbientEffects()
     {
-        var reads = EffectRegionSet.Create(EffectRegionId.Receiver, EffectRegionId.Parameter(0), EffectRegionId.Ambient);
-        var writes = EffectRegionSet.Create(EffectRegionId.Receiver, EffectRegionId.Parameter(1), EffectRegionId.Static());
+        var reads = EffectRegionSet.Create([EffectRegionId.Receiver, EffectRegionId.Parameter(0), EffectRegionId.Ambient]);
+        var writes = EffectRegionSet.Create([EffectRegionId.Receiver, EffectRegionId.Parameter(1), EffectRegionId.Static()]);
         var source = EffectSummaryOperations.Join(EffectSummaryOperations.Read(reads),
             EffectSummaryOperations.Write(writes), EffectSummaryOperations.Capability(EffectCapabilityKind.IO));
         var mapped = EffectSummaryOperations.Remap(source, EffectRegionSet.Create(EffectRegionId.Captured(3)),

@@ -33,8 +33,8 @@ public sealed class TypedWidthLongFuzzTests
     [Test]
     public async Task GeneratedWidthClaimsAgreeWithClrWitnesses()
     {
-        var core = Cases().ToArray();
-        var variableShifts = core.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.ExceptionClaim)).ToArray();
+        var core = Cases().ToImmutableArray();
+        var variableShifts = core.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.ExceptionClaim)).ToImmutableArray();
         var session = new LongFuzzSession(Harness, harnessIndex: 3, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
@@ -239,12 +239,15 @@ public sealed class TypedWidthLongFuzzTests
         { yield return item; }
     }
 
-    private static GeneratedCase SeedCase(GeneratedCase[] core, GeneratedCase[] variableShifts, int seed)
+    private static GeneratedCase SeedCase(ImmutableArray<GeneratedCase> core, ImmutableArray<GeneratedCase> variableShifts, int seed)
     {
         // Every 302 consecutive seeds cover the 167 pinned edge/cast shapes
         // and 135 distinct shift-count variants. The latter retain the same
         // low count bits while exercising both signs and high count bits.
-        System.ArgumentNullException.ThrowIfNull(variableShifts, nameof(variableShifts));
+        if (variableShifts.IsDefault)
+        { throw new ArgumentNullException(nameof(variableShifts)); }
+        if (core.IsDefault)
+        { throw new ArgumentNullException(nameof(core)); }
         var index = (int)((uint)seed % (uint)(core.Length + variableShifts.Length));
         if (index < core.Length)
         { return core[index]; }

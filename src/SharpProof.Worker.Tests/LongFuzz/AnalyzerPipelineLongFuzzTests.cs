@@ -610,13 +610,13 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     continue;
                 }
                 inputs++;
-                object?[] args = [x, y, a?.ToArray(), s];
+                ImmutableArray<object?> args = [x, y, a?.ToArray(), s];
                 object? result = null;
                 Exception? thrown = null;
                 Reset();
                 try
                 {
-                    result = target.Invoke(null, args);
+                    result = target.Invoke(null, args.ToArray());
                 }
                 catch (TargetInvocationException exception)
                 {
@@ -690,11 +690,13 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
         }
 
-        private static string? Check(string mode, Exception? thrown, object? result, object?[] args, int[]? original, string input,
+        private static string? Check(string mode, Exception? thrown, object? result, ImmutableArray<object?> args, int[]? original, string input,
             int state, int other, int stateWrites, Func<long> measure, MethodInfo post, int x, int y)
         {
             System.ArgumentNullException.ThrowIfNull(input);
             System.ArgumentNullException.ThrowIfNull(measure);
+            if (args.IsDefault)
+            { throw new ArgumentNullException(nameof(args)); }
             switch (mode)
             {
                 case ContractClaimProgramGenerator.DoesNotThrow:
