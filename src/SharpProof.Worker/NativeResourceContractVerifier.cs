@@ -61,6 +61,8 @@ internal static class NativeResourceContractVerifier
         CompilerEffectClaimArtifactCodec.Validate(claim);
         if (claim.Reason == WorkerClaimReason.UnsupportedContract)
         { return Unknown("UnsupportedResourceContract", WorkerClaimReason.UnsupportedContract); }
+        if (target.ForkJoinProjection != null)
+        { return VerifyTaskJoin(); }
         if (target.Total is not { IsBodyAbstraction: false } owner || !owner.EffectsCompleteAtEntry)
         { return Unknown("ResourceEntryUnavailable", WorkerClaimReason.UnsupportedBody); }
         if (!owner.ValidEffectClaimIds.Contains(claim.ClaimId))
@@ -198,6 +200,44 @@ internal static class NativeResourceContractVerifier
         }
         catch (InvalidDataException) { return Unknown("MalformedResourceEvidence", WorkerClaimReason.UnsupportedContract); }
         catch (ResourceExpressionLimitException) { return Unknown("ResourceProofBudgetExceeded", WorkerClaimReason.ResourceLimit); }
+
+        WorkerClaimResult VerifyTaskJoin()
+        {
+            if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries)
+            { return Unknown("ForkJoinResourceMetricUnsupported", WorkerClaimReason.UnsupportedBody); }
+            var dependency = NativeResourceTaskBinding.Bind(target, cancellation);
+            if (dependency is null)
+            { return Unknown("ForkJoinRuntimePremiseNotBound", WorkerClaimReason.UnsupportedBody); }
+            try
+            {
+                var projection = target.ForkJoinProjection!;
+                var entry = target.TotalEntry!;
+                var check = NativeForkJoinSourceCostVerifier.Check(projection, entry, cancellation);
+                if (check.Upper is not { } costs)
+                { return Unknown(check.UnknownReason ?? "ForkJoinSourceCostUnproved", WorkerClaimReason.UnsupportedBody); }
+                var limit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, entry, cancellation);
+                if (!ResourceBoundOrder.Proves(costs.LoopEntries, limit, cancellation))
+                { return Unknown("ForkJoinBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
+                var result = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
+                    WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
+                result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target,
+                    new HashSet<string>(StringComparer.Ordinal) { dependency.AssumptionId });
+                result.ProofCore = ["native-resource:" + claim.ClaimId,
+                    "resource-task-model:" + ResourceTaskCatalog.Model,
+                    "resource-task-projection:" + WorkerProtocolJson.ComputeSha256(CompilerForkJoinProjectionCodec.Encode(projection, entry, cancellation)),
+                    "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
+                result.ResourceBound = Evidence(costs.LoopEntries.ToDisplayString(), null, costs.LoopEntries);
+                result.ResourceBound.ExecutionScope = WorkerResourceModels.TaskJoinScope;
+                result.ResourceBound.MetadataAssumptions = [dependency];
+                result.ResourceBound.Asymptotic!.Lower = new() { UnknownReason = "ResourceLowerTaskDomainUnproved" };
+                result.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedTaskModelUnsupported" };
+                return result;
+            }
+            catch (ResourceExpressionLimitException)
+            { return Unknown("ForkJoinResourceBudgetExceeded", WorkerClaimReason.ResourceLimit); }
+            catch (InvalidDataException)
+            { return Unknown("ForkJoinDeclaredBoundInvalid", WorkerClaimReason.UnsupportedContract); }
+        }
 
         WorkerResourceBoundEvidence Evidence(string? inferred, string? reason, ResourceExpression? upper = null)
         {

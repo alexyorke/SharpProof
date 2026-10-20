@@ -11,6 +11,17 @@ internal static class ResourceExpressionCodec
 {
     internal const int MaximumPayloadBytes = 1024 * 1024;
     internal static ResourceExpression DecodeForCallable(byte[] payload, string callableId,
+        CompilerTotalEntryPreparation preparation, CancellationToken cancellation)
+    {
+        payload = ArgumentNullGuard.NotNull(payload, nameof(payload));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        var expression = Decode(payload, cancellation);
+        ResourceExpressionOwnership.Validate(expression, callableId, preparation, cancellation);
+        return expression;
+    }
+
+    internal static ResourceExpression DecodeForCallable(byte[] payload, string callableId,
         CompilerTotalCallablePreparation preparation, CancellationToken cancellation)
     {
         payload = ArgumentNullGuard.NotNull(payload, nameof(payload));

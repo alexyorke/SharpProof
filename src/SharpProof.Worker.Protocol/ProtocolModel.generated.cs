@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "39";
+    public const string Current = "40";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 49;
+    public const int Current = 50;
 }
 
 internal static class WorkerManifestVersions
@@ -172,6 +172,9 @@ internal enum WorkerResourceMetric
 
 internal static class WorkerResourceModels
 {
+    public const string CallableScope = "callable-source";
+    public const string TaskJoinScope = "joined-isolated-source-callbacks";
+    public const string TaskJoinModel = "task-join-source-at-most-once-v1";
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
     public const int Program = 8;
@@ -243,6 +246,8 @@ internal sealed class WorkerResourceLowerAsymptoticEvidence
 
 internal sealed class WorkerResourceBoundEvidence
 {
+    [JsonRequired]
+    public string ExecutionScope { get; set; } = WorkerResourceModels.CallableScope;
     [JsonRequired]
     public WorkerResourceMetric Metric { get; set; }
     [JsonRequired]

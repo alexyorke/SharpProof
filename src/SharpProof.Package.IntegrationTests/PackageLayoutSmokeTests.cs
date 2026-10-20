@@ -3590,7 +3590,7 @@ public sealed class PackageLayoutSmokeTests
         }
     }
     [Test]
-    public async Task MainPackageTransportsTaskChildrenWhileRootModelIsUnavailable()
+    public async Task MainPackagePreservesUnprovedTaskBoundAsUnknown()
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
@@ -3608,6 +3608,40 @@ public sealed class PackageLayoutSmokeTests
         var bound = claim.GetProperty("resourceBound");
         Assert.That(bound.GetProperty("unknownReason").GetString(), Is.Not.Null.And.Not.Empty);
         Assert.That(bound.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [Test]
+    public async Task MainPackagePublishesConditionalTaskSourceScope()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", "joined-isolated-source-callbacks");
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Does.Contain("n"));
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(n)");
+        JsonAssert.Equal(bound.GetProperty("metadataAssumptions")[0], "runtimeModel", "task-join-source-at-most-once-v1");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("joined-isolated-source-callbacks"));
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", "joined-isolated-source-callbacks");
     }
 
     [TestCase(5, false)]

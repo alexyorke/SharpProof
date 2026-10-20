@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 49 invalidate older responses without this evidence.
+Protocol 40 and cache schema 50 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 49 invalidate prior responses; compiler artifact 53 and
+Protocol 40 and cache 50 invalidate prior responses; compiler artifact 53 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -875,8 +875,23 @@ compiler inputs; the deployment must satisfy the declared runtime premise.
 Cancellation-token overloads, asynchronous callbacks, shared mutable captures,
 custom scheduling and unproved child effects remain unsupported.
 
-Task-root claims still return Unknown. This binding is preparation for native
-root scope and metric reporting; publishing task work, async/state-machine costs,
-framework allocations and concurrent live-space bounds remains roadmap work.
-Cache schema 49 identifies the added callable premise; compiler artifact 53 and
-protocol 39 retain their formats.
+For this admitted shape, a native LoopBodyEntries claim can now prove the sum of
+independently checked child loop upper costs. For example, two source children
+with bounds max(0, n) and 3 satisfy a declared bound of 3 + max(0, n). The sum
+covers isolated callback source work per root invocation through join completion,
+including any callback execution prefix. It applies under arbitrary overlap;
+it is neither elapsed time nor a bound on thread-pool/framework loop work.
+
+Every resource result carries a required executionScope field. Ordinary claims
+use callable-source. These task results use joined-isolated-source-callbacks,
+carry the bound runtime dependency and hash the owned child projection. JSON,
+cache and SARIF preserve the scope; SARIF also names it in the result message.
+Strict policy rejects the trusted runtime dependency; advisory policy can report
+the conditional proof. Captured inputs do not detect deployment compatibility.
+
+Unproved comparisons remain Unknown, with no exact violation inferred from an
+upper sum. Task allocation, byte, lifetime and stack metrics remain Unknown until
+framework and compiler-generated storage is modeled. Task lower, tight, expected
+and amortized results remain unavailable. Async/state-machine costs and concurrent
+live-space models remain roadmap work. Protocol 40 and cache 50 identify the
+required execution scope; compiler artifact 53 retains its format.

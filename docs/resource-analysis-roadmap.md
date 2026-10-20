@@ -100,8 +100,11 @@ package shard, and all non-coverage workflows. Aggregate enforcement measured
 5140/5390 changed trusted lines (95.36%, 250 gaps), failing the unchanged 100%
 floor. This supersedes the older a9f759896 measurement (4978/5213, 235 gaps).
 The report and gap inventory are preserved locally. No floor or exclusion was
-changed. The aab335ab9 transport checkpoint has fresh exact-head CI running;
-its documentation and security checks have passed.
+changed. The aab335ab9 coverage run reached a test failure before aggregation:
+one compiler-driver assertion and two artifact golden files still expected schema 52.
+The current source updates those expectations to artifact schema 53 and reruns
+the compiler-driver and golden-worker gates. This failed run produced no newer
+aggregate coverage measurement.
 
 ### Quantitative-memory feature audit
 
@@ -127,6 +130,34 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Native task-root loop results
+
+Publish the independently checked sum of isolated callback loop-body entries for
+admitted joined task roots under the bound at-most-once runtime premise. Evidence
+must state the joined-callback execution scope explicitly, including callback work
+through join completion. Decode declared limits against the owned entry bindings
+without constructing a fictitious functional body. Keep unproved comparisons,
+unbound premises, invalid children and all remaining task metrics Unknown, with
+no partial sums or invented exact/lower/expected/tight bounds. Validate execution
+scope, dependency and projection records through protocol, cache, SARIF and real
+package consumers. Protocol 40 and cache 50 identify the required scope field;
+compiler artifact 53 and manifest 6 retain their formats.
+The initial focused gate passed 17 cases, including independent concurrent loop
+counts and a validated cache/SARIF consumer with scope-corruption controls.
+The broader worker/resource/protocol gate passed 869 tests, and all 1468 analyzer
+tests passed after correcting a stale protocol-39 assertion. Both real package
+cases passed, including strict rejection of the trusted premise, advisory JSON
+and SARIF scope/growth evidence, and an unproved task bound that stays Unknown.
+The package retry passed after its initial restore exited with code 139 before
+tests. All 83 compiler-driver and golden-worker cases passed after updating the
+artifact-53 expectations. Quality/API compatibility, documentation lint and layout
+passed (2785 sources, 59 projects, 151 pinned common files; 537 trusted paths).
+Final scope controls reject stripped metadata with relabeled scope and duplicate
+model records. Their final targeted scope/protocol rerun passed all 133 cases,
+and full repository formatting passed. All local checks for this checkpoint are
+complete. Fresh exact-head CI, the unchanged 100% changed-TCB coverage gate, the
+remaining phase F features and the final audit remain required.
 
 ### Task runtime premise binding
 

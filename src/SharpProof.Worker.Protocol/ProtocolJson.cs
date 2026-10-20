@@ -758,7 +758,7 @@ internal static partial class WorkerProtocolJson
         if (value.Outcome == WorkerClaimOutcome.Proven && value.Vacuity == WorkerVacuityKind.None
             ? !HasValidResourceAsymptotic(evidence.Asymptotic) || !HasValidResourceLowerAsymptotic(evidence.Asymptotic?.Lower, evidence.Asymptotic) : evidence.Asymptotic is not null)
         { return false; }
-        if (!HasValidResourceMetadata(claim!, value, evidence))
+        if (!HasValidResourceMetadata(claim!, value, evidence) || !HasValidResourceScope(value, evidence))
         { return false; }
         if (!HasValidResourceExpected(value, evidence.Expected))
         { return false; }
@@ -774,6 +774,28 @@ internal static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceScope(WorkerClaimResult result, WorkerResourceBoundEvidence evidence)
+    {
+        result = ArgumentNullGuard.NotNull(result, nameof(result));
+        evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
+        var dependencies = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
+            dependency.RuntimeModel == WorkerResourceModels.TaskJoinModel).ToArray();
+        if (evidence.ExecutionScope == WorkerResourceModels.CallableScope)
+        {
+            return dependencies.Length == 0 && result.ProofCore?.Any(static item => item is not null &&
+                (item.StartsWith("resource-task-model:", StringComparison.Ordinal) || item.StartsWith("resource-task-projection:", StringComparison.Ordinal))) != true;
+        }
+        if (evidence.ExecutionScope != WorkerResourceModels.TaskJoinScope || result.Outcome != WorkerClaimOutcome.Proven ||
+            evidence.Metric != WorkerResourceMetric.LoopBodyEntries || dependencies.Length != 1 || dependencies[0].WitnessIdentifier != "bcl.task.run-action.when-all-array" ||
+            evidence.Asymptotic?.Lower?.UnknownReason is null || evidence.Accounting is not { Length: 0 } ||
+            evidence.Expected?.UnknownReason is null || result.ProofCore is null ||
+            result.ProofCore.Count(static item => item is not null && item == "resource-task-model:" + WorkerResourceModels.TaskJoinModel) != 1)
+        { return false; }
+        const string prefix = "resource-task-projection:";
+        var projections = result.ProofCore.Where(static item => item is not null && item.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+        return projections.Length == 1 && IsSha256(projections[0].Substring(prefix.Length));
+    }
+
     private static bool HasValidResourceExpected(WorkerClaimResult result, WorkerResourceExpectedEvidence? evidence)
     {
         result = ArgumentNullGuard.NotNull(result, nameof(result));
