@@ -6,6 +6,88 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class WorkerTests
 {
+    [Test]
+    public async Task CheckedAccountingReachesValidatedCacheAndSarifAndRejectsMalformedRecords()
+    {
+        using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,0,nameof(n),2)] public static void Target(int n,bool flush) { " +
+            "int credit=0; for(int i=0;i<n;i++) { credit++; if(flush) { while(credit>0) {credit--;} } } } }");
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+            second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
+        var claim = second.ClaimResults.Single();
+        var bound = claim.ResourceBound!;
+        Assert.That(bound.Accounting, Has.Length.EqualTo(1));
+        var original = bound.Accounting[0];
+        Assert.That(original.MaximumSpend, Is.EqualTo("max(0, n)"));
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        var accounting = row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("accounting")[0];
+        Assert.That(accounting.GetProperty("model").GetString(), Is.EqualTo(WorkerResourceModels.Accounting));
+        Assert.That(accounting.GetProperty("maximumSpend").GetString(), Is.EqualTo("max(0, n)"));
+        var payload = JsonSerializer.SerializeToUtf8Bytes(original, WorkerProtocolJson.Options);
+        var core = claim.ProofCore;
+        for (var mutation = 0; mutation < 13; mutation++)
+        {
+            var evidence = JsonSerializer.Deserialize<WorkerResourceAccountingEvidence>(payload, WorkerProtocolJson.Options)!;
+            bound.Accounting = [evidence];
+            claim.ProofCore = core;
+            switch (mutation)
+            {
+                case 0:
+                    evidence.Model = "foreign";
+                    break;
+                case 1:
+                    evidence.InitialCredit = "-1";
+                    break;
+                case 2:
+                    evidence.InitialCredit = "00";
+                    break;
+                case 3:
+                    evidence.DepositPerIteration = "0";
+                    break;
+                case 4:
+                    evidence.DepositPerIteration = "x";
+                    break;
+                case 5:
+                    evidence.CounterWidth = 16;
+                    break;
+                case 6:
+                    evidence.InitialCredit = "2147483648";
+                    break;
+                case 7:
+                    evidence.MaximumSpend = "";
+                    break;
+                case 8:
+                    evidence.MaximumSpend = new string((char)10, 1);
+                    break;
+                case 9:
+                    evidence.MaximumSpend = new string('n', 16385);
+                    break;
+                case 10:
+                    bound.Accounting = [];
+                    break;
+                case 11:
+                    bound.Accounting = Enumerable.Repeat(evidence, 17).ToArray();
+                    break;
+                default:
+                    claim.ProofCore = [];
+                    break;
+            }
+            Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False, "mutation " + mutation);
+        }
+        claim.ProofCore = core;
+        bound.Accounting = [original];
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task NativeLowerGrowthReachesValidatedCacheAndSarifWithoutInventingTightness(bool dependent)

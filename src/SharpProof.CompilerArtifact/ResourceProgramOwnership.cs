@@ -28,6 +28,10 @@ internal static class ResourceProgramOwnership
         { ResourceExpressionOwnership.Validate(length, callableId, owner, cancellation); }
         if (program.Kind == ResourceProgramKind.AllocateArray ? program.LowerLength is null : program.LowerLength is not null)
         { throw new InvalidDataException("MalformedResourceLowerExtent"); }
+        if (program.Kind == ResourceProgramKind.CreditLoop
+            ? program.Credit is null || program.Rank is null || program.Children.Length != 2 || program.RepeatKind != ResourceRepeatKind.Loop
+            : program.Credit is not null)
+        { throw new InvalidDataException("MalformedResourceCredit"); }
         if (program.LowerLength is { } lowerLength)
         { ResourceExpressionOwnership.Validate(lowerLength, callableId, owner, cancellation); }
         if (program.Kind is ResourceProgramKind.Activation or ResourceProgramKind.UpperEnvelope && program.Children.Length != 1 ||

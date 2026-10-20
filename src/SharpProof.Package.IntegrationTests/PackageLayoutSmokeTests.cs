@@ -3589,6 +3589,37 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackagePublishesCheckedCreditAccounting(bool elements)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var metric = elements ? "AllocatedElements" : "LoopBodyEntries";
+        var spending = elements ? "var a=new int[2];" : "";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n),2)] public static void Target(int n,bool flush) { " +
+            "int credit=0; for(int i=0;i<n;i++) { credit++; if(flush) { while(credit>0) { " + spending + " credit--; } } } } }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var accounting = claim.GetProperty("resourceBound").GetProperty("accounting").EnumerateArray().Single();
+        JsonAssert.Equal(accounting, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Accounting);
+        JsonAssert.Equal(accounting, "initialCredit", "0");
+        JsonAssert.Equal(accounting, "depositPerIteration", "1");
+        JsonAssert.Equal(accounting, "maximumSpend", "max(0, n)");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("accounting")[0],
+            "maximumSpend", "max(0, n)");
+    }
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

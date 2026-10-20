@@ -760,6 +760,8 @@ internal static partial class WorkerProtocolJson
         { return false; }
         if (!HasValidResourceMetadata(claim!, value, evidence))
         { return false; }
+        if (!HasValidResourceAccounting(value, evidence.Accounting))
+        { return false; }
         return value.Outcome switch
         {
             WorkerClaimOutcome.Proven => evidence.ObservedLowerBound is null && evidence.EvaluatedUpperBound is null && evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
@@ -770,6 +772,29 @@ internal static partial class WorkerProtocolJson
             _ => false
         };
     }
+    private static bool HasValidResourceAccounting(WorkerClaimResult result, WorkerResourceAccountingEvidence[]? rows)
+    {
+        result = ArgumentNullGuard.NotNull(result, nameof(result));
+        if (rows is null || rows.Length > 16 ||
+            (result.Outcome != WorkerClaimOutcome.Proven || result.Vacuity != WorkerVacuityKind.None) && rows.Length != 0)
+        { return false; }
+        var core = result.ProofCore?.Contains("resource-accounting:" + WorkerResourceModels.Accounting, StringComparer.Ordinal) == true;
+        if (core != (rows.Length != 0))
+        { return false; }
+        foreach (var row in rows)
+        {
+            if (row is null || row.Model != WorkerResourceModels.Accounting || row.CounterWidth is not (32 or 64) ||
+                !long.TryParse(row.InitialCredit, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var initial) ||
+                initial.ToString(System.Globalization.CultureInfo.InvariantCulture) != row.InitialCredit ||
+                !long.TryParse(row.DepositPerIteration, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var deposit) || deposit <= 0 ||
+                deposit.ToString(System.Globalization.CultureInfo.InvariantCulture) != row.DepositPerIteration ||
+                row.CounterWidth == 32 && (initial > int.MaxValue || deposit > int.MaxValue) ||
+                string.IsNullOrWhiteSpace(row.MaximumSpend) || row.MaximumSpend.Length > 16384 || row.MaximumSpend.Any(static character => char.IsControl(character)))
+            { return false; }
+        }
+        return true;
+    }
+
     private static bool HasValidResourceLowerAsymptotic(WorkerResourceLowerAsymptoticEvidence? evidence, WorkerResourceAsymptoticEvidence? upper)
     {
         if (evidence is null || upper is null || evidence.Model != WorkerResourceModels.NormalDomain)

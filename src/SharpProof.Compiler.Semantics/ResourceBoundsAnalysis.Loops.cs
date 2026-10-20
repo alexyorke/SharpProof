@@ -318,9 +318,6 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         else
         { return Unknown("UnprovedLoopProgress"); }
-        _counters.Add(declaration.Symbol, new Bound(envelope.Expression, ResourceExpression.Zero));
-        var body = Visit(loop.Body, depth + 1);
-        _counters.Remove(declaration.Symbol);
         var rankKind = kind switch
         {
             BinaryOperatorKind.Add => ResourceLoopKind.IncreasingAdd,
@@ -330,6 +327,13 @@ internal sealed partial class ResourceBoundsAnalysis
         };
         var rank = new ResourceLoopRank(rankKind, initial.Expression, comparison.Expression, amount,
             declaration.Symbol.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep, initial.Lower, comparison.Lower);
-        return body.Scale(count, rank, ResourceRepeatKind.Loop);
+        _counters.Add(declaration.Symbol, new Bound(envelope.Expression, ResourceExpression.Zero));
+        try
+        {
+            var accounted = CreditLoop(loop.Body, rank, count, depth);
+            return accounted ?? Visit(loop.Body, depth + 1).Scale(count, rank, ResourceRepeatKind.Loop);
+        }
+        finally
+        { _counters.Remove(declaration.Symbol); }
     }
 }

@@ -649,16 +649,16 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 37 and cache schema 39 invalidate older responses without this evidence.
+Protocol 38 and cache schema 40 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
-to numeric refutations or Unknown claims. Compiler artifact 50, manifest 6,
-resource program/evidence 6 and expression model 1 identify the current certificate.
+to numeric refutations or Unknown claims. Compiler artifact 51, manifest 6,
+resource program/evidence 7 and expression model 1 identify the current certificate.
 
 ### Lower size envelopes
 
-Resource program 6 carries lower array extents and lower loop-rank initial/limit
+Resource program 7 carries lower array extents and lower loop-rank initial/limit
 expressions separately from upper size envelopes. The compiler uses exact input
 sizes outside repeated regions and a conservative zero lower envelope for
 repeated counters. Source-call substitution preserves both envelopes. The native
@@ -701,9 +701,33 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 37 and cache 39 invalidate prior responses; compiler artifact 50 and
-resource program 6 retain their current formats. Cache and SARIF preserve the
+Protocol 38 and cache 40 invalidate prior responses; compiler artifact 51 and
+resource program 7 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
+
+### Credit potential accounting
+
+The compiler admits an outer ranked for-loop whose first statement deposits a
+fixed positive amount into a nonnegative local integer credit. Its final
+statement is a guarded unit-decrement while-loop, optionally selected by an if
+without an else. Other credit writes, aliases and unsupported exits are rejected.
+Prefix work and the drain body remain subject to the ordinary closed resource
+rules. The credit is protected from mutation while those regions are analyzed.
+
+The potential is the remaining credit. With initial credit I, outer iteration
+bound N and deposit D, total drain entries are at most I + D*N. The native worker
+derives that bound from the initialization, deposit, integer width and outer rank;
+the artifact does not supply a computed spend bound. Unchecked credit growth must
+stay representable. Checked overflow can stop a prefix but cannot create more
+credit. The outer and drain costs are composed separately for loop entries,
+allocation counts, elements and layout-bound bytes. Stack composition uses the
+maximum sequential activation cost.
+
+The result carries accounting model, initial credit, deposit, width, overflow
+mode and derived maximum spend. Unknown or refuted results carry no partial
+accounting certificate. Conditional drains need not spend every deposited credit;
+an amortized upper bound does not establish a matching allocation lower bound.
+The unit-spend potential rule remains distinct from an expected-cost model.
 
 Intrinsic string lengths are admitted as size inputs and as contract sizes such
 as text.Length. Their identity is bound through the compiler's intrinsic sequence

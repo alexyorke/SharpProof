@@ -61,6 +61,10 @@ internal static class NativeResourceAllocationVerifier
                 var rank = program.Rank ?? throw new InvalidDataException("MalformedResourceProgram");
                 return ResourceExpression.Multiply(NativeResourceProgramVerifier.CheckRank(rank, cancellation),
                     Visit(program.Children[0], layout, cancellation));
+            case ResourceProgramKind.CreditLoop:
+                var budget = NativeResourceAccountingVerifier.Budget(program, cancellation);
+                return ResourceExpression.Add(ResourceExpression.Multiply(NativeResourceProgramVerifier.CheckRank(program.Rank!, cancellation),
+                    Visit(program.Children[0], layout, cancellation)), ResourceExpression.Multiply(budget, Visit(program.Children[1], layout, cancellation)));
             default:
                 throw new InvalidDataException("UnsupportedResourceAllocationSemantics");
         }

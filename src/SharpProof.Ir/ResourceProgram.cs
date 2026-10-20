@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope, CreditLoop }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
 
@@ -55,9 +55,19 @@ internal sealed class ResourceLoopRank
     }
 }
 
+// Each outer entry deposits a fixed positive amount. A guarded unit-step drain
+// spends one credit per continuing entry; no other write may affect the credit.
+internal sealed class ResourceCreditShape(BigInteger initial, BigInteger deposit, int counterWidth, bool checkedDeposit)
+{
+    internal BigInteger Initial { get; } = initial;
+    internal BigInteger Deposit { get; } = deposit;
+    internal int CounterWidth { get; } = counterWidth;
+    internal bool CheckedDeposit { get; } = checkedDeposit;
+}
+
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 6;
+    internal const int ModelVersion = 7;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceExpression? LowerLength { get; }
@@ -65,6 +75,7 @@ internal sealed class ResourceProgram
     internal ResourceMetadataReference? Metadata { get; }
     internal ResourceAllocationShape? Allocation { get; }
     internal ResourceActivationShape? Activation { get; }
+    internal ResourceCreditShape? Credit { get; }
     internal ResourceRepeatKind RepeatKind { get; }
     internal ImmutableArray<ResourceProgram> Children { get; }
     internal int NodeCount { get; }
@@ -74,7 +85,7 @@ internal sealed class ResourceProgram
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
         ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null,
-        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null)
+        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null, ResourceCreditShape? credit = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
@@ -85,9 +96,10 @@ internal sealed class ResourceProgram
         Metadata = metadata;
         Allocation = allocation;
         Activation = activation;
+        Credit = credit;
         RepeatKind = repeatKind;
         Children = children;
-        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (lowerLength?.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount + rank.LowerInitial.NodeCount + rank.LowerLimit.NodeCount);
+        var nodes = 1 + (credit is null ? 0 : 2) + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (lowerLength?.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount + rank.LowerInitial.NodeCount + rank.LowerLimit.NodeCount);
         var depth = 1 + Math.Max(length?.Depth ?? allocation?.Extent.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
         depth = Math.Max(depth, 1 + Math.Max(lowerLength?.Depth ?? 0, rank is null ? 0 : Math.Max(rank.LowerInitial.Depth, rank.LowerLimit.Depth)));
         foreach (var child in children)
@@ -98,7 +110,8 @@ internal sealed class ResourceProgram
             depth = Math.Max(depth, 1 + child.Depth);
         }
         if (nodes > ResourceExpression.MaximumNodes || depth > ResourceExpression.MaximumDepth ||
-            rank is not null && rank.Step.ToByteArray().Length > 8192)
+            rank is not null && rank.Step.ToByteArray().Length > 8192 ||
+            credit is not null && (credit.Initial.ToByteArray().Length > 8192 || credit.Deposit.ToByteArray().Length > 8192))
         { throw new ResourceExpressionLimitException(); }
         NodeCount = nodes;
         Depth = depth;
@@ -170,5 +183,14 @@ internal sealed class ResourceProgram
     {
         body = ArgumentNullGuard.NotNull(body, nameof(body));
         return new(ResourceProgramKind.UpperEnvelope, null, null, default, [body]);
+    }
+
+    internal static ResourceProgram CreditLoop(ResourceLoopRank rank, ResourceCreditShape credit, ResourceProgram prefix, ResourceProgram drain)
+    {
+        rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
+        credit = ArgumentNullGuard.NotNull(credit, nameof(credit));
+        prefix = ArgumentNullGuard.NotNull(prefix, nameof(prefix));
+        drain = ArgumentNullGuard.NotNull(drain, nameof(drain));
+        return new(ResourceProgramKind.CreditLoop, null, rank, default, [prefix, drain], credit: credit);
     }
 }

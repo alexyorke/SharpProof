@@ -51,6 +51,9 @@ internal static class NativeResourceStackVerifier
                     ResourceExpression.Add(FrameBytes(frame), nested.StorageBytes));
             case ResourceProgramKind.Sequence:
             case ResourceProgramKind.Choice:
+            case ResourceProgramKind.CreditLoop:
+                if (program.Kind == ResourceProgramKind.CreditLoop)
+                { _ = NativeResourceAccountingVerifier.Budget(program, cancellation); }
                 var left = Visit(program.Children[0], active, cancellation);
                 var right = Visit(program.Children[1], active, cancellation);
                 return new(ResourceExpression.Max(left.Depth, right.Depth), ResourceExpression.Max(left.StorageBytes, right.StorageBytes));

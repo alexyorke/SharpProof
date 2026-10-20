@@ -42,7 +42,7 @@ internal static class NativeResourceNormalDomain
             if (--remaining < 0)
             { return "ResourceNormalDomainBudgetExceeded"; }
             var region = regions.Pop();
-            if (region.Kind is not (ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.Sequence or ResourceProgramKind.Choice or ResourceProgramKind.Repeat or ResourceProgramKind.Activation) ||
+            if (region.Kind is not (ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.Sequence or ResourceProgramKind.Choice or ResourceProgramKind.Repeat or ResourceProgramKind.Activation or ResourceProgramKind.CreditLoop) ||
                 region.Kind == ResourceProgramKind.Repeat && region.RepeatKind == ResourceRepeatKind.TailRecurrence)
             { return "ResourceNormalDomainRegionUnsupported"; }
             foreach (var child in region.Children)

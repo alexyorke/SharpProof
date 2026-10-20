@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "37";
+    public const string Current = "38";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 39;
+    public const int Current = 40;
 }
 
 internal static class WorkerManifestVersions
@@ -174,7 +174,7 @@ internal static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 6;
+    public const int Program = 7;
     public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
     public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
     public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
@@ -182,6 +182,7 @@ internal static class WorkerResourceModels
     public const int MaximumExpressionBytes = 1024 * 1024;
     public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
     public const string NormalDomain = "unbounded-scalar-counter-extension-v1:ideal-primitive-allocation";
+    public const string Accounting = "nonnegative-credit-potential-v1:unit-spend";
     public const int MaximumAsymptoticDegree = 4096;
 }
 
@@ -263,6 +264,24 @@ internal sealed class WorkerResourceBoundEvidence
     public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; set; } = [];
     [JsonRequired]
     public WorkerResourceAsymptoticEvidence? Asymptotic { get; set; }
+    [JsonRequired]
+    public WorkerResourceAccountingEvidence[] Accounting { get; set; } = [];
+}
+
+internal sealed class WorkerResourceAccountingEvidence
+{
+    [JsonRequired]
+    public string Model { get; set; } = WorkerResourceModels.Accounting;
+    [JsonRequired]
+    public string InitialCredit { get; set; } = string.Empty;
+    [JsonRequired]
+    public string DepositPerIteration { get; set; } = string.Empty;
+    [JsonRequired]
+    public int CounterWidth { get; set; }
+    [JsonRequired]
+    public bool CheckedDeposit { get; set; }
+    [JsonRequired]
+    public string MaximumSpend { get; set; } = string.Empty;
 }
 
 internal sealed class WorkerResourceMetadataAssumption

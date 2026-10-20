@@ -52,6 +52,18 @@ internal static class ResourceProgramCodec
         { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(lowerLength, cancellation)); }
         else
         { writer.WriteNullValue(); }
+        writer.WritePropertyName("credit");
+        if (program.Credit is { } credit)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("initial", credit.Initial.ToString(CultureInfo.InvariantCulture));
+            writer.WriteString("deposit", credit.Deposit.ToString(CultureInfo.InvariantCulture));
+            writer.WriteNumber("width", credit.CounterWidth);
+            writer.WriteBoolean("checked", credit.CheckedDeposit);
+            writer.WriteEndObject();
+        }
+        else
+        { writer.WriteNullValue(); }
         writer.WritePropertyName("activation");
         if (program.Activation is { } activation)
         {
@@ -136,7 +148,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "lowerLength", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
+        Fields(node, "kind", "length", "lowerLength", "credit", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -153,9 +165,11 @@ internal static class ResourceProgramCodec
         var rank = node.GetProperty("rank");
         var metadataNode = node.GetProperty("metadata");
         var activationNode = node.GetProperty("activation");
+        var creditNode = node.GetProperty("credit");
         if (kind != ResourceProgramKind.AllocateArray && (length.ValueKind != JsonValueKind.Null || lowerLength.ValueKind != JsonValueKind.Null) ||
             kind is not (ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged) && allocationNode.ValueKind != JsonValueKind.Null ||
-            kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
+            kind is not (ResourceProgramKind.Repeat or ResourceProgramKind.CreditLoop) && rank.ValueKind != JsonValueKind.Null ||
+            kind != ResourceProgramKind.CreditLoop && creditNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Activation && activationNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
@@ -214,7 +228,7 @@ internal static class ResourceProgramCodec
             { throw new InvalidDataException("Resource allocation shape disagrees with its array program."); }
             return ResourceProgram.TypedArray(allocation, decodedLowerLength);
         }
-        if (kind == ResourceProgramKind.Repeat)
+        if (kind is ResourceProgramKind.Repeat or ResourceProgramKind.CreditLoop)
         {
             Fields(rank, "kind", "initial", "limit", "lowerInitial", "lowerLimit", "step", "width", "checked");
             var rankKind = (ResourceLoopKind)Integer(rank.GetProperty("kind"));
@@ -230,6 +244,22 @@ internal static class ResourceProgramCodec
             var decodedRank = new ResourceLoopRank(rankKind, Expression(rank.GetProperty("initial"), cancellation),
                 Expression(rank.GetProperty("limit"), cancellation), new BigInteger(step), width, checkedNode.GetBoolean(),
                 Expression(rank.GetProperty("lowerInitial"), cancellation), Expression(rank.GetProperty("lowerLimit"), cancellation));
+            if (kind == ResourceProgramKind.CreditLoop)
+            {
+                Fields(creditNode, "initial", "deposit", "width", "checked");
+                var initialText = Text(creditNode.GetProperty("initial"));
+                var depositText = Text(creditNode.GetProperty("deposit"));
+                var overflow = creditNode.GetProperty("checked");
+                if (!long.TryParse(initialText, NumberStyles.None, CultureInfo.InvariantCulture, out var initial) ||
+                    initial.ToString(CultureInfo.InvariantCulture) != initialText ||
+                    !long.TryParse(depositText, NumberStyles.None, CultureInfo.InvariantCulture, out var deposit) || deposit <= 0 ||
+                    deposit.ToString(CultureInfo.InvariantCulture) != depositText ||
+                    overflow.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                { throw new InvalidDataException("Resource credit shape is invalid."); }
+                return ResourceProgram.CreditLoop(decodedRank, new ResourceCreditShape(initial, deposit,
+                    Integer(creditNode.GetProperty("width")), overflow.GetBoolean()),
+                    Read(children[0], depth + 1, ref remaining, cancellation), Read(children[1], depth + 1, ref remaining, cancellation));
+            }
             return ResourceProgram.Repeat(decodedRank, repeat, Read(children[0], depth + 1, ref remaining, cancellation));
         }
         var left = Read(children[0], depth + 1, ref remaining, cancellation);

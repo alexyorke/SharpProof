@@ -138,6 +138,12 @@ internal static class NativeResourceContractVerifier
             if (stackUpper != null)
             { result.ProofCore = [.. result.ProofCore, "resource-stack-model:" + NativeResourceStackVerifier.ModelId]; }
             result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
+            if (stackUpper is null)
+            {
+                result.ResourceBound.Accounting = NativeResourceAccountingVerifier.Evidence(target.ResourceProgram, cancellation);
+                if (result.ResourceBound.Accounting.Length != 0)
+                { result.ProofCore = [.. result.ProofCore, "resource-accounting:" + NativeResourceAccountingVerifier.ModelId]; }
+            }
             var lower = constraint.Metric switch
             {
                 WorkerResourceMetric.LoopBodyEntries => check.LowerCost?.LoopEntries,

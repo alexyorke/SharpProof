@@ -12,6 +12,101 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeResourceProgramTests
 {
+    [TestCase(-1, 1, 32, "ResourceCreditDomainUnproved")]
+    [TestCase(0, 0, 32, "ResourceCreditDomainUnproved")]
+    [TestCase(0, -1, 32, "ResourceCreditDomainUnproved")]
+    [TestCase(0, 1, 16, "MalformedResourceCredit")]
+    [TestCase(2147483648L, 1, 32, "ResourceCreditDomainUnproved")]
+    [TestCase(1, 2147483647L, 32, "ResourceCreditMayOverflow")]
+    public void NativeCreditCertificatesRejectUnprovedDomainsAndWraparound(long initial, long deposit, int width, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var program = ResourceProgram.CreditLoop(Rank(0, 0, 2, 1), new ResourceCreditShape(initial, deposit, width, false), ResourceProgram.Zero, ResourceProgram.Zero);
+        var check = Check(program);
+        Assert.That(check.Verified, Is.False);
+        Assert.That(check.Cost, Is.Null);
+        Assert.That(check.LowerCost, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(expected));
+    }
+
+    [TestCase("missing")]
+    [TestCase("negative")]
+    [TestCase("zero")]
+    [TestCase("noncanonical")]
+    [TestCase("checked")]
+    [TestCase("unrelated")]
+    public void CreditWireRecordsRequireCanonicalCompleteScopedFields(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var program = ResourceProgram.CreditLoop(Rank(0, 0, 2, 1), new ResourceCreditShape(0, 1, 32, false), ResourceProgram.Zero, ResourceProgram.Zero);
+        var root = JsonNode.Parse(ResourceProgramCodec.Encode(program, cancellation))!;
+        var node = root["program"]!.AsObject();
+        var credit = node["credit"]!.AsObject();
+        switch (mutation)
+        {
+            case "missing":
+                credit.Remove("deposit");
+                break;
+            case "negative":
+                credit["initial"] = "-1";
+                break;
+            case "zero":
+                credit["deposit"] = "0";
+                break;
+            case "noncanonical":
+                credit["deposit"] = "01";
+                break;
+            case "checked":
+                credit["checked"] = 1;
+                break;
+            default:
+                node["kind"] = (int)ResourceProgramKind.Choice;
+                node["rank"] = null;
+                break;
+        }
+        Action decode = () => ResourceProgramCodec.Decode(Encoding.UTF8.GetBytes(root.ToJsonString()), cancellation);
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void NativeCreditAccountingMatchesIndependentSpendingSchedules(int schedule)
+    {
+        var program = ResourceProgram.CreditLoop(Rank(0, 0, 10, 1), new ResourceCreditShape(3, 2, 64, false),
+            ResourceProgram.Array(ResourceExpression.Literal(3)), ResourceProgram.Array(ResourceExpression.Literal(2)));
+        var decoded = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, TestContext.CurrentContext.CancellationToken), TestContext.CurrentContext.CancellationToken);
+        var check = Check(decoded);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        var credit = 3;
+        var entries = 0;
+        var arrays = 0;
+        var elements = 0;
+        for (var outer = 0; outer < 10; outer++)
+        {
+            entries++;
+            credit += 2;
+            arrays++;
+            elements += 3;
+            if (schedule == 1 || schedule == 2 && outer % 3 != 0)
+            { continue; }
+            while (credit > 0)
+            {
+                entries++;
+                arrays++;
+                elements += 2;
+                credit--;
+            }
+        }
+        Assert.That(check.Cost!.LoopEntries.Constant, Is.EqualTo(new BigInteger(33)));
+        Assert.That(check.Cost.Arrays.Constant, Is.EqualTo(new BigInteger(33)));
+        Assert.That(check.Cost.Elements.Constant, Is.EqualTo(new BigInteger(76)));
+        Assert.That(new BigInteger(entries), Is.LessThanOrEqualTo(check.Cost.LoopEntries.Constant!.Value));
+        Assert.That(new BigInteger(arrays), Is.LessThanOrEqualTo(check.Cost.Arrays.Constant!.Value));
+        Assert.That(new BigInteger(elements), Is.LessThanOrEqualTo(check.Cost.Elements.Constant!.Value));
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
@@ -427,7 +522,7 @@ public sealed class NativeResourceProgramTests
     public void UnknownDetachedProgramKindsCannotProducePartialCosts()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
-        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null, null, null]);
+        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null, null, null, null]);
         var result = Check(program);
         Assert.That(result.Verified, Is.False);
         Assert.That(result.Cost, Is.Null);

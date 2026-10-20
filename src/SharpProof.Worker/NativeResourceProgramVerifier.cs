@@ -99,6 +99,16 @@ internal static class NativeResourceProgramVerifier
                 var body = Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
                 var entries = program.RepeatKind == ResourceRepeatKind.Loop ? ResourceExpression.Add(ResourceExpression.One, body.LoopEntries) : body.LoopEntries;
                 return new(ResourceExpression.Multiply(count, entries), ResourceExpression.Multiply(count, body.Arrays), ResourceExpression.Multiply(count, body.Elements));
+            case ResourceProgramKind.CreditLoop:
+                var budget = NativeResourceAccountingVerifier.Budget(program, cancellation);
+                var outer = CheckRank(program.Rank!, cancellation);
+                var prefix = Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
+                var drain = Visit(program.Children[1], callableId, owner, bindMetadata, cancellation);
+                return new(ResourceExpression.Add(
+                    ResourceExpression.Multiply(outer, ResourceExpression.Add(ResourceExpression.One, prefix.LoopEntries)),
+                    ResourceExpression.Multiply(budget, ResourceExpression.Add(ResourceExpression.One, drain.LoopEntries))),
+                    ResourceExpression.Add(ResourceExpression.Multiply(outer, prefix.Arrays), ResourceExpression.Multiply(budget, drain.Arrays)),
+                    ResourceExpression.Add(ResourceExpression.Multiply(outer, prefix.Elements), ResourceExpression.Multiply(budget, drain.Elements)));
             default:
                 throw new InvalidDataException("MalformedResourceProgram");
         }
@@ -158,6 +168,9 @@ internal static class NativeResourceProgramVerifier
                 };
                 return new(ResourceExpression.Multiply(count, ResourceExpression.Add(ResourceExpression.One, body.LoopEntries)),
                     ResourceExpression.Multiply(count, body.Arrays), ResourceExpression.Multiply(count, body.Elements));
+            case ResourceProgramKind.CreditLoop:
+                _ = VisitLower(program.Children[1], cancellation);
+                return VisitLower(ResourceProgram.Repeat(program.Rank!, ResourceRepeatKind.Loop, program.Children[0]), cancellation);
             default:
                 throw new InvalidDataException("MalformedResourceProgram");
         }

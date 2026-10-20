@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 37,
+    "protocolVersion": 38,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 50,
+    "compilerArtifactSchemaVersion": 51,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 39,
+    "schemaVersion": 40,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -415,6 +415,7 @@
           "src/SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Loops.cs",
+          "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Accounting.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Calls.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Allocations.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Recursion.cs",
@@ -748,6 +749,7 @@
           "src/SharpProof.Worker/NativeResourceNormalDomain.cs",
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
           "src/SharpProof.Worker/NativeResourceStackVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceAccountingVerifier.cs",
           "src/SharpProof.Worker/NativeResourceAllocationVerifier.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",

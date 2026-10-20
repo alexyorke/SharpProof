@@ -89,6 +89,31 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+Credit-potential accounting is in progress. Program 7 adds a typed credit loop
+with initial credit, fixed deposit, width and overflow mode. The native worker
+checks nonnegative potential and derives the total unit-spend budget from the
+outer rank. Source extraction protects the credit against other writes and
+aliases. Prefix/drain costs compose separately, with explicit Unknown for
+unsupported transitions or unproved wraparound. Accounting evidence is bound to
+the resource-program proof and validated independently in protocol records.
+Protocol 38, cache 40 and compiler artifact 51 invalidate prior formats.
+Verification passed 750 worker/native/protocol/cache/SARIF cases and all 756 IR
+tests. Layout passed 2757 sources, 59 projects and 151 unchanged pinned common
+files; the trusted inventory classifies 524 paths. Quality/API checks, negative
+fixtures, documentation lint and 726 links passed. Package lower/tightness
+controls passed three cases. The two new package accounting cases first exposed
+an incorrect test expectation: the canonical spend formula is max(0, n), which
+preserves zero iterations for negative n. Both expectations were corrected.
+
+Docker Desktop exited before the corrected package rerun, full analyzer run,
+full formatting check and added byte-allocation source control finished. Their
+logs contain no terminal test summaries; they are unverified, not passed. The
+750-case run predates the added byte control. Resume those four checks after
+container tooling is available, then qualify fresh exact-head CI. The accounting
+row remains open until its consumer workflows and broader verification pass.
+
+### Lower/tightness checkpoint
+
 Consumer lower/tightness evidence is implemented and verified for the admitted
 loop-entry, primitive-array-count and element-count model.
 The native normal-domain checker admits nonnegative scalar/counter extensions
@@ -116,7 +141,9 @@ required. No expected-cost or amortized result is implied by Omega/Theta evidenc
 
 The previous foundation checkpoint f0d505b0c passed canonical, package, docs and
 security CI. All four coverage shards passed, but aggregate qualification failed
-at 4081/4265 changed trusted-code lines (95.69%, 184 gaps). The 100% floor remains
+at 4081/4265 changed trusted-code lines (95.69%, 184 gaps). The next published
+469b37ca9 checkpoint also passed all four shards, but aggregate qualification
+failed at 4321/4529 (95.41%, 208 gaps). The 100% floor remains
 unchanged and fresh exact-head CI is required for the consumer extension.
 
 ### Foundation and local-capture checkpoints
