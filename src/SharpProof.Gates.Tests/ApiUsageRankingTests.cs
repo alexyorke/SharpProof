@@ -219,6 +219,13 @@ public sealed class ApiUsageRankingTests
                     ? "partially-modeled" : "unmodeled-dispatch";
             }
 
+            if (CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(symbol))
+            {
+                // Inventory evidence cannot establish dispatch at an arbitrary
+                // corpus receiver. Credit only the guarded contextual model.
+                status = knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch";
+            }
+
             if (model.GetOperation(syntax) is IPropertyReferenceOperation length && CSharpOperationSemantics.IsLength(length))
             { status = "partially-modeled"; }
             var access = "call";
@@ -579,6 +586,35 @@ public sealed class ApiUsageRankingTests
         Assert.That(known.Contains(indexers[4].SpanStart), Is.False);
     }
 
+    [Test]
+    public void HashSetInterfaceUsageRequiresActualReceiverEvidence()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class InterfaceUsageProbe {
+                public static void Target(System.Collections.Generic.ICollection<int> incoming) {
+                    var data = new System.Collections.Generic.HashSet<int>();
+                    System.Collections.Generic.ICollection<int> fresh = data;
+                    fresh.Add(17); _ = fresh.Contains(17); _ = fresh.Remove(17); _ = fresh.Count;
+                    incoming.Add(17); _ = incoming.Contains(17); _ = incoming.Remove(17); _ = incoming.Count;
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var set = compilation.GetTypeByMetadataName("System.Collections.Generic.HashSet`1")!;
+        var collection = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")!;
+        var inventory = set.GetMembers().Concat(collection.GetMembers()).Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+                CSharpOperationSemantics.IsHashSetStateDeclaration(member) || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(member))
+            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
+                static _ => "partially-modeled", StringComparer.Ordinal);
+        var tree = compilation.SyntaxTrees.Single();
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, tree.GetRoot(), "test", "interface", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites, Has.Count.EqualTo(9));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(5));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(4));
+    }
+
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
@@ -618,6 +654,8 @@ public sealed class ApiUsageRankingTests
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null ||
+                    property.Instance != null && CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(property.Property) &&
+                    context.IsDefaultHashSetOrigin(property.Instance) ||
                     property.Instance != null && property.Property.GetMethod is { } getter && DictionaryMember(getter) &&
                     context.IsDefaultDictionaryOrigin(property.Instance) &&
                     property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation) ||

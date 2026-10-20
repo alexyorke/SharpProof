@@ -2,6 +2,16 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsHashSetInterfaceStateDeclaration(ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        var method = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
+        return method != null && IsFrameworkCollectionMember(method) &&
+            symbol.OriginalDefinition.GetDocumentationCommentId() is
+                "M:System.Collections.Generic.ICollection`1.Add(`0)" or "M:System.Collections.Generic.ICollection`1.Contains(`0)" or
+                "M:System.Collections.Generic.ICollection`1.Remove(`0)" or "P:System.Collections.Generic.ICollection`1.Count";
+    }
+
     internal static bool IsHashSetStateDeclaration(ISymbol symbol)
     {
         symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
@@ -16,9 +26,11 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsHashSetStateMember(IMethodSymbol method, ITypeSymbol? knownElement = null)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return IsHashSetStateDeclaration(method.AssociatedSymbol ?? method) && !method.IsStatic && !method.IsVirtual &&
+        var declaration = method.AssociatedSymbol ?? (ISymbol)method;
+        var throughInterface = IsHashSetInterfaceStateDeclaration(declaration);
+        return (throughInterface || IsHashSetStateDeclaration(declaration)) && !method.IsStatic && (!method.IsVirtual || throughInterface) &&
             method.ContainingType is { TypeArguments.Length: 1 } type &&
-            type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.HashSet`1" &&
+            type.OriginalDefinition.GetDocumentationCommentId() == (throughInterface ? "T:System.Collections.Generic.ICollection`1" : "T:System.Collections.Generic.HashSet`1") &&
             (method.MethodKind == MethodKind.Constructor || method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
                 IsHashSetPrimitiveElement(knownElement ?? type.TypeArguments[0]));
     }
@@ -41,8 +53,10 @@ internal sealed partial class TotalLoweringContext
 
     internal static bool IsHashSetReceiverType(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol named && named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.HashSet`1" &&
-            named.GetMembers("Count").Any(CSharpOperationSemantics.IsHashSetStateDeclaration);
+        return type is INamedTypeSymbol named &&
+            named.OriginalDefinition.GetDocumentationCommentId() is "T:System.Collections.Generic.HashSet`1" or "T:System.Collections.Generic.ICollection`1" &&
+            named.GetMembers("Count").Any(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+                CSharpOperationSemantics.IsHashSetStateDeclaration(member) || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(member));
     }
 
     internal void SpecializeHashSetOriginParameter(IParameterSymbol parameter)
