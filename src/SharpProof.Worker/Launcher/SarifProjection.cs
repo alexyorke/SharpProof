@@ -414,7 +414,7 @@ internal static class SarifProjection
         System.ArgumentNullException.ThrowIfNull(path);
         var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
-            '/', StringSplitOptions.RemoveEmptyEntries);
+            '/', StringSplitOptions.RemoveEmptyEntries).ToImmutableArray();
         var reducedSegments = ImmutableArray.CreateBuilder<string>(segments.Length);
         foreach (var segment in segments)
         {

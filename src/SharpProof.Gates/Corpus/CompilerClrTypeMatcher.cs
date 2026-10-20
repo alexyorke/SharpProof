@@ -27,7 +27,7 @@ internal static class CompilerClrTypeMatcher
         for (var current = named; current != null; current = current.ContainingType)
         { arguments = arguments.Push(current); }
         var symbols = arguments.SelectMany(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.TypeArguments)).ToImmutableArray();
-        var types = runtime.GetGenericArguments();
+        var types = runtime.GetGenericArguments().ToImmutableArray();
         return symbols.Length == types.Length && symbols.Select((argument, ordinal) => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Matches(argument, types[ordinal], choice))).All(match => match);
     }
 

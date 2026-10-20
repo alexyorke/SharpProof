@@ -69,7 +69,7 @@ internal static class CorpusSnapshotFormat
         {
             throw new InvalidDataException("Corpus snapshot must be strict UTF-8.", exception);
         }
-        var lines = text.Substring(0, text.Length - 1).Split('\n');
+        var lines = text.Substring(0, text.Length - 1).Split('\n').ToImmutableArray();
         if (lines.Length < Header.Length)
         {
             throw Invalid();
@@ -138,7 +138,7 @@ internal static class CorpusSnapshotFormat
             return false;
         }
 
-        var parts = line!.Split('|');
+        var parts = line!.Split('|').ToImmutableArray();
         if (parts.Length != 4 ||
             !Enum.TryParse<CorpusVerdict>(
                 parts[1],

@@ -734,8 +734,8 @@ internal static class ContractForSymbolMatcher
 
     private static bool DecimalBitsMatch(decimal left, decimal right)
     {
-        var leftBits = decimal.GetBits(left);
-        var rightBits = decimal.GetBits(right);
+        var leftBits = decimal.GetBits(left).ToImmutableArray();
+        var rightBits = decimal.GetBits(right).ToImmutableArray();
         return leftBits[0] == rightBits[0] &&
             leftBits[1] == rightBits[1] &&
             leftBits[2] == rightBits[2] &&

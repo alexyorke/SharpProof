@@ -68,7 +68,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                     (method.ImplAttributes & MethodImplAttributes.Synchronized) != 0 || method.GetDeclarativeSecurityAttributes().Count != 0)
                 { return false; }
                 var body = pe.GetMethodBody(method.RelativeVirtualAddress);
-                var code = body.GetILBytes() ?? Array.Empty<byte>();
+                var code = body.GetILBytes()?.ToImmutableArray() ?? ImmutableArray<byte>.Empty;
                 if (!body.ExceptionRegions.IsEmpty || !body.LocalSignature.IsNil || code.Length is 0 or > 4096 ||
                     code[code.Length - 1] != 0x2a || code.Take(code.Length - 1).Any(opcode => opcode != 0x00))
                 { return false; }
@@ -218,12 +218,12 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         // Reject oversized/unexpected keys before allocating a byte array.
         if (key.Length != expectedKey.Length || hasPublicKey && expectedKey.IsEmpty)
         { return false; }
-        var bytes = key.ReadBytes(key.Length);
+        var bytes = key.ReadBytes(key.Length).ToImmutableArray();
         if (!bytes.SequenceEqual(expectedKey))
         { return false; }
         identity = new(reader.GetString(assembly.Name), assembly.Version,
             assembly.Culture.IsNil ? null : reader.GetString(assembly.Culture),
-            ImmutableArray.CreateRange(bytes), hasPublicKey, isRetargetable, contentType);
+            bytes, hasPublicKey, isRetargetable, contentType);
         return true;
     }
 
