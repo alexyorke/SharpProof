@@ -1,3 +1,4 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
 param([string]$OutputRoot,[string]$RepositoryRoot,[string]$Mode)
 $ErrorActionPreference='Stop'
 $encoding=[Text.UTF8Encoding]::new($false)

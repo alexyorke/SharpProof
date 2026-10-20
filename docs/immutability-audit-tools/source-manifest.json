@@ -3,78 +3,104 @@
     "File": "check-type-reference-authority.ps1.txt",
     "Source": "check-type-reference-authority.ps1",
     "Sha256": "65e49cabdba6db88d0fc3130d498e395d3a4e3057119ce03868a9e22a64c48f1",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "0c4dfe0ff50e5429ea403bee56e5a2e99533c13423e9c02365b8239bcce28e08"
   },
   {
     "File": "check-unit-conservation.ps1.txt",
     "Source": "check-unit-conservation.ps1",
     "Sha256": "d45f2e968da68b2c8ef276ea82d817bf20d577728b8ee6610f51047001d1b398",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "ff266c58b3fccef95ccb006659423ce6f10072a8eaddf3e673753b6ff70aa595"
   },
   {
     "File": "collect.sh.txt",
     "Source": "collect.sh",
     "Sha256": "5d28ea39cf6077743c62d4ca203473eeeefd3971398fee4bd889cc176c95ef71",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "8db48156b617316b47f8cba00dbf40fa488003132c8437024440a94add55800e"
   },
   {
     "File": "ConstAudit.cs.txt",
     "Source": "ConstAudit.cs",
     "Sha256": "32c755ee4482864135ffa09426ed0002c3d8b10c4eb075fddb333ed73e3b8b72",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "348883542ab056af217b180cb3033a105fd9ef347438aaebacaedb00f5fc43bb"
   },
   {
     "File": "ConstAudit.csproj.txt",
     "Source": "ConstAudit.csproj",
     "Sha256": "d456d1c458e243973609bbaba2bd73bc074dd72fce95fe08c5bf4b00dbd095f5",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "64734cd09619140ff769893c8289144ae0903c5fb924d4d7188b6d2d436e227e"
   },
   {
     "File": "ResidualAudit.cs.txt",
     "Source": "ResidualAudit.cs",
     "Sha256": "8451ca692c4098d49116edabddede80492c752b7c9d95fafdf8fc85a76d8b786",
-    "Authority": "Exact source captured by successful fe9144dde compiler census"
+    "Authority": "Exact source captured by successful fe9144dde compiler census",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "ea91bb90949aae6bd11a1050203817885e8c729de85a21a290335445a087303e"
   },
   {
     "File": "check-controls.ps1.txt",
     "Source": "check-controls.ps1",
     "Sha256": "51309eb2a1e60000571950bcac7ae24b7053e8482a4651d77b819fb32595d36b",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "b5c3206f6ad7764622464767e664e7f15c57bc2376a4346a867074470306173c"
   },
   {
     "File": "check-residual-controls.ps1.txt",
     "Source": "check-residual-controls.ps1",
     "Sha256": "6ab9679e2127784ae7cf142e1cfb006aa2186f18cd811488edaf87b2f4940499",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "4bcb1074c4e9249cade537fc1cc5ddf113fd890e50b0b482645f7912f560d839"
   },
   {
     "File": "check-authority-negative-controls.ps1.txt",
     "Source": "check-authority-negative-controls.ps1",
     "Sha256": "f28a616262bea74e90d07da5680a09b5a6ee9e11973faa62ad980cc9e74e578e",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "42760f843633ce3a13df308b6766d46b12c20af2395d26d019b3d368213f5c5c"
   },
   {
     "File": "check-type-reference-controls.ps1.txt",
     "Source": "check-type-reference-controls.ps1",
     "Sha256": "d3350203fcd5ac79c1b7d4a8f92e1a1ebc433169340a6b24eff31d620ed06c0d",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "5fe6f67f532681da32eb75d17c7285089501224fa31df2e288c63efa946d8db1"
   },
   {
     "File": "controls.sh.txt",
     "Source": "controls.sh",
     "Sha256": "abbb09875c160868da65772c789fcccb6144faf50215a316b21cc909dc810945",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "f31760f2036b443afea1457ee5b03ec0f54ff51ba83890fb1f6183182d89f46a"
   },
   {
     "File": "residual-controls.sh.txt",
     "Source": "residual-controls.sh",
     "Sha256": "c1bb25807d0728453b43cd6b397e3627484c15983b2c89b1abb78ea276b55ee3",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "4e9da151f964fe21438ad03e15552824850828bf1a893e31bdfde107bb64ae15"
   },
   {
     "File": "current-verified.sh.txt",
     "Source": "current-verified.sh",
     "Sha256": "f368e6ee8df9a81910b33dc46314f17417bd24acad8c3ae79d804a77f939a009",
-    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology"
+    "Authority": "Retained control/entry source; successful control runs recorded separately in audit chronology",
+    "PayloadOffsetBytes": 103,
+    "StoredSha256": "4b7cac59b1ed043355539e10689f203aea8b735675556ce756bd01777163c431"
   }
 ]

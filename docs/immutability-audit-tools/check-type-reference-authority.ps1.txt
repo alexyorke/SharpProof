@@ -1,3 +1,4 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
 param([Parameter(Mandatory=$true)][string]$OutputRoot)
 $ErrorActionPreference='Stop'
 $contexts=[Collections.Immutable.ImmutableDictionary]::CreateBuilder[string,object]([StringComparer]::Ordinal)

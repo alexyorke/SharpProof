@@ -1,3 +1,4 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
 param([string]$Before,[string]$After)
 $ErrorActionPreference='Stop'
 $beforeFiles=@(Get-ChildItem (Join-Path $Before 'residual') -Filter '*.tsv')
