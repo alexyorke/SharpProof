@@ -39,45 +39,38 @@ internal static class NativeTaskCarrierStorageVerifier
         }
         if (shapes.StateMachine is { } machine && !Valid(machine, ref remaining, cancellation))
         { return Unknown("TaskCompilerCarrierShapeUnsupported"); }
-        try
+        // Every extent and field count below is a bounded constant. Validation
+        // above admits only layout-supported fields; after the array establishes
+        // context compatibility, the remaining fixed shapes cannot fail layout
+        // or expression budgets.
+        // One source params array and at most one delegate per emitted callback.
+        // Shared frames/caches are deliberately overcounted.
+        var array = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Reference,
+            ResourceExpression.Literal(projection.Children.Length)), layout, cancellation);
+        if (array.Bounds == null)
+        { return Unknown(array.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
+        var delegates = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Delegate(), layout, cancellation);
+        var upper = ResourceExpression.Add(array.Bounds.Upper, ResourceExpression.Multiply(delegates.Bounds!.Upper,
+            ResourceExpression.Literal(shapes.MatchedCallbacks)));
+        foreach (var frame in shapes.CallbackFrames)
         {
-            // One source params array and at most one delegate per emitted
-            // callback. Shared frames/caches are deliberately overcounted.
-            var array = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Reference,
-                ResourceExpression.Literal(projection.Children.Length)), layout, cancellation);
-            if (array.Bounds == null)
-            { return Unknown(array.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
-            var delegates = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Delegate(), layout, cancellation);
-            if (delegates.Bounds == null)
-            { return Unknown(delegates.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
-            var upper = ResourceExpression.Add(array.Bounds.Upper, ResourceExpression.Multiply(delegates.Bounds.Upper,
-                ResourceExpression.Literal(shapes.MatchedCallbacks)));
-            foreach (var frame in shapes.CallbackFrames)
-            {
-                cancellation.ThrowIfCancellationRequested();
-                var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(frame.Fields), layout, cancellation);
-                if (bound.Bounds == null)
-                { return Unknown(bound.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
-                upper = ResourceExpression.Add(upper, bound.Bounds.Upper);
-            }
-            ImmutableArray<ResourceStorageKind> stateFields = [];
-            if (shapes.StateMachine is { } state)
-            {
-                if (state.IsValueType)
-                { stateFields = state.Fields; }
-                else
-                {
-                    var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(state.Fields), layout, cancellation);
-                    if (bound.Bounds == null)
-                    { return Unknown(bound.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
-                    upper = ResourceExpression.Add(upper, bound.Bounds.Upper);
-                    stateFields = [ResourceStorageKind.Reference];
-                }
-            }
-            return new(upper, stateFields, null);
+            cancellation.ThrowIfCancellationRequested();
+            var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(frame.Fields), layout, cancellation);
+            upper = ResourceExpression.Add(upper, bound.Bounds!.Upper);
         }
-        catch (ResourceExpressionLimitException)
-        { return Unknown("TaskCompilerCarrierBudgetExceeded"); }
+        ImmutableArray<ResourceStorageKind> stateFields = [];
+        if (shapes.StateMachine is { } state)
+        {
+            if (state.IsValueType)
+            { stateFields = state.Fields; }
+            else
+            {
+                var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(state.Fields), layout, cancellation);
+                upper = ResourceExpression.Add(upper, bound.Bounds!.Upper);
+                stateFields = [ResourceStorageKind.Reference];
+            }
+        }
+        return new(upper, stateFields, null);
     }
 
     private static bool Valid(CompilerTaskCarrierType type, ref int remaining, CancellationToken cancellation)

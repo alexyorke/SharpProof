@@ -326,6 +326,24 @@ public sealed class NativeTaskCarrierStorageTests
     }
 
     [Test]
+    public void AChildWithArrayCountsButNoStorageShapeCannotSupplyRootLifetimeBytes()
+    {
+        var (shapes, projection, root) = Fixture(0);
+        var child = projection.Children[1];
+        projection = projection with
+        {
+            Carriers = new(shapes, null),
+            Children = [projection.Children[0], child with { Cost = ResourceProgram.Array(ResourceExpression.Literal(2)) }]
+        };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, root, cancellation).HasSourceCosts, Is.True);
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), cancellation);
+        Assert.That(result.UnknownReason, Is.EqualTo("MissingResourceAllocationStorage"));
+        Assert.That(result.PeakUpper, Is.Null);
+        Assert.That(result.RetainedUpper, Is.Null);
+    }
+
+    [Test]
     public void OversizedEmbeddedStateReturnsUnknownWithoutAPartialCarrierBound()
     {
         var (shapes, projection, root) = Fixture(2);

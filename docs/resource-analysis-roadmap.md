@@ -179,7 +179,7 @@ normal-completion compiler/runtime storage now have native root proofs. These
 declared models and their unsupported boundaries are described below. Coverage
 qualification and the final audit remain open; the MR remains draft.
 
-### Package coverage memory containment (in progress)
+### Package coverage compiler-server lifecycle
 
 At 7f049edd3 the corrected reporter succeeded. All three semantic shards passed;
 the package collector ended with exit 137 and Docker reported oomKilled true,
@@ -207,8 +207,15 @@ collector settings. Only coverage consumer processes set
 UseSharedCompilation=false to avoid retaining one-off compiler servers. All
 case selection, assertion deadlines, instrumentation, authority evidence and
 coverage floors remain unchanged. A fresh full probe uses the same Docker
-budget. Its completion and elapsed-time verification are pending; no full-phase
-containment success is claimed yet.
+budget. The complete phase passed all 14 isolated shards at parallelism 4:
+487 tests passed and one existing test was skipped. End-to-end time was 551.98
+seconds, including build, discovery, test execution and report normalization.
+The phase exported authority and shard evidence and normalized 28 report files.
+Logs and elapsed-time evidence are retained as
+`artifacts/resource-package-server-lifecycle-coverage.log` and
+`artifacts/resource-package-server-lifecycle-elapsed.json`. This establishes a
+local full-phase pass under the constrained budget; fresh exact-head CI and the
+unchanged aggregate coverage requirements remain open.
 
 The same reporter confirms that 0e420a470's package phase also ended with Docker
 oomKilled true and exit 137. Its three semantic shards, canonical build/package
@@ -229,6 +236,25 @@ regions and roots that launch several joins or launch joins in a loop. These
 tests passed the 35-case worker task gate and all 44 frontend planner cases.
 Targeted C# formatting also passed. These controls reject unmodeled behavior;
 they do not establish cancellation or exceptional-path allocation bounds.
+
+### Carrier validation invariants
+
+The successful semantic shards from 0e420a470 provide partial line evidence,
+not aggregate qualification. They identify untested storage-composition paths.
+The fixed compiler-carrier calculations use bounded constant extents and field
+counts. Once field validation and the first array layout check succeed, the
+delegate/object shapes cannot fail the same layout or expression budgets.
+Redundant failure branches after those checks are removed; incompatible contexts
+and unsupported fields still return Unknown at their validated boundaries.
+A new control distinguishes a valid array-count program from the missing byte
+storage shape: it must return Unknown with no partial peak or retained bound.
+The combined worker/resource/protocol gate passed all 865 cases on this cleanup.
+Targeted formatting passed. Quality/API compatibility and negative fixtures
+passed, except that the remote link audit received HTTP 504 for one existing
+pinned LICENSE URL referenced by three package READMEs. The repository API
+confirms that file exists at its pinned commit. The link-only retry passed,
+including the missing-file and missing-fragment negative controls. Final roadmap
+spelling and Markdown checks passed. No coverage floor or exclusion changed.
 
 ### Root lifetime publication
 
