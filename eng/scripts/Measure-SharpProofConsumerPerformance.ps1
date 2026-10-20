@@ -17,11 +17,11 @@ Assert-SharpProofContainer 'Run consumer performance measurements in the canonic
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
-$packageFiles = @(Get-ChildItem -LiteralPath $feed -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') })
-$identity = Get-SharpProofPackageIdentitySet -Files $packageFiles -RequireRepository
+$packageFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $feed -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }))
+$identity = Get-SharpProofPackageIdentitySet -Files ([object[]]@($packageFiles)) -RequireRepository
 $sourceCommit = (& git -C $repositoryRoot rev-parse --verify HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify the benchmark repository commit.' }
-$trackedChanges = @(& git -C $repositoryRoot status --porcelain --untracked-files=no)
+$trackedChanges = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git -C $repositoryRoot status --porcelain --untracked-files=no))
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify benchmark working tree changes.' }
 $harnessHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $output = [IO.Path]::GetFullPath($OutputDirectory, $repositoryRoot)
@@ -53,10 +53,11 @@ function Invoke-MeasuredDotnet {
 
 function New-SubjectSource {
     param([int]$Increment)
-    $methods = foreach ($index in 1..8) {
-        "    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }"
+    $methodBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    for ($index = 1; $index -le 8; $index++) {
+        $methodBuilder.Add("    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }")
     }
-    return "using SharpProof.Attributes;`npublic static class Subject {`n" + ($methods -join "`n") + "`n}`n"
+    return "using SharpProof.Attributes;`npublic static class Subject {`n" + ($methodBuilder.ToImmutable() -join "`n") + "`n}`n"
 }
 
 try {
@@ -103,7 +104,7 @@ try {
             Set-Location $consumer
             $restoreMilliseconds = Invoke-MeasuredDotnet "$iteration-$variant-restore" @('restore', 'Consumer.csproj', '--packages', $cache)
             $measurements.Add(([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null }).AsReadOnly())
-            foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
+            foreach ($scenario in [Collections.Immutable.ImmutableArray]::Create[string]('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
                 if ($scenario -eq 'small-edit') {
                     [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 2), [Text.UTF8Encoding]::new($false))
                 }
@@ -142,7 +143,7 @@ finally {
             measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
             source                   = ([ordered]@{
                     commit            = $sourceCommit
-                    hasTrackedChanges = $trackedChanges.Count -gt 0
+                    hasTrackedChanges = $trackedChanges.Length -gt 0
                     harnessSha256     = $harnessHash
                 }).AsReadOnly()
             packageVersion           = [string]$identity.Version
@@ -162,15 +163,15 @@ finally {
     Remove-Item -LiteralPath $resolvedWorkspace -Recurse -Force
 }
 if ($MaximumBuildMilliseconds -gt 0) {
-    $overBudget = @($measurementSnapshot | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds })
-    if ($overBudget.Count -gt 0) { throw "$($overBudget.Count) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
+    $overBudget = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($measurementSnapshot | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds }))
+    if ($overBudget.Length -gt 0) { throw "$($overBudget.Length) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
 }
-foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
+foreach ($scenario in [Collections.Immutable.ImmutableArray]::Create[string]('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
     $medianBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
-    foreach ($variant in @('baseline', 'portable', 'verified')) {
-        $times = @($measurementSnapshot | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object)
-        $middle = [int][Math]::Floor($times.Count / 2)
-        $median = if ($times.Count % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
+    foreach ($variant in [Collections.Immutable.ImmutableArray]::Create[string]('baseline', 'portable', 'verified')) {
+        $times = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($measurementSnapshot | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object))
+        $middle = [int][Math]::Floor($times.Length / 2)
+        $median = if ($times.Length % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
         $medianBuilder[$variant] = $median
     }
     $medians = $medianBuilder.ToImmutable()
