@@ -555,11 +555,7 @@ switch ($Command) {
             @semanticArguments
     }
     'canonical-cohort-gate' {
-        & (Join-Path $PSScriptRoot 'Test-SharpProofCanonicalEvidence.ps1')
-        . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
-        Assert-SharpProofCanonicalCohorts `
-            -Root (Join-Path $repositoryRoot 'artifacts/canonical-cohorts') `
-            -RepositoryRoot $repositoryRoot
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofCanonicalCohortGate.ps1') -RepositoryRoot $repositoryRoot
     }
     'portable-tests' {
         Invoke-SolutionTests 'SharpProof.Portable.Tests.slnf'

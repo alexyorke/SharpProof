@@ -163,6 +163,8 @@ public sealed class ContainerContractTests
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = "1"; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = 1; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = JsonNode.Parse("2147483648"); },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = 2; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["powershellArchiveSha256"] = new string('0', 64); },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = "invalid"; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = JsonNode.Parse("9223372036854775808"); },
                 contract =>

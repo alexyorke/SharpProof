@@ -7,7 +7,8 @@ Branch: codex/comprehensive-immutability.
 
 ## Current checkpoint
 
-The final code checkpoint is `4a646d7ac`, including master `b0ce85e23`.
+The full audit validation is pinned to `4a646d7ac`, including master `b0ce85e23`.
+The later master integration at `71c9b117f` is recorded in IMM-M540.
 The current census covers 1949 C# paths with zero eligible const locals and zero
 metadata authority gaps. All findings are resolved or explicitly retained as
 required contracts or mutable subjects. Current decisions are recorded in
@@ -5136,3 +5137,9 @@ At pushed code checkpoint `4a646d7ac`, the complete canonical Linux amd64 Releas
 The unchanged strict gate passes 100 percent aggregate executable coverage (32879/32879 lines) and changed coverage (4241/4241 lines), with zero uncovered changed lines and zero entries in `nonCoverableFiles`. All source and module authority checks pass. The GitHub coverage job also passes on the exact pushed code checkpoint. Required mutable native subjects and final framework adapters remain explicit; no coverage exemption or floor reduction is introduced.
 
 Full repository quality checks pass, including Markdown, spelling, links, PowerShell, shell, workflow security, dependency/API checks and negative gate controls. Layout passes all 59 projects and 151 pinned common files. Literal conservation verifies 4309 raw/interpolated tokens across 1078 changed C# files, and all 1949 current source-unit authority fields verify. The final tracked validation summary records counts, expected unexecuted tests, evidence hashes and exact CI links. Later audit/documentation commits preserve these executable source bytes. Master remains fully integrated at `b0ce85e23`, with no incoming changes or conflicts. The work is complete; native Windows/macOS runtime qualification is outside this Linux execution evidence.
+
+### IMM-M540: resolve current master container-contract conflicts
+
+Integrate master `71c9b117f`, which changes the tooling image and container contract. Resolve the three overlapping files by preserving schema 3, the PowerShell archive SHA-256 authority and the updated image-stage list, while retaining immutable arrays, readonly ordered contract data and the scoped required-property builder. The new tampered-marker test mutations remain intentional mutable subjects. Other master changes merge directly.
+
+The updated canonical Linux amd64 tooling image builds, doctor reports the pinned SDK and the complete container-contract authority check passes. The first targeted test attempt ran in the cached schema-2 image and correctly rejected its obsolete marker; all eleven targeted contract tests pass in the rebuilt image, including obsolete-schema and invalid-checksum rejection. Earlier full test/coverage evidence remains explicitly pinned to its original code checkpoint. Full repository quality validation for this integration passes before pushing the merge.

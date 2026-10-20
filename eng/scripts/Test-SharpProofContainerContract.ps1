@@ -105,24 +105,12 @@ function Assert-DockerfileAuthority {
 
     $authorities = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
             ([ordered]@{
-                Argument = 'POWERSHELL_IMAGE'
-                Image    = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
-            }).AsReadOnly(),
-            ([ordered]@{
-                Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
-                Image    = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
-            }).AsReadOnly(),
-            ([ordered]@{
                 Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
                 Image    = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
             }).AsReadOnly(),
             ([ordered]@{
                 Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
                 Image    = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
-            }).AsReadOnly(),
-            ([ordered]@{
-                Argument = 'DOTNET_API_INVENTORY_IMAGE'
-                Image    = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
             }).AsReadOnly(),
             ([ordered]@{
                 Argument = 'DOTNET_SDK_IMAGE'
@@ -180,11 +168,10 @@ function Assert-DockerfileAuthority {
 
     $actualStages = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($lines | Where-Object { $_ -cmatch '^FROM\s+' }))
     $expectedStages = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-            'FROM ${POWERSHELL_IMAGE} AS powershell',
-            'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
+            'FROM ${DOTNET_SDK_IMAGE} AS powershell',
             'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
             'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
-            'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
+            'FROM powershell AS api-inventory',
             'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
             'FROM ${DOTNET_SDK_IMAGE} AS toolchain'))
     if ($actualStages.Length -cne $expectedStages.Length) {
@@ -223,23 +210,42 @@ function Assert-DockerfileAuthority {
 
     $powershellLines = Get-DockerfileStageLines `
         -Lines $lines `
-        -FromLine 'FROM ${POWERSHELL_IMAGE} AS powershell'
+        -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS powershell'
     Assert-SingleMatchingLine `
         $powershellLines `
         '^ADD --checksum=' `
         "ADD --checksum=sha256:$($ToolchainCatalog.powershell.archiveSha256) $($ToolchainCatalog.powershell.archiveUrl) /tmp/powershell.tar.gz" `
         'serviced PowerShell archive'
 
+    $apiInventoryPackPath = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($ToolchainCatalog.dotnet.apiInventoryPackVersion)"
+    $apiInventoryLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM powershell AS api-inventory'
+    Assert-SingleMatchingLine `
+        $apiInventoryLines `
+        '^ADD --checksum=' `
+        "ADD --checksum=sha256:$($ToolchainCatalog.dotnet.apiInventoryPackSha256) $($ToolchainCatalog.dotnet.apiInventoryPackUrl) /tmp/reference-pack.nupkg" `
+        'reviewed API reference pack archive'
+    if (-not ($apiInventoryLines -join "`n").Contains("`$destination = `"$apiInventoryPackPath`"", [StringComparison]::Ordinal)) {
+        throw "Dockerfile api-inventory stage must install the pack at '$apiInventoryPackPath'."
+    }
+
     $toolchainLines = Get-DockerfileStageLines `
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
-    $apiInventoryPackPath = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($ToolchainCatalog.dotnet.apiInventoryPackVersion)"
     Assert-SingleMatchingLine `
         $toolchainLines `
         '^COPY --from=api-inventory ' `
         "COPY --from=api-inventory $apiInventoryPackPath $apiInventoryPackPath" `
         'exact reviewed API reference pack copy'
+    $testRuntimePath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/$($ToolchainCatalog.dotnet.testRuntimeVersion)"
+    $testRuntimeCopyPattern = '^COPY --from=\S+ ' + [regex]::Escape($testRuntimePath) + ' '
+    Assert-SingleMatchingLine `
+        $toolchainLines `
+        $testRuntimeCopyPattern `
+        "COPY --from=minimum-framework $testRuntimePath $testRuntimePath" `
+        'pinned test runtime copy'
     Assert-SingleMatchingLine `
         $toolchainLines `
         '^COPY --from=windows-native ' `
@@ -426,7 +432,8 @@ Assert-Exact `
     'Acceptance container platform'
 
 Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API inventory generation SDK'
-Assert-Exact $catalog.dotnet.apiInventoryImage ("mcr.microsoft.com/dotnet/sdk:{0}-bookworm-slim" -f $catalog.dotnet.apiInventorySdkVersion) 'API inventory source image version'
+Assert-Exact $catalog.dotnet.apiInventoryPackUrl ('https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/{0}/microsoft.netcore.app.ref.{0}.nupkg' -f $catalog.dotnet.apiInventoryPackVersion) 'API inventory reference pack source'
+Assert-Exact $catalog.dotnet.testRuntimeVersion $catalog.dotnet.minimumSdkFrameworkVersion 'Test runtime from the minimum-framework SDK'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
 Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
 if ($AuthorityOnly) {
@@ -500,7 +507,11 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'
     }
     $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
-    Assert-Exact $marker.schemaVersion 2 'Installed container contract schema version'
+    Assert-Exact $marker.schemaVersion 3 'Installed container contract schema version'
+    Assert-Exact `
+        $marker.powershellArchiveSha256 `
+        $catalog.powershell.archiveSha256 `
+        'Installed PowerShell archive SHA-256 digest'
     Assert-Exact `
         $marker.contractVersion `
         $catalog.containerContractVersion `
