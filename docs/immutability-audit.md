@@ -4995,3 +4995,7 @@ An initial combined filter stopped at the console fixture's mandatory isolated-t
 ### IMM-M508: native sequence identity and intentional mutation/race subjects
 
 Seven current array roots are actual native CLR return/input/alias subjects, an Array.Clear mutation oracle or an argument buffer concurrently toggled with Volatile.Write to test snapshot/validation races. Exact native types, shared identity and writes remain required. Each is traced directly through current consumers/assertions; no code edit or new execution authority is inferred.
+
+### IMM-M510: preserve publication argument mutation and native icon-read scratch
+
+Six native publication argument frames are actual Prepare subjects: success rewrites slots to prepared paths, while rejection cases verify no prior mutation or invalid path reads. Null/default shape and actual string-array identity remain required. The icon header is writable Stream.ReadExactly scratch consumed by fixed signature/endianness checks. These seven current subject/consumer traces change no code and claim no new execution authority.
