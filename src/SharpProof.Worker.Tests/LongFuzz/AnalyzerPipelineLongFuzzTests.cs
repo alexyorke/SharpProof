@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -111,10 +110,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
         optionBuilder["build_property.SharpProofVerifyPolicy"] = "advisory";
         optionBuilder["build_property.SharpProofAssumptionPolicy"] = "allow";
         var options = optionBuilder.ToImmutable();
-        var exceptions = new ConcurrentBag<string>();
+        var exceptions = ImmutableStack<string>.Empty;
         var withAnalyzers = compilation.WithAnalyzers([new SharpProofAnalyzer(), new FinalCompilationCollectorAnalyzer()],
             new CompilationWithAnalyzersOptions(new AnalyzerOptions([], new OptionsProvider(options)),
-                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); exceptions.Add(analyzer.GetType().Name + ": " + exception); }, concurrentAnalysis: false,
+                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); ImmutableInterlocked.Push(ref exceptions, analyzer.GetType().Name + ": " + exception); }, concurrentAnalysis: false,
                 logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         foreach (var exception in exceptions)

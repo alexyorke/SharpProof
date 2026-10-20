@@ -17,9 +17,13 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ('SharpProof.Tutorials.' + [Guid
 $sourceRoot = Join-Path $scratch 'source'
 $utf8 = [Text.UTF8Encoding]::new($false)
 
-function Invoke-LoggedDotnet([string[]]$Arguments, [string]$LogPath) {
-    $output = @(& dotnet @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+function Invoke-LoggedDotnet([Nullable[Collections.Immutable.ImmutableArray[string]]]$Arguments, [string]$LogPath) {
+    if ($null -eq $Arguments -or $Arguments.IsDefault) { throw [ArgumentNullException]::new('Arguments') }
+    [string[]]$nativeArguments = @($Arguments)
+    $outputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & dotnet @nativeArguments 2>&1 | ForEach-Object { $outputBuilder.Add($_.ToString()) }
     $exitCode = $LASTEXITCODE
+    $output = $outputBuilder.ToImmutable()
     [IO.File]::WriteAllText($LogPath, ($output -join "`n") + "`n", $utf8)
     return $exitCode
 }
@@ -37,8 +41,10 @@ try {
         & git -C $sourceRoot apply --binary $patch
         if ($LASTEXITCODE -ne 0) { throw 'Could not apply the source snapshot.' }
     }
-    $untrackedCode = @(& git -C $repositoryRoot ls-files --others --exclude-standard -- '*.cs' '*.csproj' '*.props' '*.targets')
+    $untrackedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & git -C $repositoryRoot ls-files --others --exclude-standard -- '*.cs' '*.csproj' '*.props' '*.targets' | ForEach-Object { $untrackedBuilder.Add([string]$_) }
     if ($LASTEXITCODE -ne 0) { throw 'Could not inspect untracked source.' }
+    $untrackedCode = $untrackedBuilder.ToImmutable()
     if (@($untrackedCode | Where-Object { $_ -notlike 'docs/tutorials/*' }).Count) {
         throw 'Commit non-tutorial untracked source before running the tutorial snapshot.'
     }
@@ -51,8 +57,8 @@ try {
     Write-Host "Building tutorial feed: $version"
     foreach ($project in $manifest.projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension($project)
-        $exitCode = Invoke-LoggedDotnet -Arguments @(
-            'pack', (Join-Path $sourceRoot $project), '-c', 'Release', '-o', $feed, '--nologo') `
+        $exitCode = Invoke-LoggedDotnet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'pack', (Join-Path $sourceRoot $project), '-c', 'Release', '-o', $feed, '--nologo'))) `
             -LogPath (Join-Path $evidenceRoot "pack-$name.log")
         if ($exitCode -ne 0) { throw "Packing $name failed; see the evidence directory." }
     }
@@ -74,17 +80,17 @@ try {
   </packageSourceMapping>
 </configuration>
 "@, $utf8)
-    $cases = @(
-        @{ Id = '01-first-contract'; Native = $false; Policy = 'advisory'; Exit = 0 },
-        @{ Id = '02-diagnostics'; Native = $false; Policy = 'advisory'; Exit = 0 },
-        @{ Id = '03-effects'; Native = $true; Policy = 'require-proven'; Exit = 0 },
-        @{ Id = '04-branching'; Native = $true; Policy = 'require-proven'; Exit = 0 },
-        @{ Id = '05-loops-and-state'; Native = $true; Policy = 'require-proven'; Exit = 0 },
-        @{ Id = '06-outcomes'; Native = $true; Policy = 'advisory'; Exit = 1 },
-        @{ Id = '07-companion'; Native = $false; Policy = 'advisory'; Exit = 0 },
-        @{ Id = '08-trusted-boundary'; Native = $true; Policy = 'advisory'; Exit = 0 }
-    )
-    $transcript = [Collections.Generic.List[string]]::new()
+    $cases = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            ([ordered]@{ Id = '01-first-contract'; Native = $false; Policy = 'advisory'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '02-diagnostics'; Native = $false; Policy = 'advisory'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '03-effects'; Native = $true; Policy = 'require-proven'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '04-branching'; Native = $true; Policy = 'require-proven'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '05-loops-and-state'; Native = $true; Policy = 'require-proven'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '06-outcomes'; Native = $true; Policy = 'advisory'; Exit = 1 }).AsReadOnly(),
+            ([ordered]@{ Id = '07-companion'; Native = $false; Policy = 'advisory'; Exit = 0 }).AsReadOnly(),
+            ([ordered]@{ Id = '08-trusted-boundary'; Native = $true; Policy = 'advisory'; Exit = 0 }).AsReadOnly()
+        ))
+    $transcript = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     function Publish-Line([string]$Line) { $transcript.Add($Line); Write-Host $Line }
     foreach ($case in $cases) {
         $id = $case.Id
@@ -116,11 +122,11 @@ dotnet_diagnostic.SP0047.severity = warning
         $resultPath = Join-Path $consumer 'result.json'
         $sarifPath = Join-Path $consumer 'result.sarif'
         $project = Join-Path $consumer 'Example.csproj'
-        $restoreExit = Invoke-LoggedDotnet -Arguments @('restore', $project, '--configfile', $nugetConfig,
-            '--packages', (Join-Path $scratch 'packages'), '--nologo') -LogPath (Join-Path $evidenceRoot "$id-restore.log")
+        $restoreExit = Invoke-LoggedDotnet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('restore', $project, '--configfile', $nugetConfig,
+                    '--packages', (Join-Path $scratch 'packages'), '--nologo'))) -LogPath (Join-Path $evidenceRoot "$id-restore.log")
         if ($restoreExit) { throw "$id restore failed; see the evidence directory." }
-        $buildExit = Invoke-LoggedDotnet -Arguments @('build', $project, '-c', 'Release', '--no-restore', '--nologo',
-            "-p:SharpProofVerifyResultFile=$resultPath", "-p:SharpProofVerifySarifFile=$sarifPath") `
+        $buildExit = Invoke-LoggedDotnet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('build', $project, '-c', 'Release', '--no-restore', '--nologo',
+                    "-p:SharpProofVerifyResultFile=$resultPath", "-p:SharpProofVerifySarifFile=$sarifPath"))) `
             -LogPath (Join-Path $evidenceRoot "$id-build.log")
         Publish-Line "[$id] build exit: $buildExit"
         if ($buildExit -ne $case.Exit) { throw "$id unexpected exit $buildExit; see the evidence directory." }
@@ -146,11 +152,13 @@ dotnet_diagnostic.SP0047.severity = warning
                 throw "$id did not complete the expected claim set."
             }
             Publish-Line "  run: $($result.runStatus); failure: $($result.failureReason)"
-            $claimLines = foreach ($claim in $result.claimResults) {
+            $claimLineBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            foreach ($claim in $result.claimResults) {
                 $entry = @($result.manifest.claims | Where-Object claimId -EQ $claim.claimId)[0]
-                "  $($entry.callableId) | $($entry.kind)/$($entry.effectContractKind) | $($claim.outcome) | $($claim.reason) | $($claim.effectCertainty) | $($claim.vacuity)"
+                $claimLineBuilder.Add("  $($entry.callableId) | $($entry.kind)/$($entry.effectContractKind) | $($claim.outcome) | $($claim.reason) | $($claim.effectCertainty) | $($claim.vacuity)")
             }
-            foreach ($line in @($claimLines | Sort-Object)) { Publish-Line $line }
+            $claimLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($claimLineBuilder.ToImmutable() | Sort-Object))
+            foreach ($line in $claimLines) { Publish-Line $line }
             if ($id -in @('03-effects', '04-branching', '05-loops-and-state') -and
                 @($result.claimResults | Where-Object outcome -NE 'Proven').Count) {
                 throw "$id did not prove all selected claims."
@@ -166,7 +174,7 @@ dotnet_diagnostic.SP0047.severity = warning
             }
         }
     }
-    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'transcript.txt'), ($transcript -join "`n") + "`n", $utf8)
+    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'transcript.txt'), ($transcript.ToImmutable() -join "`n") + "`n", $utf8)
     [IO.File]::WriteAllText((Join-Path $evidenceRoot 'source-commit.txt'), $commit + "`n", $utf8)
     Write-Host "Tutorials passed. Evidence: $evidenceRoot"
 }

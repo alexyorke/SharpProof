@@ -8,7 +8,7 @@ function Test-SharpProofFacadePackage {
         [Parameter(Mandatory = $true)][string]$RepositoryCommit
     )
 
-    foreach ($value in @($PackagePath, $PackageVersion, $RepositoryCommit)) {
+    foreach ($value in [Collections.Immutable.ImmutableArray]::Create[string]($PackagePath, $PackageVersion, $RepositoryCommit)) {
         if ([string]::IsNullOrWhiteSpace($value)) { throw 'Facade validation requires nonblank package path, version, and repository commit.' }
     }
     if ($RepositoryCommit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'The expected repository commit is not a 40-character lowercase hash.' }
@@ -18,7 +18,7 @@ function Test-SharpProofFacadePackage {
         $names = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
         foreach ($entry in $archive.Entries) {
             if (-not $names.Add($entry.FullName)) { throw 'The facade package contains duplicate ZIP entries.' }
-            if ([IO.Path]::GetExtension($entry.FullName) -in @('.dll', '.exe', '.pdb')) { throw 'The metadata-only facade must not contain executable payloads or PDBs.' }
+            if ([IO.Path]::GetExtension($entry.FullName) -in [Collections.Immutable.ImmutableArray]::Create[string]('.dll', '.exe', '.pdb')) { throw 'The metadata-only facade must not contain executable payloads or PDBs.' }
         }
         $nuspecs = [Collections.Immutable.ImmutableArray]::CreateRange[IO.Compression.ZipArchiveEntry]([IO.Compression.ZipArchiveEntry[]]@($archive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase) }))
         if ($nuspecs.Length -ne 1) { throw 'The facade package must contain exactly one nuspec.' }
@@ -53,23 +53,24 @@ function Test-SharpProofEmbeddedPdbPair {
     )
 
     Import-Module (Join-Path $PSScriptRoot 'SharpProof.EmbeddedSymbols.psm1') -Force
-    [byte[]]$embedded = Get-SharpProofEmbeddedPdb -AssemblyPath $AssemblyPath
-    [byte[]]$portable = [IO.File]::ReadAllBytes($PdbPath)
+    $embeddedImage = Get-SharpProofEmbeddedPdb -AssemblyPath $AssemblyPath
+    $embedded = if ($null -eq $embeddedImage) { , [Collections.Immutable.ImmutableArray[byte]]::Empty } else { , [Collections.Immutable.ImmutableArray]::CreateRange[byte]($embeddedImage) }
+    $portable = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($PdbPath))
     if ($RequireEmbedded) {
-        if ($null -eq $embedded -or $embedded.Length -eq 0) { throw 'Shipping tooling is missing its embedded portable PDB.' }
-        $embeddedHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($embedded))
-        $portableHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($portable))
+        if ($embedded.Length -eq 0) { throw 'Shipping tooling is missing its embedded portable PDB.' }
+        $embeddedHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@($embedded)))
+        $portableHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@($portable)))
         if ($embeddedHash -cne $portableHash) { throw 'The embedded PDB does not match the exact external portable PDB bytes.' }
     }
-    elseif ($null -ne $embedded -and $embedded.Length -ne 0) { throw 'The Attributes runtime assembly must retain its external portable PDB format.' }
+    elseif ($embedded.Length -ne 0) { throw 'The Attributes runtime assembly must retain its external portable PDB format.' }
     Test-SharpProofEmbeddedSources -PdbBytes $portable
 }
 
 function Test-SharpProofEmbeddedSources {
-    param([Parameter(Mandatory = $true)][byte[]]$PdbBytes)
+    param([Parameter(Mandatory = $true)][Collections.Immutable.ImmutableArray[byte]]$PdbBytes)
 
-    $stream = [IO.MemoryStream]::new($PdbBytes, $false)
-    $provider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($stream)
+    if ($PdbBytes.IsDefault) { throw [ArgumentNullException]::new('PdbBytes') }
+    $provider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbImage($PdbBytes)
     try {
         $reader = $provider.GetMetadataReader()
         $embeddedSourceBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, Collections.Immutable.ImmutableArray[byte]]()
@@ -116,7 +117,7 @@ function Test-SharpProofEmbeddedSources {
         }
         if ($row -eq 0 -or $embeddedSources.Count -ne $row) { throw 'The PDB embedded-source inventory does not match its document inventory.' }
     }
-    finally { $provider.Dispose(); $stream.Dispose() }
+    finally { $provider.Dispose() }
 }
 
 function Test-SharpProofPackagedEmbeddedSymbols {

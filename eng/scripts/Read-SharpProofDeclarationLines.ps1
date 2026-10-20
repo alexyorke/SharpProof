@@ -31,7 +31,7 @@ try {
     $referenceBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $referenceBuilder.AddRange([string[]]@(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
                 Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName }))
-    foreach ($name in @('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
+    foreach ($name in [Collections.Immutable.ImmutableArray]::Create[string]('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
         $assemblyPath = Join-Path $roslynPath $name
         $referenceBuilder.Add('-reference:' + $assemblyPath)
         Copy-Item -LiteralPath $assemblyPath -Destination (Join-Path $temporaryPath $name)
@@ -45,16 +45,22 @@ try {
     $compilerArgumentBuilder.Add(
         (Join-Path $PSScriptRoot 'SharpProof.DeclarationLines.cs'))
     [string[]]$compilerArguments = @($compilerArgumentBuilder.ToImmutable())
-    $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $compilerOutputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & $dotnetPath @compilerArguments 2>&1 | ForEach-Object { $compilerOutputBuilder.Add([string]$_) }
+    $compilerExitCode = $LASTEXITCODE
+    $compilerOutput = $compilerOutputBuilder.ToImmutable()
+    if ($compilerExitCode -ne 0) {
         throw ('Declaration classifier compilation failed: ' + ($compilerOutput -join [Environment]::NewLine))
     }
     $requestPath = Join-Path $temporaryPath 'request.json'
     $responsePath = Join-Path $temporaryPath 'response.json'
     [IO.File]::WriteAllText($requestPath, (ConvertTo-Json -InputObject @($Documents) -Depth 8),
         [Text.UTF8Encoding]::new($false))
-    $hostOutput = @(& $dotnetPath exec --runtimeconfig $runtimeConfigPath $hostPath $requestPath $responsePath 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $hostOutputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & $dotnetPath exec --runtimeconfig $runtimeConfigPath $hostPath $requestPath $responsePath 2>&1 | ForEach-Object { $hostOutputBuilder.Add([string]$_) }
+    $hostExitCode = $LASTEXITCODE
+    $hostOutput = $hostOutputBuilder.ToImmutable()
+    if ($hostExitCode -ne 0) {
         throw ('Declaration classification failed: ' + ($hostOutput -join [Environment]::NewLine))
     }
     Get-Content -LiteralPath $responsePath -Raw | ConvertFrom-Json

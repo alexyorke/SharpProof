@@ -81,11 +81,11 @@ try {
         $apiFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
                     Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
                 }))
-        $apiContentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[byte[]]()
-        foreach ($file in $apiFiles) { $apiContentBuilder.Add([IO.File]::ReadAllBytes($file)) }
+        $apiContentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[Collections.Immutable.ImmutableArray[byte]]()
+        foreach ($file in $apiFiles) { $apiContentBuilder.Add([Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($file))) }
         $apiContents = $apiContentBuilder.ToImmutable()
         $project = Join-Path $scratch 'src/SharpProof.Attributes/SharpProof.Attributes.csproj'
-        $projectContents = [IO.File]::ReadAllBytes($project)
+        $projectContents = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($project))
         try {
             foreach ($file in $apiFiles) { [IO.File]::Delete($file) }
             # The repository explicitly enrolls these files. Remove absent compiler inputs in
@@ -97,23 +97,23 @@ try {
     </ItemGroup>
   </Target>
 '@
-            [IO.File]::WriteAllText($project, [Text.Encoding]::UTF8.GetString($projectContents).Replace(
+            [IO.File]::WriteAllText($project, [Text.Encoding]::UTF8.GetString([byte[]]@($projectContents)).Replace(
                     '</Project>', $missingFileControl + "`n</Project>"))
             Invoke-GovernanceBuild 'missing-api-files' 'RS0016'
         }
         finally {
-            [IO.File]::WriteAllBytes($project, $projectContents)
+            [IO.File]::WriteAllBytes($project, [byte[]]@($projectContents))
             for ($index = 0; $index -lt $apiFiles.Length; $index++) {
-                [IO.File]::WriteAllBytes($apiFiles[$index], $apiContents[$index])
+                [IO.File]::WriteAllBytes($apiFiles[$index], [byte[]]@($apiContents[$index]))
             }
         }
         $nullableSource = Join-Path $scratch 'src/SharpProof.Attributes/AllowedExceptionsAttribute.cs'
-        $nullableContents = [IO.File]::ReadAllBytes($nullableSource)
+        $nullableContents = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($nullableSource))
         try {
-            [IO.File]::WriteAllText($nullableSource, "#nullable disable`n" + [Text.Encoding]::UTF8.GetString($nullableContents))
+            [IO.File]::WriteAllText($nullableSource, "#nullable disable`n" + [Text.Encoding]::UTF8.GetString([byte[]]@($nullableContents)))
             Invoke-GovernanceBuild 'oblivious-public-api' 'RS0041'
         }
-        finally { [IO.File]::WriteAllBytes($nullableSource, $nullableContents) }
+        finally { [IO.File]::WriteAllBytes($nullableSource, [byte[]]@($nullableContents)) }
         Invoke-GovernanceBuild 'restored'
         $receiptSnapshot = $receipts.ToImmutable()
         ([ordered]@{ schemaVersion = 1; controls = $receiptSnapshot }).AsReadOnly() | ConvertTo-Json -Depth 4 |
