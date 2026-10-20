@@ -137,7 +137,7 @@ public static partial class Inference
                 { continue; }
                 if (requirement.Keyword is "struct" or "unmanaged")
                 { constrained.IsValueType = true; }
-                else if (constrained.IsValueType != true && (requirement.Keyword is "class" or "class?" || requirement.BaseClass))
+                else if (constrained.IsValueType != true && (requirement.Keyword is "class" or "class?" || requirement.BaseClass && requirement.Type is not null && IsReferenceBase(requirement.Type)))
                 { constrained.IsValueType = false; }
             }
             var clauses = new List<TypeParameterConstraintClauseSyntax>();
@@ -168,7 +168,7 @@ public static partial class Inference
                             : requirement.Type.Format(variables, nullableAnnotations);
                         if (!types.Contains(type))
                         { if (requirement.BaseClass) { types.Insert(0, type); } else { types.Add(type); } }
-                        hasBaseClass |= requirement.BaseClass;
+                        hasBaseClass |= requirement.BaseClass && IsReferenceBase(requirement.Type);
                     }
                 }
                 var value = keywords.Contains("unmanaged") || keywords.Contains("struct");

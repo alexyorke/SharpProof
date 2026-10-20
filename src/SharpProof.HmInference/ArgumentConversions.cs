@@ -224,21 +224,36 @@ public static partial class Inference
             return true;
         }
 
+        private int completedConversionBounds;
+        private readonly HashSet<int> completedConcreteBounds = [];
+
         private void CompleteArgumentConversions(HashSet<HmType> inferable)
         {
             if (inferable is null)
             { throw new ArgumentNullException(nameof(inferable)); }
             foreach (var target in conversionTargets)
             { PreserveResultOnly(target.Shape, CSharpTypes.Rigid(target.Original), inferable); }
-            for (var i = 0; i < conversionBounds.Count; i++)
+            CompleteArgumentBounds();
+        }
+
+        private bool CompleteArgumentBounds()
+        {
+            var start = completedConversionBounds;
+            for (var i = 0; i < start; i++)
             {
-                var bound = conversionBounds[i];
+                var previous = conversionBounds[i];
+                if (!ConversionCore(previous.Source).IsVariable && completedConcreteBounds.Add(i))
+                { BindSubtype(previous.OriginalSource, previous.OriginalTarget, previous.Source, previous.Target, previous.ReferenceOnly); }
+            }
+            for (; completedConversionBounds < conversionBounds.Count; completedConversionBounds++)
+            {
+                var bound = conversionBounds[completedConversionBounds];
                 var source = ConversionCore(bound.Source);
                 var target = ConversionCore(bound.Target);
                 if (ReferenceEquals(source, target))
                 { continue; }
                 if (!source.IsVariable)
-                { BindSubtype(bound.OriginalSource, bound.OriginalTarget, source, target, bound.ReferenceOnly); continue; }
+                { completedConcreteBounds.Add(completedConversionBounds); BindSubtype(bound.OriginalSource, bound.OriginalTarget, source, target, bound.ReferenceOnly); continue; }
                 if (bound.ReferenceOnly)
                 {
                     RequireKeyword(source, "class");
@@ -261,6 +276,7 @@ public static partial class Inference
                 }
                 inferredConstraints.Add((source, null, target, !target.IsVariable && bound.OriginalTarget.TypeKind == TypeKind.Class && target.Name != "global::System.Enum"));
             }
+            return completedConversionBounds != start;
         }
     }
 }

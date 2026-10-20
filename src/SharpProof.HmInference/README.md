@@ -462,4 +462,11 @@ from nullable-oblivious source and metadata retain their permissive domains.
 Nullable nominal constraints use normal scoped spelling, including existing extern
 aliases. Runtime IDE fixes verify nulls, reference identity, helper effects,
 interface-admitted structs, required-domain errors and non-nullability warnings.
-Further directional and transitive implication remains open.
+Dependent bounds are rechecked after their target resolves. Sealed classes and
+value types become fixed types, array/delegate bounds use conversion rules, and
+object bounds retain their nullability requirements. Transitive nominal bounds
+are simplified without dropping required non-null obligations. Reference-only
+System.Enum domains stay fixed, preserving boxed identity. Applied IDE fixes
+exercise nullable async results, concrete domains and newly admitted types.
+General directional lower-bound solving and ambiguous interface projections
+remain open.

@@ -44,15 +44,17 @@ public static partial class Inference
                 return inferredConstraints.Count + free.Count;
             }
             int previous;
+            bool expanded;
             do
             {
                 previous = Measure();
-                NormalizeConstraintPass();
-            } while (Measure() < previous);
+                expanded = NormalizeConstraintPass();
+            } while (expanded || Measure() < previous);
         }
 
-        private void NormalizeConstraintPass()
+        private bool NormalizeConstraintPass()
         {
+            var expanded = ResolveDependentConstraints();
             NormalizeConstraintNullability();
             foreach (var requirement in inferredConstraints)
             {
@@ -89,12 +91,14 @@ public static partial class Inference
             for (var i = inferredConstraints.Count - 1; i >= 0; i--)
             { if (redundant.Contains(i)) { inferredConstraints.RemoveAt(i); } }
             CollapseConstraintCycles();
+            expanded |= NormalizeTransitiveConstraints();
             for (var i = inferredConstraints.Count - 1; i >= 0; i--)
             {
                 var requirement = inferredConstraints[i];
                 if (requirement.Keyword is null && requirement.Type is not null && ReferenceEquals(ConversionCore(requirement.Variable), ConversionCore(requirement.Type)))
                 { inferredConstraints.RemoveAt(i); }
             }
+            return expanded;
         }
 
         private void NormalizeConstraintNullability()
