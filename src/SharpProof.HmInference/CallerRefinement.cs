@@ -144,7 +144,8 @@ public static partial class Inference
             {
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
-                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029" or "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377";
+                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029" or "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377"
+                    || diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error && diagnostic.Id is "CS8714" or "CS8634" or "CS8631" or "CS8603" or "CS8604" or "CS8619" or "CS8620" or "CS8625";
             }).ToArray();
             if (failures.Length == 0)
             { return; }
@@ -167,14 +168,14 @@ public static partial class Inference
                     if (semantic.GetOperation(calls[i], cancellationToken) is not IInvocationOperation call
                         || !SameMethodDefinition(call.TargetMethod, originalMethod))
                     { continue; }
-                    var constraintFailure = failures.Any(diagnostic =>
+                    var signatureFailure = failures.Any(diagnostic =>
                     {
                         if (diagnostic is null)
                         { throw new ArgumentNullException(nameof(diagnostic)); }
-                        return diagnostic.Id is "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377"
+                        return diagnostic.Id is "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377" or "CS8714" or "CS8634" or "CS8631" or "CS8603" or "CS8604" or "CS8619" or "CS8620" or "CS8625"
                             && diagnostic.Location.SourceTree == afterTree && afterCalls[i].Span.Contains(diagnostic.Location.SourceSpan);
                     });
-                    if (constraintFailure)
+                    if (signatureFailure)
                     {
                         var afterSemantic = changedCompilation.GetSemanticModel(afterTree);
                         var operation = afterSemantic.GetOperation(afterCalls[i], cancellationToken) as IInvocationOperation;

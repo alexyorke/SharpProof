@@ -30,6 +30,7 @@ bash src/SharpProof.HmInference/verify-aliases.sh "$output" | tee /workspace/Sha
 bash src/SharpProof.HmInference/verify-arrays.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/array-construction-checks.txt
 bash src/SharpProof.HmInference/verify-partials.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/partial-method-checks.txt
 bash src/SharpProof.HmInference/verify-callerconstraints.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/caller-constraint-checks.txt
+bash src/SharpProof.HmInference/verify-nullablecallers.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-caller-checks.txt
 bash src/SharpProof.HmInference/verify-builder-layout.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/builder-layout-checks.txt
 dotnet "$output" --self-test | tee /workspace/SharpProof/artifacts/hm-inference/tests.txt
 dotnet "$output" --samples | tee /workspace/SharpProof/artifacts/hm-inference/samples.txt

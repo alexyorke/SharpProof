@@ -367,6 +367,7 @@ public static partial class Inference
 
             if (IntroducesCompilerWarnings(changedCompilation))
             {
+                RefineInferenceFailures(changedCompilation, tree, changed, symbol, parameters, result, pins);
                 return new(symbol.Name, "Rejected", "Generalization introduces compiler warnings or style errors.");
             }
 

@@ -747,3 +747,11 @@ Exact-signature tests cover both caller locations, named/extension/open generic
 calls, satisfied constraints and cases with no generic component left. Applied
 Fix All runtime checks compare original values, conversion/helper order, boxing,
 new independent domains and partial async suspension, faults and cancellation.
+
+Nullable constraint and result warnings at supplied calls can also trigger
+signature refinement. This preserves original nullable argument conversions and
+return contracts while independent parameters and tuple siblings stay generic.
+Original warning suppression and warnings-as-errors settings are respected;
+other newly introduced warnings still reject candidates. Exact signatures and
+IDE runtime checks cover nullable reference/value inputs, array identity, tuple
+siblings, generic caller wrappers and async suspension, faults and cancellation.
