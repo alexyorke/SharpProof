@@ -84,7 +84,7 @@ public static partial class Inference
                     .WithBody(visited.Block).AddAttributeLists(Mark(index));
                 if (converted is null)
                 { throw new InferenceException("Cannot inspect anonymous-method target."); }
-                var spelling = CSharpTypes.Render(CSharpTypes.Rigid(converted), converted, [], model: semantic, position: node.SpanStart);
+                var spelling = CSharpTypes.Render(CSharpTypes.Rigid(converted), converted, [], nullableAnnotations: true, model: semantic, position: node.SpanStart, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
                 return SyntaxFactory.CastExpression(SyntaxFactory.ParseTypeName(spelling), SyntaxFactory.ParenthesizedExpression(lambda)).WithTriviaFrom(node);
             }
         }

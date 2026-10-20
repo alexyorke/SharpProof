@@ -218,7 +218,7 @@ internal static class CodeFixChecks
         }).ToArray();
     }
 
-    private sealed class DiagnosticSource : FixAllContext.DiagnosticProvider
+    internal sealed class DiagnosticSource : FixAllContext.DiagnosticProvider
     {
         public override async Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken cancellationToken)
         {

@@ -698,3 +698,14 @@ boxing uses its underlying type. A cross-file runtime regression demonstrates th
 an unchecked generic rewrite changes existing binder failures into successful
 calls; protected analysis preserves those failures and an existing successful call,
 while an unrelated instance method still receives a working generic IDE fix.
+
+Cross-file global aliases to closed generic types can now generalize through a
+safe extern alias import in the method's document. Candidate validation and IDE
+fixes share the import logic, including nullable signatures, suspended awaits,
+nested generic owners and constraints. Fix All adds each import once and retains
+file banners, method comments and XML documentation. Alias declarations in other
+documents retain their text. Conflicting names that require alias renaming remain
+unsupported. Compiler-provided caller-info arguments are compared before and
+after rewriting; imports that change caller line numbers are rejected, and IDE
+formatting falls back to the original expression text when needed to preserve
+CallerArgumentExpression values.

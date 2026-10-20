@@ -166,7 +166,7 @@ public static partial class Inference
                         }
                         var type = (requirement.Type.Root.CSharpSymbol ?? ConversionCore(requirement.Type).CSharpSymbol) is { } declared
                             ? CSharpTypes.Render(requirement.Type, declared, variables, nullableAnnotations, model,
-                                currentMethod!.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration ? declaration.ParameterList.Span.End : 0, preserveDeclaredAnnotations: false)
+                                currentMethod!.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration ? declaration.ParameterList.Span.End : 0, preserveDeclaredAnnotations: false, cancellationToken: cancellationToken)
                             : requirement.Type.Format(variables, nullableAnnotations);
                         if (!types.Contains(type))
                         { if (requirement.BaseClass) { types.Insert(0, type); } else { types.Add(type); } }

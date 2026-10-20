@@ -15,7 +15,7 @@ public static partial class Inference
             return type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable ? nullable.TypeArguments[0] : type;
         }
 
-        private static IMethodSymbol? ResourcePattern(SemanticModel semantic, SyntaxNode site, ITypeSymbol type, bool asynchronous)
+        private static IMethodSymbol? ResourcePattern(SemanticModel semantic, SyntaxNode site, ITypeSymbol type, bool asynchronous, CancellationToken cancellationToken)
         {
             if (semantic is null)
             { throw new ArgumentNullException(nameof(semantic)); }
@@ -26,13 +26,13 @@ public static partial class Inference
             if (!asynchronous && !type.IsRefLikeType)
             { return null; }
             var name = asynchronous ? "DisposeAsync" : "Dispose";
-            var spelling = CSharpTypes.Render(CSharpTypes.Rigid(type), type, [], true, semantic, site.SpanStart);
+            var spelling = CSharpTypes.Render(CSharpTypes.Rigid(type), type, [], true, semantic, site.SpanStart, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
             var invocation = SyntaxFactory.ParseExpression("default(" + spelling + ")!." + name + "()");
             var selected = semantic.GetSpeculativeSymbolInfo(site.SpanStart, invocation, SpeculativeBindingOption.BindAsExpression).Symbol as IMethodSymbol;
             return selected is { IsStatic: false, IsExtensionMethod: false } ? selected : null;
         }
 
-        private static (IMethodSymbol Method, bool Pattern) ResourceMethod(SemanticModel semantic, SyntaxNode site, ITypeSymbol type, bool asynchronous)
+        private static (IMethodSymbol Method, bool Pattern) ResourceMethod(SemanticModel semantic, SyntaxNode site, ITypeSymbol type, bool asynchronous, CancellationToken cancellationToken)
         {
             if (semantic is null)
             { throw new ArgumentNullException(nameof(semantic)); }
@@ -53,7 +53,7 @@ public static partial class Inference
                 // Synchronous dynamic resources convert to IDisposable at runtime.
                 return (member, false);
             }
-            var selected = ResourcePattern(semantic, site, type, asynchronous);
+            var selected = ResourcePattern(semantic, site, type, asynchronous, cancellationToken);
             if (selected is not null)
             {
                 // A valid disposal pattern does not require the framework interface.
@@ -88,7 +88,7 @@ public static partial class Inference
             var coreShape = ConversionCore(shape);
             if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
             { coreShape = coreShape.Arguments[0].Root; }
-            var selected = ResourceMethod(model, site, type, asynchronous);
+            var selected = ResourceMethod(model, site, type, asynchronous, cancellationToken);
             if (!selected.Pattern)
             {
                 if (coreShape.IsVariable)
@@ -162,8 +162,8 @@ public static partial class Inference
             { return false; }
             for (var i = 0; i < left.Length; i++)
             {
-                var original = ResourceMethod(beforeModel, left[i].Site, left[i].Type, left[i].Asynchronous);
-                var candidate = ResourceMethod(afterModel, right[i].Site, right[i].Type, right[i].Asynchronous);
+                var original = ResourceMethod(beforeModel, left[i].Site, left[i].Type, left[i].Asynchronous, cancellationToken);
+                var candidate = ResourceMethod(afterModel, right[i].Site, right[i].Type, right[i].Asynchronous, cancellationToken);
                 if (left[i].Asynchronous != right[i].Asynchronous || original.Pattern != candidate.Pattern
                     || !SameAwaitMethod(original.Method, candidate.Method, changedMethod, changedTree))
                 { return false; }

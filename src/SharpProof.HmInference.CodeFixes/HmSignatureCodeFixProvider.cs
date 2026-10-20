@@ -126,8 +126,22 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
             return parameter.WithType(shape.ParameterList.Parameters[index].Type!.WithTriviaFrom(parameter.Type!));
         }), method.ParameterList.Parameters.GetSeparators()))).WithAdditionalAnnotations(Formatter.Annotation);
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-        var changed = document.WithSyntaxRoot(root!.ReplaceNode(method, replacement));
-        return await Formatter.FormatAsync(changed, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var changedRoot = Inference.AddRequiredExternAliases((CompilationUnitSyntax)root!.ReplaceNode(method, replacement), replacement, model, cancellationToken);
+        var changed = document.WithSyntaxRoot(changedRoot);
+        var formatted = await Formatter.FormatAsync(changed, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var formattedRoot = (await formatted.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+        var formattedModel = (await formatted.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
+        if (Inference.PreservesCallerInfoArguments(root!, model, formattedRoot, formattedModel, cancellationToken))
+        { return formatted; }
+        var unformattedRoot = changedRoot.ReplaceNodes(changedRoot.GetAnnotatedNodes(Formatter.Annotation), (original, rewritten) =>
+        {
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (rewritten is null)
+            { throw new ArgumentNullException(nameof(rewritten)); }
+            return rewritten.WithoutAnnotations(Formatter.Annotation);
+        });
+        return changed.WithSyntaxRoot(unformattedRoot);
     }
 
     private sealed class SequentialFixAll : FixAllProvider

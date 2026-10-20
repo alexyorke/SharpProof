@@ -40,7 +40,7 @@ internal static partial class CSharpTypes
         return type.TypeKind + ":" + type.MetadataName;
     }
 
-    private static string BoundSpelling(INamedTypeSymbol type, SemanticModel? model, int position)
+    private static string BoundSpelling(INamedTypeSymbol type, SemanticModel? model, int position, bool requireGeneric, CancellationToken cancellationToken)
     {
         if (type is null)
         { throw new ArgumentNullException(nameof(type)); }
@@ -57,6 +57,7 @@ internal static partial class CSharpTypes
         if (Binds(full))
         { return full; }
         var candidates = new List<string> { full };
+        var importable = new List<string>();
         foreach (var reference in model.Compilation.References)
         {
             if (!SymbolEqualityComparer.Default.Equals(model.Compilation.GetAssemblyOrModuleSymbol(reference), type.ContainingAssembly))
@@ -65,20 +66,26 @@ internal static partial class CSharpTypes
             {
                 if (alias == "global")
                 { continue; }
-                candidates.Add(Identifier(alias) + "::" + (full.StartsWith("global::", StringComparison.Ordinal) ? full.Substring(8) : full));
+                var spelling = Identifier(alias) + "::" + (full.StartsWith("global::", StringComparison.Ordinal) ? full.Substring(8) : full);
+                candidates.Add(spelling);
+                if (Inference.CanAddExternAlias(model, alias, cancellationToken))
+                { importable.Add(spelling); }
             }
         }
         candidates.Add(type.ToMinimalDisplayString(model, position, SymbolDisplayFormat.FullyQualifiedFormat));
         foreach (var candidate in candidates)
-        { if (Binds(candidate)) { return candidate; } }
+        { if ((!requireGeneric || candidate.IndexOf('<') >= 0) && Binds(candidate)) { return candidate; } }
         // Imported constraints can mention foreign type parameters. Their own
         // arguments will be substituted by Render; verify the constructor here.
         foreach (var candidate in candidates)
         {
             var bound = model.GetSpeculativeTypeInfo(position, SyntaxFactory.ParseTypeName(candidate), SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
-            if (bound is INamedTypeSymbol named && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, type.OriginalDefinition))
+            if ((!requireGeneric || candidate.IndexOf('<') >= 0)
+                && bound is INamedTypeSymbol named && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, type.OriginalDefinition))
             { return candidate; }
         }
+        if (importable.Count != 0)
+        { return importable[0]; }
         throw new InferenceException("The inferred nominal type cannot be named unambiguously at this declaration.");
     }
 

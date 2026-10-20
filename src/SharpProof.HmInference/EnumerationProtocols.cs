@@ -58,7 +58,7 @@ public static partial class Inference
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var declared = CSharpTypes.Rigid(bound, concrete);
-                var spelling = CSharpTypes.Render(declared, bound, [], model: model, position: loop.SpanStart);
+                var spelling = CSharpTypes.Render(declared, bound, [], nullableAnnotations: true, model: model, position: loop.SpanStart, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
                 var resolved = model.GetSpeculativeTypeInfo(loop.SpanStart, SyntaxFactory.ParseTypeName(spelling), SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
                 if (resolved is null || resolved.TypeKind == TypeKind.Error)
                 { throw new InferenceException("Unresolved substituted enumerator constraint."); }

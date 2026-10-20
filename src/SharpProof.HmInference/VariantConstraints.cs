@@ -55,7 +55,7 @@ public static partial class Inference
             { return null; }
             var position = currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is MethodDeclarationSyntax method
                 ? method.ParameterList.Span.End : 0;
-            var spelling = CSharpTypes.Render(original, declared, [], model: model, position: position);
+            var spelling = CSharpTypes.Render(original, declared, [], nullableAnnotations: true, model: model, position: position, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
             var resolved = model.GetSpeculativeTypeInfo(position, SyntaxFactory.ParseTypeName(spelling), SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
             return resolved is { TypeKind: not TypeKind.Error } ? resolved : null;
         }

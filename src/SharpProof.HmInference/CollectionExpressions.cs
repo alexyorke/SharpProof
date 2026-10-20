@@ -13,7 +13,7 @@ public static partial class Inference
         {
             if (type is null)
             { throw new ArgumentNullException(nameof(type)); }
-            return CSharpTypes.Render(CSharpTypes.Rigid(type), type, [], true, model, position);
+            return CSharpTypes.Render(CSharpTypes.Rigid(type), type, [], true, model, position, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
         }
 
         private IMethodSymbol? CollectionEnumerator(ITypeSymbol type, int position)

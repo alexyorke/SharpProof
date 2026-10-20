@@ -37,6 +37,48 @@ internal static class NominalIdentityChecks
             return MetadataReference.CreateFromImage(bytes).WithAliases([alias]);
         }
         var references = Program.Compile([]).References.Concat([Library("HmLeftIdentity", "Left"), Library("HmRightIdentity", "global")]).ToArray();
+        var sharedAlias = CSharpSyntaxTree.ParseText("extern alias Left;global using SharedClosed=Left::Collision.Box<int>;", cancellationToken: cancellationToken);
+        var aliasUse = CSharpSyntaxTree.ParseText("#nullable enable\npublic static class ImportedAliasProbe{public static SharedClosed Echo(SharedClosed value)=>value;}", cancellationToken: cancellationToken);
+        var aliasCompilation = CSharpCompilation.Create("SharedClosedAlias", [sharedAlias, aliasUse], references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var aliasErrors = aliasCompilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
+        { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; }).ToArray();
+        if (aliasErrors.Length != 0)
+        { throw new InvalidOperationException("Invalid shared alias fixture: " + aliasErrors[0]); }
+        var aliasResult = Program.Results(aliasCompilation, cancellationToken).Single(result =>
+        { ArgumentNullException.ThrowIfNull(result); return result.Method == "Echo"; });
+        if (aliasResult.Signature != "Left::Collision.Box<T1> Echo<T1>(Left::Collision.Box<T1> value)")
+        { throw new InvalidOperationException("Shared closed alias inference: " + (aliasResult.Signature ?? aliasResult.Message)); }
+        Program.Log.Info("PASS CrossFileGlobalClosedAliasInference");
+        foreach (var alias in new[] { "class", "T1" })
+        {
+            var renamed = references.Select(reference =>
+            { ArgumentNullException.ThrowIfNull(reference); return reference.Properties.Aliases.Contains("Left") ? reference.WithAliases([alias]) : reference; });
+            var escaped = alias == "class" ? "@class" : alias;
+            var globals = CSharpSyntaxTree.ParseText("extern alias " + escaped + ";global using SharedClosed=" + escaped + "::Collision.Box<int>;", cancellationToken: cancellationToken);
+            var named = CSharpCompilation.Create("AliasName" + alias, [globals, aliasUse], renamed, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var result = Program.Results(named, cancellationToken).Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == "Echo"; });
+            if (result.Status != "Suggestion")
+            { throw new InvalidOperationException("Importable alias name " + alias + ": " + result.Message); }
+            Program.Log.Info("PASS GlobalClosedAliasName" + alias);
+        }
+        foreach (var guarded in new[]
+        {
+            "public static class GuardedAlias{public static SharedClosed Echo(SharedClosed value,int Left)=>value;}",
+            "using System.Runtime.CompilerServices;public static class GuardedAlias{static int Save([CallerLineNumber]int line=0)=>line;public static SharedClosed Echo(SharedClosed value){Save();return value;}}"
+        })
+        {
+            var guardedTree = CSharpSyntaxTree.ParseText(guarded, cancellationToken: cancellationToken);
+            var guardedCompilation = CSharpCompilation.Create("GuardedAlias", [sharedAlias, guardedTree], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var result = Program.Results(guardedCompilation, cancellationToken).Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == "Echo"; });
+            if (result.Status == "Suggestion")
+            { throw new InvalidOperationException("Alias import changed an occupied name or caller-info constant: " + result.Signature); }
+        }
+        Program.Log.Info("PASS AliasImportNameAndCallerInfoProtection");
+
+
         const string source = """
             #nullable enable
             extern alias Left;
@@ -158,6 +200,121 @@ internal static class NominalIdentityChecks
         if (shadowResult.Signature != "Inner<T> M<T1>(Inner<T> value, T1 ignored)")
         { throw new InvalidOperationException("Shadowed owner identity: " + shadowResult); }
         Program.Log.Info("PASS ShadowedEnclosingGenericNames");
-        return 11;
+        return 15 + await SharedAliasRuntime(references, images, cancellationToken).ConfigureAwait(false);
     }
+
+    private static async Task<int> SharedAliasRuntime(IEnumerable<MetadataReference> references, IEnumerable<byte[]> images, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(references);
+        ArgumentNullException.ThrowIfNull(images);
+        const string imports = """
+            extern alias Left;
+            global using SharedClosed=Left::Collision.Box<int>;
+            global using SharedNested=Left::Collision.Box<int>.Inner<string>;
+            global using SharedConstraint=Left::Collision.Constrained<Left::Collision.Item>;
+            """;
+        const string source = """
+            // retained file header
+            #nullable enable
+            using System.Threading.Tasks;
+            using System.Runtime.CompilerServices;
+            /// <summary>Retained alias owner.</summary>
+            public static class ImportedAliasProbe {
+                // retained method comment
+                public static string Format(SharedClosed value,int tag)=>Capture(value.Value+1);
+                private static string Capture(int value,[CallerArgumentExpression("value")]string expression="")=>expression;
+                public static SharedClosed Echo(SharedClosed value)=>value;
+                public static SharedClosed Again(SharedClosed value)=>value;
+                public static SharedClosed? Nullable(SharedClosed? value)=>value;
+                public static async Task<SharedClosed> Await(Task<SharedClosed> value)=>await value;
+                public static SharedNested Nested(SharedNested value)=>value;
+                public static SharedConstraint Constraint(SharedConstraint value)=>value;
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "SharedAliasRuntime", "SharedAliasRuntime", LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: references));
+        var importsDocument = project.AddDocument("Globals.cs", imports);
+        var document = importsDocument.Project.AddDocument("AliasUse.cs", source);
+        var before = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var oldDocumentation = before.GetTypeByMetadataName("ImportedAliasProbe")!.GetDocumentationCommentXml(cancellationToken: cancellationToken);
+        var provider = new HmSignatureCodeFixProvider();
+        var context = new FixAllContext(document, provider, FixAllScope.Document, "HM.GeneralizeSignature", provider.FixableDiagnosticIds,
+            new CodeFixChecks.DiagnosticSource(), cancellationToken);
+        var action = (await provider.GetFixAllProvider().GetFixAsync(context).ConfigureAwait(false))!;
+        var operations = await action.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+        var solution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
+        document = solution.GetDocument(document.Id)!;
+        var text = (await document.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString();
+        var root = (CompilationUnitSyntax)(await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+        if (root.Externs.Count != 1 || root.Externs[0].Identifier.ValueText != "Left"
+            || root.DescendantNodes().OfType<MethodDeclarationSyntax>().Count(method =>
+            { ArgumentNullException.ThrowIfNull(method); return method.TypeParameterList is not null; }) != 8
+            || !text.StartsWith("// retained file header", StringComparison.Ordinal)
+            || !text.Contains("// retained method comment", StringComparison.Ordinal)
+            || (await solution.GetDocument(importsDocument.Id)!.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString() != imports)
+        { throw new InvalidOperationException("Alias import Fix All lost a fix/trivia, duplicated an import or changed the alias declaration."); }
+        var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        if (compilation.GetTypeByMetadataName("ImportedAliasProbe")!.GetDocumentationCommentXml(cancellationToken: cancellationToken) != oldDocumentation)
+        { throw new InvalidOperationException("Adding an extern alias changed class documentation."); }
+        var errors = compilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
+        { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException(string.Join("\n", errors.Select(diagnostic =>
+            { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.ToString(); })));
+        }
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+        if (!emitted.Success)
+        { throw new InvalidOperationException(string.Join("\n", emitted.Diagnostics)); }
+        var loadContext = new System.Runtime.Loader.AssemblyLoadContext("SharedAliasRuntime", isCollectible: true);
+        try
+        {
+            foreach (var bytes in images)
+            {
+                using var dependency = new MemoryStream(bytes);
+                loadContext.LoadFromStream(dependency);
+            }
+            image.Position = 0;
+            var assembly = loadContext.LoadFromStream(image);
+            var probe = assembly.GetType("ImportedAliasProbe")!;
+            var left = loadContext.Assemblies.Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.GetName().Name == "HmLeftIdentity"; });
+            var boxType = left.GetType("Collision.Box" + (char)96 + "1")!.MakeGenericType(typeof(Uri));
+            var box = Activator.CreateInstance(boxType)!;
+            var marker = new Uri("https://example.invalid/shared-alias");
+            boxType.GetField("Value")!.SetValue(box, marker);
+            if (!ReferenceEquals(probe.GetMethod("Echo")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [box]), box)
+                || !ReferenceEquals(probe.GetMethod("Again")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [box]), box)
+                || probe.GetMethod("Nullable")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [null]) is not null)
+            { throw new InvalidOperationException("Shared alias fixes changed assembly identity or reference values."); }
+            var nestedType = left.GetType("Collision.Box" + (char)96 + "1+Inner" + (char)96 + "1")!.MakeGenericType(typeof(Uri), typeof(decimal));
+            var nested = Activator.CreateInstance(nestedType)!;
+            if (!ReferenceEquals(probe.GetMethod("Nested")!.MakeGenericMethod(typeof(Uri), typeof(decimal)).Invoke(null, [nested]), nested))
+            { throw new InvalidOperationException("Shared nested alias fix lost its generic owner."); }
+            var intBoxType = left.GetType("Collision.Box" + (char)96 + "1")!.MakeGenericType(typeof(int));
+            var intBox = Activator.CreateInstance(intBoxType)!;
+            intBoxType.GetField("Value")!.SetValue(intBox, 42);
+            var argumentText = probe.GetMethod("Format")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [intBox, marker]);
+            if (!Equals(argumentText, "value.Value+1"))
+            { throw new InvalidOperationException("IDE formatting changed a caller-argument-expression value: " + argumentText); }
+            var completionType = typeof(TaskCompletionSource<>).MakeGenericType(boxType);
+            var completion = Activator.CreateInstance(completionType, [TaskCreationOptions.RunContinuationsAsynchronously])!;
+            var task = completionType.GetProperty("Task")!.GetValue(completion)!;
+            var pending = (Task)probe.GetMethod("Await")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [task])!;
+            if (pending.IsCompleted)
+            { throw new InvalidOperationException("Shared alias await completed before its operand."); }
+            completionType.GetMethod("SetResult")!.Invoke(completion, [box]);
+            await pending.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!ReferenceEquals(pending.GetType().GetProperty("Result")!.GetValue(pending), box)
+                || probe.GetMethod("Constraint")!.GetGenericArguments()[0].GetGenericParameterConstraints().Single().Assembly != left)
+            { throw new InvalidOperationException("Shared alias fix changed an await result or foreign constraint identity."); }
+        }
+        finally { loadContext.Unload(); }
+        Program.Log.Info("PASS CrossFileGlobalAliasImportFixAllTriviaAndIdentity");
+        Program.Log.Info("PASS CrossFileGlobalAliasNullableAwaitAndNestedRuntime");
+        return 2;
+    }
+
 }

@@ -189,13 +189,14 @@ internal static partial class CSharpTypes
         return SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ? "@" + name : name;
     }
 
-    public static string Render(HmType inferred, ITypeSymbol declared, Dictionary<HmType, string> variables, bool nullableAnnotations = true, SemanticModel? model = null, int position = 0, bool preserveDeclaredAnnotations = true)
+    public static string Render(HmType inferred, ITypeSymbol declared, Dictionary<HmType, string> variables, bool nullableAnnotations, SemanticModel? model, int position, bool preserveDeclaredAnnotations, CancellationToken cancellationToken)
     {
         if (variables is null)
         {
             throw new global::System.ArgumentNullException(nameof(variables));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         inferred = inferred.Root;
         if (inferred.CSharpSymbol is INamedTypeSymbol { IsAnonymousType: true })
         { throw new InferenceException("An anonymous type cannot appear in the suggested signature."); }
@@ -210,18 +211,18 @@ internal static partial class CSharpTypes
         if (inferred.Name == NullableParameter)
         {
             var inner = inferred.Arguments[0].Root;
-            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations, model, position, preserveDeclaredAnnotations);
+            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken);
             return !annotate || inner.IsValueType == true || inner.Name is NullableParameter or NullableReference or NullableValue ? rendered : rendered + "?";
         }
         if (inferred.Name == NullableReference)
         {
             var inner = inferred.Arguments[0].Root;
-            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations, model, position, preserveDeclaredAnnotations);
+            var rendered = Render(inner, declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken);
             return !annotate || inner.Name is NullableReference or NullableParameter ? rendered : rendered + "?";
         }
         if (inferred.Name == NullableValue && declared is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
         {
-            return Render(inferred.Arguments[0], nullable.TypeArguments[0], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations) + "?";
+            return Render(inferred.Arguments[0], nullable.TypeArguments[0], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken) + "?";
         }
         if (inferred.Name == "Tuple" && declared is INamedTypeSymbol { IsTupleType: true } tuple && tuple.TupleElements.Length == inferred.Arguments.Length)
         {
@@ -237,7 +238,7 @@ internal static partial class CSharpTypes
                     throw new global::System.ArgumentOutOfRangeException(nameof(i));
                 }
 
-                return Render(inferred.Arguments[i], field.Type, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations) + (field.IsImplicitlyDeclared ? "" : " " + Identifier(field.Name));
+                return Render(inferred.Arguments[i], field.Type, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken) + (field.IsImplicitlyDeclared ? "" : " " + Identifier(field.Name));
             })) + ")";
         }
 
@@ -252,7 +253,7 @@ internal static partial class CSharpTypes
                 var modifiers = string.Join(" ", parameters[i].Modifiers.Select(token =>
                 { if (token.RawKind == 0) { throw new ArgumentException("Expected a function pointer modifier.", nameof(token)); } return token.ValueText; }));
                 rendered.Add((modifiers.Length == 0 ? "" : modifiers + " ")
-                    + Render(inferred.Arguments[i], original, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations));
+                    + Render(inferred.Arguments[i], original, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken));
             }
             return "delegate*" + (syntax.CallingConvention is null ? "" : " " + syntax.CallingConvention.NormalizeWhitespace().ToFullString())
                 + "<" + string.Join(", ", rendered) + ">";
@@ -260,26 +261,26 @@ internal static partial class CSharpTypes
         if (inferred.Name == Pointer && declared is IPointerTypeSymbol pointer)
         {
             return Render(inferred.Arguments[0], pointer.PointedAtType, variables,
-                nullableAnnotations, model, position, preserveDeclaredAnnotations) + "*";
+                nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken) + "*";
         }
         if (inferred.Name.StartsWith("[", StringComparison.Ordinal) && declared is IArrayTypeSymbol array)
         {
-            return Render(inferred.Arguments[0], array.ElementType, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations) + inferred.Name;
+            return Render(inferred.Arguments[0], array.ElementType, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken) + inferred.Name;
         }
 
         if (inferred.NestedTypeName is not null && declared is INamedTypeSymbol { ContainingType: not null } nested)
         {
             var own = OwnArguments(inferred);
-            var spelling = SyntaxFactory.ParseTypeName(BoundSpelling(nested, model, position));
+            var spelling = SyntaxFactory.ParseTypeName(BoundSpelling(nested, model, position, false, cancellationToken));
             var result = spelling is SimpleNameSyntax ? inferred.NestedTypeName
-                : Render(inferred.Arguments[0], nested.ContainingType, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations) + "." + inferred.NestedTypeName;
+                : Render(inferred.Arguments[0], nested.ContainingType, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken) + "." + inferred.NestedTypeName;
             return own.Length == 0 ? result : result + "<" + string.Join(", ", own.Select((argument, i) =>
-            { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } if (i < 0) { throw new ArgumentOutOfRangeException(nameof(i)); } return Render(argument, nested.TypeArguments[i], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations); })) + ">";
+            { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } if (i < 0) { throw new ArgumentOutOfRangeException(nameof(i)); } return Render(argument, nested.TypeArguments[i], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken); })) + ">";
         }
 
         if (inferred.Arguments.Length > 0 && declared is INamedTypeSymbol named && named.TypeArguments.Length == inferred.Arguments.Length)
         {
-            var spelling = BoundSpelling(named, model, position);
+            var spelling = BoundSpelling(named, model, position, true, cancellationToken);
             var argumentStart = spelling.IndexOf('<');
             if (named.ContainingType is null && argumentStart < 0)
             { throw new InferenceException("A closed type alias cannot express the inferred generic arguments."); }
@@ -297,12 +298,12 @@ internal static partial class CSharpTypes
                     throw new global::System.ArgumentOutOfRangeException(nameof(i));
                 }
 
-                return Render(t, named.TypeArguments[i], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations);
+                return Render(t, named.TypeArguments[i], variables, nullableAnnotations, model, position, preserveDeclaredAnnotations, cancellationToken);
             })) + ">";
         }
 
         if (inferred.CSharpSymbol is INamedTypeSymbol { Arity: 0 } nominal && inferred.Arguments.Length == 0)
-        { return BoundSpelling(nominal, model, position); }
+        { return BoundSpelling(nominal, model, position, false, cancellationToken); }
         return inferred.Format(variables, nullableAnnotations);
     }
 }

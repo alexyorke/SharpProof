@@ -271,10 +271,10 @@ public static partial class Inference
                 }
 
                 return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables,
-                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End);
+                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
             }).ToArray();
             var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
-                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End);
+                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
             TypeSyntax returnSyntax = returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName);
             returnSyntax = method.ReturnType is RefTypeSyntax refReturn ? refReturn.WithType(returnSyntax.WithTriviaFrom(refReturn.Type)) : returnSyntax.WithTriviaFrom(method.ReturnType);
             var candidate = method.WithReturnType(returnSyntax).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
@@ -295,7 +295,14 @@ public static partial class Inference
             // Recheck the original compilation with just this signature changed. This catches
             // explicit local types, conversions, name collisions and broken call sites.
             var tree = method.SyntaxTree;
-            var changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
+            var candidateMarker = new SyntaxAnnotation("HM.Candidate");
+            candidate = candidate.WithAdditionalAnnotations(candidateMarker);
+            SyntaxTree CandidateTree()
+            {
+                var root = (CompilationUnitSyntax)tree.GetRoot(cancellationToken).ReplaceNode(method, candidate);
+                return tree.WithRootAndOptions(AddRequiredExternAliases(root, candidate, model, cancellationToken), tree.Options);
+            }
+            var changed = CandidateTree();
             Compilation ReplaceCandidate(SyntaxTree replacement)
             {
                 if (replacement is null)
@@ -312,12 +319,11 @@ public static partial class Inference
                 RefineInferenceFailures(changedCompilation, tree, changed, symbol, parameters, pins);
                 if (pins.Count != previousPins)
                 { return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site."); }
-                var layoutMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(declaration =>
-                { if (declaration is null) { throw new ArgumentNullException(nameof(declaration)); } return declaration.SpanStart == method.SpanStart; });
+                var layoutMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
                 if (InferBuilderLayoutConstraints(changedCompilation, layoutMethod, variables))
                 {
                     candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(BuildConstraints(variables, nullableAnnotations)));
-                    changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
+                    changed = CandidateTree();
                     changedCompilation = ReplaceCandidate(changed);
                 }
             }
@@ -340,15 +346,7 @@ public static partial class Inference
                 return new(symbol.Name, "Rejected", "Generalization introduces compiler warnings or style errors.");
             }
 
-            var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
-            {
-                if (m is null)
-                {
-                    throw new global::System.ArgumentNullException(nameof(m));
-                }
-
-                return m.SpanStart == method.SpanStart;
-            });
+            var changedMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
             var changedModel = changedCompilation.GetSemanticModel(changed);
             var changedSymbol = changedModel.GetDeclaredSymbol(changedMethod, cancellationToken)!;
             var signatureCopies = new Dictionary<HmType, HmType>();
@@ -384,6 +382,8 @@ public static partial class Inference
                 var afterModel = changedCompilation.GetSemanticModel(afterTree);
                 var beforeRoot = sourceTree.GetRoot(cancellationToken);
                 var afterRoot = afterTree.GetRoot(cancellationToken);
+                if (!PreservesCallerInfoArguments(beforeRoot, beforeModel, afterRoot, afterModel, cancellationToken))
+                { return new(symbol.Name, "Rejected", "Generalization changes a compiler-provided caller-info argument."); }
                 if (!PreservesPinningBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes the selected pinning pattern."); }
                 if (!PreservesForEachBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
