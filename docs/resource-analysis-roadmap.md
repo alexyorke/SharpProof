@@ -99,6 +99,15 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ### Current coverage qualification
 
+Published `7a94e4a89` passed all four coverage shards in run 39491749196.
+The complete merge-commit report (ef2e90e620a966be29b1bc9017fc291c0e365413)
+measured 5955/6223 changed trusted lines (95.69%, 268 uncovered lines), failing
+the unchanged 100% floor. This is the latest complete measurement. The report
+is retained at `artifacts/resource-7a94-coverage-evidence/coverage/SharpProof.coverage.json`
+and the failed aggregate log at `artifacts/resource-7a94-coverage-failed.log`.
+The newer normal-domain and overload controls in `215a598c4` are not part of
+this report and require their own exact-head CI qualification.
+
 Published `ecdbd2c5c` passed all four coverage shards in run 39485547326.
 Its complete merge-commit measurement (64a90fb395a27dcb1af99f98197603c713672bbf)
 is 5900/6177 changed trusted lines (95.52%, 277 uncovered lines), below the
