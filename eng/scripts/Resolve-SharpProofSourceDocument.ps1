@@ -30,7 +30,7 @@ function Resolve-SharpProofSourceDocument {
     foreach ($candidate in $candidates) {
         if ($candidate.StartsWith('/_/', [StringComparison]::Ordinal)) {
             $suffix = $candidate.Substring(3)
-            $components = $suffix.Split('/')
+            $components = [Collections.Immutable.ImmutableArray]::CreateRange[string]($suffix.Split('/'))
             if ([string]::IsNullOrWhiteSpace($suffix) -or
                 [IO.Path]::IsPathRooted($suffix) -or $suffix -match '^[A-Za-z]:' -or
                 @($components | Where-Object {

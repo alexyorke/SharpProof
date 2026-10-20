@@ -4671,3 +4671,9 @@ Eleven old rows close (four migrated roots and seven scalar/native/existing-buil
 Eight retained inventories, four owned records and the fixed exclusion vector are immutable. Native evaluated SDK properties are copied into a scoped ordered builder and published readonly, preserving property order. Report payloads retain immutable snapshots directly. The Git inventory text remains a scalar; its split inventory is frozen.
 
 Full canonical before/after layout validation passes for 2695 source files, 59 projects, 151 pinned common files and all 59 evaluated projects. Complete JSON report bytes match exactly. Full script-tool regressions pass. Ten old coordinates close with five independent owned-construction attestations; PowerShell now has 151 Open rows. C# coordinate rows remain zero and coverage gaps 27. Full current ownership/archive/binding reconciliation, compiler/coverage recollection and exact-final-head native workflows remain pending.
+
+### IMM-M441: immutable JSON property and canonical path observations
+
+Retained actual/expected JSON property vectors and split source/trusted-path components are immutable. The trusted-path producer publishes its existing immutable builder snapshot directly while preserving pipeline enumeration. Legacy typed ingress, readonly membership and scoped dictionary construction keep their contracts.
+
+Twenty exact before/after property/path outcomes and failure texts match, including duplicate/case sensitivity, path rejection and output order. All twenty real source-document regressions and full script-tool regressions pass with zero formatting changes. Seven old rows close and three retained snapshots receive independent attestations. PowerShell now has 144 Open rows; C# coordinate rows remain zero and coverage gaps 27. Exhaustive current ownership/archive/binding reconciliation and final compiler/coverage/native gates remain pending.

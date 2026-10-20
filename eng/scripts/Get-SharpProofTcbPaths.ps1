@@ -36,7 +36,7 @@ function Get-SharpProofTcbPaths {
             $path.Contains('//')) {
             throw "Trusted-computing-base path is not canonical: '$path'."
         }
-        $segments = $path.Split('/')
+        $segments = [Collections.Immutable.ImmutableArray]::CreateRange[string]($path.Split('/'))
         foreach ($segment in $segments) {
             if ($segment -eq '.' -or $segment -eq '..') {
                 throw "Trusted-computing-base path contains a dot segment: '$path'."
@@ -154,5 +154,5 @@ function Get-SharpProofTcbPaths {
         }
     }
 
-    return [string[]]@($paths.ToImmutable())
+    return $paths.ToImmutable()
 }
