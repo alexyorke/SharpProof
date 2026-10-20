@@ -287,7 +287,7 @@ function Assert-SharpProofCanonicalCohorts {
             throw 'Canonical cohort does not match this attempt and the complete project partition.'
         }
         $expectedTasks = if ($cohort -eq 'Gates') {
-            , [Collections.Immutable.ImmutableArray]::Create[string]('semantic-projects')
+            , [Collections.Immutable.ImmutableArray]::Create[string]('gates-corpus', 'gates-remainder-1', 'gates-remainder-2', 'gates-remainder-3')
         }
         else {
             , [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(

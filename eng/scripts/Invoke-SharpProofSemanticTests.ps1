@@ -27,8 +27,9 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds every slot, the Worker remainder shards dominate the rest, and
-    # Projects holds every other task. All keeps the single-runner task set.
+    # holds the Gates corpus task and shards, the Worker remainder shards
+    # dominate the rest, and Projects holds every other task. All keeps the
+    # single-runner task set.
     [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
     [string]$CoverageTaskGroup = 'All'
 )
@@ -108,8 +109,8 @@ if ($CoverageTaskGroup -ne 'All' -and -not $coverageEnabled) {
     throw 'Coverage task groups require coverage collection.'
 }
 if ($coverageEnabled) {
-    # The corpus verifier starts its own worker pool and must run in a separate
-    # task that reserves every slot. Attributes has its own collector stage.
+    # Gates runs as its own task set below; its corpus verifier task reserves
+    # every slot. Attributes has its own collector stage.
     # Architecture XML/DAG checks retain a separate strict noninstrumented TRX task.
     $semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticProjects | Where-Object {
                 $_ -cne $gatesProject -and
@@ -299,11 +300,48 @@ for ($index = 1; $index -le $workerRemainderShardFilters.Length; $index++) {
     $workerRemainderNameBuilder.Add('worker-remainder-' + $index)
 }
 $workerRemainderTaskNames = $workerRemainderNameBuilder.ToImmutable()
+# Preserve the upstream Gates partition with immutable prefix groups and filters.
+$gatesShardingEnabled =
+$semanticProjectShardingEnabled -or $SemanticCohort -eq 'Gates'
+$gatesClassPrefix = 'SharpProof.Gates.Test.'
+$gatesCorpusClasses = [Collections.Immutable.ImmutableArray]::Create[string](
+    'CorpusSnapshotWorkflowTests', 'GatesCommandWorkflowTests')
+$gatesCorpusFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$gatesRemainderFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($gatesCorpusClass in $gatesCorpusClasses) {
+    $gatesCorpusFilterBuilder.Add('FullyQualifiedName~' + $gatesClassPrefix + $gatesCorpusClass)
+    $gatesRemainderFilterBuilder.Add('FullyQualifiedName!~' + $gatesClassPrefix + $gatesCorpusClass)
+}
+$gatesCorpusFilterBuilder.Add('TestCategory=Corpus')
+$gatesRemainderFilterBuilder.Add('TestCategory!=Corpus')
+$gatesCorpusFilter = $gatesCorpusFilterBuilder.ToImmutable() -join '|'
+$gatesRemainderFilter = $gatesRemainderFilterBuilder.ToImmutable() -join '&'
+$gatesPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$gatesPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeEffectOracleGate'))
+$gatesPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeEffectOracleSelection', 'CorpusGate'))
+$gatesRemainderShardPrefixes = $gatesPrefixGroupBuilder.ToImmutable()
+$gatesShardFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$gatesComplementFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($prefixes in $gatesRemainderShardPrefixes) {
+    $includedPrefixes = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($prefix in $prefixes) {
+        $includedPrefixes.Add('FullyQualifiedName~' + $gatesClassPrefix + $prefix)
+        $gatesComplementFilterBuilder.Add('FullyQualifiedName!~' + $gatesClassPrefix + $prefix)
+    }
+    $gatesShardFilterBuilder.Add('(' + ($includedPrefixes.ToImmutable() -join '|') + ')')
+}
+$gatesShardFilterBuilder.Add($gatesComplementFilterBuilder.ToImmutable() -join '&')
+$gatesRemainderShardFilters = $gatesShardFilterBuilder.ToImmutable()
+$gatesRemainderNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+for ($index = 1; $index -le $gatesRemainderShardFilters.Length; $index++) {
+    $gatesRemainderNameBuilder.Add('gates-remainder-' + $index)
+}
+$gatesRemainderTaskNames = $gatesRemainderNameBuilder.ToImmutable()
 $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
         foreach ($project in $semanticProjects) {
-            if ($project -eq (
+            if ($project -ceq $gatesProject -or $project -eq (
                     'src/SharpProof.Architecture.Tests/' +
                     'SharpProof.Architecture.Tests.csproj')) {
                 continue
@@ -321,7 +359,7 @@ if (-not $ArchitectureOnly) {
                     }).AsReadOnly())
         }
     }
-    else {
+    elseif ($SemanticCohort -ne 'Gates') {
         $taskBuilder.Add(
             ([ordered]@{
                 Name                         = 'semantic-projects'
@@ -336,16 +374,36 @@ if (-not $ArchitectureOnly) {
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
             }).AsReadOnly())
     }
-    if ($coverageEnabled) {
-        $taskBuilder.Add(([ordered]@{
-                    Name                         = 'semantic-gates'
-                    Target                       = Join-Path $repositoryRoot $gatesProject
-                    Filter                       = $semanticFilter
-                    ProjectParallelism           = 0
-                    IsolateOutput                = $false
-                    Slots                        = $parallelism
-                    DefaultEstimatedMilliseconds = 500000L
+    # The corpus task reserves the verifier pool and its host; coverage
+    # reserves every slot. Other shards retain upstream process isolation.
+    $gatesDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $gatesDescriptorBuilder.Add(([ordered]@{
+                Name                         = 'gates-corpus'
+                Filter                       = "($gatesCorpusFilter)&($semanticFilter)"
+                Slots                        = $(if ($coverageEnabled) { $parallelism } else { [Math]::Min($parallelism, 3) })
+                DefaultEstimatedMilliseconds = 250000L
+            }).AsReadOnly())
+    for ($index = 0; $index -lt $gatesRemainderShardFilters.Length; $index++) {
+        $gatesDescriptorBuilder.Add(([ordered]@{
+                    Name                         = $gatesRemainderTaskNames[$index]
+                    Filter                       = "($gatesRemainderFilter)&($semanticFilter)&$($gatesRemainderShardFilters[$index])"
+                    Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+                    DefaultEstimatedMilliseconds = 100000L
                 }).AsReadOnly())
+    }
+    $gatesTaskDescriptors = $gatesDescriptorBuilder.ToImmutable()
+    if ($gatesShardingEnabled) {
+        foreach ($descriptor in $gatesTaskDescriptors) {
+            $taskBuilder.Add(([ordered]@{
+                        Name                         = $descriptor.Name
+                        Target                       = Join-Path $repositoryRoot $gatesProject
+                        Filter                       = $descriptor.Filter
+                        ProjectParallelism           = 0
+                        IsolateOutput                = $true
+                        Slots                        = $descriptor.Slots
+                        DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
+                    }).AsReadOnly())
+        }
     }
     $workerDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $workerDescriptorBuilder.AddRange([object[]]@(
@@ -418,7 +476,10 @@ if ($architectureShardingEnabled) {
             }).AsReadOnly())
 }
 if ($CoverageTaskGroup -ne 'All') {
-    $gatesTaskNames = [Collections.Immutable.ImmutableArray]::Create[string]('semantic-gates')
+    $gatesTaskNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $gatesTaskNameBuilder.Add('gates-corpus')
+    foreach ($gatesTaskName in $gatesRemainderTaskNames) { $gatesTaskNameBuilder.Add($gatesTaskName) }
+    $gatesTaskNames = $gatesTaskNameBuilder.ToImmutable()
     $workerTaskNameBuilder = $workerRemainderTaskNames.ToBuilder()
     $workerTaskNameBuilder.Add('worker-fixed-checksum')
     $workerTaskNames = $workerTaskNameBuilder.ToImmutable()
@@ -545,9 +606,9 @@ try {
         $isolatedOutput = ''
         if ($coverageEnabled -and $task.IsolateOutput) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                -SourceDirectory (Join-Path $repositoryRoot (
-                    'artifacts/bin/SharpProof.Worker.Tests/' + $Configuration +
-                    '/net10.0')) `
+                -SourceDirectory (Split-Path -Parent (
+                    Get-SharpProofTestAssemblyPath `
+                        -ProjectPath $task.Target -Configuration $Configuration)) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
                     $task.Name + '/' + $Configuration + '/net10.0'))
