@@ -77,8 +77,13 @@ public static partial class Inference
         {
             if (loop is null)
             { throw new ArgumentNullException(nameof(loop)); }
-            if (info.ElementType is null || info.ElementType.TypeKind == TypeKind.Dynamic)
-            { throw new InferenceException("Dynamic or unresolved enumeration."); }
+            if (info.ElementType is null)
+            { throw new InferenceException("Unresolved enumeration."); }
+            if (model.GetTypeInfo(loop.Expression, cancellationToken).Type is IDynamicTypeSymbol)
+            {
+                Anchor(loop.Expression);
+                return CSharpTypes.Rigid(info.ElementType);
+            }
             if (model.GetTypeInfo(loop.Expression, cancellationToken).Type is IArrayTypeSymbol array && !info.IsAsynchronous)
             {
                 var element = HmType.Variable();

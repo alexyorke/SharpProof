@@ -677,3 +677,13 @@ Pair<object, T> at its output without changing the return dynamic metadata or
 forcing the second field to remain int. Runtime IDE checks compare DynamicAttribute
 flags exactly and verify new decimal fields, tuple values, and array/task/container
 reference identity. CLI and fresh package consumers assert the full return shapes.
+
+Foreach supports dynamic collection expressions and statically bound dynamic
+elements in arrays, IEnumerable<dynamic> and IAsyncEnumerable<dynamic>. Dynamic
+collection expressions retain the runtime IEnumerable conversion; synchronous
+dynamic resources retain the runtime IDisposable conversion. Independent values
+can become generic through loops, using statements/declarations and sync/async
+iterator methods. IDE runtime checks compare interface selection against competing
+patterns, iteration effects, early exit and exception cleanup. Async checks suspend
+both MoveNextAsync and DisposeAsync, preserve faults/cancellation, and verify
+deferred iterator execution and early disposal of inner enumerators.

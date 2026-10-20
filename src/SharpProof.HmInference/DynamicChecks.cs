@@ -60,6 +60,22 @@ internal static class DynamicChecks
             ("DynamicNamedCallerBoundary", "static Pair<object,int> M(Pair<dynamic,int> value,int tag)=>value;static string Use(Pair<dynamic,int> value)=>M(value,0).Item.ToString()!;class Pair<A,B>{public A Item=default!;}", "Suggestion", "global::Cases.Pair<object, T1> M<T1, T2>(global::Cases.Pair<dynamic, T1> value, T2 tag)"),
             ("DynamicRectangularArrayBoundary", "static object[,] M(dynamic[,] value,int tag)=>value;", "Suggestion", "object[,] M<T1>(dynamic[,] value, T1 tag)"),
 
+            ("DynamicForeachSource", "static int M(dynamic values,int seed){foreach(var item in values){}return seed;}", "Suggestion", "T1 M<T1>(dynamic values, T1 seed)"),
+            ("DynamicForeachArray", "static int M(dynamic[] values,int seed){foreach(var item in values){}return seed;}", "Suggestion", "T1 M<T1>(dynamic[] values, T1 seed)"),
+            ("DynamicForeachSequence", "static int M(System.Collections.Generic.IEnumerable<dynamic> values,int seed){foreach(var item in values){}return seed;}", "Suggestion", "T1 M<T1>(global::System.Collections.Generic.IEnumerable<dynamic> values, T1 seed)"),
+            ("DynamicForeachAsyncSequence", "static async System.Threading.Tasks.Task<int> M(System.Collections.Generic.IAsyncEnumerable<dynamic> values,int seed){await foreach(var item in values){}return seed;}", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<dynamic> values, T1 seed)"),
+            ("DynamicForeachTypedValue", "static int M(dynamic values,int tag){foreach(int item in values)return item;return 0;}", "Suggestion", "int M<T1>(dynamic values, T1 tag)"),
+            ("DynamicForeachTypedReference", "static object M(dynamic values,object fallback,int tag){foreach(object item in values)return item;return fallback;}", "Suggestion", "object M<T1>(dynamic values, object fallback, T1 tag)"),
+            ("DynamicForeachExplicitDynamic", "static int M(System.Collections.Generic.IEnumerable<int> values,int seed){foreach(dynamic item in values){}return seed;}", "Suggestion", "T1 M<T1>(global::System.Collections.Generic.IEnumerable<int> values, T1 seed)"),
+            ("DynamicForeachTuple", "static int M(System.Collections.Generic.IEnumerable<(dynamic Item,int Count)> values,int seed){foreach(var(item,count) in values)seed=count;return seed;}", "Suggestion", "T1 M<T1>(global::System.Collections.Generic.IEnumerable<(dynamic Item, T1 Count)> values, T1 seed)"),
+            ("DynamicUsing", "static int M(dynamic resource,int value){using(resource){return value;}}", "Suggestion", "T1 M<T1>(dynamic resource, T1 value)"),
+            ("DynamicUsingNullable", "static int M(dynamic? resource,int value){using(resource){return value;}}", "Suggestion", "T1 M<T1>(dynamic? resource, T1 value)"),
+            ("DynamicUsingDeclaration", "static int M(dynamic resource,int value){using var lease=resource;return value;}", "Suggestion", "T1 M<T1>(dynamic resource, T1 value)"),
+            ("DynamicUsingTypedContract", "static int M(dynamic resource,int value){using System.IDisposable lease=resource;return value;}", "Suggestion", "T1 M<T1>(dynamic resource, T1 value)"),
+
+            ("DynamicForeachIterator", "static System.Collections.Generic.IEnumerable<dynamic> M(dynamic values,int tag){foreach(var item in values)yield return item;}", "Suggestion", "global::System.Collections.Generic.IEnumerable<dynamic> M<T1>(dynamic values, T1 tag)"),
+            ("DynamicForeachAsyncIterator", "static async System.Collections.Generic.IAsyncEnumerable<dynamic> M(System.Collections.Generic.IAsyncEnumerable<dynamic> values,int tag){await foreach(var item in values)yield return item;}", "Suggestion", "global::System.Collections.Generic.IAsyncEnumerable<dynamic> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<dynamic> values, T1 tag)"),
+
             ("DynamicNullComparison", "static bool M(dynamic value,int tag)=>value==null;", "Suggestion", "bool M<T1>(dynamic value, T1 tag)")
         ];
         var failures = new List<string>();
@@ -79,7 +95,8 @@ internal static class DynamicChecks
         }
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
-        return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false)
+            + await EnumerationRuntime(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
@@ -263,6 +280,243 @@ internal static class DynamicChecks
         Program.Log.Info("PASS DynamicAwaitSuspensionAndFault");
         return 3;
     }
+
+    private static async Task<int> EnumerationRuntime(CancellationToken cancellationToken)
+    {
+        const string source = """
+            #nullable enable
+            using System;
+            using System.Collections;
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class DynamicLoopControl {
+                public static string Trace="";
+                public static TaskCompletionSource<bool> Move=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public static TaskCompletionSource<bool> Dispose=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public static TaskCompletionSource<bool> EnteredDispose=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public static void Reset(bool move,bool dispose){
+                    Trace="";Move=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    Dispose=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    EnteredDispose=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if(move)Move.SetResult(true);if(dispose)Dispose.SetResult(true);
+                }
+            }
+            public sealed class DynamicLoopSequence:IEnumerable {
+                public PatternCursor GetEnumerator(){DynamicLoopControl.Trace+="pattern-get;";return new();}
+                IEnumerator IEnumerable.GetEnumerator(){DynamicLoopControl.Trace+="interface-get;";return new Cursor();}
+                public sealed class PatternCursor {
+                    public object Current=>0;
+                    public bool MoveNext()=>false;
+                }
+                private sealed class Cursor:IEnumerator,IDisposable {
+                    private int index;
+                    public object Current {get{DynamicLoopControl.Trace+="current;";return index;}}
+                    public bool MoveNext(){DynamicLoopControl.Trace+="move;";return ++index<=2;}
+                    public void Reset()=>throw new NotSupportedException();
+                    public void Dispose(){DynamicLoopControl.Trace+="pattern-dispose;";}
+                    void IDisposable.Dispose(){DynamicLoopControl.Trace+="interface-dispose;";}
+                }
+            }
+            public sealed class DynamicPatternOnly {
+                public DynamicLoopSequence.PatternCursor GetEnumerator()=>new();
+            }
+            public sealed class DynamicPatternResource {public void Dispose(){}}
+            public sealed class DynamicLoopResource:IDisposable {
+                public void Dispose(){DynamicLoopControl.Trace+="resource-pattern;";}
+                void IDisposable.Dispose(){DynamicLoopControl.Trace+="resource-interface;";}
+            }
+            public sealed class DynamicAsyncLoop:IAsyncEnumerable<object> {
+                public IAsyncEnumerator<object> GetAsyncEnumerator(CancellationToken token=default)=>new Cursor();
+                private sealed class Cursor:IAsyncEnumerator<object> {
+                    private int index;
+                    public dynamic Current {get{DynamicLoopControl.Trace+="async-current;";return index;}}
+                    public async ValueTask<bool> MoveNextAsync(){await DynamicLoopControl.Move.Task;DynamicLoopControl.Trace+="async-move;";return ++index<=2;}
+                    public async ValueTask DisposeAsync(){
+                        DynamicLoopControl.Trace+="async-dispose-start;";DynamicLoopControl.EnteredDispose.TrySetResult(true);
+                        await DynamicLoopControl.Dispose.Task;DynamicLoopControl.Trace+="async-disposed;";
+                    }
+                }
+            }
+            public static class DynamicLoopProbe {
+                public static IEnumerable<dynamic> Iterator(dynamic values,int tag){foreach(var item in values)yield return item;}
+                public static async IAsyncEnumerable<dynamic> AsyncIterator(IAsyncEnumerable<dynamic> values,int tag){await foreach(var item in values)yield return item;}
+                public static int Sync(dynamic values,int seed){foreach(var item in values){}return seed;}
+                public static int Break(dynamic values,int seed){foreach(var item in values){break;}return seed;}
+                public static int Typed(dynamic values,int tag){foreach(int item in values)return item;return 0;}
+                public static int Static(IEnumerable<dynamic> values,int seed){foreach(var item in values){}return seed;}
+                public static async Task<int> Async(IAsyncEnumerable<dynamic> values,int seed){await foreach(var item in values){}return seed;}
+                public static int Use(dynamic resource,int seed){using(resource){return seed;}}
+                public static int UseDeclared(dynamic resource,int seed){using var lease=resource;return seed;}
+                public static int UseNullable(dynamic? resource,int seed){using(resource){return seed;}}
+                public static int Throwing(dynamic values,int seed,bool fail){foreach(var item in values){if(fail)throw new InvalidOperationException("loop");}return seed;}
+                public static dynamic First(dynamic values,dynamic fallback,int tag){foreach(var item in values)return item;return fallback;}
+            }
+            public static class DynamicLoopRunner {
+                public static string Run(){
+                    DynamicLoopControl.Reset(true,true);
+                    var sequence=new DynamicLoopSequence();var resource=new DynamicLoopResource();
+                    int sync=DynamicLoopProbe.Sync(sequence,1);int stop=DynamicLoopProbe.Break(sequence,2);
+                    int typed=DynamicLoopProbe.Typed(sequence,0);int stat=DynamicLoopProbe.Static(new dynamic[]{1,2},3);
+                    int async=DynamicLoopProbe.Async(new DynamicAsyncLoop(),4).GetAwaiter().GetResult();
+                    int used=DynamicLoopProbe.Use(resource,5);int declared=DynamicLoopProbe.UseDeclared(resource,6);
+                    int missing=DynamicLoopProbe.UseNullable(null,7);int complete=DynamicLoopProbe.Throwing(sequence,8,false);
+                    object first=DynamicLoopProbe.First(sequence,0,0);
+                    return DynamicLoopControl.Trace+"|"+sync+"|"+stop+"|"+typed+"|"+stat+"|"+async+"|"+used+"|"+declared+"|"+missing+"|"+complete+"|"+first;
+                }
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "DynamicEnumeration", "DynamicEnumeration", LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: Program.Compile([]).References));
+        var document = project.AddDocument("DynamicEnumeration.cs", source);
+        var before = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
+        var provider = new HmSignatureCodeFixProvider();
+        var fixes = 0;
+        for (var attempt = 0; attempt < 16; attempt++)
+        {
+            var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+            var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false))
+                .GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+            var diagnostic = diagnostics.FirstOrDefault(diagnostic =>
+            {
+                ArgumentNullException.ThrowIfNull(diagnostic);
+                return diagnostic.Id == "HM0001" && root.FindNode(diagnostic.Location.SourceSpan).AncestorsAndSelf().OfType<MethodDeclarationSyntax>()
+                    .FirstOrDefault()?.Parent is ClassDeclarationSyntax { Identifier.ValueText: "DynamicLoopProbe" };
+            });
+            if (diagnostic is null)
+            { break; }
+            var actions = new List<CodeAction>();
+            await provider.RegisterCodeFixesAsync(new CodeFixContext(document, diagnostic, (action, _) =>
+            { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+            var operations = await actions.Single().GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+            document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+            fixes++;
+        }
+        if (fixes != 12)
+        { throw new InvalidOperationException("Expected twelve dynamic enumeration/resource fixes; got " + fixes); }
+        var after = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
+        var expected = before.GetType("DynamicLoopRunner")!.GetMethod("Run")!.Invoke(null, null);
+        var actual = after.GetType("DynamicLoopRunner")!.GetMethod("Run")!.Invoke(null, null);
+        if (!Equals(expected, actual) || actual is not string trace || !trace.Contains("interface-get;", StringComparison.Ordinal)
+            || trace.Contains("pattern-get;", StringComparison.Ordinal) || trace.Contains("resource-pattern;", StringComparison.Ordinal))
+        { throw new InvalidOperationException("Dynamic enumeration/disposal changed protocol or effects: " + expected + " -> " + actual); }
+        var marker = new Uri("https://example.invalid/dynamic-loop");
+        var probe = after.GetType("DynamicLoopProbe")!;
+        var control = after.GetType("DynamicLoopControl")!;
+        var reset = control.GetMethod("Reset")!;
+        var sequence = Activator.CreateInstance(after.GetType("DynamicLoopSequence")!)!;
+        var resource = Activator.CreateInstance(after.GetType("DynamicLoopResource")!)!;
+        if (!ReferenceEquals(probe.GetMethod("Sync")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [sequence, marker]), marker)
+            || !ReferenceEquals(probe.GetMethod("Use")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [resource, marker]), marker))
+        { throw new InvalidOperationException("Dynamic enumeration/resource fixes lost generic values."); }
+        foreach (var assembly in new[] { before, after })
+        {
+            foreach (var test in new[] { (Method: "Sync", Type: "DynamicPatternOnly"), (Method: "Use", Type: "DynamicPatternResource") })
+            {
+                var method = assembly.GetType("DynamicLoopProbe")!.GetMethod(test.Method)!;
+                if (method.IsGenericMethodDefinition)
+                { method = method.MakeGenericMethod(typeof(int)); }
+                try
+                {
+                    method.Invoke(null, [Activator.CreateInstance(assembly.GetType(test.Type)!), 0]);
+                    throw new InvalidOperationException("Dynamic protocol unexpectedly accepted only a pattern.");
+                }
+                catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException?.GetType().FullName == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException") { }
+            }
+            var localControl = assembly.GetType("DynamicLoopControl")!;
+            localControl.GetMethod("Reset")!.Invoke(null, [true, true]);
+            var throwing = assembly.GetType("DynamicLoopProbe")!.GetMethod("Throwing")!;
+            if (throwing.IsGenericMethodDefinition)
+            { throwing = throwing.MakeGenericMethod(typeof(int)); }
+            try
+            {
+                throwing.Invoke(null, [Activator.CreateInstance(assembly.GetType("DynamicLoopSequence")!), 0, true]);
+                throw new InvalidOperationException("Dynamic loop body did not throw.");
+            }
+            catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is InvalidOperationException { Message: "loop" }) { }
+            if (!((string)localControl.GetField("Trace")!.GetValue(null)!).Contains("interface-dispose;", StringComparison.Ordinal))
+            { throw new InvalidOperationException("Dynamic loop body failure skipped disposal."); }
+            localControl.GetMethod("Reset")!.Invoke(null, [true, true]);
+            var iterator = assembly.GetType("DynamicLoopProbe")!.GetMethod("Iterator")!;
+            if (iterator.IsGenericMethodDefinition)
+            { iterator = iterator.MakeGenericMethod(typeof(int)); }
+            var values = (IEnumerable<object>)iterator.Invoke(null, [Activator.CreateInstance(assembly.GetType("DynamicLoopSequence")!), 0])!;
+            if (!Equals(localControl.GetField("Trace")!.GetValue(null), ""))
+            { throw new InvalidOperationException("Dynamic iterator executed before enumeration."); }
+            using (var enumerator = values.GetEnumerator())
+            {
+                if (!enumerator.MoveNext() || !Equals(enumerator.Current, 1))
+                { throw new InvalidOperationException("Dynamic iterator lost its first value."); }
+            }
+            if (!((string)localControl.GetField("Trace")!.GetValue(null)!).Contains("interface-dispose;", StringComparison.Ordinal))
+            { throw new InvalidOperationException("Dynamic iterator early disposal skipped its inner enumerator."); }
+
+        }
+        var asyncMethod = probe.GetMethod("Async")!.MakeGenericMethod(typeof(Uri));
+        var asyncSequence = Activator.CreateInstance(after.GetType("DynamicAsyncLoop")!)!;
+        reset.Invoke(null, [false, false]);
+        var pending = (Task<Uri>)asyncMethod.Invoke(null, [asyncSequence, marker])!;
+        if (pending.IsCompleted)
+        { throw new InvalidOperationException("Dynamic-element async enumeration completed before MoveNextAsync."); }
+        ((TaskCompletionSource<bool>)control.GetField("Move")!.GetValue(null)!).SetResult(true);
+        await ((TaskCompletionSource<bool>)control.GetField("EnteredDispose")!.GetValue(null)!).Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (pending.IsCompleted)
+        { throw new InvalidOperationException("Dynamic-element async enumeration skipped disposal suspension."); }
+        ((TaskCompletionSource<bool>)control.GetField("Dispose")!.GetValue(null)!).SetResult(true);
+        if (!ReferenceEquals(await pending.WaitAsync(cancellationToken).ConfigureAwait(false), marker))
+        { throw new InvalidOperationException("Dynamic-element async enumeration lost its generic result."); }
+        reset.Invoke(null, [false, true]);
+        var faulted = (Task<Uri>)asyncMethod.Invoke(null, [asyncSequence, marker])!;
+        var fault = new InvalidOperationException("dynamic MoveNextAsync");
+        ((TaskCompletionSource<bool>)control.GetField("Move")!.GetValue(null)!).SetException(fault);
+        try
+        {
+            await faulted.WaitAsync(cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException("Dynamic-element async enumeration lost its fault.");
+        }
+        catch (InvalidOperationException exception) when (ReferenceEquals(exception, fault)) { }
+        if (!((string)control.GetField("Trace")!.GetValue(null)!).Contains("async-disposed;", StringComparison.Ordinal))
+        { throw new InvalidOperationException("Async enumeration fault skipped disposal."); }
+        reset.Invoke(null, [false, true]);
+        var cancelled = (Task<Uri>)asyncMethod.Invoke(null, [asyncSequence, marker])!;
+        ((TaskCompletionSource<bool>)control.GetField("Move")!.GetValue(null)!).SetCanceled(cancellationToken);
+        try
+        {
+            await cancelled.WaitAsync(cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException("Dynamic-element async enumeration lost cancellation.");
+        }
+        catch (OperationCanceledException) when (cancelled.IsCanceled) { }
+        if (!((string)control.GetField("Trace")!.GetValue(null)!).Contains("async-disposed;", StringComparison.Ordinal))
+        { throw new InvalidOperationException("Async enumeration cancellation skipped disposal."); }
+        reset.Invoke(null, [false, false]);
+        var iteratorMethod = probe.GetMethod("AsyncIterator")!.MakeGenericMethod(typeof(Uri));
+        var asyncValues = (IAsyncEnumerable<object>)iteratorMethod.Invoke(null, [asyncSequence, marker])!;
+        var asyncIteratorEnumerator = asyncValues.GetAsyncEnumerator(cancellationToken);
+        await using (asyncIteratorEnumerator.ConfigureAwait(false))
+        {
+            var moving = asyncIteratorEnumerator.MoveNextAsync();
+            if (moving.IsCompleted)
+            { throw new InvalidOperationException("Dynamic-element async iterator completed before its source."); }
+            ((TaskCompletionSource<bool>)control.GetField("Move")!.GetValue(null)!).SetResult(true);
+            if (!await moving.ConfigureAwait(false) || !Equals(asyncIteratorEnumerator.Current, 1))
+            { throw new InvalidOperationException("Dynamic-element async iterator lost its first value."); }
+            var disposing = asyncIteratorEnumerator.DisposeAsync();
+            await ((TaskCompletionSource<bool>)control.GetField("EnteredDispose")!.GetValue(null)!).Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (disposing.IsCompleted)
+            { throw new InvalidOperationException("Dynamic-element async iterator skipped pending inner disposal."); }
+            ((TaskCompletionSource<bool>)control.GetField("Dispose")!.GetValue(null)!).SetResult(true);
+            await disposing.ConfigureAwait(false);
+        }
+        Program.Log.Info("PASS DynamicElementIteratorsDeferAndDisposeInnerEnumerators");
+
+        Program.Log.Info("PASS DynamicEnumerationAndResourceCodeFixRuntime");
+        Program.Log.Info("PASS DynamicEnumerationInterfaceProtocolsAndFailureCleanup");
+        Program.Log.Info("PASS DynamicElementAsyncEnumerationSuspensionFaultAndCancellation");
+        return 4;
+    }
+
 
     private static string DynamicFlags(System.Reflection.ParameterInfo parameter)
     {

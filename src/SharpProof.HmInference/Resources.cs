@@ -48,6 +48,11 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(method)); }
                 return !method.IsStatic && method.Parameters.Length == 0 && method.TypeParameters.Length == 0;
             });
+            if (!asynchronous && type is IDynamicTypeSymbol && member is not null)
+            {
+                // Synchronous dynamic resources convert to IDisposable at runtime.
+                return (member, false);
+            }
             var selected = ResourcePattern(semantic, site, type, asynchronous);
             if (selected is not null)
             {
