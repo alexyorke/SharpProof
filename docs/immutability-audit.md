@@ -5,6 +5,20 @@
 Baseline: origin/master, commit 4d456246a4113c6c8f2ff0728ddd03bd684b10e1.
 Branch: codex/comprehensive-immutability.
 
+## Current checkpoint
+
+The final code checkpoint is `4a646d7ac`, including master `b0ce85e23`.
+The current census covers 1949 C# paths with zero eligible const locals and zero
+metadata authority gaps. All findings are resolved or explicitly retained as
+required contracts or mutable subjects. Current decisions are recorded in
+[ownership](immutability-current-ownership.tsv),
+[binding forms](immutability-current-binding.tsv) and
+[runtime fields](immutability-current-const-fields.tsv); historical findings below
+retain their original source coordinates. The full execution and strict coverage
+checks pass. [Final validation](immutability-final-validation.json) records the
+exact code checkpoint, counts and evidence hashes. Final details appear in
+IMM-M536/M537 and IMM-M539.
+
 ## Scope and ownership
 
 The audit covers all 2,301 baseline tracked files, including 1,805 C# files.
@@ -5106,3 +5120,19 @@ Literal/source conservation passes 4309/1078 and now conserves 1949 tracked C# p
 ### IMM-M534: measured release authority source ownership
 
 The full coverage cohort at `2cd740475` stopped on the architecture source-ownership check: the newly linked standalone symbol validator was not in the existing shared-source list. The Gates project now admits exactly `eng/scripts/SharpProof.SymbolPackageValidator.cs`. The actual targeted ownership test passes. All other project/path restrictions remain checked; no coverage floor or source exemption changes. The M533 archive independently verifies 110 historical epochs, 308487 complete rows and 142020 current observations with zero status transfers. The complete coverage cohort will rerun at the repaired source checkpoint.
+
+### IMM-M536/M537: final compiler, ownership and provenance checkpoint
+
+The pushed code checkpoint `4a646d7ac` passes the actual compiler census: 1949 paths, 1739 compiled paths, 210 explicit absent subjects/helpers, 1889 compiled-unit instances, 142020 semantic observations and 75702 const observations. All 51 type/reference contexts reconcile with 16358 types, 139995 exact residual joins, 136 explicit unbound syntax forms and zero metadata authority gaps. No eligible const locals remain. Twenty fields retain required runtime/configured state.
+
+The current ledgers record all 346 retained array observations and 46 logical mutable framework subjects. Their actual consumers require native frames or intentionally exercise mutation. The two additional array observations are the real corrupted PE image under test. The final architecture ownership change introduces no retained array site. The only immutable self-rebinding operation remains the required assembly-cache disposal reset; avoidable immutable Add reassignment is absent from the compiler collection.
+
+Independent lossless verification conserves 111 raw Git epochs, 311540 complete historical rows, 142020 current observations and 311540 no-transfer relations. Five historical build-metadata observations are explicitly outside the selected C# universe; they are distinguished from missing paths. Earlier archives and source snapshots remain intact. The final reproduction manifest preserves the reconciler and independent verifier with exact payload offsets and hashes. Current compiler/ownership authority is separate from the full execution and coverage result recorded in IMM-M539.
+
+### IMM-M539: complete authenticated execution and strict coverage
+
+At pushed code checkpoint `4a646d7ac`, the complete canonical Linux amd64 Release collection passes with 12966 semantic, 384 package, 21 attributes and two isolated CLI tests. Six explicit long-fuzz campaigns are unselected in the ordinary collection and separately execute one bounded seed each with zero findings. One supported-host package case is intentionally unexecuted. These are the only seven unexecuted results; there are no test failures.
+
+The unchanged strict gate passes 100 percent aggregate executable coverage (32879/32879 lines) and changed coverage (4241/4241 lines), with zero uncovered changed lines and zero entries in `nonCoverableFiles`. All source and module authority checks pass. The GitHub coverage job also passes on the exact pushed code checkpoint. Required mutable native subjects and final framework adapters remain explicit; no coverage exemption or floor reduction is introduced.
+
+Full repository quality checks pass, including Markdown, spelling, links, PowerShell, shell, workflow security, dependency/API checks and negative gate controls. Layout passes all 59 projects and 151 pinned common files. Literal conservation verifies 4309 raw/interpolated tokens across 1078 changed C# files, and all 1949 current source-unit authority fields verify. The final tracked validation summary records counts, expected unexecuted tests, evidence hashes and exact CI links. Later audit/documentation commits preserve these executable source bytes. Master remains fully integrated at `b0ce85e23`, with no incoming changes or conflicts. The work is complete; native Windows/macOS runtime qualification is outside this Linux execution evidence.

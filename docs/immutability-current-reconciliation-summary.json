@@ -1,23 +1,23 @@
 {
   "ArchiveSummary": {
-    "PinnedHead": "ffd99c168cbb5dbdebff1ba765ca7cdc8f382521",
-    "Epochs": 109,
-    "HistoricalRows": 305435,
-    "CurrentObservations": 141860,
-    "CurrentUnits": 1887,
-    "SourceAuthorities": 75179,
-    "SourceBlobs": 3036,
+    "PinnedHead": "4a646d7acf13a9bda7a986405c2b2971ed6fcfb3",
+    "Epochs": 111,
+    "HistoricalRows": 311540,
+    "CurrentObservations": 142020,
+    "CurrentUnits": 1889,
+    "SourceAuthorities": 76617,
+    "SourceBlobs": 3040,
     "HistoricalRelations": {
       "MissingPathTombstone": 29021,
-      "ChangedSource": 148048,
-      "OutsideSelectedContext": 3632,
-      "ExactSourceLocationCandidateRequiresScannerReplay": 73521,
-      "Ambiguous": 2037,
-      "UnrepresentedForm": 49175,
-      "OutsideCurrentSelectedCSharpUniverse": 1
+      "ChangedSource": 148196,
+      "OutsideSelectedContext": 3656,
+      "ExactSourceLocationCandidateRequiresScannerReplay": 76247,
+      "Ambiguous": 2119,
+      "UnrepresentedForm": 52296,
+      "OutsideCurrentSelectedCSharpUniverse": 5
     },
-    "CurrentUnmatched": 140458,
-    "CurrentLocationCandidates": 1402,
+    "CurrentUnmatched": 140622,
+    "CurrentLocationCandidates": 1398,
     "StatusTransfers": 0,
     "InitialEpoch": {
       "EpochOrdinal": 1,
@@ -28,24 +28,24 @@
       "Paths": 845
     },
     "FinalEpoch": {
-      "EpochOrdinal": 109,
-      "CommitSha": "ffd99c168cbb5dbdebff1ba765ca7cdc8f382521",
-      "LedgerGitBlob": "691bd8e6116cdbbb88470e0901448b80bb08b4e1",
-      "LedgerSha256": "a2676a1efbd5afdb0c38f0e7ef9ddce6f6a4f9c892d93078b29782482b728b3e",
-      "Rows": 3049,
-      "Paths": 717
+      "EpochOrdinal": 111,
+      "CommitSha": "4a646d7acf13a9bda7a986405c2b2971ed6fcfb3",
+      "LedgerGitBlob": "e4a6ab50684719f399514e1781382f1f969747d5",
+      "LedgerSha256": "bb02fe85299fb8846810d4f256c5ba31da5c4f2fbd14669c8a37c182d145c12a",
+      "Rows": 3053,
+      "Paths": 719
     },
     "RenameAuthority": "No rename inferred; missing paths retain tombstones",
     "Scope": "Lossless historical/current union. Exact coordinates are candidates only; no unknown-scanner status transfers."
   },
-  "Verification": "All raw Git ledger blobs, row fields, current keys and no-transfer relations verified by IMM-M527 independent verifier.",
-  "OutsideUniverseQualification": "One current tracked Directory.Build.props ledger observation is outside the selected C# universe; it has exact current Git/source hash authority and is not treated as a physically missing path.",
+  "Verification": "All raw Git ledger blobs, row fields, current keys and no-transfer relations verified by IMM-M537 independent verifier.",
+  "OutsideUniverseQualification": "Five historical build-metadata observations are outside the selected C# universe. Present tracked metadata retains exact current Git/source hash authority and is distinguished from physically missing paths.",
   "ArchiveEvidenceSha256": {
-    "reconciliation-summary.json": "4bcdea915c713d37eb15580f3968155c92b151984bd15ce0317b54b661936c17",
-    "legacy-rows.tsv.gz": "5856f29248cc26af59a1edd8e6bff5685a8fdf2330ccbd63ea71a7e711f1f158",
-    "current-observations.tsv.gz": "84fbe17d3d77732c3e35713b28173d2838a0e2f3c9ad768903f11309db6252bb",
-    "historical-current-relations.tsv.gz": "c5f8afa5b9a4762f861e52c2f33bb2503864cc747e7f46e27b03a38bef09101f",
-    "source-authority.tsv.gz": "3d5bbf02feb0b123275f71d54e79008cfad64b4ae785a1386d76ffea4f7a75a7",
-    "unmatched-current.tsv.gz": "c142ecced38607f492fc8b3abacf8f274e8b1793bf9945a5578b1cfd9d901fe3"
+    "reconciliation-summary.json": "6797384c3a125a49feb1108558128b386c4001d654bb14dd5d2ab56d56cb61c5",
+    "legacy-rows.tsv.gz": "42d3fefa2eff95a8557038b4544add308f5ef16dfdce6b0e3fe1189bc5ce3b58",
+    "current-observations.tsv.gz": "78230c8e115f6622e19c9e56fe033e85c47cee3139e8f1d17359bb43cbfdc3c1",
+    "historical-current-relations.tsv.gz": "8bc4053f6c34bbe48944fdb5e205d6f62f17ac0a90b7565de09dba663715dadf",
+    "source-authority.tsv.gz": "7104454166a0ef4f93369b140d6ea07bfa1a52b24d79b161e3c02831151e93e1",
+    "unmatched-current.tsv.gz": "bbe7ae2b7ac29a9bfbf7c98d7db67f78aeb9841c0d3817c159e655b5410b7a21"
   }
 }
