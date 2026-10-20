@@ -72,8 +72,10 @@ jobs:
         if: always()
         run: |
           task_container="${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
-          state_file="artifacts/container-state/${SHARPPROOF_COVERAGE_SHARD}.json"
-          mkdir -p artifacts/container-state
+          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
+          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
+          state_file="${state_dir}/${SHARPPROOF_COVERAGE_SHARD}.json"
+          mkdir -p "$state_dir"
           if docker inspect --format \
             '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
             "$task_container" > "$state_file"; then
@@ -81,14 +83,13 @@ jobs:
           else
             printf '{"available":false}\n' > "$state_file"
           fi
-          docker rm --force "$task_container" || true
 
       - name: Upload coverage container termination
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-container-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/container-state/*.json
+          path: ${{ runner.temp }}/sharpproof-container-state/*.json
           if-no-files-found: error
           retention-days: 30
 

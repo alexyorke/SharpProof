@@ -176,6 +176,38 @@ native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
 
+### Reviewed runtime task storage (in progress)
+
+Encode the pinned Task, non-generic WhenAll promise, Task-of-void-result and
+async-box instance fields as typed storage data. Derive bytes through the layout
+model, including possible async helper delegates; do not accept a producer byte
+verdict. The box reuses Task state storage for execution context. Compose owned
+compiler/runtime carriers with independently checked child storage under an
+explicit successful-join model with default/suppressed ambient context and
+separate scheduler, debugger/tracing and caller-owned activity. Validate the
+reviewed shapes against the pinned runtime binary. Keep cumulative exceptional
+prefixes unsupported rather than silently narrowing that contract's domain.
+Public root lifetime verdicts still require bound premises and consumer controls.
+
+### Coverage diagnostic ownership correction
+
+At 6d28322c0, semantic-projects and semantic-gates completed coverage collection
+successfully, but the new reporter could not create artifacts/container-state
+because the container exporter owns that directory. Its upload then failed.
+The package collector separately ended with exit 137, and the same ownership
+failure prevented its Docker state from being recorded. Completed job logs are
+retained locally under `artifacts/resource-6d-*-job.log`.
+
+The reporter now writes JSON under runner-owned RUNNER_TEMP and uploads that
+separate path. Exact-container cleanup is registered before creating the output
+directory, so recording failures cannot skip cleanup. A canonical non-root
+permission probe reproduced the read-only artifacts failure and recorded JSON
+successfully in the separate writable directory. The full workflow quality/API
+compatibility and negative-fixture gate passed. Logs are retained as
+`artifacts/resource-coverage-state-permissions-probe.log` and
+`artifacts/resource-coverage-state-ownership-quality.log`. Hosted verification
+is pending. This correction changes no proof coverage requirement or task limit.
+
 ### Coverage container termination evidence
 
 Each coverage job now retains its named task container until Docker's exit
