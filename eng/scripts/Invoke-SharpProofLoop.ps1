@@ -71,15 +71,16 @@ function Get-GitUntrackedPaths {
         $process.Dispose()
     }
 
-    $bytes = $output.ToArray()
+    $bytes = [Collections.Immutable.ImmutableArray]::CreateRange[byte]($output.ToArray())
     $output.Dispose()
     if ($bytes.Length -eq 0) {
-        return @()
+        return [Collections.Immutable.ImmutableArray[string]]::Empty
     }
     if ($bytes[$bytes.Length - 1] -ne 0) {
         throw 'Git returned a non-terminated file inventory.'
     }
 
+    $nativeUtf8Bytes = [byte[]]@($bytes)
     $paths = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $start = 0
     for ($index = 0; $index -lt $bytes.Length; $index++) {
@@ -89,7 +90,7 @@ function Get-GitUntrackedPaths {
         $length = $index - $start
         if ($length -gt 0) {
             $paths.Add([Text.Encoding]::UTF8.GetString(
-                    $bytes,
+                    $nativeUtf8Bytes,
                     $start,
                     $length))
         }
@@ -120,8 +121,8 @@ function Test-ExactFileBytes {
         -not [IO.File]::Exists($RightPath)) {
         return $false
     }
-    $left = [IO.File]::ReadAllBytes($LeftPath)
-    $right = [IO.File]::ReadAllBytes($RightPath)
+    $left = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($LeftPath))
+    $right = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($RightPath))
     if ($left.Length -ne $right.Length) {
         return $false
     }
