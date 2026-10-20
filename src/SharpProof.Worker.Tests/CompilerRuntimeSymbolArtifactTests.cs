@@ -72,14 +72,14 @@ public sealed class CompilerRuntimeSymbolArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(json);
         System.ArgumentNullException.ThrowIfNull(path);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(path, bytes);
+        var bytes = Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         return new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference
             {
                 Path = path,
-                Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
+                Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
             },
             Cache = new WorkerCacheOptions
             {

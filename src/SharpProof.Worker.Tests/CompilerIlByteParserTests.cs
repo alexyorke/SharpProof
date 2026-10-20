@@ -185,8 +185,8 @@ public sealed class CompilerIlByteParserTests
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
         var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
-        var code = body.GetILBytes();
-        Assert.That(code, Is.Not.Null.And.Not.Empty);
+        var code = body.GetILBytes()!.ToImmutableArray();
+        Assert.That(code, Is.Not.Empty);
         Assert.That(code![0], Is.EqualTo((byte)ILOpCode.Ldstr), "Observe actual compiler output before claiming the shared parser rejection.");
         var cursor = 0;
         Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out _), Is.False);

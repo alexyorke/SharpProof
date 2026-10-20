@@ -5021,3 +5021,7 @@ Three retained SMT child vectors, public-key mismatch input, completed-response 
 ### IMM-M516: preserve remaining actual native mutation and measurement subjects
 
 Seven directly traced roots retain required native behavior: premeasurement array cloning/reset, covariant delegate-store failure, exact-length stream destinations, explicit PE/IL mutation delegates, a runtime field's actual int-array alias, and a bounded negative metadata patch image. Current writers/consumers and following concrete assertions are inspected individually. No code edits, new execution or performance authority are inferred.
+
+### IMM-M514: immutable artifact and metadata observations
+
+Twelve retained artifact, metadata blob and IL observations are immutable. Path character edits use a scoped immutable builder. Actual patch images remain mutable subjects. The final worker gate passes 111 cases; an initial compile failure from redundant span adapters on existing ReadOnlySpan helper parameters is repaired. Literal/source-unit checks verify 4305/1074 and 1948 paths. Twelve independently traced old roots reconcile, leaving eighteen unchecked. Fresh collection, coverage, archive and exact-head gates remain pending.

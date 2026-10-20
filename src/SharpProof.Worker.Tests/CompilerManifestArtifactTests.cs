@@ -37,7 +37,7 @@ public sealed class CompilerManifestArtifactTests
         var directory = compilation.ProjectDirectory;
         using var project = new ShadowTestProject(artifact);
         var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(
-            project.Artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+            project.Artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -47,7 +47,7 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(project.Artifact.Compilation, Is.Not.SameAs(compilation));
             Assert.That(project.Artifact.Compilation.ProjectDirectory,
                 Is.EqualTo(Path.GetDirectoryName(project.Request.CompilerManifest.Path)));
-            Assert.That(WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()),
+            Assert.That(WorkerProtocolJson.ComputeSha256(bytes),
                 Is.EqualTo(project.Request.CompilerManifest.Sha256));
         }
     }
@@ -1077,13 +1077,13 @@ public sealed class CompilerManifestArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         var manifest = artifact.Compilation.References[0].Modules[0];
-        var characters = manifest.Path.ToCharArray();
-        var index = Array.FindIndex(characters, char.IsLetter);
+        var characters = manifest.Path.ToImmutableArray().ToBuilder();
+        var index = Enumerable.Range(0, characters.Count).FirstOrDefault(position => char.IsLetter(characters[position]), -1);
         Assert.That(index, Is.GreaterThanOrEqualTo(0));
         characters[index] = char.IsUpper(characters[index])
             ? char.ToLowerInvariant(characters[index])
             : char.ToUpperInvariant(characters[index]);
-        var caseVariant = new string(characters);
+        var caseVariant = new string(characters.ToImmutable().AsSpan());
         Assert.That(caseVariant, Is.Not.EqualTo(manifest.Path));
         Assert.That(caseVariant, Is.EqualTo(manifest.Path).IgnoreCase);
         var modules = ImmutableArray.Create<CompilerReferenceModuleSnapshot>(

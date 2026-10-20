@@ -642,7 +642,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
-        var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
+        var il = (pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
@@ -660,7 +660,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
@@ -668,14 +668,14 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             MethodBase? resolved = null;
             if (opcode.OperandType == OperandType.InlineMethod)
             {
-                token = BitConverter.ToInt32(il, offset);
+                token = BitConverter.ToInt32(il.AsSpan(offset..));
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
             instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il.AsSpan()), instructions.ToImmutable());
     }
 
     private static PeObservation DescribePe(ImmutableArray<byte> bytes)

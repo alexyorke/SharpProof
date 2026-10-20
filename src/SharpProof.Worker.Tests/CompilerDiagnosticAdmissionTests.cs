@@ -29,14 +29,14 @@ public sealed class CompilerDiagnosticAdmissionTests
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         using var directory = new TempDirectory("SharpProof.DiagnosticAdmission-");
         var path = Path.Combine(directory.FullName, "manifest.json");
-        var bytes = Encoding.UTF8.GetBytes(MalformedArtifact(diagnostics));
-        await File.WriteAllBytesAsync(path, bytes);
+        var bytes = Encoding.UTF8.GetBytes(MalformedArtifact(diagnostics)).ToImmutableArray();
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference
             {
                 Path = path,
-                Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
+                Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
             },
             Cache = new WorkerCacheOptions { Enabled = false },
             Budgets = new WorkerBudgets()
