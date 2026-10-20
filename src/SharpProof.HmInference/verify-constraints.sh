@@ -20,7 +20,21 @@ public class CliAsyncParameterCursor<T>{public System.Threading.Tasks.ValueTask<
 public class CliAsyncParameterSequence<T,E> where E:CliAsyncParameterCursor<T>{public E GetAsyncEnumerator()=>default!;}
 public class CliTaggedParameterSequence<Tag,E> where E:CliParameterCursor<int>{public E GetEnumerator()=>default!;}
 public class CliTaggedAsyncParameterSequence<Tag,E> where E:CliAsyncParameterCursor<int>{public E GetAsyncEnumerator()=>default!;}
+[System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(CliStateBuilder<>))]
+public readonly struct CliStateTask<T>(System.Threading.Tasks.Task<T> task){public System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter()=>task.GetAwaiter();}
+public struct CliStateBuilder<T>{
+    private System.Runtime.CompilerServices.AsyncTaskMethodBuilder<T> inner;
+    public static CliStateBuilder<T> Create()=>new(){inner=System.Runtime.CompilerServices.AsyncTaskMethodBuilder<T>.Create()};
+    public CliStateTask<T> Task=>new(inner.Task);
+    public void SetResult(T value)=>inner.SetResult(value);
+    public void SetException(System.Exception exception)=>inner.SetException(exception);
+    public void SetStateMachine(System.Runtime.CompilerServices.IAsyncStateMachine state)=>inner.SetStateMachine(state);
+    public void Start<S>(ref S state) where S:T,System.Runtime.CompilerServices.IAsyncStateMachine=>inner.Start(ref state);
+    public void AwaitOnCompleted<A,S>(ref A awaiter,ref S state) where A:System.Runtime.CompilerServices.INotifyCompletion where S:System.Runtime.CompilerServices.IAsyncStateMachine=>inner.AwaitOnCompleted(ref awaiter,ref state);
+    public void AwaitUnsafeOnCompleted<A,S>(ref A awaiter,ref S state) where A:System.Runtime.CompilerServices.ICriticalNotifyCompletion where S:System.Runtime.CompilerServices.IAsyncStateMachine=>inner.AwaitUnsafeOnCompleted(ref awaiter,ref state);
+}
 public static class CliBounds{
+    public static async CliStateTask<System.Runtime.CompilerServices.IAsyncStateMachine> BuilderStateMachine(System.Runtime.CompilerServices.IAsyncStateMachine value,int ignored){await System.Threading.Tasks.Task.Yield();return value;}
     public static int RigidParameterEnumeration<E>(CliTaggedParameterSequence<int,E> values,int seed) where E:CliParameterCursor<int>{foreach(var item in values)seed=item;return seed;}
     public static async System.Threading.Tasks.Task<int> RigidAsyncParameterEnumeration<E>(CliTaggedAsyncParameterSequence<int,E> values,int seed) where E:CliAsyncParameterCursor<int>{await foreach(var item in values)seed=item;return seed;}
     public static int ParameterEnumeration(CliParameterSequence<int,CliParameterCursor<int>> values,int seed){foreach(var item in values)seed=item;return seed;}
@@ -48,10 +62,10 @@ EOF
 dotnet "$output" "$fixture/Input.cs" > "$fixture/source.log" 2>&1 || { tail -35 "$fixture/source.log"; exit 1; }
 dotnet "$output" --project "$fixture/Bounds.csproj" > "$fixture/project.log" 2>&1 || { tail -35 "$fixture/project.log"; exit 1; }
 for log in source project; do
-  for expected in 'RigidParameterEnumeration<E, T1>(global::CliTaggedParameterSequence<T1, E> values, int seed)' 'RigidAsyncParameterEnumeration<E, T1>(global::CliTaggedAsyncParameterSequence<T1, E> values, int seed)' 'ParameterEnumeration<T1>(global::CliParameterSequence<T1, global::CliParameterCursor<T1>> values, T1 seed)' 'AsyncParameterEnumeration<T1>(global::CliAsyncParameterSequence<T1, global::CliAsyncParameterCursor<T1>> values, T1 seed)' 'ProjectionArray<T1>(global::CliProjectionDual<T1> value, T1[] other)' 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
+  for expected in 'BuilderStateMachine<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)' 'RigidParameterEnumeration<E, T1>(global::CliTaggedParameterSequence<T1, E> values, int seed)' 'RigidAsyncParameterEnumeration<E, T1>(global::CliTaggedAsyncParameterSequence<T1, E> values, int seed)' 'ParameterEnumeration<T1>(global::CliParameterSequence<T1, global::CliParameterCursor<T1>> values, T1 seed)' 'AsyncParameterEnumeration<T1>(global::CliAsyncParameterSequence<T1, global::CliAsyncParameterCursor<T1>> values, T1 seed)' 'ProjectionArray<T1>(global::CliProjectionDual<T1> value, T1[] other)' 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
     if ! grep -Fq "$expected" "$fixture/$log.log"; then tail -35 "$fixture/$log.log"; exit 1; fi
   done
 done
 cp "$fixture/source.log" /workspace/SharpProof/artifacts/hm-inference/constraint-cli.txt
 cp "$fixture/project.log" /workspace/SharpProof/artifacts/hm-inference/constraint-project.txt
-printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds' 'PASS CliShapeSelectedInterfaceProjection' 'PASS CliSubstitutedParameterEnumerators' 'PASS CliRigidParameterEnumeratorTags'
+printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds' 'PASS CliShapeSelectedInterfaceProjection' 'PASS CliSubstitutedParameterEnumerators' 'PASS CliRigidParameterEnumeratorTags' 'PASS CliBuilderStateMachineResultConstraint'

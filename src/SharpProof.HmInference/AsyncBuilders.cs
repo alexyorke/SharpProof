@@ -59,6 +59,9 @@ public static partial class Inference
                 (asyncBuilder, builderUsesResult) = ConstructBuilder(attribute, returned);
                 asyncBuilderResult = builderUsesResult ? HmType.Variable() : null;
                 needsBuilderEmission = true;
+                var start = asyncBuilder.GetMembers("Start").OfType<IMethodSymbol>().SingleOrDefault(IsRequiredBuilderMember);
+                if (start is not null)
+                { BindBuilderStateMachine(start); }
                 return;
             }
             if (returned is not null && (returned.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks"
@@ -66,6 +69,40 @@ public static partial class Inference
             { throw new InferenceException("Async return type has no method builder."); }
         }
 
+        private void BindBuilderStateMachine(IMethodSymbol method)
+        {
+            if (method is null)
+            { throw new ArgumentNullException(nameof(method)); }
+            if (asyncBuilder is null || !builderUsesResult || asyncBuilderResult is null)
+            { return; }
+            var resultParameter = asyncBuilder.OriginalDefinition.TypeParameters[0];
+            var machine = method.OriginalDefinition.TypeParameters[method.Arity - 1];
+            var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            bool DependsOnResult(ITypeSymbol type)
+            {
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!visited.Add(type))
+                { return false; }
+                if (SymbolEqualityComparer.Default.Equals(type, resultParameter))
+                { return true; }
+                return type switch
+                {
+                    ITypeParameterSymbol parameter => parameter.ConstraintTypes.Any(DependsOnResult),
+                    IArrayTypeSymbol array => DependsOnResult(array.ElementType),
+                    INamedTypeSymbol named => named.TypeArguments.Any(DependsOnResult)
+                        || named.ContainingType is not null && DependsOnResult(named.ContainingType),
+                    _ => false
+                };
+            }
+            if (machine.ConstraintTypes.Any(DependsOnResult))
+            {
+                // A generated state machine cannot become a caller-supplied
+                // result subtype. Preserve this required conversion endpoint.
+                HmType.Unify(asyncBuilderResult, CSharpTypes.Rigid(asyncBuilder.TypeArguments[0]));
+            }
+        }
         private void BindBuilderReturn(HmType result, HmType value)
         {
             if (result is null)
@@ -109,6 +146,7 @@ public static partial class Inference
             var method = asyncBuilder.GetMembers(name).OfType<IMethodSymbol>().SingleOrDefault(IsRequiredBuilderMember);
             if (method is null)
             { throw new InferenceException("Missing custom-builder await member."); }
+            BindBuilderStateMachine(method);
             var definition = method.OriginalDefinition;
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             for (var owner = asyncBuilder; owner is not null; owner = owner.ContainingType)

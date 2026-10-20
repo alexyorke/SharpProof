@@ -493,3 +493,13 @@ arguments remain inferable. Sync/async, class/interface/chained constraints,
 extensions, ref Current, explicit element conversions and distinct async member
 owners have regression coverage. Runtime IDE fixes verify new tag domains with
 class/struct enumerators, early-break disposal and faults after async suspension.
+
+Custom builder state-machine bounds on Start and the selected safe/unsafe await
+member are checked for dependencies on the builder result. Such dependencies
+retain the original result domain, including nullable wrappers, while unrelated
+parameters remain inferable. Unused completion members do not restrict results.
+Fixtures emit before analysis and cover method overrides, async lambdas and local
+captures. Applied IDE fixes compare protocol traces, suspended completion, result
+identity (including boxed structs), nulls, faults and cancellation, including new
+unrelated types. Debug and Release compare against their own protocol baselines.
+Capture/layout-dependent state-machine requirements still have emission guards.

@@ -10,7 +10,7 @@ namespace SharpProof.HmInference;
 internal static class CustomBuilderChecks
 {
     private const string Imports = "#nullable enable\nusing System; using System.Threading.Tasks; using System.Runtime.CompilerServices;\n";
-    private const string Support = """
+    internal const string Support = """
         public static class BuilderTrace { public static string Value=""; }
         [AsyncMethodBuilder(typeof(ProbeBuilder<>))]
         public readonly struct ProbeTask<T>(Task<T> task) { public TaskAwaiter<T> GetAwaiter()=>task.GetAwaiter(); public Task<T> AsTask()=>task; }
@@ -48,6 +48,13 @@ internal static class CustomBuilderChecks
 
     public static async Task<int> Run(CancellationToken cancellationToken)
     {
+        var statePrefixEnd = Support.IndexOf("public struct ProbeBuilder {", StringComparison.Ordinal);
+        var statePrefix = Support[..statePrefixEnd];
+        var stateSuffix = Support[statePrefixEnd..];
+        var stateStart = statePrefix.Replace("public void Start<S>(ref S state) where S:IAsyncStateMachine", "public void Start<S>(ref S state) where S:T,IAsyncStateMachine", StringComparison.Ordinal) + stateSuffix;
+        var stateSafe = statePrefix.Replace("where A:INotifyCompletion where S:IAsyncStateMachine", "where A:INotifyCompletion where S:T,IAsyncStateMachine", StringComparison.Ordinal) + stateSuffix;
+        var stateUnsafe = statePrefix.Replace("where A:ICriticalNotifyCompletion where S:IAsyncStateMachine", "where A:ICriticalNotifyCompletion where S:T,IAsyncStateMachine", StringComparison.Ordinal) + stateSuffix;
+        var stateOverride = statePrefix.Replace("public void Start<S>(ref S state) where S:IAsyncStateMachine", "public void Start<S>(ref S state) where S:T,IAsyncStateMachine", StringComparison.Ordinal).Replace("public ProbeTask<T> Task", "public Task<T> Task", StringComparison.Ordinal).Replace("return new(inner.Task);", "return inner.Task;", StringComparison.Ordinal) + stateSuffix;
         var constrained = Support.Replace("struct ProbeBuilder<T> {", "struct ProbeBuilder<T> where T:struct {", StringComparison.Ordinal);
         var fixedResult = Support.Replace("public ProbeTask<T> Task", "public ProbeTask<int> Task", StringComparison.Ordinal)
             .Replace("return new(inner.Task);", "return default;", StringComparison.Ordinal);
@@ -83,6 +90,15 @@ internal static class CustomBuilderChecks
             """;
         (string Name, string Source, string Support, string Status, string? Signature)[] tests =
         [
+            ("StateMachineNullableResult", "static async ProbeTask<IAsyncStateMachine?> M(IAsyncStateMachine? value,int ignored){await Task.Yield();return value;}", stateStart, "Suggestion", "global::ProbeTask<global::System.Runtime.CompilerServices.IAsyncStateMachine?> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine? value, T1 ignored)"),
+            ("StateMachineOverride", "[AsyncMethodBuilder(typeof(ProbeBuilder<>))] static async Task<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await Task.Yield();return value;}", stateOverride, "Suggestion", "global::System.Threading.Tasks.Task<global::System.Runtime.CompilerServices.IAsyncStateMachine> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineLambda", "static Func<ProbeTask<IAsyncStateMachine>> M(IAsyncStateMachine value,int ignored)=>async()=>{await Task.Yield();return value;};", stateStart, "Suggestion", "global::System.Func<global::ProbeTask<global::System.Runtime.CompilerServices.IAsyncStateMachine>> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineLocalCapture", "static int M(IAsyncStateMachine value,int ignored){async ProbeTask<IAsyncStateMachine> Local(){await Task.Yield();return value;}_=Local();return ignored;}", stateStart, "Suggestion", "T1 M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineStartBound", "static async ProbeTask<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await Task.Yield();return value;}", stateStart, "Suggestion", "global::ProbeTask<global::System.Runtime.CompilerServices.IAsyncStateMachine> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineSafeAwaitBound", "static async ProbeTask<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await new SafeTask<int>(Task.FromResult(0));return value;}", stateSafe, "Suggestion", "global::ProbeTask<global::System.Runtime.CompilerServices.IAsyncStateMachine> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineUnsafeAwaitBound", "static async ProbeTask<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await Task.Yield();return value;}", stateUnsafe, "Suggestion", "global::ProbeTask<global::System.Runtime.CompilerServices.IAsyncStateMachine> M<T1>(global::System.Runtime.CompilerServices.IAsyncStateMachine value, T1 ignored)"),
+            ("StateMachineUnusedSafeBound", "static async ProbeTask<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await Task.Yield();return value;}", stateSafe, "Suggestion", "global::ProbeTask<T1> M<T1, T2>(T1 value, T2 ignored)"),
+            ("StateMachineUnusedUnsafeBound", "static async ProbeTask<IAsyncStateMachine> M(IAsyncStateMachine value,int ignored){await new SafeTask<int>(Task.FromResult(0));return value;}", stateUnsafe, "Suggestion", "global::ProbeTask<T1> M<T1, T2>(T1 value, T2 ignored)"),
             ("DiscardAssignmentValue", "static int M(int x)=>(_=x);", Support, "Suggestion", "T1 M<T1>(T1 x)"),
             ("DiscardAssignmentStatement", "static void M(int x) { _=x; }", Support, "Suggestion", "void M<T1>(T1 x)"),
             ("UnderscoreLocalIsNotDiscard", "static int M(int x) { int _=0;_=x;return _; }", Support, "Concrete", null),
@@ -128,6 +144,21 @@ internal static class CustomBuilderChecks
             var errors = compilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity == DiagnosticSeverity.Error; }).ToArray();
             if (errors.Length != 0)
             { throw new InvalidOperationException(test.Name + " fixture: " + errors[0]); }
+            if (test.Name.StartsWith("StateMachine", StringComparison.Ordinal))
+            {
+                using var fixtureImage = new MemoryStream();
+                var fixtureEmission = compilation.Emit(fixtureImage, cancellationToken: cancellationToken);
+                if (!fixtureEmission.Success)
+                { throw new InvalidOperationException(test.Name + " fixture emission: " + string.Join("; ", fixtureEmission.Diagnostics)); }
+                var release = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
+                using var releaseImage = new MemoryStream();
+                var releaseEmission = release.Emit(releaseImage, cancellationToken: cancellationToken);
+                if (!releaseEmission.Success)
+                { throw new InvalidOperationException(test.Name + " release fixture emission: " + string.Join("; ", releaseEmission.Diagnostics)); }
+                var releaseResult = Program.Results(release, cancellationToken).Single(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; });
+                if (releaseResult.Status != test.Status || releaseResult.Signature != test.Signature)
+                { throw new InvalidOperationException(test.Name + " release: " + releaseResult.Status + ": " + (releaseResult.Signature ?? releaseResult.Message)); }
+            }
             var result = Program.Results(compilation, cancellationToken).Single(r => { ArgumentNullException.ThrowIfNull(r); return r.Method == "M"; });
             if (result.Status != test.Status || result.Signature != test.Signature)
             { throw new InvalidOperationException($"{test.Name}: expected {test.Status}: {test.Signature}; got {result.Status}: {result.Signature ?? result.Message}"); }
@@ -167,7 +198,8 @@ internal static class CustomBuilderChecks
         if (Inference.Analyze(unusedMember, unusedCompilation.GetSemanticModel(unusedTree), cancellationToken).Status != "Concrete")
         { throw new InvalidOperationException("An unused task-like type lost its builder contract."); }
         Program.Log.Info("PASS CustomBuilderUnusedTypeContract");
-        return tests.Length + excluded.Length + 2 + await Runtime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + excluded.Length + 2 + await Runtime(cancellationToken).ConfigureAwait(false)
+            + await StateMachineBuilderRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
