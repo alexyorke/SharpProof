@@ -16,8 +16,8 @@ $vswhere = if ($null -ne $vswhereCommand) { $vswhereCommand.Source } else {
     Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Microsoft Visual Studio/Installer/vswhere.exe'
 }
 if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) { throw 'The installed Visual Studio vswhere utility was not found.' }
-$selection = @('-latest', '-products', '*', '-version', "[$MajorVersion.0,$($MajorVersion + 1).0)", '-requires', 'Microsoft.Component.MSBuild')
-$installationJson = (& $vswhere @selection -format json -utf8 | Out-String)
+$selection = [Collections.Immutable.ImmutableArray]::Create[string]('-latest', '-products', '*', '-version', "[$MajorVersion.0,$($MajorVersion + 1).0)", '-requires', 'Microsoft.Component.MSBuild')
+$installationJson = (& $vswhere ([string[]]@($selection)) -format json -utf8 | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'vswhere could not enumerate the requested Visual Studio major version.' }
 $installations = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($installationJson | ConvertFrom-Json)))
 if ($installations.Count -ne 1 -or ([version]$installations[0].installationVersion).Major -ne $MajorVersion) {
@@ -26,16 +26,16 @@ if ($installations.Count -ne 1 -or ([version]$installations[0].installationVersi
 $installation = $installations[0]
 $directorySeparator = [IO.Path]::DirectorySeparatorChar
 $msbuildPattern = @('MSBuild', 'Current', 'Bin', 'amd64', 'MSBuild.exe') -join $directorySeparator
-$msbuildCandidates = @(& $vswhere @selection -find $msbuildPattern)
-if ($LASTEXITCODE -ne 0 -or $msbuildCandidates.Count -ne 1) { throw 'vswhere did not identify exactly one installed amd64 MSBuild.exe.' }
+$msbuildCandidates = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& $vswhere ([string[]]@($selection)) -find $msbuildPattern))
+if ($LASTEXITCODE -ne 0 -or $msbuildCandidates.Length -ne 1) { throw 'vswhere did not identify exactly one installed amd64 MSBuild.exe.' }
 $msbuild = (Resolve-Path -LiteralPath $msbuildCandidates[0]).Path
 $installationPrefix = ([IO.Path]::GetFullPath($installation.installationPath)).TrimEnd($directorySeparator) + $directorySeparator
 if (-not $msbuild.StartsWith($installationPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'The resolved MSBuild executable is outside the selected Visual Studio installation.' }
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
-$identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg')))
+$identities = Get-SharpProofPackageIdentitySet -Files ([object[]]@($files)) -RequireRepository
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $commit = (& git -C $repository rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $identities.RepositoryCommits.Count -ne 1 -or $identities.RepositoryCommits[0] -cne $commit) {
@@ -76,7 +76,7 @@ function Invoke-VisualStudioMSBuild([string]$Directory, [string[]]$Arguments, [s
         }
         $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         if (-not $Quiet -or $process.ExitCode -ne 0) { Write-Host (($output -split '\r?\n' | Select-Object -Last 100) -join "`n") }
-        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
+        return ([ordered]@{ ExitCode = $process.ExitCode; Output = $output }).AsReadOnly()
     }
     finally { $process.Dispose() }
 }
@@ -138,14 +138,14 @@ public static class Subject {
         $restore = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments @(
             'Consumer.csproj', '-t:Restore', '-nologo', '/nodeReuse:false', '-p:RestoreConfigFile=NuGet.Config')
         if ($restore.ExitCode -ne 0) { throw 'Visual Studio 17 portable consumer restore failed.' }
-        $buildArguments = @('Consumer.csproj', '-t:Rebuild', '-p:Configuration=Release', '-nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
+        $buildArguments = [Collections.Immutable.ImmutableArray]::Create[string]('Consumer.csproj', '-t:Rebuild', '-p:Configuration=Release', '-nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
         # Full MSBuild prints the compiler's /warnaserror+:CODE switches even
         # when compilation succeeds. Match emitted diagnostics, not bare IDs.
         $analyzerFailureDiagnostic = '\b(?:warning|error)[ \t]+(?:CS8032|CS8034|CS9057|CS8785|AD0001)[ \t]*:'
-        $passing = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments $buildArguments
+        $passing = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments ([string[]]@($buildArguments))
         if ($passing.ExitCode -ne 0 -or $passing.Output -match $analyzerFailureDiagnostic) { throw 'Visual Studio 17 portable analyzer passing control failed or could not load its analyzer.' }
         [IO.File]::WriteAllText($sourcePath, $validSource.Replace('Positive(1);', 'Positive(-1);'), $encoding)
-        $negative = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments $buildArguments
+        $negative = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments ([string[]]@($buildArguments))
         if ($negative.ExitCode -eq 0 -or $negative.Output -notmatch '\berror[ \t]+SP0027[ \t]*:' -or
             $negative.Output -match $analyzerFailureDiagnostic) { throw 'Visual Studio 17 did not report the precondition violation through the real portable analyzer.' }
         if (Test-Path -LiteralPath (Join-Path $consumer 'obj/Release/net48/SharpProof/result.json')) { throw 'The advisory-only Visual Studio 17 control unexpectedly ran full verification.' }
