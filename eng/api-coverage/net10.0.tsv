@@ -1550,7 +1550,7 @@ System.Collections	P:System.Collections.BitArray.IsSynchronized	Property	unmodel
 System.Collections	P:System.Collections.BitArray.Item(System.Int32)	Property	unmodeled	-
 System.Collections	P:System.Collections.BitArray.Length	Property	unmodeled	-
 System.Collections	P:System.Collections.BitArray.SyncRoot	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Comparer`1.Default	Property	unmodeled	-
+System.Collections	P:System.Collections.Generic.Comparer`1.Default	Property	partially-modeled	intrinsic=default-comparer-cached-value
 System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.Dictionary	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.Item(`2)	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Capacity	Property	unmodeled	-

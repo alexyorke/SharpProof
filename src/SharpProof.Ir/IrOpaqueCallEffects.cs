@@ -27,6 +27,48 @@ internal static class IrOpaqueCallSite
 {
     private const string Prefix = "opaque-call:";
     private const string DefaultComparerReplayPrefix = "framework-default-comparer:";
+    internal const string DefaultComparerValuePrefix = "framework-default-comparer-value:";
+
+    internal static bool IsDefaultComparerValueView(IrFactory factory, IrTypeId declared, IrTypeId view)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(declared.IsDefault, nameof(declared));
+        RepositoryParameterGuard.ThrowIfInvalid(view.IsDefault, nameof(view));
+        // Comparer<T> directly extends Object. Its observed implementation is
+        // not evidence that it belongs to an arbitrary source-defined subtype.
+        return view == declared || view == factory.ObjectType || factory.GetImplementedReferenceInterfaces(declared).Contains(view);
+    }
+
+    internal static bool IsDefaultComparerValueName(string name)
+    {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        if (!name.StartsWith(DefaultComparerValuePrefix, StringComparison.Ordinal))
+        { return false; }
+        var kind = name.Substring(DefaultComparerValuePrefix.Length);
+        return kind == "symbolic" || IsDefaultComparerPrimitive(kind);
+    }
+
+    internal static string? DefaultComparerValuePrimitive(IrFactory factory, IrOpaqueTerm term)
+    {
+        var kind = DefaultComparerValueKind(factory, term);
+        return kind != null && IsDefaultComparerPrimitive(kind) ? kind : null;
+    }
+
+    internal static string? DefaultComparerValueKind(IrFactory factory, IrOpaqueTerm term)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        if (term.Purity != IrOpaquePurity.Pure || term.Receiver != null || !term.Arguments.IsEmpty ||
+            factory.GetTypeInfo(term.Type).Kind != IrTypeKind.Reference)
+        { return null; }
+        var member = factory.GetMemberInfo(term.Member);
+        if (!member.IsStatic || !member.ParameterTypes.IsEmpty || member.ReturnType != term.Type || member.DeclaringType != term.Type)
+        { return null; }
+        var name = factory.GetString(member.Name);
+        if (!IsDefaultComparerValueName(name))
+        { return null; }
+        return name.Substring(DefaultComparerValuePrefix.Length);
+    }
 
     internal static string DefaultComparerReplay(string primitive)
     {

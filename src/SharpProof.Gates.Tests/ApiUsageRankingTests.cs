@@ -323,7 +323,7 @@ public sealed class ApiUsageRankingTests
         var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [compare.ContainingAssembly.Name + "\t" + compare.GetDocumentationCommentId()] = "partially-modeled",
-            [getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "unmodeled"
+            [getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "partially-modeled"
         };
         var sites = new List<Site>();
         var gaps = new List<string>();
@@ -331,6 +331,7 @@ public sealed class ApiUsageRankingTests
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call" && site.Status == "partially-modeled")), Is.EqualTo(2));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(4));
+        Assert.That(sites.Where(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Access == "read").All(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.True);
     }
 
     [Test]

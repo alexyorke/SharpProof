@@ -20,7 +20,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | 5 | 0 | 16 | 0 | partially-modeled |
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 15 | 10 | 0 | 15 | 0 | unmodeled-domain |
 | M:System.Collections.Generic.List`1.Add(`0) | call | 13 | 9 | 0 | 13 | 0 | partially-modeled |
-| P:System.Collections.Generic.Comparer`1.Default | read | 13 | 13 | 0 | 13 | 0 | unmodeled |
+| P:System.Collections.Generic.Comparer`1.Default | read | 13 | 13 | 0 | 13 | 0 | partially-modeled |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | 11 | 0 | 13 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 11 | 9 | 0 | 11 | 0 | unmodeled-domain |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | partially-modeled |

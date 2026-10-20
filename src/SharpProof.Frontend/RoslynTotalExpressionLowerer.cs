@@ -481,7 +481,24 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             !CSharpOperationSemantics.IsLength(opaqueProperty) &&
             CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
-        { return read; }
+        {
+            // Keep the getter's initialization effects, but its normal value is
+            // the immutable per-runtime-type cache. Runtime type interning erases
+            // tuple names, nullable annotations and dynamic/object distinctions.
+            if (CSharpOperationSemantics.DefaultComparerElement(opaqueProperty) is { } comparerElement &&
+                CSharpOperationSemantics.IsDefaultComparerValueDeclaration(getter))
+            {
+                var type = _context.Type(opaqueProperty.Type);
+                var actual = _context.SpecializeSourceType(opaqueProperty.Type)!;
+                var primitive = _context.KnownScalarType(comparerElement);
+                var name = IrOpaqueCallSite.DefaultComparerValuePrefix +
+                    (CSharpOperationSemantics.IsComparisonIntegerType(primitive) ? primitive!.SpecialType.ToString() : "symbolic");
+                var member = _factory.GetOrCreateMember(CompilerIdentityBridge.InternType(_factory, actual), type, name, type, true, []);
+                var value = _factory.PureOpaque(member, null);
+                return new(value, read.Continuation, read.Classification);
+            }
+            return read;
+        }
         if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
             CSharpOperationSemantics.IsOpaqueDomain(operation.Type) &&
             !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null))

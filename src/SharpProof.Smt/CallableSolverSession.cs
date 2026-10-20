@@ -40,6 +40,10 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
     }
 
     public long ConsumedResourceCount => Interlocked.Read(ref _consumedResourceCount);
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider
+    {
+        set => _encoder.ConcreteOpaqueValueProvider = value;
+    }
 
     public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
     {
