@@ -480,6 +480,8 @@ public static partial class Inference
                 { return new(symbol.Name, "Rejected", "Generalization changes resource disposal or its implicit await."); }
                 if (!PreservesInterpolationBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes interpolation handler construction or append selection."); }
+                if (!PreservesDynamicBindings(beforeRoot, afterRoot, beforeModel, afterModel))
+                { return new(symbol.Name, "Rejected", "Generalization changes a dynamic binding context or method group."); }
                 if (!PreservesUserOperations(beforeRoot, afterRoot, beforeModel, afterModel))
                 { return new(symbol.Name, "Rejected", "Generalization changes a selected user operator or conversion."); }
             }
@@ -878,6 +880,8 @@ public static partial class Inference
                 && model.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol group
                 && model.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate } target)
             { return MethodGroup(expression, group, target); }
+            if (DynamicExpression(expression) is { } dynamicExpression)
+            { return dynamicExpression; }
             switch (expression)
             {
                 case PrefixUnaryExpressionSyntax pointerRead when pointerRead.IsKind(SyntaxKind.PointerIndirectionExpression):

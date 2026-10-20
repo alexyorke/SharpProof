@@ -146,6 +146,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Extension calls and array-based params calls | Infer receiver/expanded element types; preserve selected definitions |
 | Local functions | Import schemes; compiler-check retained bodies/captures |
 | Fields, properties and instance calls | Retain receiver/member types conservatively |
+| Dynamic signatures and operations | Retain dynamic annotations and binder operand types; infer independent generic components |
 | Built-in null equality/inequality | Infer symbolic operands for null constants and reference defaults; preserve user-operator dispatch |
 | Built-in arithmetic, comparisons, logic, bitwise/unary operators | Retain operand types and C# promotions |
 | Casts, typed default, checked/unchecked | Retain concrete types |
@@ -655,4 +656,15 @@ user operators continue through signature and dispatch validation. Runtime fixes
 check single evaluation, suspension and the distinction between built-in null tests
 and overloaded equality. Reference defaults and explicit reference null casts/constants require a class
 constraint when their operand becomes a bare type parameter; array/delegate shapes
-retain their inherent reference identity. Dynamic operand types remain unsupported.
+retain their inherent reference identity. Dynamic operations retain their binding context as described below.
+
+Dynamic signatures retain `dynamic` separately from `object`, including nullable,
+array, tuple and task shapes. Dynamic calls, members, indexers, operators, stores,
+construction, conversions, conditions and await keep their original static operand
+types. Other parameters/results can still become generic. Static object-to-dynamic
+arguments retain both sides of their conversion so a signature change does not
+silently turn a static call into a dynamic call. Candidate validation compares
+dynamic sites, operand types, explicit type arguments and statically known method
+groups; changing a known dynamically invoked group rejects the suggestion.
+IDE runtime checks compare original and fixed overload selection, member/indexer
+effects, user conversions, missing-member exceptions and await suspension/faults.

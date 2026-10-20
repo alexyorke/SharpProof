@@ -87,7 +87,7 @@ internal static class NullableAsyncChecks
             ("NullEqualityAsync", "static async Task<bool> M(Task<int?> x)=>(await x)==null;", "Suggestion", "global::System.Threading.Tasks.Task<bool> M<T1>(global::System.Threading.Tasks.Task<T1?> x) where T1 : struct"),
             ("NullEqualityConditional", "static bool M(ConditionalBox<int>? x)=>x?.Value==null;class ConditionalBox<T>{public T Value=default!;}", "Suggestion", "bool M<T1>(global::Cases.ConditionalBox<T1>? x) where T1 : struct"),
             ("NullEqualityTwoValues", "static bool M(int? x,int? y,bool ignored)=>x==y;", "Suggestion", "bool M<T1>(int? x, int? y, T1 ignored)"),
-            ("NullEqualityDynamicControl", "static bool M(dynamic x,int ignored)=>x==null;", "Skipped", null),
+            ("NullEqualityDynamicControl", "static bool M(dynamic x,int ignored)=>x==null;", "Suggestion", "bool M<T1>(dynamic x, T1 ignored)"),
 
             ("NullEqualityContextualDefaultControl", "static bool M(int? x)=>x==default;", "Concrete", null),
             ("NullEqualityReverseDefaultControl", "static bool M(int? x)=>default!=x;", "Concrete", null),

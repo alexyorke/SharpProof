@@ -107,6 +107,8 @@ internal static partial class CSharpTypes
             return new("[" + new string(',', array.Rank - 1) + "]", Convert(array.ElementType, erase, variables, allowRefLike));
         }
 
+        if (type is IDynamicTypeSymbol)
+        { return new("dynamic"); }
         if (type is INamedTypeSymbol named)
         {
             if (named.IsTupleType)

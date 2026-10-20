@@ -165,6 +165,11 @@ public static partial class Inference
                 { return new(CSharpTypes.NullableReference, inferred); }
                 return inferred;
             }
+            if (info.Type is IDynamicTypeSymbol || converted is IDynamicTypeSymbol)
+            {
+                _ = Expression(expression);
+                return CSharpTypes.Rigid(converted);
+            }
             var sameTuple = info.Type is INamedTypeSymbol { IsTupleType: true } sourceTuple && converted is INamedTypeSymbol { IsTupleType: true } declaredTuple
                 && SymbolEqualityComparer.Default.Equals(sourceTuple.TupleUnderlyingType, declaredTuple.TupleUnderlyingType);
             if (SymbolEqualityComparer.Default.Equals(info.Type, converted) || sameTuple || model.ClassifyConversion(expression, converted).IsIdentity)
@@ -309,6 +314,8 @@ public static partial class Inference
             { Interpolation(interpolation, expected); return; }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
+            if (TryBindDynamicArgument(value, expected, inferred))
+            { return; }
             if (TryBindArgumentConversion(value, expected, inferred))
             { return; }
             if (expected.Name == CSharpTypes.NullableParameter)
