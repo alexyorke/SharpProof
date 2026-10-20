@@ -30,8 +30,8 @@ if ($actualFamily -cne $OsFamily -or $actualHost -cne $Architecture -or $actualP
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
-$identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -In @('.nupkg', '.snupkg')))
+$identities = Get-SharpProofPackageIdentitySet -Files ([object[]]@($files)) -RequireRepository
 $version = [string]$identities.Version
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $expectedCommit = (& git -C $repository rev-parse HEAD).Trim()
@@ -129,7 +129,7 @@ function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory 
         }
         $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         Write-Host (($output -split '\r?\n' | Select-Object -Last 100) -join "`n")
-        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
+        return ([ordered]@{ ExitCode = $process.ExitCode; Output = $output }).AsReadOnly()
     }
     finally { $process.Dispose() }
 }
@@ -235,17 +235,19 @@ try {
         }
         Write-Host "Qualified Full MSBuild $($hostProperties.MSBuildVersion), SDK $($hostProperties.NETCoreSdkVersion)."
     }
-    $buildArguments = @('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
-    $passing = Invoke-ConsumerCommand $buildArguments
+    $buildArguments = [Collections.Immutable.ImmutableArray]::Create[string]('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
+    $passing = Invoke-ConsumerCommand ([string[]]@($buildArguments))
     if ($passing.ExitCode -ne 0) { throw 'Fresh default consumer did not build and prove its contract.' }
     $passingHash = Assert-ConsumerEvidence 'Proven'
     if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
-        $incremental = Invoke-ConsumerCommand $buildArguments
+        $incremental = Invoke-ConsumerCommand ([string[]]@($buildArguments))
         if ($incremental.ExitCode -ne 0) { throw 'The unchanged Visual Studio consumer did not retain a valid proof.' }
         $null = Assert-ConsumerEvidence 'Proven'
     }
     Write-ConsumerSource '0'
-    $failing = Invoke-ConsumerCommand ($buildArguments + @('-t:Rebuild'))
+    $failingArgumentBuilder = $buildArguments.ToBuilder()
+    $failingArgumentBuilder.Add('-t:Rebuild')
+    $failing = Invoke-ConsumerCommand ([string[]]@($failingArgumentBuilder.ToImmutable()))
     if ($failing.ExitCode -eq 0 -or $failing.Output -notmatch '\bSP0051\b') { throw 'False contract did not fail with the refuted-contract diagnostic SP0051.' }
     $failingHash = Assert-ConsumerEvidence 'Refuted'
     if ($passingHash -ceq $failingHash) { throw 'Modified source reused stale proof evidence.' }
