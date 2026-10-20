@@ -327,14 +327,15 @@ public sealed class ApiUsageRankingTests
             }
             """, TestContext.CurrentContext.CancellationToken);
         var comparable = compilation.GetTypeByMetadataName("System.IComparable`1")!.GetMembers("CompareTo").OfType<IMethodSymbol>().Single();
-        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [comparable.ContainingAssembly.Name + "\t" + comparable.GetDocumentationCommentId()] = "partially-modeled"
-        };
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
-        Assert.That(sites, Has.Count.EqualTo(2));
+        var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        inventoryBuilder[comparable.ContainingAssembly.Name + "\t" + comparable.GetDocumentationCommentId()] = "partially-modeled";
+        var inventory = inventoryBuilder.ToImmutable();
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
+        Assert.That(sites, Has.Length.EqualTo(2));
         Assert.That(sites.All(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.True);
         Assert.That(gaps, Is.Empty);
     }
@@ -514,7 +515,7 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(6));
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshHashSetCalls));
