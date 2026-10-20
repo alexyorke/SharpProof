@@ -1,0 +1,275 @@
+using System;
+using System.Collections.Immutable;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
+
+internal static class ResidualAudit
+{
+    private sealed class Candidate
+    {
+        internal SyntaxNode Node = null!;
+        internal ISymbol? Symbol;
+        internal string Role = "", Name = "", Type = "", TypeId = "", AssemblyIdentity = "", SymbolIdentity = "", Owner = "", Shape = "", Tokens = "", Key = "";
+    }
+
+    private static string Cell(object? value) =>
+        Convert.ToString(value, CultureInfo.InvariantCulture)?.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ') ?? "";
+    private static string Row(params object?[] cells) => string.Join("\t", cells.Select(Cell));
+    private static string Hash(string text)
+    {
+        using (var hash = SHA256.Create())
+            return string.Concat(hash.ComputeHash(Encoding.UTF8.GetBytes(text)).Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+    private static string SymbolParts(params object?[] parts) => string.Join("|", parts.Select(part => { var text = Cell(part); return text.Length.ToString(CultureInfo.InvariantCulture) + ":" + text; }));
+    private static string SymbolIdentity(ITypeSymbol type)
+    {
+        var display = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var assembly = type.ContainingAssembly?.Identity.ToString() ?? "<no-assembly>";
+        return type switch
+        {
+            IArrayTypeSymbol array => SymbolParts("Array", display, array.Rank, SymbolIdentity(array.ElementType), type.NullableAnnotation),
+            IPointerTypeSymbol pointer => SymbolParts("Pointer", display, SymbolIdentity(pointer.PointedAtType)),
+            ITypeParameterSymbol parameter => SymbolParts("TypeParameter", display, assembly, parameter.TypeParameterKind, parameter.Ordinal, Identity(parameter.ContainingSymbol), type.NullableAnnotation),
+            INamedTypeSymbol named => SymbolParts("Named", display, assembly, named.ContainingType is null ? "" : SymbolIdentity(named.ContainingType), string.Join(";", named.TypeArguments.Select(SymbolIdentity)), type.NullableAnnotation),
+            IFunctionPointerTypeSymbol function => SymbolParts("FunctionPointer", display, function.Signature.CallingConvention, function.Signature.RefKind, SymbolIdentity(function.Signature.ReturnType), string.Join(";", function.Signature.Parameters.Select(parameter => SymbolParts(parameter.RefKind, SymbolIdentity(parameter.Type))))),
+            _ => SymbolParts(type.TypeKind, display, assembly, type.NullableAnnotation)
+        };
+    }
+    private static string Identity(ISymbol? symbol) => symbol is null ? "<unbound>" :
+        symbol.GetDocumentationCommentId() ?? symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    private static string Shape(ITypeSymbol? type)
+    {
+        if (type is null || type.TypeKind == TypeKind.Error) return "UnknownBinding";
+        if (type is ITypeParameterSymbol) return "GenericTypeRequiresOwnershipReview";
+        if (type.IsRefLikeType) return "ByRefLikeRequiresOwnershipReview";
+        if (type is IArrayTypeSymbol) return "Array";
+        var original = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (original.StartsWith("global::System.Memory<", StringComparison.Ordinal) ||
+            original.StartsWith("global::System.ReadOnlyMemory<", StringComparison.Ordinal) ||
+            original.StartsWith("global::System.ArraySegment<", StringComparison.Ordinal))
+            return "MemoryOrSliceRequiresOwnershipReview";
+        if (type.TypeKind == TypeKind.Pointer || type.TypeKind == TypeKind.Dynamic) return "UnknownUnsafeOrDynamic";
+        var name = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var ns = type.ContainingNamespace?.ToDisplayString() ?? "";
+        if (name.Contains(".Builder")) return "OwnedBuilderRequiresEscapeReview";
+        if (ns.StartsWith("System.Collections.Immutable", StringComparison.Ordinal)) return "";
+        if (ns == "System.Collections" || ns.StartsWith("System.Collections.", StringComparison.Ordinal))
+        {
+            if (type.TypeKind == TypeKind.Interface || ns.Contains("ObjectModel")) return "CollectionFacadeRequiresOwnershipReview";
+            return "MutableFrameworkCollection";
+        }
+        if (type.IsReferenceType && type.SpecialType != SpecialType.System_String)
+            return "CustomReferenceOwnershipUnknown";
+        return "";
+    }
+
+    internal static void Audit(CompilationAnalysisContext context, string output, string root,
+        string projectPath, string project, string framework, string configuration, string contextId,
+        ImmutableHashSet<string> universe)
+    {
+        var types = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        var typeSymbols = ImmutableDictionary.CreateBuilder<string, ITypeSymbol>(StringComparer.Ordinal);
+        string RelativeTypePath(string compilerPath)
+        {
+            var full = Path.GetFullPath(compilerPath).Replace((char)92, '/');
+            return full.StartsWith(root, StringComparison.Ordinal) ? full.Substring(root.Length) : full;
+        }
+        void ObserveType(ITypeSymbol? type)
+        {
+            if (type is null) return;
+            var display = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var assembly = type.ContainingAssembly?.Identity.ToString() ?? "<no-assembly>";
+            var symbolIdentity = SymbolIdentity(type); var typeKey = Hash(symbolIdentity);
+            if (types.ContainsKey(typeKey))
+            {
+                if (!SymbolEqualityComparer.IncludeNullability.Equals(typeSymbols[typeKey], type))
+                    throw new InvalidOperationException("Ambiguous compiler type authority: " + display);
+                return;
+            }
+            typeSymbols.Add(typeKey, type);
+            var declarations = type.DeclaringSyntaxReferences.Select(reference => RelativeTypePath(reference.SyntaxTree.FilePath))
+                .Concat(type.Locations.Where(location => location.IsInSource && location.SourceTree != null)
+                    .Select(location => RelativeTypePath(location.SourceTree!.FilePath)))
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToImmutableArray();
+            var interfaces = type.AllInterfaces.Cast<ITypeSymbol>();
+            if (type.TypeKind == TypeKind.Interface) interfaces = interfaces.Prepend(type);
+            var collections = interfaces.Where(value => value.ContainingNamespace?.ToDisplayString().StartsWith("System.Collections", StringComparison.Ordinal) == true)
+                .Select(value => value.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)).OrderBy(value => value, StringComparer.Ordinal).ToImmutableArray();
+            var mutableCollections = collections.Where(value => value.StartsWith("global::System.Collections.Generic.ICollection<", StringComparison.Ordinal) ||
+                value.StartsWith("global::System.Collections.Generic.IList<", StringComparison.Ordinal) ||
+                value.StartsWith("global::System.Collections.Generic.IDictionary<", StringComparison.Ordinal) ||
+                value is "global::System.Collections.IList" or "global::System.Collections.IDictionary").ToImmutableArray();
+            var members = type.GetMembers();
+            types.Add(typeKey, Row(typeKey, symbolIdentity, display, type.ContainingNamespace?.ToDisplayString(), assembly,
+                declarations.Length > 0 ? "Source" : "MetadataOrSynthetic", string.Join(";", declarations),
+                type.BaseType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), type.IsRecord,
+                type.AllInterfaces.Any(value => value.ToDisplayString() == "System.IDisposable"), type.IsAnonymousType,
+                string.Join(";", members.OfType<IFieldSymbol>().Where(value => !value.IsImplicitlyDeclared && !value.IsConst && !value.IsReadOnly).Select(value => value.Name).OrderBy(value => value, StringComparer.Ordinal)),
+                string.Join(";", members.OfType<IPropertySymbol>().Where(value => value.SetMethod != null && !value.SetMethod.IsInitOnly).Select(value => value.Name).OrderBy(value => value, StringComparer.Ordinal)),
+                string.Join(";", members.OfType<IMethodSymbol>().Where(value => value.Name is "Add" or "AddRange" or "Remove" or "RemoveAt" or "Clear" or "Insert" or "SetItem").Select(value => value.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)).OrderBy(value => value, StringComparer.Ordinal)),
+                string.Join(";", collections), string.Join(";", mutableCollections), contextId, project, framework, configuration));
+        }
+        var rows = ImmutableArray.CreateBuilder<string>();
+        rows.Add("StableId\tKind\tPath\tOwner\tName\tType\tShape\tTokenSha256\tOccurrence\tDuplicateCount\tDetail\tSourceSha256\tContextSha256\tProject\tFramework\tConfiguration\tLine\tColumn\tSpanStart\tSpanLength\tTypeId\tAssemblyIdentity\tSymbolIdentity");
+        foreach (var tree in context.Compilation.SyntaxTrees)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var compilerPath = tree.FilePath.Replace('\\', '/');
+            var path = Path.GetFullPath(Path.IsPathRooted(compilerPath) ? compilerPath :
+                Path.Combine(Path.GetDirectoryName(projectPath)!, compilerPath)).Replace('\\', '/');
+            var relative = path.StartsWith(root, StringComparison.Ordinal) ? path.Substring(root.Length) : path;
+            if (!universe.Contains(relative)) continue;
+            var syntax = tree.GetRoot(context.CancellationToken);
+            var model = context.Compilation.GetSemanticModel(tree);
+            var sourceHash = Hash(tree.GetText(context.CancellationToken).ToString());
+            var candidates = ImmutableArray.CreateBuilder<Candidate>();
+            void Add(SyntaxNode node, ISymbol? symbol, string role, ITypeSymbol? type, string? name = null, string? force = null)
+            {
+                ObserveType(type);
+                var shape = force ?? Shape(type);
+                if (shape.Length == 0) return;
+                var owner = role == "ReturnRoot" || role == "LocalFunctionReturnRoot" ? symbol :
+                    role == "Materialization" || role == "SelfRebindingCollectionUpdate" || role == "UnknownInvocation"
+                        ? model.GetEnclosingSymbol(node.SpanStart, context.CancellationToken)
+                        : symbol?.ContainingSymbol ?? model.GetEnclosingSymbol(node.SpanStart, context.CancellationToken);
+                var tokens = Hash(string.Join("|", node.DescendantTokens().Select(token => token.RawKind + ":" + token.Text)));
+                var entry = new Candidate { Node = node, Symbol = symbol, Role = role, Name = name ?? symbol?.Name ?? "",
+                    Type = type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ?? "<unbound>",
+                    TypeId = type is null ? "" : Hash(SymbolIdentity(type)), AssemblyIdentity = type?.ContainingAssembly?.Identity.ToString() ?? (type is null ? "" : "<no-assembly>"), SymbolIdentity = type is null ? "" : SymbolIdentity(type), Owner = Identity(owner), Shape = shape, Tokens = tokens };
+                entry.Key = Row(relative, entry.Owner, entry.Role, entry.Name, entry.Type, tokens);
+                candidates.Add(entry);
+            }
+            foreach (var node in syntax.DescendantNodes())
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                switch (node)
+                {
+                    case VariableDeclaratorSyntax variable:
+                        var declared = model.GetDeclaredSymbol(variable, context.CancellationToken);
+                        if (declared is ILocalSymbol local) Add(variable, local, "LocalRoot", local.Type);
+                        else if (declared is IFieldSymbol field) Add(variable, field, "FieldRoot", field.Type,
+                            force: !field.IsConst && !field.IsReadOnly ? "WritableFieldRequiresRoleReview:" + Shape(field.Type) : null);
+                        else if (declared is IEventSymbol evt) Add(variable, evt, "EventRoot", evt.Type, force: "MutableEventSubscription");
+                        break;
+                    case ParameterSyntax parameter:
+                        var input = model.GetDeclaredSymbol(parameter, context.CancellationToken) as IParameterSymbol;
+                        Add(parameter, input, "ParameterRoot", input?.Type, force: input is null ? "UnknownBinding" :
+                            input.RefKind != RefKind.None ? "ByReferenceInputRequiresRoleReview:" + Shape(input.Type) : null);
+                        break;
+                    case PropertyDeclarationSyntax property:
+                        var prop = model.GetDeclaredSymbol(property, context.CancellationToken) as IPropertySymbol;
+                        Add(property, prop, "PropertyRoot", prop?.Type, force: prop?.SetMethod is { IsInitOnly: false }
+                            ? "WritablePropertyRequiresRoleReview:" + Shape(prop.Type) : null);
+                        break;
+                    case MethodDeclarationSyntax method:
+                        var methodSymbol = model.GetDeclaredSymbol(method, context.CancellationToken) as IMethodSymbol;
+                        Add(method.ReturnType, methodSymbol, "ReturnRoot", methodSymbol?.ReturnType, method.Identifier.ValueText);
+                        break;
+                    case LocalFunctionStatementSyntax function:
+                        var functionSymbol = model.GetDeclaredSymbol(function, context.CancellationToken) as IMethodSymbol;
+                        Add(function.ReturnType, functionSymbol, "LocalFunctionReturnRoot", functionSymbol?.ReturnType, function.Identifier.ValueText);
+                        break;
+                    case ForEachStatementSyntax each:
+                        var iteration = model.GetDeclaredSymbol(each, context.CancellationToken) as ILocalSymbol;
+                        Add(each.Type, iteration, "IterationRoot", iteration?.Type);
+                        break;
+                    case SingleVariableDesignationSyntax designation:
+                        var designated = model.GetDeclaredSymbol(designation, context.CancellationToken) as ILocalSymbol;
+                        Add(designation, designated, "PatternOrDeconstructionRoot", designated?.Type);
+                        break;
+                    case CatchDeclarationSyntax caught:
+                        var caughtSymbol = model.GetDeclaredSymbol(caught, context.CancellationToken) as ILocalSymbol;
+                        Add(caught, caughtSymbol, "CatchRoot", caughtSymbol?.Type);
+                        break;
+                    case IndexerDeclarationSyntax indexer:
+                        var index = model.GetDeclaredSymbol(indexer, context.CancellationToken) as IPropertySymbol;
+                        Add(indexer, index, "IndexerRoot", index?.Type, force: index?.SetMethod is { IsInitOnly: false }
+                            ? "WritableIndexerRequiresRoleReview:" + Shape(index.Type) : null);
+                        break;
+                    case EventDeclarationSyntax eventDeclaration:
+                        var eventSymbol = model.GetDeclaredSymbol(eventDeclaration, context.CancellationToken) as IEventSymbol;
+                        Add(eventDeclaration, eventSymbol, "EventRoot", eventSymbol?.Type, force: "MutableEventSubscription");
+                        break;
+                    case ObjectCreationExpressionSyntax creation:
+                        Add(creation, null, "Creation", model.GetTypeInfo(creation, context.CancellationToken).Type);
+                        break;
+                    case ImplicitObjectCreationExpressionSyntax implicitCreation:
+                        Add(implicitCreation, null, "Creation", model.GetTypeInfo(implicitCreation, context.CancellationToken).Type);
+                        break;
+                    case ArrayCreationExpressionSyntax array:
+                        Add(array, null, "Creation", model.GetTypeInfo(array, context.CancellationToken).Type);
+                        break;
+                    case ImplicitArrayCreationExpressionSyntax implicitArray:
+                        Add(implicitArray, null, "Creation", model.GetTypeInfo(implicitArray, context.CancellationToken).Type);
+                        break;
+                    case CollectionExpressionSyntax collection:
+                        Add(collection, null, "CollectionExpression", model.GetTypeInfo(collection, context.CancellationToken).ConvertedType);
+                        break;
+                    case InvocationExpressionSyntax invocation:
+                        var binding = model.GetSymbolInfo(invocation, context.CancellationToken);
+                        var target = binding.Symbol as IMethodSymbol;
+                        var resultType = model.GetTypeInfo(invocation, context.CancellationToken).Type;
+                        var targetName = target?.Name ?? "";
+                        if (targetName is "ToArray" or "ToList" or "ToDictionary" or "ToHashSet" or "CreateBuilder" or "ToBuilder")
+                            Add(invocation, null, "Materialization", resultType, targetName);
+                        else if (resultType != null && resultType.SpecialType != SpecialType.System_Void)
+                            Add(invocation, null, "InvocationResult", resultType, targetName);
+                        if (invocation.Expression is MemberAccessExpressionSyntax member &&
+                            invocation.Parent is AssignmentExpressionSyntax assignment &&
+                            assignment.Left.ToString() == member.Expression.ToString() &&
+                            targetName is "Add" or "AddUnique" or "AddRange" or "SetItem" or "SetItems" or "Remove" or "RemoveRange" or "Clear" or "Append" or "Concat" or "Prepend" or "Insert" or "InsertRange" or "RemoveAt")
+                            Add(assignment, target, "SelfRebindingCollectionUpdate", resultType, targetName, "BuilderPreferenceRequiresRoleReview");
+                        if (invocation.Expression is MemberAccessExpressionSyntax discardedMember &&
+                            (invocation.Parent is ExpressionStatementSyntax || model.GetOperation(invocation, context.CancellationToken)?.Parent is IExpressionStatementOperation) &&
+                            model.GetTypeInfo(discardedMember.Expression, context.CancellationToken).Type is { } receiverType &&
+                            receiverType.ContainingNamespace?.ToDisplayString().StartsWith("System.Collections.Immutable", StringComparison.Ordinal) == true &&
+                            !receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Contains(".Builder") &&
+                            targetName is "Add" or "AddRange" or "SetItem" or "SetItems" or "Remove" or "RemoveRange" or "Clear" or "Insert" or "InsertRange" or "RemoveAt" or "Union" or "Intersect" or "Except")
+                            Add(invocation, target, "DiscardedImmutableCollectionUpdate", resultType, targetName, "DiscardedImmutableUpdateRequiresRoleReview");
+                        if (target is null && model.GetOperation(invocation, context.CancellationToken) is not INameOfOperation)
+                            Add(invocation, null, "UnknownInvocation", resultType, force: "UnknownBinding:" + binding.CandidateReason);
+                        break;
+                }
+            }
+            void Emit(string id, string kind, SyntaxNode node, string owner, string name, string type, string shape,
+                string tokenHash, int occurrence, int duplicates, string detail, string typeId = "", string assemblyIdentity = "", string symbolIdentity = "")
+            {
+                var location = tree.GetLineSpan(node.Span).StartLinePosition;
+                rows.Add(Row(id, kind, relative, owner, name, type, shape, tokenHash, occurrence, duplicates, detail,
+                    sourceHash, contextId, project, framework, configuration, location.Line + 1, location.Character + 1, node.SpanStart, node.Span.Length, typeId, assemblyIdentity, symbolIdentity));
+            }
+            var errors = tree.GetDiagnostics(context.CancellationToken).Count(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+            Emit("UNIT-" + Hash(relative), "Unit", syntax, "", "", "", errors == 0 ? "CompiledSyntax" : "ParseErrors",
+                "", 1, 1, "Candidates=" + candidates.Count + ";ParseErrors=" + errors);
+            foreach (var group in candidates.GroupBy(candidate => candidate.Key, StringComparer.Ordinal))
+            {
+                var instances = group.OrderBy(candidate => candidate.Node.SpanStart).ToImmutableArray();
+                for (var index = 0; index < instances.Length; index++)
+                {
+                    var candidate = instances[index];
+                    Emit("SEM-" + Hash(candidate.Key + "|" + (index + 1)), candidate.Role, candidate.Node,
+                        candidate.Owner, candidate.Name, candidate.Type, candidate.Shape, candidate.Tokens,
+                        index + 1, instances.Length,
+                        instances.Length > 1 ? "AmbiguousDuplicate;review each occurrence;no automatic status transfer" :
+                        "Requires coordinator ownership/escape/behavior review;no automatic exception", candidate.TypeId, candidate.AssemblyIdentity, candidate.SymbolIdentity);
+                }
+            }
+        }
+        var typeDirectory = Path.Combine(output, "types");
+        Directory.CreateDirectory(typeDirectory);
+        File.WriteAllText(Path.Combine(typeDirectory, "types-" + contextId + ".tsv"),
+            "TypeId\tSymbolIdentity\tType\tNamespace\tAssemblyIdentity\tOrigin\tSourcePaths\tBaseType\tIsRecord\tIsDisposable\tIsAnonymousType\tMutableFields\tMutableSetters\tMutatorMethods\tCollectionInterfaces\tMutableCollectionInterfaces\tContextSha256\tProject\tFramework\tConfiguration\n" +
+            string.Join("\n", types.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value)) + "\n", new UTF8Encoding(false));
+        var directory = Path.Combine(output, "residual");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "residual-" + contextId + ".tsv"),
+            string.Join("\n", rows) + "\n", new UTF8Encoding(false));
+    }
+}

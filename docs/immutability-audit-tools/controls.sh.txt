@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo=/workspace/SharpProof
+task_root=$(mktemp -d /tmp/sharpproof-const-census-controls.XXXXXXXX)
+cp "$repo/artifacts/immutability-const-semantic/ConstAudit.csproj" "$task_root/ConstAudit.csproj"
+cp "$repo/artifacts/immutability-const-semantic/ConstAudit.cs" "$task_root/ConstAudit.cs"
+cp "$repo/artifacts/immutability-const-semantic/ResidualAudit.cs" "$task_root/ResidualAudit.cs"
+dotnet build "$task_root/ConstAudit.csproj" -c Release --verbosity quiet
+mkdir -p "$task_root/control" "$task_root/results"
+export_results() {
+ mkdir -p "$repo/artifacts/immutability-const-semantic/binding-control-results"
+ for result in "$task_root/results/"*.tsv; do
+  test -e "$result" && cp "$result" "$repo/artifacts/immutability-const-semantic/binding-control-results/"
+ done
+}
+trap export_results EXIT
+cat > "$task_root/control/Control.csproj" <<'XML'
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><LangVersion>12</LangVersion><Nullable>enable</Nullable><EnableNETAnalyzers>false</EnableNETAnalyzers><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="../control/../control/Control.cs" /></ItemGroup></Project>
+XML
+cat > "$task_root/control/Control.cs" <<'CS'
+using System;
+using System.Linq;
+var topLevel = 257;
+Console.WriteLine(topLevel);
+public enum Choice { A = 3 }
+public static class Control {
+ public static readonly int FieldValue = 257;
+ static int Read(in int value) => value;
+ public static int ReadOnlyInput() { var readOnlyArgument = 257; return Read(readOnlyArgument); }
+ public static nint NativeMaximum() { nint nativeMaximum = int.MaxValue; return nativeMaximum; }
+ public static nuint UnsignedNativeMaximum() { nuint unsignedNativeMaximum = uint.MaxValue; return unsignedNativeMaximum; }
+ public static System.Collections.Generic.IEnumerable<int> Query() => from item in new[] { 1 } let copy = item select copy;
+ public static void Catch() { try { throw new Exception(); } catch(Exception failure) { Console.WriteLine(failure.Message); } }
+ public static bool Pattern(object candidate) => candidate is int pattern && pattern > 0;
+ public static bool Out() => int.TryParse("1", out var parsed);
+ public static void PairLoop() { foreach(var (left, right) in new[] { (1, 2) }) Console.WriteLine(left + right); }
+ static string Pick(long value) => "long";
+ static string Pick(byte value) => "byte";
+ public static string Overload() { var overload = 1; return Pick(overload); }
+ static T Identity<T>(T value) => value;
+ public static int GenericSafe() { var generic = 257; return Identity(generic); }
+ public static object Dynamic(dynamic receiver) { var dynamicArgument = 1; return receiver.Pick(dynamicArgument); }
+ public static int RuntimeIdentity() { var runtimeIdentity = "same"; return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(runtimeIdentity); }
+ public static nint Native() { nint native = 17; return native; }
+ public static nuint UnsignedNative() { nuint unsignedNative = 17; return unsignedNative; }
+ public static int Safe() { var safe = 257; return safe; }
+ public static int Members() { var maximum = int.MaxValue; return maximum; }
+ public static char Characters() { var letter = 'a'; return letter; }
+ public static bool Booleans() { var flag = true; return flag; }
+ public static decimal Decimals() { var amount = 1.5m; return amount; }
+ public static Choice Enums() { var choice = Choice.A; return choice; }
+ public static string? Nulls() { string? absent = null; return absent; }
+ public static int Writes() { var written = 1; written++; return written; }
+ static void Touch(ref int value) { value++; }
+ public static int Refs() { var referenced = 1; Touch(ref referenced); return referenced; }
+ public static Func<int> Capture() { var captured = 1; return () => captured; }
+ public static bool Identity() { var identity = "same"; return ReferenceEquals(identity, "same"); }
+ public static int Loop() { for(var iteration = 0; iteration < 1; iteration++) { } return 0; }
+}
+CS
+printf 'Control.cs\n' > "$task_root/universe.txt"
+cat > "$task_root/inject.targets" <<'XML'
+<Project><ItemGroup><CompilerVisibleProperty Include="ConstAuditOutput;ConstAuditRoot;ConstAuditUniverse;ConstAuditVerify;MSBuildProjectFullPath;TargetFramework;Configuration"/><Analyzer Include="$(ConstAuditAnalyzer)"/></ItemGroup></Project>
+XML
+dotnet build "$task_root/control/Control.csproj" -c Release --verbosity quiet -p:CustomAfterMicrosoftCommonTargets="$task_root/inject.targets" -p:ConstAuditAnalyzer="$task_root/bin/Release/netstandard2.0/ConstAudit.dll" -p:ConstAuditOutput="$task_root/results" -p:ConstAuditRoot="$task_root/control" -p:ConstAuditUniverse="$task_root/universe.txt" -p:ConstAuditVerify=true
+pwsh -NoLogo -NoProfile -File "$repo/artifacts/immutability-const-semantic/check-controls.ps1" -OutputRoot "$task_root/results"
+mkdir -p "$repo/artifacts/immutability-const-semantic/binding-control-results"
+cp "$task_root/results/"*.tsv "$repo/artifacts/immutability-const-semantic/binding-control-results/"
+printf 'Semantic const census representative: %s\n' "$task_root"

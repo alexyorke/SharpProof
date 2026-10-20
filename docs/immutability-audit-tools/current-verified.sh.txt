@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec bash /workspace/SharpProof/artifacts/immutability-const-semantic/collect.sh current-verified

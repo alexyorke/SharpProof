@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source_root=/workspace/SharpProof
+mode=$1
+case "$mode" in benchmark|linked-benchmark|full|solution-verified|current-verified) ;; *) printf 'Unsupported census mode.\n' >&2; exit 2 ;; esac
+task_root=$(mktemp -d /tmp/sharpproof-const-real.XXXXXXXX)
+mkdir -p "$task_root/tool" "$task_root/results"
+export_results() {
+ local result_exit=$?
+ local export_root="$source_root/artifacts/immutability-const-semantic"
+ local destination="$export_root/$mode-results"
+ local previous="$destination-previous-$(basename "$task_root")"
+ local staging
+ staging=$(mktemp -d "$export_root/.$mode-results.XXXXXXXX")
+ printf 'exitCode=%s\n' "$result_exit" > "$task_root/results/completion-status.txt"
+ cp -a "$task_root/results/." "$staging/"
+ if [[ -e "$destination" ]]; then
+  if [[ -e "$previous" ]]; then printf 'Refusing to overwrite prior census evidence.\n' >&2; return 1; fi
+  mv "$destination" "$previous"
+ fi
+ mv "$staging" "$destination"
+ return "$result_exit"
+}
+trap export_results EXIT
+cp "$source_root/artifacts/immutability-const-semantic/ConstAudit.cs" "$task_root/tool/ConstAudit.cs"
+cp "$source_root/artifacts/immutability-const-semantic/ResidualAudit.cs" "$task_root/tool/ResidualAudit.cs"
+cp "$source_root/artifacts/immutability-const-semantic/ConstAudit.csproj" "$task_root/tool/ConstAudit.csproj"
+mkdir -p "$task_root/results/auditor-source"
+cp "$task_root/tool/ConstAudit.cs" "$task_root/tool/ResidualAudit.cs" "$task_root/tool/ConstAudit.csproj" "$source_root/artifacts/immutability-const-semantic/collect.sh" "$source_root/artifacts/immutability-const-semantic/check-unit-conservation.ps1" "$source_root/artifacts/immutability-const-semantic/check-type-reference-authority.ps1" "$task_root/results/auditor-source/"
+dotnet build "$task_root/tool/ConstAudit.csproj" -c Release --verbosity quiet
+git config --global --add safe.directory "$source_root"
+git config --global --add safe.directory /git-common/worktrees/comprehensive-immutability
+git clone --quiet --shared "$source_root" "$task_root/repo"
+git config --global --add safe.directory "$task_root/repo"
+git -C "$task_root/repo" config core.filemode false
+git -C "$source_root" diff --binary --full-index HEAD -- . | git -C "$task_root/repo" apply --allow-empty --binary --whitespace=nowarn -
+cd "$task_root/repo"
+export SHARPPROOF_REPO_ROOT="$task_root/repo"
+git ls-files -- '*.cs' ':!:eng/common/**' > "$task_root/universe.txt"
+cp "$task_root/universe.txt" "$task_root/results/source-universe.txt"
+sha256sum "$task_root/tool/ConstAudit.cs" "$task_root/tool/ResidualAudit.cs" "$task_root/tool/bin/Release/netstandard2.0/ConstAudit.dll" > "$task_root/results/analyzer-sha256.txt"
+git rev-parse HEAD > "$task_root/results/head.txt"
+git diff --binary --full-index HEAD -- . | sha256sum > "$task_root/results/working-patch-sha256.txt"
+git ls-files -z -- '*.cs' ':!:eng/common/**' | xargs -0 sha256sum > "$task_root/results/source-file-sha256.txt"
+cat > "$task_root/inject.targets" <<'XML'
+<Project><ItemGroup Condition="'$(ConstAuditSelectedProject)' == '' Or '$(MSBuildProjectFullPath)' == '$(ConstAuditSelectedProject)'"><CompilerVisibleProperty Include="ConstAuditOutput;ConstAuditRoot;ConstAuditUniverse;ConstAuditVerify;MSBuildProjectFullPath;TargetFramework;Configuration"/><Analyzer Include="$(ConstAuditAnalyzer)"/></ItemGroup></Project>
+XML
+arguments=(-c Release --verbosity minimal /m:8 /nodeReuse:false -p:UseSharedCompilation=false
+ "-p:CustomAfterMicrosoftCommonTargets=$task_root/inject.targets"
+ "-p:ConstAuditAnalyzer=$task_root/tool/bin/Release/netstandard2.0/ConstAudit.dll"
+ "-p:ConstAuditOutput=$task_root/results" "-p:ConstAuditRoot=$task_root/repo"
+ "-p:ConstAuditUniverse=$task_root/universe.txt")
+started=$(date +%s)
+if [[ "$mode" == benchmark || "$mode" == linked-benchmark ]]; then
+ selected=src/SharpProof.Ir.Tests/SharpProof.Ir.Tests.csproj
+ if [[ "$mode" == linked-benchmark ]]; then selected=src/SharpProof.Ir/SharpProof.Ir.csproj; fi
+ dotnet build "$selected" "${arguments[@]}" "-p:ConstAuditSelectedProject=$task_root/repo/$selected" -p:ConstAuditVerify=true
+else
+ verify=false
+ if [[ "$mode" == solution-verified || "$mode" == current-verified ]]; then verify=true; fi
+ dotnet build SharpProof.slnx "${arguments[@]}" "-p:ConstAuditVerify=$verify"
+fi
+pwsh -NoLogo -NoProfile -File "$source_root/artifacts/immutability-const-semantic/check-unit-conservation.ps1" -OutputRoot "$task_root/results" -RepositoryRoot "$task_root/repo" -Mode "$mode"
+elapsed=$(( $(date +%s) - started ))
+printf '%s\n' "$elapsed" > "$task_root/results/elapsed-seconds.txt"
+printf 'Real compiler const census mode=%s elapsed=%s seconds workspace=%s\n' "$mode" "$elapsed" "$task_root"

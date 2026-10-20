@@ -1,0 +1,27 @@
+param([string]$Before,[string]$After)
+$ErrorActionPreference='Stop'
+$beforeFiles=@(Get-ChildItem (Join-Path $Before 'residual') -Filter '*.tsv')
+$afterFiles=@(Get-ChildItem (Join-Path $After 'residual') -Filter '*.tsv')
+if($beforeFiles.Count -ne 1 -or $afterFiles.Count -ne 1){throw 'One report per actual compilation required'}
+$left=@(Import-Csv $beforeFiles[0].FullName -Delimiter ([char]9))
+$right=@(Import-Csv $afterFiles[0].FullName -Delimiter ([char]9))
+if($left.Count -ne $right.Count){throw 'Coordinate shift changed candidate count'}
+if(($left.ContextSha256 | Select-Object -Unique) -ceq ($right.ContextSha256 | Select-Object -Unique)){throw 'Context ignored source change'}
+if((Compare-Object ($left.StableId | Sort-Object) ($right.StableId | Sort-Object))){throw 'Coordinate shift changed structural identities'}
+if(@($left|Group-Object StableId|Where-Object Count -gt 1).Count){throw 'Duplicate IDs'}
+$units=@($left|Where-Object Kind -eq 'Unit')
+if($units.Count -ne 2){throw 'Missing unit manifest rows'}
+$zero=$units|Where-Object Path -eq 'Zero.cs'
+if($zero.Detail -cne 'Candidates=0;ParseErrors=0'){throw 'Zero-candidate unit lost'}
+foreach($shape in @('Array','OwnedBuilderRequiresEscapeReview','CollectionFacadeRequiresOwnershipReview','GenericTypeRequiresOwnershipReview','ByRefLikeRequiresOwnershipReview','BuilderPreferenceRequiresRoleReview','DiscardedImmutableUpdateRequiresRoleReview')){
+    if(-not @($left|Where-Object Shape -eq $shape).Count){throw "Missing shape $shape"}
+}
+foreach($kind in @('LocalRoot','ParameterRoot','PropertyRoot','ReturnRoot','LocalFunctionReturnRoot','Creation','Materialization','InvocationResult','SelfRebindingCollectionUpdate','DiscardedImmutableCollectionUpdate')){
+    if(-not @($left|Where-Object Kind -eq $kind).Count){throw "Missing form $kind"}
+}
+$duplicates=@($left|Where-Object { $_.Name -eq 'duplicate' -and $_.Kind -eq 'LocalRoot' })
+if($duplicates.Count -ne 2 -or @($duplicates|Where-Object DuplicateCount -ne '2').Count){throw 'Duplicate structural ambiguity not reported'}
+if(@($left|Where-Object { $_.SourceSha256.Length -ne 64 -or $_.ContextSha256.Length -ne 64 }).Count){throw 'Missing authority'}
+Write-Output "Verified $($left.Count) semantic observations, two units, zero-candidate conservation, source-sensitive contexts, shift-stable IDs and duplicate ambiguity."
+if(@($left|Where-Object { $_.Kind -eq 'UnknownInvocation' -and $_.Shape -eq 'UnknownBinding:None' }).Count){throw 'nameof was incorrectly classified as an unbound invocation'}
+if(-not @($left|Where-Object { $_.Kind -eq 'UnknownInvocation' -and $_.Shape -eq 'UnknownBinding:LateBound' }).Count){throw 'Dynamic invocation ownership gap was silently dropped'}

@@ -1,0 +1,26 @@
+param([string]$OutputRoot)
+$ErrorActionPreference='Stop'
+$taskFiles=@(Get-ChildItem -LiteralPath $OutputRoot -Filter '*.tsv')
+if($taskFiles.Count -ne 1){throw 'Expected exactly one representative compilation report'}
+$taskRows=@(Import-Csv $taskFiles[0].FullName -Delimiter ([char]9))
+$taskExpected=@{
+ readOnlyArgument='RefOrAddress'; FieldValue='FieldRequiresWriteAndApiReview'; nativeMaximum='BindingPreserved'; unsignedNativeMaximum='BindingPreserved'; pattern='LanguageFormNotConst'; parsed='LanguageFormNotConst'; left='LanguageFormNotConst'; right='LanguageFormNotConst'; native='BindingPreserved'; unsignedNative='BindingPreserved'; topLevel='BindingPreserved'; generic='BindingPreserved'; dynamicArgument='DynamicBindingRequiresReview'; runtimeIdentity='BindingPreservedNeedsSensitiveReview'; overload='BindingChanged'; safe='BindingPreserved'; maximum='BindingPreserved'; letter='BindingPreserved'; flag='BindingPreserved'; amount='BindingPreserved'; choice='BindingPreserved'; absent='BindingPreserved'; written='Write'; referenced='RefOrAddress'; captured='BindingPreservedNeedsSensitiveReview'; identity='BindingPreservedNeedsSensitiveReview'; iteration='Write'
+}
+if(@($taskRows|Where-Object Kind -eq 'Unit').Count -ne 1){throw 'Missing compiled-unit evidence'}
+foreach($taskName in $taskExpected.Keys){
+ $taskMatches=@($taskRows|Where-Object Name -ceq $taskName)
+ if($taskMatches.Count -ne 1 -or $taskMatches[0].Status -cne $taskExpected[$taskName]){throw "Unexpected semantic classification for ${taskName}: count=$($taskMatches.Count) status=$($taskMatches.Status -join ',') detail=$($taskMatches.Detail -join ',')"}
+}
+if(@($taskRows|Where-Object { $_.Kind -in @('Local','Field') }).Count -ne $taskExpected.Count){throw 'Declaration census changed'}
+$taskCategories=@{EnumMember=1;Parameter=7;CatchVariable=1;QueryVariable=2;Unit=1}
+foreach($taskCategory in $taskCategories.Keys){
+ if(@($taskRows|Where-Object Kind -ceq $taskCategory).Count -ne $taskCategories[$taskCategory]){throw "Unexpected declaration category census $taskCategory"}
+}
+foreach($taskName in @('pattern','parsed','left','right','failure','item','copy')){
+ if(@($taskRows|Where-Object Name -ceq $taskName).Count -ne 1){throw "Missing or duplicated unsupported declaration $taskName"}
+}
+if(@($taskRows|Where-Object Status -eq 'OperationRootRequiresReview').Count){throw 'Control binding proof lacks an operation root'}
+if(@($taskRows|Where-Object { $_.SourceSha256.Length -ne 64 -or $_.ContextSha256.Length -ne 64 }).Count){throw 'Missing source/context authority'}
+$taskUnit=$taskRows|Where-Object Kind -eq 'Unit'
+if($taskUnit.Path -cne 'Control.cs'){throw 'Compiled source-universe mismatch'}
+'Verified 27 declaration/binding controls, 11 language-form declarations and one compiled source unit.'

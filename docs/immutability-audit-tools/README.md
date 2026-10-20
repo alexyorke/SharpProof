@@ -1,0 +1,11 @@
+# Immutability census reproduction sources
+
+These text snapshots preserve the actual auditor and collection sources captured by the successful compiler census at fe9144dde6e04b6c0c0231797171afdee5e68e80, plus retained negative-control and entry scripts. They are reviewable reproduction inputs, not projects to compile in the repository layout. The source manifest records exact SHA-256 values and distinguishes captured census sources from control sources.
+
+Restore each `.txt` source into the ignored `artifacts/immutability-const-semantic` directory using the manifest's `Source` filename. Preserve its bytes. Run collection and controls through the canonical Linux amd64 tooling container; do not run their .NET or PowerShell commands on the Windows host. The collector expects the repository mounted at `/workspace/SharpProof`, uses the pinned SDK, creates a private source checkout and exports results under the ignored directory. The host worktree wrapper supplies the Git metadata mount when required.
+
+The `current-verified.sh` entry invokes `collect.sh current-verified`. The collector exports completion status, exact HEAD, source/unit conservation, compiler observations, type/reference authority and these auditor sources. Existing result directories are rotated without overwriting prior evidence. A failed completion does not establish compiler authority. Run the retained positive/negative controls before relying on changed auditor code.
+
+Current compiler summary and unit/field ledgers are in the parent docs directory. Ownership labels require independent source/consumer review: compiler shape categories alone do not establish avoidable mutation. The framework ledger covers its 54 deduplicated construction sites. The array ledger conserves all 524 candidates in 245 units and deliberately marks reconciliation unchecked until each site receives current evidence. Source drift remains explicit, and old statuses never transfer by coordinates or hashes alone.
+
+The raw local result directories and lossless historical archive are separate evidence. These sources do not replace them or claim final current-head coverage, native acceptance or exhaustive completion.

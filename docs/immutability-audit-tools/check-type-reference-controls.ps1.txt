@@ -1,0 +1,35 @@
+param([string]$Before,[string]$After)
+$ErrorActionPreference='Stop'
+$beforeResidual=@(Get-ChildItem (Join-Path $Before 'residual') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)})
+$afterResidual=@(Get-ChildItem (Join-Path $After 'residual') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)})
+if(Compare-Object @($beforeResidual|Sort-Object StableId|ForEach-Object {$_.StableId+'|'+$_.SourceSha256}) @($afterResidual|Sort-Object StableId|ForEach-Object {$_.StableId+'|'+$_.SourceSha256})){throw 'Metadata-only mutation changed source or structural IDs'}
+if(($beforeResidual.ContextSha256|Select-Object -Unique) -ceq ($afterResidual.ContextSha256|Select-Object -Unique)){throw 'Context omitted metadata content'}
+foreach($directory in @($Before,$After)){
+ $types=@(Get-ChildItem (Join-Path $directory 'types') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)})
+ if(@($types|Group-Object TypeId|Where-Object Count -gt 1).Count){throw 'Duplicate type authority IDs'}
+ $parameters=@($types|Where-Object Type -eq 'T');if($parameters.Count -ne 2 -or @($parameters.SymbolIdentity|Select-Object -Unique).Count -ne 2){throw 'Generic parameters from different owners share type authority'}
+ $mutable=@($types|Where-Object Type -eq 'global::Cases')
+ $record=@($types|Where-Object Type -eq 'global::FrozenCase')
+ $external=@($types|Where-Object Type -eq 'global::ReferenceFixture.Marker')
+ if($mutable.Count -ne 1 -or $mutable[0].Origin -ne 'Source' -or $mutable[0].MutableSetters -notmatch '(^|;)Values(;|$)' -or $mutable[0].SourcePaths -ne 'Cases.cs'){throw 'Missing source mutable property authority'}
+ if($record.Count -ne 1 -or $record[0].IsRecord -ne 'True' -or $record[0].MutableSetters -ne '' -or $record[0].Origin -ne 'Source'){throw 'Record/init-only authority drift'}
+ if($external.Count -ne 1 -or $external[0].Origin -ne 'MetadataOrSynthetic' -or $external[0].AssemblyIdentity -notlike 'ReferenceFixture,*' -or $external[0].SourcePaths -ne ''){throw 'External metadata origin authority drift'}
+ if(@($types|Where-Object {$_.ContextSha256 -notin $beforeResidual.ContextSha256 -and $_.ContextSha256 -notin $afterResidual.ContextSha256}).Count){throw 'Unbound type report context'}
+ $references=@(Get-ChildItem (Join-Path $directory 'references') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)})
+ if(@($references|Where-Object {$_.Authority -ne 'ExactMetadataFileSha256' -or $_.ContentSha256.Length -ne 64}).Count){throw 'Unhashed synthetic compiler reference'}
+}
+$left=@(Get-ChildItem (Join-Path $Before 'references') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)}|Where-Object ReferencePath -like '*ReferenceFixture.dll')
+$right=@(Get-ChildItem (Join-Path $After 'references') -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)}|Where-Object ReferencePath -like '*ReferenceFixture.dll')
+if($left.Count -ne 1 -or $right.Count -ne 1 -or $left[0].ContentSha256 -ceq $right[0].ContentSha256){throw 'Metadata bytes not authenticated'}
+Write-Output 'Actual symbol source/record/mutable-setter/metadata authority controls pass; changing only referenced metadata bytes changes context while preserving all source hashes and structural observation IDs.'
+foreach($directory in @($Before,$After)){& (Join-Path $PSScriptRoot 'check-type-reference-authority.ps1') -OutputRoot $directory}
+function Get-CanonicalRows([string]$Directory,[string]$Kind,[string[]]$Exclude){
+ @(Get-ChildItem (Join-Path $Directory $Kind) -Filter '*.tsv'|ForEach-Object {Import-Csv $_.FullName -Delimiter ([char]9)}|ForEach-Object {$row=$_;(@($row.PSObject.Properties|Where-Object {$_.Name -cnotin $Exclude}|ForEach-Object Value)-join [char]9)}|Sort-Object -CaseSensitive)
+}
+$leftTypes=Get-CanonicalRows $Before 'types' @('ContextSha256');$rightTypes=Get-CanonicalRows $After 'types' @('ContextSha256')
+if(Compare-Object $leftTypes $rightTypes -CaseSensitive){throw 'Metadata-only control changed complete type authority rows'}
+$leftRefs=Get-CanonicalRows $Before 'references' @('ContextSha256','ContentSha256');$rightRefs=Get-CanonicalRows $After 'references' @('ContextSha256','ContentSha256')
+if(Compare-Object $leftRefs $rightRefs -CaseSensitive){throw 'Metadata-only control changed reference path/display/authority/kind/embed/alias properties'}
+$leftOther=@(Get-CanonicalRows $Before 'references' @('ContextSha256')|Where-Object {$_ -notlike '*ReferenceFixture.dll*'});$rightOther=@(Get-CanonicalRows $After 'references' @('ContextSha256')|Where-Object {$_ -notlike '*ReferenceFixture.dll*'})
+if(Compare-Object $leftOther $rightOther -CaseSensitive){throw 'Metadata-only control changed untargeted reference content'}
+Write-Output 'Full type/reference multisets and exact residual type joins conserve metadata-only controls.'
