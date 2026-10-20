@@ -47,11 +47,12 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var module = builder.DefineDynamicModule("IdentityWitness.dll");
             var type = module.DefineType(typeName,
                 TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
-            var parameterTypes = Enumerable.Repeat(typeof(bool), ParameterCount).ToArray();
+            var parameterTypes = ImmutableArray.CreateBuilder<Type>(ParameterCount);
+            parameterTypes.AddRange(Enumerable.Repeat(typeof(bool), ParameterCount));
             parameterTypes[0] = typeof(int);
             var methodBuilder = type.DefineMethod(methodName,
                 MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig,
-                typeof(bool), parameterTypes);
+                typeof(bool), parameterTypes.ToArray());
             var positiveConstructor = typeof(PositiveAttribute).GetConstructor(Type.EmptyTypes)!;
             for (var ordinal = 0; ordinal < ParameterCount; ordinal++)
             {
@@ -77,10 +78,11 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var runtimeMethod = runtimeAssembly.GetType(typeName)!.GetMethod(methodName)!;
             foreach (var input in Inputs)
             {
-                var arguments = Enumerable.Repeat<object>(false, ParameterCount).ToArray();
+                var arguments = ImmutableArray.CreateBuilder<object>(ParameterCount);
+                arguments.AddRange(Enumerable.Repeat<object>(false, ParameterCount));
                 arguments[0] = 1;
                 arguments[1] = input;
-                Assert.That(runtimeMethod.Invoke(null, arguments), Is.EqualTo(input),
+                Assert.That(runtimeMethod.Invoke(null, arguments.ToArray()), Is.EqualTo(input),
                     "The saved implementation must load and run before any admission or fallback assertion.");
             }
 

@@ -52,7 +52,7 @@ public sealed class ExpressionAccessorWorkflowControlTests
         Assert.That(SymbolEqualityComparer.Default.Equals(
             attributes.Single().AttributeClass, expectedAttribute), Is.True);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("ExpressionAccessorWorkflowControl",
-            (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
+            AnalyzerTestHost.EmitImage(compilation), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var type = assembly.GetType("Subject", throwOnError: true)!;

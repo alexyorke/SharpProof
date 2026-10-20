@@ -40,11 +40,12 @@ public sealed class ParameterGuardContractTests
 
     private static IEnumerable<Type> GuardTypes()
     {
-        var pending = ImmutableQueue.CreateRange(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
+        var pending = ImmutableArray.CreateBuilder<AssemblyName>();
+        pending.AddRange(Assembly.GetExecutingAssembly().GetReferencedAssemblies());
         var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        while (!pending.IsEmpty)
+        for (var cursor = 0; cursor < pending.Count; cursor++)
         {
-            pending = pending.Dequeue(out var name);
+            var name = pending[cursor];
             if (name.Name?.StartsWith("SharpProof.", StringComparison.Ordinal) != true || !visited.Add(name.FullName))
             { continue; }
             var assembly = Assembly.Load(name);
@@ -53,27 +54,29 @@ public sealed class ParameterGuardContractTests
             if (assembly.GetType("SharpProof.Internal." + component.Replace(".", "", StringComparison.Ordinal) + ".ParameterGuard") is { } guard)
             { yield return guard; }
             foreach (var reference in assembly.GetReferencedAssemblies())
-            { pending = pending.Enqueue(reference); }
+            { pending.Add(reference); }
         }
     }
 
-    private static object? Invoke(Type type, string name, object?[] arguments)
+    private static object? Invoke(Type type, string name, ImmutableArray<object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         var method = type.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
         if (method.IsGenericMethodDefinition)
         { method = method.MakeGenericMethod(typeof(object)); }
-        return method.Invoke(null, arguments);
+        return method.Invoke(null, arguments.ToArray());
     }
 
-    private static void AssertFailure(Type type, string name, object?[] arguments,
+    private static void AssertFailure(Type type, string name, ImmutableArray<object?> arguments,
         Type expectedType, string parameterName, string? detail = null)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         ArgumentNullException.ThrowIfNull(expectedType);
         ArgumentNullException.ThrowIfNull(parameterName);
         var wrapper = Assert.Throws<TargetInvocationException>((Action)(() => Invoke(type, name, arguments)));

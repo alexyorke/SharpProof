@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -130,7 +131,7 @@ public sealed class MacOsHostContractTests
     {
         // Exercise the loading mechanism with a library this Linux host can load.
         // Native macOS consumers separately exercise the pinned Mach-O libraries.
-        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()));
+        using var payload = new Payload(nativeBytes: File.ReadAllBytes(ContainerContract.ResolveZ3LibraryRequired()).ToImmutableArray());
         var handle = payload.Contract.LoadZ3LibraryRequired();
         try
         {
@@ -150,33 +151,35 @@ public sealed class MacOsHostContractTests
         internal string NativeDigest { get; }
         internal MacOsHostContract Contract { get; }
 
-        internal Payload(Architecture architecture = Architecture.X64, byte[]? nativeBytes = null)
+        internal Payload(Architecture architecture = Architecture.X64, ImmutableArray<byte>? nativeBytes = null)
         {
-            nativeBytes ??= Encoding.UTF8.GetBytes("native payload");
-            var managedBytes = Encoding.UTF8.GetBytes("managed payload");
+            var nativeImage = nativeBytes ?? Encoding.UTF8.GetBytes("native payload").ToImmutableArray();
+            if (nativeImage.IsDefault)
+            { throw new ArgumentNullException(nameof(nativeBytes)); }
+            var managedBytes = Encoding.UTF8.GetBytes("managed payload").ToImmutableArray();
             var rid = architecture == Architecture.Arm64 ? "osx-arm64" : "osx-x64";
             NativePath = Path.Combine(root, "tools", "native", rid, "libz3.dylib");
             ManagedPath = Path.Combine(root, "tools", "net10", "Microsoft.Z3.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(NativePath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(ManagedPath)!);
-            File.WriteAllBytes(NativePath, nativeBytes);
-            File.WriteAllBytes(ManagedPath, managedBytes);
-            NativeDigest = Convert.ToHexStringLower(SHA256.HashData(nativeBytes));
-            var pin = new { libraryBytes = nativeBytes.Length, librarySha256 = NativeDigest };
+            File.WriteAllBytes(NativePath, nativeImage.AsSpan());
+            File.WriteAllBytes(ManagedPath, managedBytes.AsSpan());
+            NativeDigest = Convert.ToHexStringLower(SHA256.HashData(nativeImage.AsSpan()));
+            var pin = new { libraryBytes = nativeImage.Length, librarySha256 = NativeDigest };
             var catalog = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 z3 = new
                 {
                     version = "4.12.2",
                     managedAssemblyBytes = managedBytes.Length,
-                    managedAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(managedBytes))
+                    managedAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(managedBytes.AsSpan()))
                 },
                 macos = new { arm64 = pin, x64 = pin },
                 support = new { verifierPackageId = "SharpProof.Verifier" }
-            });
+            }).ToImmutableArray();
             Contract = new MacOsHostContract(true, architecture, architecture,
                 Path.Combine(root, "tools", "net10", "SharpProof.Host.dll"),
-                () => new MemoryStream(catalog, writable: false));
+                () => new MemoryStream(catalog.ToArray(), writable: false));
         }
 
         public void Dispose()

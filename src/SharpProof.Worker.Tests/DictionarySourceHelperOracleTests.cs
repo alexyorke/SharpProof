@@ -74,11 +74,13 @@ public sealed class DictionarySourceHelperOracleTests
         Compare(source, [type], [first, second], opaqueReturn: true);
     }
 
-    private static void Compare(string source, Type[] genericTypes, object?[] runtimeInputs, bool opaqueReturn)
+    private static void Compare(string source, ImmutableArray<Type> genericTypes, ImmutableArray<object?> runtimeInputs, bool opaqueReturn)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(genericTypes);
-        ArgumentNullException.ThrowIfNull(runtimeInputs);
+        if (genericTypes.IsDefault)
+        { throw new ArgumentNullException(nameof(genericTypes)); }
+        if (runtimeInputs.IsDefault)
+        { throw new ArgumentNullException(nameof(runtimeInputs)); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
@@ -130,8 +132,8 @@ public sealed class DictionarySourceHelperOracleTests
             image.Position = 0;
             var target = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!;
             if (genericTypes.Length != 0)
-            { target = target.MakeGenericMethod(genericTypes); }
-            var actual = target.Invoke(null, runtimeInputs);
+            { target = target.MakeGenericMethod(genericTypes.ToArray()); }
+            var actual = target.Invoke(null, runtimeInputs.ToArray());
             if (!opaqueReturn)
             { Assert.That(actual, Is.EqualTo(1)); }
             else if (!genericTypes[0].IsValueType)

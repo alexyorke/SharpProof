@@ -53,7 +53,7 @@ public sealed class ExpressionAccessorOverflowWorkflowControlTests
         var binary = (IBinaryOperation)model.GetOperation(binarySyntax)!;
         Assert.That(binary.IsChecked, Is.EqualTo(throws));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("ExpressionAccessorOverflowWorkflowControl",
-            (AnalyzerTestHost.EmitImage(compilation)).ToArray(), assembly =>
+            AnalyzerTestHost.EmitImage(compilation), assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             var type = assembly.GetType("Subject", throwOnError: true)!;

@@ -92,9 +92,10 @@ public sealed class FloatingPredicateBoundaryAuditTests
             "        " + body + "\n    }\n}\n";
     }
 
-    private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string scenario, string source, object?[] witnesses)
+    private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string scenario, string source, ImmutableArray<object?> witnesses)
     {
-        System.ArgumentNullException.ThrowIfNull(witnesses, nameof(witnesses));
+        if (witnesses.IsDefault)
+        { throw new ArgumentNullException(nameof(witnesses)); }
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
@@ -117,7 +118,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             if (method.IsGenericMethodDefinition)
             { method = method.MakeGenericMethod(typeof(object)); }
-            var actual = (bool)method.Invoke(null, witnesses)!;
+            var actual = (bool)method.Invoke(null, witnesses.ToArray())!;
             runtimeObservation = $"scenario={scenario}; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
                 $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +

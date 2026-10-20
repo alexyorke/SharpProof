@@ -206,7 +206,7 @@ public sealed class FinalCompilationCollectorTests
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataEffectLocationControl", (image).ToArray(), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataEffectLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
@@ -281,7 +281,7 @@ public sealed class FinalCompilationCollectorTests
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", (image).ToArray(), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
@@ -384,7 +384,7 @@ public sealed class FinalCompilationCollectorTests
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectLocationControl", (image).ToArray(), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
@@ -465,7 +465,7 @@ public sealed class FinalCompilationCollectorTests
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, (image).ToArray());
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", (image).ToArray(), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
@@ -562,7 +562,7 @@ public sealed class FinalCompilationCollectorTests
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath)),
             Is.EqualTo(ImmutableArray.Create(definitionPath, implementationPath)));
         var image = AnalyzerTestHost.EmitImage(compilation);
-        RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", (image).ToArray(), assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!

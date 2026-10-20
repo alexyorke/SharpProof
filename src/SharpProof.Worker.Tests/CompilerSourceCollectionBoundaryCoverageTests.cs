@@ -118,9 +118,10 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, object?[] arguments)
+    private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, ImmutableArray<object?> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -130,7 +131,7 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("SourceCollectionBoundary", isCollectible: true);
         try
         {
-            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments), Is.EqualTo(1));
+            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments.ToArray()), Is.EqualTo(1));
         }
         finally { runtime.Unload(); }
     }
