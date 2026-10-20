@@ -4877,3 +4877,7 @@ All thirteen actual metadata/identity cases pass. Literal conservation verifies 
 ### IMM-M478: preserve mutable SMT overlay subjects
 
 All seven native buffer sites in ArrayValueOverlayTests are deliberately mutable subjects passed to ApplyArrayObservations. Current assertions require indexed replacement, exact object identity, no-write rejection or preservation of earlier writes before a later failure. Observation entries and immutable overlay inputs are already frozen. This full-unit role trace changes no code and claims no new execution authority. Seven sites close independently, leaving 359 unchecked array candidates; M477 corpus work is still under verification.
+
+### IMM-M482: directly reviewed runtime-loading stream adapters
+
+Twelve readonly MemoryStream constructions are independently traced into actual AssemblyLoadContext.LoadFromStream calls. The retained image evidence is immutable; only the native stream frame retains cursor/disposal state required by runtime loading. No mutable collection owner is published. These individual consumer traces change no code and claim no new execution or historical transfer. There are 347 unchecked candidates; pending M477/M479/M480/M481 fixture changes remain recorded as Open coordinates until their actual gates complete.
