@@ -344,7 +344,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(expectedCount));
         Assert.That(body.ImageSha256.ToUpperInvariant(), Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan()))));
-        using var pe = new PEReader(new MemoryStream(bytes.ToArray(), writable: false));
+        using var pe = new PEReader(bytes);
         var reader = pe.GetMetadataReader();
         Assert.That(body.ModuleMvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
         Assert.That(body.ParameterAttributes.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AttributeToken)).Distinct().Count(), Is.EqualTo(expectedCount));
@@ -431,7 +431,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var definition = generic ? "LocalAttribute<T>" : "LocalAttribute";
         var (compilation, method, image) = CreateSubject(directory.FullName,
             "using System; public sealed class " + definition + " : Attribute { } public static class Library { public static int Target([" + attribute + "] int value) => value; }");
-        using var readerImage = new PEReader(new MemoryStream(image.ToArray(), writable: false));
+        using var readerImage = new PEReader(image);
         var reader = readerImage.GetMetadataReader();
         var methodDefinition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(method.MetadataToken));
         var parameter = reader.GetParameter(methodDefinition.GetParameters().Single());

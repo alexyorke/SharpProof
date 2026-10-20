@@ -4911,3 +4911,7 @@ The frozen batch conserves 4299 raw/interpolated tokens across 1068 changed C# f
 ### IMM-M491: direct reflection and assembly-load adapter review
 
 Ten current MethodInfo.Invoke or Assembly.Load calls are individually traced with their supplied frame and adjacent producer. Immutable argument/image evidence or native emitted-image producers retain only final runtime-required object/byte-array frames. No mutable observation owner is published. This role review changes no code and claims no new execution or historical transfer. The old array subset has 238 unchecked candidates; M489 and final expanded reflection/binding collection remain pending.
+
+### IMM-M489: immutable PEReader APIs and readonly iterator loader
+
+Two metadata readers now consume immutable images directly, eliminating avoidable native byte-array/stream copies. The iterator loader keeps its required native stream frame with write capability disabled, preserving warmup/measurement placement. All fourteen affected actual metadata/iterator cases pass. Literal conservation verifies 4299/1068 and the source manifest conserves 1948 paths. Three current coordinates and three old array sites reconcile independently, returning C# coordinates to zero Open and leaving 235 unchecked array candidates. Remaining expanded reflection/binding/coverage/compiler collection, ownership/archive work and exact-final-head gates remain pending.

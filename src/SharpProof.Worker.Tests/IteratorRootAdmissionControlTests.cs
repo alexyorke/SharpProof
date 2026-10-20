@@ -54,7 +54,7 @@ public sealed class IteratorRootAdmissionControlTests
         var context = new AssemblyLoadContext("IteratorRootControl_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var runtimeImage = new MemoryStream(bytes.ToArray());
+            using var runtimeImage = new MemoryStream(bytes.ToArray(), writable: false);
             var method = context.LoadFromStream(runtimeImage).GetType("Subject")!.GetMethod("Target")!;
             Delegate target = referenceReturn ? method.CreateDelegate<Func<IEnumerable<int>?>>() : method.CreateDelegate<Func<int>>();
             for (var repeat = 0; repeat < WarmupIterations; repeat++)
