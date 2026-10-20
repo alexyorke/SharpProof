@@ -316,7 +316,7 @@ internal sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("41"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(51));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(52));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(6));
             Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
             Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));

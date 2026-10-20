@@ -70,7 +70,7 @@ internal sealed class CompilerTaskCarrierCollector
                 { return Unknown("TaskCarrierCallbackMetadataUnsupported"); }
                 if (!callback.IsStatic)
                 {
-                    if (Shape(current, framework, cancellation) is not { } frame)
+                    if (Shape(current, framework, cancellation) is not { } frame || frame.IsValueType)
                     { return Unknown("TaskCarrierCallbackStorageUnsupported"); }
                     frames.Add(frame);
                 }
@@ -78,6 +78,14 @@ internal sealed class CompilerTaskCarrierCollector
         }
         // Overloads with the same metadata name may contribute extra generated
         // callbacks. Keeping them gives an upper envelope, never fewer sites.
+        var fieldBudget = ResourceExpression.MaximumNodes - (stateMachine == null ? 0 : stateMachine.Fields.Length + 1);
+        foreach (var frame in frames)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            fieldBudget -= frame.Fields.Length + 1;
+            if (fieldBudget < 0)
+            { return Unknown("TaskCarrierMetadataBudgetExceeded"); }
+        }
         if (callbacks < plan.Children.Length)
         { return Unknown("TaskCarrierCallbackMetadataIncomplete"); }
         return new(new(callableId, _moduleHash!, typeof(CSharpCompilation).Assembly.FullName!, callbacks,
@@ -126,6 +134,9 @@ internal sealed class CompilerTaskCarrierCollector
         if (!Generated(type, framework) || type.IsGenericType || type.BaseType?.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) ||
             type.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) : attribute.AttributeClass?.Name == "StructLayoutAttribute"))
         { return null; }
+        var metadataName = MetadataName(type);
+        if (string.IsNullOrWhiteSpace(metadataName) || metadataName.Length > 4096 || metadataName.Any(static character => char.IsControl(character)))
+        { return null; }
         var fields = ImmutableArray.CreateBuilder<ResourceStorageKind>();
         foreach (var field in type.GetMembers().OfType<IFieldSymbol>())
         {
@@ -154,7 +165,7 @@ internal sealed class CompilerTaskCarrierCollector
             if (fields.Count > ResourceAllocationShape.MaximumFields)
             { return null; }
         }
-        return new(MetadataName(type), type.IsValueType, fields.ToImmutable());
+        return new(metadataName, type.IsValueType, fields.ToImmutable());
     }
 
     private static bool Generated(ISymbol symbol, string framework)

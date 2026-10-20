@@ -102,8 +102,8 @@ floor. This supersedes the older a9f759896 measurement (4978/5213, 235 gaps).
 The report and gap inventory are preserved locally. No floor or exclusion was
 changed. The aab335ab9 coverage run reached a test failure before aggregation:
 one compiler-driver assertion and two artifact golden files still expected schema 52.
-The current source updates those expectations to artifact schema 54 and reruns
-the compiler-driver and golden-worker gates. This failed run produced no newer
+Later checkpoints corrected those expectations; the current source uses artifact
+schema 55. The compiler-driver and golden-worker gates were rerun. This failed run produced no newer
 aggregate coverage measurement.
 Published 24cb6d7ed passed all non-coverage workflows and the three semantic
 coverage shards. Its instrumented package shard failed
@@ -145,6 +145,12 @@ new aggregate report was produced. Its log is retained as
 Docker state evidence is needed to distinguish causes before changing limits
 or test concurrency again.
 
+The ef285be0c coverage run also passed all three semantic shards and ended its
+package phase with the container PowerShell process killed and exit 137. It
+produced no newer aggregate measurement. The log is retained as
+`artifacts/resource-ef285-coverage-failed.log`. The new container termination
+reporting has not yet run on a hosted job.
+
 ### Quantitative-memory feature audit
 
 Phase C now has compiler, native-worker, protocol, consumer and independent
@@ -169,6 +175,49 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Coverage container termination evidence
+
+Each coverage job now retains its named task container until Docker's exit
+status, OOM flag and error are saved in a separate diagnostic artifact, then
+removes that exact container. Coverage evidence, selection, deadlines, limits
+and floors remain unchanged. A missing container is recorded as unavailable;
+exit 137 alone remains insufficient to assign a cause. A controlled canonical
+container exit 23 reported exit code 23 with no OOM flag or Docker error,
+and its exact container was removed afterward. The full workflow quality/API
+compatibility and negative-fixture gate passed. Hosted termination evidence is
+still pending. No host RSS reader, cgroup reader or process-memory budget was
+introduced. The local probe is retained as
+`artifacts/resource-carrier-container-state-probe.json`.
+
+### Compiler-carrier transport
+
+The root collector now attaches carrier shapes or an explicit capture-Unknown
+reason only for selected AllocatedBytes, PeakAuxiliaryBytes or RetainedBytes
+contracts. One emission collector is reused per compilation. Closed detached
+decoding checks root ownership, execution kind, typed storage fields, module
+hash, text/count limits and a shared field budget. Capture failures preserve
+source work: an oversized-source control proves the loop bound while keeping
+storage Unknown. Loop-only selections skip emission.
+
+The 1042-case worker/resource/protocol/compiler-driver/golden gate passed. Its
+fallback case was then strengthened to check actual separate Proven/Unknown
+verdicts and passed again. All 1475 analyzer tests and three packaged task-source
+cases passed. The first package attempt stopped during analyzer restore with
+exit 139, before tests; a fresh canonical retry passed without source or test
+changes for that failure. Full formatting, quality/API compatibility, negative
+fixtures and documentation lint passed. The strengthened test also passed
+explicit whitespace verification. Documentation checked 728 links; layout
+checked 2789 sources, 59 projects and 151 pinned common files; the inventory
+includes 540 trusted paths. Logs are retained under
+`artifacts/resource-carrier-transport-*`.
+
+Projection codec 3, compiler artifact 55 and cache 52 identify the extended
+transport. Protocol 41, manifest 6 and resource program 8 retain their formats.
+The public API and resource verdict domain are unchanged. Reviewed runtime
+Task/async-box storage, root lifetime composition, remaining consumer controls,
+coverage closure and final audit remain required. Root task storage verdicts
+continue to be Unknown.
 
 ### Native compiler-carrier storage
 

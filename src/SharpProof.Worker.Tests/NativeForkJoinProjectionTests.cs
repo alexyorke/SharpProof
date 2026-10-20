@@ -359,7 +359,7 @@ public sealed class NativeForkJoinProjectionTests
         }
         var json = node.ToJsonString();
         if (mutation == "duplicate")
-        { json = json.Replace("\"version\":2", "\"version\":2,\"version\":2", StringComparison.Ordinal); }
+        { json = json.Replace("\"version\":3", "\"version\":3,\"version\":3", StringComparison.Ordinal); }
         else if (mutation == "duplicate-body")
         { json = json.Replace("\"effectsCompleteAtEntry\":true", "\"effectsCompleteAtEntry\":true,\"effectsCompleteAtEntry\":true", StringComparison.Ordinal); }
         Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json), root, cancellation); };

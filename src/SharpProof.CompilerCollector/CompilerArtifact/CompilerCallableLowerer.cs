@@ -7,6 +7,7 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerCallableLowerer
 {
     private readonly CSharpCompilation _compilation;
+    private readonly CompilerTaskCarrierCollector _taskCarriers;
     private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
     private readonly CompilerReferenceSnapshot[]? _capturedReferences;
     private readonly ContractBinder _contracts;
@@ -34,6 +35,7 @@ internal sealed class CompilerCallableLowerer
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
+        _taskCarriers = new(compilation);
         _capturedTrees = capturedTrees;
         _capturedReferences = capturedReferences;
         _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
@@ -75,6 +77,9 @@ internal sealed class CompilerCallableLowerer
                 resourceUnknown = resource.UnknownReason;
             }
         }
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+        { forkJoin = forkJoin with { Carriers = _taskCarriers.Capture(target.Method, target.Entry.CallableId, cancellationToken) }; }
         if (forkJoin is { ConfiguredAwait: true })
         { reason = WorkerClaimReason.None; }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };

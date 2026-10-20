@@ -714,7 +714,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 41 and cache schema 51 invalidate older responses without this evidence.
+Protocol 41 and cache schema 52 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -766,7 +766,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 41 and cache 51 invalidate prior responses; compiler artifact 54 and
+Protocol 41 and cache 52 invalidate prior responses; compiler artifact 55 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -893,8 +893,8 @@ Unproved comparisons remain Unknown, with no exact violation inferred from an
 upper sum. Task allocation, byte, lifetime and stack metrics remain Unknown until
 framework and compiler-generated storage is modeled. Task lower, tight, expected
 and amortized results remain unavailable. Async/state-machine costs and concurrent
-live-space models remain roadmap work. Protocol 41 and cache 51 identify the
-required execution scope and configured-await variant; compiler artifact 54
+live-space models remain roadmap work. Protocol 41 and cache 52 identify the
+required execution scope and configured-await variant; compiler artifact 55
 identifies the projection execution kind.
 
 ### Configured async join source work
@@ -941,6 +941,26 @@ remain unsupported. The declared model excludes framework and ambient callback
 work and does not prove state-machine allocation, peak memory or elapsed time.
 Those costs remain explicit Unknown results and required roadmap work.
 
-Projection codec 2 and compiler artifact 54 carry the required execution-kind
-Boolean. Protocol 41 and cache 51 identify the configured runtime-model variant;
+Projection codec 3 and compiler artifact 55 carry the required execution-kind
+Boolean. Protocol 41 and cache 52 identify the configured runtime-model variant;
 resource program 8 and manifest 6 retain their formats.
+
+## Compiler carrier evidence
+
+Projection codec 3 carries optional compiler-owned carrier evidence for selected
+AllocatedBytes, PeakAuxiliaryBytes and RetainedBytes contracts. The collector
+emits the compilation once per collector instance and imports generated callback
+frames and async state-machine fields, preserving compiler identity and a module
+hash. Debug class state machines and Release value fields remain distinct.
+The payload contains typed storage fields rather than a producer byte verdict.
+Detached decoding checks ownership, execution kind, field/count/text/hash limits,
+and a shared field budget; malformed records are rejected.
+
+A capture failure carries an explicit Unknown reason without discarding the
+independently checked callback source costs. Loop-only selections do not request
+emission. The native compiler-carrier component derives conditional direct
+closure/delegate/task-array bounds from these fields and separates state fields
+embedded in a future runtime async-box model. These internal components do not
+publish task-root memory proofs: reviewed runtime carrier storage, lifetime
+composition and consumer validation remain required. Task-root storage metrics
+continue to return Unknown.
