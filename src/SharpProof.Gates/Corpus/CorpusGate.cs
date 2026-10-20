@@ -743,9 +743,9 @@ internal static class CorpusGate
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
             StringComparer.Ordinal);
-        var observations = await Task.WhenAll(
+        var observations = (await Task.WhenAll(
             selected.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken))))
-            .ConfigureAwait(false);
+            .ConfigureAwait(false)).ToImmutableArray();
         return CorpusObservationComparison.CompareConcurrent(expected, observations);
     }
 

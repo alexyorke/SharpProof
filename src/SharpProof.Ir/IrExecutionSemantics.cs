@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Ir;
 
 // Legacy remains the authority during the dual-pipeline migration.
@@ -55,12 +57,12 @@ internal static class IrCallPreconditionMarker
                 Encoding.GetByteCount(calleeIdentity) > 4096 || Encoding.GetByteCount(callSite.Document) > 4096 ||
                 Encoding.GetByteCount(clauseSite.Document) > 4096)
             { return false; }
-            var callee = Encoding.GetBytes(calleeIdentity);
-            var callDocument = Encoding.GetBytes(callSite.Document);
-            var clauseDocument = Encoding.GetBytes(clauseSite.Document);
-            name = Prefix + "v1:" + Convert.ToBase64String(callee) + ":" + Number(clauseOrdinal) + ":" +
-                Convert.ToBase64String(callDocument) + ":" + Number(callSite.Start) + ":" + Number(callSite.Length) + ":" +
-                Convert.ToBase64String(clauseDocument) + ":" + Number(clauseSite.Start) + ":" + Number(clauseSite.Length);
+            var callee = Encoding.GetBytes(calleeIdentity).ToImmutableArray();
+            var callDocument = Encoding.GetBytes(callSite.Document).ToImmutableArray();
+            var clauseDocument = Encoding.GetBytes(clauseSite.Document).ToImmutableArray();
+            name = Prefix + "v1:" + Convert.ToBase64String(callee.ToArray()) + ":" + Number(clauseOrdinal) + ":" +
+                Convert.ToBase64String(callDocument.ToArray()) + ":" + Number(callSite.Start) + ":" + Number(callSite.Length) + ":" +
+                Convert.ToBase64String(clauseDocument.ToArray()) + ":" + Number(clauseSite.Start) + ":" + Number(clauseSite.Length);
             return true;
         }
         catch (System.Text.EncoderFallbackException)

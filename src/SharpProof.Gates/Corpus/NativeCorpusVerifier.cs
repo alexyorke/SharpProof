@@ -32,12 +32,12 @@ internal static class NativeCorpusVerifier
         {
             var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0", WorkerFeatureSet.All,
                 discovery, WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken));
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken)).ToImmutableArray();
             var path = Path.Combine(directory.FullName, "compiler-manifest.json");
-            await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(path, bytes.ToArray(), cancellationToken).ConfigureAwait(false);
             var request = new WorkerVerifyRequest
             {
-                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
+                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
                 Cache = new WorkerCacheOptions { Enabled = false, Directory = Path.Combine(directory.FullName, "cache") },
                 Budgets = new WorkerBudgets()
             };

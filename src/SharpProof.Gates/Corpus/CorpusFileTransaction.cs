@@ -222,9 +222,9 @@ internal static class CorpusFileTransaction
     {
         System.ArgumentNullException.ThrowIfNull(destination);
         System.ArgumentNullException.ThrowIfNull(source);
-        var bytes = await File.ReadAllBytesAsync(source, cancellationToken)
-            .ConfigureAwait(false);
-        await WriteDurablyAsync(destination, bytes, cancellationToken)
+        var bytes = (await File.ReadAllBytesAsync(source, cancellationToken)
+            .ConfigureAwait(false)).ToImmutableArray();
+        await WriteDurablyAsync(destination, bytes.AsMemory(), cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -273,12 +273,12 @@ internal static class CorpusFileTransaction
                     Guid.NewGuid().ToString("N") + ".restore";
                 try
                 {
-                    var content = File.ReadAllBytes(entry.BackupPath);
+                    var content = File.ReadAllBytes(entry.BackupPath).ToImmutableArray();
                     using (var stream = OpenDurableFile(
                         restore,
                         asynchronous: false))
                     {
-                        stream.Write(content, 0, content.Length);
+                        stream.Write(content.AsSpan());
                         stream.Flush(flushToDisk: true);
                     }
                     File.Move(

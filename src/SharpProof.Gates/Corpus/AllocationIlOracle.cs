@@ -19,8 +19,8 @@ internal static class AllocationIlOracle
     {
         ArgumentNullException.ThrowIfNull(method);
         var body = method.GetMethodBody();
-        var bytes = body?.GetILAsByteArray();
-        if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > CorpusExecutionDefaults.MaximumAllocationOracleBodyBytes)
+        var bytes = (body?.GetILAsByteArray() ?? []).ToImmutableArray();
+        if (body == null || bytes.Length == 0 || bytes.Length > CorpusExecutionDefaults.MaximumAllocationOracleBodyBytes)
         { return true; }
         var instructionBuilder = ImmutableDictionary.CreateBuilder<int, (OpCode Op, int Next, ImmutableArray<int> Targets)>();
         var cursor = 0;
@@ -39,16 +39,16 @@ internal static class AllocationIlOracle
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => cursor + 4 <= bytes.Length && BitConverter.ToInt32(bytes, cursor) >= 0 ? 4 + 4L * BitConverter.ToInt32(bytes, cursor) : -1,
+                OperandType.InlineSwitch => cursor + 4 <= bytes.Length && BitConverter.ToInt32(bytes.AsSpan(cursor..)) >= 0 ? 4 + 4L * BitConverter.ToInt32(bytes.AsSpan(cursor..)) : -1,
                 _ => 4
             };
             var next = cursor + (int)size;
             ImmutableArray<int> targets = opcode.OperandType switch
             {
                 OperandType.ShortInlineBrTarget => [next + unchecked((sbyte)bytes[cursor])],
-                OperandType.InlineBrTarget => [next + BitConverter.ToInt32(bytes, cursor)],
-                OperandType.InlineSwitch => Enumerable.Range(0, BitConverter.ToInt32(bytes, cursor))
-                    .Select(index => next + BitConverter.ToInt32(bytes, cursor + 4 + 4 * index)).ToImmutableArray(),
+                OperandType.InlineBrTarget => [next + BitConverter.ToInt32(bytes.AsSpan(cursor..))],
+                OperandType.InlineSwitch => Enumerable.Range(0, BitConverter.ToInt32(bytes.AsSpan(cursor..)))
+                    .Select(index => next + BitConverter.ToInt32(bytes.AsSpan((cursor + 4 + 4 * index)..))).ToImmutableArray(),
                 _ => []
             };
             instructionBuilder.Add(offset, (opcode, next, targets));
