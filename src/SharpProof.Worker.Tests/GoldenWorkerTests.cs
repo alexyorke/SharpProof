@@ -853,12 +853,12 @@ public sealed class GoldenWorkerTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         var path = Path.Combine(directory.FullName, "artifact.json");
-        await File.WriteAllBytesAsync(path, bytes);
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
-            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
+            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
             Cache = new WorkerCacheOptions { Enabled = false },
             Budgets = new WorkerBudgets { ProjectWallTimeMilliseconds = 30000, MethodWallTimeMilliseconds = 10000, MaxParallelism = 1 }
         };
@@ -903,7 +903,7 @@ public sealed class GoldenWorkerTests
             Assert.That(timeoutExit, Is.Zero);
             var timeoutRequest = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(stableRequest))!;
             var timeoutResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(stableResult))!;
-            var inputHash = Program.ComputeExpectedInputHash(timeoutRequest, (bytes).ToImmutableArray());
+            var inputHash = Program.ComputeExpectedInputHash(timeoutRequest, bytes);
             var timeoutBinding = WorkerProtocolJson.ValidateForRequest(timeoutResponse, WorkerProtocolJson.ComputeRequestHash(timeoutRequest),
                 inputHash, artifact.Manifest, timeoutRequest, Program.ExpectedVersions());
             Assert.That(timeoutBinding.IsValid, Is.True);
@@ -920,15 +920,15 @@ public sealed class GoldenWorkerTests
             File.Copy(typeof(SharpProofWorker).Assembly.Location, workerPath);
             var companionPath = Path.ChangeExtension(workerPath, ".deps.json");
             await File.WriteAllTextAsync(companionPath, "Preserved declared runtime companion.");
-            var workerBytes = await File.ReadAllBytesAsync(workerPath);
-            var companionBytes = await File.ReadAllBytesAsync(companionPath);
+            var workerBytes = (await File.ReadAllBytesAsync(workerPath)).ToImmutableArray();
+            var companionBytes = (await File.ReadAllBytesAsync(companionPath)).ToImmutableArray();
             var runtimeOutput = new StringBuilder();
             foreach (var name in ImmutableArray.Create("direct", "leaf", "worker-leaf", "executing"))
             {
                 var protectedWorker = name == "executing" ? typeof(Program).Assembly.Location : workerPath;
                 var protectedCompanion = name == "executing" ? Path.ChangeExtension(protectedWorker, ".deps.json") : companionPath;
-                var protectedWorkerBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedWorker) : workerBytes;
-                var protectedCompanionBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedCompanion) : companionBytes;
+                var protectedWorkerBytes = name == "executing" ? (await File.ReadAllBytesAsync(protectedWorker)).ToImmutableArray() : workerBytes;
+                var protectedCompanionBytes = name == "executing" ? (await File.ReadAllBytesAsync(protectedCompanion)).ToImmutableArray() : companionBytes;
                 var declaredWorker = workerPath;
                 var destination = protectedCompanion;
                 if (name == "leaf")

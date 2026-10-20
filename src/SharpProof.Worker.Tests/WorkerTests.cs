@@ -1418,9 +1418,9 @@ internal sealed partial class WorkerTests
         Assert.That(loweredCallables, Is.Not.Empty);
         loweredCallables[0]!.AsObject()["callableId"] = callableId;
         json = root.ToJsonString(WorkerProtocolJson.Options) + "\n";
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
 
         var deserializeException = CaptureJson(() =>
             CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken));
@@ -1517,9 +1517,9 @@ internal sealed partial class WorkerTests
                 ImmutableArray.Create(diagnostic),
                 WorkerProtocolJson.Options),
             StringComparison.Ordinal);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         using var worker = new SharpProofWorker(
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
@@ -1574,9 +1574,9 @@ internal sealed partial class WorkerTests
             await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         artifact = artifact with { Compilation = artifact.Compilation with { CompilerVersion = "0.0.0.0" } };
         var bytes = System.Text.Encoding.UTF8.GetBytes(
-            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes.AsMemory());
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -1780,10 +1780,10 @@ internal sealed partial class WorkerTests
             request,
             changedSpecContent,
             TestContext.CurrentContext.CancellationToken);
-        var artifactBytes = await File.ReadAllBytesAsync(
-            request.CompilerManifest.Path);
+        var artifactBytes = (await File.ReadAllBytesAsync(
+            request.CompilerManifest.Path)).ToImmutableArray();
         var sharedHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute((artifactBytes).ToImmutableArray()), baselineIdentity.ToolIdentity,
+            request, ArtifactDigest.Compute(artifactBytes), baselineIdentity.ToolIdentity,
             baselineIdentity.ToolVersion, baselineIdentity.WorkerBinarySha256,
             baselineIdentity.ApiSpecIdentity, baselineIdentity.ApiSpecVersion,
             baselineIdentity.ApiSpecContentSha256);
@@ -4879,7 +4879,7 @@ internal sealed partial class WorkerTests
                 Task.Delay(TimeSpan.FromSeconds(1))),
             backend.SecondEntered);
         backend.ReleaseFirst();
-        var responses = await Task.WhenAll(first, second);
+        var responses = (await Task.WhenAll(first, second)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -6274,7 +6274,7 @@ internal sealed partial class WorkerTests
 
         bytes[methodBodyOffset + 2] = (byte)declaredMaxStack;
         bytes[methodBodyOffset + 3] = (byte)(declaredMaxStack >> 8);
-        File.WriteAllBytes(path, bytes);
+        File.WriteAllBytes(path, bytes.AsSpan());
     }
 
     internal sealed class TestProject : IDisposable
@@ -6381,18 +6381,18 @@ internal sealed partial class WorkerTests
                 TestContext.CurrentContext.CancellationToken,
                 specificationPacks: specificationPacks);
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var path = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest-" + Guid.NewGuid().ToString("N") +
                 ".json");
-            File.WriteAllBytes(path, bytes);
+            File.WriteAllBytes(path, bytes.AsSpan());
             return new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = Path.GetFullPath(path),
-                    Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
+                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
                 },
                 Cache = new WorkerCacheOptions
                 {
@@ -6479,7 +6479,7 @@ internal sealed partial class WorkerTests
                         System.Globalization.CultureInfo.InvariantCulture) +
                     ".0"),
                 "*.dll",
-                SearchOption.TopDirectoryOnly);
+                SearchOption.TopDirectoryOnly).ToImmutableArray();
             return [.. references
                 .Append(typeof(Contract).Assembly.Location)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

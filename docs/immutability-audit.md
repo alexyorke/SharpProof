@@ -4963,3 +4963,9 @@ Thirteen retained byte/line observations are immutable. Existing native image-co
 ### IMM-M501: supplemental UTF-8 source preservation check
 
 A full scan of all changed C# sources finds three files with non-ASCII text. Their complete non-ASCII character multisets match master, and all three non-ASCII ordinary string literal occurrences retain exact master spelling (the cafe filename and two culture-sensitive filenames). The two existing comment em-dashes also remain intact. This supplements the separate complete raw/interpolated literal proof; it does not claim a general ordinary-literal ordering proof. No source edits were needed. Remaining ownership/coverage/binding/archive and final current collection/exact-head workflows remain pending.
+
+### IMM-M502: immutable launcher, golden and shared worker factory observations
+
+Sixteen retained encoded/read bytes, protected-file snapshots, handshake text, task results and reference inventories are immutable. Span/memory consumers and removal of redundant freezing preserve actual file/process/publication contracts. The real malformed-IL image still receives indexed max-stack header writes; only its final file adapter uses a readonly span.
+
+All 297 affected WorkerTests and GoldenWorkerTests cases pass. Literal conservation verifies 4299 raw/interpolated tokens across 1070 changed C# files; the source manifest conserves 1948 paths. Sixteen current coordinates close, returning C# coordinates to zero Open. Seventeen old array roles reconcile independently: sixteen migrations and one required mutable malformed-IL subject, leaving 132 unchecked candidates. Remaining coverage/binding/archive and final authenticated collection/exact-head workflows remain pending.

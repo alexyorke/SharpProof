@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -15,7 +16,7 @@ internal sealed partial class WorkerTests
         var privateRequest = Path.Combine(project.DirectoryPath, "private-request.json");
         var privateResult = Path.Combine(project.DirectoryPath, "private-result.json");
         var privateManifest = sourceRequest.CompilerManifest.Path;
-        var originalManifest = await File.ReadAllBytesAsync(privateManifest);
+        var originalManifest = (await File.ReadAllBytesAsync(privateManifest)).ToImmutableArray();
         var publishedRequest = alias switch
         {
             "request" => privateRequest,

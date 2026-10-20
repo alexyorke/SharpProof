@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -48,7 +49,7 @@ internal sealed partial class WorkerTests
                 }
                 await Task.Delay(10);
             }
-            var handshake = await File.ReadAllLinesAsync(ready);
+            var handshake = (await File.ReadAllLinesAsync(ready)).ToImmutableArray();
             Assert.That(handshake, Has.Length.EqualTo(2));
             Assert.That(handshake[0], Is.EqualTo(identity));
             var childPid = int.Parse(handshake[1], CultureInfo.InvariantCulture);
