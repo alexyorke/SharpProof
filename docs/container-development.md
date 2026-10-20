@@ -64,7 +64,8 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `package-tests` | Package test scheduler and package-backed harness |
 | `check` | Developer-check plan: restore, build, semantic and package validation |
 | `pr` | Release `pr-gates` profile |
-| `pr-gates` | Documentation checks, container contract, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
+| `pr-gates` | `repository-gates`, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
+| `repository-gates` | Source-only `pr-gates` checks: documentation, container contract, repository layout, package and release regressions, public API governance |
 | `self-apply` | Apply packaged analysis to the source project set and samples |
 | `samples` | Package-backed sample matrix; packs a feed if none is supplied |
 | `pack` | Clean exact-commit package graph build and validation |
@@ -93,7 +94,7 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` is supported only by `pr` and `pr-gates`, for CI runs that execute the package phase in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` and `-SkipRepositoryGates` are supported only by `pr` and `pr-gates`, for CI runs that execute the package phase or the repository gates in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
 
 After packing clean source, test the exported package bytes:
 
