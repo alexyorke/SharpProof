@@ -504,6 +504,17 @@ interface dispatch, boxed argument behavior, reference identity and async result
 with new reference, value and nullable payloads. Distinct viable variance
 alternatives remain unresolved rather than choosing the first declaration.
 
+When a proposal changes a supplied call or method group's instantiated signature,
+inference retries with the affected parameter components fixed to their original
+types. Receiver and unaffected tuple/container components can still generalize.
+The refinement set grows monotonically over the original finite parameter leaves;
+each retry starts with a fresh inference session and runs all candidate checks.
+Unsuccessful refinements retain the original rejection. Tests cover boxed and
+reference arguments, tuples, arrays, delegates, extensions, multiple callers and
+separate source files. Applied IDE fixes compare generic helper type arguments,
+interface dispatch, method-group signatures and object identity while admitting
+new receiver domains and unrelated tuple/tag types.
+
 Enumerator return parameters are mapped through their actual substituted types
 before resolving Current, MoveNext/MoveNextAsync and disposal members. The
 declared enumerator constraints use the original concrete substitutions for

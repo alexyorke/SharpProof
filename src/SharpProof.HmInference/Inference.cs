@@ -35,14 +35,23 @@ public static partial class Inference
             throw new global::System.ArgumentNullException(nameof(model));
         }
 
+        MethodResult? rejected = null;
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            return new Session(model, cancellationToken).Analyze(method);
+            var pins = new HashSet<(int Parameter, string Path)>();
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var previous = pins.Count;
+                var result = new Session(model, cancellationToken).Analyze(method, pins);
+                if (pins.Count == previous)
+                { return result.Status == "Suggestion" ? result : rejected ?? result; }
+                rejected ??= result;
+            }
         }
         catch (InferenceException exception)
         {
-            return new(method.Identifier.ValueText, "Skipped", exception.Message);
+            return rejected ?? new(method.Identifier.ValueText, "Skipped", exception.Message);
         }
     }
 
@@ -52,8 +61,12 @@ public static partial class Inference
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
-        public MethodResult Analyze(MethodDeclarationSyntax method)
+        public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
         {
+            if (method is null)
+            { throw new ArgumentNullException(nameof(method)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
             var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
             if (symbol.IsVararg)
             { return new(symbol.Name, "Concrete", "C# vararg methods cannot declare type parameters."); }
@@ -79,6 +92,8 @@ public static partial class Inference
                 return CSharpTypes.Erase(p.Type, method.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp13 }
                     && model.Compilation.SupportsRuntimeCapability(RuntimeCapability.ByRefLikeGenerics));
             }).ToArray();
+            for (var i = 0; i < parameters.Length; i++)
+            { RegisterSignatureOrigins(parameters[i], CSharpTypes.Rigid(symbol.Parameters[i].Type), i, "", pins); }
             for (var i = 0; i < parameters.Length; i++)
             {
                 if (method.Parameters()[i].Default is not null)
@@ -359,6 +374,7 @@ public static partial class Inference
                         var insideMethod = sourceTree == tree && method.Span.Contains(originalCalls[i].Span);
                         if (!insideMethod && !SameCallSignature(before!, after))
                         {
+                            RefineSuppliedSignature(before!, after, parameters, result, pins);
                             return new(symbol.Name, "Rejected", "Generalization changes a supplied call's instantiated signature.");
                         }
                         continue;
@@ -388,7 +404,10 @@ public static partial class Inference
                         }))
                     {
                         if (!(sourceTree == tree && method.Span.Contains(beforeGroups[i].Span)) && !SameCallSignature(before, after))
-                        { return new(symbol.Name, "Rejected", "Generalization changes a supplied method group signature."); }
+                        {
+                            RefineSuppliedSignature(before, after, parameters, result, pins);
+                            return new(symbol.Name, "Rejected", "Generalization changes a supplied method group signature.");
+                        }
                     }
                     else if ((before.ReducedFrom ?? before).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
                         != (after.ReducedFrom ?? after).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
