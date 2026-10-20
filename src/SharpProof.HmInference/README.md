@@ -573,3 +573,12 @@ have regression coverage. Incomplete marker correlation rejects a candidate. App
 nullable/unmanaged domains. CLI and fresh NuGet consumers exercise both language
 versions. C# 7.3 retains its compiler restriction on generic unmanaged constructed
 state machines.
+
+When supplied calls fail generic argument inference, contextual null/default
+literals, empty collections and target-typed construction retain their declared
+types. Implicit callback inputs retain their context, including expression trees,
+async lambdas and nested lambda returns. Independent parameters and inferable
+callback outputs remain generic. Refinement retries are bounded by signature
+components and still pass the existing compilation, warning and binding checks.
+Regression coverage includes nullable Task/ValueTask results, named extension
+arguments across files, IDE fixes and runtime checks of original and new domains.

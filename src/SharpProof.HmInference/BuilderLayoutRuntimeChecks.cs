@@ -32,6 +32,7 @@ internal static class BuilderLayoutRuntimeChecks
                 public static LayoutTask<LayoutPayload<int,string>> LocalComposite(LayoutPayload<int,string> value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}
                 public static LayoutTask<int?> LocalNullable(int? value,string ignored){static async LayoutTask<T?> Local<T>(T? item) where T:struct{await new LayoutSignal();return item;}return Local(value);}
                 public static void LocalGroup(Action<Func<int,LayoutTask<int>>> sink,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}sink(Local);}
+                public static void Contextual(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async value=>{await new LayoutSignal();return value;});}
                 public static void Callback(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async value=>{await new LayoutSignal();return value;});}
                 public static void Parenthesized(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async (value)=>{await new LayoutSignal();return value;});}
                 public static void Anonymous(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(async delegate{await new LayoutSignal();return 23;});}
@@ -54,6 +55,8 @@ internal static class BuilderLayoutRuntimeChecks
             public static class OriginalBuilderLayoutRunner{
                 public static bool Run(){
                     LayoutTrace.Value="";
+                    Func<int,LayoutTask<int>>? contextual=null;BuilderLayoutProbe.Contextual(value=>contextual=value,"tag");
+                    if(contextual is null||CallbackLayout.Managed(contextual)||contextual(23).GetAwaiter().GetResult()!=23)return false;
                     Func<int,LayoutTask<int>>? callback=null;BuilderLayoutProbe.Callback((Func<int,LayoutTask<int>> value)=>callback=value,"tag");
                     if(callback is null||CallbackLayout.Managed(callback)||callback(23).GetAwaiter().GetResult()!=23)return false;
                     Func<int,LayoutTask<int>>? parenthesized=null;BuilderLayoutProbe.Parenthesized((Func<int,LayoutTask<int>> value)=>parenthesized=value,"tag");
@@ -113,14 +116,16 @@ internal static class BuilderLayoutRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 14)
-        { throw new InvalidOperationException("Expected fourteen builder layout fixes; got " + fixes); }
+        if (fixes != 15)
+        { throw new InvalidOperationException("Expected fifteen builder layout fixes; got " + fixes); }
         document = document.Project.AddDocument("NewBuilderLayoutDomains.cs", """
             #nullable enable
             using System;
             public static class NewBuilderLayoutRunner{
                 public static bool Run(){
                     LayoutTrace.Value="";var tag=new object();var payload=new string('x',3);
+                    Func<int,LayoutTask<int>>? contextual=null;BuilderLayoutProbe.Contextual(value=>contextual=value,tag);
+                    if(contextual is null||CallbackLayout.Managed(contextual)||contextual(23).GetAwaiter().GetResult()!=23)return false;
                     Func<byte,LayoutTask<byte>>? callback=null;BuilderLayoutProbe.Callback((Func<byte,LayoutTask<byte>> value)=>callback=value,tag);
                     if(callback is null||CallbackLayout.Managed(callback)||callback(23).GetAwaiter().GetResult()!=23)return false;
                     Func<ushort,LayoutTask<ushort>>? parenthesized=null;BuilderLayoutProbe.Parenthesized((Func<ushort,LayoutTask<ushort>> value)=>parenthesized=value,tag);

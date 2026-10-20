@@ -94,8 +94,9 @@ internal static class BuilderLayoutChecks
         Program.Log.Info("PASS BuilderLayoutRejectsDebugClassStateMachine");
         var untyped = Program.Compile([CSharpSyntaxTree.ParseText(Support + "class UntypedCases{static void M(Action<Func<int,LayoutTask<int>>> sink,string ignored){sink(static async value=>{await new LayoutSignal();return value;});}static void Caller(){Func<int,LayoutTask<int>>? callback=null;M(value=>callback=value,\"tag\");}}", cancellationToken: cancellationToken)]);
         untyped = untyped.WithOptions(untyped.Options.WithOptimizationLevel(OptimizationLevel.Release));
-        if (Program.Results(untyped, cancellationToken).Single(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; }).Status == "Suggestion")
-        { throw new InvalidOperationException("An untyped registration caller cannot infer newly introduced callback type arguments."); }
+        var untypedResult = Program.Results(untyped, cancellationToken).Single(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; });
+        if (untypedResult.Status != "Suggestion" || untypedResult.Signature != "void M<T1>(global::System.Action<global::System.Func<int, global::LayoutTask<int>>> sink, T1 ignored)")
+        { throw new InvalidOperationException("Untyped async registration refinement failed: " + (untypedResult.Signature ?? untypedResult.Message)); }
         Program.Log.Info("PASS NestedLayoutPreservesUntypedRegistrationCaller");
         var runtimeChecks = await BuilderLayoutRuntimeChecks.Run(LanguageVersion.CSharp13, cancellationToken).ConfigureAwait(false);
         return tests.Length + runtimeChecks + 2;

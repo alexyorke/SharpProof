@@ -266,6 +266,10 @@ public static partial class Inference
             var changedCompilation = ReplaceCandidate(changed);
             if (needsBuilderEmission)
             {
+                var previousPins = pins.Count;
+                RefineInferenceFailures(changedCompilation, tree, changed, symbol, parameters, pins);
+                if (pins.Count != previousPins)
+                { return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site."); }
                 var layoutMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(declaration =>
                 { if (declaration is null) { throw new ArgumentNullException(nameof(declaration)); } return declaration.SpanStart == method.SpanStart; });
                 if (InferBuilderLayoutConstraints(changedCompilation, layoutMethod, variables))
@@ -285,6 +289,7 @@ public static partial class Inference
                 return IsCompilationError(d);
             }))
             {
+                RefineInferenceFailures(changedCompilation, tree, changed, symbol, parameters, pins);
                 return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site.");
             }
 

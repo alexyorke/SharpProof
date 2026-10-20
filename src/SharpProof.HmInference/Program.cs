@@ -378,6 +378,8 @@ internal static class Program
         passed += await VariantConstraintChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await VariantProjectionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await CallerRefinementChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += UntypedCallerChecks.Run(cancellationToken);
+        passed += await UntypedCallerRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await NullableConstraintChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await InterfaceProjectionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DependentBoundChecks.Run(cancellationToken).ConfigureAwait(false);
