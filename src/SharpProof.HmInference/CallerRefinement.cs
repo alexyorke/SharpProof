@@ -173,13 +173,13 @@ public static partial class Inference
                         if (call.TargetMethod.ReducedFrom is not null && SymbolEqualityComparer.Default.Equals(argument.Parameter.ContainingSymbol, call.TargetMethod))
                         { ordinal++; }
                         if (ordinal < parameters.Length)
-                        { PinContextualArgument(syntax.Expression, argument.Parameter.Type, parameters[ordinal], pins); }
+                        { PinContextualArgument(syntax.Expression, argument.Parameter.Type, parameters[ordinal], semantic, pins); }
                     }
                 }
             }
         }
 
-        private void PinContextualArgument(ExpressionSyntax expression, ITypeSymbol declared, HmType inferred, HashSet<(int Parameter, string Path)> pins)
+        private void PinContextualArgument(ExpressionSyntax expression, ITypeSymbol declared, HmType inferred, SemanticModel semantic, HashSet<(int Parameter, string Path)> pins)
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
@@ -189,14 +189,46 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(inferred)); }
             if (pins is null)
             { throw new ArgumentNullException(nameof(pins)); }
+            if (semantic is null)
+            { throw new ArgumentNullException(nameof(semantic)); }
             cancellationToken.ThrowIfCancellationRequested();
             if (expression is ParenthesizedExpressionSyntax parenthesized)
-            { PinContextualArgument(parenthesized.Expression, declared, inferred, pins); return; }
+            { PinContextualArgument(parenthesized.Expression, declared, inferred, semantic, pins); return; }
             if (expression is PostfixUnaryExpressionSyntax suppressed && suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            { PinContextualArgument(suppressed.Operand, declared, inferred, pins); return; }
+            { PinContextualArgument(suppressed.Operand, declared, inferred, semantic, pins); return; }
             if (expression.IsKind(SyntaxKind.NullLiteralExpression) || expression.IsKind(SyntaxKind.DefaultLiteralExpression)
                 || expression is ImplicitObjectCreationExpressionSyntax or CollectionExpressionSyntax { Elements.Count: 0 })
             { PinContextualShape(inferred, pins); return; }
+            if (declared is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } optional
+                && inferred.Root.Name == CSharpTypes.NullableValue)
+            {
+                if (semantic.GetTypeInfo(expression, cancellationToken).Type is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+                { PinContextualShape(inferred, pins); }
+                else
+                { PinContextualArgument(expression, optional.TypeArguments[0], inferred.Root.Arguments[0], semantic, pins); }
+                return;
+            }
+            if (expression is TupleExpressionSyntax tuple && declared is INamedTypeSymbol { IsTupleType: true } tupleType
+                && inferred.Root.Name == "Tuple" && tuple.Arguments.Count == inferred.Root.Arguments.Length)
+            {
+                for (var i = 0; i < tuple.Arguments.Count; i++)
+                { PinContextualArgument(tuple.Arguments[i].Expression, tupleType.TupleElements[i].Type, inferred.Root.Arguments[i], semantic, pins); }
+                return;
+            }
+            if (expression is ConditionalExpressionSyntax or SwitchExpressionSyntax)
+            {
+                if (semantic.GetTypeInfo(expression, cancellationToken).Type is not { TypeKind: not TypeKind.Error })
+                { PinContextualShape(inferred, pins); }
+                return;
+            }
+            if (expression is CollectionExpressionSyntax collection)
+            {
+                var element = new Session(semantic, cancellationToken).CollectionElement(declared, inferred, expression.SpanStart);
+                foreach (var item in collection.Elements.OfType<ExpressionElementSyntax>())
+                { PinContextualArgument(item.Expression, element.Type, element.Shape, semantic, pins); }
+                return;
+            }
+
             if (expression is not AnonymousFunctionExpressionSyntax lambda || declared is not INamedTypeSymbol target)
             { return; }
             if (target.OriginalDefinition.ToDisplayString() == "System.Linq.Expressions.Expression<TDelegate>")
@@ -212,6 +244,14 @@ public static partial class Inference
             if (target.DelegateInvokeMethod is not { } invoke)
             { return; }
             var signature = DelegateSignature(target, inferred);
+            ITypeSymbol outputType = invoke.ReturnType;
+            var output = signature.Output;
+            if (lambda.AsyncKeyword.IsKind(SyntaxKind.AsyncKeyword) && outputType is INamedTypeSymbol { Arity: 1 } task)
+            {
+                outputType = task.TypeArguments[0];
+                output = CSharpTypes.OwnArguments(ConversionCore(output))[0];
+            }
+            var previousPins = pins.Count;
             for (var i = 0; i < signature.Inputs.Length; i++)
             {
                 var implicitInput = lambda switch
@@ -224,10 +264,10 @@ public static partial class Inference
                 if (implicitInput)
                 { PinContextualShape(signature.Inputs[i], pins); }
             }
-            if (lambda.Body is AnonymousFunctionExpressionSyntax)
-            { PinContextualShape(signature.Output, pins); }
-            else if (lambda.Body is ExpressionSyntax body)
-            { PinContextualArgument(body, invoke.ReturnType, signature.Output, pins); }
+            if (pins.Count != previousPins)
+            { return; }
+            if (lambda.Body is ExpressionSyntax body)
+            { PinContextualReturn(body, outputType, output, semantic, pins); }
             else if (lambda.Body is BlockSyntax block)
             {
                 foreach (var statement in block.DescendantNodes(node =>
@@ -237,14 +277,35 @@ public static partial class Inference
                     return node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax;
                 }).OfType<ReturnStatementSyntax>())
                 {
-                    if (statement.Expression is AnonymousFunctionExpressionSyntax)
-                    { PinContextualShape(signature.Output, pins); }
-                    else if (statement.Expression is { } returned)
-                    { PinContextualArgument(returned, invoke.ReturnType, signature.Output, pins); }
+                    if (statement.Expression is { } returned)
+                    { PinContextualReturn(returned, outputType, output, semantic, pins); }
                 }
             }
         }
 
+        private void PinContextualReturn(ExpressionSyntax expression, ITypeSymbol declared, HmType inferred, SemanticModel semantic, HashSet<(int Parameter, string Path)> pins)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (declared is null)
+            { throw new ArgumentNullException(nameof(declared)); }
+            if (inferred is null)
+            { throw new ArgumentNullException(nameof(inferred)); }
+            if (semantic is null)
+            { throw new ArgumentNullException(nameof(semantic)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (expression is ParenthesizedExpressionSyntax parenthesized)
+            { PinContextualReturn(parenthesized.Expression, declared, inferred, semantic, pins); return; }
+            // Output inference needs a natural return type before it can examine
+            // the delegate result; tuple argument inference can inspect each field.
+            if (expression is AnonymousFunctionExpressionSyntax
+                || expression is TupleExpressionSyntax or ConditionalExpressionSyntax or SwitchExpressionSyntax or CollectionExpressionSyntax
+                && semantic.GetTypeInfo(expression, cancellationToken).Type is null)
+            { PinContextualShape(inferred, pins); return; }
+            PinContextualArgument(expression, declared, inferred, semantic, pins);
+        }
         private void PinContextualShape(HmType inferred, HashSet<(int Parameter, string Path)> pins)
         {
             if (inferred is null)

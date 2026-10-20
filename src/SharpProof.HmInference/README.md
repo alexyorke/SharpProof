@@ -582,3 +582,13 @@ callback outputs remain generic. Refinement retries are bounded by signature
 components and still pass the existing compilation, warning and binding checks.
 Regression coverage includes nullable Task/ValueTask results, named extension
 arguments across files, IDE fixes and runtime checks of original and new domains.
+
+Contextual refinement also follows tuple fields (including nullable tuples),
+nonempty collection elements using their original collection protocol, and
+conditional and switch expressions. Direct tuple arguments retain generic typed
+siblings; lifted nullable and conditional forms retain their required inference
+context. Async callback returns are
+checked against the task result shape. Callback output inference requires a
+natural return type; untyped composite returns retain the required output context,
+while typed composite returns can still generalize. Callback input refinement is
+retried first so inferred outputs retain their available generality.
