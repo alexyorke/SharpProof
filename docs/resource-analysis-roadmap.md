@@ -89,6 +89,28 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+Root closure lifetime composition now includes initialized, read-only locals.
+Entry frame allocation and ordered default stores precede initializer updates,
+preserving allocation order. Extraction and replay check updates independently
+against the certified slot set; unregistered fields and self-frame edges fail
+closed. Parameter-only frames retain immutable capture initialization. Owned
+arrays, objects and aliases compose with source factories. Debug and Release
+runtime controls independently measure the 120-byte frame/delegate/array case.
+Protocol 35, cache 37 and compiler artifact 49 invalidate prior evidence.
+
+Verification passed 486 worker cases, 21 additional runtime/factory controls,
+756 IR tests, 1450 analyzer tests, two real package workflows, six final factory
+return cases, the quality/API and full formatting gates, and 726 documentation
+links. The trusted production inventory remains 521 paths.
+The lifetime row remains open for broader capture/call composition. Remaining
+phase E/F requirements and the unchanged 100% changed-TCB coverage gate remain required.
+
+The published boundary checkpoint 8b3561e76 passed canonical, package, docs and
+security CI. All four coverage shards passed, but aggregate qualification failed
+at 3943/4119 changed trusted-code lines (95.73%, 176 gaps). This improves on the
+previous 3926/4119 checkpoint; it does not meet the 100% floor. Fresh exact-head
+CI is required after publishing this local-capture extension.
+
 The branch now includes native asymptotic upper evidence, structured protocol
 validation and trusted string-length size/contract binding, in addition to the
 expression foundation and packaged SP0060 activation repair. Before the latest

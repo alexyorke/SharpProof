@@ -26,12 +26,18 @@ public sealed class ObservedRootClosureCompilerTests
     [TestCase(true, "dead-body")]
     [TestCase(false, "nameof")]
     [TestCase(true, "nameof")]
+    [TestCase(false, "local")]
+    [TestCase(true, "local")]
+    [TestCase(false, "local-array")]
+    [TestCase(true, "local-array")]
     public void RootCaptureFramesPrecedeUserControlFlow(bool release, string shape)
     {
         ArgumentNullException.ThrowIfNull(shape);
         var body = shape switch
         {
             "return" => "return () => value;",
+            "local" => "int copied=value; return () => copied;",
+            "local-array" => "int[] copied=new int[1]; return () => copied.Length;",
             "zero-loop" => "System.Func<int> last=null; for(int i=0;i<value;i++) { last=() => value; } return last;",
             "early-throw" => "if(value<0) { throw Failure; } return () => value;",
             "nameof" => "return () => nameof(value).Length;",
@@ -77,7 +83,7 @@ public sealed class ObservedRootClosureCompilerTests
                 Assert.That(constructor.IsConstructor, Is.True);
                 Assert.That(constructor.DeclaringType!.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false), Is.True);
                 Assert.That(constructor.DeclaringType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType), Is.EquivalentTo(shape == "zero-loop" ? new[] { typeof(int), typeof(Func<int>) } : new[] { typeof(int) }));
+                    .Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType), Is.EquivalentTo(shape == "zero-loop" ? new[] { typeof(int), typeof(Func<int>) } : shape == "local-array" ? new[] { typeof(int[]) } : new[] { typeof(int) }));
             }
             var target = method.CreateDelegate<Func<int, object?>>();
             for (var warm = 0; warm < 16; warm++)
@@ -87,7 +93,7 @@ public sealed class ObservedRootClosureCompilerTests
             for (var repeat = 0; repeat < 32; repeat++)
             { result = target(0); GC.KeepAlive(result); }
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            Assert.That(allocated, Is.EqualTo(!entryFrame ? 0 : shape == "zero-loop" ? 32 * 32 : 32 * 88));
+            Assert.That(allocated, Is.EqualTo(!entryFrame ? 0 : shape == "zero-loop" ? 32 * 32 : shape == "local-array" ? 32 * 120 : 32 * 88));
         }
         finally { runtime.Unload(); }
     }

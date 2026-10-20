@@ -44,14 +44,18 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(10)]
     [TestCase(11)]
     [TestCase(12)]
+    [TestCase(13)]
+    [TestCase(14)]
+    [TestCase(15)]
+    [TestCase(16)]
     public void ClosureFramesRequireCompleteOrderedTypedCaptureInitialization(int mutation)
     {
-        if (mutation < 0 || mutation > 12)
+        if (mutation < 0 || mutation > 16)
         { throw new ArgumentOutOfRangeException(nameof(mutation)); }
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var frameType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         if (mutation != 9)
-        { factory.RegisterClosureFrameType(frameType, mutation >= 10 ? [ResourceStorageKind.Reference, ResourceStorageKind.Reference] : [ResourceStorageKind.Reference]); }
+        { factory.RegisterClosureFrameType(frameType, mutation is >= 10 and <= 12 ? [ResourceStorageKind.Reference, ResourceStorageKind.Reference] : [ResourceStorageKind.Reference]); }
         var delegateType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Callback");
         factory.RegisterDelegateReferenceType(delegateType);
         var owner = factory.CreateVariable("owner", factory.ObjectType);
@@ -60,16 +64,23 @@ public sealed class ResourceMemoryProgramTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, owner);
-        builder.Allocate(entry, mutation == 1 ? factory.CreateOperation() : factory.CreateOperation(IrClosureFrameSite.Description), frameType, frame);
+        builder.Allocate(entry, mutation == 1 ? factory.CreateOperation() : factory.CreateOperation(mutation >= 13 ? IrClosureFrameSite.LocalDescription : IrClosureFrameSite.Description), frameType, frame);
         var frameReceiver = factory.Cast(factory.ObjectType, factory.Variable(frame));
         var fieldType = mutation == 4 ? factory.BooleanType : factory.ObjectType;
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             IrClosureFrameSite.FieldName(mutation is 3 or 11 ? 1 : 0), fieldType, false);
-        IrTerm captured = mutation == 4 ? factory.Boolean(true) : mutation == 7 ? frameReceiver : mutation == 8 ? factory.Null(factory.ObjectType) : factory.Variable(owner);
+        IrTerm captured = mutation == 4 ? factory.Boolean(true) : mutation == 7 ? frameReceiver : mutation is 8 or 13 or 15 or 16 ? factory.Null(factory.ObjectType) : factory.Variable(owner);
         if (mutation != 2)
         { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, mutation == 5 ? factory.Variable(owner) : frameReceiver, field, captured); }
         if (mutation == 6)
         { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, frameReceiver, field, captured); }
+        if (mutation >= 13)
+        {
+            var updateField = mutation == 15 ? factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+                IrClosureFrameSite.FieldName(1), factory.ObjectType, false) : field;
+            builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, frameReceiver, updateField,
+                mutation == 14 ? factory.Null(factory.ObjectType) : mutation == 16 ? frameReceiver : factory.Variable(owner));
+        }
         if (mutation is 11 or 12)
         {
             var second = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
@@ -88,16 +99,16 @@ public sealed class ResourceMemoryProgramTests
         var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
         var execution = new IrProgramInterpreter(factory).Execute(program, null, 100, options, TestContext.CurrentContext.CancellationToken);
         var observed = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
-        if (mutation is 0 or 8 or 12)
+        if (mutation is 0 or 8 or 12 or 13 or 14)
         {
-            var expected = mutation == 8 ? new ResourceMemoryBounds(112, 112, 24, 24, 88, 88) :
+            var expected = mutation is 8 or 14 ? new ResourceMemoryBounds(112, 112, 24, 24, 88, 88) :
                 mutation == 12 ? new ResourceMemoryBounds(120, 120, 0, 0, 120, 120) : new ResourceMemoryBounds(112, 112, 0, 0, 112, 112);
             Assert.That(check.Bounds, Is.EqualTo(expected), check.UnknownReason);
             Assert.That(observed.Bounds, Is.EqualTo(expected), observed.UnknownReason);
         }
         else
         {
-            var suffix = mutation == 9 ? "ObjectStorageUnavailable" : mutation is 6 or 7 ? "ClosureCaptureUnsupported" : "ClosureCaptureIncomplete";
+            var suffix = mutation == 9 ? "ObjectStorageUnavailable" : mutation is 6 or 7 or 15 or 16 ? "ClosureCaptureUnsupported" : "ClosureCaptureIncomplete";
             Assert.That(check.Bounds, Is.Null);
             Assert.That(check.UnknownReason, Is.EqualTo("Memory" + suffix));
             Assert.That(observed.Bounds, Is.Null);

@@ -108,7 +108,9 @@ internal sealed partial class NativeResourceContractTests
         }
     }
 
-    [TestCase("int captured=n; return () => captured;")]
+    [TestCase("int captured=n; return () => ++captured;")]
+    [TestCase("int captured=n; captured++; return () => captured;")]
+    [TestCase("int captured=n; return () => { Change(ref captured); return captured; };")]
     [TestCase("System.Func<int> last=null; for(int i=0;i<n;i++) { last=() => n; } return last;")]
     [TestCase("if(n<0) { throw new System.Exception(); } return () => n;")]
     [TestCase("return () => 42;")]
@@ -116,12 +118,34 @@ internal sealed partial class NativeResourceContractTests
     {
         ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { " +
-            $"[ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)] public static System.Func<int> Target(int n) {{ {body} }} }}";
+            $"static void Change(ref int value) {{ value++; }} [ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)] public static System.Func<int> Target(int n) {{ {body} }} }}";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+    }
+
+    [TestCase("int captured=n; return () => captured;", 88)]
+    [TestCase("int[] captured=new int[1]; return () => captured.Length;", 120)]
+    [TestCase("Box captured=new Box(); return () => captured.Read();", 112)]
+    [TestCase("Box captured=new Box(); Box alias=captured; return () => alias.Read();", 112)]
+    [TestCase("Box captured=MakeBox(); return () => captured.Read();", 112)]
+    [TestCase("return MakeClosure();", 112)]
+    public async Task InitializedLocalCapturesRetainOwnedValues(string body, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 4, 5, 6 })
+        {
+            var limit = metric == 5 ? 0 : retained;
+            var source = "using SharpProof.Attributes; public class Box { public int Read() => 42; } public static class C { static Box MakeBox() => new Box(); " +
+                "static System.Func<int> MakeClosure() { Box captured=MakeBox(); return () => captured.Read(); } " +
+                $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public static System.Func<int> Target(int n) {{ {body} }} }}";
+            var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+            var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
     }
 
     [Test]

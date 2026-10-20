@@ -32,6 +32,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal bool ShadowCallSkeleton { get; set; }
     internal RootParameterClosurePlan? RootClosure { get; set; }
     internal IrTerm? RootClosureFrame { get; set; }
+    internal ImmutableArray<IrMemberId> RootClosureFields { get; set; } = [];
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
@@ -631,6 +632,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     {
                         var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, _context.BridgeValue(right.Value, _factory.GetVariableInfo(target).Type));
                         _builder.Write(right.Continuation, mutation.Operation, IrWriteRegion.Local);
+                        if (assignment.Target is ILocalReferenceOperation local && RootClosure is { } closure && RootClosureFrame is { } frame)
+                        {
+                            var slot = closure.Captures.IndexOf(local.Local, 0, closure.Captures.Length, SymbolEqualityComparer.Default);
+                            if (slot >= 0)
+                            {
+                                var field = RootClosureFields[slot];
+                                var value = _context.BridgeValue(right.Value, _factory.GetMemberInfo(field).ReturnType);
+                                _builder.FieldStore(right.Continuation, _context.FreshWriteSite(operation), IrWriteRegion.Field,
+                                    _factory.Cast(_factory.ObjectType, frame), field, value);
+                            }
+                        }
                     }
                     return right;
                 }

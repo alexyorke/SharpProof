@@ -5,6 +5,7 @@ namespace SharpProof.Ir;
 internal static class IrClosureFrameSite
 {
     internal const string Description = "RootClosureFrameAllocation";
+    internal const string LocalDescription = "RootLocalClosureFrameAllocation";
     private const string FieldPrefix = IrFieldSites.Prefix + "$closure-capture:";
 
     internal static string FieldName(int slot)
@@ -19,7 +20,15 @@ internal static class IrClosureFrameSite
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         allocation = RepositoryParameterGuard.NotNull(allocation, nameof(allocation));
         return factory.GetOperationInfo(allocation.Operation).Description is { } description &&
-            factory.GetString(description) == Description;
+            factory.GetString(description) is Description or LocalDescription;
+    }
+
+    internal static bool AllowsCaptureUpdates(IrFactory factory, IrAllocationInstruction allocation)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        allocation = RepositoryParameterGuard.NotNull(allocation, nameof(allocation));
+        return factory.GetOperationInfo(allocation.Operation).Description is { } description &&
+            factory.GetString(description) == LocalDescription;
     }
 
     internal static bool IsCaptureField(IrFactory factory, IrMemberId field)

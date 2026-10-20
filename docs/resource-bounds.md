@@ -564,7 +564,18 @@ frame, a 64-byte delegate, a 24-byte captured object and its 32-byte child array
 retain 144 newly owned bytes under the declared layout; two reference slots
 sharing that same graph retain 152 bytes.
 
-Missing, reordered, mismatched or overwritten capture stores remain Unknown.
+Root locals are also admitted when the body consists of initialized local
+declarations followed by one returned lambda. Captured parameters and locals
+must remain read-only, including inside the lambda. The frame is allocated at
+entry, its local slots receive typed defaults in certificate order, and each
+local initializer updates its certified slot. Owned reference captures retain
+their reachable graph; aliases retain each object once. A captured one-element
+Int32 array retains 120 bytes including the frame and delegate.
+
+Extraction and replay independently check the local-frame marker, slot identity,
+storage, receiver and owned value on every update. Updates to undeclared fields
+and self-frame references remain Unknown. Parameter-only frames still require
+immutable initialization. Missing, reordered or mismatched capture stores remain Unknown.
 Borrowed non-null captures and broader scopes still require further ownership
 models. Object packing intervals remain separate upper and lower bounds; a loose
 upper bound cannot establish an exact violating cost. Closure invocation effects
@@ -638,11 +649,11 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 34 and cache schema 36 invalidate older responses without this evidence.
+Protocol 35 and cache schema 37 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
-to numeric refutations or Unknown claims. Compiler artifact 48, manifest 6,
+to numeric refutations or Unknown claims. Compiler artifact 49, manifest 6,
 resource program/evidence 5 and expression model 1 remain unchanged.
 
 Intrinsic string lengths are admitted as size inputs and as contract sizes such

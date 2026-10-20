@@ -95,6 +95,7 @@ internal sealed class ResourceMemoryReplay
         var pendingCaptures = new Dictionary<int, IrMemberId>();
         var frames = new HashSet<int>();
         var pendingFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
+        var updatableFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         events.Add(new(ResourceMemoryEventKind.Allocate, ResourceMemoryProgram.EmptyStringIdentity, ResourceMemoryProgram.EmptyStringIdentity, 0));
@@ -177,7 +178,11 @@ internal sealed class ResourceMemoryReplay
                     {
                         frames.Add(identities.Count);
                         foreach (var capture in frameCaptures)
-                        { pendingFrameCaptures.Add((identities.Count, capture)); }
+                        {
+                            pendingFrameCaptures.Add((identities.Count, capture));
+                            if (IrClosureFrameSite.AllowsCaptureUpdates(factory, objectAllocation))
+                            { updatableFrameCaptures.Add((identities.Count, capture)); }
+                        }
                     }
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(objectTarget, slots), 0, objectLower, objectUpper));
                     liveRoots.Add(objectTarget);
@@ -230,7 +235,7 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown("MemoryReplayFieldStoreUnsupported"); }
                     var frameCapture = frames.Contains(receiver);
                     if ((frameCapture || IrClosureFrameSite.IsCaptureField(factory, field)) &&
-                        !pendingFrameCaptures.Remove((receiver, field)))
+                        !pendingFrameCaptures.Remove((receiver, field)) && !updatableFrameCaptures.Contains((receiver, field)))
                     { return Unknown("MemoryReplayClosureCaptureUnsupported"); }
                     if (value.Kind is IrValueKind.Reference or IrValueKind.Sequence or IrValueKind.String or IrValueKind.Null)
                     {

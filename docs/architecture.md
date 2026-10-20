@@ -61,7 +61,7 @@ Solver contexts belong to bounded verification work. Native payload loading, can
 
 A request binds the compiler artifact, budgets, cache options, policy, and manifest identity. A response distinguishes run status, callable coverage, and claim outcomes. Validation checks complete accountability, locations, assumptions, effect certainty, witness/vacuity consistency, and enum domains.
 
-The current worker protocol is 34, manifest schema 6, cache schema 36, and compiler artifact schema 48. [Release constants](release-constants.md) identifies the owning files. Changes to compatibility require coordinated updates, not prose-only version bumps.
+The current worker protocol is 35, manifest schema 6, cache schema 37, and compiler artifact schema 49. [Release constants](release-constants.md) identifies the owning files. Changes to compatibility require coordinated updates, not prose-only version bumps.
 
 The launcher bounds wall time and termination grace and validates worker output. MSBuild projects worker results according to policy; infrastructure failure remains a failure. Publication paths and artifacts are protected by the [filesystem support boundary](preview-support.md).
 

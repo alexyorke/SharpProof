@@ -89,6 +89,7 @@ internal static class ResourceMemoryProgram
         var pendingCaptures = new Dictionary<int, IrMemberId>();
         var frames = new HashSet<int>();
         var pendingFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
+        var updatableFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
         for (var index = 0; index < instructions.Count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -167,7 +168,11 @@ internal static class ResourceMemoryProgram
                     {
                         frames.Add(nextObject);
                         foreach (var capture in frameCaptures)
-                        { pendingFrameCaptures.Add((nextObject, capture)); }
+                        {
+                            pendingFrameCaptures.Add((nextObject, capture));
+                            if (IrClosureFrameSite.AllowsCaptureUpdates(factory, objectAllocation))
+                            { updatableFrameCaptures.Add((nextObject, capture)); }
+                        }
                     }
                     trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, objectSlot, 0, objectLower, objectUpper));
                     break;
@@ -217,7 +222,7 @@ internal static class ResourceMemoryProgram
                     { return Unknown("MemoryFieldStoreUnsupported"); }
                     var frameCapture = frames.Contains(receiver);
                     if ((frameCapture || IrClosureFrameSite.IsCaptureField(factory, field)) &&
-                        !pendingFrameCaptures.Remove((receiver, field)))
+                        !pendingFrameCaptures.Remove((receiver, field)) && !updatableFrameCaptures.Contains((receiver, field)))
                     { return Unknown("MemoryClosureCaptureUnsupported"); }
                     if (factory.GetTypeInfo(member.ReturnType).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
                     {
