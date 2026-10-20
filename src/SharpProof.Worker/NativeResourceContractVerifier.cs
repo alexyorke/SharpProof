@@ -204,7 +204,8 @@ internal static class NativeResourceContractVerifier
         WorkerClaimResult VerifyTaskJoin()
         {
             var lifetime = constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes;
-            if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries && !lifetime)
+            var sourceAllocation = constraint.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements;
+            if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries && !sourceAllocation && !lifetime)
             { return Unknown("ForkJoinResourceMetricUnsupported", WorkerClaimReason.UnsupportedBody); }
             var dependency = NativeResourceTaskBinding.Bind(target, cancellation);
             if (dependency is null)
@@ -235,7 +236,15 @@ internal static class NativeResourceContractVerifier
                     var check = NativeForkJoinSourceCostVerifier.Check(projection, entry, cancellation);
                     if (check.Upper is not { } costs)
                     { return Unknown(check.UnknownReason ?? "ForkJoinSourceCostUnproved", WorkerClaimReason.UnsupportedBody); }
-                    upper = costs.LoopEntries;
+                    // The closed compiler projection owns one source params
+                    // array, allocated before any child callback can run. Count
+                    // it even for prefixes that stop before the join is created.
+                    upper = constraint.Metric switch
+                    {
+                        WorkerResourceMetric.ArrayAllocations => ResourceExpression.Add(costs.Arrays, ResourceExpression.One),
+                        WorkerResourceMetric.AllocatedElements => ResourceExpression.Add(costs.Elements, ResourceExpression.Literal(projection.Children.Length)),
+                        _ => costs.LoopEntries
+                    };
                 }
                 var limit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, entry, cancellation);
                 if (!ResourceBoundOrder.Proves(upper, limit, cancellation))
@@ -256,7 +265,8 @@ internal static class NativeResourceContractVerifier
                         "resource-task-compiler-carriers:" + NativeTaskCarrierStorageVerifier.Model];
                 }
                 result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
-                result.ResourceBound.ExecutionScope = lifetime ? WorkerResourceModels.TaskStorageScope : WorkerResourceModels.TaskJoinScope;
+                result.ResourceBound.ExecutionScope = lifetime ? WorkerResourceModels.TaskStorageScope :
+                    sourceAllocation ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope;
                 result.ResourceBound.MetadataAssumptions = storage == null ? [dependency] : [dependency, storage];
                 result.ResourceBound.Asymptotic!.Lower = new() { UnknownReason = "ResourceLowerTaskDomainUnproved" };
                 result.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedTaskModelUnsupported" };

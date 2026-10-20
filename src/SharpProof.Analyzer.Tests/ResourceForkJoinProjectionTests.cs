@@ -167,6 +167,75 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierEmissionBudgetExceeded"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CarrierEmissionCachePreservesNestedNamespaceOwnership(bool configured)
+    {
+        var (compilation, method) = Compile("using System.Threading.Tasks; namespace A.B { public class Outer { public static class Inner { " +
+            "public static " + (configured ? "async " : "") + "Task Root(int n) => " + (configured ? "await " : "") +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" + (configured ? ".ConfigureAwait(false)" : "") +
+            "; static void Child(int n) {} } } }");
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var first = collector.Capture(method, "first", TestContext.CurrentContext.CancellationToken);
+        var second = collector.Capture(method, "second", TestContext.CurrentContext.CancellationToken);
+        Assert.That(first.UnknownReason, Is.Null);
+        Assert.That(second.UnknownReason, Is.Null);
+        Assert.That(first.Shapes!.RootCallableId, Is.EqualTo("first"));
+        Assert.That(second.Shapes!.RootCallableId, Is.EqualTo("second"));
+        Assert.That(second.Shapes.ModuleSha256, Is.EqualTo(first.Shapes.ModuleSha256));
+        Assert.That(second.Shapes.CallbackFrames.Select(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.MetadataName),
+            Has.Some.StartsWith("A.B.Outer+Inner+"));
+    }
+
+    [Test]
+    public void CarrierCaptureRejectsUnsupportedRootIdentityBeforeEmission()
+    {
+        var (compilation, method) = Create("");
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, " ", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Shapes, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierRootUnsupported"));
+    }
+
+    [Test]
+    public void CarrierCaptureRejectsAmbiguousEmittedParameterModes()
+    {
+        var (compilation, method) = Create("", "public static Task Root(ref int n) => Task.CompletedTask;");
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Shapes, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierRootMetadataAmbiguous"));
+    }
+
+    [TestCase("types", "TaskCarrierMetadataBudgetExceeded")]
+    [TestCase("callbacks", "TaskCarrierCallbackMetadataUnsupported")]
+    [TestCase("fields", "TaskCarrierMetadataBudgetExceeded")]
+    public void CarrierMetadataBudgetsRejectTheWholeCapture(string budget, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        ArgumentNullException.ThrowIfNull(reason);
+        var extra = new System.Text.StringBuilder();
+        if (budget == "types")
+        {
+            for (var index = 0; index < 4100; index++)
+            { extra.Append("private class Nested").Append(index).Append(" {} "); }
+        }
+        else
+        {
+            var methods = budget == "callbacks" ? 33 : 8;
+            for (var index = 0; index < methods; index++)
+            {
+                var arity = budget == "callbacks" ? index + 2 : index + 300;
+                var parameters = string.Join(",", Enumerable.Range(0, arity).Select(static ordinal => "int p" + ordinal));
+                var arguments = string.Join(",", Enumerable.Range(0, arity).Select(static ordinal => "p" + ordinal));
+                extra.Append("public static Task Root(").Append(parameters).Append(") => Task.WhenAll(Task.Run(()=>Sink(")
+                    .Append(arguments).Append(")),Task.Run(()=>Sink(").Append(arguments).Append("))); static void Sink(")
+                    .Append(parameters).Append(") {} ");
+            }
+        }
+        var (compilation, method) = Create("", extra.ToString());
+        var capture = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Shapes, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo(reason));
+    }
     private static (CSharpCompilation Compilation, IMethodSymbol Method) Create(string body, string extra = "", string imports = "")
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -182,7 +251,9 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root");
+            .Where(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root" &&
+                method.ParameterList.Parameters.All(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Modifiers.Count == 0))
+            .OrderBy(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.ParameterList.Parameters.Count).First();
         return (compilation, (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!);
     }
 }

@@ -795,6 +795,8 @@ internal static partial class WorkerProtocolJson
         { return false; }
         if (evidence.ExecutionScope == WorkerResourceModels.TaskJoinScope)
         { return evidence.Metric == WorkerResourceMetric.LoopBodyEntries && evidence.MetadataAssumptions.Length == 1 && storage.Length == 0 && tokens.Length == 2; }
+        if (evidence.ExecutionScope == WorkerResourceModels.TaskSourceAllocationScope)
+        { return evidence.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements && evidence.MetadataAssumptions.Length == 1 && storage.Length == 0 && tokens.Length == 2; }
         if (evidence.ExecutionScope != WorkerResourceModels.TaskStorageScope ||
             evidence.Metric is not (WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes) ||
             evidence.MetadataAssumptions.Length != 3 || storage.Length != 1 || tokens.Length != 4 ||

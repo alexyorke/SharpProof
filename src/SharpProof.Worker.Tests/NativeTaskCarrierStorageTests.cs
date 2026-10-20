@@ -326,6 +326,38 @@ public sealed class NativeTaskCarrierStorageTests
     }
 
     [Test]
+    public void CarrierCompositionDoesNotPublishAChildBoundThatExhaustsTheExpressionBudget()
+    {
+        var (shapes, projection, root) = Fixture(0);
+        var input = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var terms = Enumerable.Repeat(input, 2045).ToList();
+        while (terms.Count > 1)
+        {
+            var next = new List<ResourceExpression>();
+            for (var index = 0; index < terms.Count; index += 2)
+            { next.Add(index + 1 < terms.Count ? ResourceExpression.Add(terms[index], terms[index + 1]) : terms[index]); }
+            terms = next;
+        }
+        var length = ResourceExpression.Difference(terms[0], 1);
+        Assert.That(length.NodeCount, Is.EqualTo(4090));
+        var child = projection.Children[0];
+        var allocation = ResourceProgram.TypedArray(ResourceAllocationShape.Array(ResourceStorageKind.Word64, length));
+        projection = projection with
+        {
+            Carriers = new(shapes, null),
+            Children = [child with { Cost = allocation }, projection.Children[1]]
+        };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var children = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, root, Layout(), cancellation);
+        Assert.That(children.UnknownReason, Is.Null);
+        Assert.That(children.CumulativeUpper!.NodeCount, Is.EqualTo(ResourceExpression.MaximumNodes - 1));
+        var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), cancellation);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskRuntimeStorageExpressionBudgetExceeded"));
+        Assert.That(result.PeakUpper, Is.Null);
+        Assert.That(result.RetainedUpper, Is.Null);
+    }
+
+    [Test]
     public void AChildWithArrayCountsButNoStorageShapeCannotSupplyRootLifetimeBytes()
     {
         var (shapes, projection, root) = Fixture(0);

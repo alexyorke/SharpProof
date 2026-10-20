@@ -43,12 +43,17 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("credit++; credit+=2; while(credit>0) {credit--;}")]
     [TestCase("credit+=2; while(credit>0) {credit--;}")]
     [TestCase("credit++; while(credit>0) { if(flush) break; credit--; }")]
-    public async Task UnsupportedCreditTransitionsReturnUnknownWithoutPartialAccounting(string body)
+    [TestCase("credit++; while(credit>0) {credit--;}", "int credit=-1;")]
+    [TestCase("credit++; while(credit>0) {credit--;}", "int credit=n;")]
+    [TestCase("credit++; while(credit>0) {credit--;}", "double credit=0;")]
+    [TestCase("credit++; while(credit>0) {}")]
+    public async Task UnsupportedCreditTransitionsReturnUnknownWithoutPartialAccounting(string body, string initialize = "int credit=0;")
     {
         ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(initialize);
         var source = "using SharpProof.Attributes; public static class C { " +
             "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,0,nameof(n),10)] public static void Target(int n,bool flush) { " +
-            "int credit=0; for(int i=0;i<n;i++) { " + body + " } } }";
+            initialize + " for(int i=0;i<n;i++) { " + body + " } } }";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));

@@ -74,8 +74,10 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 - [x] Async/state-machine storage for the admitted normal-completion task-join
   model, with conditional peak/retained byte proofs.
-- [ ] Concurrent/fork-join total work, allocation and live-space composition;
-  document scheduler/overlap assumptions and return Unknown beyond them.
+- [x] Joined source work and array/element allocation prefixes, including the
+  params array and arbitrary isolated child overlap, under stated runtime scope.
+- [ ] Cumulative task runtime-byte prefixes, including fault/exception storage;
+  keep Unknown until the complete declared cost model is established.
 - [x] End-to-end runtime/allocation benchmark workflow, with input scales,
   units, environmental identity and comparable baselines. Measurements must
   remain distinguishable from proofs and must not establish Big-O by themselves.
@@ -96,6 +98,18 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 ## Current checkpoint
 
 ### Current coverage qualification
+
+Published 0da3ee9f9 passed all four coverage shards. Its exact run
+39474925632 aggregated 40 reports for merge commit
+180ab4c467714041cf6af26cefaf6c9f0304bb78, associated with that branch head.
+Changed trusted coverage measured 5882/6169 lines (95.35%, 287 uncovered lines),
+failing the unchanged 100% floor. The full report is retained at
+artifacts/resource-0da3-coverage-evidence/coverage/SharpProof.coverage.json;
+the failed gate log is artifacts/resource-0da3-coverage-failed.log. This is the
+latest complete measurement. All non-coverage checks also passed on that head. It confirms the hosted package lifecycle fix,
+but does not qualify unfinished features or subsequent local tests.
+
+The following paragraphs retain earlier measurements as history.
 
 Published c46e073c3 passed all four coverage shards, including the instrumented
 package shard, and all non-coverage workflows. Aggregate enforcement measured
@@ -255,6 +269,60 @@ pinned LICENSE URL referenced by three package READMEs. The repository API
 confirms that file exists at its pinned commit. The link-only retry passed,
 including the missing-file and missing-fragment negative controls. Final roadmap
 spelling and Markdown checks passed. No coverage floor or exclusion changed.
+
+### Source task allocation prefixes
+
+The native root checker now composes ArrayAllocations and AllocatedElements
+from every isolated child, adding the compiler-owned params array and its
+child-count elements. These are source-allocation prefixes, including partial
+launches and arbitrary child overlap, under the existing at-most-once execution
+premise. Framework/scheduler arrays are excluded by that declared source model.
+The required joined-isolated-source-allocation-prefixes result scope distinguishes
+these claims from callback-only loop work and normal-completion lifetime bytes.
+Empty callbacks still need one array and two elements for a two-child join.
+
+Protocol 43/cache 54 identify the added proof scope. Compiler artifact 55,
+projection codec 3, manifest 6 and resource program 8 retain their formats.
+Worker JSON/cache/SARIF and strict/advisory package controls now cover both
+metrics and returned/configured joins. Exchanged task scopes must be rejected.
+The combined native/resource/protocol/compiler-driver/golden gate passed all
+965 cases. All 1482 analyzer tests passed, including seven new compiler-capture
+controls for nested namespaces, emission reuse, ambiguous parameter modes and
+metadata/callback/field budgets. All six independent runtime observation cases
+passed for negative, zero and positive inputs across returned/configured joins,
+with three joined invocations per case. The instrumentation records successful
+source allocation events and is not submitted as proof evidence. All 12 selected
+strict/advisory packaged task cases passed, including source allocation scopes,
+normal lifetime scopes and unsupported byte-prefix controls. Full repository
+formatting, quality/API compatibility, negative fixtures and documentation gates
+passed. Logs are retained in artifacts with resource-task-source-allocation and
+resource-task-source-runtime filename prefixes. No public resource enum changed.
+Cumulative root task bytes remain Unknown pending the separate runtime prefix
+model below. No feature-completion or coverage improvement is claimed yet.
+
+### Cumulative task prefix review (in progress)
+
+The pinned [Task implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs)
+creates additional fault bookkeeping. In WhenAll, concurrent failed children can
+allocate lists that lose the compare-and-swap race; a cumulative bound must count
+those temporary allocations, not only the final reachable list. Child and join
+exception holders also allocate lists and dispatch records. The pinned
+[exception holder](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskExceptionHolder.cs)
+returns its existing dispatch-info list; it does not create a read-only wrapper
+for that access. The pinned
+[dispatch record](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/ExceptionServices/ExceptionDispatchInfo.cs)
+captures exception state, whose
+[CoreCLR implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Exception.CoreCLR.cs)
+copies trace data. The existing normal-completion storage catalog cannot supply
+an exceptional-prefix summary. The next model must account for fault carriers,
+list growth and losing races, and explicitly resolve exception/trace storage
+ownership before publishing cumulative root bytes. Until then that result remains
+Unknown. No runtime fault-path numeric bound is claimed by this review.
+
+Additional coverage controls passed for negative, input-dependent
+and floating-point accounting credit, a drain without progress, and a child byte
+expression that fits its own budget but exceeds the limit after carrier
+composition. All 16 accounting cases and 133 carrier/fork-join cases passed; the controls return Unknown without partial numeric evidence.
 
 ### Root lifetime publication
 

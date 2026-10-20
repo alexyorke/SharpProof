@@ -129,8 +129,6 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(resource.ResourceBound!.InferredUpperBound, Is.Null);
     }
 
-    [TestCase("ArrayAllocations")]
-    [TestCase("AllocatedElements")]
     [TestCase("AllocatedBytes")]
     [TestCase("SourceActivationDepth")]
     [TestCase("SourceStackBytes")]
@@ -146,6 +144,103 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
     }
 
+    [TestCase("ArrayAllocations", 4, 1, "((max(0, n) + 3) + 1)", false)]
+    [TestCase("ArrayAllocations", 4, 1, "((max(0, n) + 3) + 1)", true)]
+    [TestCase("AllocatedElements", 8, 2, "(((max(0, n) * 2) + 6) + 2)", false)]
+    [TestCase("AllocatedElements", 8, 2, "(((max(0, n) * 2) + 6) + 2)", true)]
+    public async Task TaskSourceAllocationPrefixesIncludeTheParamsArray(string metric, int constant, int coefficient, string expected, bool configured)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        ArgumentNullException.ThrowIfNull(expected);
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric." + metric + "," + constant + ",nameof(n)," + coefficient + ")]",
+            child: "for(int i=0;i<count;i++){var data=new int[2];}", configuredAwait: configured);
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskSourceAllocationScope));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.EqualTo(expected));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+        Assert.That(result.ResourceBound.Asymptotic!.UpperBound, Is.EqualTo("O(n)"));
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.UnknownReason, Is.Null);
+    }
+
+    [TestCase("ArrayAllocations", 1, true)]
+    [TestCase("ArrayAllocations", 0, false)]
+    [TestCase("AllocatedElements", 2, true)]
+    [TestCase("AllocatedElements", 1, false)]
+    public async Task EmptyTaskCallbacksStillRequireTheSourceParamsAllocation(string metric, int limit, bool proven)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric." + metric + "," + limit + ")]", child: "");
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+        if (proven)
+        {
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            Assert.That(result.ResourceBound.Asymptotic!.UpperBound, Is.EqualTo("O(1)"));
+            Assert.That(result.ResourceBound.UnknownReason, Is.Null);
+        }
+        else
+        {
+            Assert.That(result.ResourceBound.UnknownReason, Is.EqualTo("ForkJoinBoundComparisonUnproved"));
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        }
+    }
+
+    [TestCase(-5, false)]
+    [TestCase(0, false)]
+    [TestCase(7, false)]
+    [TestCase(-5, true)]
+    [TestCase(0, true)]
+    [TestCase(7, true)]
+    public async Task TaskSourceAllocationBoundsCoverIndependentConcurrentExecutions(int input, bool configured)
+    {
+        const string join = "Task.WhenAll(new Task[] { Task.Run(()=>Child(n)),Task.Run(()=>Child(3)) })";
+        var source = "using SharpProof.Attributes; using System.Threading.Tasks; public static class C { " +
+            "public static int Arrays, Elements; " +
+            "static T[] Observe<T>(T[] value) {System.Threading.Interlocked.Increment(ref Arrays); System.Threading.Interlocked.Add(ref Elements,value.Length); return value;} " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,4,nameof(n),1)] " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedElements,8,nameof(n),2)] public static " +
+            (configured ? "async " : "") + "Task Target(int n) => " + (configured ? "await " : "") + join +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){var data=new int[2];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), cancellation);
+        Assert.That(results, Has.Length.EqualTo(2));
+        Assert.That(results.All(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Outcome == WorkerClaimOutcome.Proven), Is.True);
+        var cost = NativeForkJoinSourceCostVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, cancellation).Upper!;
+        var arrayUpper = cost.Arrays.Evaluate(size => size is null ? throw new ArgumentNullException(nameof(size)) : input, cancellation) + 1;
+        var elementUpper = cost.Elements.Evaluate(size => size is null ? throw new ArgumentNullException(nameof(size)) : input, cancellation) + 2;
+        // Observe successful source allocation events in a separately emitted
+        // execution. Instrumentation is not submitted as proof evidence.
+        var observed = source.Replace(join, "Task.WhenAll(Observe(new Task[] { Task.Run(()=>Child(n)),Task.Run(()=>Child(3)) }))", StringComparison.Ordinal)
+            .Replace("new int[2]", "Observe(new int[2])", StringComparison.Ordinal);
+        var compilation = TestCompilation.Create("TaskSourceObservation", ("Observed.cs", observed));
+        using var stream = new System.IO.MemoryStream();
+        var emitted = compilation.Emit(stream, cancellationToken: cancellation);
+        Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
+        stream.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("TaskSourceObservation", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(stream).GetType("C")!;
+            var method = type.GetMethod("Target")!;
+            var arrays = type.GetField("Arrays")!;
+            var elements = type.GetField("Elements")!;
+            for (var invocation = 0; invocation < 3; invocation++)
+            {
+                arrays.SetValue(null, 0);
+                elements.SetValue(null, 0);
+                await (Task)method.Invoke(null, new object[] { input })!;
+                Assert.That(new System.Numerics.BigInteger((int)arrays.GetValue(null)!), Is.EqualTo(arrayUpper));
+                Assert.That(new System.Numerics.BigInteger((int)elements.GetValue(null)!), Is.EqualTo(elementUpper));
+            }
+        }
+        finally { context.Unload(); }
+    }
     [TestCase("PeakAuxiliaryBytes", false)]
     [TestCase("PeakAuxiliaryBytes", true)]
     [TestCase("RetainedBytes", false)]

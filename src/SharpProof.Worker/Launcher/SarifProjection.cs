@@ -145,7 +145,7 @@ internal static class SarifProjection
             resource += " [conditional resource metadata: " + string.Join(", ", metadata.Select(static item =>
                 item is null ? throw new ArgumentNullException(nameof(item)) : item.RuntimeModel + "/" + item.WitnessIdentifier)) + "]";
         }
-        if (result.ResourceBound is { ExecutionScope: WorkerResourceModels.TaskJoinScope or WorkerResourceModels.TaskStorageScope } scoped)
+        if (result.ResourceBound is { ExecutionScope: WorkerResourceModels.TaskJoinScope or WorkerResourceModels.TaskSourceAllocationScope or WorkerResourceModels.TaskStorageScope } scoped)
         { resource += " [scope: " + scoped.ExecutionScope + "]"; }
         var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
         return Result(

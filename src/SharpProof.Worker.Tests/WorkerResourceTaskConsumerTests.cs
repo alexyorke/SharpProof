@@ -9,12 +9,20 @@ internal sealed partial class WorkerTests
 {
     [TestCase(false)]
     [TestCase(true)]
-    public async Task JoinedTaskSourceLoopCostsReachCacheAndSarifWithValidatedScope(bool configuredAwait)
+    [TestCase(false, "ArrayAllocations", 4, 1)]
+    [TestCase(true, "ArrayAllocations", 4, 1)]
+    [TestCase(false, "AllocatedElements", 8, 2)]
+    [TestCase(true, "AllocatedElements", 8, 2)]
+    public async Task JoinedTaskSourceLoopCostsReachCacheAndSarifWithValidatedScope(bool configuredAwait,
+        string metric = "LoopBodyEntries", int constant = 3, int coefficient = 1)
     {
+        ArgumentNullException.ThrowIfNull(metric);
+        var scope = metric == "LoopBodyEntries" ? WorkerResourceModels.TaskJoinScope : WorkerResourceModels.TaskSourceAllocationScope;
         using var project = TestProject.Create("using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] public static " + (configuredAwait ? "async " : "") +
+            "[ResourceUpperBound(ResourceMetric." + metric + "," + constant + ",nameof(n)," + coefficient + ")] public static " + (configuredAwait ? "async " : "") +
             "Task Target(int n) => " + (configuredAwait ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
-            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){}} }");
+            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){" +
+            (metric == "LoopBodyEntries" ? "" : "var data=new int[2];") + "}} }");
         project.UseNetCoreReferencePack(8);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
@@ -25,15 +33,15 @@ internal sealed partial class WorkerTests
         Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
         Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
             second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
-        Assert.That(second.ClaimResults.Single().ResourceBound!.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskJoinScope));
+        Assert.That(second.ClaimResults.Single().ResourceBound!.ExecutionScope, Is.EqualTo(scope));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
-        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(WorkerResourceModels.TaskJoinScope));
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(scope));
         Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("executionScope").GetString(),
-            Is.EqualTo(WorkerResourceModels.TaskJoinScope));
+            Is.EqualTo(scope));
         var json = WorkerProtocolJson.SerializeResponse(second);
-        foreach (var mutation in new[] { "scope", "model", "duplicate-model", "projection", "duplicate-projection", "metadata", "lower", "expected", "ordinary-scope", "stripped-task", "witness" })
+        foreach (var mutation in new[] { "scope", "exchanged-task-scope", "model", "duplicate-model", "projection", "duplicate-projection", "metadata", "lower", "expected", "ordinary-scope", "stripped-task", "witness" })
         {
             var modified = WorkerProtocolJson.DeserializeResponse(json)!;
             var claim = modified.ClaimResults.Single();
@@ -42,6 +50,9 @@ internal sealed partial class WorkerTests
             {
                 case "scope":
                     bound.ExecutionScope = "foreign";
+                    break;
+                case "exchanged-task-scope":
+                    bound.ExecutionScope = scope == WorkerResourceModels.TaskJoinScope ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope;
                     break;
                 case "model":
                     claim.ProofCore = [.. claim.ProofCore.Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-task-model:", StringComparison.Ordinal))];

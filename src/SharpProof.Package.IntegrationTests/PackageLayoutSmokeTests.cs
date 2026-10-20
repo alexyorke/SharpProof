@@ -3612,15 +3612,22 @@ public sealed class PackageLayoutSmokeTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public async Task MainPackagePublishesConditionalTaskSourceScope(bool configuredAwait)
+    [TestCase(false, "ArrayAllocations", 4, 1)]
+    [TestCase(true, "ArrayAllocations", 4, 1)]
+    [TestCase(false, "AllocatedElements", 8, 2)]
+    [TestCase(true, "AllocatedElements", 8, 2)]
+    public async Task MainPackagePublishesConditionalTaskSourceScope(bool configuredAwait,
+        string metric = "LoopBodyEntries", int constant = 3, int coefficient = 1)
     {
+        ArgumentNullException.ThrowIfNull(metric);
+        var scope = metric == "LoopBodyEntries" ? "joined-isolated-source-callbacks" : "joined-isolated-source-allocation-prefixes";
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
             "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)] public static " + (configuredAwait ? "async " : "") +
+            "[ResourceUpperBound(ResourceMetric." + metric + "," + constant + ",nameof(n)," + coefficient + ")] public static " + (configuredAwait ? "async " : "") +
             "Task Target(int n) => " + (configuredAwait ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
-            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){}} }", "all");
+            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){" + (metric == "LoopBodyEntries" ? "" : "var data=new int[2];") + "}} }", "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
             "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
@@ -3636,7 +3643,7 @@ public sealed class PackageLayoutSmokeTests
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
         JsonAssert.Equal(claim, "outcome", "Proven");
         var bound = claim.GetProperty("resourceBound");
-        JsonAssert.Equal(bound, "executionScope", "joined-isolated-source-callbacks");
+        JsonAssert.Equal(bound, "executionScope", scope);
         Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Does.Contain("n"));
         JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(n)");
         JsonAssert.Equal(bound.GetProperty("metadataAssumptions")[0], "runtimeModel", configuredAwait
@@ -3644,8 +3651,8 @@ public sealed class PackageLayoutSmokeTests
         using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
-        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("joined-isolated-source-callbacks"));
-        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", "joined-isolated-source-callbacks");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(scope));
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", scope);
     }
 
     [TestCase(5, false)]
