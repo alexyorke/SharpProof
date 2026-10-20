@@ -24,15 +24,16 @@ function Assert-WindowsPayloadPrerequisites([string]$Library, [string]$PayloadAr
             $null -eq $reader.PEHeaders.PEHeader -or [int]$reader.PEHeaders.PEHeader.Magic -ne 0x20b) {
             throw "The packed DLL does not have the expected native $PayloadArchitecture PE32+ machine."
         }
-        $modules = [Collections.Generic.List[string]]::new()
-        foreach ($descriptor in @(
-                @{ Directory = $reader.PEHeaders.PEHeader.ImportTableDirectory; Stride = 20; NameOffset = 12; Delay = $false },
-                @{ Directory = $reader.PEHeaders.PEHeader.DelayImportTableDirectory; Stride = 32; NameOffset = 4; Delay = $true }
-            )) {
+        $modules = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        foreach ($descriptor in [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+                    ([ordered]@{ Directory = $reader.PEHeaders.PEHeader.ImportTableDirectory; Stride = 20; NameOffset = 12; Delay = $false }).AsReadOnly(),
+                    ([ordered]@{ Directory = $reader.PEHeaders.PEHeader.DelayImportTableDirectory; Stride = 32; NameOffset = 4; Delay = $true }).AsReadOnly()
+                ))) {
             $directory = $descriptor.Directory
             if ($directory.RelativeVirtualAddress -eq 0) { continue }
             if ($directory.Size -lt $descriptor.Stride -or $directory.Size -gt 1048576) { throw 'Malformed or oversized PE import directory.' }
-            [byte[]]$table = @($reader.GetSectionData($directory.RelativeVirtualAddress).GetContent(0, $directory.Size))
+            $table = $reader.GetSectionData($directory.RelativeVirtualAddress).GetContent(0, $directory.Size)
+            $nativeTable = [byte[]]@($table)
             $terminated = $false
             for ($offset = 0; $offset + $descriptor.Stride -le $table.Length; $offset += $descriptor.Stride) {
                 $zero = $true
@@ -40,25 +41,25 @@ function Assert-WindowsPayloadPrerequisites([string]$Library, [string]$PayloadAr
                     if ($table[$offset + $index] -ne 0) { $zero = $false; break }
                 }
                 if ($zero) { $terminated = $true; break }
-                if ($descriptor.Delay -and [BitConverter]::ToUInt32($table, $offset) -ne 1) { throw 'Unsupported non-RVA PE delay-import descriptor.' }
-                $nameRva = [BitConverter]::ToInt32($table, $offset + $descriptor.NameOffset)
+                if ($descriptor.Delay -and [BitConverter]::ToUInt32($nativeTable, $offset) -ne 1) { throw 'Unsupported non-RVA PE delay-import descriptor.' }
+                $nameRva = [BitConverter]::ToInt32($nativeTable, $offset + $descriptor.NameOffset)
                 if ($nameRva -le 0) { throw 'Malformed PE import module address.' }
                 $block = $reader.GetSectionData($nameRva)
-                [byte[]]$nameBytes = @($block.GetContent(0, [Math]::Min(256, $block.Length)))
-                $end = [Array]::IndexOf($nameBytes, [byte]0)
+                $nameBytes = $block.GetContent(0, [Math]::Min(256, $block.Length))
+                $end = $nameBytes.IndexOf([byte]0)
                 if ($end -le 0) { throw 'PE import module name is not bounded and terminated.' }
-                $module = [Text.Encoding]::ASCII.GetString($nameBytes, 0, $end)
+                $module = [Text.Encoding]::ASCII.GetString([byte[]]@($nameBytes), 0, $end)
                 if ($module -notmatch '^[a-zA-Z0-9._+\-]+\.dll$') { throw 'PE import module name is malformed.' }
                 $modules.Add($module)
             }
             if (-not $terminated) { throw 'PE import directory has no complete terminating descriptor.' }
         }
-        $imports = @($modules | Sort-Object -Unique)
-        $externalCpp = @($imports | Where-Object { $_ -match '^(vcruntime|msvcp|libc\+\+|libstdc\+\+|libgcc).*\.dll$' })
-        if ($externalCpp.Count) { throw "The $PayloadArchitecture payload requires an external C++ runtime: $($externalCpp -join ', ')." }
-        $unexpectedImports = @($imports | Where-Object { $_ -notmatch '^(KERNEL32|api-ms-win-crt-[a-zA-Z0-9\-]+)\.dll$' })
-        if ($unexpectedImports.Count) { throw "The $PayloadArchitecture payload imports DLLs outside its Windows system-runtime policy: $($unexpectedImports -join ', ')." }
-        Write-Host "Packed $PayloadArchitecture PE machine and import prerequisites passed ($($imports.Count) imported modules)."
+        $imports = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($modules | Sort-Object -Unique))
+        $externalCpp = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($imports | Where-Object { $_ -match '^(vcruntime|msvcp|libc\+\+|libstdc\+\+|libgcc).*\.dll$' }))
+        if ($externalCpp.Length) { throw "The $PayloadArchitecture payload requires an external C++ runtime: $($externalCpp -join ', ')." }
+        $unexpectedImports = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($imports | Where-Object { $_ -notmatch '^(KERNEL32|api-ms-win-crt-[a-zA-Z0-9\-]+)\.dll$' }))
+        if ($unexpectedImports.Length) { throw "The $PayloadArchitecture payload imports DLLs outside its Windows system-runtime policy: $($unexpectedImports -join ', ')." }
+        Write-Host "Packed $PayloadArchitecture PE machine and import prerequisites passed ($($imports.Length) imported modules)."
     }
     finally { $reader.Dispose(); $stream.Dispose() }
 }
@@ -67,9 +68,9 @@ $source = (Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
 if (-not (Test-Path -LiteralPath $source -PathType Container)) {
     throw 'The package source must be a directory.'
 }
-$packages = @(Get-ChildItem -LiteralPath $source -Filter 'SharpProof.Verifier.*.nupkg' -File)
-if ($packages.Count -ne 1) {
-    throw "Expected one packed SharpProof.Verifier package; found $($packages.Count)."
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $source -Filter 'SharpProof.Verifier.*.nupkg' -File))
+if ($packages.Length -ne 1) {
+    throw "Expected one packed SharpProof.Verifier package; found $($packages.Length)."
 }
 
 $catalogPath = Join-Path $PSScriptRoot '../container/toolchain.json'
