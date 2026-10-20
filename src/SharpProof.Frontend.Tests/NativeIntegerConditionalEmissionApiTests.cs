@@ -185,7 +185,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         var runtime = new AssemblyLoadContext("FrameworkConditionalControl", isCollectible: true);
         try
         {
-            using var image = new MemoryStream(bytes.ToArray());
+            using var image = new MemoryStream(bytes.ToArray(), writable: false);
             var subject = runtime.LoadFromStream(image).GetType("Subject")!;
             Assert.That(subject.GetMethod("Target")!.Invoke(null, null), Is.EqualTo(enabled ? 8 : 7));
         }

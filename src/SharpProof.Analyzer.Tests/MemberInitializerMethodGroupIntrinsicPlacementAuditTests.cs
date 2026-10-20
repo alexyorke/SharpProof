@@ -150,7 +150,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
         var runtime = new AssemblyLoadContext("MemberInitializerMethodGroups", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream((image).ToArray());
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var assembly = runtime.LoadFromStream(stream);
             var subject = assembly.GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);

@@ -39,7 +39,7 @@ public sealed class InitializerIntrinsicPlacementAuditTests
         string runtimeFailure;
         try
         {
-            using var stream = new MemoryStream((image).ToArray());
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>((Action)(() => Activator.CreateInstance(subject)))!;
             Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());

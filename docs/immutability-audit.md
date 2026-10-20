@@ -4889,3 +4889,21 @@ Twelve readonly MemoryStream constructions are independently traced into actual 
 ### IMM-M488: direct runtime/catalog/native metadata frame review
 
 Eight current readonly stream adapters are traced individually into runtime assembly loading, a macOS contract catalog reader or native BlobBuilder/PEReader metadata processing. Immutable image/catalog observations stay frozen; native producer, cursor and disposal lifecycles remain required. No code edits or new execution authority are inferred, including macOS platform execution. Three further avoidable capability/copying observations are explicitly recorded Open for M489. The old array subset has 327 unchecked candidates; final expanded reflection collection remains required.
+
+### IMM-M477: immutable corpus format and workflow observations
+
+Canonical and malformed byte fixtures, local snapshot publication, task results, snapshot text/parts and before-file observations are immutable. Native byte-array Parse adapters and actual corpus filesystem subjects preserve their contracts. All 72 corpus gate/snapshot/command cases pass, plus the separate independent pinned-requires census case.
+
+### IMM-M479: immutable strong-name observations and hash-image builder
+
+Retained public-key, reversed modulus/exponent and signature observations are immutable. A scoped immutable builder clears the checksum/certificate hash ranges before frozen span hashing; final RSA native argument frames remain. The deliberately cleared/XOR-modified corruption image remains mutable. All three real signed/corrupted identity cases pass.
+
+### IMM-M480/M481: immutable oracle arguments and stream input evidence
+
+Four owned CLR reflection argument vectors and four retained stream byte sources are immutable. Final Invoke/MemoryStream frames remain native; actual typed CLR integer arrays and FillExactly destinations retain intended mutation, identity, partial writes, EOF and cancellation behavior. All 49 actual runtime-oracle/stream-fill cases pass.
+
+### IMM-M484/M485/M486/M487: readonly loader capability and reflection observations
+
+Seventeen runtime-loading streams restrict unnecessary write capability while preserving required native cursor/disposal state. Two retained GetFields observations become immutable while their actual runtime instances remain mutable subjects. Actual gates pass 41 Analyzer loader cases, 12 frontend native-integer cases and 14 worker loader/reflection cases. The two manually discovered reflection roots expose a coverage gap in the old retained-array query; final collection must expand that query, rather than infer absence from the 524-site subset.
+
+The frozen batch conserves 4299 raw/interpolated tokens across 1068 changed C# files and all 1948 source paths. Forty-four current coordinate observations close, with three explicit M489 follow-ups still Open. Seventy-nine old array observations reconcile independently: 25 migrations and 54 native/mutable subjects, leaving 248 unchecked candidates. PowerShell coordinates remain zero Open; coverage gaps remain 27, with expanded reflection authority, remaining ownership/binding/archive work and final exact-head gates still required.

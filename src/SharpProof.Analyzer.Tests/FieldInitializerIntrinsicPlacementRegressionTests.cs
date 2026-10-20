@@ -55,7 +55,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         string runtimeFailure;
         try
         {
-            using var stream = new MemoryStream((image).ToArray());
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>(
                 (Action)(() => Activator.CreateInstance(subject)))!;
@@ -113,7 +113,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         var runtime = new AssemblyLoadContext("FieldInitializerValidLambda", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream((image).ToArray());
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);

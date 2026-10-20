@@ -44,8 +44,8 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(163841)]
     public void ExactFillCopiesFromCurrentPositionWithoutReadingBeyondDestination(int length)
     {
-        var source = Enumerable.Range(0, length + 3).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var stream = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, length + 3).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var stream = new MemoryStream(source.ToArray(), writable: false);
         stream.Position = 1;
         var destination = new byte[length];
 
@@ -60,8 +60,8 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(81920)]
     public void PrematureEofThrowsAfterKeepingTheAvailablePrefix(int available)
     {
-        var source = Enumerable.Range(0, available).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var stream = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, available).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var stream = new MemoryStream(source.ToArray(), writable: false);
         var destination = Enumerable.Repeat((byte)0xcc, available + 1).ToArray();
 
         Assert.Throws<EndOfStreamException>((Action)(() =>
@@ -76,8 +76,8 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void PositivePartialReadsContinueUsingTheOriginalChunkBound()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var inner = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var inner = new MemoryStream(source.ToArray(), writable: false);
         using var stream = new PartialReadStream(inner, 50000);
         var destination = new byte[source.Length];
 
@@ -109,8 +109,8 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void CancellationBetweenPartialReadsKeepsTheUnreadDestinationUntouched()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
-        using var inner = new MemoryStream(source, writable: false);
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToImmutableArray();
+        using var inner = new MemoryStream(source.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         using var stream = new PartialReadStream(inner, 50000, cancellation);
         var destination = Enumerable.Repeat((byte)0xcc, source.Length).ToArray();

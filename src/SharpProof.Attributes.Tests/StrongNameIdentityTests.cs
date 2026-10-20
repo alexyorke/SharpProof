@@ -86,45 +86,49 @@ internal sealed class StrongNameIdentityTests
         var headers = pe.PEHeaders;
         var corHeader = headers.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
         var metadata = pe.GetMetadataReader();
-        var publicKey = metadata.GetBlobBytes(metadata.GetAssemblyDefinition().PublicKey);
+        var publicKey = metadata.GetBlobBytes(metadata.GetAssemblyDefinition().PublicKey).ToImmutableArray();
         Assert.That(publicKey, Has.Length.EqualTo(288));
-        Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(publicKey.AsSpan(20)), Is.EqualTo(0x31415352u));
-        var modulus = publicKey.AsSpan(32).ToArray();
-        Array.Reverse(modulus);
-        var exponent = publicKey.AsSpan(28, 4).ToArray();
-        Array.Reverse(exponent);
+        Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(publicKey.AsSpan(20..)), Is.EqualTo(0x31415352u));
+        var modulus = publicKey.Skip(32).Reverse().ToImmutableArray();
+        var exponent = publicKey.Skip(28).Take(4).Reverse().ToImmutableArray();
         using var rsa = RSA.Create();
-        rsa.ImportParameters(new RSAParameters { Modulus = modulus, Exponent = exponent });
+        rsa.ImportParameters(new RSAParameters { Modulus = modulus.ToArray(), Exponent = exponent.ToArray() });
         var signatureDirectory = corHeader.StrongNameSignatureDirectory;
         var signatureOffset = FileOffset(headers, signatureDirectory.RelativeVirtualAddress);
-        var signature = image.AsSpan(signatureOffset, signatureDirectory.Size).ToArray();
-        Array.Reverse(signature);
+        var signature = image.Skip(signatureOffset).Take(signatureDirectory.Size).Reverse().ToImmutableArray();
 
         // Strong-name hashing omits header alignment padding and the signature
         // blob. PE checksum/certificate directory fields are hashed as zero.
-        var signedImage = image.ToArray();
-        Array.Clear(signedImage, headers.PEHeaderStartOffset + 64, 4);
+        var signedImageBuilder = image.ToBuilder();
+        for (var index = 0; index < 4; index++)
+        {
+            signedImageBuilder[headers.PEHeaderStartOffset + 64 + index] = 0;
+        }
         var directoriesOffset = headers.PEHeaderStartOffset + (headers.PEHeader!.Magic == PEMagic.PE32 ? 96 : 112);
-        Array.Clear(signedImage, directoriesOffset + 4 * 8, 8);
+        for (var index = 0; index < 8; index++)
+        {
+            signedImageBuilder[directoriesOffset + 4 * 8 + index] = 0;
+        }
+        var signedImage = signedImageBuilder.ToImmutable();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
-        hash.AppendData(signedImage, 0,
-            headers.PEHeaderStartOffset + headers.CoffHeader.SizeOfOptionalHeader + headers.SectionHeaders.Length * 40);
+        hash.AppendData(signedImage.AsSpan(0,
+            headers.PEHeaderStartOffset + headers.CoffHeader.SizeOfOptionalHeader + headers.SectionHeaders.Length * 40));
         foreach (var section in headers.SectionHeaders)
         {
             var start = section.PointerToRawData;
             var end = start + section.SizeOfRawData;
             if (signatureOffset >= start && signatureOffset < end)
             {
-                hash.AppendData(signedImage, start, signatureOffset - start);
-                hash.AppendData(signedImage, signatureOffset + signatureDirectory.Size,
-                    end - signatureOffset - signatureDirectory.Size);
+                hash.AppendData(signedImage.AsSpan(start, signatureOffset - start));
+                hash.AppendData(signedImage.AsSpan(signatureOffset + signatureDirectory.Size,
+                    end - signatureOffset - signatureDirectory.Size));
             }
             else
             {
-                hash.AppendData(signedImage, start, section.SizeOfRawData);
+                hash.AppendData(signedImage.AsSpan(start, section.SizeOfRawData));
             }
         }
-        return rsa.VerifyHash(hash.GetHashAndReset(), signature, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+        return rsa.VerifyHash(hash.GetHashAndReset(), signature.AsSpan(), HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
     }
 
     private static int FileOffset(PEHeaders headers, int relativeVirtualAddress)

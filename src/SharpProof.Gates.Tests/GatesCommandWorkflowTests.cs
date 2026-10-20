@@ -110,7 +110,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     public async Task CorpusUpdateCommandReproducesTheReviewedSnapshot()
     {
         var snapshot = Path.Combine(repository!.FullName, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
-        var before = await File.ReadAllBytesAsync(snapshot);
+        var before = (await File.ReadAllBytesAsync(snapshot)).ToImmutableArray();
 
         var result = await RunAsync(["corpus-update"]);
 

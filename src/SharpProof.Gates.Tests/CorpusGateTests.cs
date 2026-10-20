@@ -684,11 +684,11 @@ public sealed class CorpusGateTests
     public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
     {
         const string data = "case|Proven|Proven|";
-        var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n");
+        var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n").ToImmutableArray();
         ImmutableArray<string>? parsed = null;
         try
         {
-            parsed = CorpusSnapshotFormat.Parse(canonical);
+            parsed = CorpusSnapshotFormat.Parse(canonical.ToArray());
         }
         catch (InvalidDataException)
         {
@@ -696,11 +696,11 @@ public sealed class CorpusGateTests
         }
         Assert.That(parsed, Is.EqualTo(ImmutableArray.Create(data)));
         Assert.That(CorpusSnapshotFormat.Render(ImmutableArray.Create(data)), Is.EqualTo(CorpusSnapshotHeader + data + "\n"));
-        var invalid = ImmutableArray.Create(Encoding.UTF8.GetBytes(data + "\n"), Encoding.UTF8.GetBytes(CorpusSnapshotHeader.Split('\n')[0] + "\n" + data + "\n"), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + CorpusSnapshotHeader + data + "\n"), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)), Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics\n# SharpProof analyzer corpus snapshot schema 3\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n"), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "# extra\n" + data + "\n"), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "\n" + data + "\n"), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n\n"), new byte[] { 0xEF, 0xBB, 0xBF }.Concat(canonical).ToArray(), canonical[..^1].Concat(new byte[] { 0xFF, (byte)'\n' }).ToArray()
+        var invalid = ImmutableArray.Create(Encoding.UTF8.GetBytes(data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader.Split('\n')[0] + "\n" + data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + CorpusSnapshotHeader + data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)).ToImmutableArray(), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)).ToImmutableArray(), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)).ToImmutableArray(), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)).ToImmutableArray(), Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics\n# SharpProof analyzer corpus snapshot schema 3\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "# extra\n" + data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "\n" + data + "\n").ToImmutableArray(), Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)).ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data).ToImmutableArray(), Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n\n").ToImmutableArray(), ImmutableArray.Create<byte>(0xEF, 0xBB, 0xBF).Concat(canonical).ToImmutableArray(), canonical[..^1].Concat(ImmutableArray.Create<byte>(0xFF, (byte)'\n')).ToImmutableArray()
 );
         foreach (var bytes in invalid)
         {
-            Assert.Throws<InvalidDataException>((Action)(() => CorpusSnapshotFormat.Parse(bytes)));
+            Assert.Throws<InvalidDataException>((Action)(() => CorpusSnapshotFormat.Parse(bytes.ToArray())));
         }
     }
 
@@ -724,11 +724,11 @@ public sealed class CorpusGateTests
     [Test]
     public void CorpusSnapshotFormatRequiresCanonicalEnumNames()
     {
-        static byte[] Snapshot(string header, string data)
+        static ImmutableArray<byte> Snapshot(string header, string data)
         {
             System.ArgumentNullException.ThrowIfNull(data);
             System.ArgumentNullException.ThrowIfNull(header);
-            return Encoding.UTF8.GetBytes(header + data + "\n");
+            return Encoding.UTF8.GetBytes(header + data + "\n").ToImmutableArray();
         }
         static void AssertAccepted(string header, string data)
         {
@@ -738,7 +738,7 @@ public sealed class CorpusGateTests
                 CorpusSnapshotFormat.Render([data]),
                 Is.EqualTo(header + data + "\n"));
             Assert.That(
-                CorpusSnapshotFormat.Parse(Snapshot(header, data)),
+                CorpusSnapshotFormat.Parse(Snapshot(header, data).ToArray()),
                 Is.EqualTo(ImmutableArray.Create(data)));
         }
 
@@ -757,7 +757,7 @@ public sealed class CorpusGateTests
 ))
         {
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CorpusSnapshotFormat.Parse(Snapshot(CorpusSnapshotHeader, noncanonical))));
+                CorpusSnapshotFormat.Parse(Snapshot(CorpusSnapshotHeader, noncanonical).ToArray())));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CorpusSnapshotFormat.Render([noncanonical])));
         }
@@ -982,8 +982,8 @@ public sealed class CorpusGateTests
             SeedId = "seed"
         };
         var cases = ImmutableArray.Create(baseline, renamed, temporary, trivia);
-        var observations = await Task.WhenAll(cases.Select(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken))));
+        var observations = (await Task.WhenAll(cases.Select(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken))))).ToImmutableArray();
         var failures = CorpusGate.ValidateMetamorphicConsistency(
             [.. cases],
             [.. observations]);
@@ -1012,19 +1012,19 @@ public sealed class CorpusGateTests
                 root,
                 "src/SharpProof.Gates",
                 "Corpus",
-                "expected.canonical.snapshot"));
+                "expected.canonical.snapshot")).ToImmutableArray();
         var refuted = lines.Single(static line =>
             line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("C02.baseline|", StringComparison.Ordinal)));
-        var refutedParts = refuted.Split('|');
-        var diagnosticParts = refutedParts[3].Split('@');
+        var refutedParts = refuted.Split('|').ToImmutableArray();
+        var diagnosticParts = refutedParts[3].Split('@').ToImmutableArray();
         var message = Encoding.UTF8.GetString(
             Convert.FromBase64String(diagnosticParts[3]));
         var unsupportedInitialization = lines.Single(static line =>
             line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal)))
-            .Split('|');
+            .Split('|').ToImmutableArray();
         var openSource = lines.Single(static line =>
             line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("OSS0003.baseline|", StringComparison.Ordinal)))
-            .Split('|');
+            .Split('|').ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1155,7 +1155,7 @@ public sealed class IndependentPinnedRequiresCensusTests
             Assert.That(existing.Failures, Is.Empty, item.Id);
         }
         Assert.That(obligations, Is.EqualTo(100));
-        var snapshot = await File.ReadAllLinesAsync(Path.Combine(root, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"));
+        var snapshot = (await File.ReadAllLinesAsync(Path.Combine(root, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"))).ToImmutableArray();
         var pinnedContractIds = snapshot.Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
             .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0])).ToImmutableArray();
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));

@@ -30,7 +30,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("OwnedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image.ToArray());
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var root = runtime.LoadFromStream(stream).GetType("Subject")!.GetMethod("Root")!;
             Assert.That(root.GetParameters(), Has.Length.EqualTo(count));
             Assert.That(root.Invoke(null, new object?[count]), Is.EqualTo(count));
@@ -60,7 +60,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("RelatedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image.ToArray());
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var assembly = runtime.LoadFromStream(stream);
             var first = Activator.CreateInstance(assembly.GetType("A")!);
             var second = Activator.CreateInstance(assembly.GetType("A")!);

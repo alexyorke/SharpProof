@@ -391,7 +391,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             var constructor = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
             var instance = constructor.Invoke(caseIndex < 4 ? [1] : []);
             var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
-            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly).ToImmutableArray();
             if (caseIndex == 5)
             { fields.Single().SetValue(instance, 1); }
             Delegate execute;

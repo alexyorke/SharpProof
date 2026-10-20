@@ -68,7 +68,7 @@ public sealed class CorpusSnapshotWorkflowTests
         using var temporary = new TempDirectory("SharpProof-snapshot-update-");
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
-        var before = await File.ReadAllBytesAsync(snapshotPath);
+        var before = (await File.ReadAllBytesAsync(snapshotPath)).ToImmutableArray();
         var previousSource = Environment.GetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable);
         try
         {

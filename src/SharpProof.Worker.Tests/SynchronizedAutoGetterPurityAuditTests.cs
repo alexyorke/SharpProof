@@ -139,7 +139,7 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
             var property = subject.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
             var getter = property.GetMethod!;
             var fields = subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static |
-                BindingFlags.DeclaredOnly);
+                BindingFlags.DeclaredOnly).ToImmutableArray();
             Assert.That(fields, Has.Length.EqualTo(1));
             var field = fields.Single();
             var il = (getter.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
