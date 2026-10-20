@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -10,6 +11,97 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeForkJoinProjectionTests
 {
+    [TestCase("", 7, 0L)]
+    [TestCase("for(int i=0;i<count;i++){var a=new int[2];}", 7, 320L)]
+    [TestCase("for(int i=0;i<count;i++){var a=new int[2];}", -5, 96L)]
+    [TestCase("for(int i=0;i<count;i++){var a=new int[2];var b=new byte[3];}", 7, 640L)]
+    [TestCase("for(int i=0;i<count;i++){var a=new byte[0];}", 7, 240L)]
+    [TestCase("for(long i=1;i<count;i*=2){var a=new byte[9];}", 7, 200L)]
+    [TestCase("var a=new int[count];", 7, 96L)]
+    public void ChildStorageCompositionIncludesEveryChildAndPrimitiveWidth(string body, int size, long expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var projection = Lower(body);
+        var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(memory.UnknownReason, Is.Null);
+        var cumulative = memory.CumulativeUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : size,
+            TestContext.CurrentContext.CancellationToken);
+        var peak = memory.PeakAuxiliaryUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : size,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(cumulative, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(peak, Is.EqualTo(cumulative));
+        Assert.That(memory.RetainedUpper, Is.EqualTo(ResourceExpression.Zero));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ChildStorageSurvivesTransportWithoutInventingCarrierCosts(bool configuredAwait)
+    {
+        var projection = Lower("for(int i=0;i<count;i++){var a=new int[2];}") with { ConfiguredAwait = configuredAwait };
+        var root = Root(projection);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+        var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(decoded, root, Layout(), cancellation);
+        Assert.That(memory.UnknownReason, Is.Null);
+        Assert.That(memory.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7, cancellation),
+            Is.EqualTo(new System.Numerics.BigInteger(320)));
+        Assert.That(memory.RetainedUpper, Is.EqualTo(ResourceExpression.Zero));
+    }
+
+    [Test]
+    public void ChildStorageUsesFormalOrdinalsForNamedArguments()
+    {
+        var projection = LowerSource("using System.Threading.Tasks; public static class C {public static Task Root(int n) => Task.WhenAll(Task.Run(()=>Child(right:3,left:n)),Task.Run(()=>Child(right:n,left:1))); static void Child(int left,int right) {var a=new int[left];var b=new byte[right];}}");
+        var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(memory.UnknownReason, Is.Null);
+        Assert.That(memory.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(new System.Numerics.BigInteger(152)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ChildStorageRejectsIncompatibleLayoutsEvenWithoutAllocations(bool arrays)
+    {
+        var projection = Lower(arrays ? "var a=new int[2];" : "");
+        var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection),
+            new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x86", 4), TestContext.CurrentContext.CancellationToken);
+        Assert.That(memory.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(memory.CumulativeUpper, Is.Null);
+        Assert.That(memory.PeakAuxiliaryUpper, Is.Null);
+        Assert.That(memory.RetainedUpper, Is.Null);
+    }
+
+    [Test]
+    public void ChildStorageRejectsAnInvalidLaterChildWithoutPartialNumbers()
+    {
+        var projection = Lower("var a=new int[2];");
+        projection = projection with
+        {
+            Children = [projection.Children[0], projection.Children[1] with
+        { Owner = projection.Children[1].Owner with { EffectsCompleteAtEntry = false } }]
+        };
+        var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), TestContext.CurrentContext.CancellationToken);
+        Assert.That(memory.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
+        Assert.That(memory.CumulativeUpper, Is.Null);
+        Assert.That(memory.PeakAuxiliaryUpper, Is.Null);
+        Assert.That(memory.RetainedUpper, Is.Null);
+    }
+
+    [Test]
+    public void ChildStorageHonorsCancellation()
+    {
+        var projection = Lower("");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    private static ResourceRuntimeLayoutContext Layout()
+    {
+        return new("CoreCLR", "8.0.32", "x64", 8);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void IndependentlyChecksEveryProjectedChildAfterCodecRoundTrip(bool arrays)

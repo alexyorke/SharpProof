@@ -9,8 +9,58 @@ internal sealed record NativeForkJoinSourceCostCheck(NativeResourceCost? Upper, 
     internal bool HasSourceCosts => Upper is not null;
 }
 
+// Child storage only. Compiler/runtime carriers are not included, so this
+// conditional envelope is never itself a root allocation/lifetime verdict.
+internal sealed record NativeForkJoinChildStorageCheck(ResourceExpression? CumulativeUpper,
+    ResourceExpression? PeakAuxiliaryUpper, ResourceExpression? RetainedUpper, string? UnknownReason);
+
 internal static class NativeForkJoinSourceCostVerifier
 {
+    internal const string ChildStorageModel = "fork-join-isolated-child-storage-v1";
+
+    internal static NativeForkJoinChildStorageCheck CheckChildStorage(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = Check(projection, root, cancellation);
+        if (!source.HasSourceCosts)
+        { return new(null, null, null, source.UnknownReason); }
+        try
+        {
+            var cumulative = ResourceExpression.Zero;
+            var remaining = ResourceExpression.MaximumNodes;
+            foreach (var child in projection.Children)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var allocation = NativeResourceAllocationVerifier.Verify(child.Cost, child.Owner.CallableId, child.Owner, layout, cancellation);
+                if (allocation.ConditionalUpperBound is not { } upper)
+                { return new(null, null, null, allocation.UnknownReason ?? "ForkJoinChildStorageUnproved"); }
+                // Check already established a complete, distinct formal map and
+                // scalar entry ownership for every child, including later ones.
+                var arguments = new ResourceExpression[child.Arguments.Length];
+                foreach (var argument in child.Arguments)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    arguments[argument.ParameterOrdinal] = argument.RootParameterOrdinal is { } ordinal
+                        ? ResourceExpression.InputSize(new ResourceInput(ordinal, ResourceInputKind.NonNegativeScalar,
+                            projection.RootParameterNames[ordinal], int.MaxValue))
+                        : ResourceExpression.Literal(BigInteger.Max(0, argument.Constant!.Value));
+                }
+                cumulative = ResourceExpression.Add(cumulative, Substitute(upper, arguments, ref remaining, cancellation));
+            }
+            // Primitive local graphs cannot escape the scalar-only, void child
+            // boundary. Cumulative storage bounds their union at any overlap.
+            return new(cumulative, cumulative, ResourceExpression.Zero, null);
+        }
+        catch (ResourceExpressionLimitException)
+        { return new(null, null, null, "ForkJoinChildStorageBudgetExceeded"); }
+        catch (InvalidDataException)
+        { return new(null, null, null, "ForkJoinChildStorageOwnershipInvalid"); }
+    }
+
     internal static NativeForkJoinSourceCostCheck Check(CompilerForkJoinProjection projection,
         CompilerTotalEntryPreparation root, CancellationToken cancellation)
     {

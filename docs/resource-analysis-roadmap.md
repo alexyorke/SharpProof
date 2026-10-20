@@ -113,6 +113,24 @@ was skipped, so c46e073c3 remains the latest complete numeric measurement. The
 fixture failure needs investigation and an exact-head coverage rerun; its cause
 has not been established by the passing local resource package cases.
 
+At source commit b2584a9d7, the isolated publication-cancellation fixture passed
+unchanged in the ordinary package runner and in a fresh Release checkout with
+static managed Code Coverage instrumentation. Each selected test completed in
+about one second. The instrumented probe used the repository's managed settings
+and private output workspace. These probes do not reproduce the earlier failure
+in isolation and do not establish its cause in the full package phase context. The
+five-second readiness and cancellation assertions remain unchanged.
+
+The b2584a9d7 CI run passed all three semantic coverage shards, but its package
+shard stopped with exit code 143 after a 125-case package-layout group passed.
+There was no test assertion or complete coverage report for that termination.
+The cause is not established. A failed-job rerun was requested, preserving the
+successful shard evidence and all gate requirements. That retry passed the same
+125 package-layout cases before the host shell reported its docker compose
+process killed and the job ended with code 137. No newer aggregate measurement
+was produced. The Docker-limit mismatch and its bounded validation are tracked
+below; no further blind retry was started.
+
 ### Quantitative-memory feature audit
 
 Phase C now has compiler, native-worker, protocol, consumer and independent
@@ -137,6 +155,40 @@ The remaining feature implementation is phase F: async/state-machine costs,
 native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
+
+### Coverage container limits (in progress)
+
+The failed-job retry of b2584a9d7 passed the same 125-case package-layout group,
+then the host shell reported that its docker compose process was killed; the job
+ended with code 137. No aggregate report was produced. The coverage workflow
+inherited a 40 GiB container limit and 8 GiB memory-backed scratch from Compose,
+while this public repository's standard Linux runner has
+[16 GB RAM](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+That mismatch does not establish the exact cause of either termination, but it
+fails to contain the job within the runner's capacity. Set coverage-only Docker
+limits to 12 GiB with 4 GiB scratch, retaining the existing four CPUs, test
+selection, deadlines and coverage floor. Verify the resolved Compose settings,
+a representative instrumented package fixture group under those limits, and fresh
+exact-head CI. No host resource monitor or per-process memory budget is added.
+
+### Joined child storage envelopes
+
+Derive each isolated child's cumulative source-allocation byte upper bound with
+the existing native allocation/layout checker, then substitute its formal input
+map and sum across children. The sum is a conservative child-only peak auxiliary
+bound under arbitrary overlap. Void, isolated children retain no owned output on
+normal completion. Reject incompatible layouts and invalid later children without
+partial numeric results. This component is conditional on the owned layout and
+at-most-once runtime premises. Root byte/lifetime claims must remain Unknown until
+compiler-generated closure/state-machine and reviewed framework carrier storage
+are included. This is required composition work, not completion of phase F.
+The combined worker/resource/protocol/compiler-driver/golden gate passed all
+974 cases, including 14 child-storage cases for mixed widths, zero-length arrays,
+named formal arguments, geometric loops, transport, incompatible layouts, invalid
+later children and cancellation. Quality/API compatibility passed. The first test
+build found one block-body style issue in a helper; it was corrected before the
+passing gate. Full repository formatting passed. No root byte/lifetime verdict, public
+API, protocol or cache format was changed by this component.
 
 ### Configured async task roots
 
