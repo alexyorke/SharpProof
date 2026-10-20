@@ -8,8 +8,8 @@ $evidence = Join-Path $temporary 'evidence'
 $inventoryPath = Join-Path $temporary 'inventory.json'
 [IO.Directory]::CreateDirectory($source) | Out-Null
 $commit = 'a' * 40
-$native = [Text.Encoding]::UTF8.GetBytes('fixture-native')
-$nativeHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($native)).ToLowerInvariant()
+$native = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes('fixture-native'))
+$nativeHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@($native))).ToLowerInvariant()
 
 function New-Package([string]$Id, [string]$Extension, [string]$Vendor = 'fixture-vendor', [string]$Directory = $source) {
     $path = Join-Path $Directory "$Id.1.0.0.$Extension"
@@ -17,14 +17,16 @@ function New-Package([string]$Id, [string]$Extension, [string]$Vendor = 'fixture
     $archive = [IO.Compression.ZipFile]::Open($path, [IO.Compression.ZipArchiveMode]::Create)
     try {
         $metadata = '<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"><metadata><id>' + $Id + '</id><version>1.0.0</version><repository type="git" url="https://github.com/alexyorke/SharpProof" commit="' + $commit + '" /></metadata></package>'
-        $contents = @{ "$Id.nuspec" = [Text.Encoding]::UTF8.GetBytes($metadata) }
+        $contents = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, Collections.Immutable.ImmutableArray[byte]]([StringComparer]::OrdinalIgnoreCase)
+        $contents.Add("$Id.nuspec", [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes($metadata)))
         if ($Id -ceq 'SharpProof.Verifier' -and $Extension -ceq 'nupkg') {
-            $contents['tools/Vendor.dll'] = [Text.Encoding]::UTF8.GetBytes($Vendor)
-            $contents['tools/native/win-x64/libz3.dll'] = $native
+            $contents.Add('tools/Vendor.dll', [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes($Vendor)))
+            $contents.Add('tools/native/win-x64/libz3.dll', $native)
         }
-        foreach ($name in $contents.Keys) {
+        $payloads = $contents.ToImmutable()
+        foreach ($name in $payloads.Keys) {
             $stream = $archive.CreateEntry($name).Open()
-            try { $stream.Write([byte[]]$contents[$name]) }
+            try { $stream.Write([byte[]]@($payloads[$name])) }
             finally { $stream.Dispose() }
         }
     }
@@ -42,8 +44,8 @@ function Assert-Rejected([scriptblock]$Operation, [string]$Expected) {
 }
 
 try {
-    foreach ($id in @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'nupkg' }
-    foreach ($id in @('SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'snupkg' }
+    foreach ($id in [Collections.Immutable.ImmutableArray]::Create[string]('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'nupkg' }
+    foreach ($id in [Collections.Immutable.ImmutableArray]::Create[string]('SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'snupkg' }
     @{
         schemaVersion = 1
         packages      = @{
@@ -55,7 +57,7 @@ try {
             )
         }
     } | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath $inventoryPath -Encoding utf8NoBOM
-    $arguments = @{ PackageSource = $source; RepositoryCommit = $commit; InventoryPath = $inventoryPath }
+    $arguments = ([ordered]@{ PackageSource = $source; RepositoryCommit = $commit; InventoryPath = $inventoryPath }).AsReadOnly()
     & (Join-Path $PSScriptRoot 'New-SharpProofReleaseEvidence.ps1') @arguments -OutputDirectory $evidence -Timestamp '2026-01-01T00:00:00Z'
     & (Join-Path $PSScriptRoot 'Test-SharpProofReleaseEvidence.ps1') @arguments -EvidenceDirectory $evidence
     $toolSource = Join-Path $temporary 'tool'
@@ -70,7 +72,7 @@ try {
     Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit $commit } 'exactly one separately qualified nupkg'
     Remove-Item -LiteralPath $extraTool
     $extraBinary = Join-Path $toolSource 'Unexpected.dll'
-    [IO.File]::WriteAllBytes($extraBinary, $native)
+    [IO.File]::WriteAllBytes($extraBinary, [byte[]]@($native))
     Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit $commit } 'Unexpected file'
     Remove-Item -LiteralPath $extraBinary
     Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit ('b' * 40) } 'differs from the qualified release'
