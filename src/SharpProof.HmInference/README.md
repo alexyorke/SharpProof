@@ -737,3 +737,13 @@ can generalize. Applied fixes preserve source and emitted metadata across arrays
 tuples, nested generic owners, task payloads and existing type parameters. Runtime
 checks verify dynamic attributes, nullable values, identity and suspended async
 results with faults and cancellation in newly admitted generic domains.
+
+If an inferred constraint breaks a supplied call, analysis can retain the
+affected original signature components and retry. Class, constructor, base,
+interface, struct and unmanaged failures preserve their original boxing and
+user-defined conversions while independent parameters and tuple slots remain
+generic. Callee binding is inspected separately from return conversions.
+Exact-signature tests cover both caller locations, named/extension/open generic
+calls, satisfied constraints and cases with no generic component left. Applied
+Fix All runtime checks compare original values, conversion/helper order, boxing,
+new independent domains and partial async suspension, faults and cancellation.

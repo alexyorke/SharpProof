@@ -124,7 +124,7 @@ public static partial class Inference
             CollectSignaturePins(result, CSharpTypes.Rigid(before.ReturnType), CSharpTypes.Rigid(after.ReturnType), null, pins);
         }
 
-        private void RefineInferenceFailures(Compilation changedCompilation, SyntaxTree originalTree, SyntaxTree changedTree, IMethodSymbol originalMethod, HmType[] parameters, HashSet<(int Parameter, string Path)> pins)
+        private void RefineInferenceFailures(Compilation changedCompilation, SyntaxTree originalTree, SyntaxTree changedTree, IMethodSymbol originalMethod, HmType[] parameters, HmType result, HashSet<(int Parameter, string Path)> pins)
         {
             if (changedCompilation is null)
             { throw new ArgumentNullException(nameof(changedCompilation)); }
@@ -138,11 +138,13 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(parameters)); }
             if (pins is null)
             { throw new ArgumentNullException(nameof(pins)); }
+            if (result is null)
+            { throw new ArgumentNullException(nameof(result)); }
             var failures = changedCompilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
             {
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
-                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029";
+                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029" or "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377";
             }).ToArray();
             if (failures.Length == 0)
             { return; }
@@ -165,6 +167,33 @@ public static partial class Inference
                     if (semantic.GetOperation(calls[i], cancellationToken) is not IInvocationOperation call
                         || !SameMethodDefinition(call.TargetMethod, originalMethod))
                     { continue; }
+                    var constraintFailure = failures.Any(diagnostic =>
+                    {
+                        if (diagnostic is null)
+                        { throw new ArgumentNullException(nameof(diagnostic)); }
+                        return diagnostic.Id is "CS0452" or "CS0453" or "CS0310" or "CS0311" or "CS0315" or "CS8377"
+                            && diagnostic.Location.SourceTree == afterTree && afterCalls[i].Span.Contains(diagnostic.Location.SourceSpan);
+                    });
+                    if (constraintFailure)
+                    {
+                        var afterSemantic = changedCompilation.GetSemanticModel(afterTree);
+                        var operation = afterSemantic.GetOperation(afterCalls[i], cancellationToken) as IInvocationOperation;
+                        var binding = afterSemantic.GetSymbolInfo(afterCalls[i].Expression, cancellationToken);
+                        var selected = operation?.TargetMethod ?? binding.Symbol as IMethodSymbol;
+                        var candidates = selected is null ? binding.CandidateSymbols.OfType<IMethodSymbol>() : [selected];
+                        foreach (var candidate in candidates)
+                        {
+                            if (!ImplementationMethod(candidate).DeclaringSyntaxReferences.Any(reference =>
+                            {
+                                if (reference is null)
+                                { throw new ArgumentNullException(nameof(reference)); }
+                                return reference.SyntaxTree == changedTree && reference.GetSyntax(cancellationToken).GetAnnotations("HM.Candidate").Any();
+                            }))
+                            { continue; }
+                            RefineSuppliedSignature(call.TargetMethod, candidate, parameters, result, pins);
+                        }
+                    }
+
                     foreach (var argument in call.Arguments)
                     {
                         if (argument.IsImplicit || argument.Parameter is null || argument.Syntax is not ArgumentSyntax syntax)
