@@ -32,9 +32,9 @@ foreach ($class in $coverageDocument.SelectNodes('//class[@filename]')) {
         'filename',
         $fullPath.Substring($RepositoryPrefix.Length).Replace('\', '/'))
 }
-$authorityNodes = @(
-    $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
-if ($authorityNodes.Count -ne 0) {
+$authorityNodes = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+        $coverageDocument.SelectNodes('/coverage/sharpProofAuthority')))
+if ($authorityNodes.Length -ne 0) {
     throw "Coverage report already contains authority metadata: $Path"
 }
 $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
