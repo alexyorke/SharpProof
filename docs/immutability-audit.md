@@ -5003,3 +5003,7 @@ Six native publication argument frames are actual Prepare subjects: success rewr
 ### IMM-M509: immutable completion, diagnostic and blob observations
 
 Nine retained completion/native-oracle argument vectors, diagnostic parts and encoded bytes are immutable. Native methods, actual compiler/array/process subjects and allocation-oracle behavior retain their contracts. File/hash consumers use readonly memory/spans. An initial compile check found a missing expected-blob hash span adapter; the final gate includes its repair. Actual gates pass eight fuzz and 26 Gates cases. Literal/source-unit conservation verifies 4305 raw/interpolated tokens across 1074 changed C# files and 1948 source paths. The larger token count reflects newly included changed-file coverage, not newly introduced source literals. Nine current coordinates and old array entries reconcile independently, leaving 61 unchecked local roots and zero Open C# coordinates before the prepared native-subject review.
+
+### IMM-M512: native out-argument, array-clear and stream-destination subjects
+
+Five array sites are deliberately mutable: a reflection frame whose out slots are read after Invoke, the shared caller-visible Array.Clear oracle, and three bounded-stream read destinations. Current writers and subsequent concrete slot/element/offset/EOF/limit assertions are traced directly. No code edit or new execution authority is inferred.
