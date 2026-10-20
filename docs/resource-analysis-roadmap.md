@@ -127,6 +127,29 @@ native fork/join work/allocation/live-space composition, and their cancellation,
 exception, shared-state and repeated-entry controls. The task-join source planner
 below is only its admission foundation. The MR remains draft.
 
+### Native task-join source-cost composition
+
+Projection data now lives in the compiler-neutral artifact assembly and retains
+root parameter names as display metadata. Native checking validates root and child
+input maps, distinct entry/current/old storage, child identities and closed local
+ownership. It independently verifies each child cost program, substitutes scalar
+root inputs/constants by formal ordinal and sums upper callback loop/allocation
+counts. Invalid or unsupported children return Unknown without partial sums.
+Negative constants use the admitted nonnegative size domain. Named argument
+order, positive differences, geometric counts and maximum expressions are checked.
+
+The 26 composition cases and existing resource/protocol regressions passed all
+804 tests. The full analyzer suite passed all 1468 tests after moving the models.
+Full formatting, quality/API compatibility and negative fixtures passed. Layout
+passed at 2778 sources, 59 projects and 151 pinned common files; documentation
+links passed at 728 and the trusted inventory at 534 paths.
+
+These are conditional source costs, not root verdicts. Compiler provenance and an
+at-most-once runtime model remain required before root claim publication.
+Framework/state-machine costs and lifetime composition remain separate required
+work, not zero-cost assumptions. The projection is not yet a root artifact field;
+no public API, protocol, artifact or cache version changes in this step.
+
 ### Task-join child projection
 
 The compiler now lowers each authenticated callback into a separate exact Total

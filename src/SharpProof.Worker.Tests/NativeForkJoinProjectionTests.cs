@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -40,10 +41,158 @@ public sealed class NativeForkJoinProjectionTests
         Assert.That(check.UnknownReason, Is.Not.Null.And.Not.Empty);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ComposesCheckedSourceCostsWithRootAndConstantArguments(bool arrays)
+    {
+        var projection = Lower(arrays ? "for(int i=0;i<count;i++){var value=new int[2];}" : "for(int i=0;i<count;i++){}");
+        var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
+        Assert.That(result.Upper!.LoopEntries.ToDisplayString(), Is.EqualTo("(max(0, n) + 3)"));
+        Assert.That(result.Upper.Arrays.ToDisplayString(), Is.EqualTo(arrays ? "(max(0, n) + 3)" : "0"));
+        Assert.That(result.Upper.Elements.ToDisplayString(), Is.EqualTo(arrays ? "((max(0, n) * 2) + 6)" : "0"));
+    }
+
+    [TestCase(-3, 0)]
+    [TestCase(0, 0)]
+    [TestCase(7, 7)]
+    public void ConstantArgumentsUseTheChildsNonnegativeSizeDomain(int value, int expected)
+    {
+        var projection = Lower("for(int i=0;i<count;i++){}");
+        projection = projection with
+        {
+            Children = [
+            projection.Children[0] with { Arguments = [new(0, null, value)] },
+            projection.Children[1] with { Arguments = [new(0, null, 0)] }]
+        };
+        var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
+        Assert.That(result.Upper!.LoopEntries.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    [TestCase("root-id")]
+    [TestCase("root-input")]
+    [TestCase("root-alias")]
+    [TestCase("child-alias")]
+    [TestCase("child-id")]
+    [TestCase("child-input")]
+    [TestCase("child-receiver")]
+    [TestCase("missing-map")]
+    [TestCase("bad-formal")]
+    [TestCase("bad-root")]
+    [TestCase("ambiguous")]
+    [TestCase("unbound")]
+    [TestCase("unproved-cost")]
+    public void InvalidOwnershipOrLaterChildrenNeverReturnPartialSourceCosts(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var projection = Lower("for(int i=0;i<count;i++){}");
+        var root = Root(projection);
+        var second = projection.Children[1];
+        switch (mutation)
+        {
+            case "root-id":
+                root = root with { CallableId = "other" };
+                break;
+            case "root-input":
+                root = root with { Parameters = [] };
+                break;
+            case "root-alias":
+                root = root with { Parameters = [new(root.Parameters[0].Entry, root.Parameters[0].Entry, root.Parameters[0].Old)] };
+                break;
+            case "child-alias":
+                second = second with { Owner = second.Owner with { Parameters = [new(second.Owner.Parameters[0].Entry, second.Owner.Parameters[0].Entry, second.Owner.Parameters[0].Old)] } };
+                break;
+            case "child-id":
+                second = second with { Owner = second.Owner with { CallableId = "other" } };
+                break;
+            case "child-input":
+                second = second with { Owner = second.Owner with { Parameters = [] } };
+                break;
+            case "child-receiver":
+                second = second with { Owner = second.Owner with { HasReceiver = true } };
+                break;
+            case "missing-map":
+                second = second with { Arguments = [] };
+                break;
+            case "bad-formal":
+                second = second with { Arguments = [new(-1, 0, null)] };
+                break;
+            case "bad-root":
+                second = second with { Arguments = [new(0, 5, null)] };
+                break;
+            case "ambiguous":
+                second = second with { Arguments = [new(0, 0, 3)] };
+                break;
+            case "unbound":
+                second = second with { Arguments = [new(0, null, null)] };
+                break;
+            default:
+                second = second with { Cost = SharpProof.Ir.ResourceProgram.MetadataBoundary };
+                break;
+        }
+        projection = projection with { Children = [projection.Children[0], second] };
+        var result = NativeForkJoinSourceCostVerifier.Check(projection, root, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.HasSourceCosts, Is.False);
+        Assert.That(result.Upper, Is.Null);
+        Assert.That(result.UnknownReason, Is.Not.Null.And.Not.Empty);
+    }
+
+    [Test]
+    public void SourceCostCompositionHonorsCancellation()
+    {
+        var projection = Lower("for(int i=0;i<count;i++){}");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [Test]
+    public void NamedArgumentsComposeByFormalOrdinalRatherThanEvaluationOrder()
+    {
+        var projection = LowerSource("using System.Threading.Tasks; public static class C { public static Task Root(int n,int m) => Task.WhenAll(Task.Run(()=>Child(right:m,left:n)),Task.Run(()=>Child(right:n,left:3))); static void Child(int left,int right) {for(int i=0;i<left;i++){} for(int j=0;j<right;j++){}} }");
+        var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
+        var value = result.Upper!.LoopEntries.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal == 0 ? 4 : 7,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(18)));
+    }
+
+    [TestCase("for(int i=2;i<count;i++){}", 5, 4)]
+    [TestCase("int remaining=count; while(remaining>0){remaining/=2;}", 8, 6)]
+    [TestCase("if(count>0){for(int i=0;i<count;i++){}}else{for(int i=0;i<2;i++){}}", 4, 7)]
+    public void SubstitutionPreservesDifferenceGeometricAndMaximumExpressions(string body, int inputValue, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var projection = Lower(body);
+        var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
+        var value = result.Upper!.LoopEntries.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputValue,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    private static CompilerTotalEntryPreparation Root(CompilerForkJoinProjection projection)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        var factory = new SharpProof.Ir.IrFactory(SharpProof.Ir.IrExecutionSemantics.Total);
+        var parameters = projection.RootParameterNames.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) :
+            new CompilerTotalParameter(factory.CreateVariable("entry:" + name, factory.IntegerType),
+                factory.CreateVariable("current:" + name, factory.IntegerType), factory.CreateVariable("old:" + name, factory.IntegerType))).ToImmutableArray();
+        return new(projection.RootCallableId, factory, parameters, []);
+    }
+
     private static CompilerForkJoinProjection Lower(string body)
     {
         ArgumentNullException.ThrowIfNull(body);
         var source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {" + body + "}}";
+        return LowerSource(source);
+    }
+
+    private static CompilerForkJoinProjection LowerSource(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("ForkJoinProjection", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();

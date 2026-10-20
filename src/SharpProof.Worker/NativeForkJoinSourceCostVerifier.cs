@@ -1,0 +1,136 @@
+using System.Numerics;
+
+namespace SharpProof.Worker;
+
+// Conditional callback-source upper costs only. The owning compiler envelope
+// and an at-most-once runtime model are separate premises for a root claim.
+internal sealed record NativeForkJoinSourceCostCheck(NativeResourceCost? Upper, string? UnknownReason)
+{
+    internal bool HasSourceCosts => Upper is not null;
+}
+
+internal static class NativeForkJoinSourceCostVerifier
+{
+    internal static NativeForkJoinSourceCostCheck Check(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        cancellation.ThrowIfCancellationRequested();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(root.CallableId) || projection.RootCallableId != root.CallableId || root.HasReceiver ||
+                root.Factory is null || root.Factory.Semantics != IrExecutionSemantics.Total || root.Parameters.IsDefault || root.Clauses.IsDefault ||
+                projection.RootParameterNames.IsDefault || projection.RootParameterNames.Length != root.Parameters.Length ||
+                root.Parameters.Length > ResourceExpression.MaximumNodes || projection.Children.IsDefault || projection.Children.Length is < 2 or > 16)
+            { return Unknown("ForkJoinRootOwnershipInvalid"); }
+            CheckInputs(root.Factory, root.Parameters);
+            var total = new NativeResourceCost(ResourceExpression.Zero, ResourceExpression.Zero, ResourceExpression.Zero);
+            var remaining = ResourceExpression.MaximumNodes;
+            var instructions = ResourceExpression.MaximumNodes;
+            for (var index = 0; index < projection.Children.Length; index++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var child = projection.Children[index];
+                if (child is null || child.Owner is null || child.Owner.Program is null || child.Owner.CallableId != root.CallableId + ":fork-child:" + index.ToString(CultureInfo.InvariantCulture) ||
+                    child.Owner.HasReceiver || child.Owner.Result != null || child.Owner.IsBodyAbstraction || !child.Owner.EffectsCompleteAtEntry ||
+                    child.Owner.Clauses.IsDefault || !child.Owner.Clauses.IsEmpty || child.Owner.CallPreconditions.IsDefault || !child.Owner.CallPreconditions.IsEmpty ||
+                    child.Owner.ValidEffectClaimIds.IsDefault || !child.Owner.ValidEffectClaimIds.IsEmpty)
+                { return Unknown("ForkJoinChildOwnershipInvalid"); }
+                CheckInputs(child.Owner.Program.Factory, child.Owner.Parameters);
+                foreach (var block in child.Owner.Program.Blocks)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    instructions -= block.Instructions.Length;
+                    if (instructions < 0)
+                    { return Unknown("ForkJoinSourceCostBudgetExceeded"); }
+                }
+                if (!NativeResourceMemoryEnvelope.Admits(child.Owner, cancellation))
+                { return Unknown("ForkJoinChildIsolationUnproved"); }
+                if (child.Arguments.IsDefault || child.Arguments.Length != child.Owner.Parameters.Length)
+                { return Unknown("ForkJoinArgumentMapInvalid"); }
+                var arguments = new ResourceExpression[child.Arguments.Length];
+                foreach (var argument in child.Arguments)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    if (argument is null || argument.ParameterOrdinal < 0 || argument.ParameterOrdinal >= arguments.Length ||
+                        arguments[argument.ParameterOrdinal] != null || argument.RootParameterOrdinal.HasValue == argument.Constant.HasValue)
+                    { return Unknown("ForkJoinArgumentMapInvalid"); }
+                    if (argument.RootParameterOrdinal is { } ordinal)
+                    {
+                        if (ordinal < 0 || ordinal >= root.Parameters.Length)
+                        { return Unknown("ForkJoinArgumentMapInvalid"); }
+                        arguments[argument.ParameterOrdinal] = ResourceExpression.InputSize(new ResourceInput(ordinal,
+                            ResourceInputKind.NonNegativeScalar, projection.RootParameterNames[ordinal], int.MaxValue));
+                    }
+                    else
+                    { arguments[argument.ParameterOrdinal] = ResourceExpression.Literal(BigInteger.Max(0, argument.Constant!.Value)); }
+                }
+                var checkedChild = NativeResourceProgramVerifier.Verify(child.Cost, child.Owner.CallableId, child.Owner, cancellation);
+                if (!checkedChild.Verified)
+                { return Unknown("ForkJoinChildCostUnproved:" + checkedChild.UnknownReason); }
+                var cost = checkedChild.Cost!;
+                total = new(
+                    ResourceExpression.Add(total.LoopEntries, Substitute(cost.LoopEntries, arguments, ref remaining, cancellation)),
+                    ResourceExpression.Add(total.Arrays, Substitute(cost.Arrays, arguments, ref remaining, cancellation)),
+                    ResourceExpression.Add(total.Elements, Substitute(cost.Elements, arguments, ref remaining, cancellation)));
+            }
+            return new(total, null);
+        }
+        catch (ResourceExpressionLimitException)
+        { return Unknown("ForkJoinSourceCostBudgetExceeded"); }
+        catch (ArgumentException)
+        { return Unknown("ForkJoinInputOwnershipInvalid"); }
+        catch (InvalidDataException)
+        { return Unknown("ForkJoinInputOwnershipInvalid"); }
+    }
+
+    private static NativeForkJoinSourceCostCheck Unknown(string reason)
+    { reason = ArgumentNullGuard.NotNull(reason, nameof(reason)); return new(null, reason); }
+
+    private static void CheckInputs(IrFactory factory, ImmutableArray<CompilerTotalParameter> parameters)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Parameters must be initialized.");
+        var entries = new HashSet<IrVarId>();
+        foreach (var parameter in parameters)
+        {
+            var type = factory.GetVariableInfo(parameter.Entry).Type;
+            if (!entries.Add(parameter.Entry) || !entries.Add(parameter.Current) || !entries.Add(parameter.Old) ||
+                factory.GetVariableInfo(parameter.Current).Type != type ||
+                factory.GetVariableInfo(parameter.Old).Type != type || factory.GetTypeInfo(type) is not { Kind: IrTypeKind.Integer, Signed: true, Width: 32 })
+            { throw new InvalidDataException("Fork-join inputs must be distinct Int32 bindings."); }
+        }
+    }
+
+    private static ResourceExpression Substitute(ResourceExpression expression, ResourceExpression[] arguments,
+        ref int remaining, CancellationToken cancellation)
+    {
+        expression = ArgumentNullGuard.NotNull(expression, nameof(expression));
+        arguments = ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        cancellation.ThrowIfCancellationRequested();
+        if (--remaining < 0)
+        { throw new ResourceExpressionLimitException(); }
+        if (expression.Input is { } input)
+        {
+            if (input.Kind != ResourceInputKind.NonNegativeScalar || input.Maximum != int.MaxValue || input.Ordinal >= arguments.Length)
+            { throw new InvalidDataException("Fork-join child cost uses an unowned input."); }
+            return arguments[input.Ordinal];
+        }
+        if (expression.Constant is { } constant)
+        { return ResourceExpression.Literal(constant); }
+        var left = Substitute(expression.Operands[0], arguments, ref remaining, cancellation);
+        return expression.Kind switch
+        {
+            ResourceExpressionKind.Add => ResourceExpression.Add(left, Substitute(expression.Operands[1], arguments, ref remaining, cancellation)),
+            ResourceExpressionKind.Multiply => ResourceExpression.Multiply(left, Substitute(expression.Operands[1], arguments, ref remaining, cancellation)),
+            ResourceExpressionKind.Maximum => ResourceExpression.Max(left, Substitute(expression.Operands[1], arguments, ref remaining, cancellation)),
+            ResourceExpressionKind.PositiveDifference => ResourceExpression.Difference(left, expression.Number),
+            ResourceExpressionKind.CeilingDivide => ResourceExpression.DivideCeiling(left, expression.Number),
+            ResourceExpressionKind.Digits => ResourceExpression.Geometric(left, expression.Number, true, cancellation),
+            ResourceExpressionKind.CeilingLog => ResourceExpression.Geometric(left, expression.Number, false, cancellation),
+            ResourceExpressionKind.Align => ResourceExpression.Aligned(left, expression.Number),
+            _ => throw new InvalidDataException("Unsupported fork-join cost expression.")
+        };
+    }
+}
