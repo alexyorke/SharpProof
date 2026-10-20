@@ -825,8 +825,9 @@ public sealed class CompilerManifestArtifactTests
             Is.EqualTo(1));
 
         {
-            effects = effects.SetItem(1, effects[1] with { ClaimId = effects[0].ClaimId });
-            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = effects }) };
+            var effectBuilder = effects.ToBuilder();
+            effectBuilder[1] = effects[1] with { ClaimId = effects[0].ClaimId };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = effectBuilder.ToImmutable() }) };
         }
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerLoweredArtifact.Decode(

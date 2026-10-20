@@ -41,7 +41,9 @@ public sealed class MetadataClauseOriginTests
         {
             { detached = detached with { CallPreconditions = detached.CallPreconditions.SetItem(0, detached.CallPreconditions[0] with { MetadataClause = origin with { Minimum = -100 } }) }; }
             { detached = detached with { CallPreconditions = [] }; }
-            references = references.SetItem(0, references[0] with { Modules = [] });
+            var referenceBuilder = references.ToBuilder();
+            referenceBuilder[0] = references[0] with { Modules = [] };
+            references = referenceBuilder.ToImmutable();
             Assert.That(row.MetadataClause!.Minimum, Is.EqualTo(1));
             Assert.That(row.MetadataClause.ValueBlob, Is.EqualTo(origin.ValueBlob));
         }
