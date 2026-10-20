@@ -590,3 +590,35 @@ Use `ResourceUpperBound(ResourceMetric.SourceActivationDepth, 2)` or
 frame storage, unsupported call/recurrence semantics and unproved comparisons
 return Unknown. Stack refutations are currently unsupported; an inferred upper
 bound alone is never used as an observed violating cost.
+
+## Asymptotic upper bounds of resource formulas
+
+Opt-in SP0060 diagnostics also classify each proven loop-entry, array-count and
+element-count upper formula under
+single-input-unbounded-expression-extension-v1. Supported orders include zero,
+constants, polynomial powers, logarithmic powers and their products. For example,
+a bound of n*n+n has upper order O(n^2), and n*ceil(log2(n)) has upper order
+O(n * log(n)). These are bounds on the recorded resource metrics, not processor
+time measurements.
+
+C# input types have finite domains. This model explicitly extends the mathematical
+bound formula to an unbounded nonnegative input for growth classification; it
+does not assert that the C# method can execute at sizes beyond its physical domain.
+The generic n is bound to a recorded parameter ordinal, input kind (scalar,
+array length or string length), and display name. Physical maximum values do not
+turn a size-dependent formula into an asymptotic constant. Renaming an input does
+not change its identity.
+
+Diagnostic properties include ResourceAsymptoticModel and, for each metric,
+AsymptoticUpperBound plus the input ordinal, kind and name when present. Multiple
+independent inputs and iterated logarithms currently produce an explicit
+AsymptoticUnknownReason without an order. Numeric resource proofs remain available
+when their single-input growth classification is unsupported. Unknown numeric
+proofs publish no asymptotic orders. O(0) means the bound formula is identically
+zero.
+
+The diagnostic message labels these as upper bounds of the unbounded formula
+extension. A tight source-cost classification requires an independent lower-bound
+proof as well as the upper bound; this feature does not publish Theta results.
+Native claim evidence, lower-bound derivation, amortized accounting and validated
+distributional models remain tracked in the full roadmap.

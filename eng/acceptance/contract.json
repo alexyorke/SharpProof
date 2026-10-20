@@ -381,6 +381,7 @@
           "eng/shared/ArgumentNullGuard.cs",
           "src/SharpProof.Ir/IrModel.generated.cs",
           "src/SharpProof.Ir/IrProgram.cs",
+          "src/SharpProof.Ir/ResourceAsymptoticGrowth.cs",
           "src/SharpProof.Ir/ResourceExpression.cs",
           "src/SharpProof.Ir/ResourceAllocationShape.cs",
           "src/SharpProof.Ir/ResourceBoundOrder.cs",

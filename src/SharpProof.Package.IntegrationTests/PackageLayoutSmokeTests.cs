@@ -3590,6 +3590,26 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageReportsModeledAsymptoticUpperBoundsWithoutTightness(bool multipleInputs)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var body = multipleInputs ? "for(int i=0;i<n;i++) {} for(int j=0;j<m;j++) {}" :
+            "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "public static class Subject { public static void Target(int n,int m) { " + body + " } }", "all", "SP0060");
+        await WriteUtf8Async(Path.Combine(workspace.ConsumerDirectory, ".editorconfig"), "root = true\n[*.cs]\ndotnet_diagnostic.SP0060.severity = warning\n");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofVerify=false");
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SP0060"));
+        Assert.That(build.Output, Does.Contain("asymptotic upper bounds of the unbounded formula extension"));
+        Assert.That(build.Output, Does.Contain(multipleInputs ? "loops Unknown" : "loops O(n^2) [n=NonNegativeScalar(n)]"));
+        Assert.That(build.Output, Does.Not.Contain("Theta("));
+    }
     [Test]
     public async Task MainPackageProvesNativeResourceBoundsAndPublishesMetricEvidence()
     {

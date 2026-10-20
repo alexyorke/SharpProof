@@ -38,7 +38,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 - [x] Object, string, closure, boxing, and array allocation costs.
 - [x] Byte bounds under an explicit, versioned runtime layout model.
-- [x] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
+- [ ] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
   peak live auxiliary memory, and retained/returned output.
 - [x] Stack frame and recursive stack bounds under a declared model.
 - [x] Independent allocation/liveness controls, mixed-size objects, aliases,
@@ -88,6 +88,25 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+The branch now includes the asymptotic expression foundation and a reproduced
+packaged SP0060 severity-activation repair. Verification passed 748 IR tests,
+1430 analyzer tests and two real packaged complexity consumers. The source guide
+states the scaling model and explicit Unknown boundaries. This phase E foundation
+does not provide native lower-bound/tightness evidence, amortized accounting or
+validated distributional models.
+
+The previously published stack checkpoint eec823652 passed canonical/package/docs/
+security CI, then failed the unchanged 100% changed-trusted-code requirement at
+3720/3910 covered lines (95.14%, 190 gaps). Fresh exact-head CI is required for
+this checkpoint. The draft MR remains [#334](https://github.com/alexyorke/SharpProof/pull/334).
+
+Remaining required work is the unchecked phase C/E/F scope and final coverage/CI
+qualification. The checked phases describe explicitly admitted models with Unknown
+outside admission; they do not claim arbitrary C# analysis. Details and evidence
+for each extension follow below.
+
+### Historical initial checkpoints
 
 Branch: `codex/resource-bounds-milestone-one`; initial master: `cd3363c63`.
 Milestone-one implementation: `cd7901b72`; planning document: `488f4300e`.
@@ -1757,13 +1776,13 @@ cases passed. Final consumer controls exercise validated cache hits, SARIF model
 projection and rejection of forged stack refutations. Two additional IR controls for
 oversized block/instruction streams passed with no partial memory bounds.
 
-Phase C is now complete for the declared admitted families documented in the
+Phase C has implementations for the declared admitted families documented in the
 resource guide: typed allocation costs under the pinned layout, finite owned
 normal-completion reachability, and logical source activation storage with checked
 recursive ranks. This does not expand admission to arbitrary borrowed graphs,
 closure invocation, unbounded lifetime paths or physical JIT/GC peaks; those
-boundaries return Unknown. Broader language admission is future extension work,
-rather than evidence that unsupported cases have proved resource bounds.
+boundaries return Unknown. Broader capture/call lifetime composition remains required; the lifetime checkbox
+stays open. Unsupported cases are not evidence of a completed proof family.
 
 Quality/compatibility and full repository formatting passed before final fixture
 additions; scoped whitespace formatting passed for those additions. Documentation
@@ -1794,5 +1813,83 @@ links passed. Evaluated layout passed for 2740 sources, 59 projects and all
 The earlier stack-specific package cases, full analyzer/IR suites, final stack
 boundaries and independent recursive controls remain recorded above. The merge
 did not change their resource implementation. Fresh pushed-head CI must verify
-the combined state before qualification. Phase E/F implementation and the unchanged
+the combined state before qualification. Broader capture/call lifetimes, phase E/F implementation and the unchanged
 100% coverage gate remain required; this checkpoint does not complete the goal.
+
+## Asymptotic expression foundation
+
+Phase E now has a bounded classifier for the single-input unbounded mathematical
+extension of closed resource upper formulas. It handles nonnegative constants,
+addition/maxima, polynomial/logarithmic products, constant subtraction/division
+and alignment, and logarithms of polynomial growth. It distinguishes zero from
+positive constants, validates operator arity/payloads, retains input ordinal/kind
+identity across renaming, and propagates cancellation. Multiple independent inputs,
+iterated logarithms and malformed/budget-exhausted expressions yield explicit
+Unknown results without a partial order.
+
+SP0060 projects the model and upper orders into machine-readable properties and
+diagnostic text, including the selected input scale. Numeric proofs remain valid
+when the growth classifier abstains. Finite CLR input caps are explicitly separate
+from the unbounded formula extension. Upper expressions do not establish lower
+source-cost bounds or tightness. All phase E checkboxes therefore remain open
+until native evidence, independent lower bounds, checked amortized rules and
+validated distributional models are implemented and verified.
+
+Initial focused verification passed 19 expression tests and five analyzer tests.
+Additional noncanonical unary-constant controls and full IR/analyzer gates are in
+progress. The new classifier is classified in the trusted-source inventory.
+No wire/schema/cache change is needed for these advisory diagnostic properties.
+
+Published stack head eec823652 passed canonical, package, documentation and
+toolchain-security CI. Coverage attempt one failed before aggregate enforcement
+when the native-payload download connection reset during container preparation;
+the failed job was rerun on the same exact head. Attempt two reached aggregate
+enforcement and failed at 3720/3910 changed trusted lines (95.14%, 190 gaps).
+The gap inventory is preserved for targeted tests. The unchanged 100% requirement
+remains mandatory.
+
+The classifier's final full IR gate passed 748 tests, including 35 new growth,
+constant-folding, malformed-record, cancellation and adversarial budget controls.
+The full analyzer gate passed 1422 tests before the packaged activation repair.
+Five final visible-message/property controls passed.
+
+The first real package runs exposed a pre-existing SP0060 activation defect:
+compiler-owned editorconfig severities were not read from SyntaxTreeOptionsProvider.
+Generic analyzer-option tests had masked that path. A separate eight-case
+reproduction failed all five enabling severities and passed the three disabled
+cases on the unfixed implementation. SP0060 now reads effective per-tree/global
+compiler severities before generic-option fallback. The default/off profiles
+remain disabled, and the production severity fix is undergoing full analyzer and
+real packaged-consumer checks. A transient compiler-flags probe was removed from
+the final tests after diagnosis.
+
+Quality/compatibility and scoped C# formatting passed before the final activation
+repair. Layout validates 2743 source files, 59 projects and all 151 pinned common
+files. Documentation generation and 725 local links passed, and the authoritative
+production inventory validates all 520 trusted paths with the classifier included.
+Final formatting, documentation notes and the activation workflow are being
+checked before committing this foundation. Phase E/F and coverage qualification
+remain open.
+
+Final activation verification passed all 1430 analyzer tests, including all eight
+compiler-owned severity cases. Both real packaged consumers then passed using
+the documented editorconfig opt-in: the quadratic case emits its O(n^2) upper
+order and input identity; independent inputs emit Unknown complexity while
+retaining numeric upper bounds. Neither consumer reports tightness. The complete
+IR gate passed 748 tests, including all 35 classifier controls.
+
+The production activation repair fixes an existing packaged SP0060 gap rather
+than relying on test-host severity overrides. The final package tests retain
+normal build commands and assertions; temporary verbose compiler probes were
+removed. Full quality/compatibility, repository formatting and documentation checks passed.
+Native asymptotic evidence, independently justified lower bounds, tightness,
+checked amortized accounting, validated average-case models and phase F remain
+required. This foundation does not mark any phase E requirement complete.
+
+A requirement audit reopened the phase C lifetime item. RootParameterClosurePlan
+still admits only static ordinary factories without type parameters returning one root
+anonymous delegate, with no nested closure/local-function bodies. The existing
+finite owned graph model is implemented and tested, but the previously named
+broader capture/call lifetime composition remains required. The earlier statement
+that phase C was fully complete overstated that evidence; admission limits do not
+make this remaining requested work optional.
