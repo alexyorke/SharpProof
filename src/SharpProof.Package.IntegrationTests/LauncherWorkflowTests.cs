@@ -186,15 +186,15 @@ internal sealed class LauncherWorkflowTests
         Assert.That(output.ToString(), Does.Contain("; SARIF=" + sarif));
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(publishedRequest))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult))!;
-        var manifestBytes = await File.ReadAllBytesAsync(publishedManifest);
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
+        var manifestBytes = (await File.ReadAllBytesAsync(publishedManifest)).ToImmutableArray();
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(request.CompilerManifest.Path, Is.EqualTo(publishedManifest));
-            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(ArtifactDigest.Compute((manifestBytes).ToImmutableArray())));
+            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(ArtifactDigest.Compute(manifestBytes)));
             Assert.That(WorkerProtocolJson.ValidateForRequest(response,
                 WorkerProtocolJson.ComputeRequestHash(request),
-                Program.ComputeExpectedInputHash(request, (manifestBytes).ToImmutableArray()), artifact.Manifest,
+                Program.ComputeExpectedInputHash(request, manifestBytes), artifact.Manifest,
                 request, Program.ExpectedVersions()).IsValid, Is.True);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Disabled));
@@ -228,8 +228,8 @@ internal sealed class LauncherWorkflowTests
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "request.json")))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
-        var bytes = await File.ReadAllBytesAsync(Path.Combine(directory.FullName, "manifest.json"));
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
+        var bytes = (await File.ReadAllBytesAsync(Path.Combine(directory.FullName, "manifest.json"))).ToImmutableArray();
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exit, Is.Not.Zero);
@@ -238,7 +238,7 @@ internal sealed class LauncherWorkflowTests
             Assert.That(response.Errors, Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.ValidateForRequest(response,
                 WorkerProtocolJson.ComputeRequestHash(request),
-                Program.ComputeExpectedInputHash(request, (bytes).ToImmutableArray()), artifact.Manifest,
+                Program.ComputeExpectedInputHash(request, bytes), artifact.Manifest,
                 request, Program.ExpectedVersions()).IsValid, Is.True);
         }
     }

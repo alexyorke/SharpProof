@@ -5007,3 +5007,9 @@ Nine retained completion/native-oracle argument vectors, diagnostic parts and en
 ### IMM-M512: native out-argument, array-clear and stream-destination subjects
 
 Five array sites are deliberately mutable: a reflection frame whose out slots are read after Invoke, the shared caller-visible Array.Clear oracle, and three bounded-stream read destinations. Current writers and subsequent concrete slot/element/offset/EOF/limit assertions are traced directly. No code edit or new execution authority is inferred.
+
+### IMM-M511: complete old package observation ownership review
+
+Ten retained capture/source/manifest/launcher byte observations and startup-hook command-line data are immutable. Readonly span/memory and direct immutable image APIs preserve native parser, build, hook and filesystem contracts. An initial build identified a redundant ToImmutableArray call after freezing the buffer; CA2009 is repaired before final verification.
+
+All 64 selected freshly packed capture/probe/launcher/NaN/environment cases pass with no failures/skips. Source and HEAD remain fixed at 5776769bb with dirty fixtures explicitly captured; this is selected workflow authority, not full-package/exact-final-head authority. Literal/source-unit gates verify 4305/1074 and 1948. Ten current coordinates and old array entries reconcile independently, returning C# coordinates to zero Open and leaving 46 unchecked local roots. The old package-project subset is fully reconciled; fresh final collection and remaining ownership/coverage/binding/archive/exact-head workflows remain required.

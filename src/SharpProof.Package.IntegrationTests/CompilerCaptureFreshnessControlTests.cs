@@ -122,7 +122,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         var firstCompletion = await File.ReadAllTextAsync(consumer.CompletionPath);
-        var firstCapture = await File.ReadAllBytesAsync(consumer.StagingPath);
+        var firstCapture = (await File.ReadAllBytesAsync(consumer.StagingPath)).ToImmutableArray();
 
         var unchanged = await consumer.BuildAsync([]);
         Assert.That(unchanged.Code, Is.Zero, unchanged.Output);
@@ -147,7 +147,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         var sidecar = Path.Combine(Path.GetDirectoryName(consumer.ResultPath)!, fileName);
-        var original = await File.ReadAllBytesAsync(sidecar);
+        var original = (await File.ReadAllBytesAsync(sidecar)).ToImmutableArray();
         var rejected = await consumer.BuildAsync([(property, sidecar)]);
         Assert.That(rejected.Code, Is.Not.Zero, rejected.Output);
         Assert.That(rejected.Output, Does.Contain("compiler-owned outputs"));

@@ -10,7 +10,7 @@ public static class StartupHook
     public static void Initialize()
     {
         var temporaryDirectory = Environment.GetEnvironmentVariable("TMPDIR");
-        var arguments = Environment.GetCommandLineArgs();
+        var arguments = Environment.GetCommandLineArgs().ToImmutableArray();
         if (string.IsNullOrWhiteSpace(temporaryDirectory) ||
             arguments.Length == 0 ||
             !string.Equals(

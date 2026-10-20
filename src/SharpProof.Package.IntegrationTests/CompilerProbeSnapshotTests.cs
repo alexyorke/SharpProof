@@ -70,7 +70,7 @@ public sealed class CompilerProbeSnapshotTests
     [Test]
     public async Task ImageBackedPortableReferenceCarriesConsumedImageHash()
     {
-        var image = await File.ReadAllBytesAsync(typeof(object).Assembly.Location);
+        var image = (await File.ReadAllBytesAsync(typeof(object).Assembly.Location)).ToImmutableArray();
         var compilation = CSharpCompilation.Create(
             "ProbeConsumer",
             [CSharpSyntaxTree.ParseText("class Consumer {}")],

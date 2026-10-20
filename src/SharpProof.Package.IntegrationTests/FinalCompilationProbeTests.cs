@@ -121,7 +121,7 @@ public sealed class FinalCompilationProbeTests
         using var workspace = ProbeWorkspace.Create();
         workspace.WritePackedConsumer(feed.Version);
         var handwrittenSource =
-            await File.ReadAllBytesAsync(workspace.SubjectPath);
+            (await File.ReadAllBytesAsync(workspace.SubjectPath)).ToImmutableArray();
 
         var restore = await workspace.RestoreAsync(feed.Source);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
@@ -527,13 +527,13 @@ public sealed class FinalCompilationProbeTests
         {
             System.ArgumentNullException.ThrowIfNull(path);
             Assert.That(File.Exists(path), Is.True, path);
-            var bytes = await File.ReadAllBytesAsync(path);
-            var text = Encoding.UTF8.GetString(bytes);
+            var bytes = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
+            var text = Encoding.UTF8.GetString(bytes.AsSpan());
             Assert.That(text, Does.Not.Contain('\r'), path);
-            using var document = JsonDocument.Parse(bytes);
+            using var document = JsonDocument.Parse(bytes.AsMemory());
             var root = document.RootElement;
             var compilationSha256 =
-                WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray());
+                WorkerProtocolJson.ComputeSha256(bytes);
             var claimPaths = root.GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()
@@ -556,7 +556,7 @@ public sealed class FinalCompilationProbeTests
                     path);
             }
             return new CompilerManifestArtifact(
-                bytes.ToImmutableArray(),
+                bytes,
                 compilationSha256!,
                 claimPaths);
         }

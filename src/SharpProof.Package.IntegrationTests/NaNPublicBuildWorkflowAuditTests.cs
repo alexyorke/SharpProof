@@ -37,9 +37,9 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         Assert.That(Directory.Exists(evidence), Is.False,
             "A public workflow observation must not replace earlier evidence.");
         Directory.CreateDirectory(evidence);
-        var sourceBytes = Encoding.UTF8.GetBytes(Source);
-        Assert.That(WorkerProtocolJson.ComputeSha256((sourceBytes).ToImmutableArray()), Is.EqualTo(SourceSha256));
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.cs"), sourceBytes);
+        var sourceBytes = Encoding.UTF8.GetBytes(Source).ToImmutableArray();
+        Assert.That(WorkerProtocolJson.ComputeSha256(sourceBytes), Is.EqualTo(SourceSha256));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.cs"), sourceBytes.AsMemory());
 
         var feed = await PackagedProductFeed.GetAsync();
         using var temporary = TempDirectory.CreateOwned("SharpProof.NaNPublicBuildWorkflow", "consumer-");
@@ -63,7 +63,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
             </Project>
             """ + "\n";
         await File.WriteAllTextAsync(projectPath, project, new UTF8Encoding(false));
-        await File.WriteAllBytesAsync(Path.Combine(consumer, "Subject.cs"), sourceBytes);
+        await File.WriteAllBytesAsync(Path.Combine(consumer, "Subject.cs"), sourceBytes.AsMemory());
         await File.WriteAllBytesAsync(Path.Combine(consumer, "global.json"),
             await File.ReadAllBytesAsync(Path.Combine(repository, "global.json")));
         var nugetConfig = IsolatedPackageFeedConfiguration.Write(consumer, feed.Source);
@@ -103,8 +103,8 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         await SaveFileAsync(assemblyPath, Path.Combine(evidence, "Consumer.dll"));
         Assert.That(WorkerProtocolJson.ComputeSha256(
             (await File.ReadAllBytesAsync(Path.Combine(consumer, "Subject.cs"))).ToImmutableArray()), Is.EqualTo(SourceSha256));
-        var manifestBytes = await File.ReadAllBytesAsync(Path.Combine(publication, "compiler-manifest.json"));
-        using var manifestDocument = JsonDocument.Parse(manifestBytes);
+        var manifestBytes = (await File.ReadAllBytesAsync(Path.Combine(publication, "compiler-manifest.json"))).ToImmutableArray();
+        using var manifestDocument = JsonDocument.Parse(manifestBytes.AsMemory());
         var manifestRoot = manifestDocument.RootElement;
         var manifest = manifestRoot.GetProperty("manifest")
             .Deserialize<WorkerClaimManifest>(WorkerProtocolJson.Options)!;
@@ -119,7 +119,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         var workerSha256 = WorkerBinaryIdentity.ComputeSha256(packageWorker, nativeSha256);
         var identity = WorkerCacheIdentity.Current;
         var expectedInputHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute((manifestBytes).ToImmutableArray()), identity.ToolIdentity,
+            request, ArtifactDigest.Compute(manifestBytes), identity.ToolIdentity,
             identity.ToolVersion, workerSha256, identity.ApiSpecIdentity,
             identity.ApiSpecVersion, identity.ApiSpecContentSha256);
         var validation = WorkerProtocolJson.ValidateForRequest(
@@ -139,7 +139,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
             BuildExitCode = build.ExitCode,
             SourceSha256,
             AssemblySha256 = WorkerProtocolJson.ComputeSha256((await File.ReadAllBytesAsync(assemblyPath)).ToImmutableArray()),
-            CompilerManifestSha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray()),
+            CompilerManifestSha256 = WorkerProtocolJson.ComputeSha256(manifestBytes),
             WorkerSha256 = workerSha256,
             response.RequestHash,
             response.InputHash,
@@ -150,7 +150,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         }, WorkerProtocolJson.Options));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())));
+            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(manifestBytes)));
             Assert.That(request.VerifyPolicy, Is.EqualTo(WorkerVerifyPolicy.RequireProven));
             Assert.That(request.AssumptionPolicy, Is.EqualTo(WorkerAssumptionPolicy.Error));
             Assert.That(request.Cache.Enabled, Is.False);
