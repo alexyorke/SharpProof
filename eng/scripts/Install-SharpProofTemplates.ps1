@@ -16,7 +16,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Unexpecte
 if ($Verify -and -not $PackageSource) { throw '-Verify requires the exact packed -PackageSource.' }
 if ($PackageSource) { $PackageSource = (Resolve-Path -LiteralPath $PackageSource).Path }
 if ($Verify) {
-    $packageFiles = @(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') })
+    $packageFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }))
     $identity = Get-SharpProofPackageIdentitySet -Files $packageFiles -RequireRepository
     if ($identity.Version -ne $version) { throw "Packed feed version '$($identity.Version)' does not match checkout '$version'." }
 }
@@ -27,7 +27,7 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-templates-' + [guid
 $hive = Join-Path $scratch 'hive'
 $templateRoot = Join-Path $scratch 'templates'
 [void][IO.Directory]::CreateDirectory($templateRoot)
-foreach ($kind in @('portable', 'verified')) {
+foreach ($kind in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('portable', 'verified'))) {
     $target = Join-Path $templateRoot $kind
     Copy-Item -LiteralPath (Join-Path $repository "templates/$kind") -Destination $target -Recurse -Force
     $configPath = Join-Path $target '.template.config/template.json'
@@ -61,7 +61,7 @@ if ($Verify) {
 </configuration>
 "@
     [IO.File]::WriteAllText($configFile, $nugetConfig, [Text.UTF8Encoding]::new($false))
-    foreach ($kind in @('portable', 'verified')) {
+    foreach ($kind in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('portable', 'verified'))) {
         $consumer = Join-Path $scratch "consumer-$kind"
         Invoke-DotNet -Arguments @('new', "sp-$kind", '-n', 'TemplateConsumer', '-o', $consumer, '--debug:custom-hive', $hive)
         $project = Join-Path $consumer 'TemplateConsumer.csproj'
@@ -71,7 +71,7 @@ if ($Verify) {
             $source = Join-Path $consumer 'Calculator.cs'
             [IO.File]::WriteAllText($source, ([IO.File]::ReadAllText($source).Replace('Positive(1)', 'Positive(0)')), [Text.UTF8Encoding]::new($false))
             # The negative control must fail because the analyzer is present and SP0027 fires.
-            $negativeOutput = @(& dotnet build $project -c Release --no-restore '-warnaserror:SP0027' 2>&1)
+            $negativeOutput = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& dotnet build $project -c Release --no-restore '-warnaserror:SP0027' 2>&1))
             $negativeExit = $LASTEXITCODE
             $negativeOutput | ForEach-Object { Write-Host $_ }
             if ($negativeExit -eq 0 -or ($negativeOutput -join "`n") -notmatch 'error SP0027') {

@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg')))
 $identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $commit = (& git -C $repository rev-parse HEAD).Trim()
@@ -20,10 +20,10 @@ $probe = Join-Path $root 'probe'
 [IO.Directory]::CreateDirectory($probe) | Out-Null
 $encoding = [Text.UTF8Encoding]::new($false)
 $sdkVersion = [string](Get-Content (Join-Path $repository 'global.json') -Raw | ConvertFrom-Json).sdk.version
-$sdkLines = @(& dotnet --list-sdks)
+$sdkLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& dotnet --list-sdks))
 if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate the installed SDK needed for the compiler-host probes.' }
-$sdkLine = @($sdkLines | Where-Object { $_ -match ('^' + [regex]::Escape($sdkVersion) + ' \[(.+)\]$') })
-if ($sdkLine.Count -ne 1) { throw 'The exact SDK for the shipped compiler-host exception probes is unavailable.' }
+$sdkLine = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sdkLines | Where-Object { $_ -match ('^' + [regex]::Escape($sdkVersion) + ' \[(.+)\]$') }))
+if ($sdkLine.Length -ne 1) { throw 'The exact SDK for the shipped compiler-host exception probes is unavailable.' }
 $null = $sdkLine[0] -match ('^' + [regex]::Escape($sdkVersion) + ' \[(.+)\]$')
 $sdkRoot = Join-Path $Matches[1] $sdkVersion
 
@@ -104,7 +104,7 @@ Console.WriteLine(role + ": " + sourceFrame.GetFileName() + ":" + sourceFrame.Ge
     try {
         $build = (& dotnet build Probe.csproj -c Release --nologo '-p:UseSharedCompilation=false' 2>&1 | Out-String)
         if ($LASTEXITCODE -ne 0) { throw "Offline exception probe build failed: $build" }
-        foreach ($role in @('analyzer', 'generator', 'build-task', 'worker')) {
+        foreach ($role in [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('analyzer', 'generator', 'build-task', 'worker'))) {
             $output = (& dotnet (Join-Path $probe 'bin/Release/net10.0/Probe.dll') $payload $sdkRoot $role 2>&1 | Out-String)
             if ($LASTEXITCODE -ne 0) { throw "The actual shipped $role exception has no offline source location: $output" }
             Write-Host $output.TrimEnd()
