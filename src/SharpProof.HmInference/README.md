@@ -470,3 +470,11 @@ System.Enum domains stay fixed, preserving boxed identity. Applied IDE fixes
 exercise nullable async results, concrete domains and newly admitted types.
 General directional lower-bound solving and ambiguous interface projections
 remain open.
+
+When a type implements a generic interface through multiple argument shapes,
+constraint projection tests each alternative on a copied substitution graph.
+A uniquely compatible array, list or tuple shape selects its implementation;
+failed alternatives leave inference variables unchanged. Inherited and struct
+implementations have regression coverage, and applied IDE fixes verify interface
+dispatch, helper effects and nullable payload domains. Genuinely ambiguous
+projections remain unresolved until other constraints distinguish them.

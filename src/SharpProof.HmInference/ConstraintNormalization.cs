@@ -25,9 +25,48 @@ public static partial class Inference
             ancestors.AddRange(named.OriginalDefinition.AllInterfaces);
             var matches = ancestors.Where(ancestor =>
             { if (ancestor is null) { throw new ArgumentNullException(nameof(ancestor)); } return CSharpTypes.ConstructorIdentity(ancestor) == CSharpTypes.ConstructorIdentity(required); }).ToArray();
-            // Multiple implementations of one interface may denote different
-            // domains. Their original selected instantiation must disambiguate them.
-            return matches.Length == 1 ? CSharpTypes.Rigid(matches[0], mapping) : null;
+            if (matches.Length == 1)
+            { return CSharpTypes.Rigid(matches[0], mapping); }
+            HmType? selected = null;
+            foreach (var match in matches)
+            {
+                var projection = CSharpTypes.Rigid(match, mapping);
+                if (!CanUnifyConstraintProjection(projection, target))
+                { continue; }
+                // A failed alternative must not change the live substitution graph.
+                // Leave genuinely ambiguous choices unresolved for a later pass.
+                if (selected is not null && !SameConstraintShape(selected, projection))
+                { return null; }
+                selected = projection;
+            }
+            return selected;
+        }
+
+        private static bool CanUnifyConstraintProjection(HmType projection, HmType target)
+        {
+            if (projection is null)
+            { throw new ArgumentNullException(nameof(projection)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            var copies = new Dictionary<HmType, HmType>();
+            HmType Copy(HmType type)
+            {
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                type = type.Root;
+                if (copies.TryGetValue(type, out var existing))
+                { return existing; }
+                var copy = type.WithArguments(type.Arguments.Select(Copy).ToArray());
+                copies.Add(type, copy);
+                return copy;
+            }
+            try
+            {
+                HmType.Unify(Copy(projection), Copy(target));
+                return true;
+            }
+            catch (InferenceException)
+            { return false; }
         }
 
         private void NormalizeConstraints()

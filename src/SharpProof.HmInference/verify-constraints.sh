@@ -12,7 +12,11 @@ cat > "$fixture/Input.cs" <<'EOF'
 public class CliBoundRoot{}
 public class CliBoundMiddle:CliBoundRoot{}
 public class CliBoundLeaf:CliBoundMiddle{}
+public interface CliProjectionContract<T>{}
+public class CliProjectionDual<T>:CliProjectionContract<T[]>,CliProjectionContract<System.Collections.Generic.List<T>>{}
 public static class CliBounds{
+    public static CliProjectionDual<int> ProjectionArray(CliProjectionDual<int> value,int[] other)=>Project(value,other);
+    private static T Project<T,U>(T value,U other) where T:CliProjectionContract<U> =>value;
     public static CliBoundLeaf? NullableBound(CliBoundLeaf? value)=>NullableRoot(value);
     public static CliBoundLeaf? NullableBoth(CliBoundLeaf? value)=>NullableRoot(NullableMiddle(value));
     private static T NullableRoot<T>(T value) where T:CliBoundRoot? =>value;
@@ -34,10 +38,10 @@ EOF
 dotnet "$output" "$fixture/Input.cs" > "$fixture/source.log" 2>&1 || { tail -35 "$fixture/source.log"; exit 1; }
 dotnet "$output" --project "$fixture/Bounds.csproj" > "$fixture/project.log" 2>&1 || { tail -35 "$fixture/project.log"; exit 1; }
 for log in source project; do
-  for expected in 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
+  for expected in 'ProjectionArray<T1>(global::CliProjectionDual<T1> value, T1[] other)' 'DependentAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 ignored) where T1 : global::CliBoundRoot' 'DependentEnum<T1>(global::System.Enum? value, T1 ignored)' 'NullableBound<T1>(T1? value) where T1 : global::CliBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::CliBoundMiddle' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::CliBoundMiddle'; do
     if ! grep -Fq "$expected" "$fixture/$log.log"; then tail -35 "$fixture/$log.log"; exit 1; fi
   done
 done
 cp "$fixture/source.log" /workspace/SharpProof/artifacts/hm-inference/constraint-cli.txt
 cp "$fixture/project.log" /workspace/SharpProof/artifacts/hm-inference/constraint-project.txt
-printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds'
+printf '%s\n' 'PASS CliSourceConstraintNormalization' 'PASS CliProjectConstraintNormalization' 'PASS CliNullableConstraintImplication' 'PASS CliDependentNullableAsyncAndEnumBounds' 'PASS CliShapeSelectedInterfaceProjection'
