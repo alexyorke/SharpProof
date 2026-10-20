@@ -421,6 +421,16 @@ remain unfinished.
 
 ### Cumulative task prefix review (in progress)
 
+The pinned [first-pass exception callbacks](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/exceptionhandling.cpp#L2605)
+append frames and invoke trace saving repeatedly. The
+[saver failure cleanup](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp#L2483)
+clears buffered trace state and can clear the exception trace after a failed
+replacement. A cumulative proof must therefore bound trace updates and failed
+attempts as well as capacity growth. Array-capacity doubling alone does not
+establish that complete bound. The caller and header sources are cached with
+pinned Git blob IDs and SHA-256 records in
+`artifacts/resource-runtime-fault-review/trace-caller-sources.json`.
+
 The pinned [native trace saver](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp#L2143)
 skips shared preallocated exception handles. The
 [managed exception implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Exception.CoreCLR.cs#L141)
