@@ -326,6 +326,36 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
+### Fault notification construction (in progress)
+
+A separate native component now bounds construction of one fault notification
+from a preexisting message and a stable, nonempty dispatch list of 1..16 entries.
+Its graph contains the aggregate exception with all inherited exception fields,
+the exception-reference array and event arguments. The lazy collection-view slot
+is included; construction does not read the property that creates its object.
+The reviewed x64 layout gives the conditional upper 208 + 8*n bytes. Notification
+frequency, original exceptions/traces, resource initialization, later property
+reads, event subscribers and complete runtime binding remain separate obligations.
+Root cumulative task bytes therefore remain Unknown; no public scope or cache
+identity changed.
+
+Before the latest master merge, seven component controls, all 158 specs tests
+and all 176 IR memory controls passed. Four .NET 8.0.32 constructor observations
+use 64 warmup calls followed by 128 measured calls each. A fifth runtime control
+checks the complete inherited field tables. Nineteen new replay controls corrupt
+individual real interpreter observations and require Unknown without partial
+bounds; supported fresh/empty identities retain their expected bounds.
+
+Remote merge `373f97c1e` incorporated master `71c9b117f` and cancelled the old
+`363d09752` coverage run before aggregation. Its log is retained at
+`artifacts/resource-363d-coverage-failed.log`; no newer coverage percentage came
+from that run. The worktree fast-forwarded to the merge without losing local
+changes and rebuilt the slimmer tooling image. Post-merge verification passed
+978 worker/container-contract cases, five pinned-runtime controls, 176 IR memory
+cases, full formatting, layout, lint/API compatibility and documentation checks.
+The test runtime remains pinned at 8.0.32. Evidence uses the resource-fault-notification
+and resource-memory-replay-boundaries artifact prefixes.
+
 ### Closure plan admission controls
 
 All 2245 frontend tests passed, including 36 direct compiler-backed closure-plan
