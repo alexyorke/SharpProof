@@ -52,12 +52,12 @@ internal static class SharpProofSymbolPackageValidator
             isSymbols: true);
 
         var assemblies = package.Entries
-            .Where(static entry =>
+            .Where(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) =>
                 entry.FullName.EndsWith(".dll", StringComparison.Ordinal) &&
                 Path.GetFileName(entry.FullName).StartsWith(
                     "SharpProof.",
                     StringComparison.Ordinal))
-            .OrderBy(static entry => entry.FullName, StringComparer.Ordinal)
+            .OrderBy(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName, StringComparer.Ordinal)
             .ToImmutableArray();
         if (assemblies.Length == 0)
         {
@@ -66,13 +66,13 @@ internal static class SharpProofSymbolPackageValidator
         }
 
         var expectedPdbNames = assemblies
-            .Select(static entry => entry.FullName[..^4] + ".pdb")
+            .Select(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName[..^4] + ".pdb")
             .ToImmutableArray();
         var actualPdbNames = symbols.Entries
-            .Where(static entry => entry.FullName.EndsWith(
+            .Where(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName.EndsWith(
                 ".pdb",
                 StringComparison.OrdinalIgnoreCase))
-            .Select(static entry => entry.FullName)
+            .Select(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName)
             .Order(StringComparer.Ordinal)
             .ToImmutableArray();
         if (!actualPdbNames.SequenceEqual(expectedPdbNames, StringComparer.Ordinal))
@@ -118,7 +118,7 @@ internal static class SharpProofSymbolPackageValidator
         }
 
         var nuspecEntries = archive.Entries
-            .Where(static entry => entry.FullName.EndsWith(
+            .Where(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName.EndsWith(
                 ".nuspec",
                 StringComparison.OrdinalIgnoreCase))
             .ToImmutableArray();
@@ -163,7 +163,7 @@ internal static class SharpProofSymbolPackageValidator
                 "does not match its authenticated release role.");
         }
 
-        var pdbCount = archive.Entries.Count(static entry =>
+        var pdbCount = archive.Entries.Count(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) =>
             entry.FullName.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
         if ((!isSymbols && pdbCount != 0) || (isSymbols && pdbCount == 0))
         {
@@ -173,11 +173,11 @@ internal static class SharpProofSymbolPackageValidator
         }
     }
 
-    private static void RejectDuplicateEntries(ZipArchive archive, string path)
+    private static void RejectDuplicateEntries(ZipArchive archive, string /* SPINT001: all values valid - path is diagnostic context only */ path)
     {
         var duplicate = archive.Entries
-            .GroupBy(static entry => entry.FullName, StringComparer.Ordinal)
-            .FirstOrDefault(static group => group.Count() != 1);
+            .GroupBy(static (ZipArchiveEntry /* SPINT001: all values valid - ZipArchive.Entries supplies existing non-null archive entries */ entry) => entry.FullName, StringComparer.Ordinal)
+            .FirstOrDefault(static (IGrouping<string, ZipArchiveEntry> /* SPINT001: all values valid - GroupBy supplies non-null groups */ group) => group.Count() != 1);
         if (duplicate is not null)
         {
             throw new InvalidDataException(
@@ -194,7 +194,7 @@ internal static class SharpProofSymbolPackageValidator
         using var assemblyImage = CopyToMemory(assemblyEntry);
         using var peReader = new PEReader(assemblyImage);
         var codeViewEntries = peReader.ReadDebugDirectory()
-            .Where(static entry => entry.Type == DebugDirectoryEntryType.CodeView)
+            .Where(static (DebugDirectoryEntry /* SPINT001: all values valid - debug directory entries are filtered by their actual kind */ entry) => entry.Type == DebugDirectoryEntryType.CodeView)
             .ToImmutableArray();
         if (codeViewEntries.Length != 1)
         {
@@ -247,10 +247,11 @@ internal static class SharpProofSymbolPackageValidator
         MetadataReader reader,
         ZipArchiveEntry pdbEntry,
         ZipArchiveEntry assemblyEntry,
-        CodeViewDebugDirectoryData codeView,
-        DebugDirectoryEntry codeViewEntry,
+        CodeViewDebugDirectoryData /* SPINT001: all values valid - identity bytes are compared against the portable PDB header */ codeView,
+        DebugDirectoryEntry /* SPINT001: all values valid - the stamp contributes to the identity comparison */ codeViewEntry,
         string expectedSourceUrl)
     {
+        ArgumentNullException.ThrowIfNull(assemblyEntry);
         var debugMetadataHeader = reader.DebugMetadataHeader ??
             throw new InvalidDataException(
                 $"Portable PDB '{pdbEntry.FullName}' has no debug metadata header.");
@@ -307,6 +308,7 @@ internal static class SharpProofSymbolPackageValidator
 
     private static MemoryStream CopyToMemory(ZipArchiveEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         var image = new MemoryStream();
         using var stream = entry.Open();
         stream.CopyTo(image);
