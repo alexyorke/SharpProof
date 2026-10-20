@@ -103,10 +103,13 @@ previous formats. Initial verification passed 39 source, independent weighted-ex
 malformed-certificate, input-support and cache/SARIF controls, plus all 756 IR
 tests. Quality/API, negative fixtures, layout, the 528-path trusted inventory,
 documentation lint and 727 links passed. Layout verifies 2762 sources, 59
-projects and 151 unchanged pinned common files. Final record-digest controls,
-broader worker/protocol and analyzer regressions, full formatting and package
-workflows are still running. The expected-cost and adversarial-control rows
-remain open until verification finishes.
+projects and 151 unchanged pinned common files. Broader verification passed all 794 worker/native/protocol/parameter-attribute
+cases, including final record-digest controls, and the full formatting gate.
+The first full analyzer run passed 1449 cases and exposed two fixture issues:
+the documentation example needed its class/using wrapper, and a collector test
+still expected protocol 38. Both are corrected; the full analyzer rerun and
+seven strict-package workflows are running. The expected-cost and adversarial
+rows remain open until those workflows pass.
 
 ### Credit-accounting checkpoint
 

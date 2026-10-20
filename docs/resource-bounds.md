@@ -710,13 +710,18 @@ lower record and its declared domain.
 A Boolean entry parameter can declare an explicit input model:
 
 ```csharp
-[ResourceUpperBound(ResourceMetric.AllocatedElements, 0, nameof(n), 7)]
-public static void Process(int n, [ResourceBooleanInput(1, 3)] bool selected)
+using SharpProof.Attributes;
+
+public static class ConditionalResourceExample
 {
-    for (int i = 0; i < n; i++)
+    [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, nameof(n), 7)]
+    public static void Process(int n, [ResourceBooleanInput(1, 3)] bool selected)
     {
-        if (selected) { var a = new int[7]; }
-        else { var b = new int[2]; }
+        for (int i = 0; i < n; i++)
+        {
+            if (selected) { var a = new int[7]; }
+            else { var b = new int[2]; }
+        }
     }
 }
 ```
@@ -730,7 +735,7 @@ between zero and one million, with a positive total.
 The compiler analyzes both immutable entry valuations. The ordinary upper proof
 retains their maximum; the native worker separately derives the ceiling of
 `(falseWeight * falseUpper + trueWeight * trueUpper) / totalWeight`. The example
-has worst-case element bound 7*n and expected upper bound ceil(13*n/4) for
+has worst-case element bound `7*n` and expected upper bound `ceil(13*n/4)` for
 nonnegative n. Negative scalar entry sizes remain zero. Ceiling preserves an
 integer upper bound; it does not claim that a fractional expected cost is an
 integer. The individual conditional bounds can themselves be conservative.
