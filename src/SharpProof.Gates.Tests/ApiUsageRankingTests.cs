@@ -175,6 +175,8 @@ public sealed class ApiUsageRankingTests
             {
                 status = "unmodeled-dispatch";
             }
+            if (symbol is IMethodSymbol comparable && CSharpOperationSemantics.IsGenericComparableDeclaration(comparable))
+            { status = knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch"; }
 
             if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol) && symbol is IMethodSymbol)
             {
@@ -297,6 +299,28 @@ public sealed class ApiUsageRankingTests
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call")), Is.EqualTo(1));
             Assert.That(gaps.Single(), Does.Contain("System.Double"));
         }
+    }
+
+    [Test]
+    public void UsageScanDoesNotCreditOpenComparableDispatchFromDeclarationEvidence()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class UsageProbe {
+                public static int Open<T>(T left, T right) where T : System.IComparable<T> => left.CompareTo(right);
+                public static int Boxed(System.IComparable<int> left, int right) => left.CompareTo(right);
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var comparable = compilation.GetTypeByMetadataName("System.IComparable`1")!.GetMembers("CompareTo").OfType<IMethodSymbol>().Single();
+        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [comparable.ContainingAssembly.Name + "\t" + comparable.GetDocumentationCommentId()] = "partially-modeled"
+        };
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        Assert.That(sites, Has.Count.EqualTo(2));
+        Assert.That(sites.All(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.True);
+        Assert.That(gaps, Is.Empty);
     }
 
     [Test]

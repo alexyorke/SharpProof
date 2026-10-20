@@ -64,6 +64,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _context.TrackDefaultDictionaries(graph);
         _context.TrackDefaultHashSets(graph);
         _context.TrackFreshLists(graph);
+        _context.TrackManagedValueReceivers(graph);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
@@ -398,7 +399,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _context.RecordThisCapture(thisCapture.Id);
                 return block;
             case IFlowCaptureOperation { Value: IFieldReferenceOperation field } fieldCapture
-                when CSharpOperationSemantics.IsSupportedFieldRead(field.Field) && _expressions.IsImplicitThis(field.Instance):
+                when CSharpOperationSemantics.IsSupportedFieldRead(field.Field) && _expressions.IsImplicitThis(field.Instance) &&
+                    !_context.IsManagedValueReceiverCapture(fieldCapture.Id):
                 _context.RecordFieldCapture(fieldCapture.Id, field);
                 return block;
             case IFlowCaptureOperation capture:
