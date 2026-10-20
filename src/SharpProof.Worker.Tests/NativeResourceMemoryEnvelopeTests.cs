@@ -24,7 +24,7 @@ internal sealed partial class NativeResourceContractTests
     }
 
     [Test]
-    public void EnvelopeRejectsReferenceDefinitionsFromAnotherBlock()
+    public void EnvelopeAcceptsADominatingAllocationFromAnotherBlock()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
@@ -37,7 +37,7 @@ internal sealed partial class NativeResourceContractTests
         builder.Return(exit, factory.CreateOperation(), factory.Variable(value));
         var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], value, [])
         { EffectsCompleteAtEntry = true };
-        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.True);
     }
 
     [Test]
@@ -120,15 +120,11 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
     }
 
-    [TestCase(5, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
-    [TestCase(6, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
     [TestCase(5, "public static int[] Target(int n,int[] input) => input;")]
     [TestCase(6, "public static int[] Target(int n,int[] input) => input;")]
     [TestCase(5, "public int[] Target(int n) => new int[n];")]
     [TestCase(6, "public int[] Target(int n) => new int[n];")]
-    [TestCase(5, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
-    [TestCase(6, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
-    public async Task MemoryEnvelopesRejectBorrowedReceiverAndCrossBlockOrigins(int metric, string method)
+    public async Task MemoryEnvelopesRejectBorrowedAndReceiverOrigins(int metric, string method)
     {
         ArgumentNullException.ThrowIfNull(method);
         var source = "using SharpProof.Attributes; public sealed class C { " +
@@ -139,6 +135,61 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
         Assert.That(result.ResourceBound.UnknownReason, Is.Not.Null.And.Not.Empty);
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
+    [TestCase(5, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
+    [TestCase(6, "public static int Target(int n) {var value=new int[n]; return value.Length;}")]
+    [TestCase(5, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
+    [TestCase(6, "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}")]
+    [TestCase(5, "public static int Target(int n) {var value=new int[n]; if(n>0) return value[0]; return 0;}")]
+    [TestCase(6, "public static int Target(int n) {var value=new int[n]; if(n>0) return value[0]; return 0;}")]
+    public async Task DominatingOwnedArraysCrossCompilerGuardAndReturnBlocks(int metric, string method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+        Assert.That(result.ResourceBound!.Asymptotic!.Lower!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        if (metric == 6 && method.StartsWith("public static int Target", StringComparison.Ordinal))
+        { Assert.That(result.ResourceBound.InferredUpperBound, Is.EqualTo("0")); }
+    }
+
+    [TestCase("bypass")]
+    [TestCase("redefinition")]
+    [TestCase("cycle")]
+    public void CrossBlockOriginsRejectMissingOrRedefinedAllocations(string mode)
+    {
+        ArgumentNullException.ThrowIfNull(mode);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var allocated = builder.CreateBlock();
+        var alternate = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var value = factory.CreateVariable("value", type);
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        if (mode == "redefinition")
+        {
+            builder.Goto(entry, factory.CreateOperation(), allocated);
+            var foreign = factory.CreateVariable("uninitialized", type);
+            builder.Assign(alternate, factory.CreateOperation(), value, factory.Variable(foreign));
+        }
+        else
+        { builder.Branch(entry, factory.CreateOperation(), factory.Variable(flag), allocated, alternate); }
+        builder.Allocate(allocated, factory.CreateOperation(), type, value, factory.Integer(1));
+        builder.Goto(allocated, factory.CreateOperation(), mode == "bypass" ? exit : alternate);
+        if (mode == "cycle")
+        { builder.Branch(alternate, factory.CreateOperation(), factory.Variable(flag), allocated, exit); }
+        else
+        { builder.Goto(alternate, factory.CreateOperation(), exit); }
+        builder.Return(exit, factory.CreateOperation(), factory.Variable(value));
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], value, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
     [TestCase(false)]

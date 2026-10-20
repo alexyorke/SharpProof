@@ -6,6 +6,10 @@ in [its checkpoint](resource-bounds-progress.md); completing that milestone does
 not complete this roadmap. The merge request stays draft while required phases
 remain incomplete.
 
+The checklist and first checkpoint entry describe the current state. Older
+checkpoint entries retain their earlier statuses, versions and verification
+results as implementation history.
+
 Every feature must have a stated cost model, compiler-bound admission rules,
 sound upper bounds, explicit Unknown outcomes at unsupported boundaries, tests
 against independently observed executions, and end-to-end diagnostic/reporting
@@ -38,7 +42,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 - [x] Object, string, closure, boxing, and array allocation costs.
 - [x] Byte bounds under an explicit, versioned runtime layout model.
-- [ ] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
+- [x] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
   peak live auxiliary memory, and retained/returned output.
 - [x] Stack frame and recursive stack bounds under a declared model.
 - [x] Independent allocation/liveness controls, mixed-size objects, aliases,
@@ -89,6 +93,31 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Quantitative-memory feature audit
+
+Phase C now has compiler, native-worker, protocol, consumer and independent
+runtime controls for its declared models. The finite owned-graph checker tracks
+aliases, sharing, cycles, field overwrites, closure storage and returned roots;
+it keeps cumulative allocation, peak auxiliary storage and retained output
+separate. Current-receiver source calls and admitted deferred capture chains
+compose with those lifetime rules. Parametric primitive arrays use the separate
+conservative cumulative envelope, including initialized references across compiler
+guards. Logical source activation/stack bounds have their own declared model.
+
+The latest native/resource/protocol gate passed 778 cases. All four parametric
+package cases passed, covering direct/cross-block arrays, strict/advisory policy,
+and JSON/SARIF upper growth. Earlier independent x64 runtime controls measured
+the same storage categories and cache/frame placements; this step changes no
+layout constants. Borrowed or uninitialized graphs, unmodeled field/effect access,
+unproved closure placement and arbitrary dispatch remain explicit Unknown
+boundaries. Phase C's feature checkbox records these implemented models; it does
+not waive those boundaries or the separate 100% coverage and final-audit gates.
+
+The remaining feature implementation is phase F: async/state-machine costs,
+native fork/join work/allocation/live-space composition, and their cancellation,
+exception, shared-state and repeated-entry controls. The task-join source planner
+below is only its admission foundation. The MR remains draft.
+
 ### Structured task-work admission foundation
 
 Phase F starts with compiler recognition of a closed Task.Run/Task.WhenAll
@@ -107,7 +136,7 @@ suite passed all 2196 tests. Layout passed at 2773 sources, 59 projects and all 
 pinned common files. Recognition alone publishes no numeric claims and enables no
 new worker capability; existing native Unknown behavior remains in force.
 Quality/API compatibility, negative fixtures, documentation lint, 728 links and
-the 531-path trusted inventory passed. Full repository formatting is still running.
+the 531-path trusted inventory and full repository formatting passed.
 
 Next add dedicated resource projection/ownership, native composition, schema/cache
 identity and packaged consumer evidence. Task scheduling, join carriers, delegate
@@ -121,6 +150,25 @@ Its Action overload of Run selects the default scheduler and denies child
 attachment. WhenAll uses a completion promise with a remaining-child count.
 These source facts guide the pending model; this checkpoint does not bind them
 as native assumptions or assign their allocation cost.
+
+### Dominating primitive-array origins
+
+The next phase C step admits initialized owned references across IR blocks.
+A bounded native graph traversal must find a definition that dominates each
+cross-block use. Dominance establishes initialization; the checker separately
+validates every reference write and operand in the complete typed program.
+Because reference inputs, external stores and unmodeled effects are rejected,
+induction over execution keeps admitted references null or locally owned. This
+admits compiler default initialization and later owned assignments, while rejecting
+uninitialized reads, paths bypassing initialization, and unowned redefinitions.
+Same-block checks remain unchanged. The fallback transfers only the independently
+verified cumulative byte upper envelope; it claims no precise liveness or lower
+bound. Source array-length/conditional-output and adversarial graph controls are
+validated successfully in the 778-case native gate and four package cases.
+Model v2 and cache 47 identify the new capability; wire formats are unchanged.
+Full formatting, quality/API compatibility and negative fixtures, documentation
+lint, 728 links and the 531-path trusted inventory passed. Source/project layout
+remains the validated 2773 sources, 59 projects and 151 pinned common files.
 
 ### Parametric memory upper envelopes
 
@@ -648,6 +696,10 @@ native metadata assumptions and replayed numeric violations remain open. This
 module verifies a supplied closed program; it is not yet a published native
 resource-claim workflow. Broader ranking synthesis and all required phases C-F
 remain incomplete.
+
+The checklist and first checkpoint entry describe the current state. Older
+checkpoint entries retain their earlier statuses, versions and verification
+results as implementation history.
 
 ## Native resource contract integration (in progress)
 

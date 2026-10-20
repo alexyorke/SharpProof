@@ -3589,15 +3589,20 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
-    [TestCase(5)]
-    [TestCase(6)]
-    public async Task MainPackagePublishesParametricMemoryEnvelopes(int metric)
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
+    public async Task MainPackagePublishesParametricMemoryEnvelopes(int metric, bool crossBlock)
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
+        var method = !crossBlock ? "public static int[] Target(int n) => new int[n];" : metric == 5
+            ? "public static int Target(int n) {var value=new int[n]; return value.Length;}"
+            : "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}";
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
             "using SharpProof.Attributes; public static class Subject { " +
-            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] public static int[] Target(int n) => new int[n]; }}", "all");
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }", "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
             "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
