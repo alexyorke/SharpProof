@@ -92,8 +92,18 @@ public static partial class Inference
                 return CSharpTypes.Rigid(info.ElementType);
             }
             var mapping = EnumerationMapping(loop, info.GetEnumeratorMethod);
-            var returned = info.GetEnumeratorMethod.OriginalDefinition.ReturnType as INamedTypeSymbol
-                ?? throw new InferenceException("Unresolved enumerator type.");
+            var declaredReturn = info.GetEnumeratorMethod.OriginalDefinition.ReturnType;
+            var returned = declaredReturn as INamedTypeSymbol;
+            if (returned is null && info.GetEnumeratorMethod.ReturnType is INamedTypeSymbol actualReturn)
+            {
+                var shape = CSharpTypes.Rigid(declaredReturn, mapping);
+                if (!CSharpTypes.MapNamedArguments(actualReturn, shape, mapping))
+                { throw new InferenceException("Unresolved substituted enumerator shape."); }
+                BindEnumeratorConstraints(loop, info.GetEnumeratorMethod, actualReturn, declaredReturn, shape, mapping);
+                returned = actualReturn.OriginalDefinition;
+            }
+            if (returned is null)
+            { throw new InferenceException("Unresolved enumerator type."); }
             AddNamedArguments(returned, mapping);
             INamedTypeSymbol? ancestor = returned.OriginalDefinition;
             while (ancestor is not null && !SymbolEqualityComparer.Default.Equals(ancestor.OriginalDefinition, info.CurrentProperty.ContainingType.OriginalDefinition))

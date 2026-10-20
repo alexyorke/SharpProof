@@ -379,6 +379,7 @@ internal static class Program
         passed += await DependentBoundRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DelegateAsyncChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DelegateRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await ParameterEnumeratorChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await EnumerationChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await EnumerationRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ControlFlowChecks.Run(cancellationToken).ConfigureAwait(false);

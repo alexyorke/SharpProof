@@ -478,3 +478,11 @@ failed alternatives leave inference variables unchanged. Inherited and struct
 implementations have regression coverage, and applied IDE fixes verify interface
 dispatch, helper effects and nullable payload domains. Genuinely ambiguous
 projections remain unresolved until other constraints distinguish them.
+
+Enumerator return parameters are mapped through their actual substituted types
+before resolving Current, MoveNext/MoveNextAsync and disposal members. The
+declared enumerator constraints use the original concrete substitutions for
+conversion classification, preserving variance while relating inferred payloads.
+Class, struct, inherited, extension and async-interface patterns have regression
+coverage. Applied IDE fixes compare iteration/disposal effects, suspended async
+iteration and nullable payload reference identity in original and new domains.

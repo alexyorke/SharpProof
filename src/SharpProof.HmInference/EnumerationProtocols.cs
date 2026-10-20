@@ -32,6 +32,39 @@ public static partial class Inference
             return mapping;
         }
 
+        private void BindEnumeratorConstraints(CommonForEachStatementSyntax loop, IMethodSymbol selected, INamedTypeSymbol actualReturn,
+            ITypeSymbol declaredReturn, HmType shape, Dictionary<ITypeParameterSymbol, HmType> mapping)
+        {
+            if (loop is null)
+            { throw new ArgumentNullException(nameof(loop)); }
+            if (selected is null)
+            { throw new ArgumentNullException(nameof(selected)); }
+            if (actualReturn is null)
+            { throw new ArgumentNullException(nameof(actualReturn)); }
+            if (declaredReturn is null)
+            { throw new ArgumentNullException(nameof(declaredReturn)); }
+            if (shape is null)
+            { throw new ArgumentNullException(nameof(shape)); }
+            if (mapping is null)
+            { throw new ArgumentNullException(nameof(mapping)); }
+            if (declaredReturn is not ITypeParameterSymbol parameter)
+            { return; }
+            var full = selected.ReducedFrom ?? selected;
+            var concrete = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
+            AddNamedArguments(full.ContainingType, concrete);
+            for (var i = 0; i < full.TypeParameters.Length; i++)
+            { concrete[full.OriginalDefinition.TypeParameters[i]] = CSharpTypes.Rigid(full.TypeArguments[i]); }
+            foreach (var bound in parameter.ConstraintTypes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var declared = CSharpTypes.Rigid(bound, concrete);
+                var spelling = CSharpTypes.Render(declared, bound, [], model: model, position: loop.SpanStart);
+                var resolved = model.GetSpeculativeTypeInfo(loop.SpanStart, SyntaxFactory.ParseTypeName(spelling), SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
+                if (resolved is null || resolved.TypeKind == TypeKind.Error)
+                { throw new InferenceException("Unresolved substituted enumerator constraint."); }
+                BindSubtype(actualReturn, resolved, shape, CSharpTypes.Rigid(bound, mapping), false);
+            }
+        }
         private static AwaitExpressionInfo? ImplicitAwaitInfo(SemanticModel semantic, SyntaxNode loop, IMethodSymbol? method)
         {
             if (semantic is null)
