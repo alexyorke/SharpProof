@@ -343,6 +343,53 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
+### Master integration (in progress)
+
+MR #334 now conflicts with master after its immutable-model migration
+`015c1db92`. The merge preview identifies 21 conflicting files across protocol,
+compiler artifacts, lowering, replay/manifest tests and the benchmark script.
+The field-fact and trace-layout controls above are verified before integration.
+Save that checkpoint, merge the reviewed master revision, preserve the resource
+features while adopting immutable model updates, and verify the combined state.
+No pre-merge result qualifies the resulting merge commit.
+
+### Exception trace element layout controls
+
+Pinned CoreCLR source now identifies `StackTraceElement` in
+[the runtime header](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.h#L34):
+`ip`, `sp`, `pFunc` and a 32-bit `flags` field. Together with `ArrayHeader`
+in object.h, the reviewed x64 ABI gives a 16-byte raw header and 32-byte element
+stride. The source blob is `2918c5cd3b6cf92e38f2792724cc06f10c0269b3`,
+SHA-256 `b4450aacce56acd88867e9b00fa26669251f6dac82fe506ffe91e470e7a7fc6e`.
+The public source cache and provenance record are under
+`artifacts/resource-runtime-fault-review/`.
+
+Three independent runtime controls passed on .NET 8.0.32 x64, throwing through
+0, 3 and 15 recursive calls with inlining/tail-call elimination prevented in the
+throwing helper. They inspect the resulting byte-array header, capacity, method
+descriptor offsets and reviewed flag bits. This checks storage layout only;
+no allocation-counter observation or complete trace-cost proof is claimed.
+All 161 Specs tests, final formatting, layout (2803 source files), documentation
+and full quality/API lint gates passed. An initial spelling failure in the new
+source-link label was corrected and the complete lint gate rerun successfully.
+Cumulative trace costs still require bounds on frames, updates, affinity/deep
+copies, resolver arrays and allocation failures; the root task byte verdict
+remains Unknown. In particular, element size does not solve the failure/update
+accounting issue recorded below.
+
+### Stored field facts
+
+Six direct IR controls passed for Boolean/integer fields used to select the
+returned graph. They check the initial false/zero value, a true/one overwrite,
+and overwrite from an unknown input. Known values produce independently checked
+24-byte object storage plus the selected 32- or 40-byte returned array; concrete
+interpreter replay agrees with the cumulative, auxiliary and retained bounds.
+Unknown overwrites discard the earlier field fact and return
+`MemoryControlFlowUnsupported` with no partial bounds. All 182 memory tests
+passed. Final combined formatting, layout (2803 source files), documentation
+and full quality/API lint checks passed. These controls
+change no resource cost model or public verdict rule.
+
 ### Violation search entry controls
 
 Six focused controls passed for unsupported metrics, missing layout evidence,
