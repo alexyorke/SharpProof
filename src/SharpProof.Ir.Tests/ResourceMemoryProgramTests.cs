@@ -7,6 +7,29 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void BorrowedInputCopiesNeedOwnershipOnlyWhenObserved(bool observed)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var input = factory.CreateVariable("input", factory.ObjectType);
+        var current = factory.CreateVariable("current", factory.ObjectType);
+        var old = factory.CreateVariable("old", factory.ObjectType);
+        builder.Assign(entry, factory.CreateOperation(), current, factory.Variable(input));
+        builder.Assign(entry, factory.CreateOperation(), old, factory.Variable(input));
+        builder.Return(entry, factory.CreateOperation(), observed ? factory.Variable(current) : null);
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        if (observed)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("UnownedMemoryReference"));
+        }
+        else
+        { Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(0, 0, 0, 0, 0, 0))); }
+    }
+
     [TestCase(0, false, false)]
     [TestCase(0, true, true)]
     [TestCase(1, false, true)]

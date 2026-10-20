@@ -3589,15 +3589,19 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         }
     }
-    [Test]
-    public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache(bool instanceFactory)
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " +
-            "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
-            "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }", "all");
+        var source = instanceFactory
+            ? "using SharpProof.Attributes; public sealed class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target(int value) => () => () => value; }"
+            : "using SharpProof.Attributes; public static class Subject { " +
+                "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
             "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",

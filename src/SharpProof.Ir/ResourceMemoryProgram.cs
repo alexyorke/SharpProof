@@ -199,6 +199,11 @@ internal static class ResourceMemoryProgram
                     values[target] = ++nextObject;
                     trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, slot, 0, lower, upper));
                     break;
+                // A pure copy into an unread local cannot retain an input graph.
+                // In particular, compiler entry/current/pre-state receiver copies
+                // need no ownership fact when the method never observes them.
+                case IrAssignInstruction { Value: IrVariableTerm } deadCopy when !lastUse.ContainsKey(deadCopy.Target):
+                    break;
                 case IrAssignInstruction assignment:
                     if (factory.GetTypeInfo(assignment.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
                     {

@@ -13,6 +13,29 @@ namespace SharpProof.Attributes.Test;
     Justification = "NUnit instantiates test fixtures through reflection.")]
 internal sealed class ContractApiTests
 {
+    [TestCase(1, 3)]
+    [TestCase(0, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1000000, 1000000)]
+    public void BooleanInputModelPreservesDeclaredWeights(int trueWeight, int falseWeight)
+    {
+        var model = new ResourceBooleanInputAttribute(trueWeight, falseWeight);
+        Assert.That(model.TrueWeight, Is.EqualTo(trueWeight));
+        Assert.That(model.FalseWeight, Is.EqualTo(falseWeight));
+    }
+
+    [TestCase(-1, 1, "trueWeight")]
+    [TestCase(1000001, 1, "trueWeight")]
+    [TestCase(1, -1, "falseWeight")]
+    [TestCase(1, 1000001, "falseWeight")]
+    [TestCase(0, 0, "falseWeight")]
+    public void BooleanInputModelRejectsInvalidOrEmptyDistributions(int trueWeight, int falseWeight, string parameter)
+    {
+        System.ArgumentNullException.ThrowIfNull(parameter);
+        Action construct = () => { _ = new ResourceBooleanInputAttribute(trueWeight, falseWeight); };
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(construct)!.ParamName, Is.EqualTo(parameter));
+    }
+
     [TestCase(nameof(Contract.Requires))]
     [TestCase(nameof(Contract.Ensures))]
     [TestCase(nameof(Contract.Assume))]

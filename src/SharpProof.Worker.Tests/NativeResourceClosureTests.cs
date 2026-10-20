@@ -5,6 +5,62 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [Test]
+    public void CompiledInstanceFactoryDoesNotRetainItsUnusedReceiver()
+    {
+        var receiver = new ReceiverIndependentFactory();
+        var outer = receiver.Make(7);
+        var frame = outer.Target;
+        Assert.That(frame, Is.Not.Null);
+        Assert.That(frame, Is.Not.SameAs(receiver));
+        var fields = frame!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Has.Length.EqualTo(2));
+        Assert.That(fields.Count(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int)), Is.EqualTo(1));
+        Assert.That(fields.Any(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(ReceiverIndependentFactory)), Is.False);
+        var inner = outer();
+        Assert.That(inner.Target, Is.SameAs(frame));
+        Assert.That((object)outer(), Is.SameAs(inner));
+        Assert.That(inner(), Is.EqualTo(7));
+    }
+
+    private sealed class ReceiverIndependentFactory
+    {
+        internal Func<Func<int>> Make(int value)
+        {
+            GC.KeepAlive(this);
+            return () => () => value;
+        }
+    }
+
+    [TestCase("() => this.value")]
+    [TestCase("() => () => this.value")]
+    [TestCase("() => n + value")]
+    public async Task InstanceReceiverCaptureRemainsUnknown(string expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var returnType = expression.Contains("() => ()", StringComparison.Ordinal) ? "System.Func<System.Func<int>>" : "System.Func<int>";
+        var source = "using SharpProof.Attributes; public sealed class C { int value = 1; " +
+            $"[ResourceUpperBound(ResourceMetric.RetainedBytes,1024)] public {returnType} Target(int n) => {expression}; }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task InstanceFactoryWithoutReceiverCaptureOwnsOnlyTheReturnedRootFrame(int metric)
+    {
+        var limit = metric == 5 ? 0 : 96;
+        var source = "using SharpProof.Attributes; public sealed class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},{limit})] public System.Func<System.Func<int>> Target(int n) " +
+            "=> () => () => n; }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(limit.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
     [TestCase(4)]
     [TestCase(5)]
     [TestCase(6)]

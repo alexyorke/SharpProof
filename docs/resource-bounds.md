@@ -593,6 +593,16 @@ models. Object packing intervals remain separate upper and lower bounds; a loose
 upper bound cannot establish an exact violating cost. Closure invocation effects
 and costs require separate admission.
 
+Instance factories may use the same root-frame model when all deferred captures
+belong to their read-only parameters or initialized locals. The returned graph
+must not capture the factory receiver, explicitly or implicitly. Receiver field
+reads inside a lambda remain Unknown. Pure entry/current/pre-state copies of
+an unused receiver add no owned storage; observing or returning an unowned
+reference still requires an ownership model. Under the declared layout, a nested
+scalar root capture retains a 32-byte frame (including its deferred delegate
+cache slot) and a 64-byte outer delegate. Later invocations require separate
+cost proofs.
+
 ### Logical source stack contracts
 
 `SourceActivationDepth` bounds simultaneous logical source activations.
@@ -661,7 +671,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 39 and cache schema 42 invalidate older responses without this evidence.
+Protocol 39 and cache schema 43 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -713,7 +723,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 39 and cache 42 invalidate prior responses; compiler artifact 52 and
+Protocol 39 and cache 43 invalidate prior responses; compiler artifact 52 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 

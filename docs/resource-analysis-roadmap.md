@@ -89,6 +89,34 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Instance factory lifetime extension
+
+Instance factories now use the shared-root closure model only when deferred
+captures belong to read-only factory parameters or initialized locals. Any
+instance reference inside a deferred body rejects this plan. A native memory
+rule ignores pure variable copies into unread locals, allowing unused receiver
+entry/current/pre-state bindings without inventing an owned input graph.
+Observed borrowed references remain Unknown. Source-level controls cover all
+three byte/lifetime metrics and explicit/implicit receiver capture; an independent
+compiled-frame control checks the actual root/cache fields and shared target.
+All 772 IR tests passed, including borrowed-copy acceptance and rejection.
+All 584 selected native/resource/protocol cases passed, including the instance
+factory bounds, receiver-capture rejection and independent compiled-frame
+control. All 2165 frontend tests and quality/API compatibility checks passed.
+The complete attribute suite passed 44 tests, including declared weight
+boundaries and invalid/empty probability distributions. Both packaged-consumer
+cases passed, checking static source-call and instance factory retained bounds
+under strict/advisory policy and in JSON/SARIF. Layout passed with 2769 source
+files, 59 projects and all 151 pinned common files unchanged. The trusted-source
+inventory passed with 529 classified paths. Full repository formatting passed.
+Cache schema 43 invalidates earlier capability results; wire formats are unchanged.
+Broader capture/call lifetimes, phase F and 100% coverage qualification remain open.
+
+Published head f72dbc694 passed all four coverage shards but failed aggregate
+qualification at 4724/4952 changed trusted lines (95.40%, 228 gaps). The report
+is preserved. The 100% floor and trusted-source inventory are unchanged;
+these newer local tests have no claimed measured coverage gain yet.
+
 Nested root-capture lifetime support is implemented for the admitted shared-root
 scope. The root-frame planner now checks
 each deferred anonymous function and admits up to 16 nested functions only when

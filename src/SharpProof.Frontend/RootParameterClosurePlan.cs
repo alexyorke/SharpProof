@@ -39,8 +39,8 @@ internal sealed class RootParameterClosurePlan
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation == null || method is not { IsStatic: true, IsAsync: false, IsGenericMethod: false, MethodKind: MethodKind.Ordinary } ||
-            method.ContainingType.IsGenericType || method.ReturnType.TypeKind != TypeKind.Delegate ||
+        if (compilation == null || method is not { IsAsync: false, IsGenericMethod: false, MethodKind: MethodKind.Ordinary } ||
+            method.ContainingType.IsGenericType || !method.ContainingType.IsReferenceType || method.ReturnType.TypeKind != TypeKind.Delegate ||
             method.Parameters.Any(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind != RefKind.None) ||
             method.DeclaringSyntaxReferences.Length != 1 ||
             method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration ||
@@ -77,7 +77,7 @@ internal sealed class RootParameterClosurePlan
         foreach (var operation in anonymous.Body.Descendants())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (--remaining < 0 || operation is ILocalFunctionOperation)
+            if (--remaining < 0 || operation is ILocalFunctionOperation or IInstanceReferenceOperation)
             { return null; }
             if (operation is IAnonymousFunctionOperation nested)
             {
