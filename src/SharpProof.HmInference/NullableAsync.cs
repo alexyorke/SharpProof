@@ -170,6 +170,8 @@ public static partial class Inference
                 _ = Expression(expression);
                 return CSharpTypes.Rigid(converted);
             }
+            if (IsDynamicIdentityBoundary(info.Type, converted))
+            { return DynamicIdentityShape(CSharpTypes.Rigid(info.Type), CSharpTypes.Rigid(converted), Expression(expression)); }
             var sameTuple = info.Type is INamedTypeSymbol { IsTupleType: true } sourceTuple && converted is INamedTypeSymbol { IsTupleType: true } declaredTuple
                 && SymbolEqualityComparer.Default.Equals(sourceTuple.TupleUnderlyingType, declaredTuple.TupleUnderlyingType);
             if (SymbolEqualityComparer.Default.Equals(info.Type, converted) || sameTuple || model.ClassifyConversion(expression, converted).IsIdentity)

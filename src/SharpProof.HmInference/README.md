@@ -668,3 +668,12 @@ dynamic sites, operand types, explicit type arguments and statically known metho
 groups; changing a known dynamically invoked group rejects the suggestion.
 IDE runtime checks compare original and fixed overload selection, member/indexer
 effects, user conversions, missing-member exceptions and await suspension/faults.
+
+Identity conversions preserve nested object/dynamic annotations independently of
+their CLR representation. Return and imported-argument boundaries rebuild tuple,
+array, task and named/nested generic shapes while sharing unaffected inferred
+variables. Thus Pair<dynamic, int> can become Pair<dynamic, T> at its input and
+Pair<object, T> at its output without changing the return dynamic metadata or
+forcing the second field to remain int. Runtime IDE checks compare DynamicAttribute
+flags exactly and verify new decimal fields, tuple values, and array/task/container
+reference identity. CLI and fresh package consumers assert the full return shapes.

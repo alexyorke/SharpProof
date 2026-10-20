@@ -110,6 +110,62 @@ public static partial class Inference
         }
 
 
+        private bool IsDynamicIdentityBoundary(ITypeSymbol source, ITypeSymbol target)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            var original = CSharpTypes.Rigid(source);
+            var converted = CSharpTypes.Rigid(target);
+            if ((!ContainsDynamic(original) && !ContainsDynamic(converted))
+                || !((Microsoft.CodeAnalysis.CSharp.CSharpCompilation)model.Compilation).ClassifyConversion(source, target).IsIdentity)
+            { return false; }
+            return true;
+        }
+
+        private HmType DynamicIdentityShape(HmType source, HmType target, HmType inferred)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (inferred is null)
+            { throw new ArgumentNullException(nameof(inferred)); }
+            cancellationToken.ThrowIfCancellationRequested();
+            source = source.Root;
+            target = target.Root;
+            inferred = inferred.Root;
+            if (target.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+            {
+                return target.WithArguments(DynamicIdentityShape(
+                    source.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter ? source.Arguments[0] : source,
+                    target.Arguments[0],
+                    inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter ? inferred.Arguments[0] : inferred));
+            }
+            if (source.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+            {
+                return DynamicIdentityShape(source.Arguments[0], target,
+                    inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter ? inferred.Arguments[0] : inferred);
+            }
+            if (source.Name != target.Name)
+            {
+                UnifyDeconstructionReceiver(source, inferred);
+                return target;
+            }
+            if (source.Arguments.Length == 0)
+            { return inferred; }
+            if (inferred.IsVariable && source.CSharpSymbol is ITypeSymbol original)
+            { HmType.Unify(inferred, CSharpTypes.Erase(original)); inferred = inferred.Root; }
+            if (source.Arguments.Length != target.Arguments.Length || inferred.Arguments.Length != source.Arguments.Length)
+            { throw new InferenceException("Dynamic identity conversion shape mismatch."); }
+            var arguments = new HmType[source.Arguments.Length];
+            for (var i = 0; i < arguments.Length; i++)
+            { arguments[i] = DynamicIdentityShape(source.Arguments[i], target.Arguments[i], inferred.Arguments[i]); }
+            return target.WithArguments(arguments);
+        }
+
+
         private bool TryBindDynamicArgument(IOperation operation, HmType expected, HmType inferred)
         {
             if (operation is null)
@@ -118,8 +174,17 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expected)); }
             if (inferred is null)
             { throw new ArgumentNullException(nameof(inferred)); }
-            if (!ContainsDynamic(expected) || operation.Syntax is not ExpressionSyntax expression
+            if (operation.Syntax is not ExpressionSyntax expression
                 || model.GetTypeInfo(expression, cancellationToken).Type is not ITypeSymbol source || source is IDynamicTypeSymbol)
+            { return false; }
+            var target = (operation.Parent as IArgumentOperation)?.Parameter?.Type ?? ConversionCore(expected).CSharpSymbol;
+            if (target is not null && IsDynamicIdentityBoundary(source, target))
+            {
+                var converted = DynamicIdentityShape(CSharpTypes.Rigid(source), CSharpTypes.Rigid(target), inferred);
+                UnifyDeconstructionReceiver(expected, converted);
+                return true;
+            }
+            if (!ContainsDynamic(expected))
             { return false; }
             UnifyDeconstructionReceiver(CSharpTypes.Rigid(source), inferred);
             return true;

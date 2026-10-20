@@ -42,6 +42,24 @@ internal static class DynamicChecks
             ("DynamicStaticRootControl", "static int M(int value,int tag)=>value;static dynamic Use(dynamic value)=>M(value,0);", "Rejected", null),
             ("DynamicObjectArgument", "static dynamic M(object value,int tag)=>Imported(value);static dynamic Imported(dynamic value)=>value;", "Suggestion", "dynamic M<T1>(object value, T1 tag)"),
 
+            ("DynamicTaskIdentityBoundary", "static System.Threading.Tasks.Task<object> M(System.Threading.Tasks.Task<dynamic> value,int tag)=>value;", "Suggestion", "global::System.Threading.Tasks.Task<object> M<T1>(global::System.Threading.Tasks.Task<dynamic> value, T1 tag)"),
+            ("DynamicNestedArrayBoundary", "static System.Threading.Tasks.Task<object[]> M(System.Threading.Tasks.Task<dynamic[]> value,int tag)=>value;", "Suggestion", "global::System.Threading.Tasks.Task<object[]> M<T1>(global::System.Threading.Tasks.Task<dynamic[]> value, T1 tag)"),
+            ("DynamicTupleIdentityBoundary", "static (object Item,int Count) M((dynamic Item,int Count) value,int tag)=>value;", "Suggestion", "(object Item, T1 Count) M<T1, T2>((dynamic Item, T1 Count) value, T2 tag)"),
+            ("DynamicNamedIdentityBoundary", "static Pair<object,int> M(Pair<dynamic,int> value,int tag)=>value;class Pair<A,B>{}", "Suggestion", "global::Cases.Pair<object, T1> M<T1, T2>(global::Cases.Pair<dynamic, T1> value, T2 tag)"),
+            ("DynamicNamedArgumentBoundary", "static int M(Pair<object,int> value,int tag)=>Imported(value);static T Imported<T>(Pair<dynamic,T> value)=>default!;class Pair<A,B>{}", "Suggestion", "T1 M<T1, T2>(global::Cases.Pair<object, T1> value, T2 tag)"),
+            ("DynamicTupleArgumentBoundary", "static int M((object Item,int Count) value,int tag)=>Imported(value);static T Imported<T>((dynamic Item,T Count) value)=>value.Count;", "Suggestion", "T1 M<T1, T2>((object Item, T1 Count) value, T2 tag)"),
+            ("DynamicExplicitLocal", "static int M(object value,int tag){dynamic local=value;return local.Count;}", "Suggestion", "int M<T1>(object value, T1 tag)"),
+            ("DynamicObjectLocal", "static object M(dynamic value,int tag){object local;local=value;return local;}", "Suggestion", "object M<T1>(dynamic value, T1 tag)"),
+            ("DynamicNamedLocalBoundary", "static Pair<object,int> M(Pair<dynamic,int> value,int tag){var local=value;return local;}class Pair<A,B>{}", "Suggestion", "global::Cases.Pair<object, T1> M<T1, T2>(global::Cases.Pair<dynamic, T1> value, T2 tag)"),
+
+            ("DynamicNamedReverseBoundary", "static Pair<dynamic,int> M(Pair<object,int> value,int tag)=>value;class Pair<A,B>{}", "Suggestion", "global::Cases.Pair<dynamic, T1> M<T1, T2>(global::Cases.Pair<object, T1> value, T2 tag)"),
+            ("DynamicNamedReverseArgument", "static int M(Pair<dynamic,int> value,int tag)=>Imported(value);static T Imported<T>(Pair<object,T> value)=>default!;class Pair<A,B>{}", "Suggestion", "T1 M<T1, T2>(global::Cases.Pair<dynamic, T1> value, T2 tag)"),
+            ("DynamicNestedNullableBoundary", "static Pair<object?,int>? M(Pair<dynamic?,int>? value,int tag)=>value;class Pair<A,B>{}", "Suggestion", "global::Cases.Pair<object?, T1>? M<T1, T2>(global::Cases.Pair<dynamic?, T1>? value, T2 tag)"),
+            ("DynamicNestedOwnerBoundary", "static Owner<object>.Pair<int> M(Owner<dynamic>.Pair<int> value,int tag)=>value;class Owner<A>{public class Pair<B>{}}", "Suggestion", "global::Cases.Owner<object>.Pair<T1> M<T1, T2>(global::Cases.Owner<dynamic>.Pair<T1> value, T2 tag)"),
+
+            ("DynamicNamedCallerBoundary", "static Pair<object,int> M(Pair<dynamic,int> value,int tag)=>value;static string Use(Pair<dynamic,int> value)=>M(value,0).Item.ToString()!;class Pair<A,B>{public A Item=default!;}", "Suggestion", "global::Cases.Pair<object, T1> M<T1, T2>(global::Cases.Pair<dynamic, T1> value, T2 tag)"),
+            ("DynamicRectangularArrayBoundary", "static object[,] M(dynamic[,] value,int tag)=>value;", "Suggestion", "object[,] M<T1>(dynamic[,] value, T1 tag)"),
+
             ("DynamicNullComparison", "static bool M(dynamic value,int tag)=>value==null;", "Suggestion", "bool M<T1>(dynamic value, T1 tag)")
         ];
         var failures = new List<string>();
@@ -87,7 +105,16 @@ internal static class DynamicChecks
                 public DynamicCreated(int value){Kind="int:"+value;}
                 public DynamicCreated(object value){Kind="object";}
             }
+            public class DynamicPair<A,B>{public A Item=default!;public B Count=default!;}
             public static class DynamicProbe {
+                public static DynamicPair<object,int> BoundaryReturn(DynamicPair<dynamic,int> value,int tag)=>value;
+                public static int BoundaryArgument(DynamicPair<object,int> value,int tag)=>DynamicItem(value);
+                private static T DynamicItem<T>(DynamicPair<dynamic,T> value)=>value.Count;
+                public static (object Item,int Count) TupleBoundary((dynamic Item,int Count) value,int tag)=>value;
+                public static object[] ArrayBoundary(dynamic[] value,int tag)=>value;
+                public static Task<object> TaskBoundary(Task<dynamic> value,int tag)=>value;
+                public static DynamicPair<dynamic,int> ReverseBoundary(DynamicPair<object,int> value,int tag)=>value;
+
                 public static dynamic Call(dynamic target,int value,int tag)=>target.Read(value);
                 public static dynamic Member(dynamic target,int tag)=>target.Name;
                 public static void Store(dynamic target,int value,int tag){target.Count=value;}
@@ -155,8 +182,8 @@ internal static class DynamicChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 13)
-        { throw new InvalidOperationException("Expected thirteen dynamic code fixes; got " + fixes); }
+        if (fixes != 19)
+        { throw new InvalidOperationException("Expected nineteen dynamic code fixes; got " + fixes); }
         var after = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
         var expected = before.GetType("DynamicRunner")!.GetMethod("Run")!.Invoke(null, null);
         var actual = after.GetType("DynamicRunner")!.GetMethod("Run")!.Invoke(null, null);
@@ -196,10 +223,55 @@ internal static class DynamicChecks
             throw new InvalidOperationException("Dynamic await lost its fault.");
         }
         catch (InvalidOperationException exception) when (ReferenceEquals(exception, fault)) { }
+        foreach (var name in new[] { "BoundaryReturn", "BoundaryArgument", "TupleBoundary", "TaskBoundary", "ReverseBoundary", "ArrayBoundary" })
+        {
+            var originalMethod = before.GetType("DynamicProbe")!.GetMethod(name)!;
+            var changedMethod = probe.GetMethod(name)!;
+            if (DynamicFlags(originalMethod.ReturnParameter) != DynamicFlags(changedMethod.ReturnParameter))
+            { throw new InvalidOperationException(name + " changed return dynamic metadata."); }
+            var originalParameters = originalMethod.GetParameters();
+            var changedParameters = changedMethod.GetParameters();
+            for (var i = 0; i < originalParameters.Length; i++)
+            {
+                if (DynamicFlags(originalParameters[i]) != DynamicFlags(changedParameters[i]))
+                { throw new InvalidOperationException(name + " changed parameter dynamic metadata."); }
+            }
+        }
+        var pairType = after.GetType("DynamicPair" + (char)96 + "2")!.MakeGenericType(typeof(object), typeof(decimal));
+        var pair = Activator.CreateInstance(pairType)!;
+        var payload = new object();
+        pairType.GetField("Item")!.SetValue(pair, payload);
+        pairType.GetField("Count")!.SetValue(pair, 123.25m);
+        if (!ReferenceEquals(probe.GetMethod("BoundaryReturn")!.MakeGenericMethod(typeof(decimal), typeof(Uri)).Invoke(null, [pair, marker]), pair)
+            || !ReferenceEquals(probe.GetMethod("ReverseBoundary")!.MakeGenericMethod(typeof(decimal), typeof(Uri)).Invoke(null, [pair, marker]), pair)
+            || !Equals(probe.GetMethod("BoundaryArgument")!.MakeGenericMethod(typeof(decimal), typeof(Uri)).Invoke(null, [pair, marker]), 123.25m))
+        { throw new InvalidOperationException("Dynamic identity boundaries changed a reference or pinned an unrelated field."); }
+        var tupleResult = ((object Item, decimal Count))probe.GetMethod("TupleBoundary")!.MakeGenericMethod(typeof(decimal), typeof(Uri))
+            .Invoke(null, [(payload, 123.25m), marker])!;
+        if (!ReferenceEquals(tupleResult.Item, payload) || tupleResult.Count != 123.25m)
+        { throw new InvalidOperationException("Dynamic tuple metadata conversion changed a value."); }
+        var taskPayload = Task.FromResult(payload);
+        if (!ReferenceEquals(probe.GetMethod("TaskBoundary")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [taskPayload, marker]), taskPayload))
+        { throw new InvalidOperationException("Dynamic task metadata conversion changed task identity."); }
+        var arrayPayload = new[] { payload };
+        if (!ReferenceEquals(probe.GetMethod("ArrayBoundary")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [arrayPayload, marker]), arrayPayload))
+        { throw new InvalidOperationException("Dynamic array metadata conversion changed array identity."); }
+
+        Program.Log.Info("PASS DynamicIdentityBoundaryMetadataAndGenericSiblings");
+
         Program.Log.Info("PASS DynamicCodeFixOriginalAndGeneralizedRuntime");
         Program.Log.Info("PASS DynamicAwaitSuspensionAndFault");
-        return 2;
+        return 3;
     }
+
+    private static string DynamicFlags(System.Reflection.ParameterInfo parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+        var attribute = parameter.GetCustomAttributes(typeof(System.Runtime.CompilerServices.DynamicAttribute), false)
+            .OfType<System.Runtime.CompilerServices.DynamicAttribute>().SingleOrDefault();
+        return attribute is null ? "none" : string.Join(",", attribute.TransformFlags);
+    }
+
 
     private static System.Reflection.Assembly Load(Compilation compilation, CancellationToken cancellationToken)
     {
