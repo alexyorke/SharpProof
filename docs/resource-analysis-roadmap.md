@@ -113,6 +113,14 @@ suite. Final documentation lint, 727 links and an edited-file formatting check
 also passed. Implementation 1e33c6a71 and fixture corrections 4b4bc7930 are
 published in draft MR #334.
 
+Latest fetched master 59353cb05 adds constrained integer comparable calls and
+receiver-mutation behavior. Merge 0e4f70ef2 preserves both this branch's initializer
+stores and master's specialized field binding. The local checkpoint above
+predates that merge. Resource/closure/expected-cost, constrained-comparable and
+layout/inventory checks are being repeated on the merged state. Layout passed
+2766 sources, 59 projects and 151 unchanged pinned common files; the trusted
+inventory classifies 529 paths. Exact-head CI must qualify the resulting commit.
+
 The completed expected-cost row covers conditional upper expectations under
 the stated Boolean model. It does not establish expected lower bounds or
 tightness. Broader lifetime composition, async/concurrency, coverage and final
