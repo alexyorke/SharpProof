@@ -583,7 +583,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             ?? throw new AssertionException("The container artifact export root was not provided.");
         var output = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "fixed-checksum-normal-entry");
         Directory.CreateDirectory(output);
-        var evidence = new Dictionary<string, object?>
+        var evidence = new OrderedEvidenceBuilder
         {
             ["sourceSha256"] = Hash(Encoding.UTF8.GetBytes(Source).ToImmutableArray()),
             ["completed"] = false,
@@ -705,7 +705,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(evidence) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
+                evidence.ToJson() + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 

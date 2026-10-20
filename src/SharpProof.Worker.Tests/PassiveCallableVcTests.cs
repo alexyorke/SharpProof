@@ -661,13 +661,13 @@ internal sealed class PassiveCallableVcTests
         if (restore)
         { Store(7); }
         subject.Builder.Return(block, subject.Site, factory.Integer(0));
-        var requires = new List<PassiveContractClause>
-        { new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site) };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
         var cell = array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
             : factory.PureOpaque(field, factory.Variable(owner.Current));
-        return new("opaque-heap", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+        return new("opaque-heap", subject.Builder.Build(), [owner], subject.Result, requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, cell, factory.Integer(nonwriter ? 3 : 5)), factory.Boolean(true), subject.Site)]);
     }
 
@@ -716,14 +716,12 @@ internal sealed class PassiveCallableVcTests
         else
         { subject.Builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(7)); }
         subject.Builder.Return(block, subject.Site, Read(owner.Old));
-        var requires = new List<PassiveContractClause>
-        {
-            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site),
-            new(factory.Binary(IrBinaryOperator.Equal, Read(owner.Entry), factory.Integer(3)), factory.Boolean(true), subject.Site)
-        };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(type)), factory.Boolean(true), subject.Site));
+        requires.Add(new(factory.Binary(IrBinaryOperator.Equal, Read(owner.Entry), factory.Integer(3)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
-        var candidate = new PassiveCallableCandidate("body-snapshot", subject.Builder.Build(), [owner], subject.Result, [.. requires],
+        var candidate = new PassiveCallableCandidate("body-snapshot", subject.Builder.Build(), [owner], subject.Result, requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(7)), factory.Boolean(true), subject.Site),
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(3)), factory.Boolean(true), subject.Site)]);
         var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])

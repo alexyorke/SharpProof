@@ -56,8 +56,8 @@ public sealed class FloatingPredicateSoundnessAuditTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, valueType + ".oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, valueType + ".oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("FloatingPredicateSoundness_" + valueType, isCollectible: true);
         string runtimeObservation;
@@ -69,7 +69,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
             runtimeObservation = $"type={valueType}; argument={argument}; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
                 $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
-                $"PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}";
+                $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".clr.txt"), runtimeObservation + "\n");
             Assert.That(actual, Is.EqualTo(expectedRuntime), runtimeObservation);

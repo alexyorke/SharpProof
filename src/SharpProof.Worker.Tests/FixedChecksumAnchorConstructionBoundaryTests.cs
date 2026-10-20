@@ -621,7 +621,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             ?? throw new AssertionException("The container artifact export root was not provided.");
         var output = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "fixed-checksum-construction");
         Directory.CreateDirectory(output);
-        var observation = new Dictionary<string, object?>
+        var observation = new OrderedEvidenceBuilder
         {
             ["sourceSha256"] = Hash(Encoding.UTF8.GetBytes(Source)),
             ["nativeQueryExecutionRequested"] = false,
@@ -784,7 +784,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(observation) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
+                observation.ToJson() + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 
@@ -828,5 +828,53 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             }
         }
         return hash;
+    }
+}
+
+internal sealed class OrderedEvidenceBuilder
+{
+    private readonly ImmutableArray<KeyValuePair<string, object?>>.Builder _entries =
+        ImmutableArray.CreateBuilder<KeyValuePair<string, object?>>();
+    private readonly ImmutableDictionary<string, int>.Builder _positions =
+        ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+
+    internal object? this[string key]
+    {
+        get
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            return _entries[_positions[key]].Value;
+        }
+        set
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            var entry = new KeyValuePair<string, object?>(key, value);
+            if (_positions.TryGetValue(key, out var position))
+            {
+                _entries[position] = entry;
+            }
+            else
+            {
+                _positions.Add(key, _entries.Count);
+                _entries.Add(entry);
+            }
+        }
+    }
+
+    internal string ToJson()
+    {
+        var fields = _entries.ToImmutable();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var field in fields)
+            {
+                writer.WritePropertyName(field.Key);
+                JsonSerializer.Serialize(writer, field.Value);
+            }
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 }

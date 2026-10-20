@@ -107,10 +107,10 @@ public sealed class CompilerReferenceStackMergeCoverageTests
             {
                 foreach (var choose in Choices)
                 {
-                    object?[] arguments = [choose, first, second];
+                    ImmutableArray<object?> arguments = [choose, first, second];
                     var expected = choose ? first == null : second == null;
-                    Assert.That(subject.Method.Invoke(null, arguments), Is.EqualTo(expected));
-                    Assert.That(subject.RootMethod.Invoke(null, arguments), Is.EqualTo(expected));
+                    Assert.That(subject.Method.Invoke(null, arguments.ToArray()), Is.EqualTo(expected));
+                    Assert.That(subject.RootMethod.Invoke(null, arguments.ToArray()), Is.EqualTo(expected));
                 }
             }
         }
