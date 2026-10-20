@@ -755,3 +755,6 @@ Original warning suppression and warnings-as-errors settings are respected;
 other newly introduced warnings still reject candidates. Exact signatures and
 IDE runtime checks cover nullable reference/value inputs, array identity, tuple
 siblings, generic caller wrappers and async suspension, faults and cancellation.
+
+Solution-scale benchmark inputs, quality checks, measurements and reproduction
+commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "source_commit": "c80397ac19bc6ec975137fbabb53a6593ebad4f9",
+  "cli_sha256": "67ae65a4b990a47ac68d2cfade754ed773335503c15d62b6255e47166f841a89",
+  "environment_id": "host-image-sha256:f672419d15d784637a41362320b1f6ae9b20cba0c459fca6f0873e634285c3f9",
+  "sdk": "10.0.402",
+  "platform": "Unix",
+  "architecture": "X64",
+  "projects": 12,
+  "replicas": 4,
+  "families": 9,
+  "source_methods": 468,
+  "expected_suggestions": 432,
+  "fixture_sha256": "b074065fb1077e5b786fb52c59f451523149bedbf7a2225844bb2cdd7f350834",
+  "quality_sha256": "29b51e31b6404e53b223c22229a9bc26e05638c5a0149cf1c5f9c8c93e4aaf31",
+  "setup_seconds": 3.9468889,
+  "measurement": "Fresh CLI processes; solution loading, inference, validation and diagnostic pipe capture included; restore/native build excluded and recorded separately; first sample is not claimed to be a cold-cache run.",
+  "samples": [
+    {
+      "ordinal": 1,
+      "seconds": 22.8959228,
+      "suggestions": 432,
+      "project_compilations": 12,
+      "quality_sha256": "29b51e31b6404e53b223c22229a9bc26e05638c5a0149cf1c5f9c8c93e4aaf31"
+    },
+    {
+      "ordinal": 2,
+      "seconds": 24.4623274,
+      "suggestions": 432,
+      "project_compilations": 12,
+      "quality_sha256": "29b51e31b6404e53b223c22229a9bc26e05638c5a0149cf1c5f9c8c93e4aaf31"
+    },
+    {
+      "ordinal": 3,
+      "seconds": 22.512911,
+      "suggestions": 432,
+      "project_compilations": 12,
+      "quality_sha256": "29b51e31b6404e53b223c22229a9bc26e05638c5a0149cf1c5f9c8c93e4aaf31"
+    }
+  ],
+  "median_seconds": 22.8959228,
+  "minimum_seconds": 22.512911,
+  "maximum_seconds": 24.4623274
+}
