@@ -239,13 +239,26 @@ public static partial class Inference
             // explicit local types, conversions, name collisions and broken call sites.
             var tree = method.SyntaxTree;
             var changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
-            var changedCompilation = model.Compilation.ReplaceSyntaxTree(tree, changed);
-            // Workspace diagnostic providers key editor configuration by syntax-tree identity.
-            // The speculative replacement must retain the source tree's settings.
-            if (model.Compilation.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
+            Compilation ReplaceCandidate(SyntaxTree replacement)
             {
-                changedCompilation = changedCompilation.WithOptions(changedCompilation.Options.WithSyntaxTreeOptionsProvider(
-                    new CandidateTreeOptions(sourceOptions, tree, changed)));
+                if (replacement is null)
+                { throw new ArgumentNullException(nameof(replacement)); }
+                var rewritten = model.Compilation.ReplaceSyntaxTree(tree, replacement);
+                if (model.Compilation.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
+                { rewritten = rewritten.WithOptions(rewritten.Options.WithSyntaxTreeOptionsProvider(new CandidateTreeOptions(sourceOptions, tree, replacement))); }
+                return rewritten;
+            }
+            var changedCompilation = ReplaceCandidate(changed);
+            if (asyncBuilder is not null && symbol.IsAsync)
+            {
+                var layoutMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(declaration =>
+                { if (declaration is null) { throw new ArgumentNullException(nameof(declaration)); } return declaration.SpanStart == method.SpanStart; });
+                if (InferBuilderLayoutConstraints(changedCompilation, layoutMethod, variables))
+                {
+                    candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(BuildConstraints(variables, nullableAnnotations)));
+                    changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
+                    changedCompilation = ReplaceCandidate(changed);
+                }
             }
             if (changedCompilation.GetDiagnostics(cancellationToken).Any(d =>
             {

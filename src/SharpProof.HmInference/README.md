@@ -503,3 +503,12 @@ captures. Applied IDE fixes compare protocol traces, suspended completion, resul
 identity (including boxed structs), nulls, faults and cancellation, including new
 unrelated types. Debug and Release compare against their own protocol baselines.
 Capture/layout-dependent state-machine requirements still have emission guards.
+
+Root async methods with unmanaged state-machine builder requirements inspect
+emitted private storage through Roslyn metadata symbols. Only type arguments that
+physically occupy parameter/local, builder or awaiter fields receive unmanaged
+constraints; unused parameters and phantom arguments remain free. Active safe
+and critical completion members are distinguished. Layout probes can temporarily
+strengthen generic constraints when the host compiler enforces them before emit.
+Applied fixes verify actual runtime reference-containing layouts and reject
+managed payload calls. Nested async-function layout correlation remains open.

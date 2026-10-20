@@ -26,6 +26,7 @@ bash src/SharpProof.HmInference/verify-generators.sh "$output" | tee /workspace/
 bash src/SharpProof.HmInference/verify-tool-builds.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/tool-build-checks.txt
 bash src/SharpProof.HmInference/verify-unsafe.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/unsafe-checks.txt
 bash src/SharpProof.HmInference/verify-constraints.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/constraint-checks.txt
+bash src/SharpProof.HmInference/verify-builder-layout.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/builder-layout-checks.txt
 dotnet "$output" --self-test | tee /workspace/SharpProof/artifacts/hm-inference/tests.txt
 dotnet "$output" --samples | tee /workspace/SharpProof/artifacts/hm-inference/samples.txt
 dotnet "$output" --hm-samples | tee /workspace/SharpProof/artifacts/hm-inference/hm-samples.txt

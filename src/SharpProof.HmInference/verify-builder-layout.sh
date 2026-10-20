@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+output=$(realpath "$1")
+fixture=$(mktemp -d '/tmp/hm builder layout.XXXXXX')
+cp global.json "$fixture/global.json"
+mkdir -p "$fixture/feed"
+printf '%s\n' '<configuration><packageSources><clear/><add key="fixture" value="./feed"/></packageSources></configuration>' > "$fixture/NuGet.Config"
+sed -n '/internal const string Support = """/,/        """;/p' src/SharpProof.HmInference/BuilderLayoutChecks.cs | sed '1d;$d;s/^        //' > "$fixture/LayoutSupport.cs"
+test -s "$fixture/LayoutSupport.cs"
+cat > "$fixture/Input.cs" <<'EOF'
+public static class LayoutWorkflow{
+    public static async LayoutTask<int> LayoutCapture(int value,string ignored){await new LayoutSignal();return value;}
+    public static async LayoutTask<int> LayoutPhantom(LayoutPayload<int,string> value,string ignored){await new LayoutSignal();return value.Value;}
+}
+EOF
+cat > "$fixture/Layout.csproj" <<'EOF'
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>13.0</LangVersion><Optimize>true</Optimize><NuGetAudit>false</NuGetAudit></PropertyGroup></Project>
+EOF
+dotnet "$output" --project "$fixture/Layout.csproj" --configuration Release > "$fixture/project.log" 2>&1 || { tail -40 "$fixture/project.log"; exit 1; }
+for expected in 'LayoutCapture<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged' 'LayoutPhantom<T1, T2, T3>(global::LayoutPayload<T1, T2> value, T3 ignored) where T1 : unmanaged'; do
+  if ! grep -Fq "$expected" "$fixture/project.log"; then tail -40 "$fixture/project.log"; exit 1; fi
+done
+cp "$fixture/project.log" /workspace/SharpProof/artifacts/hm-inference/builder-layout-cli.txt
+printf '%s\n' 'PASS CliUnmanagedStateMachinePhysicalLayout'
