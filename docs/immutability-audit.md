@@ -4881,3 +4881,7 @@ All seven native buffer sites in ArrayValueOverlayTests are deliberately mutable
 ### IMM-M482: directly reviewed runtime-loading stream adapters
 
 Twelve readonly MemoryStream constructions are independently traced into actual AssemblyLoadContext.LoadFromStream calls. The retained image evidence is immutable; only the native stream frame retains cursor/disposal state required by runtime loading. No mutable collection owner is published. These individual consumer traces change no code and claim no new execution or historical transfer. There are 347 unchecked candidates; pending M477/M479/M480/M481 fixture changes remain recorded as Open coordinates until their actual gates complete.
+
+### IMM-M483: directly reviewed runtime-loading stream adapters
+
+Twelve readonly MemoryStream constructions are independently traced into actual AssemblyLoadContext.LoadFromStream calls. The retained image evidence is immutable; only the native stream frame retains cursor/disposal state required by runtime loading. No mutable collection owner is published. These individual consumer traces change no code and claim no new execution or historical transfer. There are 335 unchecked candidates; pending M477/M479/M480/M481 fixture changes remain recorded as Open coordinates until their actual gates complete.
