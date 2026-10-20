@@ -136,6 +136,11 @@ public static partial class Inference
                 return CSharpTypes.Erase(p.Type, method.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp13 }
                     && model.Compilation.SupportsRuntimeCapability(RuntimeCapability.ByRefLikeGenerics));
             }).ToArray();
+            if (symbol.PartialDefinitionPart is { } partialDefinition)
+            {
+                for (var i = 0; i < parameters.Length; i++)
+                { ImportPartialContract(parameters[i], symbol.Parameters[i].Type, partialDefinition.Parameters[i].Type, symbol); }
+            }
             for (var i = 0; i < parameters.Length; i++)
             { RegisterSignatureOrigins(parameters[i], CSharpTypes.Rigid(symbol.Parameters[i].Type), i, "", pins); }
             for (var i = 0; i < parameters.Length; i++)
@@ -175,6 +180,8 @@ public static partial class Inference
             }
 
             result = iteratorReturn is not null ? WrapIteratorResult() : WrapAsyncResult(result);
+            if (symbol.PartialDefinitionPart is { } resultDefinition)
+            { ImportPartialContract(result, symbol.ReturnType, resultDefinition.ReturnType, symbol); }
             HmType.Unify(recursiveReturn, result);
             var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
             {

@@ -526,6 +526,20 @@ public static partial class Inference
                 {
                     if (owner is not MethodDeclarationSyntax method)
                     { continue; }
+                    if (warning.Id == "CS8826")
+                    {
+                        // The compiler embeds both complete partial signatures in this
+                        // warning. Generic substitution changes that text even when
+                        // the original per-part differences have been preserved.
+                        var ordinal = 0;
+                        foreach (var declaration in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+                        {
+                            if (declaration.SpanStart == method.SpanStart)
+                            { return prefix + "partial-signature:" + ordinal; }
+                            ordinal++;
+                        }
+                    }
+
                     SyntaxNode? body = method.Body is not null ? method.Body : method.ExpressionBody?.Expression;
                     if (body is not null && body.FullSpan.Contains(span))
                     {

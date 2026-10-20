@@ -75,7 +75,7 @@ public static partial class Inference
             var newParameters = replacement.TypeParameterList?.Parameters.Skip(originalNames.Count) ?? [];
             var typeParameters = declaration.TypeParameterList is null ? replacement.TypeParameterList
                 : declaration.TypeParameterList.WithParameters(partnerNames.AddRange(newParameters));
-            var mirrored = declaration.WithReturnType(Rename(replacement.ReturnType).WithTriviaFrom(declaration.ReturnType))
+            var mirrored = declaration.WithReturnType(PreservePartialType(Rename(replacement.ReturnType), symbol!.ReturnType, partner.ReturnType, cancellationToken).WithTriviaFrom(declaration.ReturnType))
                 .WithTypeParameterList(typeParameters)
                 .WithConstraintClauses(constraints)
                 .WithParameterList(declaration.ParameterList.WithParameters(SyntaxFactory.SeparatedList(declaration.ParameterList.Parameters.Select((parameter, index) =>
@@ -84,7 +84,7 @@ public static partial class Inference
                     { throw new ArgumentNullException(nameof(parameter)); }
                     if (index < 0)
                     { throw new ArgumentOutOfRangeException(nameof(index)); }
-                    return parameter.WithType(Rename(replacement.ParameterList.Parameters[index].Type!).WithTriviaFrom(parameter.Type!));
+                    return parameter.WithType(PreservePartialType(Rename(replacement.ParameterList.Parameters[index].Type!), symbol!.Parameters[index].Type, partner.Parameters[index].Type, cancellationToken).WithTriviaFrom(parameter.Type!));
                 }), declaration.ParameterList.Parameters.GetSeparators())))
                 .WithAdditionalAnnotations(new SyntaxAnnotation("HM.PartialRewrite"));
             changes.Add((declaration, mirrored));

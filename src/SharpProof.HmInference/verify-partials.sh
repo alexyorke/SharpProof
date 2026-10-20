@@ -18,6 +18,8 @@ cat > "$fixture/Definition.cs" <<'EOF'
 using System.Threading.Tasks;
 public partial class PartialConsumer{
     public static partial int Identity(int value);
+    public static partial string? Contract(string? value,int tag);
+    public static partial dynamic Dynamic(object value,int tag);
     public static partial string? Nullable(string? value);
     public static partial Task<int> Await(Task<int> value);
     public static partial int Recursive(int value,int count);
@@ -28,6 +30,8 @@ cat > "$fixture/Implementation.cs" <<'EOF'
 using System.Threading.Tasks;
 public partial class PartialConsumer{
     public static partial int Identity(int value)=>value;
+    public static partial string Contract(string value,int tag)=>value;
+    public static partial object Dynamic(object value,int tag)=>value;
     public static partial string? Nullable(string? value)=>value;
     public static async partial Task<int> Await(Task<int> value)=>await value;
     public static partial int Recursive(int value,int count)=>count==0?value:Recursive(value,count-1);
@@ -52,9 +56,11 @@ fi
 cp "$log" "$destination"
 for expected in \
   'T1 Identity<T1>(T1 value)' \
+  'T1 Contract<T1, T2>(T1 value, T2 tag) where T1 : class' \
+  'object Dynamic<T1>(object value, T1 tag)' \
   'T1? Nullable<T1>(T1? value) where T1 : class' \
   'global::System.Threading.Tasks.Task<T1> Await<T1>(global::System.Threading.Tasks.Task<T1> value)' \
   'T1 Recursive<T1>(T1 value, int count)'; do
   if ! grep -Fq "$expected" "$log"; then printf 'Missing partial signature: %s\n' "$expected"; tail -35 "$log"; exit 1; fi
 done
-if [ "$#" -eq 1 ]; then printf '%s\n' 'PASS CliPartialMethodPairsNullableAsyncAndRecursion'; fi
+if [ "$#" -eq 1 ]; then printf '%s\n' 'PASS CliPartialMethodPairsNullableAsyncAndRecursion' 'PASS CliPartialContractAnnotations'; fi

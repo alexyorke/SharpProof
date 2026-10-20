@@ -729,3 +729,11 @@ Project Fix All tracks later methods after a partner-file edit. Async partial
 methods without an emitted state-machine attribute use a portable-PDB layout
 probe when a custom builder requires unmanaged storage; temporary constraints
 are mirrored to both signatures. IDE application requires editable source parts.
+
+When partial parts differ in nullable or dynamic annotations, each part retains
+its contract. Declaration-side nullable bounds participate in inference, and
+dynamic/object boundaries retain their fixed leaves while independent components
+can generalize. Applied fixes preserve source and emitted metadata across arrays,
+tuples, nested generic owners, task payloads and existing type parameters. Runtime
+checks verify dynamic attributes, nullable values, identity and suspended async
+results with faults and cancellation in newly admitted generic domains.
