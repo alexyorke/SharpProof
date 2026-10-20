@@ -9,6 +9,14 @@ internal static class UnsafeChecks
     {
         var tests = new (string Name, string Source, string Signature)[]
         {
+            ("FunctionPointerContextCaller", "static delegate*<int,int> M(delegate*<int,int> pointer,int tag)=>pointer;static int Echo(int value)=>value;static delegate*<int,int> Use()=>M(&Echo,0);", "delegate*<int, T1> M<T1, T2>(delegate*<int, T1> pointer, T2 tag)"),
+            ("FunctionPointerGenericContextCaller", "static delegate*<int,int> M(delegate*<int,int> pointer,int tag)=>pointer;static T Echo<T>(T value)=>value;static delegate*<int,int> Use()=>M(&Echo,0);", "delegate*<int, T1> M<T1, T2>(delegate*<int, T1> pointer, T2 tag)"),
+            ("FunctionPointerNoInputContextCaller", "static delegate*<int> M(delegate*<int> pointer,int tag)=>pointer;static int Echo()=>1;static delegate*<int> Use()=>M(&Echo,0);", "delegate*<T1> M<T1, T2>(delegate*<T1> pointer, T2 tag)"),
+            ("FunctionPointerRefContextCaller", "static delegate*<ref int,ref int> M(delegate*<ref int,ref int> pointer,int tag)=>pointer;static ref int Echo(ref int value)=>ref value;static delegate*<ref int,ref int> Use()=>M(&Echo,0);", "delegate*<ref int, ref T1> M<T1, T2>(delegate*<ref int, ref T1> pointer, T2 tag)"),
+            ("FunctionPointerTypedContextControl", "static delegate*<int,int> M(delegate*<int,int> pointer,int tag)=>pointer;static int Echo(int value)=>value;static delegate*<int,int> Use()=>M((delegate*<int,int>)&Echo,0);", "delegate*<T1, T2> M<T1, T2, T3>(delegate*<T1, T2> pointer, T3 tag)"),
+            ("FunctionPointerContextOutputCaller", "static int M(delegate*<int,int> pointer)=>pointer(default);static int Echo(int value)=>value;static int Use()=>M(&Echo);", "T1 M<T1>(delegate*<int, T1> pointer)"),
+            ("FunctionPointerNativeContextCaller", "static delegate* unmanaged[Cdecl]<int,int> M(delegate* unmanaged[Cdecl]<int,int> pointer,int tag)=>pointer;[System.Runtime.InteropServices.UnmanagedCallersOnly(CallConvs=new[]{typeof(System.Runtime.CompilerServices.CallConvCdecl)})]static int Native(int value)=>value;static delegate* unmanaged[Cdecl]<int,int> Use()=>M(&Native,0);", "delegate* unmanaged[Cdecl]<int, T1> M<T1, T2>(delegate* unmanaged[Cdecl]<int, T1> pointer, T2 tag)"),
+            ("FunctionPointerNestedContextCaller", "static delegate*<delegate*<int,int>,int> M(delegate*<delegate*<int,int>,int> pointer,int tag)=>pointer;static int Echo(delegate*<int,int> value)=>value(1);static delegate*<delegate*<int,int>,int> Use()=>M(&Echo,0);", "delegate*<delegate*<int, int>, T1> M<T1, T2>(delegate*<delegate*<int, int>, T1> pointer, T2 tag)"),
             ("FunctionPointerIdentity", "static delegate*<int,int> M(delegate*<int,int> pointer)=>pointer;", "delegate*<T1, T2> M<T1, T2>(delegate*<T1, T2> pointer)"),
             ("FunctionPointerExistingAddressCaller", "static int M(int value)=>value;static delegate*<int,int> Use()=>&M;", "T1 M<T1>(T1 value)"),
             ("FunctionPointerOptionalReadonly", "static int M(delegate*<in int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate*<in T1, T2> pointer, T1 value)"),
@@ -86,7 +94,6 @@ internal static class UnsafeChecks
         { throw new InvalidOperationException(string.Join("\n", failures)); }
         string[] uninferrableCallers =
         [
-            "static int M(delegate*<int,int> pointer)=>pointer(default);static int Echo(int value)=>value;static int Use()=>M(&Echo);",
             "static int M(delegate*<out int,void> pointer){pointer(out var value);return value;}static void Copy(out int value)=>value=1;static int Use()=>M(&Copy);",
             "static delegate*<int,int> M(delegate*<int,int> pointer,bool choose)=>choose?&Echo:pointer;static T Echo<T>(T value)=>value;static int Copy(int value)=>value;static delegate*<int,int> Use()=>M(&Copy,true);"
         ];
@@ -100,7 +107,7 @@ internal static class UnsafeChecks
             if (result.Status != "Rejected")
             { throw new InvalidOperationException("An uninferrable method-address caller must reject the candidate: " + result); }
         }
-        Program.Log.Info("PASS FunctionPointerBareAddressCallersRequireInferableTypeArguments");
+        Program.Log.Info("PASS FunctionPointerBareAddressCallersWithNoFreeComponentReject");
         return tests.Length + uninferrableCallers.Length + await UnsafeRuntimeChecks.Run(cancellationToken).ConfigureAwait(false)
             + await PinningChecks.Run(cancellationToken).ConfigureAwait(false);
     }

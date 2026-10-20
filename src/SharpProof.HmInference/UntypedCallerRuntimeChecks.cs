@@ -16,10 +16,14 @@ internal static class UntypedCallerRuntimeChecks
             #nullable enable
             using System;
             using System.Threading.Tasks;
+            public delegate string ClosedMap(int value);
+            public delegate Task<string?> ClosedAsyncMap(int value);
+            public static class Owner<T>{public delegate V Mapper<V>(int value);}
             public static class GroupSupport{
                 public static Type? LastType;
                 public static int Created;
                 public static Receiver? LastReceiver;
+                public static string Fixed(int value)=>"closed";
                 public static string Echo(int value)=>"int";
                 public static string Echo(long value)=>"long";
                 public static string GenericEcho<T>(T value){LastType=typeof(T);return "generic";}
@@ -30,6 +34,13 @@ internal static class UntypedCallerRuntimeChecks
                 public static Receiver MakeReceiver(){Created++;var receiver=new Receiver();LastReceiver=receiver;return receiver;}
             }
             public static class ContextualProbe{
+                public static ClosedMap ClosedGroup(ClosedMap map,int tag)=>map;
+                public static ClosedMap ClosedLambda(ClosedMap map,int tag)=>map;
+                public static ClosedMap? ClosedNullable(ClosedMap? map,int tag)=>map;
+                public static ClosedAsyncMap ClosedAsync(ClosedAsyncMap map,int tag)=>map;
+                public static Owner<int>.Mapper<string> OwnerGroup(Owner<int>.Mapper<string> map,int tag)=>map;
+                public static Owner<int>.Mapper<string> OwnerLambda(Owner<int>.Mapper<string> map,int tag)=>map;
+                public static System.Linq.Expressions.Expression<ClosedMap> ClosedExpression(System.Linq.Expressions.Expression<ClosedMap> map,int tag)=>map;
                 public static Func<int,string> Group(Func<int,string> map,int tag)=>map;
                 public static Func<int,string> GenericGroup(Func<int,string> map,int tag)=>map;
                 public static Func<int,Task<string?>> AsyncGroup(Func<int,Task<string?>> map,int tag)=>map;
@@ -53,6 +64,18 @@ internal static class UntypedCallerRuntimeChecks
             }
             public static class OriginalContextualRunner{
                 public static bool Run(){
+                    var closedGroup=ContextualProbe.ClosedGroup(GroupSupport.Fixed,0);
+                    var closedLambda=ContextualProbe.ClosedLambda(item=>"closed",0);
+                    var closedNullable=ContextualProbe.ClosedNullable(GroupSupport.Fixed,0);
+                    var closedAsync=ContextualProbe.ClosedAsync(GroupSupport.AsyncEcho,0);
+                    if(closedGroup.GetType()!=typeof(ClosedMap)||closedGroup(7)!="closed"||closedLambda.GetType()!=typeof(ClosedMap)||closedLambda(7)!="closed")return false;
+                    if(closedNullable?.GetType()!=typeof(ClosedMap)||closedNullable?.Invoke(7)!="closed"||ContextualProbe.ClosedNullable(null,0)!=null)return false;
+                    if(closedAsync.GetType()!=typeof(ClosedAsyncMap)||closedAsync(7).GetAwaiter().GetResult()!="async"||closedAsync(0).GetAwaiter().GetResult()!=null||GroupSupport.LastType!=typeof(int))return false;
+                    var ownerGroup=ContextualProbe.OwnerGroup(GroupSupport.GenericEcho,0);
+                    var ownerLambda=ContextualProbe.OwnerLambda(item=>"owner",0);
+                    if(ownerGroup.GetType()!=typeof(Owner<int>.Mapper<string>)||ownerGroup(7)!="generic"||GroupSupport.LastType!=typeof(int)||ownerLambda(7)!="owner")return false;
+                    var closedExpression=ContextualProbe.ClosedExpression(item=>"closed",0);
+                    if(closedExpression.Type!=typeof(ClosedMap)||closedExpression.Compile()(7)!="closed")return false;
                     var methodGroup=ContextualProbe.Group(GroupSupport.Echo,0);
                     if(methodGroup(3)!="int"||methodGroup.Method.GetParameters()[0].ParameterType!=typeof(int))return false;
                     var genericGroup=ContextualProbe.GenericGroup(GroupSupport.GenericEcho,0);
@@ -96,7 +119,7 @@ internal static class UntypedCallerRuntimeChecks
         Verify((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, false, cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 21; round++)
+        for (var round = 0; round < 28; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -116,12 +139,24 @@ internal static class UntypedCallerRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 20)
-        { throw new InvalidOperationException("Expected twenty contextual caller fixes; got " + fixes); }
+        if (fixes != 27)
+        { throw new InvalidOperationException("Expected twenty-seven contextual caller fixes; got " + fixes); }
         document = document.Project.AddDocument("NewContextualDomains.cs", """
             public static class NewContextualRunner{
                 public static bool Run(){
                     object value=new object();
+                    var closedGroup=ContextualProbe.ClosedGroup(GroupSupport.Fixed,"tag");
+                    var closedLambda=ContextualProbe.ClosedLambda(item=>item.ToString(),3m);
+                    var closedNullable=ContextualProbe.ClosedNullable(GroupSupport.Fixed,"tag");
+                    var closedAsync=ContextualProbe.ClosedAsync(GroupSupport.AsyncEcho,"tag");
+                    if(closedGroup.GetType()!=typeof(ClosedMap)||closedGroup(7)!="closed"||closedLambda.GetType()!=typeof(ClosedMap)||closedLambda(7)!="7")return false;
+                    if(closedNullable?.GetType()!=typeof(ClosedMap)||closedNullable?.Invoke(7)!="closed"||ContextualProbe.ClosedNullable(null,"tag")!=null)return false;
+                    if(closedAsync.GetType()!=typeof(ClosedAsyncMap)||closedAsync(7).GetAwaiter().GetResult()!="async"||closedAsync(0).GetAwaiter().GetResult()!=null||GroupSupport.LastType!=typeof(int))return false;
+                    var ownerGroup=ContextualProbe.OwnerGroup(GroupSupport.Decimal,"tag");
+                    var ownerLambda=ContextualProbe.OwnerLambda(item=>(decimal)item,3m);
+                    if(ownerGroup.GetType()!=typeof(Owner<int>.Mapper<decimal>)||ownerLambda.GetType()!=typeof(Owner<int>.Mapper<decimal>)||ownerGroup(7)!=7m||ownerLambda(7)!=7m)return false;
+                    var closedExpression=ContextualProbe.ClosedExpression(item=>"new",3m);
+                    if(closedExpression.Type!=typeof(ClosedMap)||closedExpression.Compile()(7)!="new")return false;
                     var methodGroup=ContextualProbe.Group(GroupSupport.Decimal,"tag");
                     var genericGroup=ContextualProbe.GenericGroup(GroupSupport.Decimal,3m);
                     var asyncGroup=ContextualProbe.AsyncGroup(GroupSupport.ArrayAsync,"tag");

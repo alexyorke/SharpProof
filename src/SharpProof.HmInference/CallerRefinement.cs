@@ -142,7 +142,7 @@ public static partial class Inference
             {
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
-                return diagnostic.Id == "CS0411";
+                return IsCompilationError(diagnostic) && diagnostic.Id is "CS0411" or "CS0029";
             }).ToArray();
             if (failures.Length == 0)
             { return; }
@@ -159,7 +159,7 @@ public static partial class Inference
                     {
                         if (diagnostic is null)
                         { throw new ArgumentNullException(nameof(diagnostic)); }
-                        return diagnostic.Location.SourceTree == afterTree && afterCalls[i].Expression.Span.Contains(diagnostic.Location.SourceSpan);
+                        return diagnostic.Location.SourceTree == afterTree && afterCalls[i].Span.Contains(diagnostic.Location.SourceSpan);
                     }))
                     { continue; }
                     if (semantic.GetOperation(calls[i], cancellationToken) is not IInvocationOperation call
@@ -229,13 +229,29 @@ public static partial class Inference
                 return;
             }
 
+            if (declared is IFunctionPointerTypeSymbol pointerType && expression is PrefixUnaryExpressionSyntax address
+                && address.IsKind(SyntaxKind.AddressOfExpression)
+                && semantic.GetSymbolInfo(address.Operand, cancellationToken).Symbol is IMethodSymbol)
+            {
+                var pointerShape = ConversionCore(inferred);
+                if (pointerShape.Arguments.Length != pointerType.Signature.Parameters.Length + 1)
+                { return; }
+                for (var i = 0; i < pointerType.Signature.Parameters.Length; i++)
+                { PinContextualShape(pointerShape.Arguments[i], pins); }
+                return;
+            }
+            if (declared is INamedTypeSymbol { TypeKind: TypeKind.Delegate } && ConversionCore(inferred).IsVariable)
+            { PinContextualShape(inferred, pins); return; }
             if (declared is INamedTypeSymbol { TypeKind: TypeKind.Delegate } delegateType
                 && expression is IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax
                 && semantic.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol)
             {
+                var groupPins = pins.Count;
                 var groupSignature = DelegateSignature(delegateType, inferred);
                 foreach (var input in groupSignature.Inputs)
                 { PinContextualShape(input, pins); }
+                if (pins.Count == groupPins)
+                { PinContextualShape(inferred, pins); }
                 return;
             }
             if (expression is not AnonymousFunctionExpressionSyntax lambda || declared is not INamedTypeSymbol target)
@@ -250,6 +266,8 @@ public static partial class Inference
                 { return; }
                 inferred = inferred.Arguments[0];
             }
+            if (ConversionCore(inferred).IsVariable)
+            { PinContextualShape(inferred, pins); return; }
             if (target.DelegateInvokeMethod is not { } invoke)
             { return; }
             var signature = DelegateSignature(target, inferred);
@@ -290,6 +308,8 @@ public static partial class Inference
                     { PinContextualReturn(returned, outputType, output, semantic, pins); }
                 }
             }
+            if (pins.Count == previousPins)
+            { PinContextualShape(inferred, pins); }
         }
 
         private void PinContextualReturn(ExpressionSyntax expression, ITypeSymbol declared, HmType inferred, SemanticModel semantic, HashSet<(int Parameter, string Path)> pins)

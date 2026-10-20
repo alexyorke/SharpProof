@@ -609,3 +609,13 @@ nullable/custom delegates and groups inside collection expressions have regressi
 coverage. Outputs and unrelated parameters remain generic when the supplied calls
 permit it. Applied IDE fixes check overloads, constructed generic arguments,
 receiver evaluation, nullable async results and newly supported output domains.
+
+Closed delegate identities and generic containing-type arguments retain their
+required context for implicit callbacks and expression trees. Refinement handles
+both failed inference and incompatible natural delegate returns. Validated pin
+removal keeps independently inferable outputs generic. Bare managed and Cdecl
+method-address arguments retain input types while allowing inferred returns,
+including ref returns and nested function-pointer inputs. Typed pointer/delegate
+controls retain full generality. IDE fixes verify nominal types, expression-tree
+delegate types, nullable async callbacks, pointer identity, ref aliasing and new
+output domains. Callers with no remaining generic component still reject.
