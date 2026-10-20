@@ -4885,3 +4885,7 @@ Twelve readonly MemoryStream constructions are independently traced into actual 
 ### IMM-M483: directly reviewed runtime-loading stream adapters
 
 Twelve readonly MemoryStream constructions are independently traced into actual AssemblyLoadContext.LoadFromStream calls. The retained image evidence is immutable; only the native stream frame retains cursor/disposal state required by runtime loading. No mutable collection owner is published. These individual consumer traces change no code and claim no new execution or historical transfer. There are 335 unchecked candidates; pending M477/M479/M480/M481 fixture changes remain recorded as Open coordinates until their actual gates complete.
+
+### IMM-M488: direct runtime/catalog/native metadata frame review
+
+Eight current readonly stream adapters are traced individually into runtime assembly loading, a macOS contract catalog reader or native BlobBuilder/PEReader metadata processing. Immutable image/catalog observations stay frozen; native producer, cursor and disposal lifecycles remain required. No code edits or new execution authority are inferred, including macOS platform execution. Three further avoidable capability/copying observations are explicitly recorded Open for M489. The old array subset has 327 unchecked candidates; final expanded reflection collection remains required.
