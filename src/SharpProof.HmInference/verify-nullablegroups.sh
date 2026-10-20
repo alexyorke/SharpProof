@@ -15,7 +15,7 @@ for policy in warnings promoted; do
   fi
   cat > "$fixture/NullableGroups.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers>$warning_policy</PropertyGroup>
+<PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><AllowUnsafeBlocks>true</AllowUnsafeBlocks><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers>$warning_policy</PropertyGroup>
 $package_reference
 </Project>
 EOF
@@ -33,6 +33,10 @@ public static partial class NullableGroupConsumer{
     public static object ReducedNotNull(this string value,int tag){Need(value);return new object();}
     public static async Task<string> ReducedAsync(this string value,int tag){await Task.Yield();return value;}
     public static async ValueTask<string> ReducedValueAsync(this string value,int tag){await Task.Yield();return value;}
+    public static string AddressReturn(string value,int tag)=>value;
+    public static ref string AddressRef(ref string value,int tag)=>ref value;
+    public static async Task<string> AddressAsync(string value,int tag){await Task.Yield();return value;}
+    public static async ValueTask<string> AddressValueAsync(string value,int tag){await Task.Yield();return value;}
     public static string Return(string value,int tag)=>value;
     public static string[] ArrayReturn(string[] value,int tag)=>value;
     public static (string left,int right) TupleReturn((string left,int right) pair,int tag)=>pair;
@@ -51,6 +55,10 @@ public static partial class NullableGroupConsumer{
     public static Func<int,object> UseReducedNotNull(string? value)=>value.ReducedNotNull;
     public static Func<int,Task<string>> UseReducedAsync(string? value)=>value.ReducedAsync;
     public static Func<int,ValueTask<string>> UseReducedValueAsync(string? value)=>(Func<int,ValueTask<string>>)value.ReducedValueAsync;
+    public static unsafe delegate*<string?,int,string> UseAddressReturn()=>&AddressReturn;
+    public static unsafe delegate*<ref string?,int,ref string> UseAddressRef()=>&AddressRef;
+    public static unsafe delegate*<string?,int,Task<string>> UseAddressAsync()=>&AddressAsync;
+    public static unsafe delegate*<string?,int,ValueTask<string>> UseAddressValueAsync()=>&AddressValueAsync;
     public static Func<string?,int,string> UseReturn()=>Return;
     public static Func<string?[],int,string[]> UseArray()=>ArrayReturn;
     public static Func<(string?,int),int,(string,int)> UseTuple()=>TupleReturn;
@@ -83,6 +91,10 @@ EOF
     'object ReducedNotNull<T1>(this string value, T1 tag)' \
     'global::System.Threading.Tasks.Task<string> ReducedAsync<T1>(this string value, T1 tag)' \
     'global::System.Threading.Tasks.ValueTask<string> ReducedValueAsync<T1>(this string value, T1 tag)' \
+    'string AddressReturn<T1>(string value, T1 tag)' \
+    'ref string AddressRef<T1>(ref string value, T1 tag)' \
+    'global::System.Threading.Tasks.Task<string> AddressAsync<T1>(string value, T1 tag)' \
+    'global::System.Threading.Tasks.ValueTask<string> AddressValueAsync<T1>(string value, T1 tag)' \
     'string Return<T1>(string value, T1 tag)' \
     'string[] ArrayReturn<T1>(string[] value, T1 tag)' \
     '(string left, T1 right) TupleReturn<T1, T2>((string left, T1 right) pair, T2 tag)' \

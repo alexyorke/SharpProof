@@ -213,7 +213,13 @@ public static partial class Inference
                 { continue; }
                 for (var i = 0; i < beforeGroups.Length; i++)
                 {
-                    var groupSpan = afterGroups[i].Parent is CastExpressionSyntax cast ? cast.Span : afterGroups[i].Span;
+                    var context = afterGroups[i].Parent switch
+                    {
+                        CastExpressionSyntax cast => (ExpressionSyntax)cast,
+                        PrefixUnaryExpressionSyntax address when address.IsKind(SyntaxKind.AddressOfExpression) => address,
+                        _ => afterGroups[i]
+                    };
+                    var groupSpan = context.Span;
                     if (!failures.Any(diagnostic =>
                     {
                         if (diagnostic is null)
@@ -265,17 +271,24 @@ public static partial class Inference
                         // delegate parameter list, including nullable annotations.
                         CollectSignaturePins(parameters[0], CSharpTypes.Rigid(extension.Parameters[0].Type), CSharpTypes.Rigid(capturedReceiver), 0, pins);
                     }
-                    var delegateType = groupSemantic.GetTypeInfo(afterGroups[i], cancellationToken).ConvertedType
-                        ?? (afterGroups[i].Parent is CastExpressionSyntax conversion ? groupSemantic.GetTypeInfo(conversion.Type, cancellationToken).Type : null);
+                    var conversionType = groupSemantic.GetTypeInfo(afterGroups[i], cancellationToken).ConvertedType
+                        ?? (context is CastExpressionSyntax conversion ? groupSemantic.GetTypeInfo(conversion.Type, cancellationToken).Type
+                            : groupSemantic.GetTypeInfo(context, cancellationToken).ConvertedType);
+                    var targetSignature = conversionType switch
+                    {
+                        INamedTypeSymbol named => named.DelegateInvokeMethod,
+                        IFunctionPointerTypeSymbol pointer => pointer.Signature,
+                        _ => null
+                    };
                     // Method-group symbols omit nullable inference annotations. Use the
-                    // delegate input contract when nullable conversion warnings expose them.
+                    // conversion input contract when nullable warnings expose them.
                     if (failures.Any(diagnostic =>
                     {
                         if (diagnostic is null)
                         { throw new ArgumentNullException(nameof(diagnostic)); }
                         return diagnostic.Id is "CS8621" or "CS8622"
                             && diagnostic.Location.SourceTree == afterTree && groupSpan.Contains(diagnostic.Location.SourceSpan);
-                    }) && delegateType is INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                    }) && targetSignature is { } invoke
                         && invoke.Parameters.Length == before.Parameters.Length)
                     {
                         var offset = before.ReducedFrom is null ? 0 : 1;

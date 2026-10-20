@@ -36,6 +36,14 @@ internal static class NullableMethodGroupRuntimeChecks
                 public static async ValueTask<string> ReducedValueAsync(this string value,int tag){await Gate.Task;return value;}
                 public static Func<int,ValueTask<string>> BindReducedValueAsync(string? value)=>value.ReducedValueAsync;
                 public static ValueTask<string> UseReducedValueAsync(string? value)=>BindReducedValueAsync(value)(1);
+                public static string AddressReturn(string value,int tag)=>value;
+                public static unsafe string UseAddressReturn(string? value){delegate*<string?,int,string> pointer=&AddressReturn;return pointer(value,1);}
+                public static ref string AddressRef(ref string value,int tag)=>ref value;
+                public static unsafe string? UseAddressRef(string? value){delegate*<ref string?,int,ref string> pointer=&AddressRef;ref string alias=ref pointer(ref value,1);alias="changed";return value;}
+                public static async Task<string> AddressAsync(string value,int tag){await Gate.Task;return value;}
+                public static unsafe Task<string> UseAddressAsync(string? value){delegate*<string?,int,Task<string>> pointer=&AddressAsync;return pointer(value,1);}
+                public static async ValueTask<string> AddressValueAsync(string value,int tag){await Gate.Task;return value;}
+                public static unsafe ValueTask<string> UseAddressValueAsync(string? value){delegate*<string?,int,ValueTask<string>> pointer=&AddressValueAsync;return pointer(value,1);}
                 public static string Return(string value,int tag)=>value;
                 public static string[] Array(string[] value,int tag)=>value;
                 public static (string left,int right) Tuple((string left,int right) pair,int tag)=>pair;
@@ -54,7 +62,7 @@ internal static class NullableMethodGroupRuntimeChecks
             """;
         using var workspace = new AdhocWorkspace();
         var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "NullableMethodGroupRuntime", "NullableMethodGroupRuntime", LanguageNames.CSharp,
-            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, warningLevel: 9999), metadataReferences: Program.Compile([]).References));
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, warningLevel: 9999, allowUnsafe: true), metadataReferences: Program.Compile([]).References));
         var document = project.AddDocument("Calls.cs", source);
         var baseline = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var baselineErrors = baseline.GetDiagnostics(cancellationToken).Where(diagnostic =>
@@ -76,7 +84,7 @@ internal static class NullableMethodGroupRuntimeChecks
         var action = (await provider.GetFixAllProvider().GetFixAsync(context).ConfigureAwait(false))!;
         var solution = (await action.GetOperationsAsync(cancellationToken).ConfigureAwait(false)).OfType<ApplyChangesOperation>().Single().ChangedSolution;
         var changed = (await solution.GetDocument(document.Id)!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
-        foreach (var name in new[] { "NotNull", "Class", "Interface", "Return", "Array", "Tuple", "Async", "ValueAsync", "ReducedReturn", "ReducedConstraint", "ReducedAsync", "ReducedValueAsync" })
+        foreach (var name in new[] { "NotNull", "Class", "Interface", "Return", "Array", "Tuple", "Async", "ValueAsync", "ReducedReturn", "ReducedConstraint", "ReducedAsync", "ReducedValueAsync", "AddressReturn", "AddressRef", "AddressAsync", "AddressValueAsync" })
         {
             if (!changed.GetTypeByMetadataName("NullableMethodGroupProbe")!.GetMembers(name).OfType<IMethodSymbol>().Single().IsGenericMethod)
             { throw new InvalidOperationException("Nullable method-group Fix All missed " + name + ": " + string.Join("; ", Program.Results((CSharpCompilation)original, cancellationToken).Where(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == name; }))); }
@@ -109,7 +117,7 @@ internal static class NullableMethodGroupRuntimeChecks
             var after = Load(changed, afterContext);
             var beforeEvents = (List<string>)before.GetField("Events")!.GetValue(null)!;
             var afterEvents = (List<string>)after.GetField("Events")!.GetValue(null)!;
-            foreach (var name in new[] { "UseNotNull", "UseClass", "UseInterface", "UseReturn", "UseReducedReturn", "UseReducedConstraint" })
+            foreach (var name in new[] { "UseNotNull", "UseClass", "UseInterface", "UseReturn", "UseReducedReturn", "UseReducedConstraint", "UseAddressReturn", "UseAddressRef" })
             {
                 foreach (var value in new string?[] { null, "payload" })
                 {
@@ -190,7 +198,7 @@ internal static class NullableMethodGroupRuntimeChecks
             Program.Log.Info("PASS NullableMethodGroupValueTaskSuspensionNullAndIdentity");
             foreach (var probe in new[] { before, after })
             {
-                foreach (var name in new[] { "UseReducedAsync", "UseReducedValueAsync" })
+                foreach (var name in new[] { "UseReducedAsync", "UseReducedValueAsync", "UseAddressAsync", "UseAddressValueAsync" })
                 {
                     foreach (var outcome in new[] { "Success", "Fault", "Cancel" })
                     {
@@ -222,12 +230,15 @@ internal static class NullableMethodGroupRuntimeChecks
                     }
                 }
             }
-            Program.Log.Info("PASS ReducedMethodGroupTaskValueTaskNullSuspensionFaultCancellation");
+            Program.Log.Info("PASS ReducedAndAddressTaskValueTaskNullSuspensionFaultCancellation");
             var text = new string(['p', 'a', 'y', 'l', 'o', 'a', 'd']);
             if (!ReferenceEquals(after.GetMethod("ReducedReturn")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [text, marker]), text))
             { throw new InvalidOperationException("Reduced delegate lost identity or its independent generic parameter."); }
             Program.Log.Info("PASS ReducedMethodGroupReceiverIdentityAndIndependentDomain");
-            return 6;
+            if (!ReferenceEquals(after.GetMethod("AddressReturn")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [text, marker]), text))
+            { throw new InvalidOperationException("Nullable function address lost identity or its independent generic parameter."); }
+            Program.Log.Info("PASS NullableFunctionAddressIdentityAliasesAndIndependentDomain");
+            return 7;
         }
         finally { beforeContext.Unload(); afterContext.Unload(); }
     }

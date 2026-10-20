@@ -20,6 +20,15 @@ internal static class NullableMethodGroupChecks
             ("ReducedSatisfied", "public static string M(this string value,int tag){Need(value);return value;}static void Need<T>(T value)where T:class{}public static System.Func<int,string> Use(string value)=>value.M;", "T1 M<T1, T2>(this T1 value, T2 tag) where T1 : class"),
             ("ReducedNoResidual", "public static string M(this string value)=>value;public static System.Func<string> Use(string? value)=>value.M;", null),
             ("ReducedCastReceiver", "public static string M(this string value,int tag)=>value;public static System.Func<int,string> Use(string? value)=>(System.Func<int,string>)value.M;", "string M<T1>(this string value, T1 tag)"),
+            ("NullableFunctionAddress", "public static string M(string value,int tag)=>value;public static unsafe delegate*<string?,int,string> Use()=>&M;", "string M<T1>(string value, T1 tag)"),
+            ("AsyncFunctionAddress", "public static async System.Threading.Tasks.Task<string> M(string value,int tag){await System.Threading.Tasks.Task.Yield();return value;}public static unsafe delegate*<string?,int,System.Threading.Tasks.Task<string>> Use()=>&M;", "global::System.Threading.Tasks.Task<string> M<T1>(string value, T1 tag)"),
+            ("ValueTaskFunctionAddress", "public static async System.Threading.Tasks.ValueTask<string> M(string value,int tag){await System.Threading.Tasks.Task.Yield();return value;}public static unsafe delegate*<string?,int,System.Threading.Tasks.ValueTask<string>> Use()=>&M;", "global::System.Threading.Tasks.ValueTask<string> M<T1>(string value, T1 tag)"),
+            ("RefFunctionAddress", "public static ref string M(ref string value,int tag)=>ref value;public static unsafe delegate*<ref string?,int,ref string> Use()=>&M;", "ref string M<T1>(ref string value, T1 tag)"),
+            ("ReadonlyFunctionAddress", "public static ref readonly string M(in string value,int tag)=>ref value;public static unsafe delegate*<in string?,int,ref readonly string> Use()=>&M;", "ref readonly string M<T1>(in string value, T1 tag)"),
+            ("ArrayFunctionAddress", "public static string[] M(string[] value,int tag)=>value;public static unsafe delegate*<string?[],int,string[]> Use()=>&M;", "string[] M<T1>(string[] value, T1 tag)"),
+            ("TupleFunctionAddress", "public static (string left,int right) M((string left,int right) pair,int tag)=>pair;public static unsafe delegate*<(string?,int),int,(string,int)> Use()=>&M;", "(string left, T1 right) M<T1, T2>((string left, T1 right) pair, T2 tag)"),
+            ("SatisfiedFunctionAddress", "public static string M(string value,int tag)=>value;public static unsafe delegate*<string,int,string> Use()=>&M;", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("NoResidualFunctionAddress", "public static string M(string value)=>value;public static unsafe delegate*<string?,string> Use()=>&M;", null),
             ("AsyncTask", "public static async System.Threading.Tasks.Task<object> M(object value,int tag){await System.Threading.Tasks.Task.Yield();Need(value);return value;}static void Need<T>(T value)where T:notnull{}public static System.Func<string?,int,System.Threading.Tasks.Task<object>> Use()=>M;", "global::System.Threading.Tasks.Task<object> M<T1>(object value, T1 tag)"),
             ("AsyncValueTask", "public static async System.Threading.Tasks.ValueTask<object> M(object value,int tag){await System.Threading.Tasks.Task.Yield();Need(value);return value;}static void Need<T>(T value)where T:class{}public static System.Func<string?,int,System.Threading.Tasks.ValueTask<object>> Use()=>M;", "global::System.Threading.Tasks.ValueTask<object> M<T1>(object value, T1 tag)"),
             ("AsyncReturn", "public static async System.Threading.Tasks.Task<string> M(string value,int tag){await System.Threading.Tasks.Task.Yield();return value;}public static System.Func<string?,int,System.Threading.Tasks.Task<string>> Use()=>M;", "global::System.Threading.Tasks.Task<string> M<T1>(string value, T1 tag)"),
@@ -58,7 +67,7 @@ internal static class NullableMethodGroupChecks
                         callerRoot = callerRoot.ReplaceNode(owner, owner.WithMembers(SyntaxFactory.List<Microsoft.CodeAnalysis.CSharp.Syntax.MemberDeclarationSyntax>(callers)));
                         trees = [tree.WithRootAndOptions(removed, tree.Options), CSharpSyntaxTree.Create(callerRoot, (CSharpParseOptions)tree.Options, "Caller.cs")];
                     }
-                    var compilation = Program.Compile(trees).WithOptions(Program.Compile([]).Options.WithWarningLevel(9999));
+                    var compilation = Program.Compile(trees).WithOptions(Program.Compile([]).Options.WithWarningLevel(9999).WithAllowUnsafe(true));
                     var originalDiagnostics = compilation.GetDiagnostics(cancellationToken);
                     if (policy != "Warnings")
                     {
