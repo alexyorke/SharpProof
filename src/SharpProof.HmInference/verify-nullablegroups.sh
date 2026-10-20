@@ -11,7 +11,7 @@ for policy in warnings promoted; do
     package_reference="<ItemGroup><PackageReference Include=\"SharpProof.HmInference\" Version=\"$3\" PrivateAssets=\"all\" /></ItemGroup>"
   fi
   if [ "$policy" = promoted ]; then
-    warning_policy="<NoWarn>CS8622</NoWarn><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors>"
+    warning_policy="<NoWarn>CS8622;CS8604</NoWarn><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors>"
   fi
   cat > "$fixture/NullableGroups.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
@@ -29,6 +29,10 @@ public static partial class NullableGroupConsumer{
     public static object NotNull(object value,int tag){Need(value);return value;}
     public static object Class(object value,int tag){NeedClass(value);return value;}
     public static IComparable Interface(IComparable value,int tag){NeedInterface(value);return value;}
+    public static string ReducedReturn(this string value,int tag)=>value;
+    public static object ReducedNotNull(this string value,int tag){Need(value);return new object();}
+    public static async Task<string> ReducedAsync(this string value,int tag){await Task.Yield();return value;}
+    public static async ValueTask<string> ReducedValueAsync(this string value,int tag){await Task.Yield();return value;}
     public static string Return(string value,int tag)=>value;
     public static string[] ArrayReturn(string[] value,int tag)=>value;
     public static (string left,int right) TupleReturn((string left,int right) pair,int tag)=>pair;
@@ -43,6 +47,10 @@ public static partial class NullableGroupConsumer{
     public static Func<string?,int,object> UseNotNull()=>NotNull;
     public static Func<string?,int,object> UseClass()=>Class;
     public static Func<string?,int,IComparable> UseInterface()=>Interface;
+    public static Func<int,string> UseReducedReturn(string? value)=>value.ReducedReturn;
+    public static Func<int,object> UseReducedNotNull(string? value)=>value.ReducedNotNull;
+    public static Func<int,Task<string>> UseReducedAsync(string? value)=>value.ReducedAsync;
+    public static Func<int,ValueTask<string>> UseReducedValueAsync(string? value)=>(Func<int,ValueTask<string>>)value.ReducedValueAsync;
     public static Func<string?,int,string> UseReturn()=>Return;
     public static Func<string?[],int,string[]> UseArray()=>ArrayReturn;
     public static Func<(string?,int),int,(string,int)> UseTuple()=>TupleReturn;
@@ -71,6 +79,10 @@ EOF
     'object NotNull<T1>(object value, T1 tag)' \
     'object Class<T1>(object value, T1 tag)' \
     'global::System.IComparable Interface<T1>(global::System.IComparable value, T1 tag)' \
+    'string ReducedReturn<T1>(this string value, T1 tag)' \
+    'object ReducedNotNull<T1>(this string value, T1 tag)' \
+    'global::System.Threading.Tasks.Task<string> ReducedAsync<T1>(this string value, T1 tag)' \
+    'global::System.Threading.Tasks.ValueTask<string> ReducedValueAsync<T1>(this string value, T1 tag)' \
     'string Return<T1>(string value, T1 tag)' \
     'string[] ArrayReturn<T1>(string[] value, T1 tag)' \
     '(string left, T1 right) TupleReturn<T1, T2>((string left, T1 right) pair, T2 tag)' \

@@ -24,6 +24,18 @@ internal static class NullableMethodGroupRuntimeChecks
                 public static object NotNull(object value,int tag){Need(value);return value;}
                 public static object Class(object value,int tag){NeedClass(value);return value;}
                 public static IComparable Interface(IComparable value,int tag){NeedInterface(value);return value;}
+                public static string ReducedReturn(this string value,int tag)=>value;
+                public static Func<int,string> BindReducedReturn(string? value)=>value.ReducedReturn;
+                public static string UseReducedReturn(string? value)=>BindReducedReturn(value)(1);
+                public static object ReducedConstraint(this string value,int tag){Need(value);return value;}
+                public static Func<int,object> BindReducedConstraint(string? value)=>value.ReducedConstraint;
+                public static object UseReducedConstraint(string? value)=>BindReducedConstraint(value)(1);
+                public static async Task<string> ReducedAsync(this string value,int tag){await Gate.Task;return value;}
+                public static Func<int,Task<string>> BindReducedAsync(string? value)=>value.ReducedAsync;
+                public static Task<string> UseReducedAsync(string? value)=>BindReducedAsync(value)(1);
+                public static async ValueTask<string> ReducedValueAsync(this string value,int tag){await Gate.Task;return value;}
+                public static Func<int,ValueTask<string>> BindReducedValueAsync(string? value)=>value.ReducedValueAsync;
+                public static ValueTask<string> UseReducedValueAsync(string? value)=>BindReducedValueAsync(value)(1);
                 public static string Return(string value,int tag)=>value;
                 public static string[] Array(string[] value,int tag)=>value;
                 public static (string left,int right) Tuple((string left,int right) pair,int tag)=>pair;
@@ -64,7 +76,7 @@ internal static class NullableMethodGroupRuntimeChecks
         var action = (await provider.GetFixAllProvider().GetFixAsync(context).ConfigureAwait(false))!;
         var solution = (await action.GetOperationsAsync(cancellationToken).ConfigureAwait(false)).OfType<ApplyChangesOperation>().Single().ChangedSolution;
         var changed = (await solution.GetDocument(document.Id)!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
-        foreach (var name in new[] { "NotNull", "Class", "Interface", "Return", "Array", "Tuple", "Async", "ValueAsync" })
+        foreach (var name in new[] { "NotNull", "Class", "Interface", "Return", "Array", "Tuple", "Async", "ValueAsync", "ReducedReturn", "ReducedConstraint", "ReducedAsync", "ReducedValueAsync" })
         {
             if (!changed.GetTypeByMetadataName("NullableMethodGroupProbe")!.GetMembers(name).OfType<IMethodSymbol>().Single().IsGenericMethod)
             { throw new InvalidOperationException("Nullable method-group Fix All missed " + name + ": " + string.Join("; ", Program.Results((CSharpCompilation)original, cancellationToken).Where(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == name; }))); }
@@ -97,7 +109,7 @@ internal static class NullableMethodGroupRuntimeChecks
             var after = Load(changed, afterContext);
             var beforeEvents = (List<string>)before.GetField("Events")!.GetValue(null)!;
             var afterEvents = (List<string>)after.GetField("Events")!.GetValue(null)!;
-            foreach (var name in new[] { "UseNotNull", "UseClass", "UseInterface", "UseReturn" })
+            foreach (var name in new[] { "UseNotNull", "UseClass", "UseInterface", "UseReturn", "UseReducedReturn", "UseReducedConstraint" })
             {
                 foreach (var value in new string?[] { null, "payload" })
                 {
@@ -176,7 +188,46 @@ internal static class NullableMethodGroupRuntimeChecks
             if (!ReferenceEquals(await valueIdentity.AsTask().WaitAsync(cancellationToken).ConfigureAwait(false), marker))
             { throw new InvalidOperationException("Nullable ValueTask delegate lost identity or its independent domain."); }
             Program.Log.Info("PASS NullableMethodGroupValueTaskSuspensionNullAndIdentity");
-            return 4;
+            foreach (var probe in new[] { before, after })
+            {
+                foreach (var name in new[] { "UseReducedAsync", "UseReducedValueAsync" })
+                {
+                    foreach (var outcome in new[] { "Success", "Fault", "Cancel" })
+                    {
+                        var reducedGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        probe.GetField("Gate")!.SetValue(null, reducedGate);
+                        var invocation = Close(probe, name, typeof(string)).Invoke(null, [null])!;
+                        var pendingReduced = invocation is Task<string> task ? task : ((ValueTask<string>)invocation).AsTask();
+                        if (pendingReduced.IsCompleted)
+                        { throw new InvalidOperationException("Reduced async delegate failed to suspend: " + name); }
+                        var expectedFailure = new InvalidOperationException("reduced-delegate");
+                        if (outcome == "Success")
+                        { reducedGate.SetResult(true); }
+                        else if (outcome == "Fault")
+                        { reducedGate.SetException(expectedFailure); }
+                        else
+                        {
+#pragma warning disable SPINT003 // Deliberately canceled fixture token, independent of test cancellation.
+                            reducedGate.SetCanceled(canceled.Token);
+#pragma warning restore SPINT003
+                        }
+                        try
+                        {
+                            var returned = await pendingReduced.WaitAsync(cancellationToken).ConfigureAwait(false);
+                            if (outcome != "Success" || returned is not null)
+                            { throw new InvalidOperationException("Reduced async delegate changed null/fault/cancellation: " + name); }
+                        }
+                        catch (InvalidOperationException exception) when (outcome == "Fault" && ReferenceEquals(exception, expectedFailure)) { }
+                        catch (OperationCanceledException exception) when (outcome == "Cancel" && exception.CancellationToken == canceled.Token) { }
+                    }
+                }
+            }
+            Program.Log.Info("PASS ReducedMethodGroupTaskValueTaskNullSuspensionFaultCancellation");
+            var text = new string(['p', 'a', 'y', 'l', 'o', 'a', 'd']);
+            if (!ReferenceEquals(after.GetMethod("ReducedReturn")!.MakeGenericMethod(typeof(Uri)).Invoke(null, [text, marker]), text))
+            { throw new InvalidOperationException("Reduced delegate lost identity or its independent generic parameter."); }
+            Program.Log.Info("PASS ReducedMethodGroupReceiverIdentityAndIndependentDomain");
+            return 6;
         }
         finally { beforeContext.Unload(); afterContext.Unload(); }
     }

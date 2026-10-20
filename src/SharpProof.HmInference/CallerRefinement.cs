@@ -221,10 +221,12 @@ public static partial class Inference
                         return diagnostic.Location.SourceTree == afterTree && groupSpan.Contains(diagnostic.Location.SourceSpan);
                     }))
                     { continue; }
-                    var before = (semantic.GetOperation(beforeGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
-                        ?? semantic.GetSymbolInfo(beforeGroups[i], cancellationToken).Symbol as IMethodSymbol;
+                    var originalBinding = semantic.GetSymbolInfo(beforeGroups[i], cancellationToken).Symbol as IMethodSymbol;
+                    var before = originalBinding?.ReducedFrom is not null ? originalBinding
+                        : (semantic.GetOperation(beforeGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method ?? originalBinding;
                     var binding = groupSemantic.GetSymbolInfo(afterGroups[i], cancellationToken);
-                    var after = (groupSemantic.GetOperation(afterGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
+                    var reduced = binding.Symbol as IMethodSymbol;
+                    var after = reduced?.ReducedFrom is not null ? reduced : (groupSemantic.GetOperation(afterGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
                         ?? binding.Symbol as IMethodSymbol
                         ?? binding.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault(candidate =>
                         {
@@ -256,6 +258,13 @@ public static partial class Inference
                     { CollectSignaturePins(result, CSharpTypes.Rigid(before.ReturnType), CSharpTypes.Rigid(after.ReturnType), null, pins); }
                     else
                     { RefineSuppliedSignature(before, after, parameters, result, pins); }
+                    if (before.ReducedFrom is { } extension && afterGroups[i] is MemberAccessExpressionSyntax access
+                        && groupSemantic.GetTypeInfo(access.Expression, cancellationToken).Type is { } capturedReceiver)
+                    {
+                        // A reduced group captures its receiver outside the
+                        // delegate parameter list, including nullable annotations.
+                        CollectSignaturePins(parameters[0], CSharpTypes.Rigid(extension.Parameters[0].Type), CSharpTypes.Rigid(capturedReceiver), 0, pins);
+                    }
                     var delegateType = groupSemantic.GetTypeInfo(afterGroups[i], cancellationToken).ConvertedType
                         ?? (afterGroups[i].Parent is CastExpressionSyntax conversion ? groupSemantic.GetTypeInfo(conversion.Type, cancellationToken).Type : null);
                     // Method-group symbols omit nullable inference annotations. Use the
