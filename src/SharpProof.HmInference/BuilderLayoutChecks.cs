@@ -36,6 +36,18 @@ internal static class BuilderLayoutChecks
         var critical = normal.Replace("where A:ICriticalNotifyCompletion where S:IAsyncStateMachine", "where A:ICriticalNotifyCompletion where S:unmanaged,IAsyncStateMachine", StringComparison.Ordinal);
         (string Name, string Body, string Support, string Signature)[] tests =
         [
+            ("LayoutDeadGenericInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}if(false)_=Local(\"dead\");return Local(value);}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutDeadShortCircuitInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}if(false&&Check(Local(\"dead\"))){}return Local(value);}static bool Check(LayoutTask<string> task)=>true;", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutPostReturnInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);_=Local(\"dead\");}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutUnusedForwardInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}static LayoutTask<string> Forward()=>Local(\"dead\");return Local(value);}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutNameOnlyForwardInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}static LayoutTask<string> Forward()=>Local(\"dead\");_=nameof(Forward);return Local(value);}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutReachableCapturedForward", "static int M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}void Forward(){_=Local(value);}Forward();return value;}", Support, "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutDeadFunctionAddress", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}if(false){unsafe{delegate*<string,LayoutTask<string>> pointer=&Local;_=pointer(\"dead\");}}return Local(value);}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutDeadCallbackInstantiation", "static void M(Action<Func<int,LayoutTask<int>>> sink,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}sink(async value=>{if(false)_=Local(\"dead\");return await Local(value);});}", Support, "void M<T1, T2>(global::System.Action<global::System.Func<T1, global::LayoutTask<T1>>> sink, T2 ignored) where T1 : unmanaged"),
+            ("LayoutFinallyInstantiation", "static int M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}try{return value;}finally{_=Local(value);}}", Support, "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutCatchInstantiation", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}try{throw new Exception();}catch(Exception){return Local(value);}}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutFilterInstantiation", "static int M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}try{throw new Exception();}catch(Exception)when(Local(value).GetAwaiter().IsCompleted){return value;}}", Support, "T1 M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
+            ("LayoutUnusedCapturedAsync", "static int M(int value,string ignored){async LayoutTask<int> Unused(){await new LayoutSignal();return value;}return value;}", Support, "int M<T1>(int value, T1 ignored)"),
             ("LayoutGenericLocalCall", "static LayoutTask<int> M(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}", Support, "global::LayoutTask<T1> M<T1, T2>(T1 value, T2 ignored) where T1 : unmanaged"),
             ("LayoutGenericLocalMultipleCalls", "static LayoutTask<int> M(int first,long second,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}_=Local(second);return Local(first);}", Support, "global::LayoutTask<T1> M<T1, T2, T3>(T1 first, T2 second, T3 ignored) where T1 : unmanaged where T2 : unmanaged"),
             ("LayoutGenericLocalCompositeCall", "static LayoutTask<LayoutPayload<int,string>> M(LayoutPayload<int,string> value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}", Support, "global::LayoutTask<global::LayoutPayload<T1, T2>> M<T1, T2, T3>(global::LayoutPayload<T1, T2> value, T3 ignored) where T1 : unmanaged"),
@@ -73,7 +85,7 @@ internal static class BuilderLayoutChecks
         foreach (var test in tests)
         {
             var compilation = Program.Compile([CSharpSyntaxTree.ParseText(test.Support + "class Cases{" + test.Body + "}", cancellationToken: cancellationToken)]);
-            compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
+            compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release).WithAllowUnsafe(true));
             using var image = new MemoryStream();
             var original = compilation.Emit(image, cancellationToken: cancellationToken);
             if (!original.Success)
@@ -86,6 +98,25 @@ internal static class BuilderLayoutChecks
         }
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
+        string[] reachableManaged =
+        [
+            "static Func<LayoutTask<int>> M(int value,bool flag,string ignored){async LayoutTask<int> Local(){await new LayoutSignal();return value;}return Local;}",
+            "static LayoutTask<int> M(int value,bool flag,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}unsafe{delegate*<string,LayoutTask<string>> pointer=&Local;_=pointer(\"managed\");}return Local(value);}",
+            "static LayoutTask<int> M(int value,bool flag,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}_=Local(\"managed\");return Local(value);}",
+            "static LayoutTask<int> M(int value,bool flag,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}if(flag)_=Local(\"managed\");return Local(value);}"
+        ];
+        foreach (var body in reachableManaged)
+        {
+            var compilation = Program.Compile([CSharpSyntaxTree.ParseText(Support + "class ReachableManaged{" + body + "}", cancellationToken: cancellationToken)]);
+            compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release).WithAllowUnsafe(true));
+            using var image = new MemoryStream();
+            if (!compilation.Emit(image, cancellationToken: cancellationToken).Success)
+            { throw new InvalidOperationException("Invalid reachable layout fixture."); }
+            if (Program.Results(compilation, cancellationToken).Single(result =>
+                { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; }).Status == "Suggestion")
+            { throw new InvalidOperationException("Reachable managed state-machine storage must still reject a suggestion."); }
+        }
+        Program.Log.Info("PASS LayoutReachableManagedInstantiationsRemainRejected");
         var debug = Program.Compile([CSharpSyntaxTree.ParseText(Support + "class DebugCases{static async LayoutTask<int> M(int value,string ignored){await new LayoutSignal();return value;}}", cancellationToken: cancellationToken)]);
         using var debugImage = new MemoryStream();
         if (debug.Emit(debugImage, cancellationToken: cancellationToken).Success
@@ -99,6 +130,6 @@ internal static class BuilderLayoutChecks
         { throw new InvalidOperationException("Untyped async registration refinement failed: " + (untypedResult.Signature ?? untypedResult.Message)); }
         Program.Log.Info("PASS NestedLayoutPreservesUntypedRegistrationCaller");
         var runtimeChecks = await BuilderLayoutRuntimeChecks.Run(LanguageVersion.CSharp13, cancellationToken).ConfigureAwait(false);
-        return tests.Length + runtimeChecks + 2;
+        return tests.Length + runtimeChecks + reachableManaged.Length + 2;
     }
 }

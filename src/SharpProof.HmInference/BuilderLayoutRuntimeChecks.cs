@@ -28,6 +28,11 @@ internal static class BuilderLayoutRuntimeChecks
         }
         var source = "using System.Linq;\n" + support + unused + legacyTask + """
             public static class BuilderLayoutProbe{
+            #pragma warning disable CS0162, CS8321 // Deliberately unreachable calls and an unused forwarding function.
+                public static int UnusedCaptured(int value,string ignored){async LayoutTask<int> Unused(){await new LayoutSignal();return value;}return value;}
+                public static LayoutTask<int> DeadInstantiation(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}if(false)_=Local("dead");static LayoutTask<string> Unused()=>Local("unused");_=nameof(Unused);return Local(value);}
+                public static int CapturedForward(int value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}void Forward(){_=Local(value);}try{return value;}finally{Forward();}}
+            #pragma warning restore CS0162, CS8321
                 public static LayoutTask<int> LocalCall(int value,string ignored){static LayoutTask<U> Forward<U>(U item)=>Local(item);static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Forward(value);}
                 public static LayoutTask<LayoutPayload<int,string>> LocalComposite(LayoutPayload<int,string> value,string ignored){static async LayoutTask<T> Local<T>(T item){await new LayoutSignal();return item;}return Local(value);}
                 public static LayoutTask<int?> LocalNullable(int? value,string ignored){static async LayoutTask<T?> Local<T>(T? item) where T:struct{await new LayoutSignal();return item;}return Local(value);}
@@ -68,7 +73,10 @@ internal static class BuilderLayoutRuntimeChecks
                     if(first is null||second is null||CallbackLayout.Managed(first)||CallbackLayout.Managed(second)||first(23).GetAwaiter().GetResult()!=23||second(23L).GetAwaiter().GetResult()!=23L)return false;
                     Func<int,LayoutTask<int>>? group=null;BuilderLayoutProbe.LocalGroup((Func<int,LayoutTask<int>> value)=>group=value,"tag");
                     if(group is null||CallbackLayout.Managed(group)||group(23).GetAwaiter().GetResult()!=23)return false;
-                    if(BuilderLayoutProbe.LocalCall(23,"tag").GetAwaiter().GetResult()!=23
+                    if(BuilderLayoutProbe.UnusedCaptured(23,"tag")!=23
+                        ||BuilderLayoutProbe.DeadInstantiation(23,"tag").GetAwaiter().GetResult()!=23
+                        ||BuilderLayoutProbe.CapturedForward(23,"tag")!=23
+                        ||BuilderLayoutProbe.LocalCall(23,"tag").GetAwaiter().GetResult()!=23
                         ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<int,string>{Value=23},"tag").GetAwaiter().GetResult().Value!=23
                         ||BuilderLayoutProbe.LocalNullable((int?)23,"tag").GetAwaiter().GetResult()!=23
                         ||BuilderLayoutProbe.LocalNullable((int?)null,"tag").GetAwaiter().GetResult()!=null)return false;
@@ -96,7 +104,7 @@ internal static class BuilderLayoutRuntimeChecks
         var expectedTrace = (string)before.GetType("LayoutTrace")!.GetField("Value")!.GetValue(null)!;
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 17; round++)
+        for (var round = 0; round < 20; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -116,8 +124,8 @@ internal static class BuilderLayoutRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 15)
-        { throw new InvalidOperationException("Expected fifteen builder layout fixes; got " + fixes); }
+        if (fixes != 18)
+        { throw new InvalidOperationException("Expected eighteen builder layout fixes; got " + fixes); }
         document = document.Project.AddDocument("NewBuilderLayoutDomains.cs", """
             #nullable enable
             using System;
@@ -137,7 +145,10 @@ internal static class BuilderLayoutRuntimeChecks
                     if(first is null||second is null||CallbackLayout.Managed(first)||CallbackLayout.Managed(second)||first(23).GetAwaiter().GetResult()!=23||second(23m).GetAwaiter().GetResult()!=23m)return false;
                     Func<byte,LayoutTask<byte>>? group=null;BuilderLayoutProbe.LocalGroup((Func<byte,LayoutTask<byte>> value)=>group=value,tag);
                     if(group is null||CallbackLayout.Managed(group)||group(23).GetAwaiter().GetResult()!=23)return false;
-                    if(BuilderLayoutProbe.LocalCall((byte)23,tag).GetAwaiter().GetResult()!=23
+                    if(BuilderLayoutProbe.UnusedCaptured(23,tag)!=23
+                        ||BuilderLayoutProbe.DeadInstantiation((byte)23,tag).GetAwaiter().GetResult()!=23
+                        ||BuilderLayoutProbe.CapturedForward((decimal)23,tag)!=23m
+                        ||BuilderLayoutProbe.LocalCall((byte)23,tag).GetAwaiter().GetResult()!=23
                         ||BuilderLayoutProbe.LocalComposite(new LayoutPayload<byte,object[]>{Value=23},tag).GetAwaiter().GetResult().Value!=23
                         ||BuilderLayoutProbe.LocalNullable((decimal?)23m,tag).GetAwaiter().GetResult()!=23m
                         ||BuilderLayoutProbe.LocalNullable((decimal?)null,tag).GetAwaiter().GetResult()!=null)return false;

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.HmInference;
@@ -26,7 +27,8 @@ public static partial class Inference
             var root = semantic.GetDeclaredSymbol(proposal, cancellationToken)
                 ?? throw new InferenceException("Cannot resolve generic layout caller.");
             var functions = new List<(SyntaxNode Node, IMethodSymbol Symbol)>();
-            var calls = new List<IMethodSymbol>();
+            var reachable = ReachableLocalLayoutCalls(semantic, proposal);
+            var calls = reachable.Calls;
             foreach (var node in proposal.DescendantNodes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -34,18 +36,14 @@ public static partial class Inference
                     : node is AnonymousFunctionExpressionSyntax && semantic.GetOperation(node, cancellationToken) is IAnonymousFunctionOperation anonymous ? anonymous.Symbol : null;
                 if (function is { IsAsync: true })
                 { functions.Add((node, function)); }
-                if (node is not (InvocationExpressionSyntax or IdentifierNameSyntax or GenericNameSyntax))
-                { continue; }
-                var selected = semantic.GetOperation(node, cancellationToken) is IMethodReferenceOperation reference ? reference.Method
-                    : semantic.GetSymbolInfo(node, cancellationToken).Symbol as IMethodSymbol;
-                if (selected is { MethodKind: MethodKind.LocalFunction, IsGenericMethod: true })
-                { calls.Add(selected); }
             }
             var required = new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default);
             foreach (var index in active)
             {
                 if (index < 0 || index >= functions.Count || !states.TryGetValue(index, out var state))
                 { throw new InferenceException("Generic local state-machine correlation changed."); }
+                if (!reachable.Functions.Contains(functions[index].Symbol.OriginalDefinition))
+                { continue; }
                 var frame = new List<ITypeParameterSymbol>();
                 var owners = new Stack<INamedTypeSymbol>();
                 for (var owner = root.ContainingType; owner is not null; owner = owner.ContainingType)
@@ -104,6 +102,81 @@ public static partial class Inference
                 added = true;
             }
             return added;
+        }
+
+        private (List<IMethodSymbol> Calls, HashSet<IMethodSymbol> Functions) ReachableLocalLayoutCalls(SemanticModel semantic, MethodDeclarationSyntax proposal)
+        {
+            if (semantic is null)
+            { throw new ArgumentNullException(nameof(semantic)); }
+            if (proposal is null)
+            { throw new ArgumentNullException(nameof(proposal)); }
+            var calls = new List<IMethodSymbol>();
+            var graphs = new HashSet<ControlFlowGraph>();
+            var functions = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            void VisitGraph(ControlFlowGraph graph)
+            {
+                if (graph is null)
+                { throw new ArgumentNullException(nameof(graph)); }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!graphs.Add(graph))
+                { return; }
+                foreach (var block in graph.Blocks)
+                {
+                    if (!block.IsReachable)
+                    { continue; }
+                    foreach (var operation in block.Operations)
+                    { VisitOperation(operation, graph); }
+                    if (block.BranchValue is { } branch)
+                    { VisitOperation(branch, graph); }
+                }
+            }
+            void VisitOperation(IOperation operation, ControlFlowGraph graph)
+            {
+                if (operation is null)
+                { throw new ArgumentNullException(nameof(operation)); }
+                if (graph is null)
+                { throw new ArgumentNullException(nameof(graph)); }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (operation is INameOfOperation)
+                { return; }
+                if (operation is IFlowAnonymousFunctionOperation anonymous)
+                {
+                    functions.Add(anonymous.Symbol.OriginalDefinition);
+                    VisitGraph(graph.GetAnonymousFunctionControlFlowGraph(anonymous, cancellationToken));
+                    return;
+                }
+                var selected = operation switch
+                {
+                    IInvocationOperation invocation => invocation.TargetMethod,
+                    IMethodReferenceOperation reference => reference.Method,
+                    _ => null
+                };
+                if (selected is { MethodKind: MethodKind.LocalFunction })
+                {
+                    if (selected.IsGenericMethod)
+                    { calls.Add(selected); }
+                    var definition = selected.OriginalDefinition;
+                    if (functions.Add(definition))
+                    {
+                        ControlFlowGraph? owner = graph;
+                        while (owner is not null && !owner.LocalFunctions.Any(function =>
+                        {
+                            if (function is null)
+                            { throw new ArgumentNullException(nameof(function)); }
+                            return SymbolEqualityComparer.Default.Equals(function.OriginalDefinition, definition);
+                        }))
+                        { owner = owner.Parent; }
+                        if (owner is null)
+                        { throw new InferenceException("Cannot correlate local layout control flow."); }
+                        VisitGraph(owner.GetLocalFunctionControlFlowGraph(definition, cancellationToken));
+                    }
+                }
+                foreach (var child in operation.ChildOperations)
+                { VisitOperation(child, graph); }
+            }
+            VisitGraph(ControlFlowGraph.Create(proposal, semantic, cancellationToken)
+                ?? throw new InferenceException("Cannot inspect local layout control flow."));
+            return (calls, functions);
         }
     }
 }
