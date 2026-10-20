@@ -40,7 +40,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized" : "no-inlining-control";
@@ -85,8 +85,8 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedSourceCalleePurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         RuntimeObservation runtimeObservation;
@@ -98,12 +98,12 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             var method = subject.GetMethod("Helper", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var flags = method.GetMethodImplementationFlags();
             var execute = target.CreateDelegate<Func<int, int>>();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = (target.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
             Assert.That(targetIl, Has.Length.EqualTo(7), "Release Target must directly call the ordinary source helper.");
             Assert.That(targetIl[0], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Ldarg_0.Value));
             Assert.That(targetIl[1], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Call.Value));
             Assert.That(targetIl[6], Is.EqualTo((byte)System.Reflection.Emit.OpCodes.Ret.Value));
-            var callToken = BitConverter.ToInt32(targetIl, 2);
+            var callToken = BitConverter.ToInt32(targetIl.AsSpan(2..));
             var calledMethod = subject.Module.ResolveMethod(callToken)!;
             callObservation = new(
                 target.Name,
@@ -112,7 +112,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 target.IsStatic,
                 target.ReturnType == typeof(int),
                 target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
-                Convert.ToHexStringLower(targetIl),
+                Convert.ToHexStringLower(targetIl.AsSpan()),
                 method.Name,
                 method.MetadataToken,
                 method.IsPrivate,
@@ -191,8 +191,8 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -201,7 +201,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         await Save(evidenceDirectory, "native-observations.json", new
         {
             SourceSha256 = sourceHash,
@@ -272,10 +272,11 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         }
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)

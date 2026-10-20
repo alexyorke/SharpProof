@@ -12,11 +12,11 @@ $wrapperPath = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 function Invoke-DotnetFormat {
     param(
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [Collections.Immutable.ImmutableArray[string]]$Arguments
     )
 
     $effectiveArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
-    [void]$effectiveArguments.AddRange([string[]]$Arguments)
+    [void]$effectiveArguments.AddRange($Arguments)
     if ($VerifyNoChanges) {
         [void]$effectiveArguments.Add('--verify-no-changes')
     }
@@ -73,8 +73,8 @@ try {
         ))
     [void]$solutionArgumentsBuilder.AddRange([string[]]@($sourcePaths))
     $solutionArguments = $solutionArgumentsBuilder.ToImmutable()
-    Invoke-DotnetFormat -Arguments ([string[]]@($whitespaceArguments))
-    Invoke-DotnetFormat -Arguments ([string[]]@($solutionArguments))
+    Invoke-DotnetFormat -Arguments $whitespaceArguments
+    Invoke-DotnetFormat -Arguments $solutionArguments
 }
 finally {
     Pop-Location

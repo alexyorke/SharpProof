@@ -53,7 +53,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized" : "no-inlining-control";
@@ -74,8 +74,8 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedCompoundGetterPurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         MethodImplAttributes getterFlags;
@@ -90,10 +90,10 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             var setter = property.SetMethod!;
             var field = cell.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Single();
             var constructor = cell.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
-            var getterIl = getter.GetMethodBody()!.GetILAsByteArray()!;
-            var setterIl = setter.GetMethodBody()!.GetILAsByteArray()!;
-            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = (target.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var getterIl = (getter.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var setterIl = (setter.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var constructorIl = (constructor.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
             var instructions = ReadTargetIl(targetIl);
             var virtualCalls = instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x6f)).ToImmutableArray();
             Assert.That(virtualCalls, Has.Length.EqualTo(2));
@@ -122,11 +122,11 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
                 Assert.That(constructorIl[1], Is.EqualTo(0x28));
                 Assert.That(constructorIl[6], Is.EqualTo(0x2a));
             }
-            var getFieldToken = BitConverter.ToInt32(getterIl, 2);
-            var setFieldToken = BitConverter.ToInt32(setterIl, 3);
+            var getFieldToken = BitConverter.ToInt32(getterIl.AsSpan(2..));
+            var setFieldToken = BitConverter.ToInt32(setterIl.AsSpan(3..));
             var returnedField = getter.Module.ResolveField(getFieldToken)!;
             var storedField = setter.Module.ResolveField(setFieldToken)!;
-            var baseConstructorToken = BitConverter.ToInt32(constructorIl, 2);
+            var baseConstructorToken = BitConverter.ToInt32(constructorIl.AsSpan(2..));
             var baseConstructor = (ConstructorInfo)constructor.Module.ResolveMethod(baseConstructorToken)!;
             getterFlags = getter.GetMethodImplementationFlags();
             var execute = target.CreateDelegate<Func<int, int>>();
@@ -176,7 +176,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
                 SourceSha256 = sourceHash,
                 EmittedPeSha256 = Hash(imageBytes),
                 TargetMetadataToken = target.MetadataToken,
-                TargetIlHex = Convert.ToHexStringLower(targetIl),
+                TargetIlHex = Convert.ToHexStringLower(targetIl.AsSpan()),
                 Instructions = instructions,
                 RequiresOffset = requirementInstruction.Offset,
                 ConstructorOffset = creationInstruction.Offset,
@@ -188,13 +188,13 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
                 SetterToken = setterCall.Token,
                 GetterMetadataToken = getter.MetadataToken,
                 SetterMetadataToken = setter.MetadataToken,
-                GetterIlHex = Convert.ToHexStringLower(getterIl),
-                SetterIlHex = Convert.ToHexStringLower(setterIl),
+                GetterIlHex = Convert.ToHexStringLower(getterIl.AsSpan()),
+                SetterIlHex = Convert.ToHexStringLower(setterIl.AsSpan()),
                 BackingFieldMetadataToken = field.MetadataToken,
                 GetterFieldToken = getFieldToken,
                 SetterStoreFieldToken = setFieldToken,
                 ConstructorMetadataToken = constructor.MetadataToken,
-                ConstructorIlHex = Convert.ToHexStringLower(constructorIl),
+                ConstructorIlHex = Convert.ToHexStringLower(constructorIl.AsSpan()),
                 BaseConstructorCallToken = baseConstructorToken,
                 GetterImplementationFlags = (int)getterFlags,
                 SetterImplementationFlags = (int)setter.GetMethodImplementationFlags(),
@@ -327,15 +327,15 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         await Save(evidenceDirectory, "native-observations.json", new
         {
             SourceSha256 = sourceHash,
@@ -407,9 +407,10 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
         }
     }
 
-    private static ImmutableArray<DecodedInstruction> ReadTargetIl(byte[] il)
+    private static ImmutableArray<DecodedInstruction> ReadTargetIl(ImmutableArray<byte> il)
     {
-        System.ArgumentNullException.ThrowIfNull(il, nameof(il));
+        if (il.IsDefault)
+        { throw new ArgumentNullException(nameof(il)); }
         var result = ImmutableArray.CreateBuilder<DecodedInstruction>();
         var offset = 0;
         while (offset < il.Length)
@@ -427,7 +428,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             }
             else if (opcode is 0x28 or 0x6f or 0x73)
             {
-                token = BitConverter.ToInt32(il, offset);
+                token = BitConverter.ToInt32(il.AsSpan(offset..));
                 offset += 4;
             }
             else if (opcode is not (0x00 or 0x02 or 0x03 or 0x06 or 0x07 or 0x0a or 0x0b or 0x16 or 0x17 or 0x25 or 0x58 or 0x5b or 0x2a))
@@ -441,10 +442,11 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
 
     private sealed record DecodedInstruction(int Offset, int Opcode, int? Token);
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)

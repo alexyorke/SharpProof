@@ -48,7 +48,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized" : "no-inlining-control";
@@ -70,8 +70,8 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedBodiedGetterCallerPurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         RuntimeObservation runtimeObservation;
@@ -82,8 +82,8 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             var getter = subject.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!.GetMethod!;
             var field = subject.GetField("_value", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
             var constructor = subject.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
-            var getterIl = getter.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = (target.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var getterIl = (getter.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(targetIl, Has.Length.EqualTo(7));
@@ -97,8 +97,8 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 Assert.That(constructor.GetParameters(), Has.Length.EqualTo(1));
                 Assert.That(constructor.GetParameters().Single().ParameterType, Is.EqualTo(typeof(int)));
             }
-            var callToken = BitConverter.ToInt32(targetIl, 2);
-            var fieldToken = BitConverter.ToInt32(getterIl, 2);
+            var callToken = BitConverter.ToInt32(targetIl.AsSpan(2..));
+            var fieldToken = BitConverter.ToInt32(getterIl.AsSpan(2..));
             var calledGetter = (MethodInfo)target.Module.ResolveMethod(callToken)!;
             var returnedField = getter.Module.ResolveField(fieldToken)!;
             var flags = getter.GetMethodImplementationFlags();
@@ -125,13 +125,13 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 EmittedPeSha256 = Hash(imageBytes),
                 TargetName = target.Name,
                 TargetMetadataToken = target.MetadataToken,
-                TargetIlHex = Convert.ToHexStringLower(targetIl),
+                TargetIlHex = Convert.ToHexStringLower(targetIl.AsSpan()),
                 TargetImplementationFlags = (int)target.GetMethodImplementationFlags(),
                 CallOpcode = "callvirt",
                 CallMetadataToken = callToken,
                 GetterName = getter.Name,
                 GetterMetadataToken = getter.MetadataToken,
-                GetterIlHex = Convert.ToHexStringLower(getterIl),
+                GetterIlHex = Convert.ToHexStringLower(getterIl.AsSpan()),
                 FieldMetadataToken = field.MetadataToken,
                 GetterFieldMetadataToken = fieldToken,
                 FieldName = field.Name,
@@ -157,7 +157,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 field.FieldType == typeof(int),
                 subject.TypeInitializer != null,
                 executions.Select(static execute => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (execute())).ToImmutableArray(),
-                Convert.ToHexStringLower(getterIl),
+                Convert.ToHexStringLower(getterIl.AsSpan()),
                 subject.Module.ModuleVersionId.ToString("D"));
             await Save(evidenceDirectory, "runtime-observations.json", new
             {
@@ -256,8 +256,8 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -266,7 +266,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         await Save(evidenceDirectory, "native-observations.json", new
         {
             SourceSha256 = sourceHash,
@@ -343,10 +343,11 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
         }
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)

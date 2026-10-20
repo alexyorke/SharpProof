@@ -53,7 +53,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized-filter" : "no-inlining-filter-control";
@@ -75,8 +75,8 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedFilterSharedFramePurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         RuntimeObservation runtimeObservation;
@@ -154,8 +154,8 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -164,7 +164,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         await Save(evidenceDirectory, "native-observations.json", new
         {
             SourceSha256 = sourceHash,
@@ -245,7 +245,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(filter);
         System.ArgumentNullException.ThrowIfNull(method);
-        var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
+        var bytes = (method.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
         var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
@@ -268,35 +268,36 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => checked(4 + 4 * BitConverter.ToInt32(bytes, offset)),
+                OperandType.InlineSwitch => checked(4 + 4 * BitConverter.ToInt32(bytes.AsSpan(offset..))),
                 _ => 4
             };
             if (size < 0 || offset + size > bytes.Length)
             { throw new InvalidOperationException("Truncated emitted IL operand."); }
-            var token = code.OperandType == OperandType.InlineMethod ? BitConverter.ToInt32(bytes, offset) : (int?)null;
+            var token = code.OperandType == OperandType.InlineMethod ? BitConverter.ToInt32(bytes.AsSpan(offset..)) : (int?)null;
             var resolved = token is { } methodToken ? method.Module.ResolveMethod(methodToken) : null;
             var operand = code.OperandType switch
             {
                 OperandType.InlineMethod => resolved?.ToString(),
-                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes, offset)).ToString(),
-                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes, offset))?.ToString(),
-                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
+                OperandType.InlineType => method.Module.ResolveType(BitConverter.ToInt32(bytes.AsSpan(offset..))).ToString(),
+                OperandType.InlineField => method.Module.ResolveField(BitConverter.ToInt32(bytes.AsSpan(offset..)))?.ToString(),
+                OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes.AsSpan(offset..)))?.ToString(),
                 _ => null
             };
             var resolvesExactFilter = resolved != null && resolved.MetadataToken == filter.MetadataToken &&
                 resolved.Module.ModuleVersionId == filter.Module.ModuleVersionId && resolved.DeclaringType == filter.DeclaringType;
-            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
+            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset..(offset + size))), operand,
                 token, resolvesExactFilter));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutable());
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes.AsSpan()), rows.ToImmutable());
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)

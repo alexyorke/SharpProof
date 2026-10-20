@@ -92,7 +92,7 @@ function Format-PowerShellSource {
     if ($formatErrors.Count -gt 0) { throw 'PowerShell formatting produced invalid syntax.' }
     # PSScriptAnalyzer can leave spaces after closing braces. Remove them
     # without trimming data inside strings or here-strings.
-    $literals = @($formatTokens | Where-Object { $_.Kind -in @('StringLiteral', 'StringExpandable', 'HereStringLiteral', 'HereStringExpandable') })
+    $literals = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($formatTokens | Where-Object { $_.Kind -in @('StringLiteral', 'StringExpandable', 'HereStringLiteral', 'HereStringExpandable') }))
     $trailingWhitespace = [regex]::Matches($formatted, '(?m)[ \t]+$')
     $builder = [Text.StringBuilder]::new($formatted)
     for ($index = $trailingWhitespace.Count - 1; $index -ge 0; $index--) {
