@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -109,15 +108,15 @@ public sealed class NightlyRefutationRegressionTests
         optionsBuilder["build_property.SharpProofVerifyPolicy"] = "advisory";
         optionsBuilder["build_property.SharpProofAssumptionPolicy"] = "allow";
         var options = optionsBuilder.ToImmutable();
-        var exceptions = new ConcurrentBag<string>();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var analyzerOptions = new AnalyzerOptions([], new OptionsProvider(options));
         var withAnalyzers = compilation.WithAnalyzers(
             [new SharpProofAnalyzer(), new FinalCompilationCollectorAnalyzer()],
             new CompilationWithAnalyzersOptions(analyzerOptions,
-                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); exceptions.Add(analyzer.GetType().Name + ": " + exception); },
+                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); lock (exceptions) { exceptions.Add(analyzer.GetType().Name + ": " + exception); } },
                 concurrentAnalysis: false, logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         Assert.That(diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id is "AD0001" or "SP0049" or "SP0025")), Is.Empty);
         Assert.That(File.Exists(manifestPath), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);

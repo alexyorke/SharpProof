@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -80,16 +79,16 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         Assert.That(referencedAssembly.Name, Is.EqualTo("PublicDriverTreeDependency"));
 
         var analyzer = new SharpProofAnalyzer();
-        var exceptions = new ConcurrentQueue<string>();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
             new AnalyzerOptions([], new OptionsProvider()),
-            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
+            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); lock (exceptions) { exceptions.Add(exception.ToString()); } },
             concurrentAnalysis: true, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: true));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
         var diagnostics = await driver.GetAnalyzerDiagnosticsAsync();
         TestContext.WriteLine(string.Join(Environment.NewLine, diagnostics));
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         if (sharedTree)
         {
             Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),

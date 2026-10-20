@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -92,15 +91,15 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
         Assert.That(compilation.GetSemanticModel(tree).Compilation, Is.SameAs(compilation));
 
         var analyzer = new SharpProofAnalyzer();
-        var exceptions = new ConcurrentQueue<string>();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
             new AnalyzerOptions([], new OptionsProvider()),
-            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
+            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); lock (exceptions) { exceptions.Add(exception.ToString()); } },
             concurrentAnalysis: true, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: true));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
         var diagnostics = await driver.GetAnalyzerDiagnosticsAsync();
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         if (aliasOnly)
         {
             Assert.That(diagnostics, Has.Length.EqualTo(1));
