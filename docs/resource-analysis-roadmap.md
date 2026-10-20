@@ -107,10 +107,15 @@ required; none of the phase E checkboxes is complete yet.
 CI for local-capture checkpoint 7c6e0c9a6 passed package, docs and security, but
 canonical and semantic-worker coverage failed on two stale artifact-schema golden
 headers (48 instead of 49). Those fixtures now expect schema 50 and all 81 worker
-goldens pass. No new aggregate coverage percentage is available for that failed
+golden cases pass. No new aggregate coverage percentage is available for that failed
 shard; 8b3561e76 remains the last numerical qualification result. Master
-1b292a43f (cached default comparer values) was fetched during verification and
-will be integrated before publishing this foundation.
+1b292a43f (cached default comparer values) was integrated in 0e89bcc93. The
+combined tree passed 803 worker cases, 1450 analyzer tests, 756 IR tests and eight
+default-comparer SMT cases. Layout validates 2753
+source files, 59 projects and 151 unchanged pinned common files; the trusted
+inventory remains 521 paths and documentation checks 726 local links. Formatting
+and all quality/API checks passed, with the final progress-note spelling repair
+verified by targeted lint. Fresh exact-head CI is required after publication.
 
 Root closure lifetime composition now includes initialized, read-only locals.
 Entry frame allocation and ordered default stores precede initializer updates,
