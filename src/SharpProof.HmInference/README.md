@@ -452,5 +452,14 @@ unification exposes another simplification. Cyclic groups retain their incoming
 and outgoing requirements; ordinary acyclic bounds and F-bounded interfaces stay
 separate. Runtime IDE-fix checks compare helper effects, values and reference
 identity in original/new domains and reject invalid base/value domains. General
-directional lower bounds, nullable constraint implication and ambiguous multiple
-interface projections remain open.
+directional lower bounds and ambiguous multiple interface projections remain open.
+Nullable constraints are collected before solving. Annotated constraint owners and
+nullable dependency cycles retain their parameter wrappers while sharing the
+underlying type variables. Nominal bounds intersect their outer nullability;
+class/notnull requirements strengthen nullable bases, and inherited interface
+bounds remove duplicate nullable/non-nullable requirements. Constraints imported
+from nullable-oblivious source and metadata retain their permissive domains.
+Nullable nominal constraints use normal scoped spelling, including existing extern
+aliases. Runtime IDE fixes verify nulls, reference identity, helper effects,
+interface-admitted structs, required-domain errors and non-nullability warnings.
+Further directional and transitive implication remains open.

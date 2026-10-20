@@ -376,14 +376,12 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped conditional access."));
         }
 
-        private List<TypeParameterConstraintClauseSyntax> NullableConstraints(HmType[] parameters, HmType result, Dictionary<HmType, string> variables, bool nullableAnnotations)
+        private void ImportNullableConstraints(HmType[] parameters, HmType result)
         {
             if (parameters is null)
             { throw new ArgumentNullException(nameof(parameters)); }
             if (result is null)
             { throw new ArgumentNullException(nameof(result)); }
-            if (variables is null)
-            { throw new ArgumentNullException(nameof(variables)); }
             var visited = new HashSet<HmType>();
             void Visit(HmType type)
             {
@@ -406,7 +404,6 @@ public static partial class Inference
             foreach (var parameter in parameters)
             { Visit(parameter); }
             Visit(result);
-            return BuildConstraints(variables, nullableAnnotations);
         }
 
         private string CompilerWarningKey(Diagnostic warning, Compilation compilation)

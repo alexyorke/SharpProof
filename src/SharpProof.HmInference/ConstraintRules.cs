@@ -19,13 +19,21 @@ public static partial class Inference
             inferredConstraints.Add((variable, keyword, null, false));
         }
 
-        private void RequireType(HmType variable, ITypeSymbol type, Dictionary<ITypeParameterSymbol, HmType>? mapping = null)
+        private void RequireType(HmType variable, ITypeSymbol type, Dictionary<ITypeParameterSymbol, HmType>? mapping = null, bool /* SPINT001: all values valid - controls preservation of legacy annotations. */ preserveObliviousAnnotations = false)
         {
             if (variable is null)
             { throw new ArgumentNullException(nameof(variable)); }
             if (type is null)
             { throw new ArgumentNullException(nameof(type)); }
-            inferredConstraints.Add((variable, null, CSharpTypes.Rigid(type, mapping), type.TypeKind == TypeKind.Class));
+            var shape = CSharpTypes.Rigid(type, mapping);
+            if (preserveObliviousAnnotations && type.NullableAnnotation == NullableAnnotation.None)
+            {
+                if (type is ITypeParameterSymbol)
+                { shape = new(CSharpTypes.NullableParameter, shape); }
+                else if (type.IsReferenceType)
+                { shape = new(CSharpTypes.NullableReference, shape); }
+            }
+            inferredConstraints.Add((variable, null, shape, type.TypeKind == TypeKind.Class));
         }
 
         private void ImportConstraints(ITypeParameterSymbol parameter, HmType variable, Dictionary<ITypeParameterSymbol, HmType> mapping, ITypeSymbol? actual = null)
@@ -42,7 +50,7 @@ public static partial class Inference
             { RequireKeyword(variable, "struct"); }
             if (parameter.HasReferenceTypeConstraint)
             {
-                RequireKeyword(variable, parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated ? "class?" : "class");
+                RequireKeyword(variable, parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.NotAnnotated ? "class" : "class?");
             }
             if (parameter.HasNotNullConstraint)
             {
@@ -60,7 +68,7 @@ public static partial class Inference
                 }
             }
             foreach (var type in parameter.ConstraintTypes)
-            { RequireType(variable, type, mapping); }
+            { RequireType(variable, type, mapping, preserveObliviousAnnotations: true); }
             if (parameter.HasConstructorConstraint)
             { RequireKeyword(variable, "new()"); }
         }
@@ -124,9 +132,7 @@ public static partial class Inference
             {
                 if (requirement.Type?.Root.Name == "object")
                 { continue; }
-                var constrained = requirement.Variable.Root;
-                while (constrained.Name == CSharpTypes.NullableParameter)
-                { constrained = constrained.Arguments[0].Root; }
+                var constrained = ConversionCore(requirement.Variable);
                 if (!constrained.IsVariable)
                 { continue; }
                 if (requirement.Keyword is "struct" or "unmanaged")
@@ -144,9 +150,7 @@ public static partial class Inference
                 {
                     if (requirement.Type?.Root.Name == "object")
                     { continue; }
-                    var constrained = requirement.Variable.Root;
-                    while (constrained.Name == CSharpTypes.NullableParameter)
-                    { constrained = constrained.Arguments[0].Root; }
+                    var constrained = ConversionCore(requirement.Variable);
                     if (!ReferenceEquals(constrained, variable.Key.Root))
                     { continue; }
                     if (requirement.Keyword is not null)
@@ -158,7 +162,7 @@ public static partial class Inference
                             if (!variables.ContainsKey(free))
                             { throw new InferenceException("A constraint-only type variable cannot be inferred from method arguments."); }
                         }
-                        var type = requirement.Type.Root.CSharpSymbol is { } declared
+                        var type = (requirement.Type.Root.CSharpSymbol ?? ConversionCore(requirement.Type).CSharpSymbol) is { } declared
                             ? CSharpTypes.Render(requirement.Type, declared, variables, nullableAnnotations, model,
                                 currentMethod!.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration ? declaration.ParameterList.Span.End : 0, preserveDeclaredAnnotations: false)
                             : requirement.Type.Format(variables, nullableAnnotations);
@@ -175,7 +179,7 @@ public static partial class Inference
                 if (value)
                 { parts.Add(keywords.Contains("unmanaged") ? "unmanaged" : "struct"); }
                 else if (reference && !hasBaseClass)
-                { parts.Add(keywords.Contains("class") || keywords.Contains("notnull") ? "class" : "class?"); }
+                { parts.Add(!nullableAnnotations || keywords.Contains("class") || keywords.Contains("notnull") ? "class" : "class?"); }
                 else if (keywords.Contains("notnull") && !hasBaseClass)
                 { parts.Add("notnull"); }
                 parts.AddRange(types);

@@ -124,6 +124,18 @@ root = true
 [*.cs]
 dotnet_diagnostic.HM0001.severity = warning
 EOF
+cat > "$consumer/NullableBounds.cs" <<'EOF'
+#nullable enable
+public static class PackageNullableBounds{
+    public static PackageBoundLeaf? NullableBound(PackageBoundLeaf? value)=>Root(value);
+    public static PackageBoundLeaf? NullableBoth(PackageBoundLeaf? value)=>Root(Middle(value));
+    public static PackageBoundLeaf LegacyBound(PackageBoundLeaf value)=>Legacy(value);
+    private static T Root<T>(T value) where T:PackageBoundRoot? =>value;
+    private static T Middle<T>(T value) where T:PackageBoundMiddle? =>value;
+#nullable disable
+    private static T Legacy<T>(T value) where T:class=>value;
+}
+EOF
 cat > "$consumer/ConstraintBounds.cs" <<'EOF'
 public class PackageBoundRoot{}
 public class PackageBoundMiddle:PackageBoundRoot{}
@@ -156,7 +168,7 @@ public unsafe static class PointerPackageProbe {
 }
 EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
-for expected in 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::PackageBoundMiddle' 'BoundProjection<T1>(global::PackageBoundBoxLeaf<T1> value, T1 first, T1 second)' 'PinPattern<T1>(global::PackagePin<T1, int> value)' 'PinVoid<T1>(T1[] values) where T1 : unmanaged' 'PinBuffer<T1>(ref global::PackageBuffer<T1> value)' 'IndirectPointer<T1, T2>(delegate*<T1, T2> pointer, T1 value)' 'NativePointer<T1, T2>(delegate* unmanaged[Cdecl]<T1, T2> pointer, T1 value)'; do
+for expected in 'NullableBound<T1>(T1? value) where T1 : global::PackageBoundRoot' 'NullableBoth<T1>(T1? value) where T1 : global::PackageBoundMiddle' 'LegacyBound<T1>(T1 value) where T1 : class?' 'BoundCycle<T1>(T1 left, T1 right)' 'StrongestBound<T1>(T1 value) where T1 : global::PackageBoundMiddle' 'BoundProjection<T1>(global::PackageBoundBoxLeaf<T1> value, T1 first, T1 second)' 'PinPattern<T1>(global::PackagePin<T1, int> value)' 'PinVoid<T1>(T1[] values) where T1 : unmanaged' 'PinBuffer<T1>(ref global::PackageBuffer<T1> value)' 'IndirectPointer<T1, T2>(delegate*<T1, T2> pointer, T1 value)' 'NativePointer<T1, T2>(delegate* unmanaged[Cdecl]<T1, T2> pointer, T1 value)'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
@@ -192,4 +204,4 @@ cp "$legacy/build.log" "$evidence/package-pattern-consumer.txt"
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' 'PASS NuGetPinningPatternsAndFixedBuffers' 'PASS NuGetConstraintNormalization' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' 'PASS NuGetPinningPatternsAndFixedBuffers' 'PASS NuGetConstraintNormalization' 'PASS NuGetNullableConstraintImplication' | tee "$evidence/package-checks.txt"
