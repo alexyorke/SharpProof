@@ -212,7 +212,7 @@ internal sealed class ApiSpecTemplate
 internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "9";
+    public const string DefaultTableVersion = "10";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -248,6 +248,8 @@ internal sealed partial class ApiSpecTable
         var evidenceTypeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
         var evidenceExceptionCulture = new SpecEvidence(SpecEvidenceKind.Observed, "dotnet-resource-message-culture-callback-boundary");
         return [
+            ImmutablePairGetterDeclaration("Key", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            ImmutablePairGetterDeclaration("Value", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.dictionary.count", "System.Collections.Generic.Dictionary`2", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.queue.count", "System.Collections.Generic.Queue`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
@@ -657,6 +659,23 @@ internal sealed partial class ApiSpecTable
                     null),
                 []),
         ];
+    }
+
+    private static ApiSpecDeclaration ImmutablePairGetterDeclaration(string property,
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        const string type = "System.Collections.Generic.KeyValuePair`2";
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget("bcl.key-value-pair." + property.ToLowerInvariant(), "P:" + type + "." + property,
+                type, SpecTargetMemberKind.PropertyGet, property, false, 0, IrTypeKind.Reference, [], IrTypeKind.Reference, assemblies),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.None, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.Unknown, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
     }
 
     private static ApiSpecDeclaration CollectionCountDeclaration(string identifier, string type,

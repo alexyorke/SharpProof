@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 9 removes unconditional resource-constructor callback guarantees.
+        // Version 10 adds immutable KeyValuePair getter effect evidence.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("9"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("10"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "e2b952334c6c2a3f6d1a9b04954bc1d8515a25e6d5f2d031f7ffedfc3bbe0adb"));
+                "176f07b7dfb4a0e7a8904b1000f08272eb16b1fc0b61b38a040aaa7a6fb5ef3e"));
         }
     }
 
