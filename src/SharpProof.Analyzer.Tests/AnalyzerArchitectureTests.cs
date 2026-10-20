@@ -94,7 +94,7 @@ public sealed class AnalyzerArchitectureTests
                 "effects",
                 ["SP0002", "SP0045"]))
             .ToImmutableArray();
-        var results = await Task.WhenAll(tasks);
+        var results = (await Task.WhenAll(tasks)).ToImmutableArray();
         var expected = Snapshot(results[0]);
 
         Assert.That(

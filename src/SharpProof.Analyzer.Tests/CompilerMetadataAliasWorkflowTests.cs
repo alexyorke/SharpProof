@@ -30,8 +30,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 }
                 """, []).WithAssemblyName("MetadataSizeDependency");
             var originalImage = AnalyzerTestHost.EmitImage(dependency);
-            var replacementImage = await File.ReadAllBytesAsync(
-                typeof(SharpProof.Attributes.PositiveAttribute).Assembly.Location);
+            var replacementImage = (await File.ReadAllBytesAsync(
+                typeof(SharpProof.Attributes.PositiveAttribute).Assembly.Location)).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(originalImage, Is.Not.Empty);
@@ -51,7 +51,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
                 module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
-            await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : (originalImage).ToArray());
+            await File.WriteAllBytesAsync(dependencyPath, (replaceBackingFile ? replacementImage : originalImage).ToArray());
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),

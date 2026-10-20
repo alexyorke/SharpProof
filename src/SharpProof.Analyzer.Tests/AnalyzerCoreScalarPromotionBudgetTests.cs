@@ -52,8 +52,8 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
             "    private static long Need(int value)\n    {\n        Contract.Requires(value > 0);\n" +
             "        return 1L" + string.Concat(Enumerable.Repeat(" + value", testCase.ValueCopies)) + ";\n" +
             "    }\n    public static long Target() => Need(0);\n}\n";
-        var sourceBytes = Encoding.UTF8.GetBytes(source);
-        var sourceHash = Convert.ToHexString(SHA256.HashData(sourceBytes));
+        var sourceBytes = Encoding.UTF8.GetBytes(source).ToImmutableArray();
+        var sourceHash = Convert.ToHexString(SHA256.HashData(sourceBytes.AsSpan()));
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0027"], filePath: path);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))

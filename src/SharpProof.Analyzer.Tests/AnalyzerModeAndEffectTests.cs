@@ -652,12 +652,12 @@ public sealed class AnalyzerModeAndEffectTests
             .Select(static _ => new RecordingSessionFactory())
             .ToImmutableArray();
 
-        var runs = await Task.WhenAll(factories.Select(factory =>
+        var runs = (await Task.WhenAll(factories.Select(factory =>
             factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (AnalyzerTestHost.AnalyzeAsync(
                 source,
                 "effects",
                 ["SP0002"],
-                new SharpProofAnalyzer(factory)))));
+                new SharpProofAnalyzer(factory)))))).ToImmutableArray();
 
         Assert.That(
             runs.Select(static diagnostics => diagnostics.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(diagnostics)) : (diagnostics.Length)),
@@ -1137,7 +1137,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task ConcurrentAutoAccessorRunsReconcileExactlyOnce()
     {
-        var runs = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
+        var runs = (await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
         {
             var factory = new RecordingSessionFactory();
             var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -1151,7 +1151,7 @@ public sealed class AnalyzerModeAndEffectTests
                 [],
                 new SharpProofAnalyzer(factory));
             return (diagnostics, factory);
-        }));
+        }))).ToImmutableArray();
 
         foreach (var (diagnostics, factory) in runs)
         {
