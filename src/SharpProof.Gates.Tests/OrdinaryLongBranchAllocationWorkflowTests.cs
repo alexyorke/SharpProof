@@ -33,7 +33,7 @@ public sealed class OrdinaryLongBranchAllocationWorkflowTests
             var method = assembly.GetType("ScalarBody", throwOnError: true)!.GetMethod("Read")!;
             var body = method.GetMethodBody()!;
             var bytes = body.GetILAsByteArray()!.ToImmutableArray();
-            var arguments = new object[] { seed };
+            ImmutableArray<object> arguments = [seed];
 
             using (Assert.EnterMultipleScope())
             {
@@ -44,7 +44,7 @@ public sealed class OrdinaryLongBranchAllocationWorkflowTests
                 Assert.That(body.LocalVariables.Count(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalType == typeof(bool))), Is.EqualTo(1));
                 Assert.That(body.LocalVariables.Any(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalIndex >= 256)), Is.True);
                 Assert.That(bytes.Length, Is.GreaterThan(sbyte.MaxValue).And.LessThan(65536));
-                Assert.That(method.Invoke(null, arguments), Is.EqualTo(expectedResult));
+                Assert.That(method.Invoke(null, arguments.ToArray()), Is.EqualTo(expectedResult));
                 Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.False);
             }
         }

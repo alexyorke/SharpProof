@@ -60,16 +60,16 @@ public sealed class PartialSourceCompletionControls
             image.Position = 0;
             var runtime = context.LoadFromStream(image).GetType("PartialCompletionSourcePremise");
             Assert.That(runtime, Is.Not.Null);
-            object?[] arguments = [fault ? (object)7L : true];
+            ImmutableArray<object?> arguments = [fault ? (object)7L : true];
             try
             {
-                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments)!;
+                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments.ToArray())!;
             }
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             {
                 actualFault = exception.InnerException;
             }
-            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments)!;
+            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments.ToArray())!;
         }
         finally
         {

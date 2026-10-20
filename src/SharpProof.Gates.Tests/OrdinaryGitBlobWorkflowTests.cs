@@ -26,8 +26,8 @@ public sealed class OrdinaryGitBlobWorkflowTests
         var pipeMaximum = int.Parse(await File.ReadAllTextAsync("/proc/sys/fs/pipe-max-size"), CultureInfo.InvariantCulture);
         var source = "public static class OrdinaryBlob { public static int Value() => 37; }\n/*" +
             new string('a', checked(pipeMaximum + 4096)) + "*/\n";
-        var expected = Encoding.UTF8.GetBytes(source);
-        await File.WriteAllBytesAsync(Path.Combine(repository.FullName, "ordinary.cs"), expected);
+        var expected = Encoding.UTF8.GetBytes(source).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(repository.FullName, "ordinary.cs"), expected.AsMemory());
         await GitAsync(repository.FullName, ["add", "ordinary.cs"]);
         await GitAsync(repository.FullName, ["commit", "--quiet", "-m", "ordinary source blob"]);
         var commit = await GitAsync(repository.FullName, ["rev-parse", "HEAD"]);
@@ -50,7 +50,7 @@ public sealed class OrdinaryGitBlobWorkflowTests
         {
             var actual = await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "ordinary.cs", TestContext.CurrentContext.CancellationToken);
             Assert.That(actual, Has.Length.EqualTo(expected.Length));
-            Assert.That(Convert.ToHexString(SHA256.HashData(actual.AsSpan())), Is.EqualTo(Convert.ToHexString(SHA256.HashData(expected))));
+            Assert.That(Convert.ToHexString(SHA256.HashData(actual.AsSpan())), Is.EqualTo(Convert.ToHexString(SHA256.HashData(expected.AsSpan()))));
         }
 
         Assert.That(GitProcessesIn(repository.FullName), Is.Empty);

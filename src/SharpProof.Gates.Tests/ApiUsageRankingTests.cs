@@ -125,7 +125,7 @@ public sealed class ApiUsageRankingTests
         }
         foreach (var line in File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")))
         {
-            var parts = line.Split('\t');
+            var parts = line.Split('\t').ToImmutableArray();
             if (parts[3] == "partially-modeled")
             { Assert.That(backlog, Does.Contain("| " + parts[1] + " | " + parts[4] + " |"), "Every partially modeled declaration must retain its current facet evidence in the backlog."); }
         }

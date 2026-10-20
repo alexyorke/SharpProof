@@ -61,16 +61,16 @@ public sealed class FuzzTotalSourceCompletionControls
             image.Position = 0;
             var runtime = context.LoadFromStream(image).GetType("SharpProofSourceCampaignBoolean");
             Assert.That(runtime, Is.Not.Null);
-            object?[] arguments = [true];
+            ImmutableArray<object?> arguments = [true];
             try
             {
-                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments)!;
+                returned = (bool)runtime!.GetMethod("Target")!.Invoke(null, arguments.ToArray())!;
             }
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             {
                 actualFault = exception.InnerException;
             }
-            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments)!;
+            actualCompletion = (bool)runtime!.GetMethod("NormalCompletion")!.Invoke(null, arguments.ToArray())!;
         }
         finally
         {

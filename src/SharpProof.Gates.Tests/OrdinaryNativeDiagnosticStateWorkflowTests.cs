@@ -75,12 +75,12 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         Assert.That(discovery.Targets, Has.Count.EqualTo(mutationCount + 1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
-        await File.WriteAllBytesAsync(path, bytes);
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
-            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = string.Concat(SHA256.HashData(bytes).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture))) },
+            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = string.Concat(SHA256.HashData(bytes.AsSpan()).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture))) },
             Cache = new WorkerCacheOptions { Enabled = false, Directory = Path.Combine(temporary.FullName, "cache") },
             Budgets = new WorkerBudgets()
         };

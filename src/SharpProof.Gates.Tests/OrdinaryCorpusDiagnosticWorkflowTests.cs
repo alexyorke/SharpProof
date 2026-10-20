@@ -52,7 +52,7 @@ public sealed class OrdinaryCorpusDiagnosticWorkflowTests
                 Is.EqualTo(observation.Diagnostics.OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic), StringComparer.Ordinal)));
             foreach (var diagnostic in observation.Diagnostics)
             {
-                var fields = diagnostic.Split('@');
+                var fields = diagnostic.Split('@').ToImmutableArray();
                 Assert.That(fields, Has.Length.EqualTo(4));
                 Assert.That(fields[1], Is.EqualTo("Warning"));
                 Assert.That(fields[2], Does.StartWith(file.Path + ":"));
