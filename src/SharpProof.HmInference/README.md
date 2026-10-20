@@ -592,3 +592,13 @@ checked against the task result shape. Callback output inference requires a
 natural return type; untyped composite returns retain the required output context,
 while typed composite returns can still generalize. Callback input refinement is
 retried first so inferred outputs retain their available generality.
+
+After contextual or binding refinement, candidate retained type components are
+removed one at a time and the full inference and validation pipeline is rerun.
+Only successful relaxations are kept; necessary call-site types remain concrete.
+Redundant aliases can be removed even when the initial refinement leaves no
+generic components. This recovers generic shared nullable inputs, tuple fields
+and async results when another caller argument already supplies their type.
+The process terminates by strictly removing retained components and supports
+cancellation between trials. It establishes a deletion-minimal retained set,
+without claiming a globally principal type for C# overloads and conversions.

@@ -45,7 +45,10 @@ public static partial class Inference
                 var previous = pins.Count;
                 var result = new Session(model, cancellationToken).Analyze(method, pins);
                 if (pins.Count == previous)
-                { return result.Status == "Suggestion" ? result : rejected ?? result; }
+                {
+                    result = MinimizeSignaturePins(method, model, pins, result, cancellationToken);
+                    return result.Status == "Suggestion" ? result : rejected ?? result;
+                }
                 rejected ??= result;
             }
         }
@@ -53,6 +56,45 @@ public static partial class Inference
         {
             return rejected ?? new(method.Identifier.ValueText, "Skipped", exception.Message);
         }
+    }
+
+
+    private static MethodResult MinimizeSignaturePins(MethodDeclarationSyntax method, SemanticModel model, HashSet<(int Parameter, string Path)> pins, MethodResult result, CancellationToken cancellationToken)
+    {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
+        if (pins is null)
+        { throw new ArgumentNullException(nameof(pins)); }
+        if (result is null)
+        { throw new ArgumentNullException(nameof(result)); }
+        bool changed;
+        do
+        {
+            changed = false;
+            var candidates = pins.ToArray();
+            Array.Sort(candidates);
+            foreach (var pin in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var trial = new HashSet<(int Parameter, string Path)>(pins);
+                trial.Remove(pin);
+                MethodResult proposed;
+                try
+                { proposed = new Session(model, cancellationToken).Analyze(method, trial); }
+                catch (InferenceException) { continue; }
+                // Trials must succeed without adding replacement pins. Concrete
+                // trials can remove redundant aliases before a generic type opens.
+                if (trial.Count != pins.Count - 1
+                    || proposed.Status != "Suggestion" && (proposed.Status != "Concrete" || result.Status == "Suggestion"))
+                { continue; }
+                pins.Remove(pin);
+                result = proposed;
+                changed = true;
+            }
+        } while (changed);
+        return result;
     }
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken)

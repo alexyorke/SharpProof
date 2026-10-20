@@ -17,6 +17,10 @@ internal static class UntypedCallerRuntimeChecks
             using System;
             using System.Threading.Tasks;
             public static class ContextualProbe{
+                public static object? Shared(object? value,object? hint,object? tag,bool flag)=>flag?value:hint;
+                public static object? SharedTuple((object? Value,object? Hint) pair,object? tag,bool flag)=>flag?pair.Value:pair.Hint;
+                public static async Task<object?> SharedAsync(object? value,object? hint,object? tag,bool flag){await Task.Yield();return flag?value:hint;}
+                public static object? SharedFree(object? value,object? hint,object? tag,int ignored,bool flag)=>flag?value:hint;
                 public static (object? Value,int Count)? Optional((object? Value,int Count)? value,int tag)=>value;
                 public static (object? Value,int Count) ConditionalTuple((object? Value,int Count) value,int tag)=>value;
                 public static (object? Value,int Count) Tuple((object? Value,int Count) value,int tag)=>value;
@@ -31,6 +35,11 @@ internal static class UntypedCallerRuntimeChecks
             }
             public static class OriginalContextualRunner{
                 public static bool Run(){
+                    object hint=new object();
+                    if(ContextualProbe.Shared(null,(object?)hint,null,true)!=null||!object.ReferenceEquals(ContextualProbe.Shared(null,(object?)hint,null,false),hint))return false;
+                    if(ContextualProbe.SharedTuple((null,(object?)hint),null,true)!=null||!object.ReferenceEquals(ContextualProbe.SharedTuple((null,(object?)hint),null,false),hint))return false;
+                    if(ContextualProbe.SharedAsync(null,(object?)hint,null,true).GetAwaiter().GetResult()!=null||!object.ReferenceEquals(ContextualProbe.SharedAsync(null,(object?)hint,null,false).GetAwaiter().GetResult(),hint))return false;
+                    if(ContextualProbe.SharedFree(null,(object?)hint,null,0,true)!=null||!object.ReferenceEquals(ContextualProbe.SharedFree(null,(object?)hint,null,0,false),hint))return false;
                     if(ContextualProbe.Nullable(null,0).GetAwaiter().GetResult()!=null)return false;
                     if(ContextualProbe.Callback(async value=>{await Task.Yield();return value==3?"ok":null;},0)(3).GetAwaiter().GetResult()!="ok")return false;
                     if(ContextualProbe.Callback(async value=>{await Task.Yield();return (string?)null;},0)(0).GetAwaiter().GetResult()!=null)return false;
@@ -58,7 +67,7 @@ internal static class UntypedCallerRuntimeChecks
         Verify((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, false, cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 12; round++)
+        for (var round = 0; round < 16; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -78,12 +87,19 @@ internal static class UntypedCallerRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 11)
-        { throw new InvalidOperationException("Expected eleven contextual caller fixes; got " + fixes); }
+        if (fixes != 15)
+        { throw new InvalidOperationException("Expected fifteen contextual caller fixes; got " + fixes); }
         document = document.Project.AddDocument("NewContextualDomains.cs", """
             public static class NewContextualRunner{
                 public static bool Run(){
                     object value=new object();
+                    var payload=new[]{"new"};
+                    var shared=ContextualProbe.Shared(null,payload,null,false);
+                    var sharedTuple=ContextualProbe.SharedTuple((null,payload),null,false);
+                    var sharedAsync=ContextualProbe.SharedAsync(null,payload,null,false).GetAwaiter().GetResult();
+                    var sharedFree=ContextualProbe.SharedFree(null,payload,null,3m,false);
+                    if(shared?.Length!=1||sharedTuple?.Length!=1||sharedAsync?.Length!=1||sharedFree?.Length!=1)return false;
+                    if(!object.ReferenceEquals(shared,payload)||!object.ReferenceEquals(sharedTuple,payload)||!object.ReferenceEquals(sharedAsync,payload)||!object.ReferenceEquals(sharedFree,payload))return false;
                     if(!object.ReferenceEquals(ContextualProbe.Nullable(value,"tag").GetAwaiter().GetResult(),value))return false;
                     if(ContextualProbe.Nullable(null,3m).GetAwaiter().GetResult()!=null)return false;
                     var optional=ContextualProbe.Optional((value,3),"tag");
