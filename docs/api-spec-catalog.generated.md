@@ -3,8 +3,8 @@
 This is a hand-maintained reference to [DefaultApiSpecCatalog.generated.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The C# declarations are the runtime authority. The filename is retained for existing references; there is no active Markdown generator or JSON review source.
 
 - Table identity: `SharpProof.ApiSpec.Default`
-- Table version: `7`
-- Declarations: 29
+- Table version: `10`
+- Declarations: 31
 
 ## Matching and evidence
 
@@ -29,6 +29,8 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.exception.ctor.string` | <code>M:System.Exception.#ctor(System.String)</code> |
 | `bcl.invalid-operation-exception.ctor` | <code>M:System.InvalidOperationException.#ctor</code> |
 | `bcl.invalid-operation-exception.ctor.string` | <code>M:System.InvalidOperationException.#ctor(System.String)</code> |
+| `bcl.key-value-pair.key` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Key</code> |
+| `bcl.key-value-pair.value` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Value</code> |
 | `bcl.list.add` | <code>M:System.Collections.Generic.List&#96;1.Add(&#96;0)</code> |
 | `bcl.math.abs.int32` | <code>M:System.Math.Abs(System.Int32)</code> |
 | `bcl.math.max.int32-int32` | <code>M:System.Math.Max(System.Int32,System.Int32)</code> |
@@ -47,6 +49,8 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `contract.old` | <code>M:SharpProof.Attributes.Contract.Old&#96;&#96;1(&#96;&#96;0)</code> |
 | `contract.requires` | <code>M:SharpProof.Attributes.Contract.Requires(System.Boolean)</code> |
 | `contract.result` | <code>M:SharpProof.Attributes.Contract.Result&#96;&#96;1</code> |
+
+The KeyValuePair getters copy immutable fields with evidence for purity, no allocations, no exceptions and termination. Their result relationships and constructors remain unmodeled. Receiver evaluation and surrounding effects retain their own obligations.
 
 ## Optional relational specification packs
 
