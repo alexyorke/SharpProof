@@ -3599,10 +3599,23 @@ public sealed class PackageLayoutSmokeTests
             "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
             "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }", "all");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
             "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
-        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
+            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var resourceReason = "result unavailable";
+        if (File.Exists(workspace.ResultPath))
+        {
+            using var diagnostic = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+            var diagnosticClaim = diagnostic.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+            resourceReason = diagnosticClaim.GetProperty("resourceBound").GetProperty("unknownReason").ToString();
+        }
+        Assert.That(build.ExitCode, Is.Zero, "Resource reason: " + resourceReason + Environment.NewLine + build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
         JsonAssert.Equal(claim, "outcome", "Proven");

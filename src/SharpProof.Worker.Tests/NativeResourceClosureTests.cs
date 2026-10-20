@@ -42,6 +42,18 @@ internal sealed partial class NativeResourceContractTests
         }
     }
 
+    [Test]
+    public async Task ConstantArgumentNestedFactoryRetainsTheCachedRootFrame()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason ?? target.ResourceUnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("96"));
+    }
+
     [TestCase(false, 4)]
     [TestCase(false, 5)]
     [TestCase(false, 6)]

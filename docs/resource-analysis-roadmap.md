@@ -113,6 +113,24 @@ models). Published merge 9036caa5d includes both changes. The 807/2165/1451 loca
 results above predate that latest integration; exact-head and relevant spec
 validation are still required. No history was rewritten.
 
+### Packaging and kernel-validation follow-up
+
+After the remote integration, the five targeted KeyValuePair/runtime-digest spec
+controls passed. Full formatting and 728 documentation links passed. A minimal
+constant-argument nested factory also passed native verification. The new package
+fixture initially omitted PlatformTarget=x64, so its Unknown reason was
+ResourceLayoutAssumptionsNotBound. The fixture now supplies x64, checks strict
+SP0048 rejection of the declared layout dependency, and checks advisory proof
+and SARIF using the same policy as existing layout package workflows. That
+corrected package check passed, including strict rejection, advisory Proven and
+96-byte result/SARIF projection. No product admission rule was weakened.
+
+Fourteen new memory-kernel controls exercise stored integer/Boolean facts and
+negated comparisons before path selection. All 14 targeted cases and the full
+770-test IR suite passed. They target gaps in the last completed coverage report;
+no numerical coverage gain is claimed before exact-head measurement. Broader
+capture/call composition, phase F and final coverage/audit requirements remain.
+
 ### Conditional expected-cost checkpoint
 
 Conditional expected upper bounds are implemented for the admitted single-Boolean

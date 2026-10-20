@@ -7,6 +7,76 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(0, false, false)]
+    [TestCase(0, true, true)]
+    [TestCase(1, false, true)]
+    [TestCase(1, true, false)]
+    [TestCase(2, false, true)]
+    [TestCase(2, true, false)]
+    [TestCase(3, false, true)]
+    [TestCase(3, true, false)]
+    [TestCase(4, false, false)]
+    [TestCase(4, true, true)]
+    [TestCase(5, false, false)]
+    [TestCase(5, true, true)]
+    public void StoredIntegerGuardFactsSelectOnlyTheObservedAllocationPath(int operation, bool negated, bool taken)
+    {
+        if (operation < 0 || operation > 5)
+        { throw new ArgumentOutOfRangeException(nameof(operation)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        var left = factory.CreateVariable("left", factory.IntegerType);
+        var right = factory.CreateVariable("right", factory.IntegerType);
+        builder.Assign(entry, factory.CreateOperation(), left, factory.Integer(2));
+        builder.Assign(entry, factory.CreateOperation(), right, factory.Integer(3));
+        var operators = new[] { IrBinaryOperator.Equal, IrBinaryOperator.NotEqual, IrBinaryOperator.LessThan,
+            IrBinaryOperator.LessThanOrEqual, IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThanOrEqual };
+        var condition = factory.Binary(operators[operation], factory.Variable(left), factory.Variable(right));
+        if (negated)
+        { condition = factory.Unary(IrUnaryOperator.Not, condition); }
+        builder.Branch(entry, factory.CreateOperation(), condition, yes, no);
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var array = factory.CreateVariable("array", type);
+        builder.Allocate(yes, factory.CreateOperation(), type, array, factory.Integer(1));
+        builder.Return(yes, factory.CreateOperation(), factory.Variable(array));
+        builder.Allocate(no, factory.CreateOperation(), type, array, factory.Integer(3));
+        builder.Return(no, factory.CreateOperation(), factory.Variable(array));
+        var program = builder.Build();
+        var token = TestContext.CurrentContext.CancellationToken;
+        var check = ResourceMemoryProgram.Evaluate(program, Layout, token);
+        var bytes = taken ? 32 : 40;
+        Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, 0, 0, bytes, bytes)));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, true)]
+    public void StoredBooleanEqualityFactsControlTheReturnedGraph(bool different, bool taken)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        var left = factory.CreateVariable("left", factory.BooleanType);
+        var right = factory.CreateVariable("right", factory.BooleanType);
+        builder.Assign(entry, factory.CreateOperation(), left, factory.Boolean(true));
+        builder.Assign(entry, factory.CreateOperation(), right, factory.Boolean(false));
+        builder.Branch(entry, factory.CreateOperation(), factory.Binary(different ? IrBinaryOperator.NotEqual : IrBinaryOperator.Equal,
+            factory.Variable(left), factory.Variable(right)), yes, no);
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var array = factory.CreateVariable("array", type);
+        builder.Allocate(yes, factory.CreateOperation(), type, array, factory.Integer(1));
+        builder.Return(yes, factory.CreateOperation(), factory.Variable(array));
+        builder.Allocate(no, factory.CreateOperation(), type, array, factory.Integer(3));
+        builder.Return(no, factory.CreateOperation(), factory.Variable(array));
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        var bytes = taken ? 32 : 40;
+        Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, 0, 0, bytes, bytes)));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void OversizedControlFlowAndInstructionStreamsReturnNoPartialMemoryBounds(bool blocks)
