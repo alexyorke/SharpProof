@@ -46,6 +46,7 @@ public sealed class HashSetStateOracleTests
         comparer.Remaining = nestedRemovals;
         Assert.That(data.Remove(17), Is.True);
         Assert.That(data.Count, Is.EqualTo(-nestedRemovals));
+        Assert.That(((ICollection<int>)data).Count, Is.EqualTo(-nestedRemovals));
     }
 
     private sealed class ReentrantComparer : IEqualityComparer<int>
@@ -145,7 +146,50 @@ public sealed class HashSetStateOracleTests
         Compare(body);
     }
 
-    private static void Compare(string body)
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    public void CollectionInterfaceMembershipMatchesCompiledRuntime(string element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        var first = element == "bool" ? "false" : element + ".MinValue";
+        var second = element == "bool" ? "true" : element + ".MaxValue";
+        Compare("var data = new System.Collections.Generic.HashSet<" + element + ">(1); System.Collections.Generic.ICollection<" + element + "> alias = data; " +
+            "alias.Add(" + first + "); alias.Add(" + second + "); alias.Add(" + first + "); var before = data.Count; " +
+            "return before == 2 && alias.Remove(" + first + ") && !data.Contains(" + first + ") && alias.Contains(" + second + ") && " +
+            "!alias.Remove(" + first + ") && alias.Count == 1 ? 1 : 0;");
+    }
+
+    [Test]
+    public void ASubclassCanReplaceTheCollectionCountImplementation()
+    {
+        ICollection<int> data = new ReimplementedCollection();
+        Assert.That(data.Count, Is.EqualTo(-9));
+        Assert.That(((HashSet<int>)data).Count, Is.Zero);
+    }
+
+    private sealed class ReimplementedCollection : HashSet<int>, ICollection<int>
+    {
+        int ICollection<int>.Count => -9;
+    }
+    [TestCase("return data.Count;")]
+    [TestCase("data.Add(marker = 3); return 0;")]
+    [TestCase("return data.Contains(17) ? 1 : 0;")]
+    [TestCase("return data.Remove(17) ? 1 : 0;")]
+    public void NullCollectionReceiversPreserveFaultsAndArgumentEvaluation(string operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        Compare("int marker = 7; System.Collections.Generic.ICollection<int> data = null; try { " + operation +
+            " } catch (System.NullReferenceException) { return marker; }", expectedApproximation: false);
+    }
+    private static void Compare(string body, bool expectedApproximation = true)
     {
         ArgumentNullException.ThrowIfNull(body);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target() { " + body + " } }");
@@ -168,7 +212,7 @@ public sealed class HashSetStateOracleTests
         });
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, null, 5000, options);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), replay.Unsupported?.Detail);
-        Assert.That(replay.ConsumedApproximation, Is.True);
+        Assert.That(replay.ConsumedApproximation, Is.EqualTo(expectedApproximation));
         var runtime = new AssemblyLoadContext("HashSetStateOracle", isCollectible: true);
         try
         {

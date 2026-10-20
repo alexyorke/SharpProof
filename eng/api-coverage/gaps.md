@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,585 declarations have no catalog/audited-intrinsic evidence, and 88 have partial
+55,583 declarations have no catalog/audited-intrinsic evidence, and 90 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,585 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,583 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -70,11 +70,11 @@ access kind and value domains satisfy the production guard.
 
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
-| A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and exact List allocations/aliases are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
+| A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance, exact List aliases and default-origin HashSet ICollection dispatch are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
 | D: Dictionary | Fresh default/capacity construction and Count support all key/value domains; integer-key scalar/reference/opaque storage also flows through proven immutable source-helper parameters; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Capacity construction has normal-state support; precise failure identity and resource behavior remain open. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add, Insert, GetRange and scalar/reference/opaque get/set share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
-| S: HashSet / Queue / Stack | HashSet default/capacity construction and signed Count are modeled; default-origin Boolean and nine integer/character key domains have shared Add/Contains/Remove state. Queue and Stack retain their FIFO/LIFO slices | Keep generic/custom equality and hashing callbacks, arbitrary incoming HashSet membership, contents outside primitive domains, ISet/ICollection dispatch, enumeration, set algebra, precise initializer/growth/fault behavior and pure membership clauses open. Comparer callbacks that reenter collection methods can make HashSet and Dictionary Count negative; nonnegativity must follow from modeled state, never a blanket getter assumption. Other Queue/Stack operations and precise resource behavior remain open. |
+| S: HashSet / Queue / Stack | HashSet default/capacity construction and signed Count are modeled; default-origin Boolean and nine integer/character key domains have shared Add/Contains/Remove state. Queue and Stack retain their FIFO/LIFO slices | Keep generic/custom equality and hashing callbacks, arbitrary incoming HashSet membership, contents outside primitive domains, ISet and unproven ICollection dispatch, enumeration, set algebra, precise initializer/growth/fault behavior and pure membership clauses open. Comparer callbacks that reenter collection methods can make HashSet and Dictionary Count negative; nonnegativity must follow from modeled state, never a blanket getter assumption. Other Queue/Stack operations and precise resource behavior remain open. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Typed SZ-array Clear now models valid scalar ranges and reference null stores, with valid-call effects for opaque values. Remaining: general Array/multidimensional/nonzero-lower-bound Clear, opaque default atoms and reference-content proofs, Copy/Resize, allocation/ref replacement and precise failure/callback semantics. Safe direct covariant Clear upcasts are covered; general covariant array assignments and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
 | N: Numeric / conversion | Convert.ToInt64 body arithmetic is partial; initialization/clauses, other conversions, floating operations and formatting remain open | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
@@ -823,6 +823,34 @@ and their callbacks remain gaps. Selected normal CLR/IR paths consume
 approximation and grant no new native framework replay authority. Incoming or
 custom-comparer dictionaries receive no new content assumptions.
 
+## Verified HashSet collection-interface dispatch
+
+Exact default/capacity HashSet origins now retain their representation through
+`ICollection<T>` Count, Add, Contains and Remove. Concrete and interface aliases
+share the same signed Count and membership storage. Add preserves its interface
+void return while duplicate insertion and removal update the shared set once.
+Membership retains the nine integer/character domains and Boolean equality;
+Count does not require element equality. Immutable generic source helpers preserve
+the caller's implementation evidence.
+
+Nullable alternatives retain the same implementation when non-null. Receiver
+faults occur after argument evaluation and before comparer or membership access.
+CLR/IR oracles check all ten primitive domains and null receivers; native controls
+prove the shared-state results and refute a wrong nullable-result claim. Tests
+retain unknown implementations, custom comparers, mixed List/HashSet joins,
+unknown receiver reassignment, ref/closure escapes and unknown writers as conservative controls.
+A subclass that reimplements ICollection.Count can return a different value;
+source inheritance alone supplies no interface-dispatch guarantee.
+
+Contains and Remove gain two partial declaration rows. Add and Count retain their
+existing List/array probes and gain HashSet interface evidence. The ranking credits
+actual receiver evidence rather than promoting every use of these declarations.
+Arbitrary incoming ICollection receivers in the original corpus remain open.
+
+Remaining: Clear, CopyTo, IsReadOnly, other collection interfaces, reference/custom
+equality domains, arbitrary incoming dispatch, precise initialization/growth faults
+and pure membership clauses. Keep these in work items A and S.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -1019,7 +1047,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 1 | partially-modeled | S |
 | M:System.Collections.Generic.HashSet`1.IsSupersetOf(System.Collections.Generic.IEnumerable{`0}) | call | 1 | unmodeled | S |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 1 | partially-modeled | S |
-| M:System.Collections.Generic.ICollection`1.Remove(`0) | call | 1 | unmodeled | A |
+| M:System.Collections.Generic.ICollection`1.Remove(`0) | call | 1 | unmodeled-dispatch | A |
 | M:System.Collections.Generic.KeyValuePair`2.#ctor(`0,`1) | call | 1 | unmodeled | O |
 | M:System.Collections.Generic.List`1.#ctor(System.Int32) | call | 1 | unmodeled | L |
 | M:System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable{`0}) | call | 1 | unmodeled | L |
@@ -1060,7 +1088,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 88 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 90 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -1088,7 +1116,9 @@ These 88 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.HashSet`1.Add(`0) | intrinsic=default-primitive-hash-set-state |
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | intrinsic=default-primitive-hash-set-state |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | intrinsic=default-primitive-hash-set-state |
-| M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
+| M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=default-hash-set-interface-state |
+| M:System.Collections.Generic.ICollection`1.Contains(`0) | intrinsic=default-hash-set-interface-state |
+| M:System.Collections.Generic.ICollection`1.Remove(`0) | intrinsic=default-hash-set-interface-state |
 | M:System.Collections.Generic.IList`1.Insert(System.Int32,`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=list-insertion-range-state |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | intrinsic=guarded-exception-message-construction;intrinsic=guarded-exception-resource-synchronization |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
@@ -1142,7 +1172,7 @@ These 88 rows record the supplied facets; Unknown facets, zero postconditions an
 | P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | P:System.Collections.Generic.HashSet`1.Count | intrinsic=default-primitive-hash-set-state |
-| P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state |
+| P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state;intrinsic=default-hash-set-interface-state |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state;intrinsic=concrete-list-state |
 | P:System.Collections.Generic.List`1.Item(System.Int32) | catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=concrete-list-state |

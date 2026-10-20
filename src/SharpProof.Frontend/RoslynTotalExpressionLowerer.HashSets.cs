@@ -19,7 +19,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var method = property?.Property.GetMethod;
         var instance = property?.Instance;
         if (method == null || instance == null || !CSharpOperationSemantics.IsHashSetStateMember(method,
-            _context.KnownValueType(method.ContainingType.TypeArguments.FirstOrDefault())) || property!.Property.Name != "Count")
+            _context.KnownValueType(method.ContainingType.TypeArguments.FirstOrDefault())) || property!.Property.Name != "Count" ||
+            CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(property.Property) && !_context.IsDefaultHashSetOrigin(instance))
         { return null; }
         var receiver = LowerClause(instance, state, depth + 1);
         if (!receiver.Classification.IsExact)
@@ -56,7 +57,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 _context.KnownValueType(method.ContainingType.TypeArguments.FirstOrDefault())))
         { return null; }
         var isCount = method.AssociatedSymbol is IPropertySymbol { Name: "Count" };
-        if (creation == null && !isCount && !_context.IsDefaultHashSetOrigin(instance!))
+        if (creation == null && (!isCount || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(method.AssociatedSymbol ?? (ISymbol)method)) &&
+            !_context.IsDefaultHashSetOrigin(instance!))
         { return null; }
         TotalBodyValue? receiver = null;
         if (creation == null)
@@ -112,11 +114,13 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var modeled = DefaultHashSetState(operation, method, owner, values[0], primitive);
         var opaque = EmitOpaqueCall(operation, method, [owner, .. values], custom, null, IrOpaqueCallEffects.All);
         var result = _context.Temporary(_factory.BooleanType);
-        _builder.Assign(modeled.Continuation, site, result, modeled.Value);
+        if (!method.ReturnsVoid)
+        { _builder.Assign(modeled.Continuation, site, result, modeled.Value); }
         _builder.Goto(modeled.Continuation, site, done);
-        _builder.Assign(opaque.Continuation, site, result, opaque.Value);
+        if (!method.ReturnsVoid)
+        { _builder.Assign(opaque.Continuation, site, result, opaque.Value); }
         _builder.Goto(opaque.Continuation, site, done);
-        return new(_factory.Variable(result), done, FrontendSubsetClassification.Exact);
+        return new(method.ReturnsVoid ? _factory.Integer(0) : _factory.Variable(result), done, FrontendSubsetClassification.Exact);
     }
 
     private TotalBodyValue DefaultHashSetState(IOperation operation, IMethodSymbol method, IrTerm owner, IrTerm key, IrBlockId block)
