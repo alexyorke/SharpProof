@@ -104,7 +104,7 @@ internal static class ContainerContract
             "schemaVersion", "contractVersion", "platform", "dotnetSdkVersion",
             "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
             "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
-            "powershellVersionLine", "powershellImageDigest", "z3Version",
+            "powershellVersionLine", "powershellArchiveSha256", "z3Version",
             "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
         };
         foreach (var property in actual.EnumerateObject())
@@ -120,7 +120,7 @@ internal static class ContainerContract
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{required.First()}' is missing.");
         }
-        RequireInteger(actual, "schemaVersion", 2);
+        RequireInteger(actual, "schemaVersion", 3);
         var contractVersion = RequireInteger(
             actual,
             "contractVersion",
@@ -139,7 +139,7 @@ internal static class ContainerContract
         RequireString(actual, "dotnetBaseImage", RequireString(expected.GetProperty("dotnet"), "baseImage"));
         RequireString(actual, "dotnetBaseImageDigest", RequireString(expected.GetProperty("dotnet"), "baseImageDigest"));
         RequireString(actual, "powershellVersionLine", RequireString(expected.GetProperty("powershell"), "versionLine"));
-        RequireString(actual, "powershellImageDigest", RequireString(expected.GetProperty("powershell"), "imageDigest"));
+        RequireString(actual, "powershellArchiveSha256", RequireSha256(expected.GetProperty("powershell"), "archiveSha256"));
         var z3Version = RequireString(
             actual,
             "z3Version",
