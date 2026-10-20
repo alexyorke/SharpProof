@@ -4859,3 +4859,7 @@ One optional tool package set is built in a private checkout at a273c28cd. Actua
 Seven runtime-reference path inventories, two catalog reflection inventories and two effect-wire enum vectors are immutable. Constructor parameter observations are immutable, and invocation arguments use a scoped immutable builder with a frozen snapshot before final native reflection adaptation. Actual mutable culture-callback values and native array/interface oracles remain intact.
 
 All 54 initial targeted effects/frontend/specs/worker tests pass. The additional capability-vector refinement passes the affected wire-mapping test. Literal conservation verifies 4299 tokens across 1068 changed C# files. A host text-decoding error affecting a Unicode path fixture was found in the diff and restored from exact UTF-8 source before final worker verification. Thirteen migrations and two intentional mutable subjects reconcile independently, leaving 398 array candidates unchecked. C# and PowerShell coordinate rows remain zero Open; remaining ownership/coverage/binding/archive and final workflows remain pending.
+
+### IMM-M474: complete repository script-format verification
+
+The canonical formatter checks all 87 PowerShell and 19 shell files. Two new export/identity changes require whitespace formatting, applied after verifying that their non-whitespace bytes are identical. A second complete check formats zero files. Native workflow evidence for these changes remains the named M468/M470 regressions; no behavioral edit or historical status transfer is introduced.

@@ -13,20 +13,20 @@ $prefix = $root.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::Director
 $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
 $assemblyPaths = if ($AssemblyPath.Count -eq 0) {
     $solution = [xml][IO.File]::ReadAllText((Join-Path $root 'SharpProof.slnx'))
-    ,([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]](@(
-        foreach ($project in $solution.SelectNodes('//Project[@Path]')) {
-            $projectPath = [IO.Path]::GetFullPath((Join-Path $root ([string]$project.Path).Replace('\', '/')))
-            if (-not $projectPath.StartsWith($prefix, $comparison)) { throw 'Foreign solution project in embedded-symbol export.' }
-            $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
-            $output = Join-Path $root "artifacts/bin/$projectName/$Configuration"
-            if (Test-Path -LiteralPath $output -PathType Container) {
-                Get-ChildItem -LiteralPath $output -Filter 'SharpProof*.dll' -Recurse -File | ForEach-Object FullName
-            }
-        }
-    ) | Sort-Object -Unique)))
+    , ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]](@(
+                    foreach ($project in $solution.SelectNodes('//Project[@Path]')) {
+                        $projectPath = [IO.Path]::GetFullPath((Join-Path $root ([string]$project.Path).Replace('\', '/')))
+                        if (-not $projectPath.StartsWith($prefix, $comparison)) { throw 'Foreign solution project in embedded-symbol export.' }
+                        $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
+                        $output = Join-Path $root "artifacts/bin/$projectName/$Configuration"
+                        if (Test-Path -LiteralPath $output -PathType Container) {
+                            Get-ChildItem -LiteralPath $output -Filter 'SharpProof*.dll' -Recurse -File | ForEach-Object FullName
+                        }
+                    }
+                ) | Sort-Object -Unique)))
 }
 else {
-    ,([Collections.Immutable.ImmutableArray]::CreateRange[string]($AssemblyPath))
+    , ([Collections.Immutable.ImmutableArray]::CreateRange[string]($AssemblyPath))
 }
 $exported = 0
 foreach ($assembly in $assemblyPaths) {

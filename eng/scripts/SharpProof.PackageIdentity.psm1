@@ -108,17 +108,17 @@ function Get-SharpProofPackageIdentity {
     }
 
     return ([ordered]@{
-        Id               = $id.InnerText
-        Version          = $version.InnerText
-        Path             = $Path
-        RepositoryUrl    = $repositoryUrl
-        RepositoryCommit = if ($null -eq $repositoryCommit) {
-            $null
-        }
-        else {
-            $repositoryCommit.ToLowerInvariant()
-        }
-    }).AsReadOnly()
+            Id               = $id.InnerText
+            Version          = $version.InnerText
+            Path             = $Path
+            RepositoryUrl    = $repositoryUrl
+            RepositoryCommit = if ($null -eq $repositoryCommit) {
+                $null
+            }
+            else {
+                $repositoryCommit.ToLowerInvariant()
+            }
+        }).AsReadOnly()
 }
 
 function Get-SharpProofPackageIdentitySet {
@@ -133,11 +133,11 @@ function Get-SharpProofPackageIdentitySet {
     $identityBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($file in $Files) {
         $identityBuilder.Add(([ordered]@{
-                File     = $file
-                Identity = Get-SharpProofPackageIdentity `
-                    -Path $file.FullName `
-                    -RequireRepository:$RequireRepository
-            }).AsReadOnly())
+                    File     = $file
+                    Identity = Get-SharpProofPackageIdentity `
+                        -Path $file.FullName `
+                        -RequireRepository:$RequireRepository
+                }).AsReadOnly())
     }
     $identities = $identityBuilder.ToImmutable()
     foreach ($extension in [Collections.Immutable.ImmutableArray]::Create[string]('.nupkg', '.snupkg')) {
@@ -167,15 +167,15 @@ function Get-SharpProofPackageIdentitySet {
     }
 
     return ([ordered]@{
-        Identities        = $identities
-        Version           = [string]$versions[0]
-        RepositoryCommits = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
-                $identities |
-                    ForEach-Object { $_.Identity.RepositoryCommit } |
-                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                    Sort-Object -Unique
-            ))
-    }).AsReadOnly()
+            Identities        = $identities
+            Version           = [string]$versions[0]
+            RepositoryCommits = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                    $identities |
+                        ForEach-Object { $_.Identity.RepositoryCommit } |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                        Sort-Object -Unique
+                ))
+        }).AsReadOnly()
 }
 
 Export-ModuleMember -Function @(
