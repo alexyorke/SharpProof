@@ -2,13 +2,157 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using System.Numerics;
 using NUnit.Framework;
+using SharpProof.Ir;
 
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, 0, 0L)]
+    [TestCase(1, 0, 240L)]
+    [TestCase(2, 3, 1288L)]
+    [TestCase(10, 4, 16704L)]
+    public void RawTracePrefixBoundsCountGrowthAffinityAndCopies(int frames, int copies, long expected)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, copies,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.CumulativeUpper!.Constant, Is.EqualTo(new BigInteger(expected)));
+        Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.RawTraceBufferModel));
+    }
+
+    [TestCase(-1, 0)]
+    [TestCase(0, -1)]
+    public void InvalidRawTraceBudgetsDoNotPublishPartialBounds(int frames, int copies)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, copies,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("InvalidRawTracePrefixBudget"));
+    }
+
+    [Test]
+    public void RawTraceBudgetsRequireThePinnedLayoutAndHonorCancellation()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8);
+        var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(1, 1, layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(1, 1, layout, cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [Test]
+    public void RawTracePrefixArithmeticDoesNotOverflowInt64()
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(int.MaxValue, int.MaxValue,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        var frames = new BigInteger(int.MaxValue);
+        Assert.That(result.CumulativeUpper!.Constant, Is.EqualTo(3 * frames * (56 + 64 * frames)));
+        Assert.That(result.CumulativeUpper.Constant, Is.GreaterThan(new BigInteger(long.MaxValue)));
+    }
+
+    [TestCase(0)]
+    [TestCase(3)]
+    [TestCase(15)]
+    public void FreshClosedTraceAllocationsStayWithinTheRawBufferPrefixBound(int depth)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var resolverField = typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        for (var index = 0; index < 64; index++)
+        { CaptureRawTrace(depth, new InvalidOperationException("raw-trace-control")); }
+        for (var index = 0; index < 32; index++)
+        {
+            var exception = new InvalidOperationException("raw-trace-control");
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            CaptureRawTrace(depth, exception);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            // Reflection and inspection occur outside the measured interval.
+            var trace = (byte[])traceField.GetValue(exception)!;
+            Assert.That(resolverField.GetValue(exception), Is.Null);
+            var frames = checked((int)BitConverter.ToUInt64(trace, 0));
+            var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 0,
+                new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+            Assert.That(allocated, Is.GreaterThan(0));
+            Assert.That(new BigInteger(allocated), Is.LessThanOrEqualTo(result.CumulativeUpper!.Constant!.Value));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static void CaptureRawTrace(int depth, InvalidOperationException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        try
+        { _ = ThrowRawAtDepth(depth, exception); }
+        catch (InvalidOperationException)
+        { }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static int ThrowRawAtDepth(int depth, InvalidOperationException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        if (depth is < 0 or > 15)
+        { throw new ArgumentOutOfRangeException(nameof(depth)); }
+        if (depth == 0)
+        { throw exception; }
+        return 1 + ThrowRawAtDepth(depth - 1, exception);
+    }
+
+    [Test]
+    public async Task CrossThreadDispatchUsesTheClosedRawTraceBudget()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var resolverField = typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        // Prepare runtime/JIT paths before creating the fresh closed collection.
+        for (var index = 0; index < 64; index++)
+        {
+            var warm = new InvalidOperationException("raw-trace-control");
+            CaptureRawTrace(0, warm);
+            ConsumeRestoredDispatch(ExceptionDispatchInfo.Capture(warm));
+        }
+        var exception = new InvalidOperationException("raw-trace-control");
+        CaptureRawTrace(3, exception);
+        var original = (byte[])traceField.GetValue(exception)!;
+        var initialFrames = checked((int)BitConverter.ToUInt64(original, 0));
+        var originalOwner = BitConverter.ToUInt64(original, 8);
+        var dispatch = ExceptionDispatchInfo.Capture(exception);
+        var completion = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            ConsumeRestoredDispatch(dispatch);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            completion.SetResult(allocated);
+        })
+        { IsBackground = true };
+        thread.Start();
+        var bytes = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.CurrentContext.CancellationToken);
+        thread.Join();
+        var trace = (byte[])traceField.GetValue(exception)!;
+        var frames = initialFrames + checked((int)BitConverter.ToUInt64(trace, 0));
+        Assert.That(resolverField.GetValue(exception), Is.Null);
+        Assert.That(BitConverter.ToUInt64(trace, 8), Is.Not.EqualTo(originalOwner));
+        // One restore clone and an affinity copy both copy the original capacity.
+        Assert.That(bytes, Is.GreaterThanOrEqualTo(2 * ((24L + original.Length + 7) & ~7L)));
+        var result = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 2,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(new BigInteger(bytes), Is.LessThanOrEqualTo(result.CumulativeUpper!.Constant!.Value));
+    }
+
     [TestCase(false, false)]
     [TestCase(false, true)]
     [TestCase(true, false)]

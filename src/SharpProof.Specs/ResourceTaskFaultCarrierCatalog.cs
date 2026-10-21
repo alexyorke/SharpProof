@@ -1,13 +1,52 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using SharpProof.Ir;
 
 namespace SharpProof.Specs;
 
-// Fixed .NET 8.0.32 fault bookkeeping only. Exception objects, strings, traces,
-// scheduler/global initialization and externally induced storage are separate.
+internal sealed record ResourceRawTraceBufferCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.RawTraceBufferModel;
+}
+
+// Fixed .NET 8.0.32 fault bookkeeping and a separately scoped raw-trace prefix
+// component. Neither component establishes a root allocation verdict.
 internal static class ResourceTaskFaultCarrierCatalog
 {
     internal const string Model = "task-join-fixed-fault-carriers-v2";
+    internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
+    internal const string RawTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp";
+    internal const string SaveTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp";
+
+    // A closed collection starts without raw traces and copies only traces from
+    // that collection. Inputs must bound ALL attempted appended frames (including
+    // failed saves/retries) and raw-array capture/restore copies over its prefix.
+    // This does not derive either input from source activations. Resolver arrays,
+    // native scratch memory, exception/dispatch instances and helper faults are
+    // separate components; this result has no root proof authority.
+    internal static ResourceRawTraceBufferCheck BoundRawTraceBuffers(int appendedFrames, int rawCopies,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        if (appendedFrames < 0 || rawCopies < 0)
+        { return new(null, "InvalidRawTracePrefixBudget"); }
+        var compatible = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Byte,
+            ResourceExpression.Zero), layout, cancellation);
+        if (!compatible.Verified)
+        { return new(null, compatible.UnknownReason); }
+        // x64 StackTraceElement is 32 bytes; its embedded ArrayHeader is 16.
+        // Grow allocates only below the required capacity, so doubling remains
+        // <= 2 * (16 + 32 * totalFrames). Affinity copies preserve that capacity.
+        // Each nonempty SaveStackTrace attempts at most one Append, which can
+        // allocate one affinity copy and one growth array. The number of such
+        // saves is <= totalFrames, even when an earlier save failed or reset.
+        // Both 24 + this capacity and every smaller byte[] align below this bound.
+        var frames = new BigInteger(appendedFrames);
+        var maximumArrayBytes = 56 + 64 * frames;
+        var maximumArrays = 2 * frames + rawCopies;
+        return new(ResourceExpression.Literal(maximumArrays * maximumArrayBytes), null);
+    }
     // One queue attempt and one at-most-once callback can each record a fault.
     internal const int MaximumChildFaultRecords = 2;
     internal const int MaximumJoinedDispatches = 16 * MaximumChildFaultRecords;

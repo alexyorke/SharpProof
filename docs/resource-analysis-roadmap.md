@@ -109,6 +109,53 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Closed raw-trace buffer prefixes
+
+A private component now bounds cumulative raw `byte[]` trace storage for a
+closed collection that starts without traces and copies only traces belonging
+to that collection. Its inputs are upper bounds on all attempted appended
+frames `F` (including failed saves, resets and retries) and capture/restore raw
+array copies `D`. It does not derive these inputs from source activations.
+
+In the pinned x64 runtime, a trace element uses 32 bytes and its embedded header
+uses 16. Growth only doubles when the old capacity is below the required
+capacity, giving a maximum payload capacity of `2 * (16 + 32 * F)`. An affinity
+copy preserves capacity. Each nonempty save attempts at most one append; each
+append can allocate an affinity copy and a growth array. Therefore there are
+at most `2 * F + D` raw arrays, each at most `56 + 64 * F` managed bytes under
+the selected layout. The cumulative upper bound is their product. BigInteger
+arithmetic prevents overflow; negative budgets and incompatible layouts return
+Unknown without a bound or model identity. Cancellation propagates.
+
+The source rules come from pinned `object.cpp` (StackTraceArray append, growth
+and copy) and `excep.cpp` (SaveStackTrace), commit
+`b9a49e4a6d3a444a3685e318c74a7892d01873f7`. Their SHA-256 digests are
+`d323c06c064b314f6f81f2ec215e035d51ee6040d614968eea5fe3d81dd3e813` and
+`721bfdaff7bfbb52fa99cc3d1ec2bbf4521997f5df49c6aa5e2fbe0804bbcac5`.
+The failure cleanup clears references rather than allocating a replacement raw
+array. This bounds all raw-array allocations across a supplied prefix budget,
+including abandoned allocations; a surviving buffer's size alone would not.
+
+The first 37 focused tests passed, including fresh closed throws with measured
+allocation intervals excluding exception construction, reflection and setup:
+`artifacts/resource-raw-trace-prefix-tests.log`. All 49 targeted trace and
+fault-notification cases passed, including cross-thread dispatch with a changed
+buffer owner and allocation of both restore and affinity copies:
+`artifacts/resource-raw-trace-prefix-runtime-final.log`. The complete Specs
+project passed all 202 cases with zero build warnings or errors:
+`artifacts/resource-raw-trace-prefix-specs-all.log`. Full quality/API and
+documentation checks passed: `artifacts/resource-raw-trace-prefix-lint.log` and
+`artifacts/resource-raw-trace-prefix-docs.log`. The first broader test build
+reported formatting in the new thread initializer; the canonical private
+formatter corrected it before the passing runs:
+`artifacts/resource-raw-trace-prefix-format.log`.
+
+Resolver arrays remain separate: native StackTraceInfo scratch capacity seeds
+their allocation and survives ClearStackTrace. Native scratch storage, physical
+frame-budget derivation, imported traces, helper failures, payloads and root
+composition are also unproved. This component changes no root verdict, protocol
+or cache identity. The cumulative runtime-byte checklist remains open.
+
 ### Transporting async-root boundary evidence
 
 The nested fork/join projection is now version 4 and the response cache is
