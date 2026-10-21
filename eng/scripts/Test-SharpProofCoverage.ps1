@@ -440,7 +440,48 @@ function Resolve-CoverageSourcePath {
         -DocumentPath $FileName -SourceRoots ([string[]]@($SourceRoots))
 }
 
+# Parsing is read-only. Each document stays private to its batch entry; the
+# existing authority checks, PDB validation, and MAX updates below stay serial.
+function Read-SharpProofCoverageReportBatch {
+    param([IO.FileInfo[]]$Reports, [int]$StartIndex, [int]$BatchSize)
+    $batch = @($StartIndex..([Math]::Min($Reports.Length - 1, $StartIndex + $BatchSize - 1)) | ForEach-Object {
+            [pscustomobject]@{ position = $_; path = $Reports[$_].FullName }
+        })
+    if ($batch.Count -eq 1) {
+        $entry = $batch[0]
+        try {
+            $document = [Xml.XmlDocument]::new(); $document.Load($entry.path)
+            $results = @([pscustomobject]@{ position = $entry.position; document = $document; error = '' })
+        }
+        catch { $results = @([pscustomobject]@{ position = $entry.position; document = $null; error = $_.Exception.Message }) }
+    }
+    else {
+        $results = @($batch | ForEach-Object -Parallel {
+                $entry = $_
+                try {
+                    $document = [Xml.XmlDocument]::new(); $document.Load($entry.path)
+                    [pscustomobject]@{ position = $entry.position; document = $document; error = '' }
+                }
+                catch { [pscustomobject]@{ position = $entry.position; document = $null; error = $_.Exception.Message } }
+            } -ThrottleLimit $BatchSize)
+    }
+    if ($results.Count -ne $batch.Count -or
+        (@($results.position | Sort-Object) -join ',') -cne (@($batch.position | Sort-Object) -join ',')) { throw 'Coverage XML parsing omitted or duplicated an input.' }
+    return , @($results | Sort-Object position)
+}
+
+# Authenticate each module/source before serial typed accumulation. Every line
+# is validated, including zero hits and overlapping PDB credits; hit counts use
+# the existing MAX rule across all reports.
+$validatedClassCount = 0
+$coverageMergeTimer = [Diagnostics.Stopwatch]::StartNew()
 $reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$coverageLineCreditIndexes = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$coverageClassGrouper = New-SharpProofCoverageLineCreditIndex -Ranges @()
+$sourcePathCaches = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+$coverageReportIndex = 0
+$coverageLoadedReports = @()
+$coverageReportBatchSize = if ($reports.Length -le 4) { 1 } else { [Math]::Min(4, (Get-SharpProofSemanticTestParallelism -RepositoryRoot $repositoryRoot)) }
 foreach ($report in $reports) {
     $reportFiles.Add(([ordered]@{
                 path  = [IO.Path]::GetRelativePath(
@@ -448,7 +489,13 @@ foreach ($report in $reports) {
                     $report.FullName).Replace('\', '/')
                 bytes = [int64]$report.Length
             }).AsReadOnly())
-    [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
+    if ($coverageReportIndex % $coverageReportBatchSize -eq 0) {
+        $coverageLoadedReports = Read-SharpProofCoverageReportBatch -Reports ([IO.FileInfo[]]@($reports)) -StartIndex $coverageReportIndex -BatchSize $coverageReportBatchSize
+    }
+    $loadedReport = $coverageLoadedReports[$coverageReportIndex % $coverageReportBatchSize]
+    if (-not [string]::IsNullOrEmpty($loadedReport.error)) { throw $loadedReport.error }
+    $document = $loadedReport.document
+    $coverageReportIndex++
     $authorityNodes = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
             $document.SelectNodes('/coverage/sharpProofAuthority')))
     if ($authorityNodes.Length -ne 1) {
@@ -468,31 +515,25 @@ foreach ($report in $reports) {
             $document.SelectNodes('/coverage/sources/source') |
                 ForEach-Object { [string]$_.InnerText }
         ))
-    # Classes in one report repeatedly name the same source documents. Scope
-    # this cache to that report's fixed source roots; each distinct filename
-    # still passes the full physical-path and repository-boundary validation.
-    $sourcePathCache = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string](
-        [StringComparer]::Ordinal)
-    $classes = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($document.SelectNodes('//class')))
-    if ($classes.Length -eq 0) {
+    # The private source snapshot is immutable during validation. Reuse path
+    # resolution only for the same ordered source-root array and filename;
+    # different roots still receive independent physical-boundary validation.
+    $sourceRootsKey = ConvertTo-Json -InputObject ([string[]]@($sourceRoots)) -Compress
+    [object]$sourcePathCache = $null
+    if (-not $sourcePathCaches.TryGetValue($sourceRootsKey, [ref]$sourcePathCache)) {
+        $sourcePathCache = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
+        $sourcePathCaches.Add($sourceRootsKey, $sourcePathCache)
+    }
+    $classes = $document.SelectNodes('//class')
+    if ($classes.Count -eq 0) {
         throw "Coverage report has no classes: $($report.FullName)"
     }
     $reportLineCount = 0
-    $hasProductionPackage = $false
-    foreach ($class in $classes) {
-        $package = $class.ParentNode.ParentNode
-        if ($null -eq $package -or
-            -not $package.HasAttribute('name')) {
-            throw "Coverage report class has no package identity: $($report.FullName)"
-        }
-        if (-not $expectedAssemblyNames.Contains([string]$package.name)) {
-            continue
-        }
-        $hasProductionPackage = $true
-        if (-not $class.HasAttribute('filename')) {
-            throw "Coverage report class has no source filename: $($report.FullName)"
-        }
-        $reportedFileName = ([string]$class.filename).Replace('\', '/')
+    $classGroups = $coverageClassGrouper.Group($classes, $expectedAssemblyNames, $report.FullName)
+    $hasProductionPackage = $classGroups.Count -gt 0
+    foreach ($group in $classGroups) {
+        $packageName = $group.Module
+        $reportedFileName = $group.Filename
         if ($reportedFileName.Contains('/obj/', [StringComparison]::Ordinal) -or
             $reportedFileName.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
@@ -512,7 +553,7 @@ foreach ($report in $reports) {
             $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
-        $sourceKey = [string]$package.name + ':' + $relativePath
+        $sourceKey = $packageName + ':' + $relativePath
         if (-not $expectedLineHits.ContainsKey($sourceKey)) {
             throw (
                 "Coverage report source is outside the authenticated source " +
@@ -521,58 +562,27 @@ foreach ($report in $reports) {
         $fileHits = $lineHits[$sourceKey]
         $fileCredits = $permittedLineCredits[$sourceKey]
         $fileReportedHits = $reportedLineHits[$sourceKey]
-        $lines = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($class.SelectNodes('.//line')))
-        if ($lines.Length -gt 0) {
-            [void]$reportedModuleDocuments.Add(([string]$package.name + ':' + $relativePath))
+        [object]$creditIndex = $null
+        if (-not $coverageLineCreditIndexes.TryGetValue($sourceKey, [ref]$creditIndex)) {
+            $creditIndex = New-SharpProofCoverageLineCreditIndex -Ranges $permittedLineRanges[$sourceKey]
+            $coverageLineCreditIndexes.Add($sourceKey, $creditIndex)
         }
-        foreach ($line in $lines) {
-            $number = 0
-            $hits = 0
-            if (-not $line.HasAttribute('number') -or
-                -not $line.HasAttribute('hits') -or
-                -not [int]::TryParse(
-                    [string]$line.number,
-                    [Globalization.NumberStyles]::Integer,
-                    [Globalization.CultureInfo]::InvariantCulture,
-                    [ref]$number) -or
-                -not [int]::TryParse(
-                    [string]$line.hits,
-                    [Globalization.NumberStyles]::Integer,
-                    [Globalization.CultureInfo]::InvariantCulture,
-                    [ref]$hits) -or
-                $number -le 0 -or
-                $hits -lt 0) {
-                throw (
-                    "Coverage report contains a malformed sequence point: " +
-                    $report.FullName)
-            }
-            # Reports repeat the same source lines across test projects. Resolve
-            # each module/source/line against its authenticated PDB ranges
-            # once per validation, then merge hits for every overlapping start.
-            [object]$credits = $null
-            if (-not $fileCredits.TryGetValue($number, [ref]$credits)) {
-                $credits = Resolve-SharpProofCoverageLineCredits `
-                    -Ranges $permittedLineRanges[$sourceKey] `
-                    -Number $number -SourcePath $sourceKey
-                $fileCredits.Add($number, $credits)
-            }
-            # Only store direct hits after the same source and PDB-range validation.
-            if (-not $fileReportedHits.ContainsKey($number) -or
-                $hits -gt $fileReportedHits[$number]) {
-                $fileReportedHits[$number] = $hits
-            }
-            foreach ($credit in $credits) {
-                if ($hits -gt $fileHits[$credit]) {
-                    $fileHits[$credit] = $hits
-                }
-            }
-            $reportLineCount++
-        }
+        $merged = $creditIndex.MergeClasses($group.Classes, $fileHits, $fileReportedHits, $fileCredits, $sourceKey, $report.FullName)
+        $reportLineCount += $merged[0]
+        $validatedClassCount += $merged[1]
+        if ($merged[0] -gt 0) { [void]$reportedModuleDocuments.Add($sourceKey) }
     }
     if ($hasProductionPackage -and $reportLineCount -eq 0) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
+    # Release this document before the next bounded parsing batch is loaded.
+    $loadedReport.document = $null
+    $document = $null; $classes = $null; $classGroups = $null; $group = $null
+    $authorityNodes = $null; $authorityNode = $null
 }
+
+$coverageMergeTimer.Stop()
+Write-Verbose ('Coverage phase: name=validation-class-records elapsedMilliseconds={0} validated={1}' -f $coverageMergeTimer.ElapsedMilliseconds, $validatedClassCount)
 
 $frozenHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($entry in $lineHits.GetEnumerator()) {

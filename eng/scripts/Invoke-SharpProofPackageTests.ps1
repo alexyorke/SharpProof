@@ -7,6 +7,10 @@ param(
 
     [string]$PackageSource = '',
 
+    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+
+    [ValidateSet(1, 4)][int]$PackagePartitionCount = 1,
+
     [switch]$NoBuild,
 
     [switch]$ReuseTestHarness,
@@ -26,6 +30,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PackageTestDiscovery.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
 & (Join-Path $PSScriptRoot 'Test-SharpProofPackageDiscovery.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -349,7 +354,9 @@ $canonicalPackageFilter =
 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 $useDefaultShardPlan = [string]::IsNullOrWhiteSpace($TestFilter) -or
 $TestFilter -ceq $canonicalPackageFilter
-$timingStem = 'package-tests-' + $Configuration.ToLowerInvariant()
+$timingStem = 'package-tests-' + $Configuration.ToLowerInvariant() + $(if ($PackagePartitionCount -eq 4) { '-partition-' + $PackagePartition } else { '' })
+if ($PackagePartitionCount -eq 4 -and -not $useDefaultShardPlan) { throw 'Package partitions require the default or canonical category filter.' }
+if ($PackagePartition -ge $PackagePartitionCount) { throw 'Package partition index exceeds the partition count.' }
 $timingSuffix = if ($coverageEnabled) { '-coverage' } else { '' }
 $canonicalTimingOutput = Join-Path $timingDirectory (
     $timingStem + $timingSuffix + '.json')
@@ -772,6 +779,12 @@ try {
                         }
                     }).AsReadOnly())
         }
+        $shardBuilder.Add(([ordered]@{
+                    Name                  = 'fixture-parameter-guards'
+                    Filter                = Get-SharpProofPackageShardFilter 'FullyQualifiedName~SharpProof.TestSupport.ParameterGuardContractTests'
+                    EstimatedMilliseconds = 1L
+                    Slots                 = 1
+                }).AsReadOnly())
         $buildTaskFilter = 'FullyQualifiedName~SharpProof.Package.Test.BuildTaskTests'
         $shardBuilder.Add(([ordered]@{
                     Name                  = 'postflight-buildtask'
@@ -853,7 +866,36 @@ try {
             -Configuration $Configuration
     }
 
-    $shards = $shardBuilder.ToImmutable()
+    $partitionEvidence = ''
+    if ($PackagePartitionCount -eq 4) {
+        $testAssembly = Get-SharpProofTestAssemblyPath -ProjectPath $testProject -Configuration $Configuration
+        $partitionEvidence = if ($coverageEnabled) { Join-Path $resolvedCoverageResults 'partition-evidence' } else { Join-Path $repositoryRoot "artifacts/package-partitions/$PackagePartition" }
+        [IO.Directory]::CreateDirectory($partitionEvidence) | Out-Null
+        $settings = Join-Path $partitionEvidence 'discovery.runsettings'
+        '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
+        Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/Settings:' + $settings), ('/ListTestsTargetPath:' + (Join-Path $partitionEvidence 'discovered-tests.txt'))) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
+        Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $testAssembly) ('Dump/D_' + [IO.Path]::GetFileName($testAssembly) + '.dump')) -Destination (Join-Path $partitionEvidence 'discovery.dump')
+        $universe = @(Read-SharpProofPackageDiscovery -Dump (Join-Path $partitionEvidence 'discovery.dump') -Filter $TestFilter)
+        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackagePartition -Method $_.method) -eq $PackagePartition })
+        if ($partitionCases.Count -eq 0) { throw 'Package partition selected no cases.' }
+        $partitionMethods = @($partitionCases | ForEach-Object { $_.method } | Sort-Object -Unique -CaseSensitive)
+        $partitionFilter = @($partitionMethods | ForEach-Object { 'FullyQualifiedName~' + $_ }) -join '|'
+        $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        foreach ($shard in $shardBuilder) {
+            $filter = "($($shard.Filter))&($partitionFilter)"
+            $listing = Join-Path $partitionEvidence ($shard.Name + '.txt')
+            Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/ListTestsTargetPath:' + $listing), ('/TestCaseFilter:' + $filter)) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
+            if (@(Get-Content -LiteralPath $listing).Count -eq 0) { continue }
+            $copy = [ordered]@{}
+            foreach ($entry in $shard.GetEnumerator()) { $copy[$entry.Key] = $entry.Value }
+            $copy['Filter'] = $filter
+            $partitionShards.Add($copy.AsReadOnly())
+        }
+        $shards = $partitionShards.ToImmutable()
+    }
+    else {
+        $shards = $shardBuilder.ToImmutable()
+    }
 
     # Start high-resource shards first so reserved lanes overlap their tails
     # instead of leaving the containment process as the final wave.
@@ -947,6 +989,20 @@ try {
         -Prepare $preparePackageTest `
         -Label 'Package test' `
         -Quiet:$Quiet
+    if ($PackagePartitionCount -eq 4) {
+        $receiptRoot = Join-Path $partitionEvidence 'results'
+        [IO.Directory]::CreateDirectory($receiptRoot) | Out-Null
+        foreach ($trx in Get-ChildItem -LiteralPath $results -Recurse -Filter '*.trx' -File) {
+            Copy-Item -LiteralPath $trx.FullName -Destination (Join-Path $receiptRoot ($trx.Directory.Name + '-' + $trx.Name))
+        }
+        Assert-SharpProofPackagePartitionReceipt -Root $receiptRoot -Expected $partitionCases
+        ([ordered]@{
+            schemaVersion = 1; count = 4; index = $PackagePartition
+            commit   = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+            runId = [string]$env:GITHUB_RUN_ID; filter = $TestFilter
+            selected = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partitionEvidence 'package-partition.json') -Encoding utf8NoBOM
+    }
     $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject

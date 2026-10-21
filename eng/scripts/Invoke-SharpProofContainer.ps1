@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -11,14 +11,20 @@ param(
 
     [string]$PackageSource = '',
 
+    [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
+
+    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+
+    [ValidateSet(1, 4)][int]$PackagePartitionCount = 1,
+
     [string]$TestFilter = '',
 
     [ValidateSet('All', 'Remaining', 'Gates')]
     [string]$SemanticCohort = 'All',
 
     # CI runs the Remaining cohort's Worker remainder shards and its other
-    # tasks on separate runners; the cohort gate requires both parts.
-    [ValidateSet('All', 'Worker', 'Projects')]
+    # tasks on separate runners; the cohort gate requires every part.
+    [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerB', 'Projects', 'GatesCorpus', 'GatesShards')]
     [string]$TaskGroup = 'All',
 
     [string]$TestResultsDirectory = '',
@@ -29,7 +35,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-a-4a', 'semantic-worker-a-4b', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
@@ -91,11 +97,17 @@ if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
 # CI collects each coverage shard on its own runner; the gate requires all.
-$coverageShardNames = [Collections.Immutable.ImmutableArray]::Create[string](
-    'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')
+. (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
+$coverageShardNames = Get-SharpProofSemanticCoverageShards
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
     throw '-CoveragePhase is supported only for coverage-shard.'
+}
+if ($PSBoundParameters.ContainsKey('SelfApplicationPhase') -and $Command -ne 'self-apply') {
+    throw '-SelfApplicationPhase is supported only for self-apply.'
+}
+if (($PSBoundParameters.ContainsKey('PackagePartition') -or $PSBoundParameters.ContainsKey('PackagePartitionCount')) -and $Command -ne 'package-tests') {
+    throw 'Package partition options are supported only for package-tests.'
 }
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
@@ -111,7 +123,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
     -not $NoBuild -and -not $Fast) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -184,8 +196,10 @@ function Invoke-TestProject([string]$ProjectPath) {
 
 function Invoke-PackageTests {
     $packageArguments = New-TestInvocationArguments -Additional ([ordered]@{
-            TestFilter    = $TestFilter
-            PackageSource = $PackageSource
+            TestFilter            = $TestFilter
+            PackageSource         = $PackageSource
+            PackagePartition      = $PackagePartition
+            PackagePartitionCount = $PackagePartitionCount
         }).AsReadOnly()
     Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofPackageTests.ps1' `
         'Package tests failed.' $packageArguments
@@ -261,6 +275,7 @@ function Invoke-SharpProofSolutionBuild(
 }
 
 function Invoke-SharpProofCoverageAuthorityBuild {
+    param([string[]]$AdditionalProjects = @())
     # The gate recomputes every production PDB and source identity. Its build
     # need not also compile the test projects already exercised by the shards
     # and the required PR gate. Derive this complete set from the same inventory
@@ -277,7 +292,7 @@ function Invoke-SharpProofCoverageAuthorityBuild {
                 OutputPath     = $selectionPath
             }).AsReadOnly()
         $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
-        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($selection.projects | ForEach-Object { [string]$_.projectPath }))
+        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@((@($selection.projects | ForEach-Object { [string]$_.projectPath }) + $AdditionalProjects | Sort-Object -CaseSensitive -Unique)))
         if ($projects.Length -eq 0) { throw 'Coverage build project selection is empty.' }
         ([ordered]@{ solution = ([ordered]@{
                     path = 'SharpProof.slnx'; projects = $projects
@@ -405,67 +420,71 @@ switch ($Command) {
         & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
     'self-apply' {
-        $trackedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                & git -C $repositoryRoot ls-files -- '*.csproj' |
-                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                    ForEach-Object {
-                        Join-Path $repositoryRoot $_
-                    } |
-                    Sort-Object
-            ))
-        if ($LASTEXITCODE -ne 0 -or $trackedProjects.Length -eq 0) {
-            throw 'self-apply requires a Git-backed repository with tracked project files.'
-        }
+        if ($SelfApplicationPhase -ne 'Samples') {
+            $trackedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    & git -C $repositoryRoot ls-files -- '*.csproj' |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                        ForEach-Object {
+                            Join-Path $repositoryRoot $_
+                        } |
+                        Sort-Object
+                ))
+            if ($LASTEXITCODE -ne 0 -or $trackedProjects.Length -eq 0) {
+                throw 'self-apply requires a Git-backed repository with tracked project files.'
+            }
 
-        $sourceProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                $trackedProjects |
-                    Where-Object {
-                        $relative = [IO.Path]::GetRelativePath(
-                            $repositoryRoot, $_).Replace('\', '/')
-                        $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
-                        -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
-                    }
-            ))
-        if ($sourceProjects.Length -eq 0) {
-            throw 'self-apply found no source-tree projects to analyze.'
-        }
+            $sourceProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    $trackedProjects |
+                        Where-Object {
+                            $relative = [IO.Path]::GetRelativePath(
+                                $repositoryRoot, $_).Replace('\', '/')
+                            $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
+                            -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
+                        }
+                ))
+            if ($sourceProjects.Length -eq 0) {
+                throw 'self-apply found no source-tree projects to analyze.'
+            }
 
-        # Build the complete source tree once with the self lane disabled so
-        # every analyzer and generator output is available as a stable input.
-        # Analyzer diagnostics are not needed here: each per-project
-        # self-application build below runs every analyzer again.
-        Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
-        Invoke-SharpProofRequiredDotnet @(
-            'build', 'SharpProof.slnx', '--configuration', $Configuration,
-            '--no-restore', '--nologo',
-            '-p:RunAnalyzersDuringBuild=false',
-            '-p:SharpProofSelfApplication=false',
-            '-p:SharpProofProfile=off',
-            '-p:SharpProofVerify=false',
-            '-p:GeneratePackageOnBuild=false')
-
-        $ordinal = 0
-        foreach ($project in $sourceProjects) {
-            $ordinal++
-            Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
-                $ordinal, $sourceProjects.Length,
-                [IO.Path]::GetRelativePath($repositoryRoot, $project))
+            # Build the complete source tree once with the self lane disabled so
+            # every analyzer and generator output is available as a stable input.
+            # Analyzer diagnostics are not needed here: each per-project
+            # self-application build below runs every analyzer again.
+            Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
             Invoke-SharpProofRequiredDotnet @(
-                'build', $project, '--configuration', $Configuration,
-                '--no-restore', '--no-dependencies', '--nologo',
-                '-p:SharpProofSelfApplication=true',
-                '-p:SharpProofProfile=advisory',
-                '-p:SharpProofFeatures=all',
+                'build', 'SharpProof.slnx', '--configuration', $Configuration,
+                '--no-restore', '--nologo',
+                '-p:RunAnalyzersDuringBuild=false',
+                '-p:SharpProofSelfApplication=false',
+                '-p:SharpProofProfile=off',
                 '-p:SharpProofVerify=false',
                 '-p:GeneratePackageOnBuild=false')
-        }
 
-        # Package-backed samples exercise the same analyzer payload through
-        # the supported package-consumer path.  The sample harness creates and
-        # cleans its own isolated local feed and temporary build roots.
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofSamples.ps1' `
-            'SharpProof self-application sample validation failed.' `
-        ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
+            $ordinal = 0
+            foreach ($project in $sourceProjects) {
+                $ordinal++
+                Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
+                    $ordinal, $sourceProjects.Length,
+                    [IO.Path]::GetRelativePath($repositoryRoot, $project))
+                Invoke-SharpProofRequiredDotnet @(
+                    'build', $project, '--configuration', $Configuration,
+                    '--no-restore', '--no-dependencies', '--nologo',
+                    '-p:SharpProofSelfApplication=true',
+                    '-p:SharpProofProfile=advisory',
+                    '-p:SharpProofFeatures=all',
+                    '-p:SharpProofVerify=false',
+                    '-p:GeneratePackageOnBuild=false')
+            }
+
+        }
+        if ($SelfApplicationPhase -ne 'Sources') {
+            # Package-backed samples exercise the same analyzer payload through
+            # the supported package-consumer path.  The sample harness creates and
+            # cleans its own isolated local feed and temporary build roots.
+            Invoke-RequiredScript 'eng/scripts/Test-SharpProofSamples.ps1' `
+                'SharpProof self-application sample validation failed.' `
+            ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
+        }
     }
     'check' {
         & (Join-Path $repositoryRoot 'eng/scripts/Invoke-SharpProofDevCheck.ps1') `
@@ -659,17 +678,23 @@ switch ($Command) {
     'coverage-shard' {
         # One runner collects one part of the default coverage run. The
         # coverage-gate job merges every shard and enforces the thresholds.
-        if ($CoveragePhase -notin $coverageShardNames) {
+        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects', 'semantic-worker-a', 'semantic-worker-a-4', 'semantic-worker-b')) {
             throw ('coverage-shard requires -CoveragePhase ' + ($coverageShardNames -join ', ') + '.')
         }
         # Identical sources in different private container workspaces must
         # produce the same MVID/PDB identity even outside GitHub Actions.
         # Analyzers do not change those binaries and the canonical PR build
         # already enforces them, so shards and the gate skip them.
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
-            -AdditionalBuildArguments @(
-            '-p:ContinuousIntegrationBuild=true',
-            '-p:RunAnalyzersDuringBuild=false')
+        if ($CoveragePhase -in $coverageShardNames) {
+            $testProjects = Get-SharpProofCoverageBuildProjects -RepositoryRoot $repositoryRoot -Phase $CoveragePhase
+            Invoke-SharpProofCoverageAuthorityBuild -AdditionalProjects ([string[]]@($testProjects))
+        }
+        else {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
+                -AdditionalBuildArguments @(
+                '-p:ContinuousIntegrationBuild=true',
+                '-p:RunAnalyzersDuringBuild=false')
+        }
         $coverageShardArguments = ([ordered]@{
                 ResultsDirectory = (Join-Path $repositoryRoot (
                         'artifacts/coverage/' + $CoveragePhase))
@@ -677,6 +702,15 @@ switch ($Command) {
             }).AsReadOnly()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `
             'Coverage shard collection failed.' $coverageShardArguments
+    }
+    'package-reproducibility' {
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproduciblePackages.ps1' `
+            'Independent-path package reproduction failed.' `
+        ([ordered]@{ Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility' }).AsReadOnly()
+    }
+    'package-partition-gate' {
+        . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
+        Assert-SharpProofPackagePartitions -Roots @(0..3 | ForEach-Object { Join-Path $repositoryRoot "artifacts/package-partitions/$_" }) -Commit ((& git rev-parse HEAD).Trim()) -Filter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
     }
     'coverage-gate' {
         . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
@@ -739,6 +773,9 @@ switch ($Command) {
                 ($shardModules -join ','))
             $authorityFileBuilder.Add($shardAuthorityPath)
         }
+        Assert-SharpProofSemanticCoveragePartitions -Root $coverageRoot -RepositoryRoot $repositoryRoot
+        . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
+        Assert-SharpProofPackagePartitions -Roots @(0..3 | ForEach-Object { Join-Path $coverageRoot "package-$_/package/partition-evidence" }) -Commit ((& git rev-parse HEAD).Trim()) -Filter ''
         $authorityKeys = $authorityKeyBuilder.ToImmutable()
         $authorityFiles = $authorityFileBuilder.ToImmutable()
         if (@($authorityKeys | Select-Object -Unique).Count -ne 1) {

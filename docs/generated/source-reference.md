@@ -218,7 +218,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -228,14 +228,20 @@ param(
 
     [string]$PackageSource = '',
 
+    [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
+
+    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+
+    [ValidateSet(1, 4)][int]$PackagePartitionCount = 1,
+
     [string]$TestFilter = '',
 
     [ValidateSet('All', 'Remaining', 'Gates')]
     [string]$SemanticCohort = 'All',
 
     # CI runs the Remaining cohort's Worker remainder shards and its other
-    # tasks on separate runners; the cohort gate requires both parts.
-    [ValidateSet('All', 'Worker', 'Projects')]
+    # tasks on separate runners; the cohort gate requires every part.
+    [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerB', 'Projects', 'GatesCorpus', 'GatesShards')]
     [string]$TaskGroup = 'All',
 
     [string]$TestResultsDirectory = '',
@@ -246,7 +252,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-a-4a', 'semantic-worker-a-4b', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,

@@ -76,9 +76,10 @@ RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
     && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; if ($PSVersionTable.PSVersion.ToString() -cne [string]$catalog.powershell.version) { throw "PowerShell does not match the serviced archive version." }; $PSVersionTable.PSVersion.ToString()'
 
 COPY eng/container/Install-ScriptTools.ps1 /opt/sharpproof/Install-ScriptTools.ps1
-RUN apt-get update -qq \
-    && apt-get install -y --no-install-recommends xz-utils=5.6.1+really5.4.5-1ubuntu0.3 \
-    && rm -rf /var/lib/apt/lists/*
+# The reviewed version can disappear from moving apt indexes while its archive
+# remains available. Verify the exact archive instead of resolving mutable indexes.
+ADD --checksum=sha256:778edae086bc8f34d80f36f301bc8fb3eff2d906c146dfb533ea6840b6d64e00 https://archive.ubuntu.com/ubuntu/pool/main/x/xz-utils/xz-utils_5.6.1+really5.4.5-1ubuntu0.3_amd64.deb /tmp/xz-utils.deb
+RUN dpkg --install /tmp/xz-utils.deb && rm /tmp/xz-utils.deb
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Install-ScriptTools.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json
 
