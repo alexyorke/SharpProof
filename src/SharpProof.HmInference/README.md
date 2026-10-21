@@ -309,6 +309,8 @@ ranges, nested object identity and completed/suspended nested awaits with new
 type arguments. Direct pointer/function-pointer types and stack allocation remain
 open.
 
+Fixed call parameters also accept representable conversions from generalized inputs, including constructors, delegate calls, explicit generic instantiations, params and array elements. Reference and omitted readonly arguments retain their original storage contracts.
+
 Fixed declared value storage accepts representable conversions from generalized inputs without changing its declared type. This includes fields, properties, indexers, explicit locals, object initializers and typed deconstruction. Nullable annotations come from the bound storage contract; numeric/boxing endpoints, explicit ref storage and inferred-local assignments retain their required types.
 
 Pattern variables participate in inference through `is` expressions, switch labels,

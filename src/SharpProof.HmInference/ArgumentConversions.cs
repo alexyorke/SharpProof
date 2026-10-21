@@ -34,6 +34,55 @@ public static partial class Inference
             return true;
         }
 
+        private bool TryBindFixedArgument(IOperation value, HmType expected)
+        {
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (expected is null)
+            { throw new ArgumentNullException(nameof(expected)); }
+            if (expected.FreeVariables().Count != 0 || ContainsDynamic(expected) || value.Syntax is not ExpressionSyntax expression)
+            { return false; }
+            var parameter = (value.Parent as IArgumentOperation)?.Parameter;
+            // Omitted readonly arguments also retain their original storage/temporary contract.
+            if (parameter is { RefKind: not RefKind.None })
+            { return false; }
+            var declared = parameter?.Type ?? ConversionCore(expected).CSharpSymbol;
+            if (declared is null)
+            { return false; }
+            if (expected.Root.Name == CSharpTypes.NullableReference)
+            { declared = declared.WithNullableAnnotation(NullableAnnotation.Annotated); }
+            var source = model.GetTypeInfo(expression, cancellationToken).Type;
+            if (source is not null && (source is IDynamicTypeSymbol || IsDynamicIdentityBoundary(source, declared)
+                || !SymbolEqualityComparer.Default.Equals(source, declared)))
+            { return false; }
+            if (!SameFixedShape(expected, CSharpTypes.Rigid(declared)))
+            { return false; }
+            FixedContextValue(expression, declared);
+            return true;
+        }
+
+        private static bool SameFixedShape(HmType first, HmType second)
+        {
+            if (first is null)
+            { throw new ArgumentNullException(nameof(first)); }
+            if (second is null)
+            { throw new ArgumentNullException(nameof(second)); }
+            first = first.Root;
+            second = second.Root;
+            if (first.IsVariable || second.IsVariable || first.Name != second.Name
+                || first.CSharpSymbol is not null && second.CSharpSymbol is not null
+                && CSharpTypes.ConstructorIdentity(first.CSharpSymbol) != CSharpTypes.ConstructorIdentity(second.CSharpSymbol)
+                || first.NestedTypeName != second.NestedTypeName
+                || first.Arguments.Length != second.Arguments.Length)
+            { return false; }
+            for (var i = 0; i < first.Arguments.Length; i++)
+            {
+                if (!SameFixedShape(first.Arguments[i], second.Arguments[i]))
+                { return false; }
+            }
+            return true;
+        }
+
         private static HmType ConversionCore(HmType shape)
         {
             if (shape is null)

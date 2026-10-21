@@ -469,6 +469,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expected)); }
             if (value.Syntax is ExpressionSyntax interpolation && IsTargetedInterpolation(interpolation))
             { Interpolation(interpolation, expected); return; }
+            if (TryBindFixedArgument(value, expected))
+            { return; }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
             if (TryBindDynamicArgument(value, expected, inferred))

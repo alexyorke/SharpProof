@@ -893,7 +893,7 @@ public static partial class Inference
                     if (declaration.Type is RefTypeSyntax)
                     { Anchor(variable.Initializer.Value is RefExpressionSyntax referent ? referent.Expression : variable.Initializer.Value); }
                     else
-                    { FixedStorageValue(variable.Initializer.Value, symbol.Type); }
+                    { FixedContextValue(variable.Initializer.Value, symbol.Type); }
                     environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
                 }
             }
@@ -973,7 +973,7 @@ public static partial class Inference
                         { return Expression(assignment.Right); }
                         if (assignment.Right is not RefExpressionSyntax && AssignmentTarget(assignment.Left).FreeVariables().Count == 0
                             && StorageType(assignment.Left) is { } fixedTarget)
-                        { return FixedStorageValue(assignment.Right, fixedTarget); }
+                        { return FixedContextValue(assignment.Right, fixedTarget); }
                         return AssignValue(assignment.Left, Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
                             ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
@@ -1239,7 +1239,7 @@ public static partial class Inference
                     else
                     {
                         if (StorageType(assignment.Left) is { } fixedMember)
-                        { FixedStorageValue(assignment.Right, fixedMember); }
+                        { FixedContextValue(assignment.Right, fixedMember); }
                         else
                         { Anchor(assignment.Right); }
                     }
@@ -1330,7 +1330,7 @@ public static partial class Inference
             };
         }
 
-        private HmType FixedStorageValue(ExpressionSyntax expression, ITypeSymbol declared)
+        private HmType FixedContextValue(ExpressionSyntax expression, ITypeSymbol declared)
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
