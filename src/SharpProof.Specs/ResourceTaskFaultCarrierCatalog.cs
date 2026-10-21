@@ -7,7 +7,10 @@ namespace SharpProof.Specs;
 // scheduler/global initialization and externally induced storage are separate.
 internal static class ResourceTaskFaultCarrierCatalog
 {
-    internal const string Model = "task-join-fixed-fault-carriers-v1";
+    internal const string Model = "task-join-fixed-fault-carriers-v2";
+    // One queue attempt and one at-most-once callback can each record a fault.
+    internal const int MaximumChildFaultRecords = 2;
+    internal const int MaximumJoinedDispatches = 16 * MaximumChildFaultRecords;
     internal const string TaskSource = ResourceTaskCatalog.EvidenceSource;
     internal const string HolderSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskExceptionHolder.cs";
     internal const string DispatchSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Runtime/ExceptionServices/ExceptionDispatchInfo.cs";

@@ -8,7 +8,12 @@ namespace SharpProof.Specs;
 // event subscribers belong to separate allocation components.
 internal static class ResourceTaskFaultNotificationCatalog
 {
-    internal const string Model = "task-fault-notification-storage-v1";
+    internal const string Model = "task-fault-notification-storage-v2";
+    // Standard holder lifecycle only: no external finalization registration,
+    // resurrection, runtime mutation, resource initialization or event work.
+    internal const string LifecycleModel = "task-join-closed-fault-notification-prefixes-v1";
+    internal const string LifecycleSource = ResourceTaskFaultCarrierCatalog.HolderSource;
+    internal const string FaultRecordSource = ResourceTaskFaultCarrierCatalog.TaskSource;
     internal const string ExceptionSource = ResourceTaskFaultCarrierCatalog.StateSource;
     internal const string ConstructorSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Exception.cs";
     internal const string AggregateSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/AggregateException.cs";

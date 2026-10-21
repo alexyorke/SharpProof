@@ -29,16 +29,20 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         var holder = ObjectBytes(ResourceTaskFaultCarrierCatalog.HolderFields);
         var dispatch = ObjectBytes(ResourceTaskFaultCarrierCatalog.DispatchFields);
         var fixedRecord = ResourceExpression.Add(contingent, ResourceExpression.Add(holder, dispatch));
-        var leafRecord = ResourceExpression.Add(fixedRecord, ListBytes(1));
-        var total = ResourceExpression.Multiply(leafRecord, ResourceExpression.Literal(count));
-        var joinList = ListBytes(count);
+        // Do not assume scheduling and callback failures are exclusive. Budget
+        // both AddException sites, including their losing carrier candidates.
+        var faultsPerChild = ResourceTaskFaultCarrierCatalog.MaximumChildFaultRecords;
+        var leafRecord = ResourceExpression.Add(fixedRecord, ListBytes(faultsPerChild));
+        var leaf = ResourceExpression.Multiply(leafRecord, ResourceExpression.Literal(faultsPerChild));
+        var total = ResourceExpression.Multiply(leaf, ResourceExpression.Literal(count));
+        var joinList = ListBytes(count * faultsPerChild);
         total = ResourceExpression.Add(total, ResourceExpression.Add(fixedRecord, joinList));
         // One observed-dispatch list and at most count-1 candidate task lists,
         // including lists that lose publication races. Each candidate gets the
         // full list-growth envelope, conservatively counting unused capacity.
         total = ResourceExpression.Add(total, ResourceExpression.Multiply(joinList, ResourceExpression.Literal(count)));
         if (projection.ConfiguredAwait)
-        { total = ResourceExpression.Add(total, leafRecord); }
+        { total = ResourceExpression.Add(total, ResourceExpression.Add(fixedRecord, ListBytes(1))); }
         return new(total, null);
 
         ResourceExpression ObjectBytes(ImmutableArray<ResourceStorageKind> fields)

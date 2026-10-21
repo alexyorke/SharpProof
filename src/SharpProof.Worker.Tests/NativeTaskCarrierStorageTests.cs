@@ -438,21 +438,69 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(InstanceFields(reader, box), Is.EqualTo(new[] { ("StateMachine", (byte)0x13) }));
     }
 
-    [TestCase(2, false, 1440L)]
-    [TestCase(3, false, 1976L)]
-    [TestCase(4, false, 2512L)]
-    [TestCase(5, false, 3576L)]
-    [TestCase(8, false, 5448L)]
-    [TestCase(9, false, 7592L)]
-    [TestCase(16, false, 13024L)]
-    [TestCase(2, true, 1808L)]
-    [TestCase(16, true, 13392L)]
+    [TestCase(2, false, 2176L)]
+    [TestCase(3, false, 3432L)]
+    [TestCase(4, false, 4424L)]
+    [TestCase(5, false, 6328L)]
+    [TestCase(8, false, 9760L)]
+    [TestCase(9, false, 13704L)]
+    [TestCase(16, false, 23672L)]
+    [TestCase(2, true, 2544L)]
+    [TestCase(16, true, 24040L)]
     public void FaultCarrierPrefixesIncludeGrowthAndLosingPublicationCandidates(int count, bool configured, long expected)
     {
         var (projection, root) = FaultProjection(count, configured);
         var result = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.UnknownReason, Is.Null);
         Assert.That(result.BookkeepingUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    [TestCase(2, false, 1136L)]
+    [TestCase(2, true, 1352L)]
+    [TestCase(8, false, 3920L)]
+    [TestCase(8, true, 4136L)]
+    [TestCase(16, false, 7632L)]
+    [TestCase(16, true, 7848L)]
+    public void ClosedNotificationPrefixesIncludeBothRecordingSitesAndEveryHolder(int count, bool configured, long expected)
+    {
+        var (projection, root) = FaultProjection(count, configured);
+        var check = NativeTaskFaultNotificationStorageVerifier.CheckJoinedPrefixes(projection, root, Layout(),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.PrefixUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultNotificationCatalog.LifecycleModel));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ClosedNotificationPrefixesRejectLayoutOrLaterChildOwnershipFailures(bool badLayout)
+    {
+        var (projection, root) = FaultProjection(2, false);
+        if (!badLayout)
+        {
+            var child = projection.Children[1];
+            projection = projection with
+            {
+                Children = projection.Children.SetItem(1,
+                child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } })
+            };
+        }
+        var layout = badLayout ? new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x86", 4) : Layout();
+        var check = NativeTaskFaultNotificationStorageVerifier.CheckJoinedPrefixes(projection, root, layout,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.PrefixUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(badLayout ? "IncompatibleResourceRuntimeLayout" : "ForkJoinChildOwnershipInvalid"));
+    }
+
+    [Test]
+    public void ClosedNotificationPrefixesHonorCancellation()
+    {
+        var (projection, root) = FaultProjection(2, true);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = NativeTaskFaultNotificationStorageVerifier.CheckJoinedPrefixes(projection, root, Layout(), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
     }
 
     [TestCase(1)]

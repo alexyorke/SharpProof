@@ -13,6 +13,8 @@ internal sealed class TaskFaultNotificationRuntimeTests
     [TestCase(2, 224)]
     [TestCase(8, 272)]
     [TestCase(16, 336)]
+    [TestCase(17, 344)]
+    [TestCase(32, 464)]
     public void PinnedConstructorAllocationsFitTheIndependentConstructionUpper(int count, int upper)
     {
         AssertPinnedRuntime();
@@ -28,6 +30,66 @@ internal sealed class TaskFaultNotificationRuntimeTests
         { GC.KeepAlive(construct(dispatches)); }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         Assert.That(allocated, Is.Positive.And.LessThanOrEqualTo((long)upper * repetitions));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TwoFaultRecordingSitesRetainBothDispatchesWithinTheFixedCarrierEnvelope(bool schedulerFirst)
+    {
+        AssertPinnedRuntime();
+        var record = CreateFaultRecorder();
+        Exception scheduling = new TaskSchedulerException("queue failure");
+        Exception callback = new InvalidOperationException("callback failure");
+        var first = schedulerFirst ? scheduling : callback;
+        var second = schedulerFirst ? callback : scheduling;
+        for (var index = 0; index < 64; index++)
+        {
+            var warm = new Task(static () => { });
+            record(warm, first);
+            record(warm, second);
+            _ = ReadFaultsAndMarkHandled(warm);
+        }
+        var task = new Task(static () => { });
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        record(task, first);
+        record(task, second);
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        var faults = ReadFaultsAndMarkHandled(task);
+        Assert.That(faults, Has.Count.EqualTo(2));
+        Assert.That(faults.Capacity, Is.EqualTo(2));
+        Assert.That(faults[0].SourceException, Is.SameAs(first));
+        Assert.That(faults[1].SourceException, Is.SameAs(second));
+        Assert.That(faults[0], Is.Not.SameAs(faults[1]));
+        // Two independent 368-byte envelopes include losing publication
+        // candidates and list growth. Original payloads/traces are excluded.
+        Assert.That(bytes, Is.Positive.And.LessThanOrEqualTo(736));
+        Assert.That(ResourceTaskFaultCarrierCatalog.MaximumChildFaultRecords, Is.EqualTo(2));
+    }
+
+    private static Action<Task, Exception> CreateFaultRecorder()
+    {
+        var target = typeof(Task).GetMethod("AddException", BindingFlags.Instance | BindingFlags.NonPublic,
+            null, [typeof(object)], null)!;
+        var method = new DynamicMethod("RecordTaskFault", typeof(void), [typeof(Task), typeof(Exception)],
+            typeof(TaskFaultNotificationRuntimeTests).Module, true);
+        var generator = method.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldarg_1);
+        generator.Emit(OpCodes.Call, target);
+        generator.Emit(OpCodes.Ret);
+        return method.CreateDelegate<Action<Task, Exception>>();
+    }
+
+    private static List<ExceptionDispatchInfo> ReadFaultsAndMarkHandled(Task task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+        var contingentField = typeof(Task).GetField("m_contingentProperties", instance)!;
+        var contingent = contingentField.GetValue(task)!;
+        var holderField = contingent.GetType().GetField("m_exceptionsHolder", instance)!;
+        var holder = holderField.GetValue(contingent)!;
+        _ = holder.GetType().GetMethod("MarkAsHandled", instance)!.Invoke(holder, [false]);
+        return (List<ExceptionDispatchInfo>)holder.GetType().GetField("m_faultExceptions", instance)!.GetValue(holder)!;
     }
 
     [Test]

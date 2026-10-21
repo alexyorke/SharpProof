@@ -97,6 +97,51 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Dual fault-recording paths and notification prefixes
+
+The pinned `Task.cs` cache still matches SHA-256
+`5967259aff81a295fc2280e6400ed76b14d29f2687882c55d5297aabd281af70`.
+`ScheduleAndStart` records a scheduler wrapper at lines 1699-1701, while the
+at-most-once callback path records its exception through `HandleException` at
+lines 2416-2436. The fixed carrier model now budgets both recording sites per
+child without assuming they are mutually exclusive. This allows up to 32
+joined dispatch records for 16 children, including publication candidates and
+list growth. Its model is `task-join-fixed-fault-carriers-v2`; the corresponding
+single-notification construction model is `task-fault-notification-storage-v2`.
+
+The new `task-join-closed-fault-notification-prefixes-v1` component separately
+bounds notification constructions under a declared closed-holder lifecycle:
+standard holders, one queue attempt and at most one callback invocation per
+child, no externally requested finalization registration, resurrection or
+runtime mutation. Each populated holder starts registered; later fault
+recording can re-register it through `MarkAsUnhandled`. Two recording sites
+therefore allow two constructions per child; the join and configured async box
+each have one completion-reserved fault publication. A leaf construction has
+at most two dispatches, the join at most twice the child count, and the async
+box one. This gives `464 * children + 208` notification bytes, plus 216 for the
+configured box, under the same preexisting-message/stable-list premises as the
+construction component. Initialization, event work and original payload/trace
+allocations remain separate. The component exposes its required runtime model explicitly. This premise is
+not bound into a root verdict;
+cumulative task runtime bytes remain Unknown and phase F remains incomplete.
+
+All 165 Specs tests passed with zero build warnings/errors on .NET 8.0.32 x64.
+New runtime controls invoke the actual private fault recorder twice in both
+orders, retain two distinct dispatches, verify capacity-two list growth and
+measure fixed allocations within the independently calculated 736-byte envelope.
+This validates recording/storage behavior; it does not reproduce a scheduler
+race or establish exception trace bounds. Notification constructor measurements
+also passed at 17 and 32 dispatches. Evidence:
+`artifacts/resource-task-dual-fault-runtime-2.log`.
+All 174 selected worker cases passed with zero build warnings/errors, including
+the prefix ledger, required-model identity, ownership/layout failures,
+cancellation and existing task-root contract behavior. Evidence:
+`artifacts/resource-task-dual-fault-worker-final.log`. Full quality/API and
+documentation checks also passed in
+`artifacts/resource-task-dual-fault-lint-final.log` and
+`artifacts/resource-task-dual-fault-docs-final.log`.
+Full formatting passed: `artifacts/resource-task-dual-fault-format-final.log`.
+
 ### Consolidated memory read validation
 
 Memory extraction now validates reads once in reverse instruction order. The
@@ -197,10 +242,20 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `ff069b5e4` passed all four coverage shards in run 39527309371.
+The complete merge-commit report (9afe98ad12cf941d29eb12a4edbc7e21d4a645de)
+measured 6069/6273 changed trusted lines (96.75%, 204 uncovered), below the
+unchanged 100% floor. This is the latest complete numeric measurement; the
+report is retained at
+`artifacts/resource-ff069b-coverage-evidence/coverage/SharpProof.coverage.json`.
+All non-coverage workflows also passed on that published head, including
+canonical package tests, reproducibility and self-application. The consolidated
+read pass and dual-fault components are newer and need exact-head qualification.
+
 Published `0cc594782` passed all four coverage shards in run 39524271604.
 The complete merge-commit report (a7dc4fa8b1a3de4817fee37afb7f13d16bb4c82e)
 measured 6056/6273 changed trusted lines (96.54%, 217 uncovered), below the
-unchanged 100% floor. This is the latest complete numeric measurement; the
+unchanged 100% floor. This is an earlier complete numeric measurement; the
 report is retained at
 `artifacts/resource-0cc594-coverage-evidence/coverage/SharpProof.coverage.json`.
 The newer analysis-budget controls are not part of this measurement.

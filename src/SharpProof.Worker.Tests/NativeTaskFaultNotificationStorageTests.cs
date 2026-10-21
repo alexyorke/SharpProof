@@ -10,6 +10,8 @@ public sealed class NativeTaskFaultNotificationStorageTests
     [TestCase(2, 224)]
     [TestCase(8, 272)]
     [TestCase(16, 336)]
+    [TestCase(17, 344)]
+    [TestCase(32, 464)]
     public void ConstructionIncludesInheritedExceptionSlotsArrayAndEventArguments(int faults, int expected)
     {
         var check = NativeTaskFaultNotificationStorageVerifier.Check(faults, new("CoreCLR", "8.0.32", "x64", 8),
@@ -19,7 +21,7 @@ public sealed class NativeTaskFaultNotificationStorageTests
     }
 
     [TestCase(0)]
-    [TestCase(17)]
+    [TestCase(33)]
     public void UnsupportedDispatchCountsHaveNoNumericComponent(int faults)
     {
         var check = NativeTaskFaultNotificationStorageVerifier.Check(faults, new("CoreCLR", "8.0.32", "x64", 8),
