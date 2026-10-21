@@ -76,7 +76,10 @@ jobs:
           mode: report
           name: ${{ github.job }}-${{ matrix.part }}
 
+  # Keep the initial runner wave for semantic tests and coverage. These shorter
+  # independent phases become ready after quality and remain required by the gate.
   canonical-package-partition:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
@@ -217,6 +220,7 @@ jobs:
           mode: report
 
   self-application:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -233,6 +237,7 @@ jobs:
         run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Sources
 
   self-application-samples:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -247,6 +252,7 @@ jobs:
         run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Samples
 
   api-coverage:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -314,6 +320,7 @@ jobs:
   # jobs, rather than in the package job that every consumer job waits for.
   # Release qualification requires this workflow's exact-commit success on master.
   formatting:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -329,6 +336,7 @@ jobs:
 
 
   package-reproducibility:
+    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
