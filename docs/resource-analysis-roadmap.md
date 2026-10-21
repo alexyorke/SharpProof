@@ -97,6 +97,70 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Fixed source-exception instance storage
+
+`NativeTaskSourceExceptionInstanceVerifier` adds a private conditional component
+for fixed ordinary source-exception instances. It rechecks owned fault families,
+requires compatible runtime layout and requires every explicit source throw to
+target a callback exceptional exit. Caught/retried source throws return Unknown
+with no numeric component or required model identity. Its model is
+`task-join-source-exception-instances-v1`; it has no root proof authority.
+
+The reviewed inherited Exception slots bound an instance by 136 bytes. The
+ArgumentException `_paramName` slot raises this to 144; ArgumentOutOfRangeException
+also has `_actualValue`, raising it to 152. The pinned runtime source cache and
+blob/SHA-256 provenance for all seven families and their fieldless SystemException
+and ArithmeticException bases are recorded in
+`artifacts/resource-runtime-fault-review/primitive-exception-sources.json`.
+The checker conservatively uses the largest candidate for every callback and
+permits at most one escaping ordinary source exception per at-most-once callback
+invocation. Runtime invocation multiplicity is a separate premise. An empty
+candidate set gives a zero source-instance component, not exception-free CLR
+execution. Messages, referenced actual values, initialization, allocation/helper
+failures, scheduler wrappers, traces and dispatch copies remain separate work.
+
+All 98 projection/profile/instance worker cases passed with zero build errors:
+`artifacts/resource-source-exception-instance-worker.log`. Independent
+warmed-constructor allocation controls passed all ten runtime cases on .NET
+8.0.32 x64 with zero build warnings/errors:
+`artifacts/resource-source-exception-instance-runtime-3.log`. The initial runtime
+test builds caught test-style and parameter-name diagnostics; those were fixed.
+The reserved runtime exception construction controls intentionally suppress
+CA2201 only on the two measured constructor expressions; they do not throw them.
+The new production
+file is registered in the acceptance contract's trusted paths. Phase F remains
+open until complete declared-cost-model composition is established.
+The broader Specs suite passed all 174 tests on .NET 8.0.32 x64:
+`artifacts/resource-source-exception-instance-specs-all.log`.
+Evaluated layout passed: 2851 source files, 59 projects and 151 pinned common
+files. Full quality/API checks passed. Evidence:
+`artifacts/resource-source-exception-instance-layout.log` and
+`artifacts/resource-source-exception-instance-lint.log`.
+Full C# formatting and final documentation checks passed. Evidence:
+`artifacts/resource-source-exception-instance-format.log` and
+`artifacts/resource-source-exception-instance-docs-final.log`.
+
+### Construction-order coverage controls
+
+Five new frontend controls compare compiled execution with exact IR replay for
+field zero initialization, instance field initializers, constructor updates,
+object-initializer overwrites and argument evaluation order. All 100 typed
+source-call cases passed in `artifacts/resource-construction-order-coverage.log`.
+Auto-property initializers normalize to field storage and are supported; that
+case now compares compiled execution with exact replay. Three additional controls
+require incomplete lowering for instance events, generic construction and split
+partial declarations. All 104 typed source-call cases passed in
+`artifacts/resource-construction-order-coverage-3.log`.
+
+The first coverage attempt for `5dadd9e3b` passed five shards but failed to
+prepare the semantic-projects image: its Linux Arm64 native-payload download
+ended prematurely (`ResponseEnded`). No project tests ran in that failed job.
+Evidence: `artifacts/resource-5dadd-coverage-failed.log`. The failed jobs were
+retried against the same commit in run 39540486904, attempt two. All six shards
+then passed and the complete aggregate measured 6168/6360 changed trusted lines
+(96.98%, 192 uncovered), failing the unchanged 100% floor. Evidence:
+`artifacts/resource-5dadd-coverage-evidence/coverage/SharpProof.coverage.json`.
+
 ### Owned-IR fault-profile coverage boundaries
 
 The next three controls exercise object/array reference casts and exhaustion
@@ -404,10 +468,18 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `5dadd9e3b` passed all six coverage shards in run 39540486904, attempt
+two. Its complete merge-commit report (0a3d1d8123995ac9a62da95b9f739f00468735af)
+measured 6168/6360 changed trusted lines (96.98%, 192 uncovered), below the
+unchanged 100% floor. This is the latest complete numeric measurement:
+`artifacts/resource-5dadd-coverage-evidence/coverage/SharpProof.coverage.json`.
+The profiler boundary controls, construction-order controls and source-exception
+instance component are newer than this report.
+
 Published `01a00a77f` passed all six coverage shards in run 39537817090.
 Its complete merge-commit report (6a6e5d3a480ce4d98b27f90d4be3a7ccbf796e69)
 measured 6159/6360 changed trusted lines (96.84%, 201 uncovered), below the
-unchanged 100% floor. This is the latest complete numeric measurement:
+unchanged 100% floor. This earlier complete numeric measurement is retained at
 `artifacts/resource-01a00-coverage-evidence/coverage/SharpProof.coverage.json`.
 Four uncovered lines belong to the new owned-IR profiler. The local loop and
 shared-budget controls and compiler-lifetime repair are newer than this report.

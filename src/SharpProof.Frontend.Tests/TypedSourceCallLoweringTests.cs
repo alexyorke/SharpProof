@@ -6,6 +6,42 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [TestCase("public sealed class Box { public int Value=5; }", "var box=new Box(); return box.Value;", 5)]
+    [TestCase("public sealed class Box { public int Value=5; public Box() { Value+=2; } }", "var box=new Box(); return box.Value;", 7)]
+    [TestCase("public sealed class Box { public int Value=5; public Box() { Value+=2; } }", "var box=new Box { Value=9 }; return box.Value;", 9)]
+    [TestCase("public sealed class Box { public int Value; public Box(int value) { Value=value; } }", "int n=3; var box=new Box(n++); return box.Value*10+n;", 34)]
+    [TestCase("public sealed class Box { public int Value; }", "var box=new Box(); return box.Value;", 0)]
+    [TestCase("public sealed class Box { public int Value { get; set; } }", "var box=new Box { Value=7 }; return box.Value;", 7)]
+    public void ConstructionInitializersAndBodyPreserveCompiledFieldValues(string declaration, string body, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        using var subject = TypedProgramSubject.Create("int Target() { " + body + " }", declaration);
+        Assert.That(subject.Invoke([]), Is.EqualTo(expected));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowering, []);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(lowering.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+            .OfType<IrAllocationInstruction>().Count(), Is.EqualTo(1));
+    }
+
+    [TestCase("public sealed class Box { public int Value=7; public event System.Action Changed; }", "var box=new Box(); return box.Value;", 7)]
+    [TestCase("public sealed class Box<T> { public int Value=7; }", "var box=new Box<int>(); return box.Value;", 7)]
+    [TestCase("public sealed partial class Box { public int Value=7; } public sealed partial class Box { }", "var box=new Box(); return box.Value;", 7)]
+    public void UnmodeledConstructionInitializersCannotClaimExactLowering(string declaration, string body, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        using var subject = TypedProgramSubject.Create("int Target() { " + body + " }", declaration);
+        Assert.That(subject.Invoke([]), Is.EqualTo(expected));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.False);
+        Assert.That(lowering.Classification.IsExact, Is.False);
+    }
+
     [TestCase(false, false)]
     [TestCase(false, true)]
     [TestCase(true, false)]

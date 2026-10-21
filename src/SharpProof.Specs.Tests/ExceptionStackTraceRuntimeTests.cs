@@ -7,6 +7,47 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, 136)]
+    [TestCase(1, 136)]
+    [TestCase(2, 136)]
+    [TestCase(3, 136)]
+    [TestCase(4, 136)]
+    [TestCase(5, 144)]
+    [TestCase(6, 152)]
+    public void OrdinarySourceExceptionInstancesFitReviewedInheritedStorage(int family, int upper)
+    {
+        if (family is < 0 or > 6)
+        { throw new ArgumentOutOfRangeException(nameof(family)); }
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        for (var index = 0; index < 64; index++)
+        { GC.KeepAlive(Create(family)); }
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 128; index++)
+        { GC.KeepAlive(Create(family)); }
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(bytes, Is.GreaterThan(0));
+        Assert.That(bytes, Is.LessThanOrEqualTo(128L * upper));
+
+        static Exception Create(int kind)
+        {
+            return kind switch
+            {
+                0 => new DivideByZeroException("preexisting-message"),
+                1 => new OverflowException("preexisting-message"),
+#pragma warning disable CA2201 // Measure these runtime-reserved instance layouts without throwing them.
+                2 => new NullReferenceException("preexisting-message"),
+                3 => new IndexOutOfRangeException("preexisting-message"),
+#pragma warning restore CA2201
+                4 => new InvalidCastException("preexisting-message"),
+                5 => new ArgumentException("preexisting-message", nameof(family)),
+                6 => new ArgumentOutOfRangeException(nameof(family), null, "preexisting-message"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+        }
+    }
+
     [TestCase(0)]
     [TestCase(3)]
     [TestCase(15)]

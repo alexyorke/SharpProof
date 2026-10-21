@@ -510,6 +510,18 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation).HasSourceCosts, Is.True);
         var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
         Assert.That(check.HasOrigins, Is.EqualTo(classified), check.UnknownReason);
+        var instances = NativeTaskSourceExceptionInstanceVerifier.Check(projection, Root(projection), Layout(), cancellation);
+        if (classified)
+        {
+            var upper = kind == IrExceptionKind.ArgumentOutOfRange ? 304 : kind == IrExceptionKind.Argument ? 288 : 272;
+            Assert.That(instances.SourceInstanceUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(upper)));
+            Assert.That(instances.RequiredRuntimeModel, Is.EqualTo(NativeTaskSourceExceptionInstanceVerifier.Model));
+        }
+        else
+        {
+            Assert.That(instances.SourceInstanceUpper, Is.Null);
+            Assert.That(instances.RequiredRuntimeModel, Is.Null);
+        }
         if (classified)
         { Assert.That(check.ExceptionKinds, Is.EquivalentTo(new[] { kind })); }
         else
@@ -722,6 +734,51 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(check.ExceptionKinds, Is.Null);
         Assert.That(check.HasIrAllocations, Is.False);
         Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsBudgetExceeded"));
+    }
+
+    [Test]
+    public void EmptySourceExceptionInstanceBoundDoesNotIncludeRuntimeFaults()
+    {
+        var projection = Lower("");
+        var check = NativeTaskSourceExceptionInstanceVerifier.Check(projection, Root(projection), Layout(),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.SourceInstanceUpper!.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(NativeTaskSourceExceptionInstanceVerifier.Model));
+    }
+
+    [Test]
+    public void CaughtSourceExceptionsCannotPublishASingleInstancePerCallbackBound()
+    {
+        var projection = Lower("");
+        var factory = projection.Children[1].Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var handler = builder.CreateBlock();
+        builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.Argument, handler);
+        builder.Return(handler, factory.CreateOperation());
+        projection = WithFaultOriginProgram(projection, builder.Build());
+        var check = NativeTaskSourceExceptionInstanceVerifier.Check(projection, Root(projection), Layout(),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.SourceInstanceUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskSourceExceptionHandlingUnsupported"));
+    }
+
+    [Test]
+    public void SourceExceptionInstancesRequireCompatibleLayoutAndHonorCancellation()
+    {
+        var projection = Lower("");
+        var root = Root(projection);
+        var check = NativeTaskSourceExceptionInstanceVerifier.Check(projection, root,
+            new("CoreCLR", "8.0.32", "x86", 4), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.SourceInstanceUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action canceled = () =>
+        { _ = NativeTaskSourceExceptionInstanceVerifier.Check(projection, root, Layout(), cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(canceled);
     }
 
     private static CompilerForkJoinProjection WithFaultOriginProgram(CompilerForkJoinProjection projection, IrProgram program)
