@@ -19,6 +19,168 @@ public sealed class NativeTaskCarrierStorageTests
     [TestCase(OptimizationLevel.Release, false)]
     [TestCase(OptimizationLevel.Debug, true)]
     [TestCase(OptimizationLevel.Release, true)]
+    public void CallbackActivationTransportFeedsNativeSourceComposition(OptimizationLevel optimization, bool configured)
+    {
+        var (compilation, method, projection, root) = Compile(configured, optimization);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var carriers = collector.Capture(method, "root", cancellation);
+        projection = projection with
+        {
+            Carriers = carriers with
+            {
+                Shapes = carriers.Shapes! with
+                { CallbackActivations = collector.CaptureCallbackActivations(method, "root", cancellation) }
+            }
+        };
+        var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+        var evidence = decoded.Carriers!.Shapes!;
+        Assert.That(evidence.CallbackActivations!.Activations!.Forwarders.ToArray(),
+            Is.EqualTo(projection.Carriers.Shapes!.CallbackActivations!.Activations!.Forwarders.ToArray()));
+        var check = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(evidence, decoded, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.WrapperActivationsUpper, Is.EqualTo(1));
+        Assert.That(check.RequiredCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.CallbackActivationModel));
+        var combined = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(decoded, root, Layout(), cancellation);
+        Assert.That(combined.UnknownReason, Is.Null);
+        Assert.That(combined.Upper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(2)));
+        Assert.That(combined.RequiredSourceModel, Is.EqualTo(NativeForkJoinSourceCostVerifier.CallbackSourceActivationModel));
+    }
+
+    [TestCase("owner")]
+    [TestCase("module")]
+    [TestCase("count")]
+    [TestCase("default")]
+    [TestCase("null")]
+    [TestCase("method-kind")]
+    [TestCase("child-kind")]
+    [TestCase("empty-token")]
+    [TestCase("duplicate")]
+    [TestCase("overlap")]
+    [TestCase("both")]
+    [TestCase("targets")]
+    public void CallbackActivationAdmissionAndCodecRejectUnownedEvidence(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, root) = Fixture(0);
+        if (mutation == "targets")
+        { shapes = shapes with { MatchedCallbacks = 3 }; }
+        var activations = new CompilerTaskCallbackActivation("root", shapes.ModuleSha256,
+            [new(0x06000001, 0x06000003), new(0x06000002, 0x06000003)]);
+        activations = mutation switch
+        {
+            "owner" => activations with { RootCallableId = "foreign" },
+            "module" => activations with { ModuleSha256 = new string('b', 64) },
+            "count" => activations with { Forwarders = [activations.Forwarders[0]] },
+            "default" => activations with { Forwarders = default },
+            "null" => activations with { Forwarders = [activations.Forwarders[0], null!] },
+            "method-kind" => activations with { Forwarders = [new(0x0a000001, 0x06000003), activations.Forwarders[1]] },
+            "child-kind" => activations with { Forwarders = [new(0x06000001, 0x0a000001), activations.Forwarders[1]] },
+            "empty-token" => activations with { Forwarders = [new(0x06000000, 0x06000003), activations.Forwarders[1]] },
+            "duplicate" => activations with { Forwarders = [activations.Forwarders[0], activations.Forwarders[0]] },
+            "overlap" => activations with { Forwarders = [new(0x06000001, 0x06000002), activations.Forwarders[1]] },
+            "both" => activations,
+            "targets" => activations with { Forwarders = [new(0x06000001, 0x06000004), new(0x06000002, 0x06000005), new(0x06000003, 0x06000006)] },
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+        };
+        shapes = shapes with { CallbackActivations = new(activations, mutation == "both" ? "Unsupported" : null) };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(shapes, projection, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskCallbackActivationEvidenceInvalid"));
+        Assert.That(check.WrapperActivationsUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        var combined = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, root, Layout(), cancellation);
+        Assert.That(combined.Upper, Is.Null);
+        Assert.That(combined.RequiredSourceModel, Is.Null);
+        Action encode = () => { _ = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation); };
+        Assert.Throws<InvalidDataException>(encode);
+    }
+
+    [TestCase(null, "TaskCallbackActivationEvidenceUnavailable")]
+    [TestCase("UnsupportedCallback", "UnsupportedCallback")]
+    [TestCase("", "TaskCallbackActivationEvidenceInvalid")]
+    public void CallbackActivationUnknownNeverBecomesAPartialBound(string? reason, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var (shapes, projection, root) = Fixture(0);
+        shapes = shapes with { CallbackActivations = reason is null ? null : new(null, reason) };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(shapes, projection, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo(expected));
+        Assert.That(check.WrapperActivationsUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        if (reason is null || reason.Length != 0)
+        {
+            var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+            Assert.That(decoded.Carriers!.Shapes!.CallbackActivations?.UnknownReason, Is.EqualTo(reason));
+        }
+    }
+
+    [TestCase("extra")]
+    [TestCase("missing")]
+    [TestCase("unknown-kind")]
+    [TestCase("long-reason")]
+    [TestCase("old-version")]
+    public void CallbackDecoderRejectsMalformedTransport(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, root) = Fixture(0);
+        shapes = shapes with { CallbackActivations = new(null, "UnsupportedCallback") };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var json = JsonNode.Parse(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation))!.AsObject();
+        var evidence = json["carriers"]!["shapes"]!.AsObject();
+        var capture = evidence["activations"]!.AsObject();
+        switch (mutation)
+        {
+            case "extra":
+                capture["extra"] = true;
+                break;
+            case "missing":
+                evidence.Remove("activations");
+                break;
+            case "unknown-kind":
+                capture["unknown"] = true;
+                break;
+            case "long-reason":
+                capture["unknown"] = new string('x', 513);
+                break;
+            case "old-version":
+                json["version"] = CompilerForkJoinProjectionCodec.Version - 1;
+                break;
+        }
+        Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), root, cancellation); };
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CallbackSourceCompositionRequiresOwnedCarriersAndCompatibleLayout(bool incompatibleLayout)
+    {
+        var (shapes, projection, root) = Fixture(0);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var absent = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, root, Layout(), cancellation);
+        Assert.That(absent.Upper, Is.Null);
+        Assert.That(absent.RequiredSourceModel, Is.Null);
+        if (!incompatibleLayout)
+        { shapes = shapes with { RootCallableId = "foreign" }; }
+        var check = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(shapes, projection, root,
+            incompatibleLayout ? new("CoreCLR", "8.0.32", "arm64", 8) : Layout(), cancellation);
+        Assert.That(check.WrapperActivationsUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(incompatibleLayout ? "IncompatibleResourceRuntimeLayout" : "TaskCompilerCarrierOwnershipUnproved"));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action verify = () => { _ = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(shapes, projection, root, Layout(), canceled.Token); };
+        Assert.Throws<OperationCanceledException>(verify);
+    }
+
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, true)]
     public void CallbackWrapperActivationComesFromTheSameEmittedModule(OptimizationLevel optimization, bool configured)
     {
         var (compilation, method, _, _) = Compile(configured, optimization);

@@ -49,6 +49,7 @@ internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string M
     int MatchedCallbacks, ImmutableArray<CompilerTaskCarrierType> CallbackFrames, CompilerTaskCarrierType? StateMachine)
 {
     internal CompilerTaskRootExceptionBoundaryCapture? RootExceptionBoundary { get; init; }
+    internal CompilerTaskCallbackActivationCapture? CallbackActivations { get; init; }
     public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
     public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
     public string CompilerIdentity { get; init; } = RepositoryParameterGuard.NotNull(CompilerIdentity, nameof(CompilerIdentity));
@@ -56,6 +57,18 @@ internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string M
         ? throw new ArgumentException("Callback frames must be initialized.", nameof(CallbackFrames)) : CallbackFrames;
 }
 internal sealed record CompilerTaskCarrierCapture(CompilerTaskCarrierShapes? Shapes, string? UnknownReason);
+
+internal sealed record CompilerTaskCallbackForwarder(int MethodToken, int ChildMethodToken);
+internal sealed record CompilerTaskCallbackActivation(string RootCallableId, string ModuleSha256,
+    ImmutableArray<CompilerTaskCallbackForwarder> Forwarders)
+{
+    public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
+    public ImmutableArray<CompilerTaskCallbackForwarder> Forwarders { get; init; } = Forwarders.IsDefault
+        ? throw new ArgumentException("Forwarders must be initialized.", nameof(Forwarders)) : Forwarders;
+    internal int WrapperActivationsUpper => Forwarders.IsEmpty ? 0 : 1;
+}
+internal sealed record CompilerTaskCallbackActivationCapture(CompilerTaskCallbackActivation? Activations, string? UnknownReason);
 
 // Source-owned emitted boundary evidence only, not a CLR frame or byte bound.
 internal sealed record CompilerTaskRootExceptionBoundary(string RootCallableId, string ModuleSha256,

@@ -9,7 +9,7 @@ namespace SharpProof.CompilerArtifact;
 // authenticates source provenance; runtime premises are checked separately.
 internal static partial class CompilerForkJoinProjectionCodec
 {
-    internal const int Version = 4;
+    internal const int Version = 5;
     internal const int MaximumPayloadBytes = 1024 * 1024;
 
     internal static byte[] Encode(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root, CancellationToken cancellation)

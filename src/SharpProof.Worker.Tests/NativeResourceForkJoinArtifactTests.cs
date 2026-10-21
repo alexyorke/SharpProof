@@ -48,6 +48,10 @@ internal sealed partial class NativeResourceContractTests
         {
             Assert.That(capture!.UnknownReason, Is.Null);
             Assert.That(capture.Shapes, Is.Not.Null);
+            Assert.That(capture.Shapes!.CallbackActivations!.UnknownReason, Is.Null);
+            Assert.That(capture.Shapes.CallbackActivations.Activations!.Forwarders, Has.Length.EqualTo(2));
+            Assert.That(NativeTaskCarrierStorageVerifier.CheckCallbackActivations(capture.Shapes, target.ForkJoinProjection, target.TotalEntry!,
+                new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken).WrapperActivationsUpper, Is.EqualTo(1));
             Assert.That(capture.Shapes!.RootExceptionBoundary, Is.Not.Null);
             Assert.That(capture.Shapes.RootExceptionBoundary!.Boundary is not null, Is.EqualTo(configured));
             Assert.That(capture.Shapes.RootExceptionBoundary.UnknownReason,

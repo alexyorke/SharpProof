@@ -38,6 +38,8 @@ internal static partial class CompilerForkJoinProjectionCodec
             { WriteCarrierType(writer, shapes.StateMachine, cancellation); }
             writer.WritePropertyName("boundary");
             WriteBoundary(writer, shapes.RootExceptionBoundary, cancellation);
+            writer.WritePropertyName("activations");
+            WriteCallbackActivations(writer, shapes.CallbackActivations, cancellation);
             writer.WriteEndObject();
         }
         writer.WriteEndObject();
@@ -76,7 +78,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Carrier Unknown reason is too long.");
             return new(null, reason);
         }
-        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary"]);
+        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary", "activations"]);
         Require(Text(shapes.GetProperty("root")) == owner, "Carrier root is unowned.");
         var module = Text(shapes.GetProperty("module"));
         Require(WorkerProtocolJson.IsSha256(module), "Carrier module hash is invalid.");
@@ -100,8 +102,87 @@ internal static partial class CompilerForkJoinProjectionCodec
         Require((encodedState.ValueKind != JsonValueKind.Null) == configured, "Carrier state-machine kind is inconsistent.");
         var state = configured ? ReadCarrierType(encodedState, ref remaining, cancellation) : null;
         return new(new(owner, module, compiler, callbacks, frames.MoveToImmutable(), state)
-        { RootExceptionBoundary = ReadBoundary(shapes.GetProperty("boundary"), owner, module, state, cancellation) }, null);
+        {
+            RootExceptionBoundary = ReadBoundary(shapes.GetProperty("boundary"), owner, module, state, cancellation),
+            CallbackActivations = ReadCallbackActivations(shapes.GetProperty("activations"), owner, module, callbacks, children, cancellation)
+        }, null);
     }
+
+    private static void WriteCallbackActivations(Utf8JsonWriter writer, CompilerTaskCallbackActivationCapture? capture, CancellationToken cancellation)
+    {
+        writer = ArgumentNullGuard.NotNull(writer, nameof(writer));
+        cancellation.ThrowIfCancellationRequested();
+        if (capture is null)
+        { writer.WriteNullValue(); return; }
+        Require((capture.Activations is null) != (capture.UnknownReason is null), "Callback evidence requires activations or Unknown.");
+        writer.WriteStartObject();
+        writer.WriteString("unknown", capture.UnknownReason);
+        writer.WritePropertyName("value");
+        if (capture.Activations is not { } activations)
+        { writer.WriteNullValue(); }
+        else
+        {
+            Require(!activations.Forwarders.IsDefault && activations.Forwarders.Length <= 64, "Callback activation count is invalid.");
+            writer.WriteStartObject();
+            writer.WriteString("root", activations.RootCallableId);
+            writer.WriteString("module", activations.ModuleSha256);
+            writer.WriteStartArray("forwarders");
+            foreach (var forwarder in activations.Forwarders)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                Require(forwarder is not null, "Callback forwarder is missing.");
+                writer.WriteStartObject();
+                writer.WriteNumber("method", forwarder!.MethodToken);
+                writer.WriteNumber("child", forwarder.ChildMethodToken);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+        writer.WriteEndObject();
+    }
+
+    private static CompilerTaskCallbackActivationCapture? ReadCallbackActivations(JsonElement value, string owner, string module,
+        int callbacks, int sourceChildren, CancellationToken cancellation)
+    {
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        module = ArgumentNullGuard.NotNull(module, nameof(module));
+        cancellation.ThrowIfCancellationRequested();
+        if (value.ValueKind == JsonValueKind.Null)
+        { return null; }
+        Properties(value, ["unknown", "value"]);
+        var unknown = value.GetProperty("unknown");
+        var encoded = value.GetProperty("value");
+        Require((unknown.ValueKind == JsonValueKind.Null) != (encoded.ValueKind == JsonValueKind.Null), "Callback evidence requires activations or Unknown.");
+        if (encoded.ValueKind == JsonValueKind.Null)
+        {
+            var reason = Text(unknown);
+            Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Callback Unknown reason is invalid.");
+            return new(null, reason);
+        }
+        Properties(encoded, ["root", "module", "forwarders"]);
+        Require(Text(encoded.GetProperty("root")) == owner && Text(encoded.GetProperty("module")) == module, "Callback activation identity is unowned.");
+        var list = encoded.GetProperty("forwarders");
+        Require(list.ValueKind == JsonValueKind.Array && list.GetArrayLength() == callbacks && callbacks <= 64, "Callback activation count is invalid.");
+        var methods = new HashSet<int>();
+        var children = new HashSet<int>();
+        var forwarders = ImmutableArray.CreateBuilder<CompilerTaskCallbackForwarder>(callbacks);
+        foreach (var item in list.EnumerateArray())
+        {
+            cancellation.ThrowIfCancellationRequested();
+            Properties(item, ["method", "child"]);
+            var method = Integer(item.GetProperty("method"));
+            var child = Integer(item.GetProperty("child"));
+            Require(MethodDefinitionToken(method) && MethodDefinitionToken(child) && methods.Add(method), "Callback method token is invalid or duplicated.");
+            children.Add(child);
+            forwarders.Add(new(method, child));
+        }
+        Require(children.Count <= sourceChildren && !methods.Overlaps(children), "Callback targets are not owned source children.");
+        return new(new(owner, module, forwarders.MoveToImmutable()), null);
+    }
+
+    private static bool MethodDefinitionToken(int token)
+    { return token >> 24 == 6 && (token & 0x00ffffff) != 0; }
 
     private static void WriteBoundary(Utf8JsonWriter writer, CompilerTaskRootExceptionBoundaryCapture? capture, CancellationToken cancellation)
     {

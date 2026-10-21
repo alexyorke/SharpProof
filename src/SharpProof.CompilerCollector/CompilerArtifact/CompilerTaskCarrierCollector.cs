@@ -6,18 +6,6 @@ using System.Reflection.PortableExecutable;
 
 namespace SharpProof.CompilerArtifact;
 
-internal sealed record CompilerTaskCallbackForwarder(int MethodToken, int ChildMethodToken);
-internal sealed record CompilerTaskCallbackActivation(string RootCallableId, string ModuleSha256,
-    ImmutableArray<CompilerTaskCallbackForwarder> Forwarders)
-{
-    public string RootCallableId { get; init; } = ArgumentNullGuard.NotNull(RootCallableId, nameof(RootCallableId));
-    public string ModuleSha256 { get; init; } = ArgumentNullGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
-    public ImmutableArray<CompilerTaskCallbackForwarder> Forwarders { get; init; } = Forwarders.IsDefault
-        ? throw new ArgumentException("Forwarders must be initialized.", nameof(Forwarders)) : Forwarders;
-    internal int WrapperActivationsUpper => Forwarders.IsEmpty ? 0 : 1;
-}
-internal sealed record CompilerTaskCallbackActivationCapture(CompilerTaskCallbackActivation? Activations, string? UnknownReason);
-
 // Import private generated fields from a real emission. This metadata is source
 // evidence; it supplies neither a physical layout nor an allocation verdict.
 internal sealed class CompilerTaskCarrierCollector

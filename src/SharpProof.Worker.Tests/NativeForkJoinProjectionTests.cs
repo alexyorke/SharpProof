@@ -37,6 +37,10 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(check.Upper, Is.Null);
         Assert.That(check.RequiredSourceModel, Is.Null);
         Assert.That(check.UnknownReason, Is.EqualTo("ResourceStackRootActivationMissing"));
+        var combined = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, Root(projection), Layout(), cancellation);
+        Assert.That(combined.Upper, Is.Null);
+        Assert.That(combined.RequiredSourceModel, Is.Null);
+        Assert.That(combined.UnknownReason, Is.EqualTo("ResourceStackRootActivationMissing"));
     }
 
     [Test]

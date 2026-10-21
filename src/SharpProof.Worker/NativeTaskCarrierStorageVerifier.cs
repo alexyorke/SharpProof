@@ -1,5 +1,10 @@
 namespace SharpProof.Worker;
 
+internal sealed record NativeTaskCallbackActivationCheck(int? WrapperActivationsUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => WrapperActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
+}
+
 internal sealed record NativeTaskCarrierStorageCheck(ResourceExpression? DirectUpper,
     ImmutableArray<ResourceStorageKind> AsyncBoxStateFields, string? UnknownReason)
 {
@@ -13,6 +18,44 @@ internal static class NativeTaskCarrierStorageVerifier
 {
     internal const string Model = WorkerResourceModels.TaskCompilerCarrierModel;
     internal const int MaximumCallbacks = 64;
+    internal const string CallbackActivationModel = "owned-emitted-callback-forwarders-v1";
+
+    internal static NativeTaskCallbackActivationCheck CheckCallbackActivations(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var carriers = Check(shapes, projection, root, layout, cancellation);
+        if (carriers.UnknownReason is { } reason)
+        { return new(null, reason); }
+        var capture = shapes.CallbackActivations;
+        if (capture is null)
+        { return new(null, "TaskCallbackActivationEvidenceUnavailable"); }
+        if (capture.Activations is not { } activations)
+        {
+            return new(null, !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskCallbackActivationEvidenceInvalid");
+        }
+        if (capture.UnknownReason is not null || activations.RootCallableId != root.CallableId ||
+            activations.ModuleSha256 != shapes.ModuleSha256 || activations.Forwarders.IsDefault ||
+            activations.Forwarders.Length != shapes.MatchedCallbacks)
+        { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+        var methods = new HashSet<int>();
+        var children = new HashSet<int>();
+        foreach (var forwarder in activations.Forwarders)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (forwarder is null || !MethodToken(forwarder.MethodToken) || !MethodToken(forwarder.ChildMethodToken) ||
+                !methods.Add(forwarder.MethodToken))
+            { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+            children.Add(forwarder.ChildMethodToken);
+        }
+        if (children.Count > projection.Children.Length || methods.Overlaps(children))
+        { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+        return new(activations.WrapperActivationsUpper, null);
+    }
+
+    private static bool MethodToken(int token)
+    { return token >> 24 == 6 && (token & 0x00ffffff) != 0; }
 
     // This binds a collector fact to its source carriers. It does not establish
     // a physical CLR frame count or a bound on runtime exception allocations.

@@ -21,9 +21,37 @@ internal sealed record NativeForkJoinSourceActivationCheck(ResourceExpression? U
     internal string? RequiredSourceModel => Upper is null ? null : NativeResourceStackVerifier.ModelId;
 }
 
+// Logical source depth plus the checked emitted forwarding activation. Runtime
+// helpers and trace enumeration remain outside this conditional component.
+internal sealed record NativeForkJoinCallbackSourceActivationCheck(ResourceExpression? Upper, string? UnknownReason)
+{
+    internal string? RequiredSourceModel => Upper is null ? null : NativeForkJoinSourceCostVerifier.CallbackSourceActivationModel;
+}
+
 internal static class NativeForkJoinSourceCostVerifier
 {
     internal const string ChildStorageModel = "fork-join-isolated-child-storage-v1";
+    internal const string CallbackSourceActivationModel = "fork-join-source-and-callback-activations-v1";
+
+    internal static NativeForkJoinCallbackSourceActivationCheck CheckCallbackSourceActivations(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        var source = CheckSourceActivations(projection, root, cancellation);
+        if (source.Upper is null)
+        { return new(null, source.UnknownReason); }
+        if (projection.Carriers?.Shapes is not { } shapes)
+        { return new(null, "TaskCompilerCarrierEvidenceUnavailable"); }
+        var callbacks = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(shapes, projection, root, layout, cancellation);
+        if (callbacks.WrapperActivationsUpper is not { } wrappers)
+        { return new(null, callbacks.UnknownReason); }
+        try
+        { return new(ResourceExpression.Add(source.Upper, ResourceExpression.Literal(wrappers)), null); }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "ForkJoinCallbackActivationBudgetExceeded"); }
+    }
 
     internal static NativeForkJoinSourceActivationCheck CheckSourceActivations(CompilerForkJoinProjection projection,
         CompilerTotalEntryPreparation root, CancellationToken cancellation)

@@ -109,6 +109,47 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Callback activation transport and native composition
+
+The nested fork/join projection is version 5 and the response cache is version
+57. Selected storage metrics now carry callback activation evidence alongside
+the emitted root boundary. The codec preserves absent and Unknown evidence and
+rejects malformed fields, identities, counts and method-definition tokens.
+Wrapper tokens must be distinct and disjoint from child targets; the number of
+distinct targets cannot exceed the owned source-child count.
+
+Native checking reuses source/carrier/layout admission before accepting the
+callback fact. Failed checks expose neither a wrapper bound nor its model. A
+separate private composition adds the checked forwarding activation to logical
+source depth, preserving Unknown on missing ownership, layout, source depth or
+evidence. This is a logical source-plus-forwarder bound, not a CLR helper-frame
+or exception trace-byte bound. It changes no cumulative root-byte verdict.
+
+Controls cover Debug/Release, synchronous/configured roots, real codec round
+trips, malformed and old payloads, absent/Unknown evidence, native identity
+checks, source composition and cancellation. Artifact workflow controls check
+the actual collector attachment. All 327 first-pass targeted carrier, protocol
+and artifact-selection cases passed with zero build warnings or errors:
+`artifacts/resource-callback-native-tests.log`. Full quality/API, documentation
+and container contract checks passed:
+`artifacts/resource-callback-native-lint.log`,
+`artifacts/resource-callback-native-docs.log` and
+`artifacts/resource-callback-native-contract.log`. The final private formatting
+pass copied zero changes: `artifacts/resource-callback-native-format-final.log`.
+The final set includes target-cardinality and missing-source-activation controls
+and the broader resource-contract/projection workflows. All 1074 cases passed
+with zero build warnings or errors:
+`artifacts/resource-callback-native-workflows.log`.
+
+Published `f87ff40bc` completed all six coverage shards and aggregation in run
+39570413127 after the xz-utils pin repair. The complete report for merge
+`2615914abf7e6b2486eeecb240c3b067a731d54e` measured 6537/6738 changed trusted
+lines (97.02%, 201 uncovered), failing the unchanged 100% floor. This supersedes
+the 96.93% report below. Evidence:
+`artifacts/resource-f87ff-coverage-evidence/coverage/SharpProof.coverage.json`.
+The callback transport/native composition changes are local and unmeasured by
+that report.
+
 ### Refreshing the available Ubuntu tooling pin
 
 The canonical Dockerfile now pins xz-utils to the available Ubuntu revision
