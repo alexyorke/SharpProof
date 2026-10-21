@@ -164,7 +164,7 @@ public static partial class Inference
             {
                 // A constructed source cannot appear on the left of a C# where
                 // clause. Keep the target constructor rather than invent a lower bound.
-                HmType.Unify(destination, CSharpTypes.Rigid(target));
+                HmType.Unify(destination, ConversionCore(CSharpTypes.Rigid(target)));
                 destination = ConversionCore(destination);
             }
             if (value.IsVariable)

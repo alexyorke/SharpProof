@@ -73,7 +73,7 @@ for expected in \
   'T1 Async<T1, T2>(T1 value, T2 tag) where T1 : notnull' \
   'T1 ValueAsync<T1, T2>(T1 value, T2 tag) where T1 : notnull' \
   'global::System.Collections.Generic.List<object> Invariant<T1>(global::System.Collections.Generic.List<object> value, T1 tag)' \
-  'int Boxing<T1>(int value, T1 tag)'; do
+  'T1 Boxing<T1, T2>(T1 value, T2 tag) where T1 : notnull'; do
   if ! grep -Fq "$expected" "$log"; then
     printf 'Missing local-return signature: %s\n' "$expected"
     tail -35 "$log"

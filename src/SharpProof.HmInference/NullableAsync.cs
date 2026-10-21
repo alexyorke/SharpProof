@@ -204,19 +204,20 @@ public static partial class Inference
             {
                 return BindDeclaredReturn(expression, new(CSharpTypes.NullableValue, Expression(expression)), converted);
             }
-            var returnConversion = model.ClassifyConversion(expression, converted);
-            if (returnConversion.IsUserDefined)
+            if (joined is AnonymousFunctionExpressionSyntax && converted.TypeKind != TypeKind.Delegate)
             {
-                var targetShape = CSharpTypes.Erase(converted);
-                if (TryUserConversion(info.Type, converted, Expression(expression), targetShape, returnConversion.MethodSymbol))
-                { return targetShape; }
+                // Natural delegates and expression trees retain their observable closed type.
+                Anchor(expression);
+                return CSharpTypes.Rigid(converted);
             }
-            // Preserve widening, boxing and reference conversions at the return
-            // boundary instead of narrowing the API to the expression's type.
-            Anchor(expression);
-            return CSharpTypes.Rigid(converted);
+            var returnConversion = model.ClassifyConversion(expression, converted);
+            var value = Expression(expression);
+            var targetShape = IsFixedDeclaredReturn(expression) ? CSharpTypes.Rigid(converted) : CSharpTypes.Erase(converted);
+            if (!returnConversion.IsUserDefined || !TryUserConversion(info.Type, converted, value, targetShape, returnConversion.MethodSymbol))
+            { BindConvertedArgument(info.Type, converted, value, targetShape, false); }
+            conversionTargets.Add((targetShape, converted));
+            return BindDeclaredReturn(expression, targetShape, converted);
         }
-
         private HmType? NullReturnHole(ExpressionSyntax expression, ITypeSymbol converted)
         {
             if (expression is null)

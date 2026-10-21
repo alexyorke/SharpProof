@@ -71,6 +71,7 @@ public static partial class Inference
             foreach (var entry in copies)
             { HmType.Unify(entry.Key, entry.Value); }
             inferredConstraints.AddRange(nested.inferredConstraints);
+            conversionTargets.AddRange(nested.conversionTargets);
             conversionBounds.AddRange(nested.conversionBounds);
             needsBuilderEmission |= nested.needsBuilderEmission;
         }

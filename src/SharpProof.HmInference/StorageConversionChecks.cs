@@ -36,7 +36,7 @@ internal static class StorageConversionChecks
             ("FixedNullableInitializer", "class Box{public object? Value;}static Box M(object? value,int tag)=>new Box{Value=value};", "global::Cases.Box M<T1, T2>(T1? value, T2 tag) where T1 : class"),
             ("FixedInterfaceField", "static IComparable field=null!;static IComparable M(IComparable value,int tag){field=value;return value;}", "T1 M<T1, T2>(T1 value, T2 tag) where T1 : global::System.IComparable"),
             ("FixedBaseField", "class Base{}static Base field=null!;static Base M(Base value,int tag){field=value;return value;}", "T1 M<T1, T2>(T1 value, T2 tag) where T1 : global::Cases.Base"),
-            ("FixedOriginalBoxing", "static object field=null!;static int M(int value,int tag){field=value;return value;}", "int M<T1>(int value, T1 tag)"),
+            ("FixedOriginalBoxing", "static object field=null!;static int M(int value,int tag){field=value;return value;}", "T1 M<T1, T2>(T1 value, T2 tag) where T1 : notnull"),
             ("FixedOriginalWidening", "static long field;static int M(int value,int tag){field=value;return value;}", "int M<T1>(int value, T1 tag)"),
             ("InferredLocalRetainsStorage", "static object M(object value,int tag){var copy=value;copy=new object();return value;}", "object M<T1>(object value, T1 tag)"),
             ("ExplicitRefLocalRetainsStorage", "class Box<T>{public T Value=default!;}static Box<object> M(Box<object> value,int tag){ref object alias=ref value.Value;_=alias;return value;}", "global::Cases.Box<object> M<T1>(global::Cases.Box<object> value, T1 tag)"),

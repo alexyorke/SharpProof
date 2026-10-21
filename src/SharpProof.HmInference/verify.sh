@@ -33,6 +33,7 @@ bash src/SharpProof.HmInference/verify-callerconstraints.sh "$output" | tee /wor
 bash src/SharpProof.HmInference/verify-nullablecallers.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-caller-checks.txt
 bash src/SharpProof.HmInference/verify-nullablegroups.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-group-checks.txt
 bash src/SharpProof.HmInference/verify-nulljoins.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/null-join-checks.txt
+bash src/SharpProof.HmInference/verify-return-conversions.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/return-conversion-checks.txt
 bash src/SharpProof.HmInference/verify-nullablereturns.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-return-checks.txt
 bash src/SharpProof.HmInference/verify-fixedlambdas.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/fixed-lambda-checks.txt
 bash src/SharpProof.HmInference/verify-fixedarguments.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/fixed-argument-checks.txt

@@ -38,7 +38,7 @@ internal static class StructuralValueChecks
             ("AnonymousGenericCall", "static int M(int value)=>ShapeId.Id(new{Value=value}).Value;", "T1 M<T1>(T1 value)"),
             ("AnonymousPattern", "static int M(int value){var item=new{Value=value};return item is {Value:var found}?found:value;}", "T1 M<T1>(T1 value)"),
             ("AnonymousWith", "static int M(int value,int replacement){var item=new{Value=value};return (item with{Value=replacement}).Value;}", "T1 M<T1>(T1 value, T1 replacement)"),
-            ("AnonymousOpaqueReturn", "static object M(int value,bool ignored)=>new{Value=value};", "object M<T1>(int value, T1 ignored)"),
+            ("AnonymousOpaqueReturn", "static object M(int value,bool ignored)=>new{Value=value};", "object M<T1, T2>(T1 value, T2 ignored)"),
             ("AnonymousNullable", "static string? M(string? value){var item=new{Value=value};return item.Value;}", "T1? M<T1>(T1? value) where T1 : class"),
             ("RecordWith", "static ShapeRec<int> M(ShapeRec<int> value,int replacement)=>value with{Value=replacement};", "global::ShapeRec<T1> M<T1>(global::ShapeRec<T1> value, T1 replacement)"),
             ("RecordStructWith", "static ShapeStruct<int> M(ShapeStruct<int> value,int replacement)=>value with{Value=replacement};", "global::ShapeStruct<T1> M<T1>(global::ShapeStruct<T1> value, T1 replacement)"),

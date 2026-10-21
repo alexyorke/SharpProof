@@ -85,7 +85,7 @@ EOF
     "$conditional" \
     'global::System.Threading.Tasks.Task<T1?> Async<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : class' \
     'global::System.Threading.Tasks.ValueTask<T1> ValueAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : notnull' \
-    'int Boxing<T1>(int value, T1 tag)' \
+    'T1 Boxing<T1, T2>(T1 value, T2 tag) where T1 : notnull' \
     'object CallerTarget<T1>(object value, T1 tag)' \
     'ref object Ref<T1>(ref object left, ref object right, T1 tag)'; do
     if ! grep -Fq "$expected" "$log"; then

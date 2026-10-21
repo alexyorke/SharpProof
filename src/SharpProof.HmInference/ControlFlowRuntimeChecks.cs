@@ -104,8 +104,10 @@ internal static class ControlFlowRuntimeChecks
             if (!Equals(probe.GetMethod(name)!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { int.MaxValue, marker }), (long)int.MaxValue))
             { throw new InvalidOperationException("Local declaration conversion changed: " + name); }
         }
-        if (!Equals(probe.GetMethod("Boxing")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { 42, marker }), true))
+        if (!Equals(probe.GetMethod("Boxing")!.MakeGenericMethod(typeof(int), typeof(Guid)).Invoke(null, new object[] { 42, marker }), true))
         { throw new InvalidOperationException("Typed local boxing identity changed."); }
+        if (!Equals(probe.GetMethod("Boxing")!.MakeGenericMethod(typeof(decimal), typeof(Guid)).Invoke(null, new object[] { 23m, marker }), true))
+        { throw new InvalidOperationException("Typed local boxing lost its new struct domain."); }
         Program.Log.Info("PASS TypedUninitializedLocalConversionsRuntime");
         if (((Func<Guid>)probe.GetMethod("Nested")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { marker })!)() != marker
             || await ((Task<Guid>)probe.GetMethod("Async")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { marker })!).WaitAsync(cancellationToken).ConfigureAwait(false) != marker

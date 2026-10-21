@@ -26,8 +26,8 @@ internal static class JoinChecks
             ("SwitchUserConversion", "struct Input{public static implicit operator long(Input value)=>0;}static long M(int flag,Input left,long right,int tag)=>flag switch{0=>left,_=>right};", "long M<T1>(int flag, global::Cases.Input left, long right, T1 tag)"),
             ("ConditionalNumericConversion", "static long M(bool flag,int left,long right,int tag)=>flag?left:right;", "long M<T1>(bool flag, int left, long right, T1 tag)"),
             ("SwitchNumericConversion", "static long M(int flag,int left,long right,int tag)=>flag switch{0=>left,_=>right};", "long M<T1>(int flag, int left, long right, T1 tag)"),
-            ("ConditionalTargetConversion", "static object M(bool flag,int left,string right,int tag)=>flag?left:right;", "object M<T1>(bool flag, int left, string right, T1 tag)"),
-            ("SwitchTargetConversion", "static object M(int flag,int left,string right,int tag)=>flag switch{0=>left,_=>right};", "object M<T1>(int flag, int left, string right, T1 tag)"),
+            ("ConditionalTargetConversion", "static object M(bool flag,int left,string right,int tag)=>flag?left:right;", "object M<T1, T2, T3>(bool flag, T1 left, T2 right, T3 tag) where T1 : notnull where T2 : notnull"),
+            ("SwitchTargetConversion", "static object M(int flag,int left,string right,int tag)=>flag switch{0=>left,_=>right};", "object M<T1, T2, T3>(int flag, T1 left, T2 right, T3 tag) where T1 : notnull where T2 : notnull"),
             ("ConditionalNullableLift", "static int? M(bool flag,int left,int? right,int tag)=>flag?left:right;", "T1? M<T1, T2>(bool flag, T1 left, T1? right, T2 tag) where T1 : struct"),
             ("SwitchNullableLift", "static int? M(int flag,int left,int? right,int tag)=>flag switch{0=>left,_=>right};", "T1? M<T1, T2>(int flag, T1 left, T1? right, T2 tag) where T1 : struct"),
             ("AsyncConditionalNullableLift", "static async Task<int?> M(bool flag,Task<int> left,Task<int?> right,int tag)=>flag?await left:await right;", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(bool flag, global::System.Threading.Tasks.Task<T1> left, global::System.Threading.Tasks.Task<T1?> right, T2 tag) where T1 : struct"),
@@ -60,7 +60,9 @@ internal static class JoinChecks
             if (errors.Length != 0)
             { throw new InvalidOperationException("Legacy join fixture: " + errors[0]); }
             var result = Program.Results(compilation, cancellationToken).Single();
-            if (result.Signature != test.Signature)
+            var expectedSignature = name == "ConditionalTargetConversion"
+                ? "object M<T1, T2, T3>(bool flag, T1 left, T2 right, T3 tag)" : test.Signature;
+            if (result.Signature != expectedSignature)
             { throw new InvalidOperationException("Legacy join " + version + ": " + (result.Signature ?? result.Message)); }
             Program.Log.Info("PASS ExpressionJoin" + version);
         }
@@ -73,7 +75,7 @@ internal static class JoinChecks
         Program.Log.Info("PASS LegacyConditionalDependentCaptureDomains");
         var mixedTree = CSharpSyntaxTree.ParseText("#nullable enable\nclass Cases{static object M(bool flag,object left,string right,int tag){object Local()=>flag?left:right;_=Local();return left;}}", new CSharpParseOptions(LanguageVersion.CSharp8), cancellationToken: cancellationToken);
         var mixedResult = Program.Results(Program.Compile([mixedTree]), cancellationToken).Single();
-        if (mixedResult.Signature != "object M<T1>(bool flag, object left, string right, T1 tag)")
+        if (mixedResult.Signature != "object M<T1, T2>(bool flag, object left, T1 right, T2 tag) where T1 : notnull")
         { throw new InvalidOperationException("Legacy conditional mixed endpoints: " + (mixedResult.Signature ?? mixedResult.Message)); }
         Program.Log.Info("PASS LegacyConditionalMixedConversionEndpoints");
         return tests.Length + 5;

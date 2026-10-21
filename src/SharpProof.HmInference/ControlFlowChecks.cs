@@ -26,7 +26,7 @@ internal static class ControlFlowChecks
             ("UninitializedLocal", "static int M(int x,bool ignored) {int value;value=x;return value;}", "Suggestion", "int M<T1>(int x, T1 ignored)"),
             ("UninitializedWidening", "static long M(int x,bool ignored) {long value;value=x;return value;}", "Suggestion", "long M<T1>(int x, T1 ignored)"),
             ("TypedLocalWidening", "static long M(int x,bool ignored) {long value=x;return value;}", "Suggestion", "long M<T1>(int x, T1 ignored)"),
-            ("TypedLocalBoxing", "static object M(int x,bool ignored) {object value=x;return value;}", "Suggestion", "object M<T1>(int x, T1 ignored)"),
+            ("TypedLocalBoxing", "static object M(int x,bool ignored) {object value=x;return value;}", "Suggestion", "object M<T1, T2>(T1 x, T2 ignored) where T1 : notnull"),
             ("TypedNullableLocal", "static string? M(string x,bool ignored) {string? value=x;return value;}", "Suggestion", "string? M<T1>(string x, T1 ignored)"),
             ("TypedDelegateLocal", "static System.Func<int> M(int x,bool ignored) {System.Func<int> read=()=>x;return read;}", "Suggestion", "global::System.Func<int> M<T1>(int x, T1 ignored)"),
             ("TypedAsyncLocal", "static async Task<int> M(Task<int> task,bool ignored) {int value=await task;return value;}", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::System.Threading.Tasks.Task<int> task, T1 ignored)"),

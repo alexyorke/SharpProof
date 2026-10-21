@@ -100,8 +100,12 @@ internal static class NominalIdentityChecks
         var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "NominalIdentity", "NominalIdentity", LanguageNames.CSharp,
             compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: references));
         var document = project.AddDocument("NominalIdentity.cs", source);
+        var originalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var originalProbe = originalCompilation.GetTypeByMetadataName("NominalProbe")!;
+        var expectedFixes = originalProbe.GetMembers().OfType<IMethodSymbol>().Count(method =>
+            { ArgumentNullException.ThrowIfNull(method); return method.MethodKind == MethodKind.Ordinary; });
         var provider = new HmSignatureCodeFixProvider();
-        for (var round = 0; round < 7; round++)
+        for (var round = 0; round < expectedFixes; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var results = Program.Results((CSharpCompilation)compilation, cancellationToken).ToArray();
@@ -126,7 +130,21 @@ internal static class NominalIdentityChecks
             if (method.Name is "Narrow" or "AwaitNarrow")
             {
                 var retained = method.Name == "Narrow" ? method.ReturnType : ((INamedTypeSymbol)method.ReturnType).TypeArguments[0];
-                if (method.TypeParameters.Length != 0 || retained.SpecialType != SpecialType.System_Object)
+                var originalMember = originalProbe.GetMembers(method.Name).OfType<IMethodSymbol>().Single();
+                var beforeInput = originalMember.Parameters[0].Type;
+                var afterInput = method.Parameters[0].Type;
+                var beforeResult = originalMember.ReturnType;
+                if (method.Name == "AwaitNarrow")
+                {
+                    beforeInput = ((INamedTypeSymbol)beforeInput).TypeArguments[0];
+                    afterInput = ((INamedTypeSymbol)afterInput).TypeArguments[0];
+                    beforeResult = ((INamedTypeSymbol)beforeResult).TypeArguments[0];
+                }
+                if (method.TypeParameters.Length != 1 || retained.SpecialType != SpecialType.System_Object
+                    || retained.NullableAnnotation != beforeResult.NullableAnnotation || afterInput.NullableAnnotation != beforeInput.NullableAnnotation
+                    || beforeInput is not INamedTypeSymbol beforeNamed || afterInput is not INamedTypeSymbol afterNamed
+                    || !beforeNamed.ContainingAssembly.Identity.Equals(afterNamed.ContainingAssembly.Identity)
+                    || beforeNamed.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) != afterNamed.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 { throw new InvalidOperationException("Return widening was lost: " + method.Name); }
                 Program.Log.Info("PASS NominalPreservedConversion" + method.Name);
                 continue;

@@ -86,7 +86,7 @@ EOF
     fi
   done
   if [ "$language" != 8 ]; then
-    grep -Fq 'object Target<T1>(bool flag, int left, string right, T1 tag)' "$log"
+    grep -Fq 'object Target<T1, T2, T3>(bool flag, T1 left, T2 right, T3 tag) where T1 : notnull where T2 : notnull' "$log"
   fi
   if [ "$#" -eq 1 ]; then printf 'PASS CliExpressionJoinsCSharp%s\n' "$language"; fi
 done

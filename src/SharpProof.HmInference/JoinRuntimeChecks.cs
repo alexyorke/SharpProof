@@ -121,7 +121,8 @@ internal static class JoinRuntimeChecks
                         events.Clear();
                         var arguments = name == "Boxing" ? new object?[] { chosen, 17, "right", tag }
                             : [name == "NumericSwitch" ? chosen ? 0 : 1 : chosen, 17, 29L, tag];
-                        var result = Invoke(probe, name, [typeof(Uri)], arguments);
+                        var types = name == "Boxing" ? new[] { typeof(int), typeof(string), typeof(Uri) } : [typeof(Uri)];
+                        var result = Invoke(probe, name, types, arguments);
                         if (name == "Boxing" ? !Equals(result, chosen ? 17 : "right") : !Equals(result, chosen ? 17L : 29L))
                         { throw new InvalidOperationException("Join numeric/boxing conversion changed: " + name); }
                         if (events.Count != (name == "NumericSwitch" && chosen ? 3 : 2) || events[^1] != (chosen ? "left" : "right"))
@@ -210,6 +211,7 @@ internal static class JoinRuntimeChecks
                 #nullable enable
                 public static class JoinProbe{
                     public static object? Stored;
+                    public static object Mixed(bool flag,object left,string right,int tag){object Local()=>flag?left:right;Stored=Local();return left;}
                     public static (object,object) Independent(bool flag,object left,object right,int tag){object Local()=>flag?left:right;Stored=Local();return(left,right);}
                     public static (object[],object[]) Arrays(bool flag,object[] left,object[] right,int tag){object[] Local()=>flag?left:right;Stored=Local();return(left,right);}
                 }
@@ -240,7 +242,18 @@ internal static class JoinRuntimeChecks
                     if (!ReferenceEquals(pair[0], left) || !ReferenceEquals(pair[1], right)
                         || !ReferenceEquals(probe.GetField("Stored")!.GetValue(null), chosen ? left : right))
                     { throw new InvalidOperationException("Legacy conditional changed array covariance identity."); }
+                    var mixedRight = new string('r', 3);
+                    var mixed = Invoke(probe, "Mixed", [typeof(string), typeof(Uri)], [chosen, marker, mixedRight, probe == legacyBefore ? 0 : marker]);
+                    if (!ReferenceEquals(mixed, marker) || !ReferenceEquals(probe.GetField("Stored")!.GetValue(null), chosen ? marker : mixedRight))
+                    { throw new InvalidOperationException("Legacy mixed join changed original branch identities."); }
                 }
+            }
+            foreach (var chosen in new[] { true, false })
+            {
+                var mixed = Invoke(legacyAfter, "Mixed", [typeof(decimal), typeof(Uri)], [chosen, marker, 23m, marker]);
+                var stored = legacyAfter.GetField("Stored")!.GetValue(null);
+                if (!ReferenceEquals(mixed, marker) || (chosen ? !ReferenceEquals(stored, marker) : stored is not decimal number || number != 23m))
+                { throw new InvalidOperationException("Legacy mixed join lost its new boxed struct domain."); }
             }
             var invalid = legacyChanged.AddSyntaxTrees(CSharpSyntaxTree.ParseText("class Bad{void Check(){_=JoinProbe.Independent<int,string,int>(true,1,\"x\",0);}}", new CSharpParseOptions(LanguageVersion.CSharp8), cancellationToken: cancellationToken));
             if (!invalid.GetDiagnostics(cancellationToken).Any(diagnostic =>

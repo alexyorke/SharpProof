@@ -38,7 +38,7 @@ internal static class LocalFunctionChecks
             ("LocalAsyncCapture", "static int M(Task<int> pending,int value){async Task<int> Local()=>await pending;_=Local();return value;}", "T1 M<T1>(global::System.Threading.Tasks.Task<int> pending, T1 value)"),
             ("LocalAsyncVoidCapture", "static int M(Task<int> pending,int value){async void Local(){await pending;}Local();return value;}", "T2 M<T1, T2>(global::System.Threading.Tasks.Task<T1> pending, T2 value)"),
             ("LocalUnsupportedBodyRetainsSuggestion", "static int M(int value){object Local(){_=value;Span<int> scratch=stackalloc int[1];return scratch.Length;}_=Local();return value;}", "T1 M<T1>(T1 value)"),
-            ("LocalReturnBoxing", "static int M(int value,bool ignored){object Local()=>value;_=Local();return value;}", "int M<T1>(int value, T1 ignored)"),
+            ("LocalReturnBoxing", "static int M(int value,bool ignored){object Local()=>value;_=Local();return value;}", "T1 M<T1, T2>(T1 value, T2 ignored)"),
             ("LocalInsideIterator", "static IEnumerable<int> M(int value,bool ignored){void Local(){_=value;}Local();yield return value;}", "global::System.Collections.Generic.IEnumerable<T1> M<T1, T2>(T1 value, T2 ignored)"),
             ("LocalIteratorInsideAsync", "static async Task<int> M(Task<int> pending,int value){IEnumerable<int> Local(){yield return value;}_=Local();return await pending;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Threading.Tasks.Task<T1> pending, int value)"),
             ("LocalGenericAsync", "static int M(int value,bool ignored){async Task<T> Local<T>(T v){await Task.Yield();return v;}_=Local(value);return value;}", "T1 M<T1, T2>(T1 value, T2 ignored)"),
