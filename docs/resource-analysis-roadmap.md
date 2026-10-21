@@ -109,6 +109,37 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Symbolic trace-buffer composition
+
+The private trace catalog now composes its raw and resolver array bounds using
+nonnegative resource expressions. For upper bounds F on all appended frames,
+R on raw copies, D on resolver copies and K on initial resolver capacity, it
+constructs `(2F + R)(56 + 64F) + (F + D)(24 + 8 max(K, 4F))`. The inputs retain
+their separate identities; neither copy count is inferred from the other.
+Arithmetic uses mathematical integers and the existing expression budget.
+Budget exhaustion and incompatible runtime layouts publish Unknown with no
+partial bound or model identity. Cancellation propagates.
+
+This component requires the same closed-collection premises as its two
+constituent models. Its inputs need separate ownership and runtime proofs.
+Logical callback depth is not an appended-frame bound. Referents, helper faults,
+payloads, initialization and the root byte composition remain open, as do the
+unchecked phase F obligations above. No root verdict or protocol changes.
+
+All 221 Specs cases passed with zero build warnings or errors, including symbolic
+inputs, independent copy counts, large arithmetic, budget/layout failures,
+cancellation and measured pinned runtime throw/restore controls:
+`artifacts/resource-trace-composition-specs.log`. Full quality/API and
+documentation checks passed: `artifacts/resource-trace-composition-lint.log`
+and `artifacts/resource-trace-composition-docs.log`. The private formatter
+normalized the test source before the passing test run.
+
+Published `f87ff40bc` also completed canonical CI run 39570412886 successfully,
+including self-application and package reproducibility. Its latest complete
+coverage remains 97.02% with 201 gaps; the callback transport and symbolic
+composition changes are not measured by that report. Exact-head qualification
+of the next published checkpoint remains required.
+
 ### Callback activation transport and native composition
 
 The nested fork/join projection is version 5 and the response cache is version

@@ -14,6 +14,11 @@ internal sealed record ResourceResolverTraceBufferCheck(ResourceExpression? Cumu
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.ResolverTraceBufferModel;
 }
 
+internal sealed record ResourceTraceBufferCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.TraceBufferModel;
+}
+
 // Fixed .NET 8.0.32 fault bookkeeping and separately scoped trace components.
 // None of these components establishes a root allocation verdict.
 internal static class ResourceTaskFaultCarrierCatalog
@@ -21,6 +26,7 @@ internal static class ResourceTaskFaultCarrierCatalog
     internal const string Model = "task-join-fixed-fault-carriers-v2";
     internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
     internal const string ResolverTraceBufferModel = "closed-exception-resolver-buffers-v1";
+    internal const string TraceBufferModel = "closed-exception-trace-buffer-composition-v1";
     internal const string FreshSourceTrackerModel = "closed-source-fault-tracker-seed-v1";
     // Both ExceptionTracker constructors call StackTraceInfo.Init (counter zero).
     // AllocateStackTrace seeds 30 in retail builds, 2 in debug builds, or zero
@@ -30,6 +36,39 @@ internal static class ResourceTaskFaultCarrierCatalog
     internal const string TrackerDispatchSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/exceptionhandling.cpp";
     internal const string RawTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp";
     internal const string SaveTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp";
+
+    // Symbolic composition of the two closed-buffer models below. Every input
+    // is a nonnegative mathematical upper bound, with its ownership and prefix
+    // scope established separately by the caller. In particular, source depth
+    // cannot be supplied as appendedFrames without a CLR/helper-frame bridge.
+    // This includes arrays only, not their referents or other fault storage.
+    internal static ResourceTraceBufferCheck BoundTraceBuffers(ResourceExpression appendedFrames,
+        ResourceExpression rawCopies, ResourceExpression resolverCopies, ResourceExpression initialResolverCapacity,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        appendedFrames = ArgumentNullGuard.NotNull(appendedFrames, nameof(appendedFrames));
+        rawCopies = ArgumentNullGuard.NotNull(rawCopies, nameof(rawCopies));
+        resolverCopies = ArgumentNullGuard.NotNull(resolverCopies, nameof(resolverCopies));
+        initialResolverCapacity = ArgumentNullGuard.NotNull(initialResolverCapacity, nameof(initialResolverCapacity));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var compatible = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Reference,
+            ResourceExpression.Zero), layout, cancellation);
+        if (!compatible.Verified)
+        { return new(null, compatible.UnknownReason); }
+        try
+        {
+            var raw = ResourceExpression.Multiply(
+                ResourceExpression.Add(ResourceExpression.Multiply(ResourceExpression.Literal(2), appendedFrames), rawCopies),
+                ResourceExpression.Add(ResourceExpression.Literal(56), ResourceExpression.Multiply(ResourceExpression.Literal(64), appendedFrames)));
+            var resolver = ResourceExpression.Multiply(ResourceExpression.Add(appendedFrames, resolverCopies),
+                ResourceExpression.Add(ResourceExpression.Literal(24), ResourceExpression.Multiply(ResourceExpression.Literal(8),
+                    ResourceExpression.Max(initialResolverCapacity, ResourceExpression.Multiply(ResourceExpression.Literal(4), appendedFrames)))));
+            return new(ResourceExpression.Add(raw, resolver), null);
+        }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "TraceBufferCompositionBudgetExceeded"); }
+    }
 
     // A closed collection starts without raw traces and copies only traces from
     // that collection. Inputs must bound ALL attempted appended frames (including

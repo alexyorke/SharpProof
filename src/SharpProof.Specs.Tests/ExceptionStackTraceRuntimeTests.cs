@@ -11,6 +11,55 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, 0, 0, 0)]
+    [TestCase(1, 0, 2, 30)]
+    [TestCase(10, 4, 1, 1024)]
+    [TestCase(int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue)]
+    public void SymbolicBufferCompositionPreservesIndependentPrefixInputs(int frames, int rawCopies, int resolverCopies, int capacity)
+    {
+        var inputs = Enumerable.Range(0, 4).Select(ordinal =>
+            ResourceExpression.InputSize(new ResourceInput(ordinal, ResourceInputKind.NonNegativeScalar, "prefix" + ordinal, int.MaxValue))).ToArray();
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var result = ResourceTaskFaultCarrierCatalog.BoundTraceBuffers(inputs[0], inputs[1], inputs[2], inputs[3],
+            new("CoreCLR", "8.0.32", "x64", 8), cancellation);
+        BigInteger[] values = [frames, rawCopies, resolverCopies, capacity];
+        var f = new BigInteger(frames);
+        var expected = (2 * f + rawCopies) * (56 + 64 * f) +
+            (f + resolverCopies) * (24 + 8 * BigInteger.Max(capacity, 4 * f));
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.TraceBufferModel));
+        Assert.That(result.CumulativeUpper!.Evaluate(input =>
+            input is null ? throw new ArgumentNullException(nameof(input)) : values[input.Ordinal], cancellation), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void BufferCompositionNeverPublishesPartialBoundsOnBudgetOrLayoutFailure()
+    {
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var frames = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "frames", int.MaxValue));
+        for (var depth = frames.Depth; depth < ResourceExpression.MaximumDepth; depth++)
+        { frames = ResourceExpression.Add(frames, ResourceExpression.One); }
+        var result = ResourceTaskFaultCarrierCatalog.BoundTraceBuffers(frames, ResourceExpression.Zero, ResourceExpression.Zero,
+            ResourceExpression.Zero, layout, cancellation);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("TraceBufferCompositionBudgetExceeded"));
+        result = ResourceTaskFaultCarrierCatalog.BoundTraceBuffers(ResourceExpression.One, ResourceExpression.One,
+            ResourceExpression.One, ResourceExpression.One, new("CoreCLR", "8.0.32", "arm64", 8), cancellation);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action check = () =>
+        {
+            _ = ResourceTaskFaultCarrierCatalog.BoundTraceBuffers(ResourceExpression.One, ResourceExpression.One,
+            ResourceExpression.One, ResourceExpression.One, layout, canceled.Token);
+        };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
     [TestCase(0, 0, 30, 0L)]
     [TestCase(1, 0, 30, 264L)]
     [TestCase(2, 3, 30, 1320L)]
@@ -105,8 +154,12 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
         var raw = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 2 * restores, layout, cancellation);
         var resolver = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, 2 * restores, 30, layout, cancellation);
+        var combined = ResourceTaskFaultCarrierCatalog.BoundTraceBuffers(ResourceExpression.Literal(frames),
+            ResourceExpression.Literal(2 * restores), ResourceExpression.Literal(2 * restores), ResourceExpression.Literal(30), layout, cancellation);
+        Assert.That(combined.UnknownReason, Is.Null);
+        Assert.That(combined.CumulativeUpper!.Constant, Is.EqualTo(raw.CumulativeUpper!.Constant + resolver.CumulativeUpper!.Constant));
         Assert.That(((object[])resolverField.GetValue(exception)!).Length, Is.LessThanOrEqualTo(Math.Max(30, 4 * frames)));
-        Assert.That(new BigInteger(allocated), Is.LessThanOrEqualTo(raw.CumulativeUpper!.Constant!.Value + resolver.CumulativeUpper!.Constant!.Value));
+        Assert.That(new BigInteger(allocated), Is.LessThanOrEqualTo(combined.CumulativeUpper.Constant!.Value));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
