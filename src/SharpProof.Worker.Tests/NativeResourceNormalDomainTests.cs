@@ -146,6 +146,31 @@ internal sealed class NativeResourceNormalDomainTests
         Assert.Throws<OperationCanceledException>(check);
     }
 
+    [TestCase(30, true)]
+    [TestCase(31, false)]
+    public void PositiveDivisorSnapshotsRespectTheResolutionDepthBoundary(int aliases, bool admitted)
+    {
+        if (aliases is not (30 or 31))
+        { throw new ArgumentOutOfRangeException(nameof(aliases)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var current = factory.CreateVariable("divisor", factory.IntegerType);
+        builder.Assign(entry, factory.CreateOperation(), current, factory.Integer(1));
+        for (var index = 0; index < aliases; index++)
+        {
+            var next = factory.CreateVariable("snapshot", factory.IntegerType);
+            builder.Assign(entry, factory.CreateOperation(), next, factory.Variable(current));
+            current = next;
+        }
+        builder.Return(entry, factory.CreateOperation(),
+            factory.Binary(IrBinaryOperator.Divide, factory.Integer(7), factory.Variable(current)));
+        var program = builder.Build();
+        Assert.That(Check(program), admitted ? Is.Null : Is.EqualTo("ResourceNormalDomainTermUnsupported"));
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000,
+            new IrProgramReplayOptions(static _ => null), TestContext.CurrentContext.CancellationToken);
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(7));
+    }
     private static string? Check(IrProgram program)
     {
         ArgumentNullException.ThrowIfNull(program);

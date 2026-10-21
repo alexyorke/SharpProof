@@ -52,6 +52,92 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
+    [TestCase("instructions")]
+    [TestCase("definitions")]
+    [TestCase("terms")]
+    [TestCase("dominance")]
+    public void MemoryEnvelopeRejectsExhaustedAnalysisBudgets(string budget)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        switch (budget)
+        {
+            case "instructions":
+            case "definitions":
+                var count = budget == "definitions" ? ResourceExpression.MaximumNodes + 1 : ResourceExpression.MaximumNodes / 2 + 1;
+                for (var index = 0; index < count; index++)
+                { builder.Assign(entry, factory.CreateOperation(), value, factory.Integer(index)); }
+                builder.Return(entry, factory.CreateOperation());
+                break;
+            case "terms":
+                IrTerm term = factory.Variable(value);
+                for (var depth = 0; depth < 13; depth++)
+                { term = factory.Binary(IrBinaryOperator.Add, term, term); }
+                builder.Return(entry, factory.CreateOperation(), term);
+                break;
+            case "dominance":
+                var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+                var current = entry;
+                for (var block = 0; block < 8; block++)
+                {
+                    for (var index = 0; index < 32; index++)
+                    {
+                        var allocated = factory.CreateVariable("array", array);
+                        builder.Allocate(current, factory.CreateOperation(), array, allocated, factory.Integer(1));
+                    }
+                    if (block == 7)
+                    { builder.Return(current, factory.CreateOperation()); }
+                    else
+                    {
+                        var next = builder.CreateBlock();
+                        builder.Goto(current, factory.CreateOperation(), next);
+                        current = next;
+                    }
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(budget));
+        }
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], null, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.False);
+    }
+
+    [TestCase("scalar", true)]
+    [TestCase("reference", false)]
+    [TestCase("memory", false)]
+    public void MemoryEnvelopeHavocPreservesOnlyScalarOwnership(string shape, bool admitted)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var owned = factory.CreateVariable("owned", array);
+        builder.Allocate(entry, factory.CreateOperation(), array, owned, factory.Integer(1));
+        switch (shape)
+        {
+            case "scalar":
+                builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Input,
+                    factory.CreateVariable("input", factory.IntegerType));
+                break;
+            case "reference":
+                builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Input, owned);
+                break;
+            case "memory":
+                builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Memory, IrHavocOrigin.Input);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(shape));
+        }
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(owned));
+        var owner = new SharpProof.CompilerArtifact.CompilerTotalCallablePreparation("owner", builder.Build(), [], owned, [])
+        { EffectsCompleteAtEntry = true };
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, TestContext.CurrentContext.CancellationToken), Is.EqualTo(admitted));
+    }
     [TestCase(5, "bool", 1)]
     [TestCase(6, "bool", 1)]
     [TestCase(5, "byte", 1)]

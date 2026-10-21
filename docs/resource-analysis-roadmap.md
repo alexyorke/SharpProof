@@ -96,13 +96,37 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+### Memory-envelope ownership and budget controls
+
+Seven additional controls reject exhausted instruction, definition, expression
+and dominance budgets, admit scalar havoc, and reject reference/memory havoc.
+Two divisor-snapshot controls exercise the normal-domain resolution boundary;
+both independently execute to seven, while the deeper chain conservatively
+returns Unknown. The final combined group passed 73 cases with zero build
+warnings/errors. Formatting passed. Evidence:
+`artifacts/resource-memory-envelope-domain-final.log` and
+`artifacts/resource-memory-envelope-budget-format.log`.
+The full quality/API gate subsequently passed, including Markdown, spelling,
+links, compatibility and negative fixtures; documentation regressions passed.
+Evidence: `artifacts/resource-memory-envelope-budget-lint-final.log` and
+`artifacts/resource-memory-envelope-budget-docs.log`.
+
+At published `0cc594782`, all coverage shards, documentation, security and the
+separate package/consumer workflow passed. Canonical quality found missing
+blank lines around roadmap headings (MD022); this checkpoint corrects them.
+The canonical package job passed its first 134-case shard, then the runner
+reported a shutdown signal and killed the Docker client with exit 137. That
+job has no complete package result, and this log does not establish OOM as the
+cause. Exact-head CI must still qualify the subsequent published sources.
+
 ### Fault notification lifecycle review
 
 The pinned `TaskExceptionHolder.cs` cache still matches SHA-256
 `bc4dda204de133879e4e334b37f74fc6c57690c05a179ae4648fbfa653a38604`
-(blob `4d9a68fdca4f11df2a493f8695dc3ea82f38544f`). Its finalizer constructs the
+(blob `4d9a68fdca4f11df2a493f8695dc3ea82f38544f`). Its finalization method constructs the
 notification at lines 54-70, while `MarkAsUnhandled` can re-register an observed
-holder for finalization at lines 213-224. The finalizer itself does not mark the
+holder for finalization at lines 213-224. The finalization method itself does not mark the
 holder handled. Therefore a per-construction bound alone is insufficient to
 multiply by an assumed one-notification-per-holder count. The admitted root
 still needs a lifecycle proof excluding later exception additions and external
@@ -111,6 +135,7 @@ fault-publication ordering at lines 1813-1827 and reserves promise completion
 before recording exceptions at lines 3377-3393; those facts are inputs to that
 proof, rather than an existing notification-frequency certificate. No new
 cumulative runtime-byte verdict is published from this review.
+
 ### Analysis-budget boundary controls
 
 Two additional scalar-traversal controls admit depth 32 with independent replay
@@ -148,10 +173,18 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `0cc594782` passed all four coverage shards in run 39524271604.
+The complete merge-commit report (a7dc4fa8b1a3de4817fee37afb7f13d16bb4c82e)
+measured 6056/6273 changed trusted lines (96.54%, 217 uncovered), below the
+unchanged 100% floor. This is the latest complete numeric measurement; the
+report is retained at
+`artifacts/resource-0cc594-coverage-evidence/coverage/SharpProof.coverage.json`.
+The newer analysis-budget controls are not part of this measurement.
+
 Published `96dcfa4ee` passed all four coverage shards in run 39522192698,
 including the repaired package preparation. The complete merge-commit report
 (92a24329ec1e45fad2e364651d8c30853c0f465f) measured 6052/6273 changed trusted
-lines (96.48%, 221 uncovered), below the unchanged 100% floor. This supersedes
+lines (96.48%, 221 uncovered), below the unchanged 100% floor. This earlier report superseded
 the complete numerical measurements below. The report is retained at
 `artifacts/resource-96dc-coverage-evidence/coverage/SharpProof.coverage.json`.
 The additional local memory and fork/join controls above are newer than this report
