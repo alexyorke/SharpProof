@@ -20,7 +20,28 @@ EOF
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+public readonly struct ConvertedBox<T>{
+    public static int Conversions;public T Value{get;}
+    public ConvertedBox(T value){Value=value;}
+    public static implicit operator ConvertedBox<T>(T value){Conversions++;return new ConvertedBox<T>(value);}
+}
 public static class NullJoinConsumer{
+public static object ConvertedReference(object? value,string fallback)=>value??fallback;
+public static object ConvertedSelection(string? value,object fallback)=>value??fallback;
+public static object ConvertedBoxing(int? value,object fallback)=>value??fallback;
+public static object ConvertedFallback(object? value,int fallback)=>value??fallback;
+public static object ConvertedAssignment(object? value,int fallback)=>value??=fallback;
+public static IEnumerable<int> ConvertedArray(int[]? value,IEnumerable<int> fallback)=>value??fallback;
+public static IEnumerable<int> ConvertedList(List<int>? value,IEnumerable<int> fallback)=>value??fallback;
+public static IEnumerable<object> ConvertedCovariance(IEnumerable<object>? value,string[] fallback)=>value??fallback;
+public static object ConvertedFactory(object? value,Func<int> fallback)=>value??fallback();
+public static long ConvertedNumeric(long? value,int fallback,int tag)=>value??fallback;
+public static ConvertedBox<int> ConvertedUser(ConvertedBox<int>? value,int fallback)=>value??fallback;
+public static ConvertedBox<int> ConvertedUserAssign(ConvertedBox<int>? value,int fallback)=>value??=fallback;
+public static async Task<object> ConvertedTask(Task<int?> value,object fallback)=>(await value)??fallback;
+public static async ValueTask<object> ConvertedValueTask(ValueTask<int?> value,object fallback)=>(await value)??fallback;
+public static async Task<object> ConvertedAssignTask(object? value,Task<int> fallback)=>value??=await fallback;
+public static async ValueTask<object> ConvertedAssignValueTask(object? value,ValueTask<int> fallback)=>value??=await fallback;
 public static object? CoalesceReference(object? value,int tag)=>value??null;
 public static object? CoalesceReferenceDefault(object? value,int tag)=>value??default;
 public static int? CoalesceValue(int? value,int tag)=>value??null;
@@ -124,6 +145,22 @@ EOF
     'global::System.Threading.Tasks.ValueTask<T1?> CoalesceAwaitValueStruct<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 tag) where T1 : struct' \
     'global::System.Threading.Tasks.Task<T1?> CoalesceAsyncAssignReference<T1, T2>(T1? value, T2 tag) where T1 : class' \
     'global::System.Threading.Tasks.ValueTask<T1?> CoalesceAsyncAssignValue<T1, T2>(T1? value, T2 tag) where T1 : struct' \
+    'T1 ConvertedReference<T1, T2>(T1? value, T2 fallback) where T1 : class where T2 : T1' \
+    'T2 ConvertedSelection<T1, T2>(T1? value, T2 fallback) where T1 : class, T2' \
+    'T2 ConvertedBoxing<T1, T2>(T1? value, T2 fallback) where T1 : struct, T2' \
+    'T1 ConvertedFallback<T1, T2>(T1? value, T2 fallback) where T1 : class where T2 : T1' \
+    'T1 ConvertedAssignment<T1, T2>(T1? value, T2 fallback) where T1 : class where T2 : T1' \
+    'global::System.Collections.Generic.IEnumerable<T1> ConvertedArray<T1>(T1[]? value, global::System.Collections.Generic.IEnumerable<T1> fallback)' \
+    'global::System.Collections.Generic.IEnumerable<T1> ConvertedList<T1>(global::System.Collections.Generic.List<T1>? value, global::System.Collections.Generic.IEnumerable<T1> fallback)' \
+    'global::System.Collections.Generic.IEnumerable<T1> ConvertedCovariance<T1, T2>(global::System.Collections.Generic.IEnumerable<T1>? value, T2[] fallback) where T1 : class where T2 : class, T1' \
+    'T1 ConvertedFactory<T1, T2>(T1? value, global::System.Func<T2> fallback) where T1 : class where T2 : T1' \
+    'long ConvertedNumeric<T1>(long? value, int fallback, T1 tag)' \
+    'global::ConvertedBox<T1> ConvertedUser<T1>(global::ConvertedBox<T1>? value, T1 fallback)' \
+    'global::ConvertedBox<T1> ConvertedUserAssign<T1>(global::ConvertedBox<T1>? value, T1 fallback)' \
+    'global::System.Threading.Tasks.Task<T2> ConvertedTask<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 fallback) where T1 : struct, T2' \
+    'global::System.Threading.Tasks.ValueTask<T2> ConvertedValueTask<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 fallback) where T1 : struct, T2' \
+    'global::System.Threading.Tasks.Task<T1> ConvertedAssignTask<T1, T2>(T1? value, global::System.Threading.Tasks.Task<T2> fallback) where T1 : class where T2 : T1' \
+    'global::System.Threading.Tasks.ValueTask<T1> ConvertedAssignValueTask<T1, T2>(T1? value, global::System.Threading.Tasks.ValueTask<T2> fallback) where T1 : class where T2 : T1' \
     'T1? Reference<T1, T2>(bool flag, T1 value, T2 tag) where T1 : class' \
     'T1? Value<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct' \
     'T1[]? Array<T1, T2>(bool flag, T1[] value, T2 tag)' \

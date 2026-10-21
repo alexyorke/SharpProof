@@ -625,6 +625,8 @@ public static partial class Inference
                 HmType.Unify(ConversionCore(left), ConversionCore(result));
                 return result;
             }
+            if (resultType is not null && ConvertedCoalescing(expression.Left, left, expression.Right, resultType) is { } convertedResult)
+            { return convertedResult; }
             while (left.Name == CSharpTypes.NullableParameter && left.Arguments[0].Root.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter)
             { left = left.Arguments[0].Root; }
             if (!operation.ValueConversion.IsIdentity || left.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter))
@@ -659,6 +661,8 @@ public static partial class Inference
                 HmType.Unify(ConversionCore(target), ConversionCore(result));
                 return result;
             }
+            if (ConvertedCoalescing(expression.Left, target, expression.Right, resultType) is { } convertedResult)
+            { return convertedResult; }
             var underlying = targetType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
                 ? nullable.TypeArguments[0] : targetType;
             if (target.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue) || sourceType is null
@@ -675,6 +679,36 @@ public static partial class Inference
                 return resultType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } ? target : target.Arguments[0];
             }
             return resultType.NullableAnnotation == NullableAnnotation.Annotated ? target : target.Arguments[0];
+        }
+        private HmType? ConvertedCoalescing(ExpressionSyntax leftSyntax, HmType left, ExpressionSyntax rightSyntax, ITypeSymbol resultType)
+        {
+            if (leftSyntax is null)
+            { throw new ArgumentNullException(nameof(leftSyntax)); }
+            if (left is null)
+            { throw new ArgumentNullException(nameof(left)); }
+            if (rightSyntax is null)
+            { throw new ArgumentNullException(nameof(rightSyntax)); }
+            if (resultType is null)
+            { throw new ArgumentNullException(nameof(resultType)); }
+            var source = model.GetTypeInfo(leftSyntax, cancellationToken).Type;
+            var fallback = model.GetTypeInfo(rightSyntax, cancellationToken).Type;
+            if (source is null || fallback is null || source is IDynamicTypeSymbol || fallback is IDynamicTypeSymbol || resultType is IDynamicTypeSymbol)
+            { return null; }
+            var selected = ConversionCore(left);
+            if (source is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
+            {
+                if (selected.Name != CSharpTypes.NullableValue)
+                { return null; }
+                selected = selected.Arguments[0];
+                source = nullable.TypeArguments[0];
+            }
+            else
+            { source = source.WithNullableAnnotation(NullableAnnotation.NotAnnotated); }
+            var result = CSharpTypes.Erase(resultType);
+            BindConvertedArgument(source, resultType, selected, result);
+            BindConvertedArgument(fallback, resultType, Expression(rightSyntax), result);
+            conversionTargets.Add((result, resultType));
+            return result;
         }
         private HmType ConditionalAccess(ConditionalAccessExpressionSyntax expression)
         {
