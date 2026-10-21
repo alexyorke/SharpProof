@@ -1144,6 +1144,14 @@ public static partial class Inference
                         if (TryUserConversion(model.GetTypeInfo(cast.Expression, cancellationToken).Type!, targetType, Expression(cast.Expression), fixedTarget, userCast.OperatorMethod))
                         { return fixedTarget; }
                     }
+                    if (model.GetTypeInfo(cast.Type, cancellationToken).Type is INamedTypeSymbol { TypeKind: TypeKind.Delegate } castDelegate)
+                    {
+                        var castOperand = cast.Expression;
+                        while (castOperand is ParenthesizedExpressionSyntax castParentheses)
+                        { castOperand = castParentheses.Expression; }
+                        if (castOperand is AnonymousFunctionExpressionSyntax)
+                        { return FixedContextValue(cast.Expression, castDelegate); }
+                    }
                     Anchor(cast.Expression);
                     return CSharpTypes.Rigid(model.GetTypeInfo(cast.Type, cancellationToken).Type!);
                 case DefaultExpressionSyntax @default:
@@ -1346,6 +1354,11 @@ public static partial class Inference
             var joined = expression;
             while (joined is ParenthesizedExpressionSyntax parentheses)
             { joined = parentheses.Expression; }
+            if (joined is AnonymousFunctionExpressionSyntax lambda && declared is INamedTypeSymbol { TypeKind: TypeKind.Delegate })
+            {
+                BindFixedConversion(Lambda(lambda, true), expected, declared, false);
+                return expected;
+            }
             var inferred = joined is ConditionalExpressionSyntax or SwitchExpressionSyntax
                 && model.GetOperation(joined, cancellationToken) is not IConditionalOperation { IsRef: true }
                 ? JoinedExpression(joined, declared, true) : Returned(expression, declared);

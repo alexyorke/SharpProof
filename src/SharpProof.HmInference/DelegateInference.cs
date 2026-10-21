@@ -262,7 +262,9 @@ public static partial class Inference
             ImportConstructedConstraints(target, nominal);
             return nominal;
         }
-        private HmType Lambda(AnonymousFunctionExpressionSyntax lambda)
+        private IMethodSymbol? fixedLambdaReturn;
+
+        private HmType Lambda(AnonymousFunctionExpressionSyntax lambda, bool fixedSignature = false)
         {
             if (lambda is null)
             { throw new ArgumentNullException(nameof(lambda)); }
@@ -290,18 +292,21 @@ public static partial class Inference
                 AnonymousMethodExpressionSyntax anonymous => anonymous.ParameterList?.Parameters.ToArray() ?? [],
                 _ => throw new InferenceException("Unsupported lambda.")
             };
-            var nominal = CSharpTypes.Erase(container);
+            var nominal = fixedSignature ? CSharpTypes.Rigid(container) : CSharpTypes.Erase(container);
             var shape = nominal.Root;
             if (shape.Name == CSharpTypes.NullableReference)
             { shape = shape.Arguments[0].Root; }
             var signature = DelegateSignature(target, SymbolEqualityComparer.Default.Equals(container.OriginalDefinition, expressionDefinition)
                 ? CSharpTypes.OwnArguments(shape)[0] : nominal);
+            var previousFixedReturn = fixedLambdaReturn;
+            var fixedReturn = fixedSignature || lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null };
             var previousAsync = asyncReturn;
             var previousBuilder = asyncBuilder;
             var previousBuilderResult = asyncBuilderResult;
             var previousBuilderUsesResult = builderUsesResult;
             try
             {
+                fixedLambdaReturn = fixedReturn ? operation.Symbol : null;
                 SetAsyncReturn(operation.Symbol);
                 Scoped(() =>
                 {
@@ -324,6 +329,13 @@ public static partial class Inference
                     }
                     else
                     { result = hasVoidBody ? VoidBody((BlockSyntax)body) : Block((BlockSyntax)body); }
+                    if (fixedReturn && !hasVoidBody && operation.Symbol.RefKind == RefKind.None)
+                    {
+                        var declared = asyncReturn is { Arity: 1 } task ? task.TypeArguments[0] : operation.Symbol.ReturnType;
+                        var fixedResult = CSharpTypes.Rigid(declared);
+                        BindFixedConversion(result, fixedResult, declared, false);
+                        result = fixedResult;
+                    }
                     if (lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null } explicitReturn)
                     { HmType.Unify(WrapAsyncResult(result), CSharpTypes.Rigid(operation.Symbol.ReturnType)); }
                     HmType.Unify(signature.Output, WrapAsyncResult(result));
@@ -332,7 +344,7 @@ public static partial class Inference
                 ImportConstructedConstraints(container, nominal);
                 return nominal;
             }
-            finally { asyncReturn = previousAsync; asyncBuilder = previousBuilder; asyncBuilderResult = previousBuilderResult; builderUsesResult = previousBuilderUsesResult; }
+            finally { fixedLambdaReturn = previousFixedReturn; asyncReturn = previousAsync; asyncBuilder = previousBuilder; asyncBuilderResult = previousBuilderResult; builderUsesResult = previousBuilderUsesResult; }
         }
     }
 }

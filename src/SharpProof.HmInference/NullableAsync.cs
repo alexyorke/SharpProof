@@ -150,8 +150,11 @@ public static partial class Inference
             var joined = expression;
             while (joined is ParenthesizedExpressionSyntax parenthesized)
             { joined = parenthesized.Expression; }
+            if (converted is INamedTypeSymbol { TypeKind: TypeKind.Delegate } && joined is AnonymousFunctionExpressionSyntax fixedLambda
+                && IsFixedDeclaredReturn(expression))
+            { return Lambda(fixedLambda, true); }
             if (converted is not null && joined is ConditionalExpressionSyntax or SwitchExpressionSyntax
-                && IsFixedLocalReturn(expression) && model.GetOperation(joined, cancellationToken) is not IConditionalOperation { IsRef: true })
+                && IsFixedDeclaredReturn(expression) && model.GetOperation(joined, cancellationToken) is not IConditionalOperation { IsRef: true })
             { return JoinedExpression(joined, converted, true); }
             if (expression is TupleExpressionSyntax tupleExpression && converted is INamedTypeSymbol { IsTupleType: true } targetTuple)
             {
@@ -193,7 +196,7 @@ public static partial class Inference
                     { inferred = inferred.Arguments[0].Root; }
                     return inferred;
                 }
-                if (IsFixedLocalReturn(expression))
+                if (IsFixedDeclaredReturn(expression))
                 {
                     var fixedReturn = CSharpTypes.Rigid(converted);
                     BindFixedConversion(inferred, fixedReturn, converted, false);
@@ -219,7 +222,7 @@ public static partial class Inference
             return CSharpTypes.Rigid(converted);
         }
 
-        private bool IsFixedLocalReturn(ExpressionSyntax expression)
+        private bool IsFixedDeclaredReturn(ExpressionSyntax expression)
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
@@ -235,17 +238,24 @@ public static partial class Inference
             }
             var declaration = slot.Parent switch
             {
-                ArrowExpressionClauseSyntax { Parent: LocalFunctionStatementSyntax local } => local,
+                ArrowExpressionClauseSyntax { Parent: LocalFunctionStatementSyntax local } => (SyntaxNode)local,
+                AnonymousFunctionExpressionSyntax lambda => lambda,
                 ReturnStatementSyntax or YieldStatementSyntax => slot.Ancestors().FirstOrDefault(owner =>
                 {
                     if (owner is null)
                     { throw new ArgumentNullException(nameof(owner)); }
                     return owner is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or MethodDeclarationSyntax;
-                }) as LocalFunctionStatementSyntax,
+                }),
                 _ => null
             };
-            return declaration is not null && (iteratorReturn is null || slot.Parent is YieldStatementSyntax)
-                && model.GetDeclaredSymbol(declaration, cancellationToken) is { RefKind: RefKind.None };
+            if (declaration is LocalFunctionStatementSyntax localDeclaration)
+            {
+                return (iteratorReturn is null || slot.Parent is YieldStatementSyntax)
+                    && model.GetDeclaredSymbol(localDeclaration, cancellationToken) is { RefKind: RefKind.None };
+            }
+            return declaration is AnonymousFunctionExpressionSyntax anonymous && fixedLambdaReturn is { RefKind: RefKind.None }
+                && model.GetOperation(anonymous, cancellationToken) is IAnonymousFunctionOperation operation
+                && SymbolEqualityComparer.Default.Equals(operation.Symbol, fixedLambdaReturn);
         }
 
         private HmType JoinedExpression(ExpressionSyntax expression, ITypeSymbol? target = null, bool fixedResult = false)
