@@ -1351,6 +1351,126 @@ function Resolve-SharpProofCoverageLineCredits {
     return , [Collections.Immutable.ImmutableArray]::CreateRange[int]($credits.ToImmutable())
 }
 
+# Compile the line accumulator after module/source authentication. Each index
+# retains the same range, integer, direct-hit, and MAX validation for one source.
+function New-SharpProofCoverageLineCreditIndex {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.IEnumerable]$Ranges)
+    if ($null -eq ('SharpProof.Automation.CoverageLineCreditIndex' -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Xml;
+namespace SharpProof.Automation
+{
+    public sealed class CoverageLineCreditIndex
+    {
+        private readonly int[][] ranges;
+        public CoverageLineCreditIndex(int[][] ranges)
+        {
+            this.ranges = new int[ranges.Length][];
+            for (int i = 0; i < ranges.Length; i++)
+            {
+                var range = ranges[i];
+                if (range == null || range.Length != 3 || range[0] <= 0 || range[1] < range[0] || range[2] < 0)
+                    throw new ArgumentException("Invalid authenticated coverage range.", nameof(ranges));
+                this.ranges[i] = (int[])range.Clone();
+            }
+        }
+        public sealed class ClassGroup
+        {
+            public string Module { get; }
+            public string Filename { get; }
+            public List<XmlElement> Classes { get; } = new List<XmlElement>();
+            public ClassGroup(string module, string filename) { Module = module; Filename = filename; }
+        }
+        public List<ClassGroup> Group(XmlNodeList classes, IEnumerable<string> expectedAssemblies, string reportPath)
+        {
+            var expected = new HashSet<string>(expectedAssemblies, StringComparer.Ordinal);
+            var groups = new Dictionary<string, ClassGroup>(StringComparer.Ordinal);
+            foreach (XmlElement item in classes)
+            {
+                var package = item.ParentNode?.ParentNode as XmlElement;
+                if (package == null || !package.HasAttribute("name"))
+                    throw new InvalidOperationException("Coverage report class has no package identity: " + reportPath);
+                string module = package.GetAttribute("name");
+                if (!expected.Contains(module)) continue;
+                if (!item.HasAttribute("filename"))
+                    throw new InvalidOperationException("Coverage report class has no source filename: " + reportPath);
+                string filename = item.GetAttribute("filename").Replace('\\', '/');
+                string key = module + ":" + filename;
+                if (!groups.TryGetValue(key, out ClassGroup group))
+                {
+                    group = new ClassGroup(module, filename);
+                    groups.Add(key, group);
+                }
+                group.Classes.Add(item);
+            }
+            return new List<ClassGroup>(groups.Values);
+        }
+        public int[] MergeClasses(IEnumerable<XmlElement> classes, IDictionary<int, int> hits,
+            IDictionary<int, int> reportedHits, IDictionary<int, object> creditCache,
+            string sourcePath, string reportPath)
+        {
+            int lines = 0, validated = 0;
+            foreach (var item in classes)
+            {
+                int count = Merge(item.SelectNodes(".//line"), hits, reportedHits, creditCache, sourcePath, reportPath);
+                lines += count;
+                validated++;
+            }
+            return new int[] { lines, validated };
+        }
+        public int Merge(XmlNodeList lines, IDictionary<int, int> hits, IDictionary<int, int> reportedHits,
+            IDictionary<int, object> creditCache, string sourcePath, string reportPath)
+        {
+            foreach (XmlElement line in lines)
+            {
+                if (!int.TryParse(line.GetAttribute("number"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int number)
+                    || !int.TryParse(line.GetAttribute("hits"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
+                    || number <= 0 || count < 0)
+                    throw new InvalidOperationException("Coverage report contains a malformed sequence point: " + reportPath);
+                if (!creditCache.TryGetValue(number, out object stored))
+                {
+                    stored = Resolve(number, sourcePath);
+                    creditCache.Add(number, stored);
+                }
+                if (!reportedHits.TryGetValue(number, out int previous) || count > previous)
+                    reportedHits[number] = count;
+                if (count > 0)
+                    foreach (int credit in (IEnumerable<int>)stored)
+                        if (count > hits[credit]) hits[credit] = count;
+            }
+            return lines.Count;
+        }
+        public int[] Resolve(int number, string sourcePath)
+        {
+            bool permitted = false;
+            var credits = new HashSet<int>();
+            foreach (var range in ranges)
+            {
+                if (number < range[0] || number > range[1]) continue;
+                permitted = true;
+                if (range[2] > 0) credits.Add(range[2]);
+            }
+            if (!permitted)
+                throw new InvalidOperationException("Coverage report sequence point is outside the authenticated PDB universe: '" + sourcePath + ":" + number + "'.");
+            var result = new int[credits.Count];
+            credits.CopyTo(result);
+            return result;
+        }
+    }
+}
+"@
+    }
+    $values = [Collections.Immutable.ImmutableArray]::CreateBuilder[int[]]()
+    foreach ($range in $Ranges) {
+        $values.Add([int[]]@([int]$range.startLine, [int]$range.endLine, [int]$range.creditLine))
+    }
+    return [SharpProof.Automation.CoverageLineCreditIndex]::new([int[][]]@($values.ToImmutable()))
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -1428,6 +1548,7 @@ Export-ModuleMember -Function @(
     'New-SharpProofParallelProcessStartInfo',
     'New-SharpProofCoverageContext',
     'Resolve-SharpProofCoverageLineCredits',
+    'New-SharpProofCoverageLineCreditIndex',
     'Remove-SharpProofOwnedDirectory',
     'Add-SharpProofCoverageArguments',
     'Invoke-SharpProofRequiredDotnet',

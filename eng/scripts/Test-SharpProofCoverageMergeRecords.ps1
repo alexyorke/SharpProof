@@ -7,7 +7,7 @@ Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Fo
 $source = Join-Path $PSScriptRoot 'Test-SharpProofCoverage.ps1'
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$null, [ref]$null)
 foreach ($function in $ast.FindAll({ param($node)
-            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Resolve-CoverageSourcePath'
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -cin @('Resolve-CoverageSourcePath', 'Read-SharpProofCoverageReportBatch')
         }, $true)) { . ([scriptblock]::Create($function.Extent.Text)) }
 $loops = @($ast.FindAll({ param($node)
             $node -is [Management.Automation.Language.ForEachStatementAst] -and $node.Variable.VariablePath.UserPath -ceq 'report'
@@ -48,12 +48,14 @@ function Invoke-MergeFixture {
     }
     $lineHits = $expectedLineHits
     $reportedModuleDocuments = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
-    $validatedClassRecords = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::Ordinal)
-    $reusedClassRecords = 0; $validatedClassCount = 0
+    $validatedClassCount = 0
     $reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $coverageLineCreditIndexes = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+    $coverageClassGrouper = New-SharpProofCoverageLineCreditIndex -Ranges @()
     $sourcePathCaches = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
+    $coverageReportIndex = 0; $coverageLoadedReports = @(); $coverageReportBatchSize = 1
     . ([scriptblock]::Create($loops[0].Extent.Text))
-    return [pscustomobject]@{ reused = $reusedClassRecords; validated = $validatedClassCount; hits = $lineHits }
+    return [pscustomobject]@{ validated = $validatedClassCount; hits = $lineHits }
 }
 function Assert-MergeFailure([object[]]$Reports, [string]$Expected) {
     try { Invoke-MergeFixture -Reports $Reports | Out-Null }
@@ -61,15 +63,27 @@ function Assert-MergeFailure([object[]]$Reports, [string]$Expected) {
     throw "Coverage merge accepted invalid records: $Expected"
 }
 try {
+    $parseFiles = @()
+    for ($index = 0; $index -lt 5; $index++) {
+        $path = Join-Path $fixture ("parse-$index.xml")
+        [IO.File]::WriteAllText($path, $(if ($index -eq 1) { '<coverage>' } else { "<coverage position='$index' />" }))
+        $parseFiles += Get-Item -LiteralPath $path
+    }
+    $parsed = Read-SharpProofCoverageReportBatch -Reports $parseFiles -StartIndex 0 -BatchSize 4
+    if ($parsed.Count -ne 4 -or $parsed[0].document.DocumentElement.position -cne '0' -or
+        [string]::IsNullOrEmpty($parsed[1].error) -or $null -ne $parsed[1].document -or
+        $parsed[3].document.DocumentElement.position -cne '3') { throw 'Read-only XML batches lost their order or a malformed input.' }
+    $last = Read-SharpProofCoverageReportBatch -Reports $parseFiles -StartIndex 4 -BatchSize 4
+    if ($last.Count -ne 1 -or $last[0].document.DocumentElement.position -cne '4') { throw 'Read-only XML parsing omitted the last partial batch.' }
     $lines = "<line number='10' hits='0' /><line number='20' hits='2' />"
     $first = Write-Report 'first' 'ProductionA' $lines
     $same = Write-Report 'same' 'ProductionA' $lines
     $otherModule = Write-Report 'other' 'ProductionB' $lines
     $zero = Write-Report 'zero' 'ProductionA' "<line number='10' hits='0' /><line number='20' hits='0' />"
     $result = Invoke-MergeFixture -Reports @($first, $same, $otherModule, $zero)
-    if ($result.reused -ne 1 -or $result.validated -ne 3 -or
+    if ($result.validated -ne 4 -or
         $result.hits['ProductionA:src/Subject.cs'][10] -ne 2 -or $result.hits['ProductionB:src/Subject.cs'][10] -ne 2 -or
-        $result.hits['ProductionA:src/Subject.cs'][20] -ne 2) { throw 'Coverage reuse changed MAX, module ownership, zero hits, or overlapping credits.' }
+        $result.hits['ProductionA:src/Subject.cs'][20] -ne 2) { throw 'Coverage accumulation changed MAX, module ownership, zero hits, or overlapping credits.' }
     $badAuthority = Write-Report 'authority' 'ProductionA' $lines 'other'
     Assert-MergeFailure @($first, $badAuthority) 'Coverage report authority does not match'
     foreach ($bad in @("<line number='999' hits='0' />", "<line number='10' hits='-1' />", "<line number='10' hits='invalid' />", "<line number='invalid' hits='0' />", "<line number='10' />")) {
@@ -85,9 +99,14 @@ try {
     $differentRoots = Write-Report 'different-roots' 'ProductionA' "<line number='10' hits='1' />"
     [IO.File]::WriteAllText($differentRoots.FullName, $rootedText.Replace((Join-Path $fixture 'src'), (Join-Path $fixture 'missing')))
     Assert-MergeFailure @($rooted, $differentRoots) 'Source document is foreign or missing'
+    foreach ($header in @(@(" name='ProductionA'", '', 'no package identity'), @(" filename='src/Subject.cs'", '', 'no source filename'))) {
+        $badHeader = Write-Report 'bad-header' 'ProductionA' $lines
+        [IO.File]::WriteAllText($badHeader.FullName, [IO.File]::ReadAllText($badHeader.FullName).Replace($header[0], $header[1]))
+        Assert-MergeFailure @($first, $badHeader) $header[2]
+    }
     $empty = Write-Report 'empty' 'ProductionA' ''
     Assert-MergeFailure @($first, $empty) 'no production sequence points'
-    Write-Host 'Coverage class reuse regressions passed: identical records, module isolation, MAX and zero hits, overlapping credits, authority mismatch, malformed records, out-of-range zero hits, and isolation between distinct source roots.'
+    Write-Host 'Coverage merge regressions passed: identical records, module isolation, MAX and zero hits, overlapping credits, authority mismatch, malformed records, out-of-range zero hits, and isolation between distinct source roots.'
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($fixture)
