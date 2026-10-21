@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -11,8 +12,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275AnalyzerApiCoverageTests
 {
-    private static readonly CSharpCompilation Compilation = TestCompilation.Create(
-        "Pr275AnalyzerApi", ("Subject.cs", """
+    private static readonly CSharpCompilation Compilation = TestCompilation.CreateExact(
+        "Pr275AnalyzerApi", [("Subject.cs", """
             using System;
             class Subject {
                 public Subject() { }
@@ -23,7 +24,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
                 public static implicit operator int(Subject value) => 0;
                 public void Read() { }
             }
-            """));
+            """)]);
 
     [TestCase("method", "Read")]
     [TestCase("constructor", "Subject")]
@@ -38,7 +39,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(expectedToken);
         var tree = Compilation.SyntaxTrees.Single();
-        var nodes = tree.GetRoot().DescendantNodes().ToArray();
+        var nodes = tree.GetRoot().DescendantNodes().ToImmutableArray();
         SyntaxNode declaration = declarationKind switch
         {
             "method" => nodes.OfType<MethodDeclarationSyntax>().Single(),

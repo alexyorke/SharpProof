@@ -5,11 +5,11 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer 'Qualify the optional tool in the canonical Linux amd64 container.'
 $PackageSource = (Resolve-Path -LiteralPath $PackageSource).Path
-$packages = @(Get-ChildItem -LiteralPath $PackageSource -Filter 'SharpProof.Tool.*.nupkg' -File)
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $PackageSource -Filter 'SharpProof.Tool.*.nupkg' -File))
 if ($packages.Count -ne 1) { throw 'The optional tool feed must contain exactly one SharpProof.Tool package.' }
 $archive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
 try {
-    $spec = @($archive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::Ordinal) })
+    $spec = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($archive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::Ordinal) }))
     if ($spec.Count -ne 1) { throw 'Expected one tool nuspec.' }
     $reader = [IO.StreamReader]::new($spec[0].Open())
     try { [xml]$metadata = $reader.ReadToEnd() } finally { $reader.Dispose() }
@@ -27,7 +27,7 @@ $feed = [Security.SecurityElement]::Escape($PackageSource)
 $configuration = Join-Path $scratch 'NuGet.Config'
 [IO.File]::WriteAllText($configuration, "<configuration><packageSources><clear/><add key=`"exact-tool-feed`" value=`"$feed`"/></packageSources></configuration>")
 function Invoke-ToolCheck([string[]]$Arguments) {
-    $captured = @(& dotnet @Arguments 2>&1)
+    $captured = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& dotnet @Arguments 2>&1))
     if ($LASTEXITCODE -ne 0) { throw "Tool acceptance command failed: $($Arguments -join ' ')`n$($captured -join "`n")" }
     return ($captured -join "`n")
 }
@@ -37,13 +37,17 @@ try {
     [void](Invoke-ToolCheck @('tool', 'install', 'SharpProof.Tool', '--version', $version, '--configfile', $configuration))
     $help = Invoke-ToolCheck @('sharpproof', '--help')
     if ($help -notmatch 'explain <result.json>' -or $help -notmatch 'doctor') { throw 'Installed tool help does not expose its real commands.' }
-    $doctor = (Invoke-ToolCheck @('sharpproof', 'doctor', '--json')) | ConvertFrom-Json
-    if ($doctor.sdk -notmatch '^\d+\.\d+\.\d+' -or $doctor.scope -notmatch 'no project evaluation') { throw 'Installed tool doctor scope or SDK discovery failed.' }
+    $doctor = [Text.Json.JsonDocument]::Parse((Invoke-ToolCheck @('sharpproof', 'doctor', '--json')))
+    try {
+        if ($doctor.RootElement.GetProperty('sdk').GetString() -notmatch '^\d+\.\d+\.\d+' -or
+            $doctor.RootElement.GetProperty('scope').GetString() -notmatch 'no project evaluation') { throw 'Installed tool doctor scope or SDK discovery failed.' }
+    }
+    finally { $doctor.Dispose() }
     # Construct stored failure evidence with the exact packaged public protocol API.
     # This is a reader fixture, not a verification run or synthetic proof.
     $archive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
     try {
-        $protocolEntries = @($archive.Entries | Where-Object { $_.FullName.EndsWith('/SharpProof.Worker.Protocol.dll', [StringComparison]::Ordinal) })
+        $protocolEntries = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($archive.Entries | Where-Object { $_.FullName.EndsWith('/SharpProof.Worker.Protocol.dll', [StringComparison]::Ordinal) }))
         if ($protocolEntries.Count -ne 1) { throw 'Expected exactly one packaged tool protocol assembly.' }
         $protocolPath = Join-Path $scratch 'SharpProof.Worker.Protocol.dll'
         [IO.Compression.ZipFileExtensions]::ExtractToFile($protocolEntries[0], $protocolPath)
@@ -70,13 +74,19 @@ var response = new WorkerVerifyResponse
     InputHash = new string('a', 64),
     RunStatus = WorkerRunStatus.Failed,
     FailureReason = WorkerRunFailureReason.InputUnavailable,
-    Errors = [new() { Code = "input.unavailable", Message = "Stored reader fixture; no verification was performed." }]
+    Errors = [new() { Code = "input.unavailable", Message = "Stored reader fixture; no verification was performed." }],
+    Summary = new()
+    {
+        CacheStatus = WorkerCacheStatus.Disabled,
+        Versions = new()
+        {
+            WorkerVersion = "tool-consumer-fixture",
+            ApiSpecVersion = "tool-consumer-fixture",
+            WorkerBinarySha256 = new string('a', 64),
+            ApiSpecContentSha256 = new string('b', 64)
+        }
+    }
 };
-response.Summary.CacheStatus = WorkerCacheStatus.Disabled;
-response.Summary.Versions.WorkerVersion = "tool-consumer-fixture";
-response.Summary.Versions.ApiSpecVersion = "tool-consumer-fixture";
-response.Summary.Versions.WorkerBinarySha256 = new string('a', 64);
-response.Summary.Versions.ApiSpecContentSha256 = new string('b', 64);
 WorkerProtocolJson.SealManifest(response.Manifest);
 if (!WorkerProtocolJson.Validate(response).IsValid)
     throw new InvalidDataException("The stored reader fixture violates the protocol.");
@@ -85,25 +95,30 @@ File.WriteAllText(args[0], WorkerProtocolJson.SerializeResponse(response));
     [void](Invoke-ToolCheck @('restore', $fixtureProject, '--configfile', $fixtureConfiguration))
     [void](Invoke-ToolCheck @('run', '--project', $fixtureProject, '--configuration', 'Release', '--no-restore', '--',
             (Join-Path $scratch 'stored-result.json')))
-    $explanation = (Invoke-ToolCheck @('sharpproof', 'explain', 'stored-result.json', '--json')) | ConvertFrom-Json
-    if ($explanation.scope -notmatch '^Stored evidence only' -or $explanation.runStatus -cne 'Failed' -or $explanation.errors.Count -ne 1) {
-        throw 'Installed explain lost the stored evidence boundary or recorded failure.'
-    }
-    [IO.File]::WriteAllText((Join-Path $scratch 'invalid-result.json'), '{}')
-    $invalid = @(& dotnet sharpproof explain invalid-result.json 2>&1)
-    if ($LASTEXITCODE -ne 2 -or ($invalid -join "`n") -notmatch 'SharpProof:') { throw 'Installed tool accepted malformed evidence.' }
-    $manifests = @(
-        foreach ($relativeManifest in @('dotnet-tools.json', '.config/dotnet-tools.json')) {
-            $manifestPath = Join-Path $scratch $relativeManifest
-            if (Test-Path -LiteralPath $manifestPath -PathType Leaf) { $manifestPath }
+    $explanation = [Text.Json.JsonDocument]::Parse((Invoke-ToolCheck @('sharpproof', 'explain', 'stored-result.json', '--json')))
+    try {
+        if ($explanation.RootElement.GetProperty('scope').GetString() -notmatch '^Stored evidence only' -or
+            $explanation.RootElement.GetProperty('runStatus').GetString() -cne 'Failed' -or
+            $explanation.RootElement.GetProperty('errors').GetArrayLength() -ne 1) {
+            throw 'Installed explain lost the stored evidence boundary or recorded failure.'
         }
-    )
+    }
+    finally { $explanation.Dispose() }
+    [IO.File]::WriteAllText((Join-Path $scratch 'invalid-result.json'), '{}')
+    $invalid = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(& dotnet sharpproof explain invalid-result.json 2>&1))
+    if ($LASTEXITCODE -ne 2 -or ($invalid -join "`n") -notmatch 'SharpProof:') { throw 'Installed tool accepted malformed evidence.' }
+    $manifests = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            foreach ($relativeManifest in [Collections.Immutable.ImmutableArray]::Create[string]('dotnet-tools.json', '.config/dotnet-tools.json')) {
+                $manifestPath = Join-Path $scratch $relativeManifest
+                if (Test-Path -LiteralPath $manifestPath -PathType Leaf) { $manifestPath }
+            }
+        ))
     if ($manifests.Count -ne 1) { throw 'Tool acceptance requires exactly one local manifest in the isolated consumer.' }
     $manifest = Get-Content -LiteralPath $manifests[0] -Raw | ConvertFrom-Json -AsHashtable
     if (-not $manifest.ContainsKey('tools') -or $manifest.tools -isnot [Collections.IDictionary]) {
         throw 'Local tool manifest has no tool registrations.'
     }
-    $toolKeys = @($manifest.tools.Keys | Where-Object { $_ -ieq 'SharpProof.Tool' })
+    $toolKeys = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($manifest.tools.Keys | Where-Object { $_ -ieq 'SharpProof.Tool' })))
     if ($manifest.tools.Count -ne 1 -or $toolKeys.Count -ne 1) { throw 'Local manifest must register only SharpProof.Tool.' }
     $registeredTool = $manifest.tools[$toolKeys[0]]
     if ($registeredTool.version -cne $version -or @($registeredTool.commands).Count -ne 1 -or

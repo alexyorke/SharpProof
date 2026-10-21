@@ -22,130 +22,92 @@ internal static class IrTraversal
         };
     }
 
-    internal static void PushChildren(
+    internal static ImmutableStack<IrTerm> PushChildren(
         IrTerm term,
-        Stack<IrTerm> pending)
+        ImmutableStack<IrTerm> pending)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
         ArgumentNullGuard.NotNull(pending, nameof(pending));
-        switch (term)
+        foreach (var child in GetChildren(term))
         {
-            case IrOpaqueTerm opaque:
-                if (opaque.Receiver is { } receiver)
-                {
-                    pending.Push(receiver);
-                }
-                for (var index = 0; index < opaque.Arguments.Length; index++)
-                {
-                    pending.Push(opaque.Arguments[index]);
-                }
-                break;
-            case IrUnaryTerm unary:
-                pending.Push(unary.Operand);
-                break;
-            case IrBinaryTerm binary:
-                pending.Push(binary.Left);
-                pending.Push(binary.Right);
-                break;
-            case IrConditionalTerm conditional:
-                pending.Push(conditional.Condition);
-                pending.Push(conditional.WhenTrue);
-                pending.Push(conditional.WhenFalse);
-                break;
-            case IrCastTerm cast:
-                pending.Push(cast.Operand);
-                break;
-            case IrLengthTerm length:
-                pending.Push(length.Value);
-                break;
-            case IrSequenceAccessTerm access:
-                pending.Push(access.Sequence);
-                pending.Push(access.Index);
-                break;
+            pending = pending.Push(child);
         }
+        return pending;
     }
 
     internal static bool Any(IrTerm root, Func<IrTerm, bool> predicate)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(predicate, nameof(predicate));
-        var pending = new Stack<IrTerm>(1);
-        pending.Push(root);
-        return Traverse(pending, predicate, variables: null);
+        return Traverse(ImmutableStack<IrTerm>.Empty.Push(root), predicate, false).Found;
     }
 
     internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
-        var pending = new Stack<IrTerm>();
-        pending.Push(root);
-        return CollectVariablesCore(pending);
+        return Traverse(ImmutableStack<IrTerm>.Empty.Push(root), null, true).Variables;
     }
 
-    internal static ImmutableHashSet<IrVarId> CollectVariables(
-        IEnumerable<IrTerm> roots)
+    internal static ImmutableHashSet<IrVarId> CollectVariables(IEnumerable<IrTerm> roots)
     {
         roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
-        return CollectVariablesCore(new Stack<IrTerm>(roots));
-    }
-
-    private static ImmutableHashSet<IrVarId> CollectVariablesCore(
-        Stack<IrTerm> pending)
-    {
-        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
-        var result = ImmutableHashSet.CreateBuilder<IrVarId>();
-        Traverse(pending, predicate: null, result);
-        return result.ToImmutable();
-    }
-
-    private static bool Traverse(
-        Stack<IrTerm> pending,
-        Func<IrTerm, bool>? predicate,
-        ImmutableHashSet<IrVarId>.Builder? variables)
-    {
-        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
-        var visited = new HashSet<IrId>();
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IrTerm>.Empty;
+        foreach (var root in roots)
         {
-            var term = pending.Pop();
+            pending = pending.Push(root);
+        }
+        return Traverse(pending, null, true).Variables;
+    }
+
+    private static (bool Found, ImmutableHashSet<IrVarId> Variables) Traverse(
+        ImmutableStack<IrTerm> pending,
+        Func<IrTerm, bool>? predicate,
+        bool collectVariables)
+    {
+        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
+        while (!pending.IsEmpty)
+        {
+            var term = pending.Peek();
+            pending = pending.Pop();
             if (!visited.Add(term.Id))
             {
                 continue;
             }
-
             if (predicate != null && predicate(term))
             {
-                return true;
+                return (true, variables.ToImmutable());
             }
-
-            if (variables != null && term is IrVariableTerm variable)
+            if (collectVariables && term is IrVariableTerm variable)
             {
                 variables.Add(variable.Variable);
             }
-
-            PushChildren(term, pending);
+            pending = PushChildren(term, pending);
         }
-        return false;
+        return (false, variables.ToImmutable());
     }
 
-    internal static T FoldBottomUp<T>(
+    internal static (T Value, ImmutableDictionary<IrId, T> Memo) FoldBottomUp<T>(
         IrTerm root,
-        Dictionary<IrId, T> memo,
-        Func<IrTerm, ImmutableArray<IrTerm>, Dictionary<IrId, T>, T> combine,
+        ImmutableDictionary<IrId, T> memo,
+        Func<IrTerm, ImmutableArray<IrTerm>, ImmutableDictionary<IrId, T>, T> combine,
         Func<IrTerm, (bool HasValue, T Value)>? shortCircuit = null)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));
         ArgumentNullGuard.NotNull(combine, nameof(combine));
-        var pending = new Stack<(
+        var memoBuilder = memo.ToBuilder();
+        var pending = ImmutableStack<(
             IrTerm Term,
             bool ChildrenReady,
-            ImmutableArray<IrTerm> Children)>();
-        pending.Push((root, false, []));
-        while (pending.Count != 0)
+            ImmutableArray<IrTerm> Children)>.Empty;
+        pending = pending.Push((root, false, []));
+        while (!pending.IsEmpty)
         {
-            var (term, childrenReady, children) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+            var (term, childrenReady, children) = pending.Peek();
+            pending = pending.Pop();
+            if (memoBuilder.ContainsKey(term.Id))
             {
                 continue;
             }
@@ -154,19 +116,19 @@ internal static class IrTraversal
             {
                 if (shortCircuit?.Invoke(term) is (true, var value))
                 {
-                    memo.Add(term.Id, value);
+                    memoBuilder.Add(term.Id, value);
                     continue;
                 }
 
                 children = GetChildren(term);
                 if (children.Length != 0)
                 {
-                    pending.Push((term, true, children));
+                    pending = pending.Push((term, true, children));
                     foreach (var child in children)
                     {
-                        if (!memo.ContainsKey(child.Id))
+                        if (!memoBuilder.ContainsKey(child.Id))
                         {
-                            pending.Push((child, false, []));
+                            pending = pending.Push((child, false, []));
                         }
                     }
 
@@ -174,9 +136,9 @@ internal static class IrTraversal
                 }
             }
 
-            memo.Add(term.Id, combine(term, children, memo));
+            memoBuilder.Add(term.Id, combine(term, children, memoBuilder.ToImmutable()));
         }
 
-        return memo[root.Id];
+        return (memoBuilder[root.Id], memoBuilder.ToImmutable());
     }
 }

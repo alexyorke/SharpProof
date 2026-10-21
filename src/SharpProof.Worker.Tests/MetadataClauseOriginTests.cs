@@ -39,9 +39,11 @@ public sealed class MetadataClauseOriginTests
         }
         if (metadata)
         {
-            detached.CallPreconditions[0].MetadataClause = origin with { Minimum = -100 };
-            detached.CallPreconditions = [];
-            references[0].Modules = [];
+            { detached = detached with { CallPreconditions = detached.CallPreconditions.SetItem(0, detached.CallPreconditions[0] with { MetadataClause = origin with { Minimum = -100 } }) }; }
+            { detached = detached with { CallPreconditions = [] }; }
+            var referenceBuilder = references.ToBuilder();
+            referenceBuilder[0] = references[0] with { Modules = [] };
+            references = referenceBuilder.ToImmutable();
             Assert.That(row.MetadataClause!.Minimum, Is.EqualTo(1));
             Assert.That(row.MetadataClause.ValueBlob, Is.EqualTo(origin.ValueBlob));
         }
@@ -83,58 +85,71 @@ public sealed class MetadataClauseOriginTests
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
         _ = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references);
         var row = dto.CallPreconditions.Single();
-        row.MetadataClause = mutation switch
         {
-            "image" => origin with { ImageSha256 = new string('0', 64) },
-            "mvid" => origin with { ModuleMvid = Guid.Empty.ToString("D") },
-            "module" => origin with { ModuleName = "other.dll" },
-            "assembly" => origin with { AssemblyIdentity = "other" },
-            "method" => origin with { MethodToken = origin.MethodToken + 1 },
-            "parameter" => origin with { ParameterToken = origin.ParameterToken + 1 },
-            "attribute" => origin with { AttributeToken = origin.AttributeToken + 1 },
-            "constructor" => origin with { ConstructorToken = origin.ConstructorToken + 1 },
-            "ordinal" => origin with { ParameterOrdinal = 128 },
-            "sequence" => origin with { ParameterSequence = 0 },
-            "kind" => origin with { Kind = "Positive" },
-            "minimum" => origin with { Minimum = 2 },
-            "maximum" => origin with { Maximum = 9 },
-            "signature" => origin with { ConstructorSignature = [0x20, 0, 1] },
-            "blob" => origin with { ValueBlob = [1] },
-            "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(new byte[65_536]) },
-            "missing-origin" => null,
-            "wrong-table" => origin with { MethodToken = 0x08000001 },
-            _ => origin
-        };
+            row = row with
+            {
+                MetadataClause = mutation switch
+                {
+                    "image" => origin with { ImageSha256 = new string('0', 64) },
+                    "mvid" => origin with { ModuleMvid = Guid.Empty.ToString("D") },
+                    "module" => origin with { ModuleName = "other.dll" },
+                    "assembly" => origin with { AssemblyIdentity = "other" },
+                    "method" => origin with { MethodToken = origin.MethodToken + 1 },
+                    "parameter" => origin with { ParameterToken = origin.ParameterToken + 1 },
+                    "attribute" => origin with { AttributeToken = origin.AttributeToken + 1 },
+                    "constructor" => origin with { ConstructorToken = origin.ConstructorToken + 1 },
+                    "ordinal" => origin with { ParameterOrdinal = 128 },
+                    "sequence" => origin with { ParameterSequence = 0 },
+                    "kind" => origin with { Kind = "Positive" },
+                    "minimum" => origin with { Minimum = 2 },
+                    "maximum" => origin with { Maximum = 9 },
+                    "signature" => origin with { ConstructorSignature = [0x20, 0, 1] },
+                    "blob" => origin with { ValueBlob = [1] },
+                    "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(Enumerable.Repeat((byte)0, 65_536)) },
+                    "missing-origin" => null,
+                    "wrong-table" => origin with { MethodToken = 0x08000001 },
+                    _ => origin
+                }
+            };
+            dto = dto with { CallPreconditions = dto.CallPreconditions.ReplaceReference(dto.CallPreconditions.Single(), row) };
+        }
         switch (mutation)
         {
             case "source-span":
-                dto.Graph.Operations[row.ClauseSite].SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 };
+                { dto = dto with { Graph = dto.Graph with { Operations = dto.Graph.Operations.SetItem(row.ClauseSite, dto.Graph.Operations[row.ClauseSite] with { SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 } }) } }; }
                 break;
             case "missing-owner":
                 references = [];
                 break;
             case "wrong-owner":
-                foreach (var reference in references)
-                { foreach (var module in reference.Modules) { module.Sha256 = new string('0', 64); } }
+                references = [.. references.Select(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
+                    reference with { Modules = [.. reference.Modules.Select(module => module is null ? throw new ArgumentNullException(nameof(module)) :
+                        module with { Sha256 = new string('0', 64) })] })];
                 break;
             case "remove-row":
-                dto.CallPreconditions = [];
+                { dto = dto with { CallPreconditions = [] }; }
                 break;
             case "duplicate-row":
-                dto.CallPreconditions = [row, row];
+                { dto = dto with { CallPreconditions = [row, row] }; }
                 break;
         }
         Assert.Throws<InvalidDataException>(new Action(() =>
             CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references)));
     }
 
-    [Test]
-    public void MetadataRequiresExplicitOwnershipContext()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MetadataRequiresExplicitOwnershipContext(bool presentDefault)
     {
         var (body, _, _) = Create(true);
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
+        ImmutableArray<CompilerReferenceSnapshot>? references = presentDefault
+            ? default(ImmutableArray<CompilerReferenceSnapshot>)
+            : null;
+        Assert.That(references.HasValue, Is.EqualTo(presentDefault));
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(
+                body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references)));
     }
 
     [Test]
@@ -149,7 +164,7 @@ public sealed class MetadataClauseOriginTests
         Assert.That(invalidDigest, Is.Empty);
     }
 
-    private static (CompilerTotalCallablePreparation Body, CompilerReferenceSnapshot[] References,
+    private static (CompilerTotalCallablePreparation Body, ImmutableArray<CompilerReferenceSnapshot> References,
         CompilerMetadataClauseOrigin Origin) Create(bool metadata)
     {
         using var subject = new MetadataTestSubject(
@@ -181,7 +196,7 @@ public sealed class MetadataClauseOriginTests
         var context = new TotalLoweringContext(factory, method);
         var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken).Clauses.Single();
         var value = IrSubstitution.Substitute(factory, bound.Value,
-            new Dictionary<IrVarId, IrTerm> { [context.Parameters[0].Entry] = factory.Variable(entry) });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(context.Parameters[0].Entry, factory.Variable(entry)));
         string name;
         Assert.That(metadata ? CompilerTotalCallableArtifactCodec.TryCreateMetadataMarkerName("Library.Target", 0,
             factory.GetOperationInfo(site).SourceSpan, origin, out name) :

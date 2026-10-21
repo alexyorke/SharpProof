@@ -12,7 +12,7 @@ public sealed class Wave7CompanionAssumptionControlTests
     [TestCase(true, false)]
     public async Task RegionReturnsPreserveThePrologueFilter(bool companion, bool valid)
     {
-        var clauses = "Contract.Assume(value > 0); Contract.Ensures(Contract.Result<int>() > 0);";
+        const string clauses = "Contract.Assume(value > 0); Contract.Ensures(Contract.Result<int>() > 0);";
         var source = "using SharpProof.Attributes; public static class Subject { public static int Target(int value) { " +
             (companion ? "" : clauses) + " try { return " + (valid ? "value" : "-1") + "; } finally { value = 0; } } } " +
             (companion ? "[ContractFor(typeof(Subject))] public static class Specification { public static int Target(int value) { " +

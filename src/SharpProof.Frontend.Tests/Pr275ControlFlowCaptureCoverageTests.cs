@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -27,9 +28,9 @@ public sealed class Pr275ControlFlowCaptureCoverageTests
         var graph = ControlFlowGraph.Create(method, compilation.GetSemanticModel(tree))!;
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
             .Concat(block.BranchValue == null ? [] : [block.BranchValue])))
-            .SelectMany(DescendantsAndSelf).ToArray();
-        var captures = operations.OfType<IFlowCaptureOperation>().ToArray();
-        var references = operations.OfType<IFlowCaptureReferenceOperation>().ToArray();
+            .SelectMany(DescendantsAndSelf).ToImmutableArray();
+        var captures = operations.OfType<IFlowCaptureOperation>().ToImmutableArray();
+        var references = operations.OfType<IFlowCaptureReferenceOperation>().ToImmutableArray();
         var lowerer = new RoslynOperationLowerer(new IrFactory());
 
         Assert.That(captures, Is.Not.Empty);

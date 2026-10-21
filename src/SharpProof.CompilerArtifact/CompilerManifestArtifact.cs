@@ -92,7 +92,7 @@ internal static class WorkerBinaryIdentity
         using var hash = new CanonicalHashWriter();
         foreach (var file in files)
         {
-            hash.Add(Path.GetFileName(file)).Add(File.ReadAllBytes(file));
+            hash.Add(Path.GetFileName(file)).Add(File.ReadAllBytes(file).ToImmutableArray());
         }
         return hash.Add("z3.native").Add(z3LibrarySha256 ?? string.Empty).Finish();
     }
@@ -137,7 +137,7 @@ internal static class CompilerManifestArtifactJson
 
         // Reject malformed containers before canonicalization dereferences them.
         if (validate && (artifact.Manifest == null ||
-            artifact.Callables == null ||
+            artifact.Callables.IsDefault ||
             artifact.Callables.Any(static item => item == null)))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
@@ -150,20 +150,29 @@ internal static class CompilerManifestArtifactJson
 
         if (canonicalize)
         {
+            // Canonicalization replaces collections on the manifest and callable
+            // entries. Copy those owners before sorting producer-owned data.
+            artifact = artifact with
+            {
+                Manifest = artifact.Manifest with
+                {
+                    Callables = artifact.Manifest.Callables.IsDefault ? default : artifact.Manifest.Callables.Select(static (WorkerCallableManifestEntry /* SPINT001: all values valid - null entries are validated after canonicalization */ callable) =>
+                        callable is null ? null! : callable with { }).ToImmutableArray()
+                }
+            };
             try
             { WorkerProtocolJson.Canonicalize(artifact.Manifest); }
             catch (ArgumentOutOfRangeException exception) when (exception.ActualValue is Enum)
             {
                 throw new JsonException("The compiler manifest contains an unknown enum value.", exception);
             }
-            artifact.CompilerDiagnostics =
-                CompilerDiagnosticArtifactOrdering.Canonicalize(
-                    artifact.CompilerDiagnostics);
-            artifact.Callables = [
-                .. artifact.Callables.OrderBy(
+            artifact = artifact with
+            {
+                CompilerDiagnostics = CompilerDiagnosticArtifactOrdering.Canonicalize(artifact.CompilerDiagnostics),
+                Callables = [.. artifact.Callables.OrderBy(
                     static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
-                    StringComparer.Ordinal)
-            ];
+                    StringComparer.Ordinal)]
+            };
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (validate)
@@ -222,7 +231,8 @@ internal static class CompilerManifestArtifactJson
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            callables = DecodeCallables(artifact, cancellationToken);
+            callables = DecodeCallables(artifact, out var compilation, cancellationToken);
+            artifact = artifact with { Compilation = compilation };
         }
         catch (InvalidDataException exception)
         {
@@ -236,17 +246,29 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        return DecodeCallables(artifact, out _, cancellationToken);
+    }
+
+    private static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
+        CompilerManifestArtifact artifact,
+        out CompilerCompilationSnapshot compilation,
+        CancellationToken cancellationToken)
+    {
         Validate(
             artifact,
             validateDecodability: false,
             cancellationToken);
-        artifact.Compilation.SpecificationPackIds = artifact.SpecificationPackIds;
-        artifact.Compilation.SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion;
-        artifact.Compilation.SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256;
+        compilation = artifact.Compilation with
+        {
+            SpecificationPackIds = artifact.SpecificationPackIds,
+            SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion,
+            SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256
+        };
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
-            artifact.Compilation,
+            compilation,
             cancellationToken);
     }
 
@@ -371,9 +393,9 @@ internal static class CompilerManifestArtifactJson
     }
 
     private static bool HasValidDiagnosticShapes(
-        CompilerDiagnosticArtifact[]? diagnostics)
+        ImmutableArray<CompilerDiagnosticArtifact> diagnostics)
     {
-        return diagnostics?.All(HasValidDiagnosticShape) == true;
+        return !diagnostics.IsDefault && diagnostics.All(HasValidDiagnosticShape);
     }
 
     private static bool HasValidDiagnosticShape(
@@ -390,21 +412,21 @@ internal static class CompilerManifestArtifactJson
     }
 
     private static bool HasMatchingCallables(
-        CompilerCallableArtifact[]? callables,
+        ImmutableArray<CompilerCallableArtifact> callables,
         WorkerClaimManifest manifest)
     {
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
-        return callables?.Length == manifest.Callables.Length &&
+        return !callables.IsDefault && callables.Length == manifest.Callables.Length &&
         callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
             manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
             StringComparer.Ordinal);
     }
 
     private static bool HasValidCallableStates(
-        CompilerCallableArtifact[]? callables,
+        ImmutableArray<CompilerCallableArtifact> callables,
         bool hasCompilerDiagnostics)
     {
-        return callables?.All(callable =>
+        return !callables.IsDefault && callables.All(callable =>
             callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable != null &&
             (!hasCompilerDiagnostics ||
              (callable.FailureReason ==
@@ -423,7 +445,7 @@ internal static class CompilerManifestArtifactFile
     // so they need a larger bounded envelope than ordinary worker JSON files.
     internal const int MaximumBytes = 32 * 1024 * 1024;
 
-    internal static byte[] ReadAllBytes(
+    internal static ImmutableArray<byte> ReadAllBytes(
         string path,
         int maximumBytes,
         CancellationToken cancellationToken)
@@ -435,7 +457,7 @@ internal static class CompilerManifestArtifactFile
 
     // A directory entry may already have an observed length. Keep that snapshot
     // through admission so opening a replaced or resized file fails closed.
-    internal static byte[] ReadAllBytes(
+    internal static ImmutableArray<byte> ReadAllBytes(
         FileInfo file,
         int maximumBytes,
         CancellationToken cancellationToken)
@@ -451,7 +473,7 @@ internal static class CompilerManifestArtifactFile
             cancellationToken);
     }
 
-    internal static byte[] ReadExact(
+    internal static ImmutableArray<byte> ReadExact(
         FileStream stream,
         int length,
         string changedMessage,
@@ -479,7 +501,7 @@ internal static class CompilerManifestArtifactFile
         cancellationToken.ThrowIfCancellationRequested();
         EnsureEndOfFile(stream.ReadByte());
         cancellationToken.ThrowIfCancellationRequested();
-        return bytes;
+        return bytes.ToImmutableArray();
     }
 
     private static FileStream Open(

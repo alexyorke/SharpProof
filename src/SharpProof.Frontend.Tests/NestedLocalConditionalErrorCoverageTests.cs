@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -12,7 +13,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NestedLocalConditionalErrorCoverageTests
 {
-    private static readonly string[] ExpectedErrorIds = ["CS0159"];
+    private static readonly ImmutableArray<string> ExpectedErrorIds = ["CS0159"];
     private const string OuterLabelSource = """
         public static class Subject
         {
@@ -57,7 +58,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     public void OuterLabelInElseProducesOwnedConditionalErrorAndRefusesControlFlow()
     {
         var compilation = CreateCompilation(OuterLabelSource);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedErrorIds));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
@@ -89,12 +90,12 @@ public sealed class NestedLocalConditionalErrorCoverageTests
             var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-            foreach (var input in new[] { false, true })
+            foreach (var input in ImmutableArray.Create(false, true))
             {
                 Assert.That(target.Invoke(null, [input]), Is.EqualTo(7));
                 var parameter = context.Parameters.Single();
                 var execution = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [parameter.Entry] = factory.CreateBooleanValue(input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateBooleanValue(input)));
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));

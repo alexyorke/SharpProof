@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -21,8 +22,8 @@ public sealed class IrFactoryComparerTests
         var second = factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true,
             factory.IntegerType, factory.BooleanType);
         Assert.That(first, Is.Not.EqualTo(second));
-        Assert.That(factory.GetMemberInfo(first).ParameterTypes, Is.EqualTo(new[] { factory.BooleanType, last }));
-        Assert.That(factory.GetMemberInfo(second).ParameterTypes, Is.EqualTo(new[] { factory.IntegerType, factory.BooleanType }));
+        Assert.That(factory.GetMemberInfo(first).ParameterTypes, Is.EqualTo(ImmutableArray.Create(factory.BooleanType, last)));
+        Assert.That(factory.GetMemberInfo(second).ParameterTypes, Is.EqualTo(ImmutableArray.Create(factory.IntegerType, factory.BooleanType)));
         Assert.That(factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true,
             factory.BooleanType, last), Is.EqualTo(first));
     }

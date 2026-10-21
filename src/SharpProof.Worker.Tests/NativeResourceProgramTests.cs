@@ -318,7 +318,7 @@ public sealed class NativeResourceProgramTests
         ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { [ZeroAllocations] public static void Target(int n) { " + body +
             " } private static void Leaf(int size) { for(int i=0;i<size;i++) { var a = new int[2]; } } }";
-        var compilation = TestCompilation.Create("ResourceProgram", ("Subject.cs", source));
+        var compilation = TestCompilation.Create("ResourceProgram", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");

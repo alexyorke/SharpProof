@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -25,7 +26,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
                 public static void Root({{parameters}}) { Helper(1); }
             }
             """;
-        var compilation = TestCompilation.Create("ShadowParameterBoundary", ("parameters.cs", source));
+        var compilation = TestCompilation.CreateExact("ShadowParameterBoundary", [("parameters.cs", source)]);
         EmitAndCheck(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot();
@@ -77,7 +78,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var entry = caller.Body.Parameters.Single().Entry;
         var factory = caller.Body.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 0)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
     }
@@ -87,8 +88,8 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
     public void ActualCompilationTreeCountControlsBothSourceInventories(int treeCount, bool expectedComplete)
     {
         const string source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { public static void Helper(int value) { Contract.Requires(value>0); } public static void Root() { Helper(1); } }";
-        var sources = Enumerable.Range(0, treeCount).Select(index => ($"tree{index}.cs", index == 0 ? source : string.Empty)).ToArray();
-        var compilation = TestCompilation.Create("TreeBoundary", sources);
+        var sources = Enumerable.Range(0, treeCount).Select(index => ($"tree{index}.cs", index == 0 ? source : string.Empty)).ToImmutableArray();
+        var compilation = TestCompilation.CreateExact("TreeBoundary", OutputKind.DynamicallyLinkedLibrary, sources);
         EmitAndCheck(compilation);
         Assert.That(compilation.SyntaxTrees.Length, Is.EqualTo(treeCount));
         Assert.That(compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath)).Distinct().Count(), Is.EqualTo(treeCount));
@@ -116,10 +117,10 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
     public void ActualOwnedMethodCountRetainsTheBoundedInventory(int methodCount, bool expectedComplete)
     {
         var methods = string.Concat(Enumerable.Range(0, methodCount).Select(index => $"public static void Owner{index}() {{ }}\n"));
-        var compilation = TestCompilation.Create("OwnerBoundary", ("owners.cs", "public static class Subject {\n" + methods + "}"));
+        var compilation = TestCompilation.CreateExact("OwnerBoundary", [("owners.cs", "public static class Subject {\n" + methods + "}")]);
         EmitAndCheck(compilation);
         var tree = compilation.SyntaxTrees.Single();
-        var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(methodCount));
         Assert.That(tree.GetRoot().DescendantNodesAndSelf().Count(), Is.LessThan(65536));
         var model = compilation.GetSemanticModel(tree);
@@ -146,7 +147,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var attributes = string.Join(",", Enumerable.Repeat("Tag", attributeCount));
         var source = "using System; [AttributeUsage(AttributeTargets.Method, AllowMultiple=true)] public sealed class TagAttribute:Attribute { } " +
             $"public static class Subject {{ [{attributes}] public static int Root() => 1; }}";
-        var compilation = TestCompilation.Create("SyntaxBoundary", ("attributes.cs", source));
+        var compilation = TestCompilation.CreateExact("SyntaxBoundary", [("attributes.cs", source)]);
         EmitAndCheck(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot();
@@ -185,7 +186,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
     }
 }

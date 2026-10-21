@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -37,8 +37,8 @@ public sealed class NightlyRefutationRegressionTests
         // Compile the same method for the CLR with contracts erased, as the
         // nightly runtime oracle does. Both admitted values throw; the source
         // has no normal-return statement, so this holds for all admitted x.
-        var runtime = TestCompilation.Create("NightlyRefutationRuntime",
-            ("Subject.cs", "#undef SHARPPROOF_CONTRACTS\n" + source));
+        var runtime = TestCompilation.CreateExact("NightlyRefutationRuntime",
+            [("Subject.cs", "#undef SHARPPROOF_CONTRACTS\n" + source)]);
         TestCompilation.AssertNoErrors(runtime);
         using var image = new MemoryStream();
         var emission = runtime.Emit(image);
@@ -46,7 +46,7 @@ public sealed class NightlyRefutationRegressionTests
         image.Position = 0;
         var assembly = System.Reflection.Assembly.Load(image.ToArray());
         var target = assembly.GetType("C")!.GetMethod("Target")!;
-        foreach (var x in new[] { 1, 2 })
+        foreach (var x in ImmutableArray.Create(1, 2))
         {
             var exception = Assert.Throws<System.Reflection.TargetInvocationException>(
                 new Action(() => { _ = target.Invoke(null, [x]); }));
@@ -97,31 +97,31 @@ public sealed class NightlyRefutationRegressionTests
         Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var temp = new TempDirectory("sharpproof-nightly-regression-");
         var manifestPath = Path.Combine(temp.FullName, "manifest.json");
-        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["build_property._SharpProofCompilerManifestPath"] = manifestPath,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net9.0",
-            ["build_property._SharpProofProjectDirectory"] = "/project",
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] =
-                WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture),
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow"
-        };
-        var exceptions = new ConcurrentBag<string>();
+        var optionsBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionsBuilder["build_property._SharpProofCompilerManifestPath"] = manifestPath;
+        optionsBuilder["build_property._SharpProofCompilationTargetFramework"] = "net9.0";
+        optionsBuilder["build_property._SharpProofProjectDirectory"] = "/project";
+        optionsBuilder["build_property.SharpProofVerifyMaximumExpressionDepth"] =
+            WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture);
+        optionsBuilder["build_property.SharpProofProfile"] = "advisory";
+        optionsBuilder["build_property.SharpProofFeatures"] = "all";
+        optionsBuilder["build_property.SharpProofVerifyPolicy"] = "advisory";
+        optionsBuilder["build_property.SharpProofAssumptionPolicy"] = "allow";
+        var options = optionsBuilder.ToImmutable();
+        var exceptions = ImmutableArray.CreateBuilder<string>();
         var analyzerOptions = new AnalyzerOptions([], new OptionsProvider(options));
         var withAnalyzers = compilation.WithAnalyzers(
             [new SharpProofAnalyzer(), new FinalCompilationCollectorAnalyzer()],
             new CompilationWithAnalyzersOptions(analyzerOptions,
-                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); exceptions.Add(analyzer.GetType().Name + ": " + exception); },
+                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); lock (exceptions) { exceptions.Add(analyzer.GetType().Name + ": " + exception); } },
                 concurrentAnalysis: false, logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
-        Assert.That(exceptions, Is.Empty);
+        Assert.That(exceptions.ToImmutable(), Is.Empty);
         Assert.That(diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id is "AD0001" or "SP0049" or "SP0025")), Is.Empty);
         Assert.That(File.Exists(manifestPath), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
@@ -130,7 +130,7 @@ public sealed class NightlyRefutationRegressionTests
                 claim.CallableId.Contains("Target", StringComparison.Ordinal)))));
     }
 
-    private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
+    private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
         public override AnalyzerConfigOptions GlobalOptions => _options;
@@ -146,9 +146,9 @@ public sealed class NightlyRefutationRegressionTests
         }
     }
 
-    private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    private sealed class DictionaryOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             System.ArgumentNullException.ThrowIfNull(key);

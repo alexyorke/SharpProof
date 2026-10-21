@@ -307,24 +307,24 @@ if ($CoveragePhase -in @('all', 'semantic-projects')) {
 # only paths proven to be inside this checkout to repository-relative names so
 # the persisted report remains valid after the disposable clone is removed and
 # the policy gate evaluates the same canonical source identity everywhere.
-$coverageReports = @(
-    Get-ChildItem `
-        -LiteralPath $resolvedResultsDirectory `
-        -Recurse `
-        -Filter '*.cobertura*.xml' `
-        -File `
-        -ErrorAction Stop |
-        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
+$coverageReports = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+        Get-ChildItem `
+            -LiteralPath $resolvedResultsDirectory `
+            -Recurse `
+            -Filter '*.cobertura*.xml' `
+            -File `
+            -ErrorAction Stop |
+            Where-Object { Test-SharpProofCoverageReportName -Path $_.Name }))
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
-$coverageModuleIdentities = @(
-    $coverageAuthority.modules |
-        ForEach-Object {
-            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
-            [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
-        } |
-        Sort-Object)
+$coverageModuleIdentities = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        $coverageAuthority.modules |
+            ForEach-Object {
+                [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+            } |
+            Sort-Object))
 $normalizer = Join-Path $PSScriptRoot 'Normalize-SharpProofCoverageReport.ps1'
 $authorityCommit = [string]$coverageAuthority.commit
 $moduleIdentities = $coverageModuleIdentities -join ','
@@ -335,25 +335,25 @@ $coverageNormalizationBytes = [long](@(
         $coverageReports | Measure-Object -Property Length -Sum).Sum)
 $coverageNormalizationTimer = [Diagnostics.Stopwatch]::StartNew()
 try {
-    $normalizationResults = @($coverageReports | ForEach-Object -Parallel {
-            $reportPath = $_.FullName
-            try {
-                $scriptPath = $using:normalizer
-                & $scriptPath `
-                    -Path $reportPath `
-                    -RepositoryPrefix $using:repositoryPrefix `
-                    -AuthorityCommit $using:authorityCommit `
-                    -ModuleIdentities $using:moduleIdentities
-                [pscustomobject]@{ Path = $reportPath; Error = '' }
-            }
-            catch {
-                [pscustomobject]@{
-                    Path  = $reportPath
-                    Error = $_.Exception.Message
+    $normalizationResults = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($coverageReports | ForEach-Object -Parallel {
+                $reportPath = $_.FullName
+                try {
+                    $scriptPath = $using:normalizer
+                    & $scriptPath `
+                        -Path $reportPath `
+                        -RepositoryPrefix $using:repositoryPrefix `
+                        -AuthorityCommit $using:authorityCommit `
+                        -ModuleIdentities $using:moduleIdentities
+                    [pscustomobject]@{ Path = $reportPath; Error = '' }
                 }
-            }
-        } -ThrottleLimit $normalizationParallelism)
-    if ($normalizationResults.Count -ne $coverageReports.Count) {
+                catch {
+                    [pscustomobject]@{
+                        Path  = $reportPath
+                        Error = $_.Exception.Message
+                    }
+                }
+            } -ThrottleLimit $normalizationParallelism))
+    if ($normalizationResults.Length -ne $coverageReports.Length) {
         throw 'Coverage normalization did not return a result for every report.'
     }
     foreach ($result in $normalizationResults) {
@@ -364,7 +364,7 @@ try {
 }
 finally {
     $coverageNormalizationTimer.Stop()
-    Write-Host ('Coverage phase: name=normalization elapsedMilliseconds={0} reportCount={1} reportBytes={2} parallelism={3}' -f $coverageNormalizationTimer.ElapsedMilliseconds, $coverageReports.Count, $coverageNormalizationBytes, $normalizationParallelism)
+    Write-Host ('Coverage phase: name=normalization elapsedMilliseconds={0} reportCount={1} reportBytes={2} parallelism={3}' -f $coverageNormalizationTimer.ElapsedMilliseconds, $coverageReports.Length, $coverageNormalizationBytes, $normalizationParallelism)
 }
 if ($CoveragePhase -ne 'all') {
     Save-SharpProofCoverageShardManifest -Root $resolvedResultsDirectory -Phase $CoveragePhase

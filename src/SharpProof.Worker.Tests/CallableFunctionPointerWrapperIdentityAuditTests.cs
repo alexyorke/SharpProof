@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -35,7 +36,7 @@ public sealed class CallableFunctionPointerWrapperIdentityAuditTests
             [("Subject.cs", source)], allowUnsafe: true);
         TestCompilation.AssertNoErrors(compilation);
         var methods = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target")
-            .OfType<IMethodSymbol>().ToArray();
+            .OfType<IMethodSymbol>().ToImmutableArray();
         Assert.That(methods, Has.Length.EqualTo(2));
         foreach (var method in methods)
         {

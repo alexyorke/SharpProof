@@ -12,20 +12,27 @@ internal static class CompilerSpecificationPackSelection
                 new[] { ';' },
                 StringSplitOptions.RemoveEmptyEntries));
     internal static bool IsValid(
-        string[]? packIds,
+        ImmutableArray<string>? packIds,
         int catalogVersion,
         string? catalogSha256)
     {
-        if (packIds == null ||
+        if (packIds is not { } snapshot || snapshot.IsDefault ||
             catalogVersion != CompilerSpecificationPackCatalogVersions.Current ||
             catalogSha256 != CompilerSpecificationPackCatalogVersions.Sha256 ||
-            !packIds.All(ValidPackId) ||
-            !IsCanonical(packIds))
+            !snapshot.All(ValidPackId) ||
+            !IsCanonical(snapshot))
         {
             return false;
         }
 
-        return packIds.All(KnownPackIds.Contains);
+        return snapshot.All(KnownPackIds.Contains);
+    }
+
+    internal static bool IsValid(
+        ImmutableArray<string> packIds, int catalogVersion, string? catalogSha256)
+    {
+        return !packIds.IsDefault &&
+            IsValid((ImmutableArray<string>?)packIds, catalogVersion, catalogSha256);
     }
 
     internal static bool Matches(
@@ -44,9 +51,9 @@ internal static class CompilerSpecificationPackSelection
                 >= '0' and <= '9' or '.' or '-');
     }
 
-    private static bool IsCanonical(string[] values)
+    private static bool IsCanonical(ImmutableArray<string> values)
     {
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         return values.Zip(values.Skip(1), static (left, right) =>
             left is null ? throw new System.ArgumentNullException(nameof(left)) : right is null ? throw new System.ArgumentNullException(nameof(right)) : (StringComparer.Ordinal.Compare(left, right) < 0)).All(
                 static ordered => ordered);

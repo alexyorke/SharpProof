@@ -26,11 +26,11 @@ public sealed class CompilerEffectClaimSealGuardTests
         var originalDigest = claim.EvidenceSha256;
         if (missingConstraint)
         {
-            claim.Constraint = null!;
+            { claim = claim with { Constraint = null! }; }
         }
         else
         {
-            claim.Constraint.AllowedExceptionTypes = null!;
+            { claim = claim with { Constraint = claim.Constraint with { AllowedExceptionTypes = default } }; }
         }
 
         var error = Assert.Throws<InvalidDataException>(

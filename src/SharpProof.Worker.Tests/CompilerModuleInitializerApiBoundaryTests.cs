@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -16,7 +17,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
     {
         const string validSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public static class Subject { [ModuleInitializer] public static void Initialize() { } [DoesNotThrow] public static int Root() => 1; }";
         const string errorSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public static class Subject { public static int Value { [ModuleInitializer] get => 1; } [DoesNotThrow] public static int Root() => 1; }";
-        var valid = TestCompilation.Create("ModuleInitializerApiBoundary", ("valid.cs", validSource));
+        var valid = TestCompilation.CreateExact("ModuleInitializerApiBoundary", [("valid.cs", validSource)]);
         using var image = new MemoryStream();
         Assert.That(valid.Emit(image).Success, Is.True);
         image.Position = 0;
@@ -94,7 +95,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         };
         var errorSource = "using SharpProof.Attributes; using System.Runtime.CompilerServices; public class Subject { " +
             member + " [DoesNotThrow] public static int Root() => 1; }";
-        var valid = TestCompilation.Create("ModuleInitializerNonordinary", ("valid.cs", validSource));
+        var valid = TestCompilation.CreateExact("ModuleInitializerNonordinary", [("valid.cs", validSource)]);
         using var image = new MemoryStream();
         Assert.That(valid.Emit(image).Success, Is.True);
         image.Position = 0;
@@ -139,14 +140,14 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         var tree = CSharpSyntaxTree.ParseText(source, (CSharpParseOptions)valid.SyntaxTrees.Single().Options, "field-like-event.cs");
         var compilation = valid.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
         var eventSymbol = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Value").OfType<IEventSymbol>().Single();
-        foreach (var method in new[] { eventSymbol.AddMethod!, eventSymbol.RemoveMethod! })
+        foreach (var method in ImmutableArray.Create(eventSymbol.AddMethod!, eventSymbol.RemoveMethod!))
         {
             Assert.That(method.IsImplicitlyDeclared, Is.True);
             Assert.That(method.IsStatic, Is.True);
             Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
             Assert.That(method.GetAttributes().Single().AttributeClass!.ToDisplayString(), Is.EqualTo("System.Runtime.CompilerServices.ModuleInitializerAttribute"));
         }
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.EqualTo(errors.Length == 0));

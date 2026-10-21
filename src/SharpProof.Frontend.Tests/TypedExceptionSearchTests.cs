@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -67,14 +68,15 @@ public sealed class TypedExceptionSearchTests
         System.ArgumentNullException.ThrowIfNull(graph);
         System.ArgumentNullException.ThrowIfNull(name);
         TestContext.Out.WriteLine("CFG " + name);
-        var pending = new Stack<(ControlFlowRegion Region, int Depth)>();
-        pending.Push((graph.Root, 0));
-        while (pending.Count != 0)
+        var pending = ImmutableStack<(ControlFlowRegion Region, int Depth)>.Empty;
+        pending = pending.Push((graph.Root, 0));
+        while (!pending.IsEmpty)
         {
-            var (region, depth) = pending.Pop();
+            pending = pending.Pop(out var frame);
+            var (region, depth) = frame;
             TestContext.Out.WriteLine($"{new string(' ', depth)}{region.Kind} [{region.FirstBlockOrdinal},{region.LastBlockOrdinal}] type={region.ExceptionType}");
             foreach (var child in region.NestedRegions.Reverse())
-            { pending.Push((child, depth + 1)); }
+            { pending = pending.Push((child, depth + 1)); }
         }
         foreach (var block in graph.Blocks)
         {

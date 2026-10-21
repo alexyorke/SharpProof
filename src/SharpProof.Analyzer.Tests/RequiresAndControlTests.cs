@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -376,12 +377,13 @@ public sealed class RequiresAndControlTests
         string name,
         string source,
         string? mode,
-        string[] enabledIds,
+        ImmutableArray<string> enabledIds,
         bool allowCompilationErrors,
         string? expectedId,
         int expectedCount = 1)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        { throw new ArgumentNullException(nameof(enabledIds)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(source);
         return new TestCaseData(
@@ -398,12 +400,13 @@ public sealed class RequiresAndControlTests
     public async Task ReportsExpectedDiagnostics(
         string source,
         string? mode,
-        string[] enabledIds,
+        ImmutableArray<string> enabledIds,
         bool allowCompilationErrors,
         string? expectedId,
         int expectedCount)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        { throw new ArgumentNullException(nameof(enabledIds)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             source,
@@ -923,7 +926,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.StartWith(
@@ -1044,7 +1047,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027", "SP0027"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
@@ -1124,7 +1127,7 @@ public sealed class RequiresAndControlTests
         var messages = diagnostics
             .Select(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             messages.All(static message =>
                 message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
@@ -1170,7 +1173,7 @@ public sealed class RequiresAndControlTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
         Assert.That(messages[1], Does.Contain("Contract.Old").And.Contain("<placement>"));
         Assert.That(messages[2], Does.Contain("Contract.Old").And.Contain("<nesting>"));
@@ -1267,7 +1270,7 @@ public sealed class RequiresAndControlTests
             profile: "strict",
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().Severity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -1303,7 +1306,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
@@ -1386,7 +1389,7 @@ public sealed class RequiresAndControlTests
             ["SP0047"]);
 
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(messages, Has.Length.EqualTo(2));
@@ -1451,7 +1454,7 @@ public sealed class RequiresAndControlTests
 
         var invalid = diagnostics
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024"))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(invalid, Has.Length.EqualTo(3));
         Assert.That(
             invalid.Select(static diagnostic =>
@@ -1488,7 +1491,7 @@ public sealed class RequiresAndControlTests
             "effects",
             ["SP0002", "SP0024"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "TrustedWithoutSummary");
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -34,7 +35,7 @@ internal sealed partial class WorkerTests
             Assert.That(total.IsBodyAbstraction, Is.False);
             Assert.That(total.EffectsCompleteAtEntry, Is.True);
         }
-        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         var call = instructions.OfType<IrCallInstruction>().Single();
         Assert.That(IrOpaqueCallSite.Effects(total.Program.Factory, call.Operation), Is.EqualTo(IrOpaqueCallEffects.All));
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>

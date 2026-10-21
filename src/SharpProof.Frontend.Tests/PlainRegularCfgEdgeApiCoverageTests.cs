@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
@@ -19,7 +20,7 @@ public sealed class PlainRegularCfgEdgeApiCoverageTests
         Assert.That(subject.Invoke([]), Is.EqualTo(expected));
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var edges = subject.Graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor))
-            .Where(branch => branch != null).Select(branch => branch!).ToArray();
+            .Where(branch => branch != null).Select(branch => branch!).ToImmutableArray();
         var plain = edges.First(branch => branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (branch.Semantics == ControlFlowBranchSemantics.Regular &&
             branch.FinallyRegions.IsEmpty && branch.Destination != null));
         Assert.That(subject.Graph.Blocks[plain.Source.Ordinal], Is.SameAs(plain.Source));

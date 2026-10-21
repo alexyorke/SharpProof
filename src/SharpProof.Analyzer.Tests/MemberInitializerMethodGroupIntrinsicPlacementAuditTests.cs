@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -58,10 +59,10 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(targetOwner.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(ContractApi).Assembly.GetName().Name));
         }
         var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
-            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToArray();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToImmutableArray();
         Assert.That(variables, Has.Length.EqualTo(2));
-        var expectedDiagnostics = new List<string>();
-        var bindings = new List<string>();
+        var expectedDiagnosticsBuilder = ImmutableArray.CreateBuilder<string>();
+        var bindingsBuilder = ImmutableArray.CreateBuilder<string>();
         foreach (var variable in variables)
         {
             var field = model.GetDeclaredSymbol(variable) as IFieldSymbol;
@@ -70,7 +71,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(initializer, Is.Not.Null);
             Assert.That(initializer!.InitializedFields, Has.Length.EqualTo(1));
             Assert.That(SymbolEqualityComparer.Default.Equals(initializer.InitializedFields.Single(), field), Is.True);
-            var operations = initializer.Value.DescendantsAndSelf().ToArray();
+            var operations = initializer.Value.DescendantsAndSelf().ToImmutableArray();
             var methodReference = operations.OfType<IMethodReferenceOperation>().Single();
             var creation = operations.OfType<IDelegateCreationOperation>().Single();
             var method = methodReference.Method;
@@ -118,35 +119,38 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(((GenericNameSyntax)member.Name).TypeArgumentList.Arguments.Single().ToString(), Is.EqualTo("int"));
             Assert.That(member.SyntaxTree, Is.SameAs(tree));
             Assert.That(methodReference.Syntax.Span, Is.EqualTo(variable.Initializer!.Value.Span));
-            bindings.Add($"{field.Name}|owner={field}|root={initializer.Kind}|operation={methodReference.Kind}|" +
+            bindingsBuilder.Add($"{field.Name}|owner={field}|root={initializer.Kind}|operation={methodReference.Kind}|" +
                 $"delegate={creation.Type}|method={method}|apiAssembly={method.ContainingAssembly.Identity}|span={member.Span}");
             if (intrinsic)
             {
-                expectedDiagnostics.Add($"SP0024|Error|{filePath}|{member.Span}|" +
+                expectedDiagnosticsBuilder.Add($"SP0024|Error|{filePath}|{member.Span}|" +
                     $"SharpProof contract 'Contract.{expectedName}' has invalid argument '<placement>': " +
                     "expected use inside Contract.Ensures");
             }
         }
+        var expectedDiagnostics = expectedDiagnosticsBuilder.ToImmutable();
+        var bindings = bindingsBuilder.ToImmutable();
         var image = AnalyzerTestHost.EmitImage(compilation);
         var runtimeBinding = VerifyConstructionAndDelegates(image, intrinsic);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         var actual = DescribeDiagnostics(diagnostics);
         var expected = string.Join("\n", expectedDiagnostics);
         var observation = $"sourceSHA256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)))};" +
-            $"peSHA256={Convert.ToHexString(SHA256.HashData(image))};compilerErrors=0\n" +
+            $"peSHA256={Convert.ToHexString(SHA256.HashData((image).AsSpan()))};compilerErrors=0\n" +
             string.Join("\n", bindings) + "\n" + runtimeBinding +
             $"\nExpected complete diagnostics: [{expected}]\nActual complete diagnostics: [{actual}]";
         await TestContext.Out.WriteLineAsync(observation);
         Assert.That(actual, Is.EqualTo(expected), observation);
     }
 
-    private static string VerifyConstructionAndDelegates(byte[] image, bool intrinsic)
+    private static string VerifyConstructionAndDelegates(ImmutableArray<byte> image, bool intrinsic)
     {
-        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        if (image.IsDefault)
+        { throw new ArgumentNullException(nameof(image)); }
         var runtime = new AssemblyLoadContext("MemberInitializerMethodGroups", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var assembly = runtime.LoadFromStream(stream);
             var subject = assembly.GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);

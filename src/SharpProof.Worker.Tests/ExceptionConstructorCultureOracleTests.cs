@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 
@@ -62,7 +63,7 @@ public sealed class ExceptionConstructorCultureOracleTests
     private static void Observe(Func<Exception> create, bool resourceMessage)
     {
         ArgumentNullException.ThrowIfNull(create);
-        foreach (var throws in new[] { false, true })
+        foreach (var throws in ImmutableArray.Create(false, true))
         {
             var previous = CultureInfo.CurrentUICulture;
             var culture = new CallbackCulture(throws);

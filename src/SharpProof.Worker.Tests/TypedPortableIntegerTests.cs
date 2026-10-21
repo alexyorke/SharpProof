@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
@@ -14,32 +15,34 @@ public sealed class TypedPortableIntegerTests
     public void RoundTripPreservesWidthSignednessBitsAndOperators()
     {
         var factory = new IrFactory();
-        var roots = new List<IrTerm>();
-        var values = new Dictionary<IrVarId, IrValue>();
-        foreach (var width in new[] { 8, 16, 32, 64 })
+        var rootBuilder = ImmutableArray.CreateBuilder<IrTerm>();
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
-            foreach (var isSigned in new[] { false, true })
+            foreach (var isSigned in ImmutableArray.Create(false, true))
             {
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
                 var variable = factory.CreateVariable($"input{width}{isSigned}", type);
-                values.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
-                roots.Add(factory.IntegerBits(type, mask));
-                roots.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
+                valueBuilder.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
+                rootBuilder.Add(factory.IntegerBits(type, mask));
+                rootBuilder.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                rootBuilder.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                rootBuilder.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
             }
         }
+        var roots = rootBuilder.ToImmutable();
+        var values = valueBuilder.ToImmutable();
         var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var json = JsonSerializer.Serialize(encoded.Graph, WorkerProtocolJson.SharedOptions);
         var decoded = PortableIrGraphCodec.Decode(JsonSerializer.Deserialize<PortableIrGraph>(
             json, WorkerProtocolJson.SharedOptions)!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var decodedValues = encoded.VariableIndices.ToDictionary(
+        var decodedValues = encoded.VariableIndices.ToImmutableDictionary(
             pair => decoded.Variables[pair.Value],
             pair => decoded.Factory.CreateIntegerValueFromBits(
                 decoded.Factory.GetVariableInfo(decoded.Variables[pair.Value]).Type,
                 values[pair.Key].IntegerBits));
-        for (var index = 0; index < roots.Count; index++)
+        for (var index = 0; index < roots.Length; index++)
         {
             var expected = new IrInterpreter(factory).Evaluate(roots[index], values);
             var actual = new IrInterpreter(decoded.Factory).Evaluate(decoded.Roots[index], decodedValues);
@@ -81,7 +84,7 @@ public sealed class TypedPortableIntegerTests
     public void InvalidTypedWidthCannotBecomeLegacy(int width)
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Width = width;
+        graph = graph.ReplaceRow(graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)), graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)) with { Width = width });
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
@@ -89,10 +92,10 @@ public sealed class TypedPortableIntegerTests
     public void SignednessAndOutOfWidthBitsAreRejected()
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Signed = true;
+        graph = graph.ReplaceRow(graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)), graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)) with { Signed = true });
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         graph = CreateLiteralGraph(8);
-        graph.Terms[0].Bits = 256;
+        graph = graph with { Terms = graph.Terms.SetItem(0, graph.Terms[0] with { Bits = 256 }) };
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 

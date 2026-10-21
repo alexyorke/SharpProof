@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -50,11 +51,10 @@ public sealed class StackStateOracleTests
             .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
             .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
         var parameter = total.Parameters.Single().Entry;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
-                new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(0)))
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
+            new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(0)));
+        var inputs = inputBuilder.ToImmutable();
         var result = new IrProgramInterpreter(factory).Execute(total.Program, inputs, 1000);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ConsumedApproximation, Is.False, "An incoming empty Stack needs no constructor/growth choice.");
@@ -80,10 +80,10 @@ public sealed class StackStateOracleTests
         var interpreted = new IrProgramInterpreter(factory).Execute(total.Program, null, 10000, choices);
         Assert.That(interpreted.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), interpreted.Unsupported?.Detail);
         Assert.That(interpreted.ConsumedApproximation, Is.True);
-        var compilation = TestCompilation.Create("StackStateOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("StackStateOracle", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, ImmutableArray.Create(("Probe.cs", source)));
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new AssemblyLoadContext("StackStateOracle", isCollectible: true);

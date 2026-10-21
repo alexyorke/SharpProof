@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -583,7 +584,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
     public async Task UnconstructibleJointTemplatesCannotProduceAnInvariantCertificate()
     {
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        var compilation = TestCompilation.Create("FixedChecksumHoudiniAdmission", ("Subject.cs", Source));
+        var compilation = TestCompilation.CreateExact("FixedChecksumHoudiniAdmission", [("Subject.cs", Source)]);
         TestCompilation.AssertNoErrors(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
@@ -620,7 +621,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             ?? throw new AssertionException("The container artifact export root was not provided.");
         var output = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "fixed-checksum-construction");
         Directory.CreateDirectory(output);
-        var observation = new Dictionary<string, object?>
+        var observation = new OrderedEvidenceBuilder
         {
             ["sourceSha256"] = Hash(Encoding.UTF8.GetBytes(Source)),
             ["nativeQueryExecutionRequested"] = false,
@@ -631,13 +632,13 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(output, "source.cs"), Source, new UTF8Encoding(false));
-            var compilation = TestCompilation.Create("FixedChecksumAnchorConstruction", ("Subject.cs", Source));
+            var compilation = TestCompilation.CreateExact("FixedChecksumAnchorConstruction", [("Subject.cs", Source)]);
             TestCompilation.AssertNoErrors(compilation);
             using var image = new MemoryStream();
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            observation["imageSha256"] = Hash(image.ToArray());
-            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.ToArray());
+            observation["imageSha256"] = Hash(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
             // The runtime image has the same source; only the shipped Conditional symbol is absent.
             var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
                 ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
@@ -647,11 +648,11 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             using var runtimeImage = new MemoryStream();
             var runtimeEmitted = runtimeCompilation.Emit(runtimeImage);
             Assert.That(runtimeEmitted.Success, Is.True, string.Join("\n", runtimeEmitted.Diagnostics));
-            observation["runtimeImageSha256"] = Hash(runtimeImage.ToArray());
+            observation["runtimeImageSha256"] = Hash(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length)));
             var runtimeTarget = Assembly.Load(runtimeImage.ToArray()).GetType("Subject")!.GetMethod("Target")!;
             Assert.That(runtimeTarget.GetParameters(), Has.Length.EqualTo(16));
             var controls = Controls();
-            var controlResults = new List<object>();
+            var controlResults = ImmutableArray.CreateBuilder<object>();
             foreach (var inputs in controls)
             {
                 var checksum = ReferenceChecksum(inputs);
@@ -659,11 +660,11 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 var expected = unchecked((int)checksum) & mask;
                 var actual = (int)runtimeTarget.Invoke(null, inputs.Cast<object>().ToArray())!;
                 controlResults.Add(new { inputs, checksum, preChecksumMask = mask, expected, actual });
-                observation["controls"] = controlResults;
+                observation["controls"] = controlResults.ToImmutable();
                 Assert.That(actual, Is.EqualTo(expected));
                 Assert.That(actual, Is.InRange(0, inputs[0]));
             }
-            Assert.That(controls, Has.Count.EqualTo(20));
+            Assert.That(controls, Has.Length.EqualTo(20));
             var baseline = controls[4];
             var changed = controls[5];
             Assert.That(baseline[0], Is.EqualTo(64));
@@ -708,7 +709,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             var irControlCount = 0;
             foreach (var inputs in controls)
             {
-                var initial = new Dictionary<IrVarId, IrValue>();
+                var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
                 for (var ordinal = 0; ordinal < inputs.Length; ordinal++)
                 {
                     var binding = candidate.Parameters[ordinal];
@@ -716,7 +717,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                         candidate.Factory.GetVariableInfo(binding.Entry).Type, inputs[ordinal]));
                 }
                 // Public interpreter default10000, not an expanded limit or Worker replay4096 override.
-                var replay = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, initial);
+                var replay = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, initial.ToImmutable());
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.Unsupported, Is.Null);
@@ -734,18 +735,18 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             observation["loops"] = loops.Select(loop => loop is null ? throw new System.ArgumentNullException(nameof(loop)) : (new
             {
                 header = loop.Header.Value,
-                blocks = loop.Blocks.Select(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)).Order().ToArray(),
-                writes = loop.Writes.Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToArray(),
-                tracked = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Tracked.Select(printer.Print).ToArray(),
-                anchors = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Anchors.Select(printer.Print).ToArray()
-            })).ToArray();
+                blocks = loop.Blocks.Select(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)).Order().ToImmutableArray(),
+                writes = loop.Writes.Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray(),
+                tracked = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Tracked.Select(printer.Print).ToImmutableArray(),
+                anchors = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Anchors.Select(printer.Print).ToImmutableArray()
+            })).ToImmutableArray();
             var generated = LoopInvariantCandidates.Generate(candidate, loops, TestContext.CurrentContext.CancellationToken);
             observation["generated"] = generated.Select((invariant, ordinal) => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (new
             {
                 ordinal,
                 header = invariant.Header.Value,
                 condition = printer.Print(invariant.Condition)
-            })).ToArray();
+            })).ToImmutableArray();
             observation["generatedCount"] = generated.Length;
             var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
             observation["ordinaryBuilt"] = ordinaryBuilt;
@@ -761,14 +762,16 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             {
                 throw new AssertionException("The full generated joint construction must exceed the unchanged default construction limit.");
             }
-            var singletonBuilds = new List<bool>();
-            observation["singletonBuilds"] = singletonBuilds;
+            var singletonBuilds = ImmutableArray.CreateBuilder<bool>();
+            observation["singletonBuilds"] = singletonBuilds.ToImmutable();
             foreach (var invariant in generated)
             {
                 singletonBuilds.Add(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], TestContext.CurrentContext.CancellationToken) != null);
+                observation["singletonBuilds"] = singletonBuilds.ToImmutable();
             }
-            Assert.That(singletonBuilds, Has.Count.EqualTo(48));
-            Assert.That(singletonBuilds.All(built => built), Is.True, "Every actual generated singleton must remain constructible.");
+            var singletonSnapshot = singletonBuilds.ToImmutable();
+            Assert.That(singletonSnapshot, Has.Length.EqualTo(48));
+            Assert.That(singletonSnapshot.All(built => built), Is.True, "Every actual generated singleton must remain constructible.");
             observation["disposition"] = "Strict component construction separation; no normal native/Houdini execution established";
         }
         catch (Exception exception)
@@ -781,39 +784,41 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(observation) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
+                observation.ToJson() + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans hash the empty payload */ bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
-    private static List<int[]> Controls()
+    private static ImmutableArray<ImmutableArray<int>> Controls()
     {
-        var values = new List<int[]>();
+        var values = ImmutableArray.CreateBuilder<ImmutableArray<int>>(20);
         for (var index = 0; index < 5; index++)
         {
             var count = index switch { 0 => 0, 1 => 1, 2 => 16, 3 => 32, _ => 64 };
-            var inputs = Enumerable.Repeat(-1, 16).ToArray();
+            var inputs = ImmutableArray.CreateBuilder<int>(16);
+            inputs.AddRange(Enumerable.Repeat(-1, 16));
             inputs[0] = count;
-            values.Add(inputs);
+            values.Add(inputs.MoveToImmutable());
         }
         for (var ordinal = 1; ordinal < 16; ordinal++)
         {
-            var inputs = Enumerable.Repeat(-1, 16).ToArray();
+            var inputs = ImmutableArray.CreateBuilder<int>(16);
+            inputs.AddRange(Enumerable.Repeat(-1, 16));
             inputs[0] = 64;
             inputs[ordinal] = -3;
-            values.Add(inputs);
+            values.Add(inputs.MoveToImmutable());
         }
-        return values;
+        return values.MoveToImmutable();
     }
 
-    private static uint ReferenceChecksum(int[] inputs)
+    private static uint ReferenceChecksum(ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new System.ArgumentNullException(nameof(inputs)); }
         var hash = 2166136261U;
         for (var round = 0; round < 32; round++)
         {
@@ -823,5 +828,53 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             }
         }
         return hash;
+    }
+}
+
+internal sealed class OrderedEvidenceBuilder
+{
+    private readonly ImmutableArray<KeyValuePair<string, object?>>.Builder _entries =
+        ImmutableArray.CreateBuilder<KeyValuePair<string, object?>>();
+    private readonly ImmutableDictionary<string, int>.Builder _positions =
+        ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+
+    internal object? this[string key]
+    {
+        get
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            return _entries[_positions[key]].Value;
+        }
+        set
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            var entry = new KeyValuePair<string, object?>(key, value);
+            if (_positions.TryGetValue(key, out var position))
+            {
+                _entries[position] = entry;
+            }
+            else
+            {
+                _positions.Add(key, _entries.Count);
+                _entries.Add(entry);
+            }
+        }
+    }
+
+    internal string ToJson()
+    {
+        var fields = _entries.ToImmutable();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var field in fields)
+            {
+                writer.WritePropertyName(field.Key);
+                JsonSerializer.Serialize(writer, field.Value);
+            }
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 }

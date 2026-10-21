@@ -19,7 +19,7 @@ public sealed class CompilerSourceDelegateBoundaryTests
         var source = "using SharpProof.Attributes; " + declaration +
             " public static class Subject { [DoesNotThrow] public static int Root(int value) { " + delegateType +
             " step = Increment; return step(value); } private static int Increment(int value) => value + 1; }";
-        var compilation = TestCompilation.Create("SourceDelegateBoundary", ("delegate.cs", source));
+        var compilation = TestCompilation.CreateExact("SourceDelegateBoundary", [("delegate.cs", source)]);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         image.Position = 0;

@@ -3,7 +3,7 @@ namespace SharpProof.Verify;
 internal static class CallableReplayValidator
 {
     internal static bool EntryConstraintsHold(IrFactory factory, ImmutableArray<IrTerm> constraints,
-        IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+        ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
 
         RepositoryParameterGuard.RequireInitialized(constraints.IsDefault, nameof(constraints), "Array must be initialized.");
@@ -39,8 +39,8 @@ internal static class CallableReplayValidator
     {
         if (!EntryConstraintsHold(factory, context.EntryConstraints, model, cancellationToken))
         { return AbstentionReason.CounterexampleReplayFailed; }
-        var final = model.ToBuilder();
-        var approximationVariables = new HashSet<IrVarId>();
+        var finalBuilder = model.ToBuilder();
+        var approximationBuilder = ImmutableHashSet.CreateBuilder<IrVarId>();
         IrHeap? heap = null;
         if (!context.IsTrivial)
         {
@@ -49,28 +49,28 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+            var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                initial[binding.Key] = GetRequiredValue(model, binding.Value);
+                initialBuffer[binding.Key] = GetRequiredValue(model, binding.Value);
             }
+            var initial = initialBuffer.ToImmutable();
             var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
                 request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
-                }));
-            if (factory.Semantics == IrExecutionSemantics.Total)
+                }))
             {
-                replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet();
-                replayOptions.ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider;
-                replayOptions.ConcreteOpaqueValueProvider = context.ReplayOptions?.ConcreteOpaqueValueProvider;
-                replayOptions.ConcreteLockCompletionProvider = context.ReplayOptions?.ConcreteLockCompletionProvider;
-            }
+                SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(),
+                ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider,
+                ConcreteOpaqueValueProvider = context.ReplayOptions?.ConcreteOpaqueValueProvider,
+                ConcreteLockCompletionProvider = context.ReplayOptions?.ConcreteLockCompletionProvider
+            };
             var execution = new IrProgramInterpreter(factory).Execute(
-                program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
+                program, initial, context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -87,11 +87,11 @@ internal static class CallableReplayValidator
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                final[binding.Value] = GetRequiredValue(execution.Values, binding.Key);
-                approximationVariables.Remove(binding.Value);
+                finalBuilder[binding.Value] = GetRequiredValue(execution.Values, binding.Key);
+                approximationBuilder.Remove(binding.Value);
                 if (execution.ApproximationVariables.Contains(binding.Key))
                 {
-                    approximationVariables.Add(binding.Value);
+                    approximationBuilder.Add(binding.Value);
                 }
             }
             if (context.ResultVariables.Length > 1 ||
@@ -104,8 +104,8 @@ internal static class CallableReplayValidator
             }
             if (context.ResultVariables.Length == 1)
             {
-                final[context.ResultVariables[0]] = execution.ReturnValue!;
-                approximationVariables.Remove(context.ResultVariables[0]);
+                finalBuilder[context.ResultVariables[0]] = execution.ReturnValue!;
+                approximationBuilder.Remove(context.ResultVariables[0]);
             }
         }
         else if (context.Program != null || !context.ParameterBindings.IsEmpty ||
@@ -121,9 +121,11 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            final[binding.Key] = value;
-            approximationVariables.Remove(binding.Key);
+            finalBuilder[binding.Key] = value;
+            approximationBuilder.Remove(binding.Key);
         }
+        var final = finalBuilder.ToImmutable();
+        var approximationVariables = approximationBuilder.ToImmutable();
         foreach (var domain in context.IntegerDomains)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -145,7 +147,7 @@ internal static class CallableReplayValidator
         }
         var interpreter = new IrInterpreter(factory);
         // An Old read sees the objects as the callable entered.
-        var snapshots = context.PreStateBindings.Keys.ToArray();
+        var snapshots = context.PreStateBindings.Keys.ToImmutableHashSet();
         if (factory.Semantics == IrExecutionSemantics.Total)
         {
             if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)

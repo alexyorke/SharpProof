@@ -8,15 +8,15 @@ namespace SharpProof.Smt;
 // what the proof kernel then proves over bitvectors.
 internal static class HornInvariantSearch
 {
-    public static IReadOnlyDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, IReadOnlyList<VerificationQuery> clauses,
-        IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
+    public static ImmutableDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, ImmutableArray<VerificationQuery> clauses,
+        ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(clauses, nameof(clauses));
+        RepositoryParameterGuard.ThrowIfMissing(clauses.IsDefault, nameof(clauses));
         ArgumentNullGuard.NotNull(states, nameof(states));
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
-        var encoder = new BvEncoder(context, factory, owner) { Relations = [] };
+        var encoder = new BvEncoder(context, factory, owner, enableInvariantRelations: true);
         try
         {
             context.UpdateParamValue("rlimit", rlimit.ToString(CultureInfo.InvariantCulture));
@@ -24,38 +24,39 @@ internal static class HornInvariantSearch
             return new Search(context, factory, owner, encoder, states, rlimit, cancellationToken).Run(clauses);
         }
         catch (Exception exception) when (exception is UnsupportedIrEncodingException or SmtResourceLimitException or Z3Exception)
-        { return new Dictionary<IrMemberId, IrTerm>(); }
+        { return ImmutableDictionary<IrMemberId, IrTerm>.Empty; }
         finally
         { encoder.DisposeReferences(); }
     }
 
     private sealed class Search(Context context, IrFactory factory, Z3ExpressionOwner owner, BvEncoder encoder,
-        IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
+        ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         private readonly SmtQueryResourceMeter _meter = (states is null ? throw new System.ArgumentNullException(nameof(states)) : (encoder is null ? throw new System.ArgumentNullException(nameof(encoder)) : (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : new(rlimit, cancellationToken))))));
-        private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
+        private readonly ImmutableDictionary<string, IrTerm>.Builder _names = ImmutableDictionary.CreateBuilder<string, IrTerm>(StringComparer.Ordinal);
+        private readonly ImmutableDictionary<string, FuncDecl>.Builder _relations = ImmutableDictionary.CreateBuilder<string, FuncDecl>(StringComparer.Ordinal);
+        private readonly ImmutableDictionary<string, Expr>.Builder _integers = ImmutableDictionary.CreateBuilder<string, Expr>(StringComparer.Ordinal);
         private int _unknownCount;
-        private readonly Dictionary<uint, Expr> _converted = [];
-        private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
+        private readonly ImmutableDictionary<uint, Expr>.Builder _converted = ImmutableDictionary.CreateBuilder<uint, Expr>();
+        private readonly ImmutableDictionary<string, Expr>.Builder _applications = ImmutableDictionary.CreateBuilder<string, Expr>(StringComparer.Ordinal);
+        private readonly ImmutableDictionary<string, (string Function, ImmutableArray<Expr> Arguments, uint Width)>.Builder _applied = ImmutableDictionary.CreateBuilder<string, (string Function, ImmutableArray<Expr> Arguments, uint Width)>(StringComparer.Ordinal);
+        private readonly ImmutableList<FuncDecl>.Builder _relationOrder = ImmutableList.CreateBuilder<FuncDecl>();
         private FuncDecl? _error;
 
-        internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
+        internal ImmutableDictionary<IrMemberId, IrTerm> Run(ImmutableArray<VerificationQuery> clauses)
         {
-            clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-            var proposals = new Dictionary<IrMemberId, IrTerm>();
+            RepositoryParameterGuard.ThrowIfMissing(clauses.IsDefault, nameof(clauses));
+            var proposals = ImmutableDictionary.CreateBuilder<IrMemberId, IrTerm>();
             _error = context.MkFuncDecl("error", [], context.BoolSort);
-            var rules = new List<BoolExpr>();
+            var rules = ImmutableArray.CreateBuilder<BoolExpr>();
             foreach (var clause in clauses)
             {
-                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToList();
+                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToImmutableList();
                 foreach (var (guards, head) in Heads(encoder.EncodeBoolean(clause.Goal.Predicate, _meter)))
                 { rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
             }
             if (encoder.ReferenceFacts.Count != 0 || encoder.Relations!.Count == 0)
-            { return proposals; }
+            { return proposals.ToImmutable(); }
             using var fixedpoint = context.MkFixedpoint();
             using var parameters = context.MkParams();
             parameters.Add("engine", "spacer");
@@ -63,46 +64,44 @@ internal static class HornInvariantSearch
             using var interruptParameter = context.MkSymbol("ctrl_c");
             parameters.Add(interruptParameter, false);
             fixedpoint.Parameters = parameters;
-            foreach (var relation in _relations.Values)
+            foreach (var relation in _relationOrder)
             { fixedpoint.RegisterRelation(relation); }
             fixedpoint.RegisterRelation(_error);
-            foreach (var converted in rules)
+            foreach (var converted in rules.ToImmutable())
             {
                 var rule = Ackermann(converted);
-                var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-                CollectIntegerConstants(rule, constants);
-                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constants.Values], rule)));
+                var (constants, constantOrder) = CollectIntegerConstants(rule);
+                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constantOrder.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : constants[name])], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
-            { return proposals; }
-            foreach (var relation in encoder.Relations)
+            { return proposals.ToImmutable(); }
+            foreach (var relation in encoder.RelationDeclarations)
             {
                 if (!_relations.TryGetValue(relation.Value.Name.ToString(), out var integer))
                 { continue; }
                 var state = states.TryGetValue(relation.Key, out var known)
                     ? known : throw new ArgumentException("Every invariant relation requires a state.");
-                var domain = integer.Domain;
+                var domain = integer.Domain.ToImmutableArray();
                 if (state.Length != domain.Length)
                 { throw new ArgumentException("An invariant state must match its relation's arity."); }
                 var arguments = state.Select((term, ordinal) =>
-                    ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToArray();
+                    ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToImmutableArray();
                 for (var ordinal = 0; ordinal < state.Length; ordinal++)
                 { _names[arguments[ordinal].FuncDecl.Name.ToString()] = state[ordinal]; }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
-                if (Translate(Own(cover.SubstituteVars(arguments))) is { } invariant && invariant.Type == factory.BooleanType)
+                if (Translate(Own(cover.SubstituteVars(arguments.ToArray()))) is { } invariant && invariant.Type == factory.BooleanType)
                 { proposals[relation.Key] = invariant; }
             }
-            return proposals;
+            return proposals.ToImmutable();
         }
 
         // A rule whose uninterpreted applications became unknowns also
         // requires equal unknowns for equal arguments (Ackermann's reduction).
         private BoolExpr Ackermann(BoolExpr rule)
         {
-            var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-            CollectIntegerConstants(rule, constants);
-            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToArray();
-            var congruence = new List<BoolExpr>();
+            var (constants, _) = CollectIntegerConstants(rule);
+            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToImmutableArray();
+            var congruence = ImmutableArray.CreateBuilder<BoolExpr>();
             // A bitvector unknown keeps its signed range.
             foreach (var name in applied)
             {
@@ -160,11 +159,12 @@ internal static class HornInvariantSearch
             if (IsRelation(expression))
             {
                 var name = expression.FuncDecl.Name.ToString();
-                var arguments = expression.Args.Select(Integer).ToArray();
+                var arguments = expression.Args.Select(Integer).ToImmutableArray();
                 if (!_relations.TryGetValue(name, out var relation))
                 {
                     relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
-                    _relations.Add(name, relation);
+                    _relations.AddUnique(name, relation);
+                    _relationOrder.Add(relation);
                 }
                 return Own(context.MkApp(relation, arguments));
             }
@@ -176,13 +176,13 @@ internal static class HornInvariantSearch
                 if (!_integers.TryGetValue(name, out var integer))
                 {
                     integer = Own(context.MkIntConst(name));
-                    _integers.Add(name, integer);
+                    _integers.AddUnique(name, integer);
                 }
                 return integer;
             }
             // Source rules contain only encoder-authored applications;
             // quantification and native cover retrieval happen after conversion.
-            var operands = expression.Args.Select(Integer).ToArray();
+            var operands = expression.Args.Select(Integer).ToImmutableArray();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
                 var function = expression.FuncDecl.Name.ToString();
@@ -191,14 +191,14 @@ internal static class HornInvariantSearch
                 {
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
                     application = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
-                    _applications.Add(key, application);
-                    _applied.Add(name, (function, operands, expression.Sort is BitVecSort sort ? sort.Size : 0));
+                    _applications.AddUnique(key, application);
+                    _applied.AddUnique(name, (function, operands, expression.Sort is BitVecSort sort ? sort.Size : 0));
                 }
                 return application;
             }
             // Completed recursive conversions have Bool/Int result sorts;
             // equality therefore compares those converted values directly.
-            var numbers = operands.OfType<ArithExpr>().ToArray();
+            var numbers = operands.OfType<ArithExpr>().ToImmutableArray();
             var arithmetic = numbers.Length == operands.Length && operands.Length != 0;
             Expr? result = expression.FuncDecl.DeclKind switch
             {
@@ -210,7 +210,7 @@ internal static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
                 Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers),
-                Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers),
+                Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers.ToArray()),
                 Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers),
                 Z3_decl_kind.Z3_OP_BNEG when arithmetic => context.MkUnaryMinus(numbers[0]),
                 Z3_decl_kind.Z3_OP_SIGN_EXT when arithmetic => operands[0],
@@ -268,13 +268,14 @@ internal static class HornInvariantSearch
         {
             if (!ContainsRelation(fact) || IsRelation(fact))
             { return fact; }
-            var applications = new List<Expr>();
-            Applications(fact, applications);
-            var holds = applications.Select(_ => (Expr)Own(context.MkTrue())).ToArray();
-            return Own(context.MkAnd([(BoolExpr)Own(fact.Substitute([.. applications], holds)), .. applications.Cast<BoolExpr>()]));
+            var applicationBuilder = ImmutableList.CreateBuilder<Expr>();
+            Applications(fact, applicationBuilder);
+            var applications = applicationBuilder.ToImmutable();
+            var holds = applications.Select(_ => (Expr)Own(context.MkTrue())).ToImmutableArray();
+            return Own(context.MkAnd([(BoolExpr)Own(fact.Substitute([.. applications], holds.ToArray())), .. applications.Cast<BoolExpr>()]));
         }
 
-        private void Applications(Expr expression, List<Expr> applications)
+        private void Applications(Expr expression, ImmutableList<Expr>.Builder applications)
         {
             applications = RepositoryParameterGuard.NotNull(applications, nameof(applications));
             _meter.Consume();
@@ -289,10 +290,11 @@ internal static class HornInvariantSearch
                 foreach (var argument in expression.Args)
                 { Applications(argument, applications); }
             }
+            return;
         }
 
         // The heads a goal requires, each with the guards under which it must hold.
-        private IEnumerable<(BoolExpr[] Guards, BoolExpr Head)> Heads(BoolExpr goal)
+        private IEnumerable<(ImmutableArray<BoolExpr> Guards, BoolExpr Head)> Heads(BoolExpr goal)
         {
             if (!ContainsRelation(goal))
             { return [([Own(context.MkNot(goal))], Own((BoolExpr)context.MkApp(_error!)))]; }
@@ -303,8 +305,8 @@ internal static class HornInvariantSearch
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
                 var guards = goal.Args.Where(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (!ContainsRelation(argument)))
-                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToArray();
-                return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToArray(), head.Head))];
+                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToImmutableArray();
+                return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToImmutableArray(), head.Head))];
             }
             throw new UnsupportedIrEncodingException();
         }
@@ -312,26 +314,40 @@ internal static class HornInvariantSearch
         // Collect free constants from authored integerized rules. Every node is
         // a Bool/Int application; nonrelation applications became fresh constants.
         // Quantification is added only after this traversal.
-        private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
+        private (ImmutableDictionary<string, Expr> Values, ImmutableList<string> Order) CollectIntegerConstants(Expr expression)
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
+            var constants = ImmutableDictionary.CreateBuilder<string, Expr>(StringComparer.Ordinal);
+            var order = ImmutableList.CreateBuilder<string>();
+            CollectIntegerConstantsCore(expression, constants, order);
+            return (constants.ToImmutable(), order.ToImmutable());
+        }
+
+        private void CollectIntegerConstantsCore(
+            Expr expression, ImmutableDictionary<string, Expr>.Builder constants, ImmutableList<string>.Builder order)
+        {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             constants = RepositoryParameterGuard.NotNull(constants, nameof(constants));
+            order = RepositoryParameterGuard.NotNull(order, nameof(order));
             _meter.Consume();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
             {
-                constants[expression.FuncDecl.Name.ToString()] = expression;
+                var name = expression.FuncDecl.Name.ToString();
+                if (!constants.ContainsKey(name))
+                { order.Add(name); }
+                constants[name] = expression;
                 return;
             }
             foreach (var argument in expression.Args)
-            { CollectIntegerConstants(argument, constants); }
+            { CollectIntegerConstantsCore(argument, constants, order); }
         }
-
         // The IR meaning of a cover over boolean and bitvector state.
         private IrTerm? Translate(Expr expression)
         {
             expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
-            var arguments = expression.IsApp ? expression.Args : [];
+            var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
             var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);
             switch (nativeKind)
             {
@@ -344,7 +360,7 @@ internal static class HornInvariantSearch
             }
             if (literal is not null)
             { return literal; }
-            IrTerm?[] operands = [.. arguments.Select(Translate)];
+            ImmutableArray<IrTerm?> operands = [.. arguments.Select(Translate)];
             return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
     }

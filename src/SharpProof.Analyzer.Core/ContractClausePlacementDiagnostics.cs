@@ -8,9 +8,9 @@ internal sealed class ContractClausePlacementDiagnostics(
 {
     private readonly Compilation _compilation = (compilation ?? throw new System.ArgumentNullException(nameof(compilation)));
     private readonly CancellationToken _cancellationToken = cancellationToken;
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+    private ImmutableDictionary<IMethodSymbol, byte>
         _reportedAnonymousRequires =
-            new(SymbolEqualityComparer.Default);
+            ImmutableDictionary.Create<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
 
     internal void Report(ContractClauseInventory inventory, Action<Diagnostic> reportDiagnostic)
     {
@@ -37,8 +37,8 @@ internal sealed class ContractClausePlacementDiagnostics(
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var method = inventory.Callable;
         if (method.MethodKind != MethodKind.AnonymousFunction ||
-            !_reportedAnonymousRequires.TryAdd(
-                ContractClauseInventoryBuilder.NormalizeCallable(method), 0))
+            !ImmutableInterlocked.TryAdd(ref _reportedAnonymousRequires,
+                ContractClauseInventoryBuilder.NormalizeCallable(method), (byte)0))
         {
             return;
         }

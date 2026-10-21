@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -9,9 +10,9 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class MetadataValueProjectionRepresentativeTests
 {
-    private static readonly string[] SingleAttributeNames = ["PositiveAttribute", "InRangeAttribute"];
-    private static readonly int[] SingleParameterOrdinals = [0, 0];
-    private static readonly int[] PairParameterOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> SingleAttributeNames = ["PositiveAttribute", "InRangeAttribute"];
+    private static readonly ImmutableArray<int> SingleParameterOrdinals = [0, 0];
+    private static readonly ImmutableArray<int> PairParameterOrdinals = [0, 1];
 
     [Test]
     public void RealMetadataAnnotationsRetainFacadeOrderAndIndependentPredicateTruth()
@@ -34,13 +35,10 @@ public sealed class MetadataValueProjectionRepresentativeTests
         Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Validation.Kind)),
             Is.EqualTo(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Validation.Kind))));
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -3, -2, 0, 1, 2, 3 })
+        foreach (var input in ImmutableArray.Create(-3, -2, 0, 1, 2, 3))
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(value.Type, (long)input)
-            };
-            var expected = new[] { input > 0, input >= -2 && input <= 2 };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(value.Type, (long)input));
+            var expected = ImmutableArray.Create(input > 0, input >= -2 && input <= 2);
             for (var index = 0; index < expected.Length; index++)
             {
                 Assert.That(interpreter.Evaluate(result.Clauses[index].Value, values).Value!.Boolean, Is.EqualTo(expected[index]));
@@ -106,7 +104,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var emit = library.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
         var compilation = TestCompilation.Create("MetadataValueProjectionConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(compilation);
         using var consumerImage = new MemoryStream();
         var consumerEmit = compilation.Emit(consumerImage);

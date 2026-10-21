@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,7 +19,7 @@ public sealed class FuzzResultValidationTests
             new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40), new(1000, 1000, 1000, 1000, 1023, 127), true, []);
         var valid = JsonSerializer.Serialize(summary);
         await File.WriteAllTextAsync(Path.Combine(temporaryDirectory.FullName, "valid.json"), valid);
-        Action<JsonObject>[] mutations =
+        ImmutableArray<Action<JsonObject>> mutations =
         [
             root => { System.ArgumentNullException.ThrowIfNull(root); root["SchemaVersion"] = 4; },
             root => { System.ArgumentNullException.ThrowIfNull(root); root["SchemaVersion"] = 5; },
@@ -80,8 +81,15 @@ public sealed class FuzzResultValidationTests
             Write-Output $rejected
             """);
         var start = new ProcessStartInfo("pwsh") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        foreach (var argument in new[] { "-NoLogo", "-NoProfile", "-File", script, "-Validator",
-            Path.Combine(TestRepository.FindRoot(), "eng/scripts", "Assert-SharpProofFuzzRunnerResult.ps1"), "-Inputs", temporaryDirectory.FullName })
+        foreach (var argument in ImmutableArray.Create(
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            script,
+            "-Validator",
+            Path.Combine(TestRepository.FindRoot(), "eng/scripts", "Assert-SharpProofFuzzRunnerResult.ps1"),
+            "-Inputs",
+            temporaryDirectory.FullName))
         { start.ArgumentList.Add(argument); }
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();

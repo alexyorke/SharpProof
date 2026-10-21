@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -95,9 +96,9 @@ public sealed class ConstructedGenericContractTests
         var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var type = factory.GetVariableInfo(parameter.Variable).Type;
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -1, 1 })
+        foreach (var input in ImmutableArray.Create(-1, 1))
         {
-            var values = new Dictionary<IrVarId, IrValue> { [parameter.Variable] = factory.CreateIntegerValue(type, input) };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(type, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));
         }
     }
@@ -905,7 +906,7 @@ public sealed class ConstructedGenericContractTests
         Assert.That(result.Failure, Is.EqualTo(expectedFailure));
     }
 
-    private static IMethodSymbol[] GetConstructedTargets(
+    private static ImmutableArray<IMethodSymbol> GetConstructedTargets(
         CSharpCompilation compilation,
         string expressionPrefix)
     {
@@ -933,12 +934,12 @@ public sealed class ConstructedGenericContractTests
 
     private sealed record ConstructedMethodFixture(
         CSharpCompilation Compilation,
-        IMethodSymbol[] Targets,
+        ImmutableArray<IMethodSymbol> Targets,
         ContractBinder Binder)
     {
         public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
         public ContractBinder Binder { get; init; } = Binder ?? throw new System.ArgumentNullException(nameof(Binder));
-        public IMethodSymbol[] Targets { get; init; } = Targets ?? throw new System.ArgumentNullException(nameof(Targets));
+        public ImmutableArray<IMethodSymbol> Targets { get; init; } = Targets.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Targets)) : Targets;
     }
 
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -26,7 +27,7 @@ internal sealed class PackagedProductFeed : IDisposable
     internal const string PackageSourceEnvironmentVariable =
         "SHARPPROOF_PACKAGE_SOURCE";
 
-    private static readonly string[] s_expectedPackageIds = [
+    private static readonly ImmutableArray<string> s_expectedPackageIds = [
         AttributesPackageId,
         MainPackageId,
         VerifierPackageId
@@ -42,13 +43,13 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private PackagedProductFeed(
         string source,
-        IReadOnlyList<PackagedPackage> packages,
-        IReadOnlyList<PackagedPackage> symbolPackages,
+        ImmutableArray<PackagedPackage> packages,
+        ImmutableArray<PackagedPackage> symbolPackages,
         TempDirectory? ownedDirectory)
     {
-        System.ArgumentNullException.ThrowIfNull(packages);
+        ArgumentOutOfRangeException.ThrowIfEqual(packages.IsDefault, true);
         System.ArgumentNullException.ThrowIfNull(source);
-        System.ArgumentNullException.ThrowIfNull(symbolPackages);
+        ArgumentOutOfRangeException.ThrowIfEqual(symbolPackages.IsDefault, true);
         Source = source;
         Packages = packages;
         SymbolPackages = symbolPackages;
@@ -59,11 +60,11 @@ internal sealed class PackagedProductFeed : IDisposable
     {
         get;
     }
-    internal IReadOnlyList<PackagedPackage> Packages
+    internal ImmutableArray<PackagedPackage> Packages
     {
         get;
     }
-    internal IReadOnlyList<PackagedPackage> SymbolPackages
+    internal ImmutableArray<PackagedPackage> SymbolPackages
     {
         get;
     }
@@ -142,16 +143,7 @@ internal sealed class PackagedProductFeed : IDisposable
             // before packing those same assemblies without another compilation.
             _ = ReadPackageProjects(repositoryRoot);
             var build = await RunProcessAsync(
-                repositoryRoot,
-                "dotnet",
-                "build",
-                "SharpProof.slnx",
-                "-c",
-                "Release",
-                "--nologo",
-                "/nodeReuse:false",
-                "-p:GeneratePackageOnBuild=false",
-                "-p:RunAnalyzersDuringBuild=false");
+                repositoryRoot, "dotnet", ["build", "SharpProof.slnx", "-c", "Release", "--nologo", "/nodeReuse:false", "-p:GeneratePackageOnBuild=false", "-p:RunAnalyzersDuringBuild=false"]);
             if (build.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -160,16 +152,7 @@ internal sealed class PackagedProductFeed : IDisposable
             }
 
             var symbols = await RunProcessAsync(
-                repositoryRoot,
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-File",
-                Path.Combine(repositoryRoot, "eng", "scripts", "Export-SharpProofEmbeddedSymbols.ps1"),
-                "-RepositoryRoot",
-                repositoryRoot,
-                "-Configuration",
-                "Release");
+                repositoryRoot, "pwsh", ["-NoLogo", "-NoProfile", "-File", Path.Combine(repositoryRoot, "eng", "scripts", "Export-SharpProofEmbeddedSymbols.ps1"), "-RepositoryRoot", repositoryRoot, "-Configuration", "Release"]);
             if (symbols.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -178,20 +161,7 @@ internal sealed class PackagedProductFeed : IDisposable
             }
 
             var result = await RunProcessAsync(
-                repositoryRoot,
-                "dotnet",
-                "pack",
-                "SharpProof.slnx",
-                "-c",
-                "Release",
-                "--nologo",
-                "/nodeReuse:false",
-                "-p:GeneratePackageOnBuild=false",
-                "-p:RunAnalyzersDuringBuild=false",
-                "--no-build",
-                "--no-restore",
-                "--output",
-                sourceDirectory);
+                repositoryRoot, "dotnet", ["pack", "SharpProof.slnx", "-c", "Release", "--nologo", "/nodeReuse:false", "-p:GeneratePackageOnBuild=false", "-p:RunAnalyzersDuringBuild=false", "--no-build", "--no-restore", "--output", sourceDirectory]);
             if (result.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -236,7 +206,7 @@ internal sealed class PackagedProductFeed : IDisposable
             ownedDirectory);
     }
 
-    private static PackagedPackage[] ReadPackages(
+    private static ImmutableArray<PackagedPackage> ReadPackages(
         string source,
         string extension)
     {
@@ -252,18 +222,16 @@ internal sealed class PackagedProductFeed : IDisposable
                 extension,
                 StringComparison.OrdinalIgnoreCase)))
             .Select(ReadPackage)
-            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (Array.IndexOf(
-                s_expectedPackageIds,
-                package.Id)))
+            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (s_expectedPackageIds.IndexOf(package.Id)))
         ];
     }
 
     private static void ValidatePackages(
-        PackagedPackage[] packages,
+        ImmutableArray<PackagedPackage> packages,
         string kind,
-        string[] expectedIds)
+        ImmutableArray<string> expectedIds)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedIds);
+        ArgumentOutOfRangeException.ThrowIfEqual(expectedIds.IsDefault, true);
         System.ArgumentNullException.ThrowIfNull(kind);
         if (!packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id))
                 .SequenceEqual(expectedIds, StringComparer.Ordinal))
@@ -302,7 +270,7 @@ internal sealed class PackagedProductFeed : IDisposable
         return new PackagedPackage(id, version, path);
     }
 
-    private static string[] ReadPackageProjects(string repositoryRoot)
+    private static ImmutableArray<string> ReadPackageProjects(string repositoryRoot)
     {
         System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         var path = Path.Combine(
@@ -322,12 +290,11 @@ internal sealed class PackagedProductFeed : IDisposable
             .Select(static value => value.GetString() ??
                 throw new InvalidDataException(
                     "A package project path is null."))
-            .ToArray();
-        var expectedProjects = new[] {
+            .ToImmutableArray();
+        var expectedProjects = ImmutableArray.Create(
             "src/SharpProof.Attributes/SharpProof.Attributes.csproj",
             "src/SharpProof.Verifier/SharpProof.Verifier.csproj",
-            "src/SharpProof.Package/SharpProof.Package.csproj"
-        };
+            "src/SharpProof.Package/SharpProof.Package.csproj");
         if (!projects.SequenceEqual(
                 expectedProjects,
                 StringComparer.Ordinal))
@@ -343,9 +310,10 @@ internal sealed class PackagedProductFeed : IDisposable
     private static async Task<PackageProcessResult> RunProcessAsync(
         string workingDirectory,
         string executable,
-        params string[] arguments)
+        ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(executable);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = ProcessRunner.CreateStartInfo(

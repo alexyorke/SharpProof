@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -44,7 +45,7 @@ public sealed class CompilerProbeSnapshotTests
         var kinds = document.RootElement.GetProperty("syntaxTrees")
             .EnumerateArray()
             .Select(static tree => ((tree.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(tree)) : (tree.GetProperty("generatedKind").GetString())))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(kinds, Is.EqualTo(["Unknown", "Unknown"]));
     }
@@ -69,7 +70,7 @@ public sealed class CompilerProbeSnapshotTests
     [Test]
     public async Task ImageBackedPortableReferenceCarriesConsumedImageHash()
     {
-        var image = await File.ReadAllBytesAsync(typeof(object).Assembly.Location);
+        var image = (await File.ReadAllBytesAsync(typeof(object).Assembly.Location)).ToImmutableArray();
         var compilation = CSharpCompilation.Create(
             "ProbeConsumer",
             [CSharpSyntaxTree.ParseText("class Consumer {}")],
@@ -164,8 +165,8 @@ public sealed class CompilerProbeSnapshotTests
         var analyzerOptions = new AnalyzerOptions(
             [],
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
-                    (CompilerProbeContract.OutputPathOptionKey, outputPath))));
+                new DictionaryAnalyzerConfigOptions([
+                    (CompilerProbeContract.OutputPathOptionKey, outputPath)])));
         var withAnalyzers = compilation.WithAnalyzers(
             [new CompilerProbeAnalyzer()],
             new CompilationWithAnalyzersOptions(

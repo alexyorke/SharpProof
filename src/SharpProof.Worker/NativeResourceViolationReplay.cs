@@ -181,20 +181,26 @@ internal static class NativeResourceViolationReplay
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation);
             var observedText = violatingPrefix.ToString(CultureInfo.InvariantCulture);
             var limitText = evaluatedLimit.ToString(CultureInfo.InvariantCulture);
-            result.ResourceBound = new()
+            result = result with
             {
-                Metric = constraint.Metric,
-                CostModel = constraint.CostModel,
-                DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256(constraint.UpperBound),
-                ObservedLowerBound = observedText,
-                EvaluatedUpperBound = limitText
+                ResourceBound = new()
+                {
+                    Metric = constraint.Metric,
+                    CostModel = constraint.CostModel,
+                    DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256([.. constraint.UpperBound]),
+                    ObservedLowerBound = observedText,
+                    EvaluatedUpperBound = limitText
+                }
             };
-            result.EffectWitness = new()
+            result = result with
             {
-                Kind = "resource-bound-exceeded",
-                Detail = constraint.Metric + (lifetime ? " completed execution " : " prefix ") + observedText + " exceeds entry bound " + limitText,
-                Effects = constraint.Metric == WorkerResourceMetric.LoopBodyEntries ? WorkerEffectSet.None : WorkerEffectSet.Allocates,
-                Location = new() { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
+                EffectWitness = new()
+                {
+                    Kind = "resource-bound-exceeded",
+                    Detail = constraint.Metric + (lifetime ? " completed execution " : " prefix ") + observedText + " exceeds entry bound " + limitText,
+                    Effects = constraint.Metric == WorkerResourceMetric.LoopBodyEntries ? WorkerEffectSet.None : WorkerEffectSet.Allocates,
+                    Location = new() { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
+                }
             };
             result.Model = [.. owner.Parameters.Select((parameter, ordinal) =>
             {

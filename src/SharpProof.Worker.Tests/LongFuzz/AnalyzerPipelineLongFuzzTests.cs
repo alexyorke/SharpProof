@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -30,11 +30,11 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class AnalyzerPipelineLongFuzzTests
 {
     private const string Harness = "analyzer-pipeline";
-    private static readonly int[] s_ints = [0, 1, 2, 3, -1, 5, 100, int.MaxValue, int.MinValue];
-    private static readonly int[]?[] s_arrays = [null, [], [3, -1, 0]];
-    private static readonly string?[] s_strings = [null, "", "ab", "abc"];
+    private static readonly ImmutableArray<int> s_ints = [0, 1, 2, 3, -1, 5, 100, int.MaxValue, int.MinValue];
+    private static readonly ImmutableArray<int[]?> s_arrays = [null, [], [3, -1, 0]];
+    private static readonly ImmutableArray<string?> s_strings = [null, "", "ab", "abc"];
     // A few missing boundaries extend coverage without multiplying the Cartesian grid.
-    private static readonly (int X, int Y, int[]? Array, string? Text)[] s_boundaryInputs =
+    private static readonly ImmutableArray<(int X, int Y, int[]? Array, string? Text)> s_boundaryInputs =
     [
         (0, -2, null, null),
         (6, 0, null, null),
@@ -60,8 +60,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                result = new CaseResult("", "", "");
-                result.Problems.Add(("HarnessException", LongFuzzHit.Error, exception.ToString()));
+                result = new CaseResult("", "", "", [("HarnessException", LongFuzzHit.Error, exception.ToString())]);
             }
             foreach (var (kind, severity, details) in result.Problems)
             {
@@ -73,9 +72,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    internal sealed record CaseResult(string Outcome, string Reason, string Runtime)
+    internal sealed record CaseResult(string Outcome, string Reason, string Runtime, ImmutableArray<(string Kind, string Severity, string Details)> Problems)
     {
-        internal List<(string Kind, string Severity, string Details)> Problems { get; } = [];
+        internal ImmutableArray<(string Kind, string Severity, string Details)> Problems { get; init; } = Problems.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Problems)) : Problems;
         public string Outcome { get; init; } = Outcome ?? throw new System.ArgumentNullException(nameof(Outcome));
         public string Reason { get; init; } = Reason ?? throw new System.ArgumentNullException(nameof(Reason));
         public string Runtime { get; init; } = Runtime ?? throw new System.ArgumentNullException(nameof(Runtime));
@@ -94,28 +93,27 @@ public sealed class AnalyzerPipelineLongFuzzTests
         if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
         {
             count("compile-error");
-            return new CaseResult("", "", "");
+            return new CaseResult("", "", "", []);
         }
         count("compiled");
-        var problems = new List<(string, string, string)>();
+        var problems = ImmutableArray.CreateBuilder<(string, string, string)>();
         using var temp = new TempDirectory("sharpproof-longfuzz-");
         var manifestPath = Path.Combine(temp.FullName, "manifest.json");
-        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["build_property._SharpProofCompilerManifestPath"] = manifestPath,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net9.0",
-            ["build_property._SharpProofProjectDirectory"] = "/project",
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] =
-                WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture),
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow"
-        };
-        var exceptions = new ConcurrentBag<string>();
+        var optionBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionBuilder["build_property._SharpProofCompilerManifestPath"] = manifestPath;
+        optionBuilder["build_property._SharpProofCompilationTargetFramework"] = "net9.0";
+        optionBuilder["build_property._SharpProofProjectDirectory"] = "/project";
+        optionBuilder["build_property.SharpProofVerifyMaximumExpressionDepth"] =
+                WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture);
+        optionBuilder["build_property.SharpProofProfile"] = "advisory";
+        optionBuilder["build_property.SharpProofFeatures"] = "all";
+        optionBuilder["build_property.SharpProofVerifyPolicy"] = "advisory";
+        optionBuilder["build_property.SharpProofAssumptionPolicy"] = "allow";
+        var options = optionBuilder.ToImmutable();
+        var exceptions = ImmutableStack<string>.Empty;
         var withAnalyzers = compilation.WithAnalyzers([new SharpProofAnalyzer(), new FinalCompilationCollectorAnalyzer()],
             new CompilationWithAnalyzersOptions(new AnalyzerOptions([], new OptionsProvider(options)),
-                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); exceptions.Add(analyzer.GetType().Name + ": " + exception); }, concurrentAnalysis: false,
+                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); ImmutableInterlocked.Push(ref exceptions, analyzer.GetType().Name + ": " + exception); }, concurrentAnalysis: false,
                 logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         foreach (var exception in exceptions)
@@ -130,7 +128,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 problems.Add(("AnalyzerDiagnostic-" + diagnostic.Id, LongFuzzHit.Error, diagnostic.ToString()));
             }
         }
-        WorkerModelValue[] reportedModel = [];
+        var reportedModel = ImmutableArray<WorkerModelValue>.Empty;
         WorkerClaimOutcome? outcome = null;
         var reason = "";
         if (File.Exists(manifestPath))
@@ -140,6 +138,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             {
                 var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
                 using var project = new ShadowTestProject(artifact);
+                artifact = project.Artifact;
                 using var worker = SharpProofWorker.Create(project.Request.Budgets);
                 var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
                 if (response.Errors.Length > 0)
@@ -152,9 +151,15 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     problems.Add(("WorkerResponseInvalid", LongFuzzHit.Error, "The worker response failed protocol validation."));
                 }
                 var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
-                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
                 if (claims.Length == 1)
                 {
+                    // The former array copy rejected a default protocol model here,
+                    // inside the worker-error capture and before publishing an outcome.
+                    if (claims[0].Model.IsDefault)
+                    {
+                        throw new InvalidDataException("The reported entry model is uninitialized.");
+                    }
                     reportedModel = claims[0].Model;
                     outcome = claims[0].Outcome;
                     reason = claims[0].Reason.ToString();
@@ -215,9 +220,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     "No tested input violates the claim the worker refuted (" + observation.Inputs + " inputs)."));
             }
         }
-        var caseResult = new CaseResult(outcome?.ToString() ?? "None", reason, runtime);
-        caseResult.Problems.AddRange(problems);
-        return caseResult;
+        return new CaseResult(outcome?.ToString() ?? "None", reason, runtime, problems.ToImmutable());
     }
 
     internal sealed record Observation(string? Violation, string? Error, int Inputs);
@@ -283,9 +286,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
                         literal.Parent is PrefixUnaryExpressionSyntax unary ? unary : literal)))
                     .Where(static constant => constant is { HasValue: true, Value: int })
                     .Select(static constant => ((!constant.HasValue) ? throw new System.ArgumentException("Value must be initialized.", nameof(constant)) : ((int)constant.Value!)))
-                    .Distinct().Order().ToArray();
-                var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToArray();
-                var arrayLengths = SourceArrayLengths(tree, model).Distinct().Order().ToArray();
+                    .Distinct().Order().ToImmutableArray();
+                var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToImmutableArray();
+                var arrayLengths = SourceArrayLengths(tree, model).Distinct().Order().ToImmutableArray();
                 return Execute(type, mode, trackWrites, sourceIntegers, stringLengths, arrayLengths, exactInput);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -317,7 +320,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     DeclaredAccessibility: Accessibility.Public,
                     Type.SpecialType: SpecialType.System_Int32
                 })
-                .ToArray();
+                .ToImmutableArray();
             if (stateFields.Length != 1)
             {
                 return (null, Unsupported("could not uniquely identify the public static int State field"));
@@ -336,13 +339,11 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 return SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(expression).Symbol, stateField.Symbol);
             }
 
-            var changes = new List<TextChange>
-            {
-                new(stateField.Field.Span, TrackedState)
-            };
+            var changes = ImmutableArray.CreateBuilder<TextChange>();
+            changes.Add(new(stateField.Field.Span, TrackedState));
             var stateRefExpressions = root.DescendantNodes().OfType<RefExpressionSyntax>()
-                .Where(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : RefersToState(reference.Expression)).ToArray();
-            var aliases = new List<(RefExpressionSyntax Reference, LocalDeclarationStatementSyntax Statement,
+                .Where(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : RefersToState(reference.Expression)).ToImmutableArray();
+            var aliases = ImmutableArray.CreateBuilder<(RefExpressionSyntax Reference, LocalDeclarationStatementSyntax Statement,
                 ExpressionStatementSyntax? Write)>();
             foreach (var reference in stateRefExpressions)
             {
@@ -362,7 +363,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
                 var aliasReferences = root.DescendantNodes().OfType<IdentifierNameSyntax>()
                     .Where(identifier => identifier is null ? throw new ArgumentNullException(nameof(identifier)) : SymbolEqualityComparer.Default.Equals(
-                        model.GetSymbolInfo(identifier).Symbol, local)).ToArray();
+                        model.GetSymbolInfo(identifier).Symbol, local)).ToImmutableArray();
                 if (local.RefKind == RefKind.Ref && refType.ReadOnlyKeyword.IsKind(SyntaxKind.None))
                 {
                     // Switch labels own a statement list without an intervening block.
@@ -405,7 +406,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 return (null, Unsupported("State is passed or exposed by reference outside a supported local alias"));
             }
 
-            foreach (var alias in aliases)
+            foreach (var alias in aliases.ToImmutable())
             {
                 changes.Add(new TextChange(alias.Reference.Expression.Span, "s_state"));
                 if (alias.Write != null)
@@ -416,7 +417,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 }
             }
 
-            return (tree.GetText().WithChanges(changes).ToString(), null);
+            return (tree.GetText().WithChanges(changes.ToImmutable()).ToString(), null);
 
             bool IsByRefUse(IdentifierNameSyntax identifier)
             {
@@ -563,11 +564,14 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return model.GetConstantValue(expression) is { HasValue: true, Value: int value } && value == 0;
         }
 
-        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths, int[] arrayLengths, ExactReplayInput? exactInput)
+        private static Observation Execute(Type type, string mode, bool trackWrites, ImmutableArray<int> sourceIntegers, ImmutableArray<int> stringLengths, ImmutableArray<int> arrayLengths, ExactReplayInput? exactInput)
         {
-            System.ArgumentNullException.ThrowIfNull(arrayLengths, nameof(arrayLengths));
-            System.ArgumentNullException.ThrowIfNull(sourceIntegers, nameof(sourceIntegers));
-            System.ArgumentNullException.ThrowIfNull(stringLengths, nameof(stringLengths));
+            if (arrayLengths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(arrayLengths)); }
+            if (sourceIntegers.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sourceIntegers)); }
+            if (stringLengths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(stringLengths)); }
             System.ArgumentNullException.ThrowIfNull(type);
             var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
             var pre = type.GetMethod("Pre", BindingFlags.Public | BindingFlags.Static)!;
@@ -605,13 +609,13 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     continue;
                 }
                 inputs++;
-                object?[] args = [x, y, a?.ToArray(), s];
+                ImmutableArray<object?> args = [x, y, a?.ToArray(), s];
                 object? result = null;
                 Exception? thrown = null;
                 Reset();
                 try
                 {
-                    result = target.Invoke(null, args);
+                    result = target.Invoke(null, args.ToArray());
                 }
                 catch (TargetInvocationException exception)
                 {
@@ -629,11 +633,14 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return new(null, null, inputs);
         }
 
-        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
+        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(ImmutableArray<int> sourceIntegers, ImmutableArray<int> stringLengths, ImmutableArray<int> arrayLengths)
         {
-            System.ArgumentNullException.ThrowIfNull(arrayLengths, nameof(arrayLengths));
-            System.ArgumentNullException.ThrowIfNull(sourceIntegers, nameof(sourceIntegers));
-            System.ArgumentNullException.ThrowIfNull(stringLengths, nameof(stringLengths));
+            if (arrayLengths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(arrayLengths)); }
+            if (sourceIntegers.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sourceIntegers)); }
+            if (stringLengths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(stringLengths)); }
             foreach (var x in s_ints)
             {
                 foreach (var y in s_ints)
@@ -675,18 +682,20 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
             var existingLengths = s_arrays.Concat(s_boundaryInputs.Select(static input => input.Array))
                 .OfType<int[]>().Where(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.All(static value => value == 0)))
-                .Select(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.Length)).ToHashSet();
+                .Select(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.Length)).ToImmutableHashSet();
             foreach (var length in arrayLengths.Where(length => !existingLengths.Contains(length)))
             {
                 yield return (0, 0, new int[length], null);
             }
         }
 
-        private static string? Check(string mode, Exception? thrown, object? result, object?[] args, int[]? original, string input,
+        private static string? Check(string mode, Exception? thrown, object? result, ImmutableArray<object?> args, int[]? original, string input,
             int state, int other, int stateWrites, Func<long> measure, MethodInfo post, int x, int y)
         {
             System.ArgumentNullException.ThrowIfNull(input);
             System.ArgumentNullException.ThrowIfNull(measure);
+            if (args.IsDefault)
+            { throw new ArgumentNullException(nameof(args)); }
             switch (mode)
             {
                 case ContractClaimProgramGenerator.DoesNotThrow:
@@ -736,7 +745,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
         }
     }
 
-    private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
+    private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
 
@@ -755,9 +764,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
         }
     }
 
-    private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    private sealed class DictionaryOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -30,7 +31,7 @@ public sealed class OpaqueListValueOracleTests
         using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(), "src/SharpProof.Gates/Corpus/oss-methods.json")));
         var method = corpus.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = corpus.RootElement.GetProperty("files").EnumerateArray().Single(item => item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var lines = file.GetProperty("content").GetString()!.Split('\n');
+        var lines = file.GetProperty("content").GetString()!.Split('\n').ToImmutableArray();
         var swap = string.Join("\n", lines.Skip(method.GetProperty("startLine").GetInt32() - 1)
             .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
         var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new List<T>() { first, second }; data.Swap(0, 1); return Read<T>(data); } static U Read<U>(IList<U> data) => data[0]; " + swap + " }";
@@ -40,7 +41,7 @@ public sealed class OpaqueListValueOracleTests
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         for (var ordinal = 0; ordinal < total.Parameters.Length; ordinal++)
         {
             var parameter = total.Parameters[ordinal].Entry;
@@ -48,9 +49,10 @@ public sealed class OpaqueListValueOracleTests
             var value = ordinal == 0 ? first : second;
             // Each opaque value is an abstract atom. Struct payloads are never
             // interpreted as fields or numbers by this differential execution.
-            inputs[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
+            inputBuilder[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
                 : factory.CreateReferenceValue(parameterType, new IrObjectState());
         }
+        var inputs = inputBuilder.ToImmutable();
         var choices = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -65,10 +67,10 @@ public sealed class OpaqueListValueOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Reference, Is.SameAs(expected.Reference)); }
 
-        var compilation = TestCompilation.Create("OpaqueListValueOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("OpaqueListValueOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new AssemblyLoadContext("OpaqueListValueOracle", isCollectible: true);

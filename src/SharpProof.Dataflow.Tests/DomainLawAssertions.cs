@@ -4,10 +4,11 @@ internal static class DomainLawAssertions
 {
     public static void AssertCanonicalTransfers<T>(
         CanonicalAbstractDomain<T> domain,
-        IReadOnlyList<T> samples)
+        ImmutableArray<T> samples)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(samples);
+        if (samples.IsDefault)
+        { throw new ArgumentNullException(nameof(samples)); }
         foreach (var sample in samples)
         {
             Assert.That(
@@ -19,10 +20,11 @@ internal static class DomainLawAssertions
 
     public static void AssertOrderAndJoinLaws<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> samples)
+        ImmutableArray<T> samples)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(samples);
+        if (samples.IsDefault)
+        { throw new ArgumentNullException(nameof(samples)); }
         foreach (var value in samples)
         {
             Assert.That(
@@ -127,11 +129,12 @@ internal static class DomainLawAssertions
 
     public static void AssertMonotone<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> samples,
+        ImmutableArray<T> samples,
         Func<T, T> transfer)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(samples);
+        if (samples.IsDefault)
+        { throw new ArgumentNullException(nameof(samples)); }
         System.ArgumentNullException.ThrowIfNull(transfer);
         foreach (var left in samples)
         {
@@ -150,10 +153,11 @@ internal static class DomainLawAssertions
 
     public static void AssertConservativeHavoc<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> samples)
+        ImmutableArray<T> samples)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(samples);
+        if (samples.IsDefault)
+        { throw new ArgumentNullException(nameof(samples)); }
         foreach (var value in samples)
         {
             var havoced = domain.Havoc(value);

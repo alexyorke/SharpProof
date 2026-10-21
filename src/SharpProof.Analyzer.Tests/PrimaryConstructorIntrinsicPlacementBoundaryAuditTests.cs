@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0024"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0024"];
 
     [Test]
     public async Task OldInParenthesizedClassPrimaryBaseArgumentReportsPlacementDiagnostic()
@@ -47,7 +48,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         AssertNoCompilationErrors(compilation);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [Test]
@@ -70,7 +71,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var model = compilation.GetSemanticModel(tree);
         var intrinsicCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
-                method.Name is "Result" or "Old")).ToArray();
+                method.Name is "Result" or "Old")).ToImmutableArray();
         Assert.That(intrinsicCalls, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsicCalls)
         {
@@ -84,7 +85,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var runtime = new AssemblyLoadContext("PrimaryIntrinsicValidLambda", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             Assert.That(Activator.CreateInstance(subject), Is.Not.Null);
         }
@@ -94,7 +95,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         }
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [TestCase(false)]
@@ -152,7 +153,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         AssertNoCompilationErrors(compilation);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     private static async Task AssertMisuseAsync(
@@ -199,7 +200,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
             var runtime = new AssemblyLoadContext("PrimaryIntrinsicBoundaryMisuse", isCollectible: true);
             try
             {
-                using var stream = new MemoryStream(image);
+                using var stream = new MemoryStream((image).ToArray(), writable: false);
                 var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
                 var exception = Assert.Throws<TargetInvocationException>(
                     (Action)(() => Activator.CreateInstance(subject)))!;

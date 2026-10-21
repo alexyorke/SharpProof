@@ -49,7 +49,7 @@ public sealed class ObservedRootClosureCompilerTests
         var source = "public static class Subject { static readonly System.Exception Failure=new System.Exception(); " +
             "[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static " + resultType + " Target(int value) { " + body + " } }";
-        var compilation = TestCompilation.Create("RootClosureCompiler", ("Subject.cs", source));
+        var compilation = TestCompilation.Create("RootClosureCompiler", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(release ? OptimizationLevel.Release : OptimizationLevel.Debug));
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

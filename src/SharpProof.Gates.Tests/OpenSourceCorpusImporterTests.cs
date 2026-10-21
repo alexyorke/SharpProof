@@ -9,6 +9,18 @@ namespace SharpProof.Gates.Test;
 public sealed class OpenSourceCorpusImporterTests
 {
     [Test]
+    public void DefaultGitArgumentsRejectBeforeStartingAProcess()
+    {
+        using var temporary = new TempDirectory("SharpProof-importer-default-arguments-");
+        var unavailableGit = Path.Combine(temporary.FullName, "missing-git");
+        var exception = Assert.ThrowsAsync<ArgumentNullException>((Func<Task>)(() =>
+            OpenSourceCorpusImporter.ReadGitAsync(temporary.FullName, default,
+                TestContext.CurrentContext.CancellationToken, unavailableGit)));
+        Assert.That(exception!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(Directory.EnumerateFileSystemEntries(temporary.FullName), Is.Empty);
+    }
+
+    [Test]
     public async Task SourceDiscoveryUsesCommittedBlobsAndSelectsAcrossFiles()
     {
         using var upstream = new TempDirectory("SharpProof-importer-");
@@ -37,9 +49,9 @@ public sealed class OpenSourceCorpusImporterTests
             source.AppendLine("}");
             await File.WriteAllTextAsync(path, source.ToString());
         }
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "fixture");
-        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "fixture"]);
+        var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
 
         // An uncommitted edit must not contaminate the imported snapshot.
         var changedPath = Path.Combine(upstream.FullName, "Algorithms", "F00.cs");
@@ -102,8 +114,8 @@ public sealed class OpenSourceCorpusImporterTests
         using var upstream = new TempDirectory("SharpProof-importer-");
         await InitializeRepositoryAsync(upstream.FullName);
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "fixture.txt"), "committed\n");
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "fixture");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "fixture"]);
         await File.AppendAllTextAsync(Path.Combine(upstream.FullName, "fixture.txt"), "dirty\n");
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
@@ -118,10 +130,10 @@ public sealed class OpenSourceCorpusImporterTests
         using var upstream = new TempDirectory("SharpProof-importer-");
         await InitializeRepositoryAsync(upstream.FullName);
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "fixture.txt"), "committed\n");
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "fixture");
-        await GitAsync(upstream.FullName, "remote", "add", "origin",
-            "https://example.com/untrusted-repository.git");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "fixture"]);
+        await GitAsync(upstream.FullName, ["remote", "add", "origin",
+            "https://example.com/untrusted-repository.git"]);
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await OpenSourceCorpusImporter.PrepareAsync(
@@ -142,14 +154,14 @@ public sealed class OpenSourceCorpusImporterTests
             Path.Combine(upstream.FullName, "fixture.txt"), "untrusted\n");
         await File.WriteAllTextAsync(
             Path.Combine(approved.FullName, "fixture.txt"), "trusted\n");
-        foreach (var repository in new[] { upstream.FullName, approved.FullName })
+        foreach (var repository in ImmutableArray.Create(upstream.FullName, approved.FullName))
         {
-            await GitAsync(repository, "add", ".");
-            await GitAsync(repository, "commit", "--quiet", "-m", "fixture");
+            await GitAsync(repository, ["add", "."]);
+            await GitAsync(repository, ["commit", "--quiet", "-m", "fixture"]);
         }
-        await GitAsync(upstream.FullName, "remote", "add", "origin",
-            "https://github.com/aalhour/C-Sharp-Algorithms");
-        var untrustedCommit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        await GitAsync(upstream.FullName, ["remote", "add", "origin",
+            "https://github.com/aalhour/C-Sharp-Algorithms"]);
+        var untrustedCommit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
 
         // Git rewrites this fetch only inside the test process and its children.
         // The importer still sees the approved origin URL and verifies membership.
@@ -183,14 +195,15 @@ public sealed class OpenSourceCorpusImporterTests
         System.ArgumentNullException.ThrowIfNull(path);
         Directory.CreateDirectory(Path.Combine(path, "Algorithms"));
         Directory.CreateDirectory(Path.Combine(path, "DataStructures"));
-        await GitAsync(path, "init", "--quiet");
-        await GitAsync(path, "config", "user.name", "SharpProof Test");
-        await GitAsync(path, "config", "user.email", "test@example.invalid");
+        await GitAsync(path, ["init", "--quiet"]);
+        await GitAsync(path, ["config", "user.name", "SharpProof Test"]);
+        await GitAsync(path, ["config", "user.email", "test@example.invalid"]);
     }
 
-    private static Task<string> GitAsync(string path, params string[] arguments)
+    private static Task<string> GitAsync(string path, ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(path);
         return OpenSourceCorpusImporter.ReadGitAsync(
             path, arguments, TestContext.CurrentContext.CancellationToken);

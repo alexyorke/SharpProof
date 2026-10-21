@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -218,7 +219,7 @@ public sealed class DictionaryDomainBoundaryTests
         builder.Return(lowered.Continuation, context.Site(operation), lowered.Value);
         var masks = builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
             .OfType<IrAssignInstruction>().Select(assignment => assignment is null ? throw new ArgumentNullException(nameof(assignment)) : assignment.Value)
-            .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd).ToArray();
+            .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd).ToImmutableArray();
         Assert.That(masks.Length, Is.EqualTo(nonnegative ? 1 : 0));
         if (nonnegative)
         { Assert.That(new IrInterpreter(context.Factory).Evaluate(masks.Single().Right).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(int.MaxValue))); }

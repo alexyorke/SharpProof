@@ -11,15 +11,15 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 internal sealed class ContractInvocationMaterializationExtendedMatrixTests
 {
-    private static readonly bool[] BooleanValues = [false, true];
-    private static readonly BoundContractKind[] BooleanClauseKinds =
+    private static readonly ImmutableArray<bool> BooleanValues = [false, true];
+    private static readonly ImmutableArray<BoundContractKind> BooleanClauseKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Assume,
         BoundContractKind.Ensures
     ];
-    private static readonly BoundContractKind[] RequiresOnlyKinds = [BoundContractKind.Requires];
-    private static readonly BoundContractKind[] CompanionClauseKinds =
+    private static readonly ImmutableArray<BoundContractKind> RequiresOnlyKinds = [BoundContractKind.Requires];
+    private static readonly ImmutableArray<BoundContractKind> CompanionClauseKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Ensures
@@ -552,7 +552,7 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
         return [.. candidates.OrderBy(candidate => ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Syntax.SpanStart)))];
     }
 
-    private static Dictionary<IrVarId, IrValue> CreatePairValues(
+    private static ImmutableDictionary<IrVarId, IrValue> CreatePairValues(
         DirectContext context,
         bool left,
         bool right,
@@ -561,7 +561,7 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
         bool? result = null)
     {
         System.ArgumentNullException.ThrowIfNull(context);
-        var values = new Dictionary<IrVarId, IrValue>();
+        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         AddParameterValue(context, values, "left", left);
         AddParameterValue(context, values, "right", right);
         if (oldLeft.HasValue)
@@ -577,17 +577,17 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
             AddResultValue(context, values, result.Value);
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
-    private static Dictionary<IrVarId, IrValue> CreateSingleValue(
+    private static ImmutableDictionary<IrVarId, IrValue> CreateSingleValue(
         DirectContext context,
         bool value,
         bool? oldValue = null,
         bool? result = null)
     {
         System.ArgumentNullException.ThrowIfNull(context);
-        var values = new Dictionary<IrVarId, IrValue>();
+        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         AddParameterValue(context, values, "value", value);
         if (oldValue.HasValue)
         {
@@ -598,12 +598,12 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
             AddResultValue(context, values, result.Value);
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
     private static void AddParameterValue(
         DirectContext context,
-        Dictionary<IrVarId, IrValue> values,
+        ImmutableDictionary<IrVarId, IrValue>.Builder values,
         string name,
         bool value)
     {
@@ -617,7 +617,7 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
 
     private static void AddPreStateValue(
         DirectContext context,
-        Dictionary<IrVarId, IrValue> values,
+        ImmutableDictionary<IrVarId, IrValue>.Builder values,
         string parameterName,
         bool value)
     {
@@ -633,14 +633,13 @@ internal sealed class ContractInvocationMaterializationExtendedMatrixTests
 
     private static void AddResultValue(
         DirectContext context,
-        Dictionary<IrVarId, IrValue> values,
+        ImmutableDictionary<IrVarId, IrValue>.Builder values,
         bool value)
     {
         System.ArgumentNullException.ThrowIfNull(values);
         Assert.That(context.ExpressionBinder.ResultVariable.HasValue, Is.True);
         var result = context.ExpressionBinder.ResultVariable ?? throw new AssertionException("The genuine Ensures candidate must allocate its result slot.");
-        values[result] =
-            context.Factory.CreateBooleanValue(value);
+        values[result] = context.Factory.CreateBooleanValue(value);
     }
 
     private static string DescribeOperation(IrFactory factory, BoundContractClause clause)

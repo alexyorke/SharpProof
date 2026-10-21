@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -71,7 +72,7 @@ public sealed class BitwiseOperatorSemanticsTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("BitwiseOperatorSemantics", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("BitwiseOperatorSemantics", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -96,6 +97,7 @@ public sealed class BitwiseOperatorSemanticsTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null, "Expected admitted compiler-captured total body.");
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
@@ -107,7 +109,7 @@ public sealed class BitwiseOperatorSemanticsTests
 
     private static IEnumerable<object[]> Inputs()
     {
-        long[] edges = [0, 1, -1, 2, 7, 8, 15, 16, 127, 128, 255, 256, -127, -128, -129, 0x7FFF, 0x8000, 0xFFFF,
+        ImmutableArray<long> edges = [0, 1, -1, 2, 7, 8, 15, 16, 127, 128, 255, 256, -127, -128, -129, 0x7FFF, 0x8000, 0xFFFF,
             int.MaxValue, int.MinValue, uint.MaxValue, long.MaxValue, long.MinValue, 0x40000000, 0x55555555, unchecked((long)0xAAAAAAAAAAAAAAAAUL)];
         var random = new Random(20261010);
         long Pick()

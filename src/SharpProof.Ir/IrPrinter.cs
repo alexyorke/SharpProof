@@ -14,7 +14,7 @@ internal sealed partial class IrPrinter(IrFactory factory)
         _factory.EnsureTerm(term, nameof(term));
         // Count expanded work, not unique DAG nodes. Include a conservative
         // escaped-text allowance so a few enormous atoms cannot bypass it.
-        IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
+        IrTraversal.FoldBottomUp(term, ImmutableDictionary<IrId, long>.Empty, (node, children, costs) =>
         {
             RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
 
@@ -77,7 +77,8 @@ internal sealed partial class IrPrinter(IrFactory factory)
     private static string Quote(string value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        var builder = new StringBuilder().Append('"');
+        var fragments = ImmutableArray.CreateBuilder<string>();
+        fragments.Add("\"");
         foreach (var character in value)
         {
             var escape = character switch
@@ -91,21 +92,22 @@ internal sealed partial class IrPrinter(IrFactory factory)
             };
             if (escape != null)
             {
-                builder.Append(escape);
+                fragments.Add(escape);
                 continue;
             }
             if (character is < ' ' or > '~')
             {
-                builder.Append("\\u").Append(
+                fragments.Add("\\u" +
                     ((int)character).ToString(
                         "X4",
                         CultureInfo.InvariantCulture));
             }
             else
             {
-                builder.Append(character);
+                fragments.Add(character.ToString());
             }
         }
-        return builder.Append('"').ToString();
+        fragments.Add("\"");
+        return string.Concat(fragments.ToImmutable());
     }
 }

@@ -36,8 +36,8 @@ internal static class AdvisoryLowering
         if (!TotalBodyLowering.IsBodyDeclaration(declaration))
         { return (null, "UnsupportedCallable"); }
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture))))
-            .ToArray();
-        var paths = documents.ToDictionary(item => item.Tree, item => item.Path);
+            .ToImmutableArray();
+        var paths = ImmutableDictionaryCapture.Create(documents, item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
             tree => paths.TryGetValue(tree, out var path) ? path : throw new InvalidOperationException("The syntax tree is not part of the compilation."));
         FrontendProgramLoweringResult? lowering;

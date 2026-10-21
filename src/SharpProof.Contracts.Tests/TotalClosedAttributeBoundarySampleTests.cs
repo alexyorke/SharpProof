@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
@@ -60,21 +61,17 @@ public sealed class TotalClosedAttributeBoundarySampleTests
         var runtime = System.Reflection.Assembly.Load(image.ToArray()).GetType("Target")!.GetMethod("Read")!;
         var values = typeName switch
         {
-            "sbyte" => new BigInteger[] { -128, -1, 0, 1, 127 },
-            "ushort" => new BigInteger[] { 0, 1, 128, 129, ushort.MaxValue },
-            _ => new BigInteger[] { 0, 1, 128, 129, ulong.MaxValue }
+            "sbyte" => ImmutableArray.Create<BigInteger>(-128, -1, 0, 1, 127),
+            "ushort" => ImmutableArray.Create<BigInteger>(0, 1, 128, 129, ushort.MaxValue),
+            _ => ImmutableArray.Create<BigInteger>(0, 1, 128, 129, ulong.MaxValue)
         };
         foreach (var value in values)
         {
             object argument = typeName switch { "sbyte" => (sbyte)value, "ushort" => (ushort)value, _ => (ulong)value };
             var actualReturn = runtime.Invoke(null, [argument]);
             Assert.That(BigInteger.Parse(Convert.ToString(actualReturn, CultureInfo.InvariantCulture)!, CultureInfo.InvariantCulture), Is.EqualTo(value));
-            var supplied = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = info.Signed ? factory.CreateIntegerValue(inputType, (long)value) : factory.CreateIntegerValue(inputType, (ulong)value),
-                [result] = info.Signed ? factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (long)value) :
-                    factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (ulong)value)
-            };
+            var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, info.Signed ? factory.CreateIntegerValue(inputType, (long)value) : factory.CreateIntegerValue(inputType, (ulong)value)).SetItem(result, info.Signed ? factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (long)value) :
+                    factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (ulong)value));
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(requires.Value, supplied).Value!.Boolean, Is.EqualTo(value >= -129 && value <= 128));
             Assert.That(interpreter.Evaluate(ensures.Value, supplied).Value!.Boolean, Is.EqualTo(value >= -1 && value <= 1));

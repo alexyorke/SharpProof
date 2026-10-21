@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -30,7 +31,10 @@ internal sealed class WorkerVcLoopTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
-        var blocks = total.Program.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
+        var blocks = ImmutableDictionaryCapture.Create(
+            total.Program.Blocks,
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id),
+            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
         var pointBlock = total.Program.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrAssumeInstruction))));
         builder.SetEntry(blocks[total.Program.Entry]);
         foreach (var block in total.Program.Blocks)
@@ -76,7 +80,7 @@ internal sealed class WorkerVcLoopTests
                 }
             }
         }
-        artifact.Callables.Single().Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() }) }) }; }
         try
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -161,7 +165,7 @@ internal sealed class WorkerVcLoopTests
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response);
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }), kind);
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)), kind);
             Assert.That(posts.SelectMany(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions)).Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
             Assert.That(posts[1].Model, Is.Not.Empty, kind);
         }
@@ -179,7 +183,7 @@ internal sealed class WorkerVcLoopTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
+            Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
         Assert.That(posts[1].Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
         Assert.That(posts.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity == WorkerVacuityKind.None)), Is.True);
     }
@@ -223,16 +227,16 @@ internal sealed class WorkerVcLoopTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(posts[1].Model, Is.Not.Empty);
     }
 
-    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
+    private static ImmutableArray<WorkerClaimResult> Postconditions(WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
         var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
     }
 }

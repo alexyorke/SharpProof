@@ -40,7 +40,7 @@ public sealed class ObservedDelegateAllocationTests
             "System.Runtime.CompilerServices.MethodImplOptions.NoInlining | " +
             "System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static object Target(int value) { " + body + " } }";
-        var compilation = TestCompilation.Create("ObservedDelegateOracle", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ObservedDelegateOracle", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);

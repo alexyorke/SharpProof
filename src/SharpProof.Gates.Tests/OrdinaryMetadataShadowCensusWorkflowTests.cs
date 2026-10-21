@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -44,7 +45,7 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
         var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var original = batch.Callers.Single().Body;
@@ -56,14 +57,12 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         var owner = inventory.Owners.Single();
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, ImmutableArray.Create(body), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(coverage.Expected, Is.Zero);
         Assert.That(coverage.Matched, Is.Zero);
-        Assert.That(coverage.Failures, Is.EqualTo(new[]
-        {
+        Assert.That(coverage.Failures, Is.EqualTo(ImmutableArray.Create(
             "UnsupportedClauseOwner:" + owner.CallableId,
-            "NativeSourceSpanMissing:" + body.CallableId
-        }));
+            "NativeSourceSpanMissing:" + body.CallableId)));
     }
 }

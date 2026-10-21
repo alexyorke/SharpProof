@@ -23,9 +23,9 @@ internal static partial class CallableVerificationPolicy
                 WorkerCallableCoverageReason.UnsupportedCallable);
         }
 
-        var effectClaims = target.EffectClaims.ToDictionary(
+        var effectClaims = ImmutableDictionaryCapture.Create(target.EffectClaims,
             static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId),
-            StringComparer.Ordinal);
+            static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : evidence, StringComparer.Ordinal);
         var hasRequires = target.Entry.Assumptions.Any(static assumption =>
             assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition));
         var claims = target.Entry.ClaimIds.Select((claimId, index) =>

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -27,12 +28,12 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
-        await File.WriteAllBytesAsync(path, bytes);
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
-            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = ComputeSha256(bytes) },
+            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = ComputeSha256(bytes.AsSpan()) },
             Cache = new WorkerCacheOptions { Enabled = false, Directory = Path.Combine(temporary.FullName, "cache") },
             Budgets = new WorkerBudgets()
         };
@@ -69,9 +70,8 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
         await TestContext.Out.WriteLineAsync("actual-native-cancellation source-sha256=" + ComputeSha256(Encoding.UTF8.GetBytes(source)));
     }
 
-    private static string ComputeSha256(byte[] bytes)
+    private static string ComputeSha256(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - every byte span including empty has a SHA256 digest */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return string.Concat(SHA256.HashData(bytes).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
     }
 }

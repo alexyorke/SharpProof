@@ -50,7 +50,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             var identifier = template.Target.WitnessIdentifier;
             var row = Witnesses[identifier];
             var expectedFacets = ExpectedFacets(template);
-            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToArray();
+            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToImmutableArray();
 
             using (Assert.EnterMultipleScope())
             {
@@ -226,9 +226,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 Postcondition(
                     0,
                     "negative, zero, and maximum normal returns",
-                    MathAbsNegativeCall,
-                    MathAbsZeroCall,
-                    MathAbsMaximumCall)
+                    [MathAbsNegativeCall, MathAbsZeroCall, MathAbsMaximumCall])
             ]);
     }
 
@@ -421,7 +419,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ObserveExceptionConstructorEffect,
             SpecEffect.None,
             PrepareExceptionConstructorReceiver,
-            InvokePreparedExceptionConstructor);
+            [InvokePreparedExceptionConstructor]);
     }
 
     private static RowWitness CreateBclExceptionCtorStringWitness()
@@ -431,8 +429,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ObserveExceptionStringConstructorEffect,
             SpecEffect.None,
             PrepareExceptionConstructorReceiver,
-            InvokePreparedExceptionStringConstructor,
-            InvokePreparedExceptionNullStringConstructor);
+            [InvokePreparedExceptionStringConstructor, InvokePreparedExceptionNullStringConstructor]);
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
@@ -529,8 +526,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 Postcondition(
                     0,
                     "empty and embedded-null receivers",
-                    EmptyStringLengthCall,
-                    EmbeddedNullStringLengthCall)
+                    [EmptyStringLengthCall, EmbeddedNullStringLengthCall])
             ]);
     }
 
@@ -623,9 +619,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
 
         return new RowWitness(
-            [.. new IFacetWitness?[] {
+            [.. ImmutableArray.Create<IFacetWitness?>(
                 effects, allocation, throws, nullness, cardinality, termination
-            }.OfType<IFacetWitness>()],
+            ).OfType<IFacetWitness>()],
             postconditions.IsDefault ? [] : postconditions);
     }
 
@@ -649,9 +645,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
         Action prepare,
-        params Action[] invokes)
+        ImmutableArray<Action> invokes)
     {
-        System.ArgumentNullException.ThrowIfNull(invokes, nameof(invokes));
+        if (invokes.IsDefault)
+        { throw new ArgumentNullException(nameof(invokes)); }
         System.ArgumentNullException.ThrowIfNull(edgeInputs);
         System.ArgumentNullException.ThrowIfNull(observeEffect);
         System.ArgumentNullException.ThrowIfNull(prepare);
@@ -846,11 +843,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static PostconditionWitness Postcondition(
         int index,
         string edgeInputs,
-        params Func<RuntimeCall>[] edges)
+        ImmutableArray<Func<RuntimeCall>> edges)
     {
-        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
         System.ArgumentNullException.ThrowIfNull(edgeInputs);
-        return new(index, edgeInputs, [.. edges]);
+        return new(index, edgeInputs, edges);
     }
 
     private static ImmutableArray<FacetKind> ExpectedFacets(ApiSpecTemplate template)
@@ -893,9 +891,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return facets.ToImmutable();
     }
 
-    private static SpecEffect ObserveNoEffects(params Func<bool>[] edges)
+    private static SpecEffect ObserveNoEffects(ImmutableArray<Func<bool>> edges)
     {
-        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
         return edges.All(static edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge())) ? SpecEffect.None : SpecEffect.Unknown;
     }
 
@@ -940,7 +939,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveObjectConstructorEffect()
     {
-        return ObserveNoEffects(ObjectConstructorEdge);
+        return ObserveNoEffects([ObjectConstructorEdge]);
     }
 
     private static SpecEffect ObserveExceptionConstructorEffect()
@@ -948,7 +947,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return ObserveConstructorWrites(
             PrepareExceptionConstructorReceiver,
             static () => s_exceptionConstructorReceiver,
-            InvokePreparedExceptionConstructor);
+            [InvokePreparedExceptionConstructor]);
     }
 
     private static SpecEffect ObserveExceptionStringConstructorEffect()
@@ -956,17 +955,17 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return ObserveConstructorWrites(
             PrepareExceptionConstructorReceiver,
             static () => s_exceptionConstructorReceiver,
-            InvokePreparedExceptionStringConstructor,
-            InvokePreparedExceptionNullStringConstructor);
+            [InvokePreparedExceptionStringConstructor, InvokePreparedExceptionNullStringConstructor]);
     }
 
     private static SpecEffect ObserveConstructorWrites<TException>(
         Action prepare,
         Func<TException> receiver,
-        params Action[] invokes)
+        ImmutableArray<Action> invokes)
         where TException : Exception
     {
-        System.ArgumentNullException.ThrowIfNull(invokes, nameof(invokes));
+        if (invokes.IsDefault)
+        { throw new ArgumentNullException(nameof(invokes)); }
         System.ArgumentNullException.ThrowIfNull(prepare);
         System.ArgumentNullException.ThrowIfNull(receiver);
         return invokes.All(invoke =>
@@ -987,7 +986,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         prepare();
         var target = receiver();
         var fields = InstanceFields(target.GetType());
-        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToArray();
+        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToImmutableArray();
         invoke();
         for (var index = 0; index < fields.Length; index++)
         {
@@ -1020,45 +1019,40 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveContractAssumeEffect()
     {
-        return ObserveNoEffects(
-            static () => ContractAssumeEdge(false),
-            static () => ContractAssumeEdge(true));
+        return ObserveNoEffects([static () => ContractAssumeEdge(false), static () => ContractAssumeEdge(true)]);
     }
 
     private static SpecEffect ObserveContractEnsuresEffect()
     {
-        return ObserveNoEffects(
-            static () => ContractEnsuresEdge(false),
-            static () => ContractEnsuresEdge(true));
+        return ObserveNoEffects([static () => ContractEnsuresEdge(false), static () => ContractEnsuresEdge(true)]);
     }
 
     private static SpecEffect ObserveContractOldEffect()
     {
-        return ObserveNoEffects(
+        return ObserveNoEffects([
             static () => ContractOldDirectHasNoEffects(null),
-            static () => ContractOldDirectHasNoEffects(ListItem));
+            static () => ContractOldDirectHasNoEffects(ListItem)
+        ]);
     }
 
     private static SpecEffect ObserveContractRequiresEffect()
     {
-        return ObserveNoEffects(
-            static () => ContractRequiresEdge(false),
-            static () => ContractRequiresEdge(true));
+        return ObserveNoEffects([static () => ContractRequiresEdge(false), static () => ContractRequiresEdge(true)]);
     }
 
     private static SpecEffect ObserveContractResultEffect()
     {
-        return ObserveNoEffects(ContractResultDirectHasNoEffects);
+        return ObserveNoEffects([ContractResultDirectHasNoEffects]);
     }
 
     private static SpecEffect ObserveStringConcatEffect()
     {
-        return ObserveNoEffects(StringConcatEdge);
+        return ObserveNoEffects([StringConcatEdge]);
     }
 
     private static SpecEffect ObserveMathAbsEffect()
     {
-        return ObserveNoEffects(MathAbsNormalEdges);
+        return ObserveNoEffects([MathAbsNormalEdges]);
     }
 
     private static SpecEffect ObserveStringLengthEffect()
@@ -1175,9 +1169,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         };
     }
 
-    private static SpecNullness ObserveNullness(params Func<object?>[] edges)
+    private static SpecNullness ObserveNullness(ImmutableArray<Func<object?>> edges)
     {
-        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
         var sawNull = false;
         var sawNonNull = false;
         foreach (var edge in edges)
@@ -1218,19 +1213,21 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecNullness ObserveStringConcatNullness()
     {
-        return ObserveNullness(
+        return ObserveNullness([
             static () => string.Concat(null, null),
             static () => string.Concat(null, ConcatRight),
-            static () => string.Concat(ConcatLeft, ConcatRight));
+            static () => string.Concat(ConcatLeft, ConcatRight)
+        ]);
     }
 
     private static SpecCardinality ObserveCardinality(
-        params Func<object?>[] edges)
+        ImmutableArray<Func<object?>> edges)
     {
-        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        if (edges.IsDefault)
+        { throw new ArgumentNullException(nameof(edges)); }
         var counts = edges.Select(static edge =>
                 edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (Count((IEnumerable)edge()!)))
-            .ToArray();
+            .ToImmutableArray();
         if (counts.All(static count => count == 0))
         {
             return SpecCardinality.Empty;
@@ -1259,7 +1256,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static T ObserveEmptySequence<T>(
         Func<object?> objectFactory,
         Func<object?> valueFactory,
-        Func<Func<object?>[], T> observe)
+        Func<ImmutableArray<Func<object?>>, T> observe)
     {
         System.ArgumentNullException.ThrowIfNull(objectFactory);
         System.ArgumentNullException.ThrowIfNull(observe);
@@ -1293,7 +1290,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         foreach (var edge in edges)
         {
             var call = edge();
-            var bindings = new Dictionary<(SpecVariableRole, int), object?>();
+            var bindingsBuilder = ImmutableDictionary.CreateBuilder<(SpecVariableRole, int), object?>();
             foreach (var variable in template.Variables)
             {
                 var value = variable.Role switch
@@ -1303,8 +1300,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     SpecVariableRole.Result => call.Result,
                     _ => throw new AssertionException("Unknown spec variable role.")
                 };
-                bindings.Add((variable.Role, variable.Ordinal), value);
+                bindingsBuilder.AddUnique((variable.Role, variable.Ordinal), value);
             }
+            var bindings = bindingsBuilder.ToImmutable();
             if (Evaluate(condition, bindings) is not true)
             {
                 return false;
@@ -1315,7 +1313,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object? Evaluate(
         SpecTermDeclaration term,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         return term switch
@@ -1338,7 +1336,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object EvaluateUnary(
         SpecUnaryDeclaration unary,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         return unary.Operator switch
@@ -1351,7 +1349,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object EvaluateBinary(
         SpecBinaryDeclaration binary,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         var left = Evaluate(binary.Left, bindings);
@@ -1379,7 +1377,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static long EvaluateLength(
         SpecLengthDeclaration length,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         return Evaluate(length.Value, bindings) switch
         {
@@ -1430,7 +1428,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return CreateConstructorInvoker<TReceiver, Action<TReceiver>>(
             "ConstructorWitness",
             [typeof(TReceiver)],
-            Type.EmptyTypes,
+            ImmutableArray<Type>.Empty,
             static generator => { System.ArgumentNullException.ThrowIfNull(generator); generator.Emit(OpCodes.Ldarg_0); },
             "constructor was unavailable.");
     }
@@ -1453,28 +1451,31 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static TDelegate CreateConstructorInvoker<TReceiver, TDelegate>(
         string methodSuffix,
-        Type[] delegateParameterTypes,
-        Type[] constructorParameterTypes,
+        ImmutableArray<Type> delegateParameterTypes,
+        ImmutableArray<Type> types,
         Action<ILGenerator> emitArguments,
         string unavailableDescription)
         where TReceiver : class
         where TDelegate : Delegate
     {
-        System.ArgumentNullException.ThrowIfNull(delegateParameterTypes, nameof(delegateParameterTypes));
+        if (delegateParameterTypes.IsDefault)
+        { throw new ArgumentNullException(nameof(delegateParameterTypes)); }
         System.ArgumentNullException.ThrowIfNull(emitArguments);
         System.ArgumentNullException.ThrowIfNull(methodSuffix);
         System.ArgumentNullException.ThrowIfNull(unavailableDescription);
         var method = new DynamicMethod(
             "SharpProof_" + typeof(TReceiver).Name + "_" + methodSuffix,
             typeof(void),
-            delegateParameterTypes,
+            delegateParameterTypes.ToArray(),
             typeof(ApiSpecRuntimeOracleTests).Module,
             true);
         var generator = method.GetILGenerator();
         emitArguments(generator);
+        if (types.IsDefault)
+        { throw new ArgumentNullException(nameof(types)); }
         generator.Emit(
             OpCodes.Call,
-            typeof(TReceiver).GetConstructor(constructorParameterTypes) ??
+            typeof(TReceiver).GetConstructor(types.ToArray()) ??
             throw new AssertionException(
                 typeof(TReceiver).FullName + " " + unavailableDescription));
         generator.Emit(OpCodes.Ret);

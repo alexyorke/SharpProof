@@ -6,11 +6,13 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.PackageTestDiscovery.ps1')
 
 $className = 'Fixture.PackageTests'
-$arguments = @{
-    ClassNames    = @($className)
-    MinimumCounts = @{ $className = 1 }
-    Descriptions  = @{ $className = 'Fixture' }
-}
+$minimumCountBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::OrdinalIgnoreCase)
+$minimumCountBuilder.Add($className, 1)
+$arguments = ([ordered]@{
+        ClassNames    = [Collections.Immutable.ImmutableArray]::Create[string]($className)
+        MinimumCounts = $minimumCountBuilder
+        Descriptions  = ([ordered]@{ $className = 'Fixture' }).AsReadOnly()
+    }).AsReadOnly()
 $methods = Get-SharpProofPackageMethodsFromDiscovery @arguments -FullyQualifiedNames @(
     'Fixture.PackageTests.First',
     'Fixture.PackageTests.First(1)',

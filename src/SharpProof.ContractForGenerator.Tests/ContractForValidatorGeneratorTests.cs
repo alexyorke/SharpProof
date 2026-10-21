@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.ContractForGenerator.Test;
 
 [TestFixture]
@@ -7,7 +8,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void InvalidGeneratedSourceIsRejectedByTheTestHost()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Subject.cs", "public sealed class Subject { }"));
+            [("Subject.cs", "public sealed class Subject { }")]);
 
         Action action = () =>
         {
@@ -25,7 +26,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void AnalyzerCrashesRemainVisibleToTheTestHost()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Subject.cs", "public sealed class Subject { }"));
+            [("Subject.cs", "public sealed class Subject { }")]);
 
         var run = GeneratorTestHost.RunWithAnalyzer(
             compilation,
@@ -118,7 +119,7 @@ public sealed class ContractForValidatorGeneratorTests
                 void Read(double value = -0.0);
             }
             """,
-            ("ReferencedTargetContracts.cs",
+            [("ReferencedTargetContracts.cs",
             """
             using SharpProof.Attributes;
             [ContractFor(typeof(IReferencedTarget))]
@@ -128,7 +129,7 @@ public sealed class ContractForValidatorGeneratorTests
                     double value = 0.0) {
                 }
             }
-            """));
+            """)]);
 
         AssertSingle(GeneratorTestHost.RunAnalyzer(compilation), "SPCF0005");
     }
@@ -137,7 +138,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedCompanionFloatingDefaultBitsMustMatch()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             public interface ITarget {
                 void Read(float value = -0.0f);
@@ -154,7 +155,7 @@ public sealed class ContractForValidatorGeneratorTests
                     float value = -0.0f) {
                 }
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -188,7 +189,7 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void InterfaceCompanionWithDirectClausesIsValid()
     {
-        var compilation = GeneratorTestHost.CreateCompilation((
+        var compilation = GeneratorTestHost.CreateCompilation([(
             "Subject.cs",
             """
             #nullable enable
@@ -208,7 +209,7 @@ public sealed class ContractForValidatorGeneratorTests
                     return null;
                 }
             }
-            """));
+            """)]);
 
         var generatedRun = GeneratorTestHost.RunWithDefaultGenerator(compilation);
         Assert.That(generatedRun.Diagnostics, Is.Empty);
@@ -401,7 +402,7 @@ public sealed class ContractForValidatorGeneratorTests
                 void Read(ref readonly int value);
             }
             """,
-            ("CurrentContracts.cs",
+            [("CurrentContracts.cs",
             """
             using SharpProof.Attributes;
             [ContractFor(typeof(IReferencedTarget))]
@@ -410,7 +411,7 @@ public sealed class ContractForValidatorGeneratorTests
                     IReferencedTarget receiver,
                     ref readonly int value) { }
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -419,7 +420,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedNamedRefReadonlyCompanionRemainsValid()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             public interface ITarget {
                 void Read(ref readonly int value);
@@ -434,7 +435,7 @@ public sealed class ContractForValidatorGeneratorTests
                     ITarget receiver,
                     ref readonly int value) { }
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -538,7 +539,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedNamedRefReadonlyExpressionBodyRemainsValid()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             public abstract class Target {
                 public abstract ref readonly int Read();
@@ -553,7 +554,7 @@ public sealed class ContractForValidatorGeneratorTests
                 public static ref readonly int Read(Target receiver) =>
                     ref storage;
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -641,7 +642,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedCompanionUsesUnorderedFunctionPointerConventions()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             using SharpProof.Attributes;
             public unsafe interface ITarget {
@@ -661,7 +662,7 @@ public sealed class ContractForValidatorGeneratorTests
                         delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) =>
                         value;
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -676,7 +677,7 @@ public sealed class ContractForValidatorGeneratorTests
                     Map(delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int> value);
             }
             """,
-            ("MetadataContracts.cs",
+            [("MetadataContracts.cs",
             """
             using SharpProof.Attributes;
             [ContractFor(typeof(IMetadataTarget))]
@@ -687,7 +688,7 @@ public sealed class ContractForValidatorGeneratorTests
                         delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) =>
                         value;
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -1043,12 +1044,12 @@ public sealed class ContractForValidatorGeneratorTests
             [ContractFor({{referencedTarget}})]
             {{referencedCompanion}}
             """,
-            ("Subject.cs",
+            [("Subject.cs",
             $$"""
             using SharpProof.Attributes;
             [ContractFor({{sourceTarget}})]
             {{sourceCompanion}}
-            """));
+            """)]);
 
         var diagnostic = AssertSingle(
             GeneratorTestHost.RunAnalyzer(compilation),
@@ -1068,14 +1069,14 @@ public sealed class ContractForValidatorGeneratorTests
                 public static void Invoke(ITarget<int> receiver, int value) { }
             }
             """,
-            ("Subject.cs",
+            [("Subject.cs",
             """
             using SharpProof.Attributes;
             [ContractFor(typeof(ITarget<string>))]
             public static class SourceContracts {
                 public static void Invoke(ITarget<string> receiver, string value) { }
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -1087,12 +1088,12 @@ public sealed class ContractForValidatorGeneratorTests
             """
             public interface IReferencedTarget { void Invoke(); }
             """,
-            ("CurrentCompanion.cs",
+            [("CurrentCompanion.cs",
             """
             using SharpProof.Attributes;
             [ContractFor(typeof(IReferencedTarget))]
             public static class ReferencedTargetContracts { }
-            """));
+            """)]);
 
         var run = GeneratorTestHost.RunAnalyzer(compilation);
         Assert.That(run.Diagnostics.Length, Is.EqualTo(1));
@@ -1115,13 +1116,13 @@ public sealed class ContractForValidatorGeneratorTests
     public void MetadataReferenceTargetDiagnosticUsesCurrentCompanionLocation()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("MetadataCompanion.cs",
+            [("MetadataCompanion.cs",
             """
             using System;
             using SharpProof.Attributes;
             [ContractFor(typeof(IDisposable))]
             public static class DisposableContracts { }
-            """));
+            """)]);
 
         var diagnostic = AssertSingle(
             GeneratorTestHost.RunAnalyzer(compilation),
@@ -1140,7 +1141,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void CurrentCompilationTargetDiagnosticUsesTargetLocation()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("CurrentTarget.cs",
+            [("CurrentTarget.cs",
             """
             public interface ICurrentTarget { void Invoke(); }
             """),
@@ -1149,7 +1150,7 @@ public sealed class ContractForValidatorGeneratorTests
             using SharpProof.Attributes;
             [ContractFor(typeof(ICurrentTarget))]
             public static class CurrentTargetContracts { }
-            """));
+            """)]);
 
         var diagnostic = AssertSingle(
             GeneratorTestHost.RunAnalyzer(compilation),
@@ -1169,7 +1170,7 @@ public sealed class ContractForValidatorGeneratorTests
     {
         var compilation =
             GeneratorTestHost.CreateCompilationWithoutAttributes(
-                ("Subject.cs",
+                [("Subject.cs",
                 """
                 using System;
                 using SharpProof.Attributes;
@@ -1193,7 +1194,7 @@ public sealed class ContractForValidatorGeneratorTests
                     public static void Invoke(ITarget receiver) {
                     }
                 }
-                """));
+                """)]);
 
         var diagnostic = AssertSingle(
             GeneratorTestHost.RunAnalyzer(compilation),
@@ -1570,7 +1571,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedNamedCompanionAlignsAcrossTargetOnlyWrapper()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             public sealed class Outer<T> {
                 public sealed class Middle {
@@ -1590,7 +1591,7 @@ public sealed class ContractForValidatorGeneratorTests
                         U item) { }
                 }
             }
-            """));
+            """)]);
 
         Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
@@ -1683,8 +1684,8 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
         var compilation = includeAttributes
-            ? GeneratorTestHost.CreateCompilation(source)
-            : GeneratorTestHost.CreateCompilationWithoutAttributes(source);
+            ? GeneratorTestHost.CreateCompilation([source])
+            : GeneratorTestHost.CreateCompilationWithoutAttributes([source]);
 
         var diagnostic = AssertSingle(
             GeneratorTestHost.RunAnalyzer(compilation),
@@ -1727,7 +1728,7 @@ public sealed class ContractForValidatorGeneratorTests
         Assert.That(
             run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(Enumerable.Repeat("SPCF0008", 3)));
-        string[] expectedMessages = [
+        ImmutableArray<string> expectedMessages = [
             "Contract.Ensures in companion method 'Invoke' has invalid placement: Conditional",
             "Contract.Ensures in companion method 'Invoke' has invalid placement: Late",
             "Contract.Requires in companion method 'Invoke' has invalid placement: Unreachable"
@@ -1772,7 +1773,7 @@ public sealed class ContractForValidatorGeneratorTests
     {
         System.ArgumentNullException.ThrowIfNull(optionKey);
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Subject.cs",
+            [("Subject.cs",
             """
             using SharpProof.Attributes;
 
@@ -1784,15 +1785,13 @@ public sealed class ContractForValidatorGeneratorTests
             public static class TargetContracts {
                 public static void Ghost(ITarget receiver) { }
             }
-            """));
+            """)]);
 
+        var optionBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        optionBuilder[optionKey] = " OFF ";
         var run = GeneratorTestHost.RunAnalyzer(
             compilation,
-            globalOptions: new Dictionary<string, string>(
-                StringComparer.OrdinalIgnoreCase)
-            {
-                [optionKey] = " OFF "
-            });
+            globalOptions: optionBuilder.ToImmutable());
 
         Assert.That(run.Diagnostics, Is.Empty);
     }
@@ -1839,7 +1838,7 @@ public sealed class ContractForValidatorGeneratorTests
         System.ArgumentNullException.ThrowIfNull(secondKey);
         System.ArgumentNullException.ThrowIfNull(secondValue);
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Subject.cs",
+            [("Subject.cs",
             """
             using SharpProof.Attributes;
 
@@ -1851,14 +1850,13 @@ public sealed class ContractForValidatorGeneratorTests
             public static class TargetContracts {
                 public static void Ghost(ITarget receiver) { }
             }
-            """));
+            """)]);
+        var optionBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        optionBuilder[firstKey] = firstValue;
+        optionBuilder[secondKey] = secondValue;
         var run = GeneratorTestHost.RunAnalyzer(
             compilation,
-            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [firstKey] = firstValue,
-                [secondKey] = secondValue
-            });
+            globalOptions: optionBuilder.ToImmutable());
 
         Assert.That(
             run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
@@ -1869,7 +1867,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void GeneratedTreesAreOwnedByTheFinalCompilationAnalyzer()
     {
         var compilation = GeneratorTestHost.CreateCompilation(
-            ("Target.cs",
+            [("Target.cs",
             """
             public interface ITarget {
                 void Invoke();
@@ -1882,7 +1880,7 @@ public sealed class ContractForValidatorGeneratorTests
             [ContractFor(typeof(ITarget))]
             public static class TargetContracts {
             }
-            """));
+            """)]);
 
         var run = GeneratorTestHost.RunAnalyzer(compilation);
 
@@ -1924,13 +1922,13 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """;
         var forwardCompilation = GeneratorTestHost.CreateCompilation(
-            ("02_Target.cs", target),
+            [("02_Target.cs", target),
             ("03_OtherCompanion.cs", duplicate),
-            ("01_Companion.cs", companion));
+            ("01_Companion.cs", companion)]);
         var reverseCompilation = GeneratorTestHost.CreateCompilation(
-            ("01_Companion.cs", companion),
+            [("01_Companion.cs", companion),
             ("02_Target.cs", target),
-            ("03_OtherCompanion.cs", duplicate));
+            ("03_OtherCompanion.cs", duplicate)]);
 
         var first = GeneratorTestHost.RunWithDefaultGenerator(forwardCompilation);
         var cached = GeneratorTestHost.RunWithDefaultGenerator(
@@ -1965,8 +1963,8 @@ public sealed class ContractForValidatorGeneratorTests
         var files = Directory.GetFiles(
             Path.Combine(root, "src/SharpProof.ContractForGenerator"),
             "*.cs",
-            SearchOption.AllDirectories);
-        string[] forbidden = [
+            SearchOption.AllDirectories).ToImmutableArray();
+        ImmutableArray<string> forbidden = [
             "ToDisplayString(",
             "SyntaxFactory.",
             "ParseExpression(",
@@ -1989,7 +1987,7 @@ public sealed class ContractForValidatorGeneratorTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         return GeneratorTestHost.RunAnalyzer(
-            GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
+            GeneratorTestHost.CreateCompilation([("Subject.cs", source)]));
     }
 
     private static Diagnostic AssertSingle(

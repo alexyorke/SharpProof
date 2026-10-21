@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Z3;
 
 namespace SharpProof.Smt.Test;
@@ -28,17 +29,19 @@ public sealed class NativeFailureLifecycleTests
         using var solver = runner.Context.MkSolver();
         using var owner = new Z3ExpressionOwner();
         const int holes = 20;
-        var placements = new BoolExpr[holes + 1][];
+        var placementsBuilder = ImmutableArray.CreateBuilder<ImmutableArray<BoolExpr>>(holes + 1);
         for (var pigeon = 0; pigeon <= holes; pigeon++)
         {
-            placements[pigeon] = new BoolExpr[holes];
+            var rowBuilder = ImmutableArray.CreateBuilder<BoolExpr>(holes);
             for (var hole = 0; hole < holes; hole++)
             {
-                placements[pigeon][hole] = owner.Own(runner.Context.MkBoolConst($"p{pigeon}h{hole}"));
+                rowBuilder.Add(owner.Own(runner.Context.MkBoolConst($"p{pigeon}h{hole}")));
             }
-            solver.Assert(owner.Own(runner.Context.MkOr(
-                Enumerable.Range(0, holes).Select(hole => ((hole < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(hole)) : (placements[pigeon][hole]))).ToArray())));
+            var row = rowBuilder.ToImmutable();
+            placementsBuilder.Add(row);
+            solver.Assert(owner.Own(runner.Context.MkOr(row.ToArray())));
         }
+        var placements = placementsBuilder.ToImmutable();
         for (var hole = 0; hole < holes; hole++)
         {
             for (var first = 0; first <= holes; first++)

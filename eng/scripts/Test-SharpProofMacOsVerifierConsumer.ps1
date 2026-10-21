@@ -17,12 +17,12 @@ if (-not $IsMacOS -or $actualHost -cne $Architecture -or $actualProcess -cne $Ar
 }
 
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$packages = @(Get-ChildItem -LiteralPath $source -Filter '*.nupkg' -File)
-if ($packages.Count -ne 3) {
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $source -Filter '*.nupkg' -File))
+if ($packages.Length -ne 3) {
     throw 'The native macOS consumer requires exactly three package artifacts.'
 }
-$verifier = @($packages | Where-Object Name -Match '^SharpProof\.Verifier\.(.+)\.nupkg$')
-if ($verifier.Count -ne 1) {
+$verifier = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($packages | Where-Object Name -Match '^SharpProof\.Verifier\.(.+)\.nupkg$'))
+if ($verifier.Length -ne 1) {
     throw 'The native macOS consumer requires one SharpProof.Verifier package.'
 }
 $version = [regex]::Match($verifier[0].Name, '^SharpProof\.Verifier\.(.+)\.nupkg$').Groups[1].Value
@@ -89,8 +89,8 @@ public static class Subject
             throw 'The native macOS verifier did not publish a worker result.'
         }
         $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-        $claims = @($result.claimResults)
-        if ($claims.Count -lt 1 -or @($claims | Where-Object outcome -CEQ 'Proven').Count -lt 1) {
+        $claims = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($result.claimResults))
+        if ($claims.Length -lt 1 -or @($claims | Where-Object outcome -CEQ 'Proven').Count -lt 1) {
             throw 'The native macOS verifier did not prove a claim.'
         }
 

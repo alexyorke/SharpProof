@@ -79,7 +79,7 @@ internal sealed class Wave8ExceptionInitializationBoundaryTests
     private static CompilerManifestArtifact CreateAndRun(string scenario)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var compilation = TestCompilation.Create("Wave8InitializationBoundary", ("Subject.cs", Source(scenario)));
+        var compilation = TestCompilation.CreateExact("Wave8InitializationBoundary", [("Subject.cs", Source(scenario))]);
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
         Assert.That(((CSharpParseOptions)compilation.SyntaxTrees.Single().Options).LanguageVersion, Is.EqualTo(LanguageVersion.CSharp12));
@@ -128,6 +128,7 @@ internal sealed class Wave8ExceptionInitializationBoundaryTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

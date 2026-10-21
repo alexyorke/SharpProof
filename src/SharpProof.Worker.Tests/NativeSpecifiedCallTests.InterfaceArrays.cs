@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -42,7 +43,7 @@ internal sealed partial class NativeSpecifiedCallTests
     public async Task ArrayBackedListStoreProvesStoredValueAndRetainsMutationEffects(string element)
     {
         var store = "((System.Collections.Generic.IList<" + element + ">)values)[index] = replacement;";
-        var requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
+        const string requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
         var parameters = element + "[] values, int index, " + element + " replacement";
         await CheckInterfaceArrayContract(parameters,
             requires + "Contract.Ensures(Contract.Result<" + element + ">() == replacement); " + store + " return values[index];",
@@ -156,7 +157,7 @@ internal sealed partial class NativeSpecifiedCallTests
         var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (!valid)
         { Assert.That(purity.Outcome, Is.Not.TypeOf<RefutedOutcome>(), "A possible cache write must not fabricate a definite impurity."); }
-        foreach (var result in new[] { allocations, purity, capabilities })
+        foreach (var result in ImmutableArray.Create(allocations, purity, capabilities))
         { Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(valid), result.Reason.ToString()); }
     }
 
@@ -188,7 +189,9 @@ internal sealed partial class NativeSpecifiedCallTests
     public async Task InterfaceArrayBoundsRetainResourceCallbackExceptionUncertainty(string allowed, bool expected)
     {
         System.ArgumentNullException.ThrowIfNull(allowed);
-        foreach (var access in new[] { "return ((System.Collections.Generic.IList<int>)values)[index];", "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;" })
+        foreach (var access in ImmutableArray.Create(
+            "return ((System.Collections.Generic.IList<int>)values)[index];",
+            "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;"))
         {
             var preparation = Prepare("[AllowedExceptions(typeof(" + allowed + "))] public static int Target(int[] values, int index) { Contract.Requires(values != null); " + access + " }");
             var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -281,7 +284,7 @@ internal sealed partial class NativeSpecifiedCallTests
         System.ArgumentNullException.ThrowIfNull(prefix);
         System.ArgumentNullException.ThrowIfNull(postfix);
         System.ArgumentNullException.ThrowIfNull(delta);
-        var previous = "Contract.Old(values[0])";
+        const string previous = "Contract.Old(values[0])";
         var updated = "unchecked((" + type + ")(" + previous + " + (" + delta + ")))";
         await CheckInterfaceArrayContract(type + "[] values",
             "Contract.Requires(values != null && values.Length > 0); " +
@@ -314,7 +317,7 @@ internal sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task InterfaceArrayCompoundReadPrecedesRhsMutationAndRebinding()
     {
-        var requires = "Contract.Requires(values != null && values.Length > 1); ";
+        const string requires = "Contract.Requires(values != null && values.Length > 1); ";
         await CheckInterfaceArrayContract("int[] values, int replacement",
             requires + "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) + replacement)); " +
             "((System.Collections.Generic.IList<int>)values)[0] += (values[0] = replacement); return values[0];", WorkerClaimOutcome.Proven);

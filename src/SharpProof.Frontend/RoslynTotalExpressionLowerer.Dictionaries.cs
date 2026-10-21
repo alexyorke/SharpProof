@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
-    private readonly Dictionary<(string Name, IrTypeId Value, IrTypeId? Key), IrMemberId> _dictionaryFields = [];
+    private readonly ImmutableDictionary<(string Name, IrTypeId Value, IrTypeId? Key), IrMemberId>.Builder _dictionaryFields = ImmutableDictionary.CreateBuilder<(string Name, IrTypeId Value, IrTypeId? Key), IrMemberId>();
 
     private IrMemberId DictionaryField(string name, IrTypeId value, IrTypeId? key = null)
     {
@@ -11,10 +11,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var storage = (name, value, key);
         if (_dictionaryFields.TryGetValue(storage, out var field))
         { return field; }
-        field = _factory.GetOrCreateMember(_factory.InternExternalIdentity(("dictionary", name, value, key),
+        field = _factory.GetOrCreateMemberSnapshot(_factory.InternExternalIdentity(("dictionary", name, value, key),
             EqualityComparer<(string, string, IrTypeId, IrTypeId?)>.Default), _factory.ObjectType,
             IrFieldSites.Prefix + "dictionary:" + name, value, false, key is { } index ? [index] : []);
-        _dictionaryFields.Add(storage, field);
+        _dictionaryFields.AddUnique(storage, field);
         return field;
     }
 
@@ -61,11 +61,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 And(safe, present), FrontendSubsetClassification.Exact);
     }
 
-    private IrBlockId DictionaryInitialization(IOperation operation, IMethodSymbol method, IrTerm[] values, IrBlockId block)
+    private IrBlockId DictionaryInitialization(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrBlockId block)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var source = _factory.GetOperationInfo(_context.Site(operation)).SourceSpan;
         var keyType = _context.KnownValueType(method.ContainingType.TypeArguments[0]) ?? method.ContainingType.TypeArguments[0];
@@ -80,7 +80,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         // contents through user equality/hash callbacks. Retain the ambient
         // uncertainty without invalidating its modeled entries on normal return.
         var member = OpaqueCallMember(method, values, _factory.BooleanType, out var display);
-        _builder.Call(effects, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.All & ~IrOpaqueCallEffects.Writes,
+        _builder.CallSnapshot(effects, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.All & ~IrOpaqueCallEffects.Writes,
             display + ":primitive-runtime-initialization"), null, member, null, values);
         _builder.Write(effects, site, IrWriteRegion.Static);
         _builder.Allocate(effects, site, _factory.ObjectType);
@@ -101,16 +101,18 @@ internal sealed partial class RoslynTotalExpressionLowerer
         {
             var creation = (IObjectCreationOperation)operation;
             var constructor = creation.Constructor!;
-            var constructorValues = new IrTerm[creation.Arguments.Length];
+            var constructorValuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
+            constructorValuesBuilder.Count = creation.Arguments.Length;
             foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
             {
                 var value = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!value.Classification.IsExact)
                 { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
                 value = Pin(operation, value);
-                constructorValues[argument.Parameter!.Ordinal] = value.Value;
+                constructorValuesBuilder[argument.Parameter!.Ordinal] = value.Value;
                 block = value.Continuation;
             }
+            var constructorValues = constructorValuesBuilder.ToImmutable();
             if (constructorValues.Length != 0)
             {
                 // Capacity evaluation precedes construction. Negative capacity
@@ -152,14 +154,15 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
         receiver = Pin(operation, receiver);
         block = receiver.Continuation;
-        var values = new IrTerm[arguments.Length + (assigned == null ? 0 : 1)];
+        var valueBuffer = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned == null ? 0 : 1));
+        valueBuffer.Count = valueBuffer.Capacity;
         foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
         {
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
             value = Pin(operation, value);
-            values[argument.Parameter!.Ordinal] = value.Value;
+            valueBuffer[argument.Parameter!.Ordinal] = value.Value;
             block = value.Continuation;
         }
         if (assigned != null)
@@ -168,9 +171,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
             value = Pin(operation, value);
-            values[values.Length - 1] = value.Value;
+            valueBuffer[valueBuffer.Count - 1] = value.Value;
             block = value.Continuation;
         }
+        var values = valueBuffer.MoveToImmutable();
         block = CheckReceiver(operation, receiver.Value, block);
         var owner = AsObject(receiver.Value);
         var count = DictionaryField("count", _factory.IntegerType);
@@ -197,13 +201,13 @@ internal sealed partial class RoslynTotalExpressionLowerer
         return new(_factory.Variable(result), done, FrontendSubsetClassification.Exact);
     }
 
-    private TotalBodyValue DefaultDictionaryState(IOperation operation, IMethodSymbol method, IrTerm owner, IrTerm[] values,
+    private TotalBodyValue DefaultDictionaryState(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
         string name, bool assigned, IrBlockId block)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var type = method.ContainingType;

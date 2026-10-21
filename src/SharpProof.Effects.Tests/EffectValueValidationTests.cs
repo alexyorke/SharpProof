@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
@@ -6,7 +7,7 @@ internal sealed class EffectValueValidationTests
     [Test]
     public void ContractMetadataIntegerConversionRejectsInvalidValues()
     {
-        object[] invalidValues = [
+        ImmutableArray<object> invalidValues = [
             new object(),
             "not-an-integer",
             decimal.MaxValue
@@ -48,10 +49,9 @@ internal sealed class EffectValueValidationTests
                 EffectCompleteness.Complete, uncertainty, incompleteReason);
         }
 
-        var allocationMarker = EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative;
-        var uncertaintyMarker = EffectUncertainty.Unknown & ~EffectUncertainty.All;
-        var invalidClaims = new (string Name, Action Construct, string Parameter)[]
-        {
+        const EffectAllocationKind allocationMarker = EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative;
+        const EffectUncertainty uncertaintyMarker = EffectUncertainty.Unknown & ~EffectUncertainty.All;
+        var invalidClaims = ImmutableArray.Create<(string Name, Action Construct, string Parameter)>(
             ("unknown allocation bit", () => _ = Summary(allocation: (EffectAllocationKind)(-1)), "allocation"),
             ("partial unknown allocation", () => _ = Summary(allocation: allocationMarker), "allocation"),
             ("unreachable termination", () => _ = Summary(termination: EffectTermination.Bottom), "termination"),
@@ -61,7 +61,7 @@ internal sealed class EffectValueValidationTests
                 "analysisIncompleteReason"),
             ("complete with incomplete evidence", () => _ = Summary(
                 incompleteReason: EffectAnalysisIncompleteReason.BlockBudgetExceeded), "analysisIncompleteReason")
-        };
+        );
 
         foreach (var (name, construct, parameter) in invalidClaims)
         {

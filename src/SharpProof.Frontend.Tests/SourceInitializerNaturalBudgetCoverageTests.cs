@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -10,7 +11,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
     [Test]
     public void ActualStaticFieldDeclarationsConsumeTheDefaultSessionBudget()
     {
-        var fieldCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
+        const int fieldCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
         var fields = string.Join("\n", Enumerable.Range(0, fieldCount)
             .Select(static ordinal => $"public static int Field{ordinal};"));
         var cells = "public sealed class LargeCell { " + fields + " } " +
@@ -20,7 +21,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
         var large = subject.Compilation.GetTypeByMetadataName("LargeCell")!;
         var small = subject.Compilation.GetTypeByMetadataName("SmallCell")!;
         Assert.That(large.GetMembers().OfType<IFieldSymbol>().Count(), Is.EqualTo(fieldCount));
-        var visitedFields = large.GetMembers().Take(fieldCount).ToArray();
+        var visitedFields = large.GetMembers().Take(fieldCount).ToImmutableArray();
         Assert.That(visitedFields, Has.Length.EqualTo(fieldCount));
         Assert.That(visitedFields.All(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member is IFieldSymbol { IsStatic: true, HasConstantValue: false, DeclaringSyntaxReferences.Length: 1 })), Is.True);
         Assert.That(large.StaticConstructors, Is.Empty);

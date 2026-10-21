@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -5,7 +6,7 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrTerminatorAdmissionTests
 {
-    private static readonly IrInstructionKind[] s_terminalKinds =
+    private static readonly ImmutableArray<IrInstructionKind> s_terminalKinds =
     [
         IrInstructionKind.Branch, IrInstructionKind.Goto, IrInstructionKind.Throw,
         IrInstructionKind.Return, IrInstructionKind.ExceptionalExit
@@ -46,7 +47,7 @@ public sealed class IrTerminatorAdmissionTests
         }, out var failure);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
         Assert.That(spent, Is.EqualTo(10));
-        Assert.That(order, Is.EqualTo(new[] { entry, returned, go, thrown, exceptional }));
+        Assert.That(order, Is.EqualTo(ImmutableArray.Create(entry, returned, go, thrown, exceptional)));
     }
 
     [Test]

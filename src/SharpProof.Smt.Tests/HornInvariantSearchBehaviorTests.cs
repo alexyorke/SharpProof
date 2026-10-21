@@ -34,7 +34,7 @@ public sealed class HornInvariantSearchBehaviorTests
         var falseGoal = factory.Binary(IrBinaryOperator.LessThan,
             factory.Variable(counter), factory.Integer(3));
         var unsafeClauses = clauses.Take(2).Append(Query(factory,
-            [Assume(factory, Relation(factory, relation, factory.Variable(counter)))], falseGoal)).ToArray();
+            [Assume(factory, Relation(factory, relation, factory.Variable(counter)))], falseGoal)).ToImmutableArray();
 
         var proposals = HornInvariantSearch.Propose(factory, unsafeClauses, states, 1_000_000, TestContext.CurrentContext.CancellationToken);
 
@@ -42,22 +42,21 @@ public sealed class HornInvariantSearchBehaviorTests
     }
 
     private static (IrFactory Factory, IrVarId Counter, IrMemberId Relation,
-        Dictionary<IrMemberId, ImmutableArray<IrTerm>> States, VerificationQuery[] Clauses) CounterSystem()
+        ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> States, ImmutableArray<VerificationQuery> Clauses) CounterSystem()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var counter = factory.CreateVariable("counter", factory.IntegerType);
         var current = factory.Variable(counter);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:counter", factory.BooleanType, isStatic: true, factory.IntegerType);
-        var state = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>
-        {
-            [relation] = [current]
-        };
+        var stateBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        stateBuilder[relation] = [current];
+        var state = stateBuilder.ToImmutable();
         var atZero = Equal(factory, current, factory.Integer(0));
         var belowThree = factory.Binary(IrBinaryOperator.LessThan, current, factory.Integer(3));
         var next = factory.Binary(IrBinaryOperator.Add, current, factory.Integer(1));
         var nonnegative = factory.Binary(IrBinaryOperator.GreaterThanOrEqual, current, factory.Integer(0));
-        VerificationQuery[] clauses =
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [Assume(factory, atZero)], Relation(factory, relation, current)),
             Query(factory, [Assume(factory, Relation(factory, relation, current)), Assume(factory, belowThree)],

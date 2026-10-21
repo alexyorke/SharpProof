@@ -21,8 +21,10 @@ public sealed class HornSigned64BoundaryStateTests
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:signed64-boundary", factory.BooleanType, isStatic: true, type);
         var atom = factory.PureOpaque(relation, null, current);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [initial], atom),
             Query(factory, [atom, guard], factory.PureOpaque(relation, null, next)),

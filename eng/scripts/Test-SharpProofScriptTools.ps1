@@ -39,13 +39,13 @@ function Invoke-FixtureCheck {
 }
 
 try {
-    $files = @{
-        'probe.ps1'           = "Write-Output 'fixture'`n"
-        'probe.psm1'          = "function Get-FixtureValue { 1 }`nExport-ModuleMember -Function 'Get-FixtureValue'`n"
-        'probe.psd1'          = "@{ Value = 1 }`n"
-        'probe.bash'          = "#!/usr/bin/env bash`nprintf '%s\n' fixture`n"
-        'utility with spaces' = "#!/usr/bin/env bash`nprintf '%s\n' fixture`n"
-    }
+    $files = ([ordered]@{
+            'probe.ps1'           = "Write-Output 'fixture'`n"
+            'probe.psm1'          = "function Get-FixtureValue { 1 }`nExport-ModuleMember -Function 'Get-FixtureValue'`n"
+            'probe.psd1'          = "@{ Value = 1 }`n"
+            'probe.bash'          = "#!/usr/bin/env bash`nprintf '%s\n' fixture`n"
+            'utility with spaces' = "#!/usr/bin/env bash`nprintf '%s\n' fixture`n"
+        }).AsReadOnly()
     foreach ($entry in $files.GetEnumerator()) {
         [IO.File]::WriteAllText((Join-Path $fixture $entry.Key), $entry.Value, $encoding)
     }
@@ -55,16 +55,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot track script fixtures.' }
     Invoke-FixtureCheck -ExpectedSuccess $true -Apply
     Invoke-FixtureCheck -ExpectedSuccess $true -ExpectedMessage 'Checked 3 PowerShell files and 2 shell scripts'
-    $cases = @(
-        @{ File = 'probe.ps1'; Text = ''; Message = 'Formatting differs: probe.ps1' },
-        @{ File = 'probe.ps1'; Text = "if(`$true){Write-Output 'fixture'}`n"; Message = 'Formatting differs: probe.ps1' },
-        @{ File = 'probe.ps1'; Text = "`$Error = 'invalid'`n"; Message = 'PSAvoidAssignmentToAutomaticVariable' },
-        @{ File = 'probe.ps1'; Text = "if (`n"; Message = 'PowerShell parse error' },
-        @{ File = 'probe.psm1'; Text = "function Get-FixtureValue{1}`n"; Message = 'Formatting differs: probe.psm1' },
-        @{ File = 'probe.psd1'; Text = "@{Value=1}`n"; Message = 'Formatting differs: probe.psd1' },
-        @{ File = 'probe.bash'; Text = "#!/usr/bin/env bash`nif true;then`nprintf fixture`nfi`n"; Message = 'Shell formatting failed' },
-        @{ File = 'utility with spaces'; Text = "#!/usr/bin/env bash`nprintf '%s\n' `$value`n"; Message = 'SC2086' }
-    )
+    $cases = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            ([ordered]@{ File = 'probe.ps1'; Text = ''; Message = 'Formatting differs: probe.ps1' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.ps1'; Text = "if(`$true){Write-Output 'fixture'}`n"; Message = 'Formatting differs: probe.ps1' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.ps1'; Text = "`$Error = 'invalid'`n"; Message = 'PSAvoidAssignmentToAutomaticVariable' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.ps1'; Text = "if (`n"; Message = 'PowerShell parse error' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.psm1'; Text = "function Get-FixtureValue{1}`n"; Message = 'Formatting differs: probe.psm1' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.psd1'; Text = "@{Value=1}`n"; Message = 'Formatting differs: probe.psd1' }).AsReadOnly(),
+            ([ordered]@{ File = 'probe.bash'; Text = "#!/usr/bin/env bash`nif true;then`nprintf fixture`nfi`n"; Message = 'Shell formatting failed' }).AsReadOnly(),
+            ([ordered]@{ File = 'utility with spaces'; Text = "#!/usr/bin/env bash`nprintf '%s\n' `$value`n"; Message = 'SC2086' }).AsReadOnly()
+        ))
     foreach ($case in $cases) {
         $path = Join-Path $fixture $case.File
         $original = [IO.File]::ReadAllText($path)

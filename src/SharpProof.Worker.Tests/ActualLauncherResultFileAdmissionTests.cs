@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -20,7 +21,7 @@ public sealed class ActualLauncherResultFileAdmissionTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("LauncherResultFileAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("LauncherResultFileAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -28,6 +29,7 @@ public sealed class ActualLauncherResultFileAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
@@ -37,8 +39,8 @@ public sealed class ActualLauncherResultFileAdmissionTests
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var resultPath = Path.Combine(project.Snapshot.CompilerManifest.Compilation.ProjectDirectory, "actual-completed-result.json");
         var absentPath = Path.Combine(project.Snapshot.CompilerManifest.Compilation.ProjectDirectory, "absent-result.json");
-        var bytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(response));
-        await File.WriteAllBytesAsync(resultPath, bytes);
+        var bytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(response)).ToImmutableArray();
+        await File.WriteAllBytesAsync(resultPath, bytes.AsMemory());
         var expectedInputHash = project.Bind().InputHash;
         var versions = Launcher.Program.ExpectedVersions();
         // The maintained parser must leave a real completed response unchanged.
@@ -51,6 +53,6 @@ public sealed class ActualLauncherResultFileAdmissionTests
             project.Snapshot.CompilerManifest, expectedInputHash, versions, TestContext.CurrentContext.CancellationToken);
         Assert.That(File.Exists(absentPath), Is.False);
         Assert.That(await File.ReadAllBytesAsync(resultPath), Is.EqualTo(bytes));
-        Assert.That(WorkerProtocolJson.Validate(WorkerProtocolJson.DeserializeResponse(Encoding.UTF8.GetString(bytes))!).IsValid, Is.True);
+        Assert.That(WorkerProtocolJson.Validate(WorkerProtocolJson.DeserializeResponse(Encoding.UTF8.GetString(bytes.AsSpan()))!).IsValid, Is.True);
     }
 }

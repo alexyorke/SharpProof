@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Framework;
 using SharpProof.Host;
@@ -56,10 +57,17 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         }
     }
 
-    protected static IEnumerable<string> Present(params string?[] paths)
+    protected static ImmutableArray<string> Present(ImmutableArray<string?> paths)
     {
-        System.ArgumentNullException.ThrowIfNull(paths, nameof(paths));
-        return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
+        if (paths.IsDefault)
+        { throw new ArgumentNullException(nameof(paths)); }
+        var present = ImmutableArray.CreateBuilder<string>();
+        foreach (var path in paths)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            { present.Add(path!); }
+        }
+        return present.ToImmutable();
     }
 
     internal static string ResolveProjectRelativePath(

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,7 +14,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class OwnedVoidReturnRecoveryCoverageTests
 {
-    private static readonly string[] RecoveryErrorIds = ["CS0127"];
+    private static readonly ImmutableArray<string> RecoveryErrorIds = ["CS0127"];
 
     [TestCase("invalid-value", "return 1;", true)]
     [TestCase("bare-return", "return;", false)]
@@ -27,7 +28,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         var compilation = CSharpCompilation.Create("OwnedVoidReturn_" + shape, [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToArray();
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToImmutableArray();
         if (compilerError)
         {
             Assert.That(errors, Is.EqualTo(RecoveryErrorIds));
@@ -41,7 +42,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.EqualTo(!compilerError));
         var emitErrors = emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToArray();
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToImmutableArray();
         if (compilerError)
         {
             Assert.That(emitErrors, Is.EqualTo(RecoveryErrorIds));
@@ -59,7 +60,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         var returns = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return))
-            .ToArray();
+            .ToImmutableArray();
         if (compilerError)
         {
             var returnSyntax = syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single();
@@ -95,10 +96,10 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(context.Compilation, Is.SameAs(compilation));
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-        var irReturns = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().ToArray();
+        var irReturns = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().ToImmutableArray();
         Assert.That(irReturns, Is.Not.Empty);
         Assert.That(irReturns.All(instruction => instruction.Value == null), Is.True);
-        var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>());
+        var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue, Is.Null);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -30,7 +31,7 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002"],
             filePath: generated ? "Subject.g.cs" : "Subject.cs");
         var compilerErrors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(compilerErrors, Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -52,6 +53,6 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         });
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,
             profile: profile, features: "effects");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
@@ -10,7 +11,7 @@ internal static class CompilerEffectClaimArtifactCodec
     internal static void Seal(CompilerEffectClaimArtifact value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        if (value.Constraint?.AllowedExceptionTypes is null)
+        if (value.Constraint is null || value.Constraint.AllowedExceptionTypes.IsDefault)
         { throw new InvalidDataException("Compiler effect-claim evidence is invalid."); }
         value.EvidenceSha256 = ComputeSha256(value);
     }
@@ -56,9 +57,9 @@ internal static class CompilerEffectClaimArtifactCodec
             (!rule.ExceptionsMustBeEmpty || value.AllowedExceptionTypes.Length == 0);
     }
 
-    private static bool HasCanonicalStrings(string[]? values)
+    private static bool HasCanonicalStrings(ImmutableArray<string> values)
     {
-        if (values == null)
+        if (values.IsDefault)
         { return false; }
         string? previous = null;
         foreach (var value in values)

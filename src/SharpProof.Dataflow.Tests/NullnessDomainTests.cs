@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow.Test;
 [TestFixture]
 public sealed class NullnessDomainTests
 {
-    private static readonly NullnessValue[] Samples = Enum.GetValues<NullnessValue>();
+    private static readonly ImmutableArray<NullnessValue> Samples = Enum.GetValues<NullnessValue>().ToImmutableArray();
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
 
     [Test]

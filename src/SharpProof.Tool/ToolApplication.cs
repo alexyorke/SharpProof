@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -22,10 +23,10 @@ internal static class ToolApplication
         """;
 
     internal static async Task<int> RunAsync(
-        string[] args, TextWriter output, TextWriter error, Func<CancellationToken, Task<string>> discoverSdk,
+        ImmutableArray<string> args, TextWriter output, TextWriter error, Func<CancellationToken, Task<string>> discoverSdk,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(discoverSdk);
@@ -73,14 +74,14 @@ internal static class ToolApplication
         }
     }
 
-    private static async Task<int> ExplainAsync(string[] args, TextWriter output, CancellationToken cancellationToken)
+    private static async Task<int> ExplainAsync(ImmutableArray<string> args, TextWriter output, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        RepositoryParameterGuard.ThrowIfMissing(args.IsDefault, nameof(args));
         ArgumentNullException.ThrowIfNull(output);
         string? file = null;
         int? line = null;
         var json = false;
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var index = 2; index < args.Length; index++)
         {
             var option = args[index];
@@ -120,33 +121,38 @@ internal static class ToolApplication
             throw new InvalidDataException("The stored result does not satisfy the SharpProof worker protocol.");
         }
         ArgumentNullException.ThrowIfNull(response);
-        var entries = new List<ExplanationEntry>();
-        var claims = new Dictionary<string, WorkerClaimManifestEntry>(StringComparer.Ordinal);
+        var entryBuffer = ImmutableArray.CreateBuilder<ExplanationEntry>();
+        var claimBuffer = ImmutableDictionary.CreateBuilder<string, WorkerClaimManifestEntry>(StringComparer.Ordinal);
         foreach (var claim in response.Manifest.Claims)
         {
             ArgumentNullException.ThrowIfNull(claim);
-            claims.Add(claim.ClaimId, claim);
+            RepositoryParameterGuard.RequireUniqueKey(claimBuffer.ContainsKey(claim.ClaimId), claim.ClaimId);
+            claimBuffer.Add(claim.ClaimId, claim);
         }
-        var callables = new Dictionary<string, WorkerCallableManifestEntry>(StringComparer.Ordinal);
+        var callableBuffer = ImmutableDictionary.CreateBuilder<string, WorkerCallableManifestEntry>(StringComparer.Ordinal);
         foreach (var callable in response.Manifest.Callables)
         {
             ArgumentNullException.ThrowIfNull(callable);
-            callables.Add(callable.CallableId, callable);
+            RepositoryParameterGuard.RequireUniqueKey(callableBuffer.ContainsKey(callable.CallableId), callable.CallableId);
+            callableBuffer.Add(callable.CallableId, callable);
         }
+        var claims = claimBuffer.ToImmutable();
+        var callables = callableBuffer.ToImmutable();
         foreach (var result in response.ClaimResults)
         {
             ArgumentNullException.ThrowIfNull(result);
             var claim = claims[result.ClaimId];
-            Add(entries, claim.Location, file, line, "claim", result.ClaimId,
+            Add(entryBuffer, claim.Location, file, line, "claim", result.ClaimId,
                 result.Outcome.ToString(), result.Reason.ToString(), result.Vacuity.ToString(), result.Assumptions.Length);
         }
         foreach (var result in response.CallableResults)
         {
             ArgumentNullException.ThrowIfNull(result);
             var callable = callables[result.CallableId];
-            Add(entries, callable.Location, file, line, "callable", result.CallableId,
+            Add(entryBuffer, callable.Location, file, line, "callable", result.CallableId,
                 result.Coverage.ToString(), result.Reason.ToString(), "NotApplicable", result.Assumptions.Length);
         }
+        var entries = entryBuffer.ToImmutable();
         if (json)
         {
             await WriteLineAsync(output, JsonSerializer.Serialize(new
@@ -182,7 +188,7 @@ internal static class ToolApplication
                 ArgumentNullException.ThrowIfNull(failure);
                 await WriteLineAsync(output, failure.Code + ": " + failure.Message, cancellationToken).ConfigureAwait(false);
             }
-            await WriteLineAsync(output, "Matching entries: " + entries.Count.ToString(CultureInfo.InvariantCulture) +
+            await WriteLineAsync(output, "Matching entries: " + entries.Length.ToString(CultureInfo.InvariantCulture) +
                 ". Reason guidance: https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md", cancellationToken).ConfigureAwait(false);
         }
         return 0;
@@ -195,7 +201,7 @@ internal static class ToolApplication
         await writer.WriteLineAsync(text.AsMemory(), cancellationToken).ConfigureAwait(false);
     }
 
-    private static void Add(List<ExplanationEntry> entries, WorkerSourceLocation location, string? file, int? line,
+    private static void Add(ImmutableArray<ExplanationEntry>.Builder entries, WorkerSourceLocation location, string? file, int? line,
         string kind, string id, string outcome, string reason, string vacuity, int assumptions)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -211,7 +217,7 @@ internal static class ToolApplication
         }
     }
 
-    private sealed class ExplanationEntry
+    private sealed record ExplanationEntry
     {
         internal ExplanationEntry(string path, int line, int column, string kind, string id,
             string outcome, string reason, string vacuity, int assumptions)

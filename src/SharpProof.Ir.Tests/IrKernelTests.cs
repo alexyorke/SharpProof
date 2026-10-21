@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -96,7 +97,7 @@ internal sealed class IrKernelTests
             System.ArgumentNullException.ThrowIfNull(a);
             System.ArgumentNullException.ThrowIfNull(b);
             System.ArgumentNullException.ThrowIfNull(term);
-            return interpreter.Evaluate(term, new Dictionary<IrVarId, IrValue> { [left] = a, [right] = b }).Value!.Boolean;
+            return interpreter.Evaluate(term, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, a).SetItem(right, b)).Value!.Boolean;
         }
         var text = factory.CreateStringValue(new string('a', 2));
         var copy = factory.CreateStringValue(new string('a', 2));
@@ -138,10 +139,7 @@ internal sealed class IrKernelTests
             IrBinaryOperator.NotEqual,
             quotient,
             quotient);
-        var variables = new Dictionary<IrVarId, IrValue>
-        {
-            [divisor] = factory.CreateIntegerValue(0)
-        };
+        var variables = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(divisor, factory.CreateIntegerValue(0));
         var interpreter = new IrInterpreter(factory);
 
         var equalResult = interpreter.Evaluate(equal, variables);
@@ -177,10 +175,7 @@ internal sealed class IrKernelTests
 
         var result = new IrInterpreter(factory).Evaluate(
             conditional,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [divisor] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(divisor, factory.CreateIntegerValue(0)));
 
         Assert.That(conditional, Is.TypeOf<IrConditionalTerm>());
         Assert.That(
@@ -204,17 +199,11 @@ internal sealed class IrKernelTests
 
         var first = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(1)
-            },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(1)),
             timeout.Token);
         var second = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(2)
-            },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(2)),
             timeout.Token);
 
         Assert.That(first.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -460,10 +449,7 @@ internal sealed class IrKernelTests
             factory.Integer(5));
         var evaluation = new IrInterpreter(factory).Evaluate(
             substituted,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [second] = factory.CreateIntegerValue(7)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(second, factory.CreateIntegerValue(7)));
 
         Assert.That(first, Is.Not.EqualTo(second));
         Assert.That(
@@ -504,11 +490,7 @@ internal sealed class IrKernelTests
         var substituted = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [receiver] = factory.Null(receiverType),
-                [argument] = factory.Integer(4)
-            });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(receiver, factory.Null(receiverType)).SetItem(argument, factory.Integer(4)));
 
         Assert.That(substituted, Is.TypeOf<IrOpaqueTerm>());
         var opaque = (IrOpaqueTerm)substituted;
@@ -534,15 +516,11 @@ internal sealed class IrKernelTests
         var unchanged = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>());
+            ImmutableDictionary<IrVarId, IrTerm>.Empty);
         var substituted = IrSubstitution.Substitute(
             factory,
             root,
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [first] = factory.Variable(second),
-                [second] = factory.Integer(1)
-            });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Variable(second)).SetItem(second, factory.Integer(1)));
 
         Assert.That(unchanged, Is.SameAs(root));
         Assert.That(
@@ -551,6 +529,25 @@ internal sealed class IrKernelTests
                 IrBinaryOperator.Add,
                 factory.Variable(second),
                 factory.Integer(1))));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SubstitutionRejectsRepeatedKeysEvenWithIdenticalReplacementTerms(bool many)
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var root = factory.Variable(variable);
+        var replacements = new RepeatedReplacementMap(variable, factory.Integer(7));
+
+        if (many)
+        {
+            Assert.Throws<ArgumentException>((Action)(() => IrSubstitution.SubstituteMany(factory, [root], replacements)));
+        }
+        else
+        {
+            Assert.Throws<ArgumentException>((Action)(() => IrSubstitution.Substitute(factory, root, replacements)));
+        }
     }
 
     [TestCase(false)]
@@ -564,11 +561,8 @@ internal sealed class IrKernelTests
         var foreignRoot = foreignFactory.Integer(9);
         var changingRoots = new ChangingIrTermList(root, foreignRoot);
         IReadOnlyDictionary<IrVarId, IrTerm> replacements = hasReplacement
-            ? new Dictionary<IrVarId, IrTerm>
-            {
-                [variable] = factory.Integer(7)
-            }
-            : new Dictionary<IrVarId, IrTerm>();
+            ? ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(variable, factory.Integer(7))
+            : ImmutableDictionary<IrVarId, IrTerm>.Empty;
 
         var result = IrSubstitution.SubstituteMany(
             factory,
@@ -586,7 +580,7 @@ internal sealed class IrKernelTests
 
         var stableResult = IrSubstitution.SubstituteMany(
             factory,
-            new[] { root },
+            ImmutableArray.Create(root),
             replacements);
         Assert.That(
             stableResult[0],
@@ -783,14 +777,14 @@ internal sealed class IrKernelTests
     public void BinaryOperatorKeysAreDistinctWithinEachTypedDomain()
     {
         var factory = new IrFactory();
-        var integers = new[] {
+        var integers = ImmutableArray.Create<IrTerm>(
             factory.Variable(factory.CreateVariable("left", factory.IntegerType)),
             factory.Variable(factory.CreateVariable("right", factory.IntegerType))
-        };
-        var booleans = new[] {
+        );
+        var booleans = ImmutableArray.Create<IrTerm>(
             factory.Variable(factory.CreateVariable("first", factory.BooleanType)),
             factory.Variable(factory.CreateVariable("second", factory.BooleanType))
-        };
+        );
 
         AssertDistinct(
             [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
@@ -809,15 +803,17 @@ internal sealed class IrKernelTests
             booleans);
 
         void AssertDistinct(
-            IrBinaryOperator[] operators,
-            IrTerm[] operands)
+            ImmutableArray<IrBinaryOperator> operators,
+            ImmutableArray<IrTerm> operands)
         {
-            System.ArgumentNullException.ThrowIfNull(operands, nameof(operands));
-            System.ArgumentNullException.ThrowIfNull(operators, nameof(operators));
+            if (operands.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(operands)); }
+            if (operators.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(operators)); }
             var terms = operators
                 .Select(value => factory.Binary(value, operands[0], operands[1]))
                 .Cast<IrBinaryTerm>()
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(terms, Is.Unique);
             Assert.That(
                 terms.Select(static term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Operator)),
@@ -848,18 +844,10 @@ internal sealed class IrKernelTests
 
         var skipped = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [enabled] = factory.CreateBooleanValue(false),
-                [divisor] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(enabled, factory.CreateBooleanValue(false)).SetItem(divisor, factory.CreateIntegerValue(0)));
         var evaluated = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [enabled] = factory.CreateBooleanValue(true),
-                [divisor] = factory.CreateIntegerValue(2)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(enabled, factory.CreateBooleanValue(true)).SetItem(divisor, factory.CreateIntegerValue(2)));
 
         Assert.That(skipped.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(skipped.Value!.Boolean, Is.False);
@@ -883,40 +871,22 @@ internal sealed class IrKernelTests
 
         var divideByZero = interpreter.Evaluate(
             division,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [dividend] = factory.CreateIntegerValue(1),
-                [divisor] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(1)).SetItem(divisor, factory.CreateIntegerValue(0)));
         var overflow = interpreter.Evaluate(
             division,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [dividend] = factory.CreateIntegerValue(long.MinValue),
-                [divisor] = factory.CreateIntegerValue(-1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(long.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
         var remainder = interpreter.Evaluate(
             factory.Binary(
                 IrBinaryOperator.Remainder,
                 factory.Variable(dividend),
                 factory.Variable(divisor)),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [dividend] = factory.CreateIntegerValue(long.MinValue),
-                [divisor] = factory.CreateIntegerValue(-1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(long.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
         var missing = interpreter.Evaluate(
             division,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [dividend] = factory.CreateIntegerValue(1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(1)));
         var invalid = interpreter.Evaluate(
             factory.Variable(dividend),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [dividend] = factory.CreateBooleanValue(true)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateBooleanValue(true)));
 
         Assert.That(
             divideByZero.Exception!.Kind,
@@ -958,11 +928,7 @@ internal sealed class IrKernelTests
 
         var result = new IrInterpreter(factory).Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [left] = wrongKind,
-                [right] = factory.CreateIntegerValue(1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, wrongKind).SetItem(right, factory.CreateIntegerValue(1)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -996,25 +962,13 @@ internal sealed class IrKernelTests
 
         var found = interpreter.Evaluate(
             access,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [sequence] = values,
-                [index] = factory.CreateIntegerValue(1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, values).SetItem(index, factory.CreateIntegerValue(1)));
         var outside = interpreter.Evaluate(
             access,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [sequence] = values,
-                [index] = factory.CreateIntegerValue(2)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, values).SetItem(index, factory.CreateIntegerValue(2)));
         var nullAccess = interpreter.Evaluate(
             access,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [sequence] = factory.CreateNullValue(sequenceType),
-                [index] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, factory.CreateNullValue(sequenceType)).SetItem(index, factory.CreateIntegerValue(0)));
         var failingIndex = interpreter.Evaluate(
             factory.SequenceAccess(
                 factory.Null(sequenceType),
@@ -1024,10 +978,7 @@ internal sealed class IrKernelTests
                     factory.Integer(0))));
         var length = interpreter.Evaluate(
             factory.Length(factory.Variable(sequence)),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [sequence] = values
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, values));
 
         Assert.That(found.Value!.Integer, Is.EqualTo(8));
         Assert.That(
@@ -1060,12 +1011,9 @@ internal sealed class IrKernelTests
 
         var unsupported = interpreter.Evaluate(
             cast,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [source] = factory.CreateReferenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(source, factory.CreateReferenceValue(
                     sourceType,
-                    new object())
-            });
+                    new object())));
         var nullCast = interpreter.Evaluate(
             factory.Cast(targetType, factory.Null(sourceType)));
 
@@ -1099,7 +1047,7 @@ internal sealed class IrKernelTests
             factory.Cast(factory.ObjectType, Operand()),
             factory.Cast(factory.ObjectType, Operand()));
         var result = new IrInterpreter(factory).Evaluate(comparison,
-            new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(true) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(true)));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
     }
 
@@ -1112,10 +1060,10 @@ internal sealed class IrKernelTests
         var computed = interpreter.Evaluate(
             factory.Binary(IrBinaryOperator.StringConcat,
                 factory.Variable(input), factory.String("suffix")),
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateStringValue("prefix")));
         Assert.That(computed.Status, Is.EqualTo(IrEvaluationStatus.Value));
         var result = interpreter.Evaluate(factory.Cast(factory.ObjectType, factory.Variable(input)),
-            new Dictionary<IrVarId, IrValue> { [input] = computed.Value! });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, computed.Value!));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
     }
 
@@ -1130,7 +1078,7 @@ internal sealed class IrKernelTests
         var rewritten = IrSubstitution.Substitute(factory, widened, input, factory.String("prefix"));
         var interpreter = new IrInterpreter(factory);
         Assert.That(interpreter.Evaluate(widened,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") })
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateStringValue("prefix")))
             .Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(interpreter.Evaluate(rewritten).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         var folded = factory.Binary(IrBinaryOperator.StringConcat,
@@ -1164,7 +1112,7 @@ internal sealed class IrKernelTests
         var roundTrip = factory.Cast(factory.ObjectType,
             factory.Cast(factory.StringType, widened));
         var result = new IrInterpreter(factory).Evaluate(roundTrip,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue(supplied) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateStringValue(supplied)));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Reference, Is.SameAs(supplied));
     }
@@ -1200,20 +1148,14 @@ internal sealed class IrKernelTests
 
         var succeeded = interpreter.Evaluate(
             cast,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [source] = factory.CreateReferenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(source, factory.CreateReferenceValue(
                     factory.ObjectType,
-                    "sharp")
-            });
+                    "sharp")));
         var failed = interpreter.Evaluate(
             cast,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [source] = factory.CreateReferenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(source, factory.CreateReferenceValue(
                     factory.ObjectType,
-                    new object())
-            });
+                    new object())));
         var concatNull = interpreter.Evaluate(
             factory.Binary(
                 IrBinaryOperator.StringConcat,
@@ -1263,28 +1205,17 @@ internal sealed class IrKernelTests
         var failingArgument = interpreter.Evaluate(failingArgumentTerm);
         var nullReceiver = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [receiver] = factory.CreateNullValue(receiverType),
-                [argument] = factory.CreateIntegerValue(1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(receiver, factory.CreateNullValue(receiverType)).SetItem(argument, factory.CreateIntegerValue(1)));
         var missingArgument = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [receiver] = factory.CreateReferenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(receiver, factory.CreateReferenceValue(
                     receiverType,
-                    new object())
-            });
+                    new object())));
         var opaque = interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [receiver] = factory.CreateReferenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(receiver, factory.CreateReferenceValue(
                     receiverType,
-                    new object()),
-                [argument] = factory.CreateIntegerValue(1)
-            });
+                    new object())).SetItem(argument, factory.CreateIntegerValue(1)));
 
         Assert.That(
             failingArgument.Exception!.Kind,
@@ -1355,11 +1286,7 @@ internal sealed class IrKernelTests
 
         var cachedLeafTerm = Nest(shared);
         var uncachedLeafTerm = Nest(uncached);
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [sharedVariable] = factory.CreateIntegerValue(1),
-            [uncachedVariable] = factory.CreateIntegerValue(1)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sharedVariable, factory.CreateIntegerValue(1)).SetItem(uncachedVariable, factory.CreateIntegerValue(1));
         var interpreter = new IrInterpreter(factory);
 
         var cachedLeaf = interpreter.Evaluate(cachedLeafTerm, environment);
@@ -1407,10 +1334,7 @@ internal sealed class IrKernelTests
             variableTerm,
             512);
 
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [value] = factory.CreateIntegerValue(1)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, factory.CreateIntegerValue(1));
         var result = new IrInterpreter(factory).Evaluate(term, environment);
 
         // StackOverflowException is uncatchable, so the interpreter has to
@@ -1435,14 +1359,47 @@ internal sealed class IrKernelTests
             variableTerm,
             32);
 
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [value] = factory.CreateIntegerValue(1)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, factory.CreateIntegerValue(1));
         var result = new IrInterpreter(factory).Evaluate(term, environment);
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(33L));
+    }
+
+    private sealed class RepeatedReplacementMap : IReadOnlyDictionary<IrVarId, IrTerm>
+    {
+        private readonly ImmutableDictionary<IrVarId, IrTerm> _values;
+
+        public RepeatedReplacementMap(IrVarId variable, IrTerm replacement)
+        {
+            ArgumentNullException.ThrowIfNull(replacement);
+            if (variable.IsDefault)
+            {
+                throw new ArgumentException("Variable must be initialized.", nameof(variable));
+            }
+            _values = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement);
+        }
+
+        public int Count => 2;
+        public IEnumerable<IrVarId> Keys => _values.Keys.Concat(_values.Keys);
+        public IEnumerable<IrTerm> Values => _values.Values.Concat(_values.Values);
+        public IrTerm this[IrVarId /* SPINT001: all values valid - absent keys retain dictionary lookup behavior */ key] => _values[key];
+        public bool ContainsKey(IrVarId /* SPINT001: all values valid - absent keys return false */ key)
+        {
+            return _values.ContainsKey(key);
+        }
+        public bool TryGetValue(IrVarId /* SPINT001: all values valid - absent keys return false */ key, out IrTerm value)
+        {
+            return _values.TryGetValue(key, out value!);
+        }
+        public IEnumerator<KeyValuePair<IrVarId, IrTerm>> GetEnumerator()
+        {
+            return _values.Concat(_values).GetEnumerator();
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     private sealed class ChangingIrTermList : IReadOnlyList<IrTerm>
@@ -1469,10 +1426,9 @@ internal sealed class IrKernelTests
         public IEnumerator<IrTerm> GetEnumerator()
         {
             EnumerationCount++;
-            return new[]
-            {
+            return ImmutableArray.Create(
                 EnumerationCount == 1 ? _first : _later
-            }.AsEnumerable().GetEnumerator();
+            ).AsEnumerable().GetEnumerator();
         }
 
         System.Collections.IEnumerator

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,9 +16,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class BulkMetadataDefaultWorkBoundaryTests
 {
-    private static readonly int[] DivisionInputs = [3, 2];
-    private static readonly int[] MetadataInputs = [3];
-    private static readonly bool[] ExpectedPreconditions = [true];
+    private static readonly ImmutableArray<int> DivisionInputs = [3, 2];
+    private static readonly ImmutableArray<int> MetadataInputs = [3];
+    private static readonly ImmutableArray<bool> ExpectedPreconditions = [true];
 
     [Test]
     public void NaturalMetadataDivisionStopsAtTheDefaultFaultWorkBoundary()
@@ -75,9 +76,9 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
             string.Concat(Enumerable.Repeat("x=x+1;", additions)) + "x=-x;x=-x;return x; } } }";
     }
 
-    private static List<(string Code, long Operand)> DivisionInstructions(int negations)
+    private static ImmutableArray<(string Code, long Operand)> DivisionInstructions(int negations)
     {
-        var expected = new List<(string Code, long Operand)>();
+        var expected = ImmutableArray.CreateBuilder<(string Code, long Operand)>();
         for (var index = 0; index < negations; index++)
         {
             expected.Add(("Ldarg", 0));
@@ -90,12 +91,12 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         expected.Add(("Ldarg", 1));
         expected.Add(("Div", 0));
         expected.Add(("Ret", 0));
-        return expected;
+        return expected.ToImmutable();
     }
 
-    private static List<(string Code, long Operand)> MetadataInstructions(int additions)
+    private static ImmutableArray<(string Code, long Operand)> MetadataInstructions(int additions)
     {
-        var expected = new List<(string Code, long Operand)>();
+        var expected = ImmutableArray.CreateBuilder<(string Code, long Operand)>();
         for (var index = 0; index < additions; index++)
         {
             expected.Add(("Ldarg", 0));
@@ -111,7 +112,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         }
         expected.Add(("Ldarg", 0));
         expected.Add(("Ret", 0));
-        return expected;
+        return expected.ToImmutable();
     }
 
     private static void AssertCallerShape(CSharpCompilation compilation, bool discarded)
@@ -161,16 +162,17 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         }
     }
 
-    private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static TotalIlBody Resolve(MetadataTestSubject subject, CompilerReferenceSnapshot[] references)
+    private static TotalIlBody Resolve(MetadataTestSubject subject, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
@@ -185,27 +187,30 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         return body;
     }
 
-    private static void AssertInstructions(TotalIlBody body, List<(string Code, long Operand)> expected, int count)
+    private static void AssertInstructions(TotalIlBody body, ImmutableArray<(string Code, long Operand)> expected, int count)
     {
         System.ArgumentNullException.ThrowIfNull(body);
-        System.ArgumentNullException.ThrowIfNull(expected);
-        Assert.That(expected, Has.Count.EqualTo(count));
+        if (expected.IsDefault)
+        { throw new System.ArgumentException("Array must be initialized.", nameof(expected)); }
+        Assert.That(expected, Has.Length.EqualTo(count));
         Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Code, instruction.Operand))), Is.EqualTo(expected));
         Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
+    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
     }
 
-    private static void AssertRejected(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
+    private static void AssertRejected(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = Prepare(compilation, references);
         Assert.That(batch.Callers, Is.Empty);
@@ -213,9 +218,12 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
     }
 
-    private static void AssertCompleteControl(MetadataTestSubject subject, int[] inputs, int expected)
+    private static void AssertCompleteControl(MetadataTestSubject subject, ImmutableArray<int> inputs, int expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(inputs));
+        }
         System.ArgumentNullException.ThrowIfNull(subject);
         AssertCallerShape(subject.Compilation, discarded: inputs.Length == 1);
         var references = Capture(subject.Compilation);
@@ -229,13 +237,13 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         var artifact = CompilerTotalCallableArtifactCodec.Encode(prepared)!;
         var decoded = CompilerDecodedShadowBody.Decode(prepared.CallableId, artifact, TestContext.CurrentContext.CancellationToken, references).Body;
         var factory = decoded.Program.Factory;
-        var arguments = new Dictionary<IrVarId, IrValue>();
+        var arguments = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         for (var index = 0; index < inputs.Length; index++)
         {
             var entry = decoded.Parameters[index].Entry;
             arguments.Add(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, inputs[index]));
         }
-        var observed = new List<bool>();
+        var observed = ImmutableArray.CreateBuilder<bool>();
         var marker = decoded.CallPreconditions.Single().Instruction;
         var options = new IrProgramReplayOptions(static _ => null)
         {
@@ -247,10 +255,10 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
                 { observed.Add(value.Boolean); }
             }
         };
-        var execution = new IrProgramInterpreter(factory).Execute(decoded.Program, arguments, 10000, options);
+        var execution = new IrProgramInterpreter(factory).Execute(decoded.Program, arguments.ToImmutable(), 10000, options);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(execution.ConsumedApproximation, Is.False);
-        Assert.That(observed, Is.EqualTo(ExpectedPreconditions));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ExpectedPreconditions));
     }
 }

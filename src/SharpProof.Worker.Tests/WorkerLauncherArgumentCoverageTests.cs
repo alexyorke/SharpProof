@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using SharpProof.Ir;
 using NUnit.Framework;
 using SharpProof.Host;
 
@@ -13,7 +15,8 @@ public sealed class WorkerLauncherArgumentCoverageTests
     {
         // This fixture runs without parallel tests: keep ambient test-host overrides
         // private to this invocation and restore every value even when an assertion fails.
-        var savedEnvironment = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var savedEnvironment = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.Ordinal);
+        var savedEnvironmentOrder = ImmutableArray.CreateBuilder<string>();
         var originalError = Console.Error;
         using var diagnostic = new StringWriter();
         try
@@ -25,14 +28,16 @@ public sealed class WorkerLauncherArgumentCoverageTests
                 {
                     break;
                 }
-                savedEnvironment.Add(variable, Environment.GetEnvironmentVariable(variable));
+                savedEnvironment.AddUnique(variable, Environment.GetEnvironmentVariable(variable));
+                savedEnvironmentOrder.Add(variable);
                 Environment.SetEnvironmentVariable(variable, null);
             }
             Assert.That(TrustedChildEnvironment.FindUnsafeRuntimeVariable(), Is.Null);
             if (unsafeOverride)
             {
                 const string variable = "DOTNET_STARTUP_HOOKS";
-                savedEnvironment.TryAdd(variable, Environment.GetEnvironmentVariable(variable));
+                if (savedEnvironment.TryAdd(variable, Environment.GetEnvironmentVariable(variable)))
+                { savedEnvironmentOrder.Add(variable); }
                 Environment.SetEnvironmentVariable(variable, "untrusted-bootstrap-hook");
             }
             Console.SetError(diagnostic);
@@ -45,9 +50,10 @@ public sealed class WorkerLauncherArgumentCoverageTests
         finally
         {
             Console.SetError(originalError);
-            foreach (var entry in savedEnvironment)
+            var capturedEnvironment = savedEnvironment.ToImmutable();
+            foreach (var name in savedEnvironmentOrder.ToImmutable())
             {
-                Environment.SetEnvironmentVariable(entry.Key, entry.Value);
+                Environment.SetEnvironmentVariable(name, capturedEnvironment[name]);
             }
         }
     }
@@ -61,12 +67,11 @@ public sealed class WorkerLauncherArgumentCoverageTests
         using var directory = new TempDirectory("SharpProof.Worker.Test-cli-");
         var request = Path.Combine(directory.FullName, "request.json");
         var result = Path.Combine(directory.FullName, "result.json");
-        var arguments = new List<string>
-        {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create(
             "verify", "--request", request, "--result", result,
             "--compiler-manifest", Path.Combine(directory.FullName, "manifest.json"),
-            "--verify-policy", "advisory", "--assumption-policy", "allow"
-        };
+            "--verify-policy", "advisory", "--assumption-policy", "allow"));
         switch (scenario)
         {
             case "missing-prefix":
@@ -76,10 +81,10 @@ public sealed class WorkerLauncherArgumentCoverageTests
                 arguments[2] = " ";
                 break;
             case "partial-publication":
-                arguments.AddRange(["--publish-request", Path.Combine(directory.FullName, "published-request.json")]);
+                arguments.AddRange(ImmutableArray.Create("--publish-request", Path.Combine(directory.FullName, "published-request.json")));
                 break;
             case "sarif-without-publication":
-                arguments.AddRange(["--publish-sarif", Path.Combine(directory.FullName, "report.sarif")]);
+                arguments.AddRange(ImmutableArray.Create("--publish-sarif", Path.Combine(directory.FullName, "report.sarif")));
                 break;
         }
         var originalError = Console.Error;
@@ -88,7 +93,7 @@ public sealed class WorkerLauncherArgumentCoverageTests
         try
         {
             Console.SetError(diagnostic);
-            exitCode = await Launcher.Program.RunMain([.. arguments], verify: null, validatePreflight: null,
+            exitCode = await Launcher.Program.RunMain(arguments.ToImmutable(), verify: null, validatePreflight: null,
                 cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally

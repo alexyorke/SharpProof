@@ -31,20 +31,21 @@ function Get-GitUntrackedPaths {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    $arguments = @(
-        '-C',
-        $repositoryRoot,
-        'ls-files',
-        '-z',
-        '--others',
-        '--exclude-standard')
+    $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $argumentBuilder.AddRange([string[]]@(
+            '-C',
+            $repositoryRoot,
+            'ls-files',
+            '-z',
+            '--others',
+            '--exclude-standard'))
     if ($IgnoredPackages) {
-        $arguments += @('--ignored', '--', 'nupkgs/')
+        $argumentBuilder.AddRange([string[]]@('--ignored', '--', 'nupkgs/'))
     }
     else {
-        $arguments += '--'
+        $argumentBuilder.Add('--')
     }
-    foreach ($argument in $arguments) {
+    foreach ($argument in $argumentBuilder.ToImmutable()) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
 
@@ -70,16 +71,17 @@ function Get-GitUntrackedPaths {
         $process.Dispose()
     }
 
-    $bytes = $output.ToArray()
+    $bytes = [Collections.Immutable.ImmutableArray]::CreateRange[byte]($output.ToArray())
     $output.Dispose()
     if ($bytes.Length -eq 0) {
-        return @()
+        return [Collections.Immutable.ImmutableArray[string]]::Empty
     }
     if ($bytes[$bytes.Length - 1] -ne 0) {
         throw 'Git returned a non-terminated file inventory.'
     }
 
-    $paths = [Collections.Generic.List[string]]::new()
+    $nativeUtf8Bytes = [byte[]]@($bytes)
+    $paths = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $start = 0
     for ($index = 0; $index -lt $bytes.Length; $index++) {
         if ($bytes[$index] -ne 0) {
@@ -88,18 +90,18 @@ function Get-GitUntrackedPaths {
         $length = $index - $start
         if ($length -gt 0) {
             $paths.Add([Text.Encoding]::UTF8.GetString(
-                    $bytes,
+                    $nativeUtf8Bytes,
                     $start,
                     $length))
         }
         $start = $index + 1
     }
-    return $paths.ToArray()
+    return $paths.ToImmutable()
 }
 
 function Get-RequiredHead {
-    $head = @(& $gitPath -C $repositoryRoot rev-parse HEAD)
-    if ($LASTEXITCODE -ne 0 -or $head.Count -ne 1) {
+    $head = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& $gitPath -C $repositoryRoot rev-parse HEAD))
+    if ($LASTEXITCODE -ne 0 -or $head.Length -ne 1) {
         throw 'Could not resolve the host checkout HEAD.'
     }
     $value = ([string]$head[0]).Trim()
@@ -119,8 +121,8 @@ function Test-ExactFileBytes {
         -not [IO.File]::Exists($RightPath)) {
         return $false
     }
-    $left = [IO.File]::ReadAllBytes($LeftPath)
-    $right = [IO.File]::ReadAllBytes($RightPath)
+    $left = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($LeftPath))
+    $right = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($RightPath))
     if ($left.Length -ne $right.Length) {
         return $false
     }
@@ -175,10 +177,13 @@ try {
         throw 'Could not capture the host tracked-source patch.'
     }
 
-    $untrackedPaths = @(Get-GitUntrackedPaths)
-    $packagePaths = @(Get-GitUntrackedPaths -IgnoredPackages)
-    $sourcePaths = @($untrackedPaths + $packagePaths)
-    $sourcePaths = @($sourcePaths | Sort-Object -Unique -CaseSensitive)
+    $untrackedPaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-GitUntrackedPaths))
+    $packagePaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-GitUntrackedPaths -IgnoredPackages))
+    $sourcePathBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$sourcePathBuilder.AddRange([string[]]@($untrackedPaths))
+    [void]$sourcePathBuilder.AddRange([string[]]@($packagePaths))
+    $sourcePaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            $sourcePathBuilder.ToImmutable() | Sort-Object -Unique -CaseSensitive))
     $manifest = [IO.File]::Open(
         $sourceManifest,
         [IO.FileMode]::CreateNew,
@@ -230,15 +235,15 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not verify the host tracked-source patch.'
     }
-    $verificationPaths = @(
-        Get-GitUntrackedPaths
-        Get-GitUntrackedPaths -IgnoredPackages)
-    $verificationUntracked = @(
-        $verificationPaths | Sort-Object -Unique -CaseSensitive)
+    $verificationPaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            Get-GitUntrackedPaths
+            Get-GitUntrackedPaths -IgnoredPackages))
+    $verificationUntracked = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            $verificationPaths | Sort-Object -Unique -CaseSensitive))
     if ($verificationHead -cne $head -or
         @(Compare-Object `
-                -ReferenceObject $sourcePaths `
-                -DifferenceObject $verificationUntracked `
+                -ReferenceObject ([string[]]@($sourcePaths)) `
+                -DifferenceObject ([string[]]@($verificationUntracked)) `
                 -CaseSensitive `
                 -SyncWindow 0).Count -ne 0 -or
         -not (Test-ExactFileBytes `

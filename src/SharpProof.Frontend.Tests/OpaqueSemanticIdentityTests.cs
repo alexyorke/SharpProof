@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -28,7 +29,7 @@ public sealed class OpaqueSemanticIdentityTests
             .Where(static operation =>
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Conversion.IsReference && !operation.IsImplicit))
             .OrderByDescending(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsTryCast))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(operations, Has.Length.EqualTo(2));
         Assert.That(operations[0].IsTryCast, Is.True);
         Assert.That(operations[1].IsTryCast, Is.False);
@@ -63,7 +64,7 @@ public sealed class OpaqueSemanticIdentityTests
             .DescendantsAndSelf()
             .OfType<IFieldReferenceOperation>()
             .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Field.Name))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(fields, Has.Length.EqualTo(2));
         Assert.That(fields[0].ConstantValue.Value, Is.EqualTo(1L));
         Assert.That(fields[1].ConstantValue.Value, Is.EqualTo(2L));
@@ -96,7 +97,7 @@ public sealed class OpaqueSemanticIdentityTests
                 """)
             .DescendantsAndSelf()
             .OfType<ITypeOfOperation>()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(typeOfOperations, Has.Length.EqualTo(2));
 
         var typeOfFactory = new IrFactory();
@@ -125,7 +126,7 @@ public sealed class OpaqueSemanticIdentityTests
                 """)
             .DescendantsAndSelf()
             .OfType<ISizeOfOperation>()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(sizeOfOperations, Has.Length.EqualTo(2));
         Assert.That(
             sizeOfOperations[0].ConstantValue.Value,
@@ -185,7 +186,7 @@ public sealed class OpaqueSemanticIdentityTests
         var diagnostics = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             diagnostics,
             Is.Empty,

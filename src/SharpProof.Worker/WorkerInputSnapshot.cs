@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Host;
 
 namespace SharpProof.Worker;
@@ -13,7 +14,7 @@ internal sealed partial record WorkerInputSnapshot
         ArgumentNullException.ThrowIfNull(cacheIdentity);
         cancellationToken.ThrowIfCancellationRequested();
         var manifestPath = Path.GetFullPath(request.CompilerManifest.Path);
-        byte[] manifestBytes;
+        ImmutableArray<byte> manifestBytes;
         try
         {
             manifestBytes = CompilerManifestArtifactFile.ReadAllBytes(

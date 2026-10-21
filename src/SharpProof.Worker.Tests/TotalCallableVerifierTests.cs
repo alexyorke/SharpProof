@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Ir;
@@ -28,9 +29,10 @@ public sealed class TotalCallableVerifierTests
             }
             else
             {
-                var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
-                await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; },
+                var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+                await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; },
                     null, TestContext.CurrentContext.CancellationToken, backend, resourceBudget, () => backend.ConsumedResourceCount);
+                var checks = checkBuilder.ToImmutable();
                 Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
                 Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome)), Is.EqualTo(1));
             }
@@ -50,9 +52,10 @@ public sealed class TotalCallableVerifierTests
         var resourceBudget = new MethodResourceBudget(null, budgets.QueryRlimit, budgets.QueryRlimit);
         for (var run = 0; run < 2; run++)
         {
-            var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
-            await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; },
+            var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+            await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; },
                 null, TestContext.CurrentContext.CancellationToken, backend, resourceBudget);
+            var checks = checkBuilder.ToImmutable();
             Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Reason)), Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
             Assert.That(checks.Values.Any(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome)), Is.False);
         }
@@ -106,9 +109,10 @@ public sealed class TotalCallableVerifierTests
         using var project = new ShadowTestProject(source);
         var preparation = project.Snapshot.Callables.Single();
         CallableEntryFeasibility? entry = null;
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, value => { System.ArgumentNullException.ThrowIfNull(value); entry = value; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, value => { System.ArgumentNullException.ThrowIfNull(value); entry = value; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         Assert.That(entry, Is.Not.Null);
         Assert.That((int)entry!.Kind, Is.EqualTo(entryKind));
         Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : ((int)check.Feasibility)), Is.All.EqualTo(normalKind));
@@ -127,11 +131,12 @@ public sealed class TotalCallableVerifierTests
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
         using var cancellation = new CancellationTokenSource();
         CallableEntryFeasibility? entry = null;
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
             await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-                check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; },
+                check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; },
                 value => { System.ArgumentNullException.ThrowIfNull(value, nameof(value)); entry = value; cancellation.Cancel(); }, cancellation.Token)));
+        var checks = checkBuilder.ToImmutable();
         Assert.That(entry!.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(checks.Values.All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Checked)), Is.True);
     }
@@ -152,9 +157,10 @@ public sealed class TotalCallableVerifierTests
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.IsSuccess, Is.False);
         Assert.That(preparation.Total, Is.Not.Null);
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         var result = checks.Values.Single();
         Assert.That(result.Enrolled, Is.True);
         Assert.That(result.Checked, Is.True);
@@ -168,9 +174,10 @@ public sealed class TotalCallableVerifierTests
     {
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
         var preparation = project.Snapshot.Callables.Single();
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         var result = checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome));
         Assert.That(result.Checked, Is.True);
         Assert.That(result.Evidence.EntryModel.Keys,
@@ -182,17 +189,18 @@ public sealed class TotalCallableVerifierTests
     public void CancellationAfterFirstProofPreservesPublishedEvidence()
     {
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         using var cancellation = new CancellationTokenSource();
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
             await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
                 check =>
                 {
                     System.ArgumentNullException.ThrowIfNull(check);
-                    checks[check.ClaimId] = check;
+                    checkBuilder[check.ClaimId] = check;
                     if (check.Checked)
                     { cancellation.Cancel(); }
                 }, cancellation.Token)));
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)), Is.EqualTo(1));
         Assert.That(checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)).Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Checked)).Enrolled, Is.True);

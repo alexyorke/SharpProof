@@ -43,6 +43,7 @@ internal sealed partial class ContractClauseInventory
         HasRejectedContractApiUsage = hasRejectedContractApiUsage;
         ImplementationBody = implementationBody;
         Clauses = clauses;
+        _hasValidClause = ComputeHasValidClause(clauses);
     }
     public IMethodSymbol Callable { get; }
     public bool ContractApiAvailable { get; }

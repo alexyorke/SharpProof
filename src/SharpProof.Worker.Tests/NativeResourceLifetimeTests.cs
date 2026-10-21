@@ -63,7 +63,7 @@ internal sealed partial class NativeResourceContractTests
         var source = "using SharpProof.Attributes; public static class C { " +
             $"[ResourceUpperBound((ResourceMetric){metric}, 1000)] public static int[] Target() => new int[1]; }}";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
-        target.Compilation.ResourceTargetPlatform = "AnyCpu";
+        target = target with { Compilation = target.Compilation with { ResourceTargetPlatform = "AnyCpu" } };
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceLayoutAssumptionsNotBound"));
@@ -132,9 +132,9 @@ internal sealed partial class NativeResourceContractTests
             UpperBound = ResourceExpressionCodec.Encode(ResourceExpression.Zero, TestContext.CurrentContext.CancellationToken)
         };
         Assert.That(WorkerProtocolMetadata.HasValidResourceConstraint(WorkerEffectContractKind.ResourceUpperBound, constraint), Is.True);
-        constraint.CostModel = WorkerResourceModels.AllocationCostModel;
+        constraint = constraint with { CostModel = WorkerResourceModels.AllocationCostModel };
         Assert.That(WorkerProtocolMetadata.HasValidResourceConstraint(WorkerEffectContractKind.ResourceUpperBound, constraint), Is.False);
-        constraint.CostModel = WorkerResourceModels.CostModel;
+        constraint = constraint with { CostModel = WorkerResourceModels.CostModel };
         Assert.That(WorkerProtocolMetadata.HasValidResourceConstraint(WorkerEffectContractKind.ResourceUpperBound, constraint), Is.False);
     }
     [TestCase("Contract.Requires(false);", false)]

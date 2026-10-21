@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -45,7 +46,7 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         var originModel = CompilationModelProvider.GetSemanticModel(caller, originTree);
         Assert.That(callerModel.Compilation, Is.SameAs(caller));
         Assert.That(originModel.Compilation, Is.SameAs(origin));
-        var calls = (await callerTree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = (await callerTree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(2));
         foreach (var call in calls)
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -65,7 +66,7 @@ public sealed class ReachableReadRegionRegressionTests
             "effects",
             ["SP0002"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         AnalyzerTestHost.AssertMessageContains(
             diagnostics.Single(),
             "StaticControl");

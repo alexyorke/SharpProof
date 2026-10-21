@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -16,8 +17,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class SourceNativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
-    private static readonly byte[] OmittedTargetIl = [0x1d, 0x2a];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<byte> OmittedTargetIl = [0x1d, 0x2a];
 
     // SP-NATIVE-CONDITIONAL-001 nearby controls, added in the green phase.
     // These source-backed cases were NOT run on the red baseline. The original
@@ -88,7 +89,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var method = invocation.TargetMethod;
-        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
+        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToImmutableArray();
         var raw = overloaded
             ? candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters[0].Type.SpecialType == SpecialType.System_IntPtr))
             : candidates.Single();
@@ -116,7 +117,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var reader = pe.GetMetadataReader();
         var targetDefinition = reader.MethodDefinitions.Select(reader.GetMethodDefinition)
             .Single(candidate => reader.GetString(candidate.Name) == "Target");
-        var targetIl = pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!;
+        var targetIl = (pe.GetMethodBody(targetDefinition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         if (!enabled)
         { Assert.That(targetIl, Is.EqualTo(OmittedTargetIl)); }
         TestContext.WriteLine(JsonSerializer.Serialize(new
@@ -131,7 +132,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
             WrapperAttributes = method.GetAttributes().Length,
             CandidateCount = candidates.Length,
             Attribute = attribute.ToString(),
-            TargetIl = Convert.ToHexString(targetIl),
+            TargetIl = Convert.ToHexString(targetIl.AsSpan()),
             CoreSource = core,
             CallerSource = source
         }));

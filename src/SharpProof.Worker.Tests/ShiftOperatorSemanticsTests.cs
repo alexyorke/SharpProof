@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -70,7 +71,7 @@ public sealed class ShiftOperatorSemanticsTests
                 }
             }
             """.Replace("__BODY__", body, StringComparison.Ordinal) + "\n";
-        var compilation = TestCompilation.Create("ShiftOperatorSemantics", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ShiftOperatorSemantics", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -102,6 +103,7 @@ public sealed class ShiftOperatorSemanticsTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null, "Expected admitted compiler-captured total body.");
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
@@ -113,7 +115,7 @@ public sealed class ShiftOperatorSemanticsTests
 
     private static IEnumerable<object[]> Inputs()
     {
-        long[] edges = [0, 1, -1, 2, 7, 8, 31, 32, 33, 63, 64, 65, 127, 128, 200, 255, -31, -32, -33, -64,
+        ImmutableArray<long> edges = [0, 1, -1, 2, 7, 8, 31, 32, 33, 63, 64, 65, 127, 128, 200, 255, -31, -32, -33, -64,
             int.MaxValue, int.MinValue, uint.MaxValue, long.MaxValue, long.MinValue, 0x40000000];
         var random = new Random(20261010);
         long Pick()

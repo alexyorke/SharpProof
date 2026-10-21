@@ -97,7 +97,7 @@ internal static class OpenSourceCorpusCatalog
     internal static string ComputeNormalizedSha256(string normalizedValue)
     {
         System.ArgumentNullException.ThrowIfNull(normalizedValue);
-        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
+        return HashEncoding.ComputeSha256Hex((Encoding.UTF8.GetBytes(normalizedValue)).ToImmutableArray());
     }
 
     internal static string NormalizeLineEndings(string value)
@@ -187,8 +187,7 @@ internal static class OpenSourceCorpusCatalog
             ValidateSource(source, corpusDirectory);
         }
 
-        var files = new Dictionary<string, CompilationUnitSyntax>(
-            StringComparer.Ordinal);
+        var fileBuilder = ImmutableDictionary.CreateBuilder<string, CompilationUnitSyntax>(StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
             if (file is null)
@@ -206,7 +205,7 @@ internal static class OpenSourceCorpusCatalog
 
             ValidateRelativePath(file.Path, $"source file {file.Path}");
             var key = GetSourceFileKey(file.SourceId, file.Path);
-            if (files.ContainsKey(key))
+            if (fileBuilder.ContainsKey(key))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source file: {key}.");
@@ -233,16 +232,17 @@ internal static class OpenSourceCorpusCatalog
                     AnalyzerGateHost.ParseOptions,
                     file.Path)
                 .GetCompilationUnitRoot();
-            files.Add(key, root);
+            fileBuilder.Add(key, root);
         }
 
-        var declarationIndexes = files.ToDictionary(
+        var files = fileBuilder.ToImmutable();
+        var declarationIndexes = files.ToImmutableDictionary(
             static pair => pair.Key,
             static pair => BuildDeclarationIndex(pair.Value),
             StringComparer.Ordinal);
 
-        var locations = new HashSet<string>(StringComparer.Ordinal);
-        var declarations = new HashSet<string>(StringComparer.Ordinal);
+        var locations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var declarations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var index = 0; index < document.Methods.Length; index++)
         {
             var method = document.Methods[index];
@@ -276,12 +276,13 @@ internal static class OpenSourceCorpusCatalog
 
             var location =
                 $"{fileKey}|{method.StartLine}|{method.EndLine}";
-            if (!locations.Add(location))
+            if (locations.Contains(location))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source location: {location}.");
             }
 
+            locations.Add(location);
             var declaration = FindDeclaration(
                 declarationIndexes[fileKey],
                 method);
@@ -296,12 +297,13 @@ internal static class OpenSourceCorpusCatalog
                     $"OSS corpus method {method.Id} declaration hash does not match.");
             }
 
-            if (!declarations.Add(declarationHash))
+            if (declarations.Contains(declarationHash))
             {
                 throw new InvalidDataException(
                     $"OSS corpus method {method.Id} duplicates another declaration.");
             }
 
+            declarations.Add(declarationHash);
             if (!string.Equals(
                     declaration.Identifier.ValueText,
                     method.MethodName,
@@ -336,8 +338,8 @@ internal static class OpenSourceCorpusCatalog
         }
 
         return new ValidationResult(
-            files.ToImmutableDictionary(StringComparer.Ordinal),
-            declarationIndexes.ToImmutableDictionary(StringComparer.Ordinal),
+            files,
+            declarationIndexes,
             sourceFileCount);
     }
 
@@ -362,11 +364,11 @@ internal static class OpenSourceCorpusCatalog
         internal int SourceFileCount { get; } = sourceFileCount;
     }
 
-    internal static HashSet<string> ValidateSourceIds(
+    internal static ImmutableHashSet<string> ValidateSourceIds(
         IEnumerable<OpenSourceCorpusSource> sources)
     {
         System.ArgumentNullException.ThrowIfNull(sources);
-        var sourceIds = new HashSet<string>(StringComparer.Ordinal);
+        var sourceIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
             if (source is null)
@@ -381,14 +383,15 @@ internal static class OpenSourceCorpusCatalog
                     "OSS corpus source IDs must not be empty.");
             }
 
-            if (!sourceIds.Add(source.Id))
+            if (sourceIds.Contains(source.Id))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source ID: {source.Id}.");
             }
+            sourceIds.Add(source.Id);
         }
 
-        return sourceIds;
+        return sourceIds.ToImmutable();
     }
 
     internal static ImmutableDictionary<
@@ -474,7 +477,7 @@ internal static class OpenSourceCorpusCatalog
                 $"OSS corpus source {source.Id} license file is missing.");
         }
 
-        var actualHash = HashEncoding.ComputeSha256Hex(File.ReadAllBytes(licensePath));
+        var actualHash = HashEncoding.ComputeSha256Hex((File.ReadAllBytes(licensePath)).ToImmutableArray());
         if (!string.Equals(
                 actualHash,
                 source.LicenseSha256,
@@ -564,7 +567,7 @@ internal static class OpenSourceCorpusCatalog
     private static string? ResolveLink(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
-        foreach (FileSystemInfo info in new FileSystemInfo[] { new FileInfo(path), new DirectoryInfo(path) })
+        foreach (FileSystemInfo info in ImmutableArray.Create<FileSystemInfo>(new FileInfo(path), new DirectoryInfo(path)))
         {
             try
             {

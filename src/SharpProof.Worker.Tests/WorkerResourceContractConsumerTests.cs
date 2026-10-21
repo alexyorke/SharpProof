@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -30,8 +31,8 @@ internal sealed partial class WorkerTests
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(result => result.GetProperty("ruleId").GetString() == "SharpProof.Proven");
         Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("metric").GetString(), Is.EqualTo(metric));
-        claim.Outcome = WorkerClaimOutcome.Refuted;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        claim = claim with { Outcome = WorkerClaimOutcome.Refuted };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim] }).IsValid, Is.False);
     }
     [Test]
     public async Task NativeResourceContractsReachValidatedCacheAndSarifConsumers()
@@ -63,15 +64,15 @@ internal sealed partial class WorkerTests
         Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("metric").GetString(), Is.EqualTo("AllocatedElements"));
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("resource:AllocatedElements"));
         var originalMetric = evidence.Metric;
-        evidence.Metric = WorkerResourceMetric.ArrayAllocations;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.Metric = originalMetric;
+        evidence = evidence with { Metric = WorkerResourceMetric.ArrayAllocations };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [second.ClaimResults.Single() with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { Metric = originalMetric };
         var originalHash = evidence.DeclaredBoundSha256;
-        evidence.DeclaredBoundSha256 = WorkerProtocolVersions.EmptySha256;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.DeclaredBoundSha256 = originalHash;
-        second.Manifest.Claims.Single().ResourceUpperBound!.UpperBound = null!;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        evidence = evidence with { DeclaredBoundSha256 = WorkerProtocolVersions.EmptySha256 };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [second.ClaimResults.Single() with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { DeclaredBoundSha256 = originalHash };
+        second = second with { Manifest = second.Manifest with { Claims = second.Manifest.Claims.SetItem(0, second.Manifest.Claims.Single() with { ResourceUpperBound = second.Manifest.Claims.Single().ResourceUpperBound! with { UpperBound = null! } }) } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [second.ClaimResults.Single() with { ResourceBound = evidence }] }).IsValid, Is.False);
     }
     [TestCase(false)]
     [TestCase(true)]
@@ -92,10 +93,10 @@ internal sealed partial class WorkerTests
             second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
         var claim = second.ClaimResults.Single();
         var evidence = claim.ResourceBound!;
-        evidence.Asymptotic = new WorkerResourceAsymptoticEvidence { UpperBound = "O(1)", PolynomialDegree = 0, LogarithmicDegree = 0, IsZero = false };
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.Asymptotic = null;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+        evidence = evidence with { Asymptotic = new WorkerResourceAsymptoticEvidence { UpperBound = "O(1)", PolynomialDegree = 0, LogarithmicDegree = 0, IsZero = false } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { Asymptotic = null };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.True);
         Assert.That(evidence.ObservedLowerBound, Is.EqualTo("3"));
         Assert.That(evidence.EvaluatedUpperBound, Is.EqualTo("2"));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
@@ -104,26 +105,26 @@ internal sealed partial class WorkerTests
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("observed prefix: 3 > 2"));
         foreach (var malformed in new[] { "2", "1", "03", "-1", "1.0", "18446744073709551616" })
         {
-            evidence.ObservedLowerBound = malformed;
-            Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False, malformed);
+            evidence = evidence with { ObservedLowerBound = malformed };
+            Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False, malformed);
         }
-        evidence.ObservedLowerBound = "3";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
-        claim.EffectWitness!.Effects = loop ? WorkerEffectSet.Allocates : WorkerEffectSet.None;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        claim.EffectWitness.Effects = loop ? WorkerEffectSet.None : WorkerEffectSet.Allocates;
-        evidence.ObservedLowerBound = "3";
-        evidence.EvaluatedUpperBound = "02";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.EvaluatedUpperBound = "2";
-        evidence.InferredUpperBound = "3";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.InferredUpperBound = null;
-        claim.EffectWitness!.Kind = "managed-array-allocation";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        claim.EffectWitness.Kind = "resource-bound-exceeded";
-        claim.ResourceBound = null;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        evidence = evidence with { ObservedLowerBound = "3" };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.True);
+        claim = claim with { EffectWitness = claim.EffectWitness! with { Effects = loop ? WorkerEffectSet.Allocates : WorkerEffectSet.None } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        claim = claim with { EffectWitness = claim.EffectWitness! with { Effects = loop ? WorkerEffectSet.None : WorkerEffectSet.Allocates } };
+        evidence = evidence with { ObservedLowerBound = "3" };
+        evidence = evidence with { EvaluatedUpperBound = "02" };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { EvaluatedUpperBound = "2" };
+        evidence = evidence with { InferredUpperBound = "3" };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { InferredUpperBound = null };
+        claim = claim with { EffectWitness = claim.EffectWitness! with { Kind = "managed-array-allocation" } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        claim = claim with { EffectWitness = claim.EffectWitness! with { Kind = "resource-bound-exceeded" } };
+        evidence = null!;
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
     }
     [Test]
     public async Task ReviewedResourceMetadataReachesValidatedCacheAndSarifConsumers()
@@ -150,45 +151,57 @@ internal sealed partial class WorkerTests
         var result = second.ClaimResults.Single();
         var metadata = result.ResourceBound!.MetadataAssumptions.Single();
         Assert.That(metadata.WitnessIdentifier, Is.EqualTo("bcl.math.max.int32-int32"));
-        var metadataRows = result.ResourceBound.MetadataAssumptions;
-        result.ResourceBound.MetadataAssumptions = null!;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        result.ResourceBound.MetadataAssumptions = Enumerable.Repeat(metadata, 17).ToArray();
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        result.ResourceBound.MetadataAssumptions = metadataRows;
+        var metadataRows = result.ResourceBound!.MetadataAssumptions;
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = null! } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = Enumerable.Repeat(metadata, 17).ToArray() } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = metadataRows } };
         var originalWitness = metadata.WitnessIdentifier;
-        metadata.WitnessIdentifier = null!;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        metadata.WitnessIdentifier = originalWitness;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+        metadata = metadata with { WitnessIdentifier = null! };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        metadata = metadata with { WitnessIdentifier = originalWitness };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.True);
         Assert.That(metadata.RuntimeModel, Is.EqualTo("net8.0.32"));
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
         var witness = metadata.WitnessIdentifier;
-        metadata.WitnessIdentifier = "bcl.math.abs.int32";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        metadata.WitnessIdentifier = witness;
+        metadata = metadata with { WitnessIdentifier = "bcl.math.abs.int32" };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        metadata = metadata with { WitnessIdentifier = witness };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
         var runtime = metadata.RuntimeModel;
-        metadata.RuntimeModel = "net10.0";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        metadata.RuntimeModel = runtime;
+        metadata = metadata with { RuntimeModel = "net10.0" };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        metadata = metadata with { RuntimeModel = runtime };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
         var assembly = metadata.ReferenceAssembly;
-        metadata.ReferenceAssembly = "foreign";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        metadata.ReferenceAssembly = assembly;
+        metadata = metadata with { ReferenceAssembly = "foreign" };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        metadata = metadata with { ReferenceAssembly = assembly };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
         var hash = metadata.ReferenceSha256;
-        metadata.ReferenceSha256 = "invalid";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        metadata.ReferenceSha256 = hash;
+        metadata = metadata with { ReferenceSha256 = "invalid" };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        metadata = metadata with { ReferenceSha256 = hash };
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [metadata] } };
         var assumption = result.Assumptions.Single(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == metadata.AssumptionId);
-        assumption.Used = false;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        assumption.Used = true;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
-        result.ResourceBound.MetadataAssumptions = [];
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        assumption = assumption with { Used = false };
+        result.Assumptions = result.Assumptions.Select(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == assumption.Id ? assumption : item).ToImmutableArray();
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
+        assumption = assumption with { Used = true };
+        result.Assumptions = result.Assumptions.Select(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == assumption.Id ? assumption : item).ToImmutableArray();
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.True);
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [] } };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result] }).IsValid, Is.False);
     }
     [Test]
     public async Task UnknownResourceContractsRejectPartialAndUndefinedEvidence()
@@ -209,20 +222,20 @@ internal sealed partial class WorkerTests
         Assert.That(claim.ResourceBound, Is.Not.Null);
         var evidence = claim.ResourceBound!;
         Assert.That(evidence.UnknownReason, Is.Not.Empty);
-        evidence.ObservedLowerBound = "1";
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
-        evidence.ObservedLowerBound = null;
-        evidence.InferredUpperBound = "n";
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
-        evidence.InferredUpperBound = null;
+        evidence = evidence with { ObservedLowerBound = "1" };
+        Assert.That(WorkerProtocolJson.Validate(response with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { ObservedLowerBound = null };
+        evidence = evidence with { InferredUpperBound = "n" };
+        Assert.That(WorkerProtocolJson.Validate(response with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { InferredUpperBound = null };
         var reason = evidence.UnknownReason;
-        evidence.UnknownReason = "bad\nreason";
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
-        evidence.UnknownReason = reason;
-        claim.Outcome = (WorkerClaimOutcome)999;
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
-        claim.Outcome = WorkerClaimOutcome.Unknown;
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        evidence = evidence with { UnknownReason = "bad\nreason" };
+        Assert.That(WorkerProtocolJson.Validate(response with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { UnknownReason = reason };
+        claim = claim with { Outcome = (WorkerClaimOutcome)999 };
+        Assert.That(WorkerProtocolJson.Validate(response with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.False);
+        claim = claim with { Outcome = WorkerClaimOutcome.Unknown };
+        Assert.That(WorkerProtocolJson.Validate(response with { ClaimResults = [claim with { ResourceBound = evidence }] }).IsValid, Is.True);
     }
     [TestCase(false)]
     [TestCase(true)]
@@ -269,17 +282,21 @@ internal sealed partial class WorkerTests
         Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("metric").GetString(), Is.EqualTo("AllocatedBytes"));
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
         var assumption = result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId);
-        evidence.MetadataAssumptions = [];
-        assumption.Used = false;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        evidence.MetadataAssumptions = [dependency];
-        assumption.Used = true;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
+        evidence = evidence with { MetadataAssumptions = [] };
+        assumption = assumption with { Used = false };
+        result.Assumptions = result.Assumptions.Select(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == assumption.Id ? assumption : item).ToImmutableArray();
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result with { ResourceBound = evidence }] }).IsValid, Is.False);
+        evidence = evidence with { MetadataAssumptions = [dependency] };
+        assumption = assumption with { Used = true };
+        result.Assumptions = result.Assumptions.Select(item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Id == assumption.Id ? assumption : item).ToImmutableArray();
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result with { ResourceBound = evidence }] }).IsValid, Is.True);
         var model = dependency.RuntimeModel;
-        dependency.RuntimeModel = "net8.0.32";
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
-        dependency.RuntimeModel = model;
-        evidence.CostModel = WorkerResourceModels.CostModel;
-        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+        dependency = dependency with { RuntimeModel = "net8.0.32" };
+        evidence = evidence with { MetadataAssumptions = [dependency] };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result with { ResourceBound = evidence }] }).IsValid, Is.False);
+        dependency = dependency with { RuntimeModel = model };
+        evidence = evidence with { MetadataAssumptions = [dependency] };
+        evidence = evidence with { CostModel = WorkerResourceModels.CostModel };
+        Assert.That(WorkerProtocolJson.Validate(second with { ClaimResults = [result with { ResourceBound = evidence }] }).IsValid, Is.False);
     }
 }

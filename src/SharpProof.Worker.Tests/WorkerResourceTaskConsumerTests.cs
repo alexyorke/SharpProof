@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
@@ -49,10 +50,10 @@ internal sealed partial class WorkerTests
             switch (mutation)
             {
                 case "scope":
-                    bound.ExecutionScope = "foreign";
+                    bound = bound with { ExecutionScope = "foreign" };
                     break;
                 case "exchanged-task-scope":
-                    bound.ExecutionScope = scope == WorkerResourceModels.TaskJoinScope ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope;
+                    bound = bound with { ExecutionScope = scope == WorkerResourceModels.TaskJoinScope ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope };
                     break;
                 case "model":
                     claim.ProofCore = [.. claim.ProofCore.Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-task-model:", StringComparison.Ordinal))];
@@ -67,30 +68,30 @@ internal sealed partial class WorkerTests
                     claim.ProofCore = [.. claim.ProofCore, "resource-task-projection:" + new string('a', 64)];
                     break;
                 case "metadata":
-                    bound.MetadataAssumptions = [];
+                    bound = bound with { MetadataAssumptions = [] };
                     break;
                 case "lower":
-                    bound.Asymptotic!.Lower!.UnknownReason = null;
+                    bound = bound with { Asymptotic = bound.Asymptotic! with { Lower = bound.Asymptotic!.Lower! with { UnknownReason = null } } };
                     break;
                 case "expected":
-                    bound.Expected = null;
+                    bound = bound with { Expected = null };
                     break;
                 case "ordinary-scope":
-                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
+                    bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
                     break;
                 case "stripped-task":
-                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
-                    bound.MetadataAssumptions = [];
-                    foreach (var assumption in claim.Assumptions)
-                    { assumption.Used = false; }
+                    bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
+                    bound = bound with { MetadataAssumptions = [] };
+                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption with { Used = false }).ToImmutableArray();
                     break;
                 case "witness":
-                    bound.MetadataAssumptions.Single().WitnessIdentifier = "other";
+                    bound = bound with { MetadataAssumptions = [bound.MetadataAssumptions.Single() with { WitnessIdentifier = "other" }] };
                     break;
                 default:
                     Assert.Fail("Unknown mutation");
                     break;
             }
+            modified = modified with { ClaimResults = [claim with { ResourceBound = bound }] };
             var validation = WorkerProtocolJson.Validate(modified);
             Assert.That(validation.IsValid, Is.False, mutation);
             Assert.That(validation.Errors.Any(static error => error is null ? throw new ArgumentNullException(nameof(error)) :
@@ -142,16 +143,15 @@ internal sealed partial class WorkerTests
             switch (mutation)
             {
                 case "ordinary-scope":
-                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
+                    bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
                     break;
                 case "work-scope":
-                    bound.ExecutionScope = WorkerResourceModels.TaskJoinScope;
+                    bound = bound with { ExecutionScope = WorkerResourceModels.TaskJoinScope };
                     break;
                 case "stripped-task":
-                    bound.ExecutionScope = WorkerResourceModels.CallableScope;
-                    bound.MetadataAssumptions = [];
-                    foreach (var assumption in claim.Assumptions)
-                    { assumption.Used = false; }
+                    bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
+                    bound = bound with { MetadataAssumptions = [] };
+                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption with { Used = false }).ToImmutableArray();
                     break;
                 case "storage-model":
                     claim.ProofCore = [.. claim.ProofCore.Where(static item => item is not null && !item.StartsWith("resource-task-storage-model:", StringComparison.Ordinal))];
@@ -163,25 +163,27 @@ internal sealed partial class WorkerTests
                     claim.ProofCore = [.. claim.ProofCore, "resource-task-model:foreign"];
                     break;
                 case "reference":
-                    bound.MetadataAssumptions.Single(static dependency => dependency is not null &&
-                        dependency.RuntimeModel is WorkerResourceModels.TaskStorageModel or WorkerResourceModels.ConfiguredTaskStorageModel).ReferenceSha256 = new string('a', 64);
+                    var storageDependency = bound.MetadataAssumptions.Single(static dependency => dependency is not null &&
+                        dependency.RuntimeModel is WorkerResourceModels.TaskStorageModel or WorkerResourceModels.ConfiguredTaskStorageModel);
+                    bound = bound with { MetadataAssumptions = [.. bound.MetadataAssumptions.Select(dependency => dependency is null ? throw new ArgumentNullException(nameof(dependency)) : ReferenceEquals(dependency, storageDependency) ? dependency with { ReferenceSha256 = new string('a', 64) } : dependency)] };
                     break;
                 case "layout":
-                    bound.MetadataAssumptions = [.. bound.MetadataAssumptions.Where(static dependency => dependency is not null && dependency.RuntimeModel != WorkerResourceModels.AllocationLayout)];
+                    bound = bound with { MetadataAssumptions = [.. bound.MetadataAssumptions.Where(static dependency => dependency is not null && dependency.RuntimeModel != WorkerResourceModels.AllocationLayout)] };
                     break;
                 case "lower":
-                    bound.Asymptotic!.Lower!.UnknownReason = null;
+                    bound = bound with { Asymptotic = bound.Asymptotic! with { Lower = bound.Asymptotic!.Lower! with { UnknownReason = null } } };
                     break;
                 case "expected":
-                    bound.Expected = null;
+                    bound = bound with { Expected = null };
                     break;
                 case "cumulative":
-                    bound.Metric = WorkerResourceMetric.AllocatedBytes;
+                    bound = bound with { Metric = WorkerResourceMetric.AllocatedBytes };
                     break;
                 default:
                     Assert.Fail("Unknown mutation");
                     break;
             }
+            modified = modified with { ClaimResults = [claim with { ResourceBound = bound }] };
             var validation = WorkerProtocolJson.Validate(modified);
             Assert.That(validation.IsValid, Is.False, mutation);
             Assert.That(validation.Errors.Any(static error => error is not null && error.Code == "response.resource_evidence"), Is.True, mutation);

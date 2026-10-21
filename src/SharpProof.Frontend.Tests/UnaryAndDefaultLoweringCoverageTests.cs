@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -237,7 +238,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -256,9 +257,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             compilation.GetSemanticModel(tree),
             expression);
         var factory = new IrFactory();
-        var lowerer = concreteReplay
-            ? RoslynOperationLowerer.CreateForConcreteReplay(factory)
-            : new RoslynOperationLowerer(factory);
+        RoslynOperationLowerer lowerer;
         if (specializedType.HasValue)
         {
             var replacement = compilation.GetSpecialType(
@@ -273,7 +272,14 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
                     _ => type
                 };
             }
-            lowerer.TypeSpecializer = Specialize;
+            lowerer = RoslynOperationLowerer.CreateConfigured(
+                factory, Specialize, static _ => default, allowCompilerConstants: concreteReplay);
+        }
+        else
+        {
+            lowerer = concreteReplay
+                ? RoslynOperationLowerer.CreateForConcreteReplay(factory)
+                : new RoslynOperationLowerer(factory);
         }
         var result = lowerer.Lower(operation);
         assert?.Invoke(factory, result);

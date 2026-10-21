@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.Loader;
@@ -43,7 +44,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
         var runtime = new AssemblyLoadContext("SourceCacheSample", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var type = runtime.LoadFromStream(stream).GetType("SourceCacheRoot", throwOnError: true)!;
             for (var owner = 0; owner < ownerCount; owner++)
             {
@@ -65,7 +66,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
             Assert.That(inventory.Owners.Select(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.DiscoveryComplete)), Is.All.True);
         }
         var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
-            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken),
+            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(),
             null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {

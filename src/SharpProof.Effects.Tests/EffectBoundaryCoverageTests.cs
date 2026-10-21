@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -10,14 +11,19 @@ public sealed class EffectBoundaryCoverageTests
     {
         var first = EffectRegionSet.Create(EffectRegionId.Parameter(1));
         var second = EffectRegionSet.Create(EffectRegionId.Parameter(2));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            EffectRegionSet.Create(default(ImmutableArray<EffectRegionId>))));
+        Assert.That(EffectRegionSet.Create([EffectRegionId.Parameter(2), EffectRegionId.Parameter(1), EffectRegionId.Parameter(2)]).Regions,
+            Is.EqualTo(ImmutableArray.Create(EffectRegionId.Parameter(1), EffectRegionId.Parameter(2))));
         var union = first.Union(second);
-        Assert.That(union.Regions, Is.EqualTo(new[] { EffectRegionId.Parameter(1), EffectRegionId.Parameter(2) }));
+        Assert.That(union.Regions, Is.EqualTo(ImmutableArray.Create(EffectRegionId.Parameter(1), EffectRegionId.Parameter(2))));
         Assert.That(first.Union(EffectRegionSet.Empty), Is.EqualTo(first));
         Assert.That(EffectRegionSet.Empty.Union(first), Is.EqualTo(first));
         Assert.That(EffectRegionSet.Unknown.Union(first), Is.EqualTo(EffectRegionSet.Unknown));
         Assert.That(EffectRegionSet.Unknown.IsSubsetOf(first), Is.False);
-        Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)new[] { EffectRegionId.Unknown, EffectRegionId.Parameter(1) }), Is.EqualTo(EffectRegionSet.Unknown));
-        Assert.That(EffectRegionSet.Create(Array.Empty<EffectRegionId>()).IsEmpty, Is.True);
+        Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)ImmutableArray.Create(EffectRegionId.Unknown, EffectRegionId.Parameter(1))), Is.EqualTo(EffectRegionSet.Unknown));
+        Assert.That(EffectRegionSet.Create(ImmutableArray<EffectRegionId>.Empty).IsEmpty, Is.True);
+        Assert.That(EffectRegionSet.Create(ImmutableArray.Create(EffectRegionId.Parameter(1))), Is.EqualTo(first));
         Assert.That(EffectRegionSet.Create(new[] { EffectRegionId.Parameter(1) }), Is.EqualTo(first));
         Assert.That(((object)first).Equals(first), Is.True);
         Assert.That(((object)first).Equals(second), Is.False);
@@ -43,14 +49,14 @@ public sealed class EffectBoundaryCoverageTests
     [Test]
     public void SymbolOrderingHandlesNullEqualAndDistinctSourceSymbols()
     {
-        var first = TestCompilation.Create("Ordering", ("a.cs", "public class C { }")).GetTypeByMetadataName("C")!;
-        var second = TestCompilation.Create("Ordering", ("b.cs", "public class C { }")).GetTypeByMetadataName("C")!;
+        var first = TestCompilation.CreateExact("Ordering", [("a.cs", "public class C { }")]).GetTypeByMetadataName("C")!;
+        var second = TestCompilation.CreateExact("Ordering", [("b.cs", "public class C { }")]).GetTypeByMetadataName("C")!;
         var comparer = EffectSymbolComparer<INamedTypeSymbol>.Instance;
         Assert.That(comparer.Compare(first, first), Is.Zero);
         Assert.That(comparer.Compare(null, first), Is.LessThan(0));
         Assert.That(comparer.Compare(first, null), Is.GreaterThan(0));
         Assert.That(comparer.Compare(first, second), Is.LessThan(0));
-        var later = TestCompilation.Create("Ordering", ("a.cs", "public class D { } public class C { }")).GetTypeByMetadataName("C")!;
+        var later = TestCompilation.CreateExact("Ordering", [("a.cs", "public class D { } public class C { }")]).GetTypeByMetadataName("C")!;
         Assert.That(comparer.Compare(first, later), Is.LessThan(0));
         var methodType = TestCompilation.Create("MethodOrdering", "class C { void A() {} void B() {} }").GetTypeByMetadataName("C")!;
         Assert.That(EffectSymbolComparer<ISymbol>.Instance.Compare(methodType.GetMembers("A").Single(), methodType.GetMembers("B").Single()), Is.LessThan(0));
@@ -77,7 +83,7 @@ public sealed class EffectBoundaryCoverageTests
     public void InitializerProjectionRecognizesFieldsPropertiesAndAbsentInitializers()
     {
         var root = CSharpSyntaxTree.ParseText("class C { int f = 1; int g; int P { get; } = 2; }").GetRoot();
-        var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>().ToArray();
+        var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>().ToImmutableArray();
         Assert.That(EffectProjections.GetInitializerExpression(variables[0])!.ToString(), Is.EqualTo("1"));
         Assert.That(EffectProjections.GetInitializerExpression(variables[1]), Is.Null);
         Assert.That(EffectProjections.GetInitializerExpression(root.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single())!.ToString(), Is.EqualTo("2"));
@@ -201,7 +207,8 @@ public sealed class EffectBoundaryCoverageTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        var reference = MetadataReference.CreateFromImage(image.ToArray());
+        var emittedImage = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        var reference = MetadataReference.CreateFromImage(emittedImage);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.Unspecified), Is.False);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreRuntime), Is.True);
         Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack), Is.False);

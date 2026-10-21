@@ -20,14 +20,14 @@ internal static class NativeExceptionEffectVerifier
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
         var expected = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind is
-            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)).ToArray();
+            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)).ToImmutableArray();
         var results = ImmutableDictionary.CreateBuilder<string, PassiveCallableCheckResult>(StringComparer.Ordinal);
         if (expected.Length == 0)
         { return results.ToImmutable(); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         if (candidate == null)
         { return All(Unknown(WorkerClaimReason.UnsupportedBody)); }
-        var constraints = (preparation.Total?.ExceptionConstraints ?? []).ToDictionary(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (constraint.ClaimId), StringComparer.Ordinal);
+        var constraints = ImmutableDictionaryCapture.Create(preparation.Total?.ExceptionConstraints ?? [], constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (constraint.ClaimId), static constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : constraint, StringComparer.Ordinal);
         foreach (var claim in expected)
         {
             if (!constraints.ContainsKey(claim.ClaimId))
@@ -52,7 +52,7 @@ internal static class NativeExceptionEffectVerifier
             {
                 var allowed = constraints[claim.ClaimId].AllowedKinds.ToImmutableHashSet();
                 var anyThrowViolates = claim.ContractKind == WorkerEffectContractKind.DoesNotThrow;
-                var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToHashSet(StringComparer.Ordinal);
+                var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToImmutableHashSet(StringComparer.Ordinal);
                 var factory = candidate.Program.Factory;
                 results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, cancellationToken, anyThrowViolates,
                     site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),

@@ -17,9 +17,9 @@ function Get-SharpProofCleanFuzzSourceCommit {
         [string]$RepositoryRoot
     )
 
-    $headOutput = @(& git -C $RepositoryRoot rev-parse HEAD)
+    $headOutput = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git -C $RepositoryRoot rev-parse HEAD))
     $headExitCode = $LASTEXITCODE
-    $head = if ($headOutput.Count -eq 1) {
+    $head = if ($headOutput.Length -eq 1) {
         ([string]$headOutput[0]).Trim()
     }
     else {
@@ -28,9 +28,9 @@ function Get-SharpProofCleanFuzzSourceCommit {
     if ($headExitCode -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
         throw 'Unable to bind fuzz evidence to the exact source commit.'
     }
-    $dirty = @(& git -C $RepositoryRoot status `
-            --porcelain=v1 --untracked-files=all)
-    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
+    $dirty = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git -C $RepositoryRoot status `
+                --porcelain=v1 --untracked-files=all))
+    if ($LASTEXITCODE -ne 0 -or $dirty.Length -ne 0) {
         throw 'Fuzz evidence requires a clean repository source tree.'
     }
     return $head
@@ -88,8 +88,8 @@ function Get-SharpProofFuzzCampaignSchedule {
         -Value $RetainedCases -Name 'retainedCasesPerSeed'
     $maximumCaseCount = Assert-SharpProofFuzzCaseBudget `
         -Value $MaximumCases -Name 'maximumCampaignCases'
-    $retainedRunSeeds = [Collections.Generic.List[int]]::new()
-    $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+    $retainedRunSeeds = [Collections.Immutable.ImmutableArray]::CreateBuilder[int]()
+    $seenSeeds = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[int]()
     $sharedRetainedSeed = $false
     foreach ($seed in $RetainedSeeds) {
         if (-not $seenSeeds.Add($seed)) {
@@ -114,15 +114,15 @@ function Get-SharpProofFuzzCampaignSchedule {
         -RetainedRunCount $retainedRunSeeds.Count `
         -MaximumCases $maximumCaseCount
 
-    return [pscustomobject]@{
-        RotatingCases          = $scheduledRotatingCases
-        RequestedRotatingCases = $rotatingCaseCount
-        RetainedCasesPerSeed   = $retainedCaseCount
-        RetainedSeeds          = [int[]]$RetainedSeeds
-        RetainedRunSeeds       = $retainedRunSeeds.ToArray()
-        SharedRetainedSeed     = $sharedRetainedSeed
-        RequestedCases         = $requestedCases
-    }
+    return ([ordered]@{
+            RotatingCases          = $scheduledRotatingCases
+            RequestedRotatingCases = $rotatingCaseCount
+            RetainedCasesPerSeed   = $retainedCaseCount
+            RetainedSeeds          = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]$RetainedSeeds)
+            RetainedRunSeeds       = $retainedRunSeeds.ToImmutable()
+            SharedRetainedSeed     = $sharedRetainedSeed
+            RequestedCases         = $requestedCases
+        }).AsReadOnly()
 }
 
 function Read-SharpProofRetainedFuzzSeedManifest {
@@ -166,8 +166,8 @@ function Read-SharpProofRetainedFuzzSeedManifest {
         if ($seedValues.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
             throw 'Retained fuzz seeds must be an array.'
         }
-        $seeds = [Collections.Generic.List[int]]::new()
-        $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+        $seeds = [Collections.Immutable.ImmutableArray]::CreateBuilder[int]()
+        $seenSeeds = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[int]()
         $hasDuplicateSeed = $false
         foreach ($element in $seedValues.EnumerateArray()) {
             [int]$seed = 0
@@ -192,11 +192,11 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             & $AfterValidation $Path
         }
 
-        return [pscustomobject]@{
-            SchemaVersion = $schemaVersion
-            CasesPerSeed  = $casesPerSeed
-            Seeds         = @($seeds)
-        }
+        return ([ordered]@{
+                SchemaVersion = $schemaVersion
+                CasesPerSeed  = $casesPerSeed
+                Seeds         = $seeds.ToImmutable()
+            }).AsReadOnly()
     }
     finally {
         if ($null -ne $document) { $document.Dispose() }
@@ -211,8 +211,8 @@ function Get-SharpProofRetainedFuzzSeed {
     )
 
     $manifest = Read-SharpProofRetainedFuzzSeedManifest -Path $Path
-    $seeds = @($manifest.Seeds)
-    if ($seeds.Count -ne 1) {
+    $seeds = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]@($manifest.Seeds))
+    if ($seeds.Length -ne 1) {
         throw 'The acceptance fuzz run requires exactly one retained seed.'
     }
     return [int]$seeds[0]

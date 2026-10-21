@@ -154,12 +154,12 @@ internal static class FuzzRunner
     internal const int MaximumRetainedFailures = 64;
 
     internal static async Task<int> RunCliAsync(
-        string[] arguments,
+        ImmutableArray<string> arguments,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
         error = RepositoryParameterGuard.NotNull(error, nameof(error));
         output = RepositoryParameterGuard.NotNull(output, nameof(output));
         var log = new RepositoryLogger(output, error);
@@ -196,6 +196,51 @@ internal static class FuzzRunner
         }
     }
 
+    private readonly record struct GeneratedCaseEvaluation(
+        FuzzSourceCaseExecutor.NativeInput NativeInput,
+        FuzzOracleStatus SmtStatus,
+        FuzzOracleStatus PartialStatus)
+    {
+        public FuzzSourceCaseExecutor.NativeInput NativeInput { get; } =
+            NativeInput ?? throw new ArgumentNullException(nameof(NativeInput));
+    }
+
+    private readonly record struct ReplayedCaseEvaluation(
+        FiniteDomainDifferentialResult FiniteResult,
+        PartialTermSmtDifferentialResult PartialResult)
+    {
+        public FiniteDomainDifferentialResult FiniteResult { get; } =
+            FiniteResult ?? throw new ArgumentNullException(nameof(FiniteResult));
+        public PartialTermSmtDifferentialResult PartialResult { get; } =
+            PartialResult ?? throw new ArgumentNullException(nameof(PartialResult));
+    }
+
+    private static async Task<ImmutableArray<T>> RunIndexedAsync<T>(
+        int count, int maximumParallelism,
+        Func<int, CancellationToken, ValueTask<T>> execute, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(execute);
+        RepositoryParameterGuard.RequireInitialized(count < 0, nameof(count), "Value must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(maximumParallelism < 1, nameof(maximumParallelism), "Value must be initialized.");
+        var ordered = ImmutableArray.CreateBuilder<T>(count);
+        ordered.Count = count;
+        var gate = new object();
+        await Parallel.ForEachAsync(Enumerable.Range(0, count),
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = maximumParallelism,
+                CancellationToken = cancellationToken
+            },
+            async (index, token) =>
+            {
+                RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
+                var value = await execute(index, token).ConfigureAwait(false);
+                lock (gate)
+                { ordered[index] = value; }
+            }).ConfigureAwait(false);
+        return ordered.MoveToImmutable();
+    }
+
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
         CancellationToken cancellationToken)
@@ -220,21 +265,18 @@ internal static class FuzzRunner
                 "Maximum parallelism must be between 1 and " + FuzzOptions.MaximumAllowedParallelism.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
         }
 
-        var frontendCases = new GeneratedCSharpCase[options.Cases];
-        for (var index = 0; index < frontendCases.Length; index++)
+        var caseBuffer = ImmutableArray.CreateBuilder<GeneratedCSharpCase>(options.Cases);
+        for (var index = 0; index < options.Cases; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var caseSeed = CreateCaseSeed(options.Seed, index);
-            frontendCases[index] = new SmallCSharpCaseGenerator(
+            caseBuffer.Add(new SmallCSharpCaseGenerator(
                 unchecked(caseSeed ^ 0x35A1D7)).Next(
-                    maximumDepth: 4);
+                    maximumDepth: 4));
         }
-        var frontendResults =
-            new FrontendDifferentialResult[options.Cases];
-        var frontendStatuses = new FuzzOracleStatus[options.Cases];
-        var smtStatuses = new FuzzOracleStatus[options.Cases];
-        var partialStatuses = new FuzzOracleStatus[options.Cases];
-        var nativeInputs = new FuzzSourceCaseExecutor.NativeInput[options.Cases];
+        var frontendCases = caseBuffer.ToImmutable();
+        var frontendResultBuffer = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(options.Cases);
+        frontendResultBuffer.Count = options.Cases;
         for (var offset = 0;
              offset < frontendCases.Length;
              offset += FrontendCompilationBatchSize)
@@ -244,47 +286,39 @@ internal static class FuzzRunner
                 FrontendCompilationBatchSize,
                 frontendCases.Length - offset);
             var batchResults = FrontendDifferentialOracle.CompareBatch(
-                new ArraySegment<GeneratedCSharpCase>(
-                    frontendCases,
-                    offset,
-                    count),
-                cancellationToken);
-            batchResults.CopyTo(frontendResults, offset);
+                frontendCases.Slice(offset, count), cancellationToken);
+            for (var index = 0; index < batchResults.Length; index++)
+            { frontendResultBuffer[offset + index] = batchResults[index]; }
         }
+        var frontendResults = frontendResultBuffer.ToImmutable();
         var frontendCoverage = CreateFrontendCoverage(
-            frontendCases,
-            frontendResults);
+            frontendCases.AsSpan(),
+            frontendResults.AsSpan());
         var coverageSatisfied =
             options.Cases < PullRequestCoverageBudget ||
             HasRequiredFrontendCoverage(frontendCoverage);
-        var parallelOptions = new ParallelOptions
-        {
-            MaxDegreeOfParallelism = options.MaximumParallelism,
-            CancellationToken = cancellationToken
-        };
-
-        await Parallel.ForEachAsync(
-            Enumerable.Range(0, options.Cases),
-            parallelOptions,
+        var evaluations = await RunIndexedAsync<GeneratedCaseEvaluation>(
+            options.Cases, options.MaximumParallelism,
             async (index, token) =>
             {
                 RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
-
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
-
-                nativeInputs[index] = FuzzSourceCaseExecutor.NativeInput.Generated(caseSeed);
-                var comparison = nativeInputs[index].CreateComparison();
+                var nativeInput = FuzzSourceCaseExecutor.NativeInput.Generated(caseSeed);
+                var comparison = nativeInput.CreateComparison();
                 var smt = await comparison.CompareFiniteAsync(token).ConfigureAwait(false);
-                smtStatuses[index] = smt.Status;
                 var partial = await comparison.ComparePartialAsync(token).ConfigureAwait(false);
-                partialStatuses[index] = partial.Status;
-            });
+                return new GeneratedCaseEvaluation(nativeInput, smt.Status, partial.Status);
+            }, cancellationToken);
+        var nativeInputs = evaluations.Select(static result => result.NativeInput).ToImmutableArray();
+        var smtStatuses = evaluations.Select(static result => result.SmtStatus).ToImmutableArray();
+        var partialStatuses = evaluations.Select(static result => result.PartialStatus).ToImmutableArray();
 
-        var (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures) =
+        var (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, retainedFailures) =
             await CompleteCaseStageAsync(options, frontendCases, frontendResults,
-                frontendStatuses, smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
-
+                smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
+        var failures = ImmutableArray.CreateBuilder<FuzzFailure>();
+        failures.AddRange(retainedFailures);
         var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
         failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
         coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
@@ -305,82 +339,80 @@ internal static class FuzzRunner
             totalPrograms.Coverage,
             metadataPrograms.Coverage,
             coverageSatisfied,
-            [.. failures]);
+            failures.ToImmutable());
     }
 
     internal static async Task<FuzzSourceCampaignResult> ReplaySourceCasesAsync(
-        IReadOnlyList<FuzzSourceCampaignCase> sourceCases,
+        ImmutableArray<FuzzSourceCampaignCase> sourceCases,
         CancellationToken cancellationToken, int seed = FuzzOptions.DefaultSeed)
     {
-        ArgumentNullException.ThrowIfNull(sourceCases);
-        var sources = sourceCases.Select(source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (new FuzzSourceCampaignCase(
-            source.Frontend, source.FiniteMembers, source.FiniteArguments.ToArray(),
-            source.PartialMembers, source.PartialScenarios.Select(arguments =>
-                arguments is null ? throw new System.ArgumentNullException(nameof(arguments)) : ((IReadOnlyList<object?>)arguments.ToArray())).ToArray()))).ToArray();
+        if (sourceCases.IsDefault)
+        { throw new ArgumentNullException(nameof(sourceCases)); }
+        var sources = sourceCases.Select(source => source is null ? throw new ArgumentNullException(nameof(source)) : new FuzzSourceCampaignCase(
+            source.Frontend, source.FiniteMembers, source.FiniteArguments,
+            source.PartialMembers, source.PartialScenarios)).ToImmutableArray();
         var options = new FuzzOptions(sources.Length, seed, FuzzOptions.DefaultMaximumParallelism);
-        var nativeInputs = sources.Select(FuzzSourceCaseExecutor.NativeInput.Source).ToArray();
-        var frontendCases = sources.Select(source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (source.Frontend)).ToArray();
-        var frontendResults = new FrontendDifferentialResult[sources.Length];
-        var finiteResults = new FiniteDomainDifferentialResult[sources.Length];
-        var partialResults = new PartialTermSmtDifferentialResult[sources.Length];
-        var frontendStatuses = new FuzzOracleStatus[sources.Length];
-        var smtStatuses = new FuzzOracleStatus[sources.Length];
-        var partialStatuses = new FuzzOracleStatus[sources.Length];
+        var nativeInputs = sources.Select(FuzzSourceCaseExecutor.NativeInput.Source).ToImmutableArray();
+        var frontendCases = sources.Select(source => source is null ? throw new ArgumentNullException(nameof(source)) : source.Frontend).ToImmutableArray();
+        var frontendResultBuffer = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(sources.Length);
+        frontendResultBuffer.Count = sources.Length;
         for (var offset = 0; offset < frontendCases.Length; offset += FrontendCompilationBatchSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(FrontendCompilationBatchSize, frontendCases.Length - offset);
             var results = FrontendDifferentialOracle.CompareBatch(
-                new ArraySegment<GeneratedCSharpCase>(frontendCases, offset, count), cancellationToken);
-            results.CopyTo(frontendResults, offset);
+                frontendCases.Slice(offset, count), cancellationToken);
+            for (var index = 0; index < results.Length; index++)
+            { frontendResultBuffer[offset + index] = results[index]; }
         }
-        await Parallel.ForEachAsync(Enumerable.Range(0, sources.Length),
-            new ParallelOptions { MaxDegreeOfParallelism = options.MaximumParallelism, CancellationToken = cancellationToken },
+        var frontendResults = frontendResultBuffer.ToImmutable();
+        var evaluations = await RunIndexedAsync<ReplayedCaseEvaluation>(
+            sources.Length, options.MaximumParallelism,
             async (index, token) =>
             {
                 RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
-
                 token.ThrowIfCancellationRequested();
                 var comparison = nativeInputs[index].CreateComparison();
                 var finite = await comparison.CompareFiniteAsync(token).ConfigureAwait(false);
-                finiteResults[index] = finite;
-                smtStatuses[index] = finite.Status;
                 var partial = await comparison.ComparePartialAsync(token).ConfigureAwait(false);
-                partialResults[index] = partial;
-                partialStatuses[index] = partial.Status;
-            }).ConfigureAwait(false);
+                return new ReplayedCaseEvaluation(finite, partial);
+            }, cancellationToken).ConfigureAwait(false);
+        var finiteResults = evaluations.Select(static result => result.FiniteResult).ToImmutableArray();
+        var partialResults = evaluations.Select(static result => result.PartialResult).ToImmutableArray();
+        var smtStatuses = finiteResults.Select(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Status).ToImmutableArray();
+        var partialStatuses = partialResults.Select(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Status).ToImmutableArray();
         var completed = await CompleteCaseStageAsync(options, frontendCases, frontendResults,
-            frontendStatuses, smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
+            smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
         return new FuzzSourceCampaignResult(sources.Length, seed, completed.Agreements, completed.Abstentions,
             completed.FrontendAgreements, completed.SmtAgreements, completed.PartialSmtAgreements,
-            [.. completed.Failures], [.. frontendResults], [.. finiteResults], [.. partialResults]);
+            completed.Failures, frontendResults, finiteResults, partialResults);
     }
 
     private static async Task<(int Agreements, int Abstentions, int FrontendAgreements,
-        int SmtAgreements, int PartialSmtAgreements, List<FuzzFailure> Failures)> CompleteCaseStageAsync(
-        FuzzOptions options, GeneratedCSharpCase[] frontendCases, FrontendDifferentialResult[] frontendResults,
-        FuzzOracleStatus[] frontendStatuses, FuzzOracleStatus[] smtStatuses, FuzzOracleStatus[] partialStatuses,
-        FuzzSourceCaseExecutor.NativeInput[] nativeInputs, CancellationToken cancellationToken)
+        int SmtAgreements, int PartialSmtAgreements, ImmutableArray<FuzzFailure> Failures)> CompleteCaseStageAsync(
+        FuzzOptions options, ImmutableArray<GeneratedCSharpCase> frontendCases, ImmutableArray<FrontendDifferentialResult> frontendResults,
+        ImmutableArray<FuzzOracleStatus> smtStatuses, ImmutableArray<FuzzOracleStatus> partialStatuses,
+        ImmutableArray<FuzzSourceCaseExecutor.NativeInput> nativeInputs, CancellationToken cancellationToken)
     {
-        frontendCases = RepositoryParameterGuard.NotNull(frontendCases, nameof(frontendCases));
-        frontendResults = RepositoryParameterGuard.NotNull(frontendResults, nameof(frontendResults));
-        frontendStatuses = RepositoryParameterGuard.NotNull(frontendStatuses, nameof(frontendStatuses));
-        nativeInputs = RepositoryParameterGuard.NotNull(nativeInputs, nameof(nativeInputs));
-        partialStatuses = RepositoryParameterGuard.NotNull(partialStatuses, nameof(partialStatuses));
-        smtStatuses = RepositoryParameterGuard.NotNull(smtStatuses, nameof(smtStatuses));
+        RepositoryParameterGuard.ThrowIfInvalid(frontendCases.IsDefault, nameof(frontendCases));
+        RepositoryParameterGuard.ThrowIfInvalid(frontendResults.IsDefault, nameof(frontendResults));
+        RepositoryParameterGuard.ThrowIfInvalid(nativeInputs.IsDefault, nameof(nativeInputs));
+        RepositoryParameterGuard.ThrowIfInvalid(partialStatuses.IsDefault, nameof(partialStatuses));
+        RepositoryParameterGuard.ThrowIfInvalid(smtStatuses.IsDefault, nameof(smtStatuses));
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
         var agreements = 0;
         var abstentions = 0;
         var frontendAgreements = 0;
         var smtAgreements = 0;
         var partialSmtAgreements = 0;
+        var frontendStatuses = ImmutableArray.CreateBuilder<FuzzOracleStatus>(options.Cases);
         for (var index = 0; index < options.Cases; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var frontendStatus = frontendResults[index].Status;
             var smtStatus = smtStatuses[index];
             var partialStatus = partialStatuses[index];
-            frontendStatuses[index] = frontendStatus;
+            frontendStatuses.Add(frontendStatus);
             if (frontendStatus == FuzzOracleStatus.Agreement)
             {
                 frontendAgreements++;
@@ -410,10 +442,10 @@ internal static class FuzzRunner
         }
 
         var failureKeys = SelectFailureKeys(
-            frontendStatuses,
+            frontendStatuses.ToImmutable(),
             smtStatuses,
             partialStatuses);
-        var failures = new List<FuzzFailure>(failureKeys.Length);
+        var failures = ImmutableArray.CreateBuilder<FuzzFailure>(failureKeys.Length);
         foreach (var failureKey in failureKeys)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -440,15 +472,21 @@ internal static class FuzzRunner
             }
         }
 
-        return (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures);
+        return (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures.ToImmutable());
     }
 
     internal static ImmutableArray<FuzzFailureKey> SelectFailureKeys(
-        IReadOnlyList<FuzzOracleStatus> frontend,
-        IReadOnlyList<FuzzOracleStatus> smt,
-        IReadOnlyList<FuzzOracleStatus> partial)
+        ImmutableArray<FuzzOracleStatus> frontend,
+        ImmutableArray<FuzzOracleStatus> smt,
+        ImmutableArray<FuzzOracleStatus> partial)
     {
-        if (frontend.Count != smt.Count || smt.Count != partial.Count)
+        if (frontend.IsDefault)
+        { throw new ArgumentNullException(nameof(frontend)); }
+        if (smt.IsDefault)
+        { throw new ArgumentNullException(nameof(smt)); }
+        if (partial.IsDefault)
+        { throw new ArgumentNullException(nameof(partial)); }
+        if (frontend.Length != smt.Length || smt.Length != partial.Length)
         {
             throw new ArgumentException(
                 "Fuzz oracle status collections must have equal lengths.");
@@ -456,7 +494,7 @@ internal static class FuzzRunner
 
         var keys = ImmutableArray.CreateBuilder<FuzzFailureKey>(
             MaximumRetainedFailures);
-        for (var index = 0; index < frontend.Count; index++)
+        for (var index = 0; index < frontend.Length; index++)
         {
             Add(index, "finite-domain-smt", smt[index] != FuzzOracleStatus.Agreement);
             Add(index, "frontend", frontend[index] != FuzzOracleStatus.Agreement);
@@ -513,11 +551,9 @@ internal static class FuzzRunner
     }
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(
-        IReadOnlyList<GeneratedCSharpCase> cases,
-        IReadOnlyList<FrontendDifferentialResult> results)
+        ReadOnlySpan<GeneratedCSharpCase> cases /* SPINT001: all values valid - default and empty spans represent zero generated cases */,
+        ReadOnlySpan<FrontendDifferentialResult> results /* SPINT001: all values valid - default and empty spans represent zero oracle observations */)
     {
-        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        results = RepositoryParameterGuard.NotNull(results, nameof(results));
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;

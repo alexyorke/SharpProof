@@ -47,61 +47,64 @@ internal sealed partial class WorkerTests
         for (var mutation = 0; mutation < 21; mutation++)
         {
             var evidence = JsonSerializer.Deserialize<WorkerResourceExpectedEvidence>(payload, WorkerProtocolJson.Options)!;
-            bound.Expected = evidence;
             claim.ProofCore = core;
             switch (mutation)
             {
                 case 0:
-                    evidence.Model = "foreign";
+                    evidence = evidence with { Model = "foreign" };
                     break;
                 case 1:
-                    evidence.InputOrdinal = -1;
+                    evidence = evidence with { InputOrdinal = -1 };
                     break;
                 case 2:
-                    evidence.InputName = "";
+                    evidence = evidence with { InputName = "" };
                     break;
                 case 3:
-                    evidence.InputName = new string((char)10, 1);
+                    evidence = evidence with { InputName = new string((char)10, 1) };
                     break;
                 case 4:
-                    evidence.TrueWeight = -1;
+                    evidence = evidence with { TrueWeight = -1 };
                     break;
                 case 5:
-                    evidence.TrueWeight = 0;
-                    evidence.FalseWeight = 0;
+                    evidence = evidence with { TrueWeight = 0 };
+                    evidence = evidence with { FalseWeight = 0 };
                     break;
                 case 6:
-                    evidence.FalseWeight = 1000001;
+                    evidence = evidence with { FalseWeight = 1000001 };
                     break;
                 case 7:
-                    evidence.UpperBound = "";
+                    evidence = evidence with { UpperBound = "" };
                     break;
                 case 8:
-                    evidence.FalseUpperBound = null;
+                    evidence = evidence with { FalseUpperBound = null };
                     break;
                 case 9:
-                    evidence.TrueUpperBound = new string((char)10, 1);
+                    evidence = evidence with { TrueUpperBound = new string((char)10, 1) };
                     break;
                 case 10:
-                    evidence.UnknownReason = "unknown";
+                    evidence = evidence with { UnknownReason = "unknown" };
                     break;
                 case 11:
                     claim.ProofCore = [.. core.Where(item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-input-model:", StringComparison.Ordinal))];
                     break;
                 case 12:
-                    bound.Expected = null;
+                    bound = bound with { Expected = null };
                     break;
                 case 13:
-                    evidence.UpperBound = new string('n', 16385);
+                    evidence = evidence with { UpperBound = new string('n', 16385) };
                     break;
                 default:
-                    evidence.InputName = new string('n', 257);
+                    evidence = evidence with { InputName = new string('n', 257) };
                     break;
             }
+            if (mutation != 12)
+            { bound = bound with { Expected = evidence }; }
+            second = second with { ClaimResults = [claim with { ResourceBound = bound }] };
             Assert.That(Valid(), Is.False, "mutation " + mutation);
         }
-        bound.Expected = original;
+        bound = bound with { Expected = original };
         claim.ProofCore = core;
+        second = second with { ClaimResults = [claim with { ResourceBound = bound }] };
         Assert.That(Valid(), Is.True);
     }
 
@@ -136,54 +139,57 @@ internal sealed partial class WorkerTests
         for (var mutation = 0; mutation < 13; mutation++)
         {
             var evidence = JsonSerializer.Deserialize<WorkerResourceAccountingEvidence>(payload, WorkerProtocolJson.Options)!;
-            bound.Accounting = [evidence];
             claim.ProofCore = core;
             switch (mutation)
             {
                 case 0:
-                    evidence.Model = "foreign";
+                    evidence = evidence with { Model = "foreign" };
                     break;
                 case 1:
-                    evidence.InitialCredit = "-1";
+                    evidence = evidence with { InitialCredit = "-1" };
                     break;
                 case 2:
-                    evidence.InitialCredit = "00";
+                    evidence = evidence with { InitialCredit = "00" };
                     break;
                 case 3:
-                    evidence.DepositPerIteration = "0";
+                    evidence = evidence with { DepositPerIteration = "0" };
                     break;
                 case 4:
-                    evidence.DepositPerIteration = "x";
+                    evidence = evidence with { DepositPerIteration = "x" };
                     break;
                 case 5:
-                    evidence.CounterWidth = 16;
+                    evidence = evidence with { CounterWidth = 16 };
                     break;
                 case 6:
-                    evidence.InitialCredit = "2147483648";
+                    evidence = evidence with { InitialCredit = "2147483648" };
                     break;
                 case 7:
-                    evidence.MaximumSpend = "";
+                    evidence = evidence with { MaximumSpend = "" };
                     break;
                 case 8:
-                    evidence.MaximumSpend = new string((char)10, 1);
+                    evidence = evidence with { MaximumSpend = new string((char)10, 1) };
                     break;
                 case 9:
-                    evidence.MaximumSpend = new string('n', 16385);
+                    evidence = evidence with { MaximumSpend = new string('n', 16385) };
                     break;
                 case 10:
-                    bound.Accounting = [];
+                    bound = bound with { Accounting = [] };
                     break;
                 case 11:
-                    bound.Accounting = Enumerable.Repeat(evidence, 17).ToArray();
+                    bound = bound with { Accounting = Enumerable.Repeat(evidence, 17).ToArray() };
                     break;
                 default:
                     claim.ProofCore = [];
                     break;
             }
+            if (mutation is not (10 or 11))
+            { bound = bound with { Accounting = [evidence] }; }
+            second = second with { ClaimResults = [claim with { ResourceBound = bound }] };
             Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False, "mutation " + mutation);
         }
         claim.ProofCore = core;
-        bound.Accounting = [original];
+        bound = bound with { Accounting = [original] };
+        second = second with { ClaimResults = [claim with { ResourceBound = bound }] };
         Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.True);
     }
 
@@ -232,66 +238,70 @@ internal sealed partial class WorkerTests
         for (var mutation = 0; mutation < 17; mutation++)
         {
             var parent = JsonSerializer.Deserialize<WorkerResourceAsymptoticEvidence>(payload, WorkerProtocolJson.Options)!;
-            bound.Asymptotic = parent;
             var lower = parent.Lower!;
             switch (mutation)
             {
                 case 0:
-                    parent.Lower = null;
+                    parent = parent with { Lower = null };
                     break;
                 case 1:
-                    lower.Model = "foreign";
+                    lower = lower with { Model = "foreign" };
                     break;
                 case 2:
-                    lower.InferredBound = null;
+                    lower = lower with { InferredBound = null };
                     break;
                 case 3:
-                    lower.LowerBound = "Theta(n^2)";
+                    lower = lower with { LowerBound = "Theta(n^2)" };
                     break;
                 case 4:
-                    lower.TightBound = null;
+                    lower = lower with { TightBound = null };
                     break;
                 case 5:
-                    lower.Growth = null;
+                    lower = lower with { Growth = null };
                     break;
                 case 6:
-                    lower.Growth!.Lower = lower;
+                    lower = lower with { Growth = lower.Growth! with { Lower = lower } };
                     break;
                 case 7:
-                    lower.Growth!.IsZero = true;
+                    lower = lower with { Growth = lower.Growth! with { IsZero = true } };
                     break;
                 case 8:
-                    lower.Growth!.PolynomialDegree = 3;
-                    lower.Growth.UpperBound = "O(n^3)";
+                    lower = lower with { Growth = lower.Growth! with { PolynomialDegree = 3 } };
+                    lower = lower with { Growth = lower.Growth! with { UpperBound = "O(n^3)" } };
                     break;
                 case 9:
-                    lower.Growth!.InputOrdinal = 1;
+                    lower = lower with { Growth = lower.Growth! with { InputOrdinal = 1 } };
                     break;
                 case 10:
-                    lower.UnknownReason = "contradictory";
+                    lower = lower with { UnknownReason = "contradictory" };
                     break;
                 case 11:
-                    lower.Growth!.UnknownReason = "unproved";
+                    lower = lower with { Growth = lower.Growth! with { UnknownReason = "unproved" } };
                     break;
                 case 12:
-                    lower.Growth!.LogarithmicDegree = null;
+                    lower = lower with { Growth = lower.Growth! with { LogarithmicDegree = null } };
                     break;
                 case 13:
-                    lower.InferredBound = new string((char)10, 1);
+                    lower = lower with { InferredBound = new string((char)10, 1) };
                     break;
                 case 14:
-                    lower.TightBound = "Theta(1)";
+                    lower = lower with { TightBound = "Theta(1)" };
                     break;
                 case 15:
-                    lower.Growth!.Model = "foreign";
+                    lower = lower with { Growth = lower.Growth! with { Model = "foreign" } };
                     break;
                 default:
-                    lower.TightUnknownReason = "unproved";
+                    lower = lower with { TightUnknownReason = "unproved" };
                     break;
             }
+            if (mutation != 0)
+            { parent = parent with { Lower = lower }; }
+            bound = bound with { Asymptotic = parent };
+            response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False, "mutation " + mutation);
         }
-        bound.Asymptotic = original;
+        bound = bound with { Asymptotic = original };
+        response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -343,72 +353,75 @@ internal sealed partial class WorkerTests
         for (var mutation = 0; mutation < 19; mutation++)
         {
             var growth = JsonSerializer.Deserialize<WorkerResourceAsymptoticEvidence>(payload, WorkerProtocolJson.Options)!;
-            bound.Asymptotic = growth;
             switch (mutation)
             {
                 case 0:
-                    bound.Asymptotic = null;
+                    bound = bound with { Asymptotic = null };
                     break;
                 case 1:
-                    growth.Model = "unowned";
+                    growth = growth with { Model = "unowned" };
                     break;
                 case 2:
-                    growth.PolynomialDegree = -1;
+                    growth = growth with { PolynomialDegree = -1 };
                     break;
                 case 3:
-                    growth.LogarithmicDegree = WorkerResourceModels.MaximumAsymptoticDegree + 1;
+                    growth = growth with { LogarithmicDegree = WorkerResourceModels.MaximumAsymptoticDegree + 1 };
                     break;
                 case 4:
-                    growth.IsZero = true;
+                    growth = growth with { IsZero = true };
                     break;
                 case 5:
-                    growth.UpperBound = "Theta(n^2)";
+                    growth = growth with { UpperBound = "Theta(n^2)" };
                     break;
                 case 6:
-                    growth.InputOrdinal = null;
+                    growth = growth with { InputOrdinal = null };
                     break;
                 case 7:
-                    growth.InputKind = null;
+                    growth = growth with { InputKind = null };
                     break;
                 case 8:
-                    growth.InputName = null;
+                    growth = growth with { InputName = null };
                     break;
                 case 9:
-                    growth.UnknownReason = "contradictory";
+                    growth = growth with { UnknownReason = "contradictory" };
                     break;
                 case 10:
-                    growth.InputName = new string((char)10, 1);
+                    growth = growth with { InputName = new string((char)10, 1) };
                     break;
                 case 11:
-                    growth.InputOrdinal = -1;
+                    growth = growth with { InputOrdinal = -1 };
                     break;
                 case 12:
-                    growth.InputOrdinal = null;
-                    growth.InputKind = null;
-                    growth.InputName = null;
+                    growth = growth with { InputOrdinal = null };
+                    growth = growth with { InputKind = null };
+                    growth = growth with { InputName = null };
                     break;
                 case 13:
-                    growth.IsZero = null;
+                    growth = growth with { IsZero = null };
                     break;
                 case 14:
-                    growth.PolynomialDegree = null;
+                    growth = growth with { PolynomialDegree = null };
                     break;
                 case 15:
-                    growth.UpperBound = null;
+                    growth = growth with { UpperBound = null };
                     break;
                 case 16:
-                    growth.InputKind = "Unspecified";
+                    growth = growth with { InputKind = "Unspecified" };
                     break;
                 case 17:
-                    growth.InputName = new string('x', 16385);
+                    growth = growth with { InputName = new string('x', 16385) };
                     break;
                 default:
-                    growth.UpperBound = "O(n)";
+                    growth = growth with { UpperBound = "O(n)" };
                     break;
             }
+            if (mutation != 0)
+            { bound = bound with { Asymptotic = growth }; }
+            response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False, "mutation " + mutation);
         }
-        bound.Asymptotic = original;
+        bound = bound with { Asymptotic = original };
+        response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -428,37 +441,39 @@ internal sealed partial class WorkerTests
         for (var mutation = 0; mutation < 8; mutation++)
         {
             var growth = JsonSerializer.Deserialize<WorkerResourceAsymptoticEvidence>(payload, WorkerProtocolJson.Options)!;
-            bound.Asymptotic = growth;
             switch (mutation)
             {
                 case 0:
-                    growth.UnknownReason = "";
+                    growth = growth with { UnknownReason = "" };
                     break;
                 case 1:
-                    growth.PolynomialDegree = 0;
+                    growth = growth with { PolynomialDegree = 0 };
                     break;
                 case 2:
-                    growth.InputOrdinal = 0;
+                    growth = growth with { InputOrdinal = 0 };
                     break;
                 case 3:
-                    growth.UpperBound = "O(1)";
+                    growth = growth with { UpperBound = "O(1)" };
                     break;
                 case 4:
-                    growth.IsZero = false;
+                    growth = growth with { IsZero = false };
                     break;
                 case 5:
-                    growth.Model = "unowned";
+                    growth = growth with { Model = "unowned" };
                     break;
                 case 6:
-                    growth.UnknownReason = new string((char)10, 1);
+                    growth = growth with { UnknownReason = new string((char)10, 1) };
                     break;
                 default:
-                    growth.UnknownReason = new string('x', 257);
+                    growth = growth with { UnknownReason = new string('x', 257) };
                     break;
             }
+            bound = bound with { Asymptotic = growth };
+            response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False, "mutation " + mutation);
         }
-        bound.Asymptotic = original;
+        bound = bound with { Asymptotic = original };
+        response = response with { ClaimResults = [response.ClaimResults.Single() with { ResourceBound = bound }] };
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 

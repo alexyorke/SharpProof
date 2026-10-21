@@ -384,7 +384,7 @@ public sealed class CancellationFlowAnalyzerTests
             Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.DroppedTokenId)));
     }
 
-    private static async Task<Diagnostic[]> Analyze(string source,
+    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source,
         string filePath = "input.cs", string? assemblyName = null, bool isExe = false)
     {
         System.ArgumentNullException.ThrowIfNull(filePath);
@@ -398,7 +398,7 @@ public sealed class CancellationFlowAnalyzerTests
         {
             compilation = compilation.WithAssemblyName(assemblyName);
         }
-        return (await compilation.WithAnalyzers([new CancellationFlowAnalyzer()])
-            .GetAnalyzerDiagnosticsAsync()).ToArray();
+        return await compilation.WithAnalyzers([new CancellationFlowAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync();
     }
 }

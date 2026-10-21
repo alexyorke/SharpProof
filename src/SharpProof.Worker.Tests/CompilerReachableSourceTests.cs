@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -92,7 +93,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(shared.Graph, Is.Not.Null);
         Assert.That(PortableIrGraphCodec.Decode(shared.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Program, Is.Not.Null);
         Assert.That(graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId != shared.BodyId)).All(body =>
-            body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
+            body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(ImmutableArray.Create(shared.BodyId)) && body.Graph != null && body.IsCallSkeleton &&
             body.SourceCalls.Single().CalleeBodyId == shared.BodyId)), Is.True);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -167,7 +168,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
         Assert.That(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Local", StringComparison.Ordinal))).Callees,
-            Is.EqualTo(new[] { graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Helper", StringComparison.Ordinal))).BodyId }));
+            Is.EqualTo(ImmutableArray.Create(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Helper", StringComparison.Ordinal))).BodyId)));
     }
 
     [TestCase("public static int Root() => P; static int P => 1;")]
@@ -302,36 +303,76 @@ public sealed class CompilerReachableSourceTests
         switch (mutation)
         {
             case "missing":
-                graph.Bodies = graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body != leaf)).ToArray();
+                {
+                    graph = graph with { Bodies = graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body != leaf)).ToImmutableArray() };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "duplicate":
-                graph.Bodies = [.. graph.Bodies, leaf];
+                {
+                    graph = graph with { Bodies = [.. graph.Bodies, leaf] };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "identity":
-                leaf.BodyId = "wrong";
+                {
+                    leaf = leaf with { BodyId = "wrong" };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "root":
-                graph.Roots[0].CallableId = "wrong";
+                {
+                    graph = graph with { Roots = graph.Roots.SetItem(0, graph.Roots[0] with { CallableId = "wrong" }) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "root-swap":
-                (graph.Roots[0].BodyId, graph.Roots[1].BodyId) =
-                    (graph.Roots[1].BodyId, graph.Roots[0].BodyId);
+                {
+                    var changedFixture = (graph.Roots[1].BodyId, graph.Roots[0].BodyId);
+                    graph = graph with { Roots = graph.Roots.SetItem(0, graph.Roots[0] with { BodyId = changedFixture.Item1 }) };
+                    artifact = artifact with { ReachableSource = graph };
+                    graph = graph with { Roots = graph.Roots.SetItem(1, graph.Roots[1] with { BodyId = changedFixture.Item2 }) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "edge":
-                leaf.Callees = ["wrong"];
+                {
+                    leaf = leaf with { Callees = ["wrong"] };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "graph":
-                leaf.Graph!.Semantics = IrExecutionSemantics.Legacy;
+                {
+                    leaf = leaf with { Graph = leaf.Graph! with { Semantics = IrExecutionSemantics.Legacy } };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "location":
-                leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!.Document = "wrong.cs";
+                {
+                    leaf = leaf with { Graph = leaf.Graph!.ReplaceRow(leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!, leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan! with { Document = "wrong.cs" }) };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "document":
-                graph.Documents[0].MaximumBodyEnd = 0;
+                {
+                    graph = graph with { Documents = graph.Documents.SetItem(0, graph.Documents[0] with { MaximumBodyEnd = 0 }) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "unreachable":
                 foreach (var body in graph.Bodies)
-                { body.Callees = []; }
+                {
+                    {
+                        {
+                            graph = graph with { Bodies = graph.Bodies.ReplaceReference(body, body with { Callees = [] }) };
+                            artifact = artifact with { ReachableSource = graph };
+                        }
+                    }
+                }
                 break;
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
@@ -358,32 +399,72 @@ public sealed class CompilerReachableSourceTests
         switch (mutation)
         {
             case "missing":
-                caller.SourceCalls = [];
+                {
+                    caller = caller with { SourceCalls = [] };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "duplicate":
-                caller.SourceCalls = [caller.SourceCalls[0], caller.SourceCalls[0]];
+                {
+                    caller = caller with { SourceCalls = [caller.SourceCalls[0], caller.SourceCalls[0]] };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "index":
-                caller.SourceCalls[0].InstructionIndex = 0;
+                {
+                    caller = caller with { SourceCalls = caller.SourceCalls.SetItem(0, caller.SourceCalls[0] with { InstructionIndex = 0 }) };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "callee":
-                caller.SourceCalls[0].CalleeBodyId = caller.BodyId;
-                caller.Callees = [caller.BodyId];
+                {
+                    caller = caller with { SourceCalls = caller.SourceCalls.SetItem(0, caller.SourceCalls[0] with { CalleeBodyId = caller.BodyId }) };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
+                {
+                    caller = caller with { Callees = [caller.BodyId] };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "signature":
-                callee.ParameterTypes[0] = "wrong";
+                {
+                    callee = callee with { ParameterTypes = callee.ParameterTypes.SetItem(0, "wrong") };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId == caller.SourceCalls[0].CalleeBodyId)), callee) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "return":
-                callee.ReturnType = null;
+                {
+                    callee = callee with { ReturnType = null };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId == caller.SourceCalls[0].CalleeBodyId)), callee) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "static":
-                callee.IsStatic = false;
+                {
+                    callee = callee with { IsStatic = false };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId == caller.SourceCalls[0].CalleeBodyId)), callee) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "identity":
-                callee.CallIdentity = "wrong";
+                {
+                    callee = callee with { CallIdentity = "wrong" };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId == caller.SourceCalls[0].CalleeBodyId)), callee) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
             case "marker":
-                caller.IsCallSkeleton = false;
+                {
+                    caller = caller with { IsCallSkeleton = false };
+                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)), caller) };
+                    artifact = artifact with { ReachableSource = graph };
+                }
                 break;
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(

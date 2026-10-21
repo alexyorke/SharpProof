@@ -10,7 +10,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class MetadataValueProjectionAdditionalMatrixTests
 {
-    private static readonly (SpecialType Type, int Width, bool Signed)[] IntegerDomains =
+    private static readonly ImmutableArray<(SpecialType Type, int Width, bool Signed)> IntegerDomains =
     [
         (SpecialType.System_SByte, 8, true),
         (SpecialType.System_Byte, 8, false),
@@ -23,7 +23,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         (SpecialType.System_Char, 16, false)
     ];
 
-    private static readonly long[][] IntegerBoundarySamples =
+    private static readonly ImmutableArray<ImmutableArray<long>> IntegerBoundarySamples =
     [
         [-128L, -1L, 0L, 1L, 127L],
         [0L, 1L, 2L, 255L],
@@ -36,9 +36,9 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         [0L, 1L, 2L, char.MaxValue]
     ];
 
-    private static readonly int[] LongBoundParameterOrdinals = [0, 1, 2, 3, 4];
-    private static readonly int[] ReferenceParameterOrdinals = [0, 1, 2];
-    private static readonly IrTypeKind[] ReferenceValueKinds =
+    private static readonly ImmutableArray<int> LongBoundParameterOrdinals = [0, 1, 2, 3, 4];
+    private static readonly ImmutableArray<int> ReferenceParameterOrdinals = [0, 1, 2];
+    private static readonly ImmutableArray<IrTypeKind> ReferenceValueKinds =
         [IrTypeKind.String, IrTypeKind.Sequence, IrTypeKind.Reference];
 
     private const string MetadataLibrarySource = """
@@ -120,10 +120,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
             foreach (var sample in IntegerBoundarySamples[parameterIndex])
             {
-                var environment = new Dictionary<IrVarId, IrValue>
-                {
-                    [entry] = factory.CreateIntegerValue(input.Type, sample)
-                };
+                var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(input.Type, sample));
                 var expectedPositive = sample > 0;
                 var expectedInRange = sample >= -1L && sample <= 1L;
                 var positiveClause = projected.Clauses[parameterIndex * 2];
@@ -163,7 +160,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         Assert.That(result.Clauses[3].Validation.Minimum, Is.EqualTo(long.MaxValue));
         Assert.That(result.Clauses[4].Validation.Maximum, Is.EqualTo(long.MinValue));
 
-        long[][] sampleValues =
+        ImmutableArray<ImmutableArray<long>> sampleValues =
         [
             [-128L, 0L, 127L],
             [0L, 1L, uint.MaxValue],
@@ -171,7 +168,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
             [0L, int.MaxValue],
             [0L, uint.MaxValue]
         ];
-        bool[][] expectedValues =
+        ImmutableArray<ImmutableArray<bool>> expectedValues =
         [
             [true, true, true],
             [true, true, true],
@@ -185,11 +182,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
             var input = factory.Variable(context.Parameters[parameterIndex].Entry);
             for (var sampleIndex = 0; sampleIndex < sampleValues[parameterIndex].Length; sampleIndex++)
             {
-                var environment = new Dictionary<IrVarId, IrValue>
-                {
-                    [context.Parameters[parameterIndex].Entry] = factory.CreateIntegerValue(
-                        input.Type, sampleValues[parameterIndex][sampleIndex])
-                };
+                var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[parameterIndex].Entry, factory.CreateIntegerValue(
+                        input.Type, sampleValues[parameterIndex][sampleIndex]));
                 Assert.That(interpreter.Evaluate(result.Clauses[parameterIndex].Value, environment).Value!.Boolean,
                     Is.EqualTo(expectedValues[parameterIndex][sampleIndex]));
             }
@@ -198,11 +192,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var ulongEntry = context.Parameters[2].Entry;
         var ulongType = factory.Variable(ulongEntry).Type;
         var maximumUlong = interpreter.Evaluate(
-            factory.Integer(ulongType, ulong.MaxValue), new Dictionary<IrVarId, IrValue>()).Value!;
-        var highUnsignedEnvironment = new Dictionary<IrVarId, IrValue>
-        {
-            [ulongEntry] = maximumUlong
-        };
+            factory.Integer(ulongType, ulong.MaxValue), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!;
+        var highUnsignedEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(ulongEntry, maximumUlong);
         Assert.That(interpreter.Evaluate(result.Clauses[2].Value, highUnsignedEnvironment).Value!.Boolean,
             Is.False);
     }
@@ -239,14 +230,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
                 _ => throw new ArgumentOutOfRangeException(nameof(parameterIndex))
             };
             var clause = projected.Clauses[parameterIndex];
-            var nullEnvironment = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = factory.CreateNullValue(input.Type)
-            };
-            var nonNullEnvironment = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = nonNullValue
-            };
+            var nullEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateNullValue(input.Type));
+            var nonNullEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, nonNullValue);
             Assert.That(interpreter.Evaluate(clause.Value, nullEnvironment).Value!.Boolean, Is.False);
             Assert.That(interpreter.Evaluate(clause.Value, nonNullEnvironment).Value!.Boolean, Is.True);
             Assert.That(interpreter.Evaluate(clause.SafeCondition, nullEnvironment).Value!.Boolean, Is.True);
@@ -374,7 +359,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
         var compilation = TestCompilation.Create(
                 "MetadataValueProjectionMatrixConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(compilation);
         using var consumerImage = new MemoryStream();
         var emittedConsumer = compilation.Emit(consumerImage);

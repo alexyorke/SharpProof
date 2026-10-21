@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorUnaryApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0023"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0023"];
 
     [Test]
     public void LogicalNotOnIntegerPreservesCompilerErrorAndTypedApiAbstention()
@@ -26,7 +27,7 @@ public sealed class CompilerErrorUnaryApiCoverageTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var diagnostics = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();

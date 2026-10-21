@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
@@ -14,11 +15,11 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerEvidenceValidationBoundaryTests
 {
-    private static readonly string[] ExpectedClaimIds = ["none", "argument", "effect"];
+    private static readonly ImmutableArray<string> ExpectedClaimIds = ["none", "argument", "effect"];
     [Test]
     public void ModuleEvidenceRequiresAnMvidBeforeMatchingLoadedAndFileIdentities()
     {
-        var compilation = TestCompilation.Create("ModuleEvidence", ("module.cs", "public static class Subject { public static int Value() => 1; }"));
+        var compilation = TestCompilation.CreateExact("ModuleEvidence", [("module.cs", "public static class Subject { public static int Value() => 1; }")]);
         using var image = Emit(compilation);
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
@@ -44,7 +45,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
             CompilerReferenceModuleEvidence.Match(missingMvid, otherName)))!.Message,
             Is.EqualTo("A compiler reference path does not match its loaded metadata."));
 
-        var changed = TestCompilation.Create("ModuleEvidence", ("module.cs", "public static class Subject { public static int Value() => 2; }"));
+        var changed = TestCompilation.CreateExact("ModuleEvidence", [("module.cs", "public static class Subject { public static int Value() => 2; }")]);
         using var changedImage = Emit(changed);
         using var changedPe = new PEReader(changedImage);
         var changedEvidence = CompilerReferenceModuleEvidence.Capture(changedPe.GetMetadataReader());
@@ -69,7 +70,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
             new CompilerReferenceSiblingLocation("Module.netmodule", null, sibling).Resolve()))!.Message,
             Is.EqualTo("A compiler reference directory is unavailable."));
-        foreach (var unsafeName in new[] { "", ".", "..", "../Module.netmodule", "a\0b" })
+        foreach (var unsafeName in ImmutableArray.Create("", ".", "..", "../Module.netmodule", "a\0b"))
         {
             Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
                 CompilerCompilationCapture.ResolveSiblingModule("\0", unsafeName)))!.Message,
@@ -82,7 +83,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void SpecificationBindingSeparatesAuditedTypeKindsFromTotalIntegerWidths()
     {
-        var compilation = TestCompilation.Create("BindingEvidence", ("binding.cs", "public static class Subject { public static int Same(int left, int right) => left; public static long Mixed(int left, long right) => right; }"));
+        var compilation = TestCompilation.CreateExact("BindingEvidence", [("binding.cs", "public static class Subject { public static int Same(int left, int right) => left; public static long Mixed(int left, long right) => right; }")]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = Emit(compilation);
         Assert.That(image.Length, Is.GreaterThan(0));
@@ -103,7 +104,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var integer = factory.GetOrCreateIntegerType(32, true);
         var rule = bound.Apply([factory.Integer(integer, 7), factory.Integer(integer, 11)]);
         Assert.That(rule.Classification.IsExact, Is.True);
-        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Integer, Is.EqualTo(7));
+        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Integer, Is.EqualTo(7));
         Assert.That(bound.Apply([]).Classification.IsExact, Is.False);
         Assert.That(bound.Apply([factory.Boolean(true), factory.Integer(integer, 11)]).Classification.IsExact, Is.False);
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition with { ParameterTypes = [IrTypeKind.Boolean, IrTypeKind.Integer] }), Is.Null);
@@ -118,7 +119,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void OwnedSyntaxEncodingUsesTheOriginalOrdinalPathOrTheMissingOwnerSentinel()
     {
-        var compilation = TestCompilation.Create("SyntaxEvidence", ("syntax.cs", "public static class Subject { public static int First() { int value = 1; return value; } public static int Second() => 2; }"));
+        var compilation = TestCompilation.CreateExact("SyntaxEvidence", [("syntax.cs", "public static class Subject { public static int First() { int value = 1; return value; } public static int Second() => 2; }")]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var root = tree.GetRoot();
@@ -145,23 +146,26 @@ public sealed class CompilerEvidenceValidationBoundaryTests
     [Test]
     public void ExceptionProjectionRequiresTheCompleteRuntimeTypeUniverse()
     {
-        var compilation = TestCompilation.Create("ExceptionEvidence", ("exception.cs", "public static class Subject { }"));
+        var compilation = TestCompilation.CreateExact("ExceptionEvidence", [("exception.cs", "public static class Subject { }")]);
         TestCompilation.AssertNoErrors(compilation);
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         var argumentIdentity = CompilerExceptionTypeIdentity.Encode(core.GetTypeByMetadataName("System.ArgumentException")!);
-        var claims = new[]
+        var claims = ImmutableArray.Create(new CompilerEffectClaimArtifact { ClaimId = "none", ContractKind = WorkerEffectContractKind.DoesNotThrow }, new CompilerEffectClaimArtifact
         {
-            new CompilerEffectClaimArtifact { ClaimId = "none", ContractKind = WorkerEffectContractKind.DoesNotThrow },
-            new CompilerEffectClaimArtifact { ClaimId = "argument", ContractKind = WorkerEffectContractKind.AllowedExceptions,
-                Constraint = new() { AllowedExceptionTypes = [argumentIdentity] } },
-            new CompilerEffectClaimArtifact { ClaimId = "effect", ContractKind = WorkerEffectContractKind.EffectContract,
-                Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] } }
-        };
+            ClaimId = "argument",
+            ContractKind = WorkerEffectContractKind.AllowedExceptions,
+            Constraint = new() { AllowedExceptionTypes = [argumentIdentity] }
+        }, new CompilerEffectClaimArtifact
+        {
+            ClaimId = "effect",
+            ContractKind = WorkerEffectContractKind.EffectContract,
+            Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] }
+        });
         var projected = CompilerExceptionConstraintEvidence.Project(core, claims);
         Assert.That(projected.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId)), Is.EqualTo(ExpectedClaimIds));
         Assert.That(projected[0].AllowedKinds, Is.Empty);
-        Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
-        Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
+        Assert.That(projected[1].AllowedKinds, Is.EqualTo(ImmutableArray.Create(IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange)));
+        Assert.That(projected[2].AllowedKinds, Is.EqualTo(ImmutableArray.Create(IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange)));
         Assert.That(compilation.Assembly.GetTypeByMetadataName("System.DivideByZeroException"), Is.Null);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, claims), Is.Empty);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, []), Is.Empty);

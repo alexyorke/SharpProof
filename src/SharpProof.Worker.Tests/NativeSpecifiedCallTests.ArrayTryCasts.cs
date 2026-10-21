@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -93,9 +94,9 @@ internal sealed partial class NativeSpecifiedCallTests
         try
         {
             var runtime = load.LoadFromStream(emitted).GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int[]?, int, int, int>>();
-            foreach (var values in new int[]?[] { null, [], [11], [17, 23] })
+            foreach (var values in ImmutableArray.Create<int[]?>(null, [], [11], [17, 23]))
             {
-                foreach (var index in new[] { -1, 0, 1, values?.Length ?? 0 })
+                foreach (var index in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                 {
                     Exception? fault = null;
                     var expected = 0;
@@ -106,13 +107,8 @@ internal sealed partial class NativeSpecifiedCallTests
                     var parameters = context.Parameters;
                     var type = factory.GetVariableInfo(parameters[0].Entry).Type;
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-                        {
-                            [parameters[0].Entry] = values == null ? factory.CreateNullValue(type) :
-                                factory.CreateSequenceValue(type, values.Select(value => factory.CreateIntegerValue(value))),
-                            [parameters[1].Entry] = factory.CreateIntegerValue(index),
-                            [parameters[2].Entry] = factory.CreateIntegerValue(29)
-                        }, 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                        ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(parameters[0].Entry, values == null ? factory.CreateNullValue(type) :
+                                factory.CreateSequenceValue(type, values.Select(value => factory.CreateIntegerValue(value)))).SetItem(parameters[1].Entry, factory.CreateIntegerValue(index)).SetItem(parameters[2].Entry, factory.CreateIntegerValue(29)), 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                     Assert.That(replay.Status, Is.EqualTo(fault == null ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
                     if (fault == null)
                     {

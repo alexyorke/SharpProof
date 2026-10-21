@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -33,7 +34,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
         Assert.That(image, Is.Not.Empty);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("ScalarDomainProbe")!
             .GetMembers("Identity").Single();
-        var runtimeMethod = System.Reflection.Assembly.Load(image)
+        var runtimeMethod = System.Reflection.Assembly.Load((image).ToArray())
             .GetType("ScalarDomainProbe", throwOnError: true)!.GetMethod("Identity")!;
         object? runtimeValue = null;
         Assert.DoesNotThrow((Action)(() => { runtimeValue = runtimeMethod.Invoke(null, [value]); }));

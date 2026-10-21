@@ -118,11 +118,12 @@ internal sealed class ContractIntrinsicValidator
         IOperation root)
     {
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        var pending = new Stack<IOperation>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var operation = pending.Pop();
+            var operation = pending.Peek();
+            pending = pending.Pop();
             yield return operation;
             if (operation != root &&
                 (operation is ILocalFunctionOperation or IAnonymousFunctionOperation))
@@ -132,7 +133,7 @@ internal sealed class ContractIntrinsicValidator
 
             foreach (var child in operation.ChildOperations.Reverse())
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
     }

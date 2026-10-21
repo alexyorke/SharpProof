@@ -1,0 +1,111 @@
+{
+  "CodeCheckpoint": "4a646d7acf13a9bda7a986405c2b2971ed6fcfb3",
+  "StrictCoveragePassed": true,
+  "Reports": 65,
+  "Aggregate": {
+    "coveredLines": 32879,
+    "coverableLines": 32879,
+    "linePercent": 100.0,
+    "minimumLinePercent": 100.0,
+    "passed": true
+  },
+  "Changed": {
+    "comparisonRef": "b0ce85e23544140698dda435f57dd5089411fc8a",
+    "coveredLines": 4241,
+    "coverableLines": 4241,
+    "linePercent": 100.0,
+    "minimumLinePercent": 100.0,
+    "passed": true
+  },
+  "TestOutcomes": {
+    "attributes": {
+      "Passed": 21
+    },
+    "fuzz-console-cancellation": {
+      "Passed": 2
+    },
+    "semantic": {
+      "Passed": 12966,
+      "NotExecuted": 6
+    },
+    "package": {
+      "Passed": 384,
+      "NotExecuted": 1
+    }
+  },
+  "StrictSummarySha256": "28b3af41548e8b7d866fb6e2503e3d5e7287f740fb990a73cdff7be1389bf541",
+  "ExpectedUnexecutedTests": [
+    [
+      "semantic",
+      "GeneratedTypedClaimsAgreeWithClr",
+      "NotExecuted"
+    ],
+    [
+      "semantic",
+      "GeneratedContractsAgreeWithClrAdmission",
+      "NotExecuted"
+    ],
+    [
+      "semantic",
+      "GeneratedCompositionsAgreeWithClr",
+      "NotExecuted"
+    ],
+    [
+      "semantic",
+      "GeneratedWidthClaimsAgreeWithClrWitnesses",
+      "NotExecuted"
+    ],
+    [
+      "semantic",
+      "GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime",
+      "NotExecuted"
+    ],
+    [
+      "semantic",
+      "GeneratedControlFlowClaimsAgreeWithRuntime",
+      "NotExecuted"
+    ],
+    [
+      "package",
+      "VerificationFailsExplicitlyOnUnsupportedHosts",
+      "NotExecuted"
+    ]
+  ],
+  "Scope": "Canonical Linux amd64 full authenticated Release collection. Six explicit long-fuzz campaigns are separately checked with one seed each and zero findings; one package supported-host case is intentionally unexecuted. No native Windows/macOS runtime qualification is inferred.",
+  "CoverageCi": "https://github.com/alexyorke/SharpProof/actions/runs/39447620433/job/118720147506",
+  "QualityCi": "https://github.com/alexyorke/SharpProof/actions/runs/39447620201/job/118713614632",
+  "SourceAuthority": {
+    "Paths": 1949,
+    "CompiledPaths": 1739,
+    "ExplicitAbsentPaths": 210,
+    "CompiledUnitInstances": 1889,
+    "SemanticObservations": 142020,
+    "ConstObservations": 75702,
+    "EligibleConstLocals": 0,
+    "MetadataAuthorityGaps": 0,
+    "OwnershipDecisions": 392,
+    "ExplicitSyntaxBindingForms": 136,
+    "RuntimeConfiguredFields": 20,
+    "HistoricalEpochs": 111,
+    "HistoricalRows": 311540,
+    "StatusTransfers": 0
+  },
+  "Checks": {
+    "ReleaseBuild": "Passed; zero warnings/errors",
+    "RepositoryQuality": "Passed",
+    "Layout": "Passed; 59 evaluated projects and 151 pinned common files",
+    "LiteralConservation": "Passed; 4309 raw/interpolated tokens in 1078 changed C# files",
+    "SourceUnitAuthority": "Passed; all 1949 current unit authority fields",
+    "SourceOwnership": "Passed; all current ownership/binding/runtime-field source hashes",
+    "QualifiedArchive": "Passed; raw Git blobs, complete historical rows and current observations independently verified",
+    "BoundedExplicitFuzz": "Passed; six campaigns, one seed each, zero findings"
+  },
+  "EvidenceSha256": {
+    "immutability-m535-final-coverage.log": "f8c979b99cb3d31a9e639251c462ee94c1a9efe916f60c2acbaccdf8e63e336b",
+    "immutability-m536-current-census.log": "a2dd56481fccf01e29aac2411e57fb60419985b3a1e20d8bbcfdce16f7106bd3",
+    "immutability-m536-final-verify.log": "6e2275722d3203658466c2588c99d62393fddb4677e24ac67ef194c42ecc198e",
+    "immutability-m537-verification.log": "7b67874eb7a0298f937006248c02ba491635dcfc45a20914cad15e3b90f49a82",
+    "immutability-m538-final-quality.log": "b0ad4c96f1861ab433c4bf3370be8abd8b69de218c7b1796e021ef267823266f",
+    "immutability-m538-final-layout.log": "1da9abd6c1c5b80efe6038dcecce3cce532024014cc80e6cd71c6960963b537a"
+  }
+}

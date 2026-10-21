@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -15,85 +16,85 @@ public sealed class TypedProgramLoweringTests
 {
     public static IEnumerable<TestCaseData> ScalarCases()
     {
-        foreach (var input in new[] { int.MinValue, int.MinValue + 1, -2, -1, 0, 1, int.MaxValue })
+        foreach (var input in ImmutableArray.Create(int.MinValue, int.MinValue + 1, -2, -1, 0, 1, int.MaxValue))
         {
-            yield return Case("int Target(int x) => checked(x & int.MaxValue);", input);
-            yield return Case("int Target(int x) => int.MaxValue & x;", input);
+            yield return Case("int Target(int x) => checked(x & int.MaxValue);", [input]);
+            yield return Case("int Target(int x) => int.MaxValue & x;", [input]);
         }
-        yield return Case("int Target(int x, int y) => x & y;", -1, int.MinValue);
-        yield return Case("uint Target(uint x, uint y) => checked(x & y);", uint.MaxValue, 0x80000000U);
-        yield return Case("long Target(long x, long y) => x & y;", -1L, long.MinValue);
-        yield return Case("ulong Target(ulong x, ulong y) => checked(x & y);", ulong.MaxValue, 0x8000000000000000UL);
-        yield return Case("int Target(sbyte x, byte y) => x & y;", (sbyte)-1, (byte)128);
-        yield return Case("int Target(short x, ushort y) => x & y;", (short)-1, (ushort)32768);
-        yield return Case("long Target(uint x, int y) => x & y;", uint.MaxValue, -1);
-        yield return Case("int Target(int x) { int y = x++ & ++x; return y * 100 + x; }", 3);
-        yield return Case("int Target(int x) { x &= x++; return x; }", 3);
-        yield return Case("sbyte Target(sbyte x) { unchecked { x &= (sbyte)-128; return x; } }", (sbyte)-1);
-        yield return Case("short Target(short x) { unchecked { x &= (short)-32768; return x; } }", (short)-1);
-        yield return Case("uint Target(uint x, uint y) { x &= y; return x; }", uint.MaxValue, 0x80000000U);
-        yield return Case("ulong Target(ulong x, ulong y) { x &= y; return x; }", ulong.MaxValue, 0x8000000000000000UL);
-        foreach (var operation in new[] { "|", "^" })
+        yield return Case("int Target(int x, int y) => x & y;", [-1, int.MinValue]);
+        yield return Case("uint Target(uint x, uint y) => checked(x & y);", [uint.MaxValue, 0x80000000U]);
+        yield return Case("long Target(long x, long y) => x & y;", [-1L, long.MinValue]);
+        yield return Case("ulong Target(ulong x, ulong y) => checked(x & y);", [ulong.MaxValue, 0x8000000000000000UL]);
+        yield return Case("int Target(sbyte x, byte y) => x & y;", [(sbyte)-1, (byte)128]);
+        yield return Case("int Target(short x, ushort y) => x & y;", [(short)-1, (ushort)32768]);
+        yield return Case("long Target(uint x, int y) => x & y;", [uint.MaxValue, -1]);
+        yield return Case("int Target(int x) { int y = x++ & ++x; return y * 100 + x; }", [3]);
+        yield return Case("int Target(int x) { x &= x++; return x; }", [3]);
+        yield return Case("sbyte Target(sbyte x) { unchecked { x &= (sbyte)-128; return x; } }", [(sbyte)-1]);
+        yield return Case("short Target(short x) { unchecked { x &= (short)-32768; return x; } }", [(short)-1]);
+        yield return Case("uint Target(uint x, uint y) { x &= y; return x; }", [uint.MaxValue, 0x80000000U]);
+        yield return Case("ulong Target(ulong x, ulong y) { x &= y; return x; }", [ulong.MaxValue, 0x8000000000000000UL]);
+        foreach (var operation in ImmutableArray.Create("|", "^"))
         {
-            yield return Case($"int Target(int x, int y) => x {operation} y;", -1, int.MinValue);
-            yield return Case($"uint Target(uint x, uint y) => checked(x {operation} y);", uint.MaxValue, 0x80000000U);
-            yield return Case($"long Target(long x, long y) => x {operation} y;", long.MinValue, 0x5555555555555555L);
-            yield return Case($"ulong Target(ulong x, ulong y) => checked(x {operation} y);", ulong.MaxValue, 0x8000000000000000UL);
-            yield return Case($"int Target(sbyte x, byte y) => x {operation} y;", (sbyte)-1, (byte)128);
-            yield return Case($"long Target(uint x, int y) => x {operation} y;", uint.MaxValue, -1);
-            yield return Case($"int Target(int x) {{ int y = x++ {operation} ++x; return y * 100 + x; }}", 3);
-            yield return Case($"int Target(int x) {{ x {operation}= x++; return x; }}", 3);
-            yield return Case($"sbyte Target(sbyte x) {{ checked {{ x {operation}= (sbyte)-128; return x; }} }}", (sbyte)1);
-            yield return Case($"ulong Target(ulong x, ulong y) {{ x {operation}= y; return x; }}", 0x00FF00FF00FF00FFUL, 0x8000000000000001UL);
+            yield return Case($"int Target(int x, int y) => x {operation} y;", [-1, int.MinValue]);
+            yield return Case($"uint Target(uint x, uint y) => checked(x {operation} y);", [uint.MaxValue, 0x80000000U]);
+            yield return Case($"long Target(long x, long y) => x {operation} y;", [long.MinValue, 0x5555555555555555L]);
+            yield return Case($"ulong Target(ulong x, ulong y) => checked(x {operation} y);", [ulong.MaxValue, 0x8000000000000000UL]);
+            yield return Case($"int Target(sbyte x, byte y) => x {operation} y;", [(sbyte)-1, (byte)128]);
+            yield return Case($"long Target(uint x, int y) => x {operation} y;", [uint.MaxValue, -1]);
+            yield return Case($"int Target(int x) {{ int y = x++ {operation} ++x; return y * 100 + x; }}", [3]);
+            yield return Case($"int Target(int x) {{ x {operation}= x++; return x; }}", [3]);
+            yield return Case($"sbyte Target(sbyte x) {{ checked {{ x {operation}= (sbyte)-128; return x; }} }}", [(sbyte)1]);
+            yield return Case($"ulong Target(ulong x, ulong y) {{ x {operation}= y; return x; }}", [0x00FF00FF00FF00FFUL, 0x8000000000000001UL]);
         }
-        foreach (var operation in new[] { "&", "|", "^" })
+        foreach (var operation in ImmutableArray.Create("&", "|", "^"))
         {
-            foreach (var (x, y) in new[] { (false, false), (false, true), (true, false), (true, true) })
+            foreach (var (x, y) in ImmutableArray.Create((false, false), (false, true), (true, false), (true, true)))
             {
-                yield return Case($"bool Target(bool x, bool y) => x {operation} y;", x, y);
-                yield return Case($"bool Target(bool x, bool y) {{ x {operation}= y; return x; }}", x, y);
+                yield return Case($"bool Target(bool x, bool y) => x {operation} y;", [x, y]);
+                yield return Case($"bool Target(bool x, bool y) {{ x {operation}= y; return x; }}", [x, y]);
             }
-            yield return Case($"int Target(int x) {{ bool b = x++ > 3 {operation} x++ > 4; return b ? x : -x; }}", 3);
+            yield return Case($"int Target(int x) {{ bool b = x++ > 3 {operation} x++ > 4; return b ? x : -x; }}", [3]);
         }
-        yield return Case("int Target(int x) => ~x;", int.MinValue);
-        yield return Case("uint Target(uint x) => ~x;", 0x80000001U);
-        yield return Case("long Target(long x) => ~x;", long.MaxValue);
-        yield return Case("ulong Target(ulong x) => ~x;", 1UL);
-        yield return Case("int Target(byte x) => ~x;", byte.MaxValue);
-        yield return Case("int Target(sbyte x) => ~x;", sbyte.MinValue);
-        yield return Case("byte Target(byte x) => (byte)~x;", (byte)0x0F);
-        yield return Case("int Target(byte a, sbyte b) => a + b;", (byte)255, (sbyte)-128);
-        yield return Case("int Target(ushort a) => -a;", ushort.MaxValue);
-        yield return Case("long Target(uint a, int b) => a + b;", uint.MaxValue, -1);
-        yield return Case("long Target(uint a) => -a;", uint.MaxValue);
-        yield return Case("uint Target(uint a) => unchecked(a + 1);", uint.MaxValue);
-        yield return Case("ulong Target(ulong a) => unchecked(a + 1);", ulong.MaxValue);
-        yield return Case("ulong Target(sbyte a) => unchecked((ulong)a);", (sbyte)-1);
-        yield return Case("sbyte Target(ulong a) => unchecked((sbyte)a);", ulong.MaxValue);
-        yield return Case("bool Target(ulong a, ulong b) => a > b;", 1UL << 63, 1UL);
-        yield return Case("int Target(sbyte a, sbyte b) => a / b;", sbyte.MinValue, (sbyte)-1);
-        yield return Case("int Target(int x) { return x + x++; }", 3);
-        yield return Case("int Target(int x) { x += x++; return x; }", 3);
-        yield return Case("int Target(int x) { int y = ++x; return y + x; }", 3);
-        yield return Case("int Target(int x) { int y = x--; return y + x; }", 3);
-        yield return Case("bool Target(int d) => d != 0 && 10 / d > 0;", 0);
-        yield return Case("bool Target(int d) => d == 0 || 10 / d > 0;", 0);
-        yield return Case("int Target(int d) => d == 0 ? 1 : 10 / d;", 0);
-        yield return Case("int Target(int x) { if (x > 0) { x += 2; } else { x -= 1; } return x; }", -3);
-        yield return Case("long Target(ulong a) => checked((long)a);", (ulong)long.MaxValue + 1);
-        yield return Case("ulong Target(long a) => checked((ulong)a);", -1L);
-        foreach (var value in new[] { -1, 0, 255, 256 })
+        yield return Case("int Target(int x) => ~x;", [int.MinValue]);
+        yield return Case("uint Target(uint x) => ~x;", [0x80000001U]);
+        yield return Case("long Target(long x) => ~x;", [long.MaxValue]);
+        yield return Case("ulong Target(ulong x) => ~x;", [1UL]);
+        yield return Case("int Target(byte x) => ~x;", [byte.MaxValue]);
+        yield return Case("int Target(sbyte x) => ~x;", [sbyte.MinValue]);
+        yield return Case("byte Target(byte x) => (byte)~x;", [(byte)0x0F]);
+        yield return Case("int Target(byte a, sbyte b) => a + b;", [(byte)255, (sbyte)-128]);
+        yield return Case("int Target(ushort a) => -a;", [ushort.MaxValue]);
+        yield return Case("long Target(uint a, int b) => a + b;", [uint.MaxValue, -1]);
+        yield return Case("long Target(uint a) => -a;", [uint.MaxValue]);
+        yield return Case("uint Target(uint a) => unchecked(a + 1);", [uint.MaxValue]);
+        yield return Case("ulong Target(ulong a) => unchecked(a + 1);", [ulong.MaxValue]);
+        yield return Case("ulong Target(sbyte a) => unchecked((ulong)a);", [(sbyte)-1]);
+        yield return Case("sbyte Target(ulong a) => unchecked((sbyte)a);", [ulong.MaxValue]);
+        yield return Case("bool Target(ulong a, ulong b) => a > b;", [1UL << 63, 1UL]);
+        yield return Case("int Target(sbyte a, sbyte b) => a / b;", [sbyte.MinValue, (sbyte)-1]);
+        yield return Case("int Target(int x) { return x + x++; }", [3]);
+        yield return Case("int Target(int x) { x += x++; return x; }", [3]);
+        yield return Case("int Target(int x) { int y = ++x; return y + x; }", [3]);
+        yield return Case("int Target(int x) { int y = x--; return y + x; }", [3]);
+        yield return Case("bool Target(int d) => d != 0 && 10 / d > 0;", [0]);
+        yield return Case("bool Target(int d) => d == 0 || 10 / d > 0;", [0]);
+        yield return Case("int Target(int d) => d == 0 ? 1 : 10 / d;", [0]);
+        yield return Case("int Target(int x) { if (x > 0) { x += 2; } else { x -= 1; } return x; }", [-3]);
+        yield return Case("long Target(ulong a) => checked((long)a);", [(ulong)long.MaxValue + 1]);
+        yield return Case("ulong Target(long a) => checked((ulong)a);", [-1L]);
+        foreach (var value in ImmutableArray.Create(-1, 0, 255, 256))
         {
-            yield return Case("byte Target(int a) => checked((byte)a);", value);
+            yield return Case("byte Target(int a) => checked((byte)a);", [value]);
         }
-        foreach (var mode in new[] { "checked", "unchecked" })
+        foreach (var mode in ImmutableArray.Create("checked", "unchecked"))
         {
-            foreach (var operation in new[] { "/", "%" })
+            foreach (var operation in ImmutableArray.Create("/", "%"))
             {
-                yield return Case($"int Target(int a, int b) => {mode}(a {operation} b);", int.MinValue, -1);
-                yield return Case($"long Target(long a, long b) => {mode}(a {operation} b);", long.MinValue, -1L);
-                yield return Case($"int Target(int a, int b) => {mode}(a {operation} b);", 3, 0);
-                yield return Case($"long Target(long a, long b) => {mode}(a {operation} b);", 3L, 0L);
+                yield return Case($"int Target(int a, int b) => {mode}(a {operation} b);", [int.MinValue, -1]);
+                yield return Case($"long Target(long a, long b) => {mode}(a {operation} b);", [long.MinValue, -1L]);
+                yield return Case($"int Target(int a, int b) => {mode}(a {operation} b);", [3, 0]);
+                yield return Case($"long Target(long a, long b) => {mode}(a {operation} b);", [3L, 0L]);
             }
         }
     }
@@ -132,9 +133,10 @@ public sealed class TypedProgramLoweringTests
     }
 
     [TestCaseSource(nameof(ScalarCases))]
-    public void CandidateMatchesCompiledCSharp(string members, object[] arguments)
+    public void CandidateMatchesCompiledCSharp(string members, ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var lowered = subject.Lower();
@@ -189,7 +191,7 @@ public sealed class TypedProgramLoweringTests
         builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
         var parameter = subject.Context.Parameters.Single().Current;
         var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Value(parameter, input)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo((bool)subject.Invoke([input])!));
     }
@@ -223,7 +225,7 @@ public sealed class TypedProgramLoweringTests
         builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
         var parameter = subject.Context.Parameters.Single().Current;
         var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Value(parameter, input)));
         var expected = subject.Invoke([input]);
         if (expected is DivideByZeroException)
         {
@@ -313,9 +315,10 @@ public sealed class TypedProgramLoweringTests
         Assert.That(subject.Lower().IsExact, Is.False);
     }
 
-    private static TestCaseData Case(string members, params object[] arguments)
+    private static TestCaseData Case(string members, ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(members);
         return new TestCaseData(members, arguments).SetName("Candidate: " + members + " [" + string.Join(",", arguments) + "]");
     }
@@ -403,12 +406,13 @@ internal sealed class TypedProgramSubject : IDisposable
                     new RoslynTypeMapper(Factory).GetTypeId(method.ReturnType))) : null;
         }
     }
-    internal IrProgramExecutionResult Execute(FrontendProgramLoweringResult lowering, object[] arguments)
+    internal IrProgramExecutionResult Execute(FrontendProgramLoweringResult lowering, ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(lowering);
         return new IrProgramInterpreter(Factory).Execute(lowering.Program,
-            Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
+            ImmutableDictionaryCapture.Create(Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
     }
     internal IrValue Value(IrVarId variable, object value)
     {
@@ -421,11 +425,12 @@ internal sealed class TypedProgramSubject : IDisposable
         return value is bool boolean ? Factory.CreateBooleanValue(boolean) : value is ulong unsigned
             ? Factory.CreateIntegerValue(type, unsigned) : Factory.CreateIntegerValue(type, Convert.ToInt64(value, CultureInfo.InvariantCulture));
     }
-    internal object? Invoke(object[] arguments)
+    internal object? Invoke(ImmutableArray<object> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         try
-        { return _method.Invoke(null, arguments); }
+        { return _method.Invoke(null, arguments.ToArray()); }
         catch (TargetInvocationException exception) { return exception.InnerException; }
     }
     public void Dispose()

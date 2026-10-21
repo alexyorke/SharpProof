@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -15,7 +16,7 @@ public sealed class NativeConstructionAdmissionTests
         System.ArgumentNullException.ThrowIfNull(dimension);
         var bounded = CreateCandidate(dimension, 1);
         var enlarged = CreateCandidate(dimension, PassiveCallableVcBuilder.MaximumSteps + 1);
-        foreach (var candidate in new[] { bounded, enlarged })
+        foreach (var candidate in ImmutableArray.Create(bounded, enlarged))
         {
             // The public builder accepts both owned programs, and their entry
             // executes normally. Size admission does not imply malformed IR.
@@ -75,15 +76,10 @@ public sealed class NativeConstructionAdmissionTests
         var candidate = new PassiveCallableCandidate("bounded-expansion-admission", builder.Build(), [input], null, [], [ensures]);
         Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
-        foreach (var value in new[] { false, true })
+        foreach (var value in ImmutableArray.Create(false, true))
         {
             var inputValue = factory.CreateBooleanValue(value);
-            var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, new Dictionary<IrVarId, IrValue>
-            {
-                [input.Entry] = inputValue,
-                [input.Current] = inputValue,
-                [input.Old] = inputValue
-            });
+            var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input.Entry, inputValue).SetItem(input.Current, inputValue).SetItem(input.Old, inputValue));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -124,7 +120,7 @@ public sealed class NativeConstructionAdmissionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("default-construction-admission");
-        var parameters = new List<PassiveParameterBinding>();
+        var parameters = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
         if (dimension == "parameters")
         {
             for (var index = 0; index < count; index++)
@@ -146,6 +142,6 @@ public sealed class NativeConstructionAdmissionTests
         var result = factory.CreateVariable("result", factory.IntegerType);
         var ensures = new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(result), factory.Integer(0)), factory.Boolean(true), site);
-        return new PassiveCallableCandidate("default-construction-admission", builder.Build(), [.. parameters], result, [], [ensures]);
+        return new PassiveCallableCandidate("default-construction-admission", builder.Build(), parameters.ToImmutable(), result, [], [ensures]);
     }
 }

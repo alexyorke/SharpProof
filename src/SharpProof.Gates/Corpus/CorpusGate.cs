@@ -77,8 +77,8 @@ internal static class CorpusGate
         var inventory = shadow.PotentialCalls ??
             throw new InvalidOperationException("Potential-call shadow inventory was not produced.");
         var owners = inventory.Owners.Where(static owner =>
-            owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.DeclaredAccessibility == Accessibility.Public)).ToArray();
-        var calls = owners.SelectMany(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Calls)).ToArray();
+            owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.DeclaredAccessibility == Accessibility.Public)).ToImmutableArray();
+        var calls = owners.SelectMany(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Calls)).ToImmutableArray();
         var failures = ImmutableArray.CreateBuilder<string>();
         failures.AddRange(inventory.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)));
         var boundRequires = 0;
@@ -104,9 +104,10 @@ internal static class CorpusGate
         ArgumentNullException.ThrowIfNull(bodies);
         var failures = ImmutableArray.CreateBuilder<string>();
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken);
-        var documents = compilation.SyntaxTrees.Select((tree, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: snapshots[index].Path)))))
-            .ToDictionary(static row => row.Tree, static row => row.Path);
-        var expected = new HashSet<ContractCoverageKey>();
+        var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: snapshots[index].Path)))))
+            , static row => row.Tree, static row => row.Path);
+        var expected = ImmutableHashSet.CreateBuilder<ContractCoverageKey>();
+        var expectedOrder = ImmutableArray.CreateBuilder<ContractCoverageKey>();
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         failures.AddRange(inventory.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)));
         foreach (var owner in inventory.Owners.Where(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.DeclaredAccessibility == Accessibility.Public)))
@@ -133,17 +134,19 @@ internal static class CorpusGate
                         new(document, span.Start, span.Length));
                     if (!expected.Add(key))
                     { failures.Add("DuplicateSourceObligation:" + key); }
+                    else
+                    { expectedOrder.Add(key); }
                 }
             }
         }
-        var seen = new HashSet<ContractCoverageKey>();
-        var matched = new HashSet<ContractCoverageKey>();
+        var seen = ImmutableHashSet.CreateBuilder<ContractCoverageKey>();
+        var matched = ImmutableHashSet.CreateBuilder<ContractCoverageKey>();
         // Maintained callers supply C#-lowered or validated decoded bodies.
         // Both producers bind every call precondition to an owned assignment.
         foreach (var body in bodies)
         {
-            var instructions = body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                .ToDictionary(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id));
+            var instructions = ImmutableDictionaryCapture.Create(body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                , static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : instruction.Id, static instruction => instruction ?? throw new ArgumentNullException(nameof(instruction)));
             foreach (var obligation in body.CallPreconditions)
             {
                 var marker = (IrAssignInstruction)instructions[obligation.Instruction];
@@ -161,7 +164,7 @@ internal static class CorpusGate
                 { matched.Add(key); }
             }
         }
-        foreach (var missing in expected.Except(matched))
+        foreach (var missing in expectedOrder.Where(key => !matched.Contains(key)))
         { failures.Add("MissingNativeObligation:" + missing); }
         return new(expected.Count, matched.Count, failures.ToImmutable());
     }
@@ -199,7 +202,7 @@ internal static class CorpusGate
             .ConfigureAwait(false);
 
         var failures = ImmutableArray.CreateBuilder<string>();
-        var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
+        var usedAllowances = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var allowedDegradations = ImmutableArray.CreateBuilder<string>();
 
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
@@ -306,7 +309,7 @@ internal static class CorpusGate
         var supportedUnknownCount = 0;
         var diagnosticCount = 0;
         var unknownReasonCounts =
-            new Dictionary<string, int>(StringComparer.Ordinal);
+            ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         foreach (var observation in observations)
         {
             var corpusCase = casesById[observation.CaseId];
@@ -538,11 +541,11 @@ internal static class CorpusGate
                 document,
                 cancellationToken)
             .ConfigureAwait(false);
-        var updates = import?.Updates.ToList() ?? [];
+        var updates = import?.Updates.ToBuilder() ?? ImmutableArray.CreateBuilder<CorpusFileUpdate>();
         updates.Add(new CorpusFileUpdate(snapshotPath, snapshot));
         await CorpusFileTransaction.WriteAllAsync(
                 corpusDirectory,
-                updates,
+                updates.ToImmutable(),
                 cancellationToken)
             .ConfigureAwait(false);
     }
@@ -592,7 +595,7 @@ internal static class CorpusGate
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(item);
         var verdicts = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken)
-            .ConfigureAwait(false)).Where(static verdict => verdict is null ? throw new System.ArgumentNullException(nameof(verdict)) : (verdict.Method.DeclaredAccessibility == Accessibility.Public)).ToArray();
+            .ConfigureAwait(false)).Where(static verdict => verdict is null ? throw new System.ArgumentNullException(nameof(verdict)) : (verdict.Method.DeclaredAccessibility == Accessibility.Public)).ToImmutableArray();
         return verdicts.Length switch
         {
             0 => null,
@@ -609,37 +612,31 @@ internal static class CorpusGate
 
         System.ArgumentNullException.ThrowIfNull(openSourceDocument);
         RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
-        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
         var syntheticCases = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToArray();
-        var syntheticObservations = new CorpusObservation[syntheticCases.Length];
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToImmutableArray();
         using var slots = new SemaphoreSlim(
             Math.Min(2, Math.Max(1, Environment.ProcessorCount)));
-        await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
+        // WhenAll publishes results in input task order, regardless of completion order.
+        var syntheticObservations = (await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
             async index =>
             {
                 RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
-
                 await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
-                    syntheticObservations[index] = await ObserveCaseAsync(
-                            syntheticCases[index], cancellationToken)
+                    return await ObserveCaseAsync(syntheticCases[index], cancellationToken)
                         .ConfigureAwait(false);
                 }
                 finally
                 {
                     slots.Release();
                 }
-            })).ConfigureAwait(false);
-        observations.AddRange(syntheticObservations);
-
-        observations.AddRange(
+            })).ConfigureAwait(false)).ToImmutableArray();
+        return syntheticObservations.AddRange(
             await OpenSourceCorpusRunner.ObserveAsync(
                     openSourceDocument,
                     cancellationToken)
                 .ConfigureAwait(false));
-        return observations.ToImmutable();
     }
 
     private static CorpusObservation Observe(
@@ -746,9 +743,9 @@ internal static class CorpusGate
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
             StringComparer.Ordinal);
-        var observations = await Task.WhenAll(
+        var observations = (await Task.WhenAll(
             selected.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken))))
-            .ConfigureAwait(false);
+            .ConfigureAwait(false)).ToImmutableArray();
         return CorpusObservationComparison.CompareConcurrent(expected, observations);
     }
 
@@ -929,7 +926,7 @@ internal static class CorpusGate
 
         var observedReasons = actual
             .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Reason))
-            .ToHashSet(StringComparer.Ordinal);
+            .ToImmutableHashSet(StringComparer.Ordinal);
         foreach (var reason in ratchet.MaximumByReason.Keys
                      .Where(reason => reason is null ? throw new System.ArgumentNullException(nameof(reason)) : (!observedReasons.Contains(reason)))
                      .OrderBy(static reason => reason is null ? throw new System.ArgumentNullException(nameof(reason)) : (reason), StringComparer.Ordinal))

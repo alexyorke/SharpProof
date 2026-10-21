@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text;
 
@@ -13,10 +14,11 @@ internal static class SdkProbe
     }
 
     internal static async Task<string> RunAsync(
-        string executable, string[] arguments, TimeSpan timeout, CancellationToken cancellationToken)
+        string executable, ImmutableArray<string> arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(executable);
-        ArgumentNullException.ThrowIfNull(arguments);
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         if (timeout <= TimeSpan.Zero || timeout.TotalMilliseconds > uint.MaxValue - 1)
         {
             throw new ArgumentOutOfRangeException(nameof(timeout), "Discovery must have a finite positive supported deadline.");

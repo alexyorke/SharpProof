@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Goal = SharpProof.Verify.Goal;
 
 namespace SharpProof.Smt.Test;
@@ -38,8 +39,8 @@ public sealed class CachedBuiltinQueryIsolationTests
                 new Goal(factory, known, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
             Assert.That(await new ProofKernel(session).VerifyAsync(priming, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
         }
-        var assumptions = previousQuery ? Array.Empty<Assumption>() :
-            new[] { new Assumption(factory, known, new LoweredJustification(factory.CreateOperation())) };
+        var assumptions = previousQuery ? ImmutableArray<Assumption>.Empty :
+            ImmutableArray.Create(new Assumption(factory, known, new LoweredJustification(factory.CreateOperation())));
         var query = new VerificationQuery(factory, assumptions,
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(1)));
         var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);

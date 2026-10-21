@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -12,18 +13,18 @@ public sealed class CSharpPreprocessorSymbolsTests
     {
         var fromOptions = Parse(
             "internal static class Subject { }",
-            ContractApiCatalog.ConditionalSymbol);
+            [ContractApiCatalog.ConditionalSymbol]);
         var fromDirective = Parse(
             """
             #define SHARPPROOF_CONTRACTS
             internal static class Subject { }
-            """);
+            """, []);
         var removedByDirective = Parse(
             """
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
             """,
-            ContractApiCatalog.ConditionalSymbol);
+            [ContractApiCatalog.ConditionalSymbol]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -54,13 +55,13 @@ public sealed class CSharpPreprocessorSymbolsTests
             #define SHARPPROOF_CONTRACTS
             #endif
             internal static class Subject { }
-            """);
+            """, []);
         var removed = Parse(
             """
             #define SHARPPROOF_CONTRACTS
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
-            """);
+            """, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -79,9 +80,10 @@ public sealed class CSharpPreprocessorSymbolsTests
 
     private static SyntaxTree Parse(
         string source,
-        params string[] symbols)
+        ImmutableArray<string> symbols)
     {
-        System.ArgumentNullException.ThrowIfNull(symbols, nameof(symbols));
+        if (symbols.IsDefault)
+        { throw new ArgumentNullException(nameof(symbols)); }
         System.ArgumentNullException.ThrowIfNull(source);
         return CSharpSyntaxTree.ParseText(
             source,

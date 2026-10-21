@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -56,6 +57,6 @@ public sealed class ExpressionAccessorHelperWorkflowAuditTests
         });
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,
             profile: "advisory", features: "effects");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
     }
 }

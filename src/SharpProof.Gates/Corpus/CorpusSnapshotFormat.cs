@@ -7,7 +7,7 @@ namespace SharpProof.Gates;
 
 internal static class CorpusSnapshotFormat
 {
-    private static readonly string[] Header =
+    private static readonly ImmutableArray<string> Header =
     [
         "# SharpProof analyzer corpus snapshot schema 3",
         "# case-id|verdict|semantic-outcome|sorted-diagnostics",
@@ -17,12 +17,12 @@ internal static class CorpusSnapshotFormat
     internal static string Render(IEnumerable<string> dataLines)
     {
         System.ArgumentNullException.ThrowIfNull(dataLines);
-        var lines = dataLines.ToArray();
+        var lines = dataLines.ToImmutableArray();
         ValidateCanonicalData(lines);
         return string.Join("\n", Header.Concat(lines)) + "\n";
     }
 
-    internal static string[] ReadDataLines(string path)
+    internal static ImmutableArray<string> ReadDataLines(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         return ParseDocument(File.ReadAllBytes(path)).DataLines;
@@ -35,13 +35,13 @@ internal static class CorpusSnapshotFormat
         return ParseDocument(File.ReadAllBytes(path)).Observations;
     }
 
-    internal static string[] Parse(byte[] bytes)
+    internal static ImmutableArray<string> Parse(byte[] bytes)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         return ParseDocument(bytes).DataLines;
     }
 
-    private static ParsedSnapshot ParseDocument(byte[] bytes)
+    private static ParsedSnapshot ParseDocument(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length == 0 || (bytes.Length >= 3 && bytes[0] == 0xEF &&
                 bytes[1] == 0xBB && bytes[2] == 0xBF))
@@ -69,7 +69,7 @@ internal static class CorpusSnapshotFormat
         {
             throw new InvalidDataException("Corpus snapshot must be strict UTF-8.", exception);
         }
-        var lines = text.Substring(0, text.Length - 1).Split('\n');
+        var lines = text.Substring(0, text.Length - 1).Split('\n').ToImmutableArray();
         if (lines.Length < Header.Length)
         {
             throw Invalid();
@@ -81,18 +81,22 @@ internal static class CorpusSnapshotFormat
                 throw Invalid();
             }
         }
-        var data = lines.Skip(Header.Length).ToArray();
+        var data = lines.Skip(Header.Length).ToImmutableArray();
         return new ParsedSnapshot(data, ParseCanonicalData(data));
     }
 
-    private static void ValidateCanonicalData(string[] lines)
+    private static void ValidateCanonicalData(ImmutableArray<string> lines)
     {
-        System.ArgumentNullException.ThrowIfNull(lines, nameof(lines));
+        if (lines.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(lines));
+        }
         _ = ParseCanonicalData(lines);
     }
 
+    // Both callers materialize the array or validate initialization before parsing.
     private static ImmutableArray<CorpusObservation> ParseCanonicalData(
-        string[] lines)
+        ImmutableArray<string> lines)
     {
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             lines.Length);
@@ -134,7 +138,7 @@ internal static class CorpusSnapshotFormat
             return false;
         }
 
-        var parts = line!.Split('|');
+        var parts = line!.Split('|').ToImmutableArray();
         if (parts.Length != 4 ||
             !Enum.TryParse<CorpusVerdict>(
                 parts[1],
@@ -172,10 +176,10 @@ internal static class CorpusSnapshotFormat
     }
 
     private sealed record ParsedSnapshot(
-        string[] DataLines,
+        ImmutableArray<string> DataLines,
         ImmutableArray<CorpusObservation> Observations)
     {
-        public string[] DataLines { get; init; } = DataLines ?? throw new System.ArgumentNullException(nameof(DataLines));
+        public ImmutableArray<string> DataLines { get; init; } = DataLines.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(DataLines)) : DataLines;
         public ImmutableArray<CorpusObservation> Observations { get; init; } = Observations.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Observations)) : Observations;
     }
 }

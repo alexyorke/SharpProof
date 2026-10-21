@@ -20,13 +20,13 @@ public sealed class ReachableGraphRejectionBoundaryTests
         switch (mutation)
         {
             case "types":
-                graph.Types = null!;
+                graph = graph with { Types = default };
                 break;
             case "roots":
-                graph.Roots = [int.MaxValue];
+                graph = graph with { Roots = [int.MaxValue] };
                 break;
             case "term":
-                graph.Terms = [null!];
+                graph = graph with { Terms = [null!] };
                 break;
             case "valid":
                 CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -34,6 +34,7 @@ public sealed class ReachableGraphRejectionBoundaryTests
                 Assert.That(CompilerManifestArtifactJson.Deserialize(payload, cancellationToken: TestContext.CurrentContext.CancellationToken).ReachableSource!.Bodies, Has.Length.EqualTo(1));
                 return;
         }
+        { artifact = artifact with { ReachableSource = artifact.ReachableSource! with { Bodies = artifact.ReachableSource!.Bodies.ReplaceReference(artifact.ReachableSource!.Bodies.Single(), artifact.ReachableSource!.Bodies.Single() with { Graph = graph }) } }; }
         var malformed = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Deserialize(malformed, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -24,18 +25,16 @@ public sealed class FrontendFailureRetentionTests
     {
         var cases = FrozenRecursiveCases();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(cases, Has.Count.EqualTo(269));
-        Assert.That(results, Has.Length.EqualTo(cases.Count));
-        var knownFailures = new HashSet<string>(StringComparer.Ordinal)
-        {
+        Assert.That(cases, Has.Length.EqualTo(269));
+        Assert.That(results, Has.Length.EqualTo(cases.Length));
+        var knownFailures = ImmutableHashSet.Create(StringComparer.Ordinal,
             "(values == (condition ? values : values))",
             "((condition ? values : values) == values)",
             "(values != (condition ? values : values))",
-            "((condition ? values : values) != values)"
-        };
+            "((condition ? values : values) != values)");
         var semanticFailures = 0;
         var agreements = 0;
-        for (var index = 0; index < cases.Count; index++)
+        for (var index = 0; index < cases.Length; index++)
         {
             var observed = results[index];
             var expression = cases[index].Expression.Render();
@@ -58,18 +57,27 @@ public sealed class FrontendFailureRetentionTests
         }
         Assert.That(agreements, Is.EqualTo(265));
         Assert.That(semanticFailures, Is.EqualTo(4));
-        var known = cases.FindIndex(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Expression.Render() ==
-            "(values == (condition ? values : values))"));
+        var known = -1;
+        for (var index = 0; index < cases.Length; index++)
+        {
+            var generated = cases[index];
+            System.ArgumentNullException.ThrowIfNull(generated);
+            if (generated.Expression.Render() == "(values == (condition ? values : values))")
+            {
+                known = index;
+                break;
+            }
+        }
         Assert.That(known, Is.GreaterThanOrEqualTo(0));
         Assert.That(results[known].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(results[known].Detail, Does.Contain("UnsupportedCast"));
         var census = JsonSerializer.Serialize(new
         {
-            cases = cases.Count,
+            cases = cases.Length,
             agreements,
             semanticFailures,
-            sources = cases.Select(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Source)).ToArray(),
-            outcomes = results.ToArray()
+            sources = cases.Select(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Source)).ToImmutableArray(),
+            outcomes = results
         });
         var evidenceRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")
             ?? Directory.GetCurrentDirectory();
@@ -181,15 +189,15 @@ public sealed class FrontendFailureRetentionTests
         return GeneratedCSharpExpression.Conditional(
             GeneratedCSharpExpression.Condition(), whenTrue, whenFalse);
     }
-    private static List<GeneratedCSharpCase> FrozenRecursiveCases()
+    private static ImmutableArray<GeneratedCSharpCase> FrozenRecursiveCases()
     {
         var integer = Compound(GeneratedCSharpExpression.Left(), GeneratedCSharpExpression.Right());
         var boolean = Compound(GeneratedCSharpExpression.Condition(), GeneratedCSharpExpression.Boolean(false));
         var text = Compound(GeneratedCSharpExpression.Text(), GeneratedCSharpExpression.String("!"));
         var sequence = Compound(GeneratedCSharpExpression.Values(), GeneratedCSharpExpression.Values());
         var reference = Compound(GeneratedCSharpExpression.Reference(), GeneratedCSharpExpression.NullReference());
-        var parents = new List<GeneratedCSharpExpression>
-        {
+        var parentBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpExpression>();
+        parentBuilder.AddRange(ImmutableArray.Create<GeneratedCSharpExpression>(
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Not, boolean),
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Negate, integer),
             GeneratedCSharpExpression.Conditional(boolean, integer, integer),
@@ -199,39 +207,37 @@ public sealed class FrontendFailureRetentionTests
             GeneratedCSharpExpression.CastToString(reference),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, text),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.AndAlso, boolean, boolean),
-            GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, boolean)
-        };
-        foreach (var kind in new[]
-        {
+            GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, boolean)));
+        foreach (var kind in ImmutableArray.Create(
             GeneratedExpressionKind.Add, GeneratedExpressionKind.Subtract,
             GeneratedExpressionKind.Multiply, GeneratedExpressionKind.Divide,
             GeneratedExpressionKind.Remainder, GeneratedExpressionKind.LessThan,
             GeneratedExpressionKind.LessThanOrEqual, GeneratedExpressionKind.GreaterThan,
-            GeneratedExpressionKind.GreaterThanOrEqual
-        })
+            GeneratedExpressionKind.GreaterThanOrEqual))
         {
-            parents.Add(GeneratedCSharpExpression.Binary(kind, integer, integer));
+            parentBuilder.Add(GeneratedCSharpExpression.Binary(kind, integer, integer));
         }
-        foreach (var kind in new[] { GeneratedExpressionKind.Equal, GeneratedExpressionKind.NotEqual })
+        foreach (var kind in ImmutableArray.Create(GeneratedExpressionKind.Equal, GeneratedExpressionKind.NotEqual))
         {
-            foreach (var operand in new[] { integer, text, sequence, reference })
+            foreach (var operand in ImmutableArray.Create(integer, text, sequence, reference))
             {
-                parents.Add(GeneratedCSharpExpression.Binary(kind, operand, operand));
+                parentBuilder.Add(GeneratedCSharpExpression.Binary(kind, operand, operand));
             }
         }
 
-        var cases = new List<GeneratedCSharpCase>();
+        var parents = parentBuilder.ToImmutable();
+        var caseBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpCase>();
         foreach (var parent in parents)
         {
             var candidates = CSharpStructuralShrinker.GetCandidates(parent);
-            var childSources = parent.Children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Render())).ToHashSet(StringComparer.Ordinal);
+            var childSources = parent.Children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Render())).ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(candidates.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind == parent.Kind &&
                 !childSources.Contains(candidate.Render()))), Is.True, parent.Render());
             foreach (var candidate in candidates)
             {
                 Assert.That(candidate.Type, Is.EqualTo(parent.Type));
                 Assert.That(candidate.NodeCount, Is.LessThan(parent.NodeCount));
-                cases.Add(new(candidate, Left: 8, Right: 2, Condition: true)
+                caseBuilder.Add(new(candidate, Left: 8, Right: 2, Condition: true)
                 {
                     Text = "proof",
                     Values = [3, 5, 7],
@@ -240,6 +246,6 @@ public sealed class FrontendFailureRetentionTests
             }
         }
         Assert.That(parents.Select(parent => parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Kind)).Distinct().Count(), Is.EqualTo(20));
-        return cases;
+        return caseBuilder.ToImmutable();
     }
 }

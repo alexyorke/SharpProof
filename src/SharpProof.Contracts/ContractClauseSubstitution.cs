@@ -7,7 +7,7 @@ internal static class ContractClauseSubstitution
     internal static ContractClauseSubstitutionResult Substitute(
         IrFactory factory,
         ImmutableArray<BoundContractClause> sourceClauses,
-        IReadOnlyDictionary<IrVarId, IrTerm> substitutions)
+        ImmutableDictionary<IrVarId, IrTerm> substitutions)
     {
 
         RepositoryParameterGuard.RequireInitialized(sourceClauses.IsDefault, nameof(sourceClauses), "Array must be initialized.");

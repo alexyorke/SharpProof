@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Fuzz;
@@ -11,15 +12,13 @@ public sealed class FuzzScalarAndUnaryTests
     public void SemanticEdgesPreserveBooleanStringAndSharedSequenceInputs()
     {
         long[] shared = [4, 7];
-        var cases = new[]
-        {
+        var cases = ImmutableArray.Create(
             new FrontendSemanticEdgeCase("bool", "bool value", "!value",
                 [true], FrontendSubsetDecision.Exact, FrontendAbstention.None),
             new FrontendSemanticEdgeCase("string", "string value", "value",
                 ["proof"], FrontendSubsetDecision.Exact, FrontendAbstention.None),
             new FrontendSemanticEdgeCase("long[]", "long[] first, long[] second", "first",
-                [shared, shared], FrontendSubsetDecision.Exact, FrontendAbstention.None)
-        };
+                [shared, shared], FrontendSubsetDecision.Exact, FrontendAbstention.None));
 
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
@@ -56,16 +55,14 @@ public sealed class FuzzScalarAndUnaryTests
     {
         var integer = GeneratedCSharpExpression.Binary(GeneratedExpressionKind.Add,
             GeneratedCSharpExpression.Left(), GeneratedCSharpExpression.Integer(2));
-        var parents = new[]
-        {
+        var parents = ImmutableArray.Create(
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Negate, integer),
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Not,
                 GeneratedCSharpExpression.Binary(GeneratedExpressionKind.AndAlso,
                     GeneratedCSharpExpression.Condition(), GeneratedCSharpExpression.Boolean(true))),
             GeneratedCSharpExpression.Conditional(GeneratedCSharpExpression.Condition(),
-                integer, GeneratedCSharpExpression.Right())
-        };
-        var cases = new List<GeneratedCSharpCase>();
+                integer, GeneratedCSharpExpression.Right()));
+        var casesBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpCase>();
         foreach (var parent in parents)
         {
             var candidates = CSharpStructuralShrinker.GetCandidates(parent);
@@ -74,12 +71,13 @@ public sealed class FuzzScalarAndUnaryTests
             {
                 Assert.That(candidate.Type, Is.EqualTo(parent.Type));
                 Assert.That(candidate.NodeCount, Is.LessThan(parent.NodeCount));
-                cases.Add(new(candidate, 3, -1, true));
+                casesBuilder.Add(new(candidate, 3, -1, true));
             }
         }
 
+        var cases = casesBuilder.ToImmutable();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(results, Has.Length.EqualTo(cases.Count));
+        Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)
         {
             Assert.That(results[index].Status, Is.EqualTo(FuzzOracleStatus.Agreement),

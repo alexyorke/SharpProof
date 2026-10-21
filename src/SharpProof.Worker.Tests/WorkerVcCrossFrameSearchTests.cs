@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Smt;
@@ -161,13 +162,16 @@ public sealed class WorkerVcCrossFrameSearchTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             Assert.That(response.Errors, Is.Empty);
-            var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition))
-                .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+            var ordinals = ImmutableDictionaryCapture.Create(
+                response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)),
+                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal),
+                StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+                Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo(new[] { incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None }));
+                Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }

@@ -27,8 +27,9 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds every slot, the Worker remainder shards dominate the rest, and
-    # Projects holds every other task. All keeps the single-runner task set.
+    # holds the Gates corpus task and shards, the Worker remainder shards
+    # dominate the rest, and Projects holds every other task. All keeps the
+    # single-runner task set.
     [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
     [string]$CoverageTaskGroup = 'All'
 )
@@ -55,8 +56,8 @@ $semanticSolutionFilter = Join-Path `
     $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
 $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
-$semanticProjects = @($semanticSolution.solution.projects |
-        ForEach-Object { ([string]$_).Replace('\', '/') })
+$semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticSolution.solution.projects |
+            ForEach-Object { ([string]$_).Replace('\', '/') }))
 $gatesProject = 'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
 $partitionFilter = ''
 if ($SemanticCohort -ne 'All') {
@@ -72,16 +73,16 @@ if ($SemanticCohort -ne 'All') {
     if (@($semanticProjects | Where-Object { $_ -ceq $gatesProject }).Count -ne 1) {
         throw 'The canonical semantic project list must contain exactly one Gates project.'
     }
-    $semanticProjects = @($semanticProjects | Where-Object {
-            if ($SemanticCohort -eq 'Gates') { $_ -ceq $gatesProject }
-            else { $_ -cne $gatesProject }
-        })
+    $semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticProjects | Where-Object {
+                if ($SemanticCohort -eq 'Gates') { $_ -ceq $gatesProject }
+                else { $_ -cne $gatesProject }
+            }))
     $partitionFilter = Join-Path $repositoryRoot (
         '.sharpproof-canonical-' + [Guid]::NewGuid().ToString('N') + '.slnf')
-    [ordered]@{ solution = [ordered]@{
-            path = 'SharpProof.slnx'; projects = $semanticProjects
-        }
-    } | ConvertTo-Json -Depth 4 |
+    ([ordered]@{ solution = ([ordered]@{
+                path = 'SharpProof.slnx'; projects = $semanticProjects
+            }).AsReadOnly()
+    }).AsReadOnly() | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
     $semanticSolutionFilter = $partitionFilter
 }
@@ -108,47 +109,51 @@ if ($CoverageTaskGroup -ne 'All' -and -not $coverageEnabled) {
     throw 'Coverage task groups require coverage collection.'
 }
 if ($coverageEnabled) {
-    # The corpus verifier starts its own worker pool and must run in a separate
-    # task that reserves every slot. Attributes has its own collector stage.
+    # Gates runs as its own task set below; its corpus verifier task reserves
+    # every slot. Attributes has its own collector stage.
     # Architecture XML/DAG checks retain a separate strict noninstrumented TRX task.
-    $semanticProjects = @($semanticProjects | Where-Object {
-            $_ -cne $gatesProject -and
-            $_ -cne 'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj' -and
-            (-not $AttributesCollectedSeparately -or
-            $_ -cne 'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj')
-        })
+    $semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticProjects | Where-Object {
+                $_ -cne $gatesProject -and
+                $_ -cne 'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj' -and
+                (-not $AttributesCollectedSeparately -or
+                $_ -cne 'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj')
+            }))
     $partitionFilter = Join-Path $repositoryRoot (
         '.sharpproof-coverage-' + [Guid]::NewGuid().ToString('N') + '.slnf')
-    [ordered]@{ solution = [ordered]@{
-            path = 'SharpProof.slnx'; projects = $semanticProjects
-        }
-    } | ConvertTo-Json -Depth 4 |
+    ([ordered]@{ solution = ([ordered]@{
+                path = 'SharpProof.slnx'; projects = $semanticProjects
+            }).AsReadOnly()
+    }).AsReadOnly() | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
     $semanticSolutionFilter = $partitionFilter
 }
 
 if (-not $NoBuild) {
-    $semanticBuildProjects = if ($ArchitectureOnly) {
-        @('src\SharpProof.Architecture.Tests\SharpProof.Architecture.Tests.csproj')
+    $semanticBuildProjectBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    if ($ArchitectureOnly) {
+        $semanticBuildProjectBuilder.Add('src\SharpProof.Architecture.Tests\SharpProof.Architecture.Tests.csproj')
+    }
+    elseif ($SemanticCohort -eq 'All') {
+        foreach ($project in $semanticSolution.solution.projects) { $semanticBuildProjectBuilder.Add([string]$project) }
+        $semanticBuildProjectBuilder.Add('src\SharpProof.Worker.Tests\SharpProof.Worker.Tests.csproj')
     }
     else {
-        if ($SemanticCohort -eq 'All') {
-            @($semanticSolution.solution.projects) + @(
-                'src\SharpProof.Worker.Tests\SharpProof.Worker.Tests.csproj')
+        $semanticBuildProjectBuilder.AddRange($semanticProjects)
+        if ($SemanticCohort -ne 'Gates') {
+            $semanticBuildProjectBuilder.Add('src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
         }
-        elseif ($SemanticCohort -eq 'Gates') { $semanticProjects }
-        else { $semanticProjects + @('src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj') }
     }
+    $semanticBuildProjects = $semanticBuildProjectBuilder.ToImmutable()
     $semanticBuildFilter = Join-Path $repositoryRoot (
         '.sharpproof-semantic-build-' +
         [Guid]::NewGuid().ToString('N') + '.slnf')
     try {
-        [pscustomobject]@{
-            solution = [ordered]@{
-                path     = 'SharpProof.slnx'
-                projects = @($semanticBuildProjects)
-            }
-        } | ConvertTo-Json -Depth 4 |
+        ([ordered]@{
+            solution = ([ordered]@{
+                    path     = 'SharpProof.slnx'
+                    projects = $semanticBuildProjects
+                }).AsReadOnly()
+        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
             Set-Content `
                 -LiteralPath $semanticBuildFilter `
                 -Encoding utf8NoBOM
@@ -156,14 +161,15 @@ if (-not $NoBuild) {
             -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
             -TimeoutSeconds $TimeoutSeconds `
             -Quiet:$Quiet
-        $buildArguments = @(
-            'build', $semanticBuildFilter,
-            '-c', $Configuration, '--no-restore')
+        $buildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArgumentBuilder.AddRange([string[]]@(
+                'build', $semanticBuildFilter,
+                '-c', $Configuration, '--no-restore'))
         if ($Fast) {
-            $buildArguments += '-p:RunAnalyzersDuringBuild=false'
+            $buildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
         }
         Invoke-SharpProofRequiredDotnet `
-            -Arguments $buildArguments `
+            -Arguments ([string[]]@($buildArgumentBuilder.ToImmutable())) `
             -TimeoutSeconds $TimeoutSeconds `
             -Quiet:$Quiet
     }
@@ -188,7 +194,7 @@ $canonicalTimingOutput = Join-Path $timingDirectory (
 $timingOutput = Join-Path $timingDirectory (
     $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
     $timingSuffix + '.json')
-$priorDurations = @{}
+$priorDurationBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
 foreach ($priorTimingPath in $(if ($Fast) {
             @($canonicalTimingOutput, $timingOutput)
         }
@@ -204,7 +210,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
         foreach ($task in @($prior.tasks)) {
             $elapsed = [long]$task.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorDurations[[string]$task.name] = $elapsed
+                $priorDurationBuilder[[string]$task.name] = $elapsed
             }
         }
     }
@@ -214,6 +220,8 @@ foreach ($priorTimingPath in $(if ($Fast) {
             $_.Exception.Message)
     }
 }
+
+$priorDurations = $priorDurationBuilder.ToImmutable()
 
 $mainParallelism = [Math]::Max(
     1,
@@ -226,45 +234,48 @@ $coverageEnabled -or $ArchitectureOnly -or (
 $semanticProjectShardingEnabled =
 $architectureShardingEnabled -and -not $ArchitectureOnly
 $workerClassPrefix = 'SharpProof.Worker.Test.'
-$workerDedicatedClasses = @(
-    'ClaimManifestBuilderTests',
-    'CompilerManifestArtifactTests')
+New-Variable -Name workerDedicatedClasses -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'ClaimManifestBuilderTests',
+            'CompilerManifestArtifactTests')))
 $claimFilter =
 'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[0]
 $manifestFilter =
 'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[1]
-$workerCoreClasses = @(
-    'WorkerTests',
-    'WorkerProgramTests',
-    'CompilerCallableLowererTests'
-)
+New-Variable -Name workerCoreClasses -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'WorkerTests',
+            'WorkerProgramTests',
+            'CompilerCallableLowererTests'
+        )))
 $workerCoreFilter = @($workerCoreClasses | ForEach-Object {
         'FullyQualifiedName~' + $workerClassPrefix + $_
     }) -join '|'
 $workerRemainderFilter = @(
-    $workerDedicatedClasses + $workerCoreClasses |
+    @($workerDedicatedClasses) + @($workerCoreClasses) |
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
-# The remainder holds about thirteen minutes of serial Worker test time, and
-# one test process keeps about one CPU busy. Split it by test class name
-# prefix into shards balanced by measured class durations (about three
-# minutes each uninstrumented). The last shard is the complement of the
-# listed prefixes, so every current and future class runs in exactly one
-# shard. Rebalance the prefixes when one shard grows well past the others.
-$workerRemainderShardPrefixes = @(
-    , @('NativeA')
-    , @('NativeS', 'C')
-    , @('W', 'T', 'G', 'F'))
-$workerRemainderShardFilters = @(
-    foreach ($prefixes in $workerRemainderShardPrefixes) {
-        '(' + (@($prefixes | ForEach-Object {
-                    'FullyQualifiedName~' + $workerClassPrefix + $_
-                }) -join '|') + ')'
+# Preserve the measured upstream class-prefix partition, with an immutable
+# outer vector and immutable ordered prefix groups. The final filter is the
+# complement, so every current and future remainder class selects one shard.
+$workerPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeA'))
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeS', 'C'))
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('W', 'T', 'G', 'F'))
+$workerRemainderShardPrefixes = $workerPrefixGroupBuilder.ToImmutable()
+$workerShardFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$workerComplementFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($prefixes in $workerRemainderShardPrefixes) {
+    $includedPrefixes = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($prefix in $prefixes) {
+        $includedPrefixes.Add('FullyQualifiedName~' + $workerClassPrefix + $prefix)
+        $workerComplementFilterBuilder.Add('FullyQualifiedName!~' + $workerClassPrefix + $prefix)
     }
-    @($workerRemainderShardPrefixes | ForEach-Object { $_ } | ForEach-Object {
-            'FullyQualifiedName!~' + $workerClassPrefix + $_
-        }) -join '&')
+    $workerShardFilterBuilder.Add('(' + ($includedPrefixes.ToImmutable() -join '|') + ')')
+}
+$workerShardFilterBuilder.Add($workerComplementFilterBuilder.ToImmutable() -join '&')
+$workerRemainderShardFilters = $workerShardFilterBuilder.ToImmutable()
 
 $testProject = Join-Path $repositoryRoot (
     'src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
@@ -282,37 +293,75 @@ $checksumMethod = $workerClassPrefix +
 'FixedChecksumNormalWorkerEntryTests.FrozenChecksumUsesActualDefaultNativeWorker'
 $checksumTaskFilter = "($workerRemainderTaskFilter)&(FullyQualifiedName=$checksumMethod)"
 if ($coverageEnabled) {
-    $workerRemainderTaskFilter += "&(FullyQualifiedName!=$checksumMethod)"
+    $workerRemainderTaskFilter = [string]::Concat($workerRemainderTaskFilter, "&(FullyQualifiedName!=$checksumMethod)")
 }
-$workerRemainderTaskNames = @(
-    for ($index = 1; $index -le $workerRemainderShardFilters.Count; $index++) {
-        'worker-remainder-' + $index
-    })
-$tasks = [Collections.Generic.List[object]]::new()
+$workerRemainderNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+for ($index = 1; $index -le $workerRemainderShardFilters.Length; $index++) {
+    $workerRemainderNameBuilder.Add('worker-remainder-' + $index)
+}
+$workerRemainderTaskNames = $workerRemainderNameBuilder.ToImmutable()
+# Preserve the upstream Gates partition with immutable prefix groups and filters.
+$gatesShardingEnabled =
+$semanticProjectShardingEnabled -or $SemanticCohort -eq 'Gates'
+$gatesClassPrefix = 'SharpProof.Gates.Test.'
+$gatesCorpusClasses = [Collections.Immutable.ImmutableArray]::Create[string](
+    'CorpusSnapshotWorkflowTests', 'GatesCommandWorkflowTests')
+$gatesCorpusFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$gatesRemainderFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($gatesCorpusClass in $gatesCorpusClasses) {
+    $gatesCorpusFilterBuilder.Add('FullyQualifiedName~' + $gatesClassPrefix + $gatesCorpusClass)
+    $gatesRemainderFilterBuilder.Add('FullyQualifiedName!~' + $gatesClassPrefix + $gatesCorpusClass)
+}
+$gatesCorpusFilterBuilder.Add('TestCategory=Corpus')
+$gatesRemainderFilterBuilder.Add('TestCategory!=Corpus')
+$gatesCorpusFilter = $gatesCorpusFilterBuilder.ToImmutable() -join '|'
+$gatesRemainderFilter = $gatesRemainderFilterBuilder.ToImmutable() -join '&'
+$gatesPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$gatesPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeEffectOracleGate'))
+$gatesPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeEffectOracleSelection', 'CorpusGate'))
+$gatesRemainderShardPrefixes = $gatesPrefixGroupBuilder.ToImmutable()
+$gatesShardFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$gatesComplementFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($prefixes in $gatesRemainderShardPrefixes) {
+    $includedPrefixes = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($prefix in $prefixes) {
+        $includedPrefixes.Add('FullyQualifiedName~' + $gatesClassPrefix + $prefix)
+        $gatesComplementFilterBuilder.Add('FullyQualifiedName!~' + $gatesClassPrefix + $prefix)
+    }
+    $gatesShardFilterBuilder.Add('(' + ($includedPrefixes.ToImmutable() -join '|') + ')')
+}
+$gatesShardFilterBuilder.Add($gatesComplementFilterBuilder.ToImmutable() -join '&')
+$gatesRemainderShardFilters = $gatesShardFilterBuilder.ToImmutable()
+$gatesRemainderNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+for ($index = 1; $index -le $gatesRemainderShardFilters.Length; $index++) {
+    $gatesRemainderNameBuilder.Add('gates-remainder-' + $index)
+}
+$gatesRemainderTaskNames = $gatesRemainderNameBuilder.ToImmutable()
+$taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
         foreach ($project in $semanticProjects) {
-            if ($project -eq (
+            if ($project -ceq $gatesProject -or $project -eq (
                     'src/SharpProof.Architecture.Tests/' +
                     'SharpProof.Architecture.Tests.csproj')) {
                 continue
             }
-            $tasks.Add([pscustomobject]@{
-                    Name                         = 'semantic-' + (
-                        [IO.Path]::GetFileNameWithoutExtension(
-                            $project)).ToLowerInvariant()
-                    Target                       = Join-Path $repositoryRoot $project
-                    Filter                       = $semanticFilter
-                    ProjectParallelism           = 0
-                    IsolateOutput                = $false
-                    Slots                        = [Math]::Min($parallelism, 2)
-                    DefaultEstimatedMilliseconds = 30000L
-                })
+            $taskBuilder.Add(([ordered]@{
+                        Name                         = 'semantic-' + (
+                            [IO.Path]::GetFileNameWithoutExtension(
+                                $project)).ToLowerInvariant()
+                        Target                       = Join-Path $repositoryRoot $project
+                        Filter                       = $semanticFilter
+                        ProjectParallelism           = 0
+                        IsolateOutput                = $false
+                        Slots                        = [Math]::Min($parallelism, 2)
+                        DefaultEstimatedMilliseconds = 30000L
+                    }).AsReadOnly())
         }
     }
-    else {
-        $tasks.Add(
-            [pscustomobject]@{
+    elseif ($SemanticCohort -ne 'Gates') {
+        $taskBuilder.Add(
+            ([ordered]@{
                 Name                         = 'semantic-projects'
                 Target                       = $semanticSolutionFilter
                 Filter                       = $semanticFilter
@@ -323,117 +372,153 @@ if (-not $ArchitectureOnly) {
                 # coverage widths retain their existing reservation.
                 Slots                        = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
-            })
+            }).AsReadOnly())
     }
-    if ($coverageEnabled) {
-        $tasks.Add([pscustomobject]@{
-                Name                         = 'semantic-gates'
-                Target                       = Join-Path $repositoryRoot $gatesProject
-                Filter                       = $semanticFilter
-                ProjectParallelism           = 0
-                IsolateOutput                = $false
-                Slots                        = $parallelism
-                DefaultEstimatedMilliseconds = 500000L
-            })
+    # The corpus task reserves the verifier pool and its host; coverage
+    # reserves every slot. Other shards retain upstream process isolation.
+    $gatesDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $gatesDescriptorBuilder.Add(([ordered]@{
+                Name                         = 'gates-corpus'
+                Filter                       = "($gatesCorpusFilter)&($semanticFilter)"
+                Slots                        = $(if ($coverageEnabled) { $parallelism } else { [Math]::Min($parallelism, 3) })
+                DefaultEstimatedMilliseconds = 250000L
+            }).AsReadOnly())
+    for ($index = 0; $index -lt $gatesRemainderShardFilters.Length; $index++) {
+        $gatesDescriptorBuilder.Add(([ordered]@{
+                    Name                         = $gatesRemainderTaskNames[$index]
+                    Filter                       = "($gatesRemainderFilter)&($semanticFilter)&$($gatesRemainderShardFilters[$index])"
+                    Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+                    DefaultEstimatedMilliseconds = 100000L
+                }).AsReadOnly())
     }
-    $workerTaskDescriptors = @(
-        [pscustomobject]@{
-            Name                         = 'worker-claim-manifest'
-            Filter                       = $claimTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 30000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-compiler-manifest'
-            Filter                       = $manifestTaskFilter
-            Slots                        = [Math]::Min($parallelism, 4)
-            DefaultEstimatedMilliseconds = 50000L
-        },
-        [pscustomobject]@{
-            Name                         = 'worker-core'
-            Filter                       = $workerCoreTaskFilter
-            Slots                        = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 50000L
-        })
+    $gatesTaskDescriptors = $gatesDescriptorBuilder.ToImmutable()
+    if ($gatesShardingEnabled) {
+        foreach ($descriptor in $gatesTaskDescriptors) {
+            $taskBuilder.Add(([ordered]@{
+                        Name                         = $descriptor.Name
+                        Target                       = Join-Path $repositoryRoot $gatesProject
+                        Filter                       = $descriptor.Filter
+                        ProjectParallelism           = 0
+                        IsolateOutput                = $true
+                        Slots                        = $descriptor.Slots
+                        DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
+                    }).AsReadOnly())
+        }
+    }
+    $workerDescriptorBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $workerDescriptorBuilder.AddRange([object[]]@(
+            ([ordered]@{
+                Name                         = 'worker-claim-manifest'
+                Filter                       = $claimTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 30000L
+            }).AsReadOnly(),
+            ([ordered]@{
+                Name                         = 'worker-compiler-manifest'
+                Filter                       = $manifestTaskFilter
+                Slots                        = [Math]::Min($parallelism, 4)
+                DefaultEstimatedMilliseconds = 50000L
+            }).AsReadOnly(),
+            ([ordered]@{
+                Name                         = 'worker-core'
+                Filter                       = $workerCoreTaskFilter
+                Slots                        = [Math]::Min($parallelism, 2)
+                DefaultEstimatedMilliseconds = 50000L
+            }).AsReadOnly()))
     if ($coverageEnabled) {
         # The fixed-deadline native check retains its existing process hint,
         # while reserving the scheduler so competing test processes cannot overlap.
-        $workerTaskDescriptors += [pscustomobject]@{
-            Name                         = 'worker-fixed-checksum'
-            Filter                       = $checksumTaskFilter
-            Slots                        = $parallelism
-            ProcessSlots                 = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 10000L
-        }
+        $workerDescriptorBuilder.Add(([ordered]@{
+                    Name                         = 'worker-fixed-checksum'
+                    Filter                       = $checksumTaskFilter
+                    Slots                        = $parallelism
+                    ProcessSlots                 = [Math]::Min($parallelism, 2)
+                    DefaultEstimatedMilliseconds = 10000L
+                }).AsReadOnly())
     }
-    # Each remainder shard keeps about one CPU busy, so uninstrumented runs
-    # schedule one slot per shard and overlap every shard. Instrumented
-    # processes use more memory, so coverage keeps two shards at a time.
-    for ($index = 0; $index -lt $workerRemainderShardFilters.Count; $index++) {
-        $workerTaskDescriptors += [pscustomobject]@{
-            Name                         = $workerRemainderTaskNames[$index]
-            Filter                       = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
-            Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
-            DefaultEstimatedMilliseconds = 200000L
-        }
+    # Retain the upstream four-shard policy and memory-aware slot reservation.
+    for ($index = 0; $index -lt $workerRemainderShardFilters.Length; $index++) {
+        $workerDescriptorBuilder.Add(([ordered]@{
+                    Name                         = $workerRemainderTaskNames[$index]
+                    Filter                       = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
+                    Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
+                    DefaultEstimatedMilliseconds = 200000L
+                }).AsReadOnly())
     }
+    $workerTaskDescriptors = $workerDescriptorBuilder.ToImmutable()
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
-        $tasks.Add([pscustomobject]@{
-                Name                         = $descriptor.Name
-                Target                       = $testProject
-                Filter                       = $descriptor.Filter
-                ProjectParallelism           = 0
-                IsolateOutput                = $true
-                Slots                        = $descriptor.Slots
-                ProcessSlots                 = $(if ($descriptor.PSObject.Properties.Name -contains 'ProcessSlots') {
-                        $descriptor.ProcessSlots
-                    }
-                    else { $descriptor.Slots })
-                DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
-            })
+        $taskBuilder.Add(([ordered]@{
+                    Name                         = $descriptor.Name
+                    Target                       = $testProject
+                    Filter                       = $descriptor.Filter
+                    ProjectParallelism           = 0
+                    IsolateOutput                = $true
+                    Slots                        = $descriptor.Slots
+                    ProcessSlots                 = $(if ((($descriptor -is [Collections.IDictionary] -and $descriptor.Keys -contains 'ProcessSlots') -or ($descriptor -isnot [Collections.IDictionary] -and $descriptor.PSObject.Properties.Name -contains 'ProcessSlots'))) {
+                            $descriptor.ProcessSlots
+                        }
+                        else { $descriptor.Slots })
+                    DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
+                }).AsReadOnly())
     }
 }
 if ($architectureShardingEnabled) {
-    $tasks.Add([pscustomobject]@{
-            Name                         = 'architecture'
-            EvidenceKind                 = 'ArchitectureOnly'
-            Target                       = Join-Path $repositoryRoot (
-                'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj')
-            Filter                       = $semanticFilter
-            ProjectParallelism           = 0
-            IsolateOutput                = $false
-            Slots                        = 1
-            DefaultEstimatedMilliseconds = 10000L
-        })
+    $taskBuilder.Add(([ordered]@{
+                Name                         = 'architecture'
+                EvidenceKind                 = 'ArchitectureOnly'
+                Target                       = Join-Path $repositoryRoot (
+                    'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj')
+                Filter                       = $semanticFilter
+                ProjectParallelism           = 0
+                IsolateOutput                = $false
+                Slots                        = 1
+                DefaultEstimatedMilliseconds = 10000L
+            }).AsReadOnly())
 }
 if ($CoverageTaskGroup -ne 'All') {
-    $gatesTaskNames = @('semantic-gates')
-    $workerTaskNames = $workerRemainderTaskNames + @('worker-fixed-checksum')
+    $gatesTaskNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $gatesTaskNameBuilder.Add('gates-corpus')
+    foreach ($gatesTaskName in $gatesRemainderTaskNames) { $gatesTaskNameBuilder.Add($gatesTaskName) }
+    $gatesTaskNames = $gatesTaskNameBuilder.ToImmutable()
+    $workerTaskNameBuilder = $workerRemainderTaskNames.ToBuilder()
+    $workerTaskNameBuilder.Add('worker-fixed-checksum')
+    $workerTaskNames = $workerTaskNameBuilder.ToImmutable()
     # Capture the name first: inside switch, $_ is the switch value.
-    $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
-            $taskName = [string]$_.Name
-            switch ($CoverageTaskGroup) {
-                'Gates' { $taskName -cin $gatesTaskNames }
-                'Worker' { $taskName -cin $workerTaskNames }
-                'Projects' { $taskName -cnotin ($gatesTaskNames + $workerTaskNames) }
-            }
-        })
-    if ($tasks.Count -eq 0) {
+    $taskSnapshot = $taskBuilder.ToImmutable()
+    $selectedTasks = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($taskSnapshot | Where-Object {
+                $taskName = [string]$_.Name
+                switch ($CoverageTaskGroup) {
+                    'Gates' { $taskName -cin $gatesTaskNames }
+                    'Worker' { $taskName -cin $workerTaskNames }
+                    'Projects' { $taskName -cnotin $gatesTaskNames -and $taskName -cnotin $workerTaskNames }
+                }
+            }))
+    $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($selectedTask in $selectedTasks) { $taskBuilder.Add($selectedTask) }
+    if ($taskBuilder.Count -eq 0) {
         throw "Coverage task group '$CoverageTaskGroup' selected no tasks."
     }
 }
-foreach ($task in $tasks) {
-    $task | Add-Member -NotePropertyName EstimatedMilliseconds `
-        -NotePropertyValue $(if ($priorDurations.ContainsKey($task.Name)) {
-            [long]$priorDurations[$task.Name]
-        }
-        else {
-            [long]$task.DefaultEstimatedMilliseconds
-        })
+$estimatedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+foreach ($task in $taskBuilder) {
+    $properties = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $task.Keys) { $properties[$key] = $task[$key] }
+    $properties['EstimatedMilliseconds'] = if ($priorDurations.ContainsKey($task.Name)) {
+        [long]$priorDurations[$task.Name]
+    }
+    else {
+        [long]$task.DefaultEstimatedMilliseconds
+    }
+    $estimatedTaskBuilder.Add($properties.ToImmutable())
 }
-$tasks = @($tasks | Sort-Object `
-    @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-    @{ Expression = 'Name'; Descending = $false })
+$taskSnapshot = $estimatedTaskBuilder.ToImmutable()
+$orderedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+foreach ($orderedTask in ($taskSnapshot | Sort-Object `
+        @{ Expression = { $_.EstimatedMilliseconds }; Descending = $true }, `
+        @{ Expression = { $_.Name }; Descending = $false }) ) {
+    $orderedTaskBuilder.Add($orderedTask)
+}
+$tasks = $orderedTaskBuilder.ToImmutable()
 
 $retainCanonicalResults = -not [string]::IsNullOrWhiteSpace($TestResultsDirectory)
 if ($retainCanonicalResults -and $coverageEnabled) {
@@ -462,8 +547,8 @@ if ($retainCanonicalResults) {
     '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' |
         Set-Content -LiteralPath $discoverySettings -Encoding utf8NoBOM
 }
-$timings = [Collections.Generic.List[object]]::new()
-$failures = [Collections.Generic.List[string]]::new()
+$timings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 $campaignFailure = $null
 
@@ -471,35 +556,41 @@ try {
     $prepareSemanticTest = {
         param([object]$task)
 
-        $processSlots = if ($task.PSObject.Properties.Name -contains 'ProcessSlots') {
+        $processSlots = if ((($task -is [Collections.IDictionary] -and $task.Keys -contains 'ProcessSlots') -or ($task -isnot [Collections.IDictionary] -and $task.PSObject.Properties.Name -contains 'ProcessSlots'))) {
             $task.ProcessSlots
         }
         else { $task.Slots }
-        $environment = @{
-            SHARPPROOF_TEST_PROJECT_PARALLELISM = $processSlots.ToString(
-                [Globalization.CultureInfo]::InvariantCulture)
-        }
+        $environment = ([ordered]@{
+                SHARPPROOF_TEST_PROJECT_PARALLELISM = $processSlots.ToString(
+                    [Globalization.CultureInfo]::InvariantCulture)
+            }).AsReadOnly()
         if ($retainCanonicalResults) {
             $taskRoot = Join-Path $resultsRoot $task.Name
             [IO.Directory]::CreateDirectory($taskRoot) | Out-Null
-            $discoveryProjects = if ($task.Target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
-                @((Get-Content -LiteralPath $task.Target -Raw | ConvertFrom-Json).solution.projects)
+            $discoveryProjectBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            if ($task.Target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
+                foreach ($project in (Get-Content -LiteralPath $task.Target -Raw | ConvertFrom-Json).solution.projects) {
+                    $discoveryProjectBuilder.Add([string]$project)
+                }
             }
-            else { @($task.Target) }
-            $discoveryArguments = @('vstest')
-            $discoveryAssemblies = @()
+            else { $discoveryProjectBuilder.Add([string]$task.Target) }
+            $discoveryProjects = $discoveryProjectBuilder.ToImmutable()
+            $discoveryArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $discoveryArgumentBuilder.AddRange([string[]]@('vstest'))
+            $discoveryAssemblyBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
             foreach ($project in $discoveryProjects) {
                 $projectPath = [IO.Path]::GetFullPath(([string]$project).Replace('\', '/'), $repositoryRoot)
-                $discoveryAssemblies += Get-SharpProofTestAssemblyPath `
-                    -ProjectPath $projectPath -Configuration $Configuration
+                $discoveryAssemblyBuilder.Add((Get-SharpProofTestAssemblyPath `
+                            -ProjectPath $projectPath -Configuration $Configuration))
             }
-            $discoveryArguments += $discoveryAssemblies
-            $discoveryArguments += @(
-                '/ListFullyQualifiedTests',
-                ('/Settings:' + $discoverySettings),
-                ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
-                ('/TestCaseFilter:' + $task.Filter))
-            Invoke-SharpProofRequiredDotnet -Arguments $discoveryArguments `
+            $discoveryAssemblies = $discoveryAssemblyBuilder.ToImmutable()
+            $discoveryArgumentBuilder.AddRange($discoveryAssemblies)
+            $discoveryArgumentBuilder.AddRange([string[]]@(
+                    '/ListFullyQualifiedTests',
+                    ('/Settings:' + $discoverySettings),
+                    ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
+                    ('/TestCaseFilter:' + $task.Filter)))
+            Invoke-SharpProofRequiredDotnet -Arguments ([string[]]@($discoveryArgumentBuilder.ToImmutable())) `
                 -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
             $dumpRoot = Join-Path $taskRoot 'discovery'
             [IO.Directory]::CreateDirectory($dumpRoot) | Out-Null
@@ -515,9 +606,9 @@ try {
         $isolatedOutput = ''
         if ($coverageEnabled -and $task.IsolateOutput) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                -SourceDirectory (Join-Path $repositoryRoot (
-                    'artifacts/bin/SharpProof.Worker.Tests/' + $Configuration +
-                    '/net10.0')) `
+                -SourceDirectory (Split-Path -Parent (
+                    Get-SharpProofTestAssemblyPath `
+                        -ProjectPath $task.Target -Configuration $Configuration)) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
                     $task.Name + '/' + $Configuration + '/net10.0'))
@@ -529,40 +620,44 @@ try {
             $assembly = Get-SharpProofTestAssemblyPath `
                 -ProjectPath $task.Target `
                 -Configuration $Configuration
-            $arguments = @('vstest', $assembly)
-            $arguments += '/TestCaseFilter:' + $task.Filter
-            $arguments += '/logger:console;verbosity=minimal'
-            $arguments += "/logger:trx;LogFilePrefix=$($task.Name)"
-            $arguments += '/ResultsDirectory:' + (
-                Join-Path $resultsRoot $task.Name)
-            if ($task.PSObject.Properties.Name -contains 'RunSettings') {
-                $arguments += '/Settings:' + $task.RunSettings
+            $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $argumentBuilder.AddRange([string[]]@('vstest', $assembly))
+            $argumentBuilder.Add('/TestCaseFilter:' + $task.Filter)
+            $argumentBuilder.Add('/logger:console;verbosity=minimal')
+            $argumentBuilder.Add("/logger:trx;LogFilePrefix=$($task.Name)")
+            $argumentBuilder.Add('/ResultsDirectory:' + (
+                    Join-Path $resultsRoot $task.Name))
+            if ((($task -is [Collections.IDictionary] -and $task.Keys -contains 'RunSettings') -or ($task -isnot [Collections.IDictionary] -and $task.PSObject.Properties.Name -contains 'RunSettings'))) {
+                $argumentBuilder.Add('/Settings:' + $task.RunSettings)
             }
+            $arguments = $argumentBuilder.ToImmutable()
         }
         else {
-            $arguments = @(
-                'test', $task.Target, '-c', $Configuration,
-                '--no-build', '--no-restore')
+            $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $argumentBuilder.AddRange([string[]]@(
+                    'test', $task.Target, '-c', $Configuration,
+                    '--no-build', '--no-restore'))
             if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+                $argumentBuilder.Add('-p:OutDir=' + $isolatedOutput + '/')
             }
-            $arguments += @(
-                '--filter', $task.Filter,
-                '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFilePrefix=$($task.Name)",
-                '--results-directory', (Join-Path $resultsRoot $task.Name))
+            $argumentBuilder.AddRange([string[]]@(
+                    '--filter', $task.Filter,
+                    '--logger', 'console;verbosity=minimal',
+                    '--logger', "trx;LogFilePrefix=$($task.Name)",
+                    '--results-directory', (Join-Path $resultsRoot $task.Name)))
             if ($task.ProjectParallelism -gt 0) {
-                $arguments += "/m:$($task.ProjectParallelism)"
+                $argumentBuilder.Add("/m:$($task.ProjectParallelism)")
             }
-            $arguments = Add-SharpProofCoverageArguments `
-                -Arguments $arguments `
+            $coverageArguments = Add-SharpProofCoverageArguments `
+                -ImmutableArguments $argumentBuilder.ToImmutable() `
                 -Enabled ($coverageEnabled -and $task.Name -cne 'architecture') `
                 -Settings $resolvedCoverageSettings
+            $arguments = $coverageArguments
         }
-        return [pscustomobject]@{
-            Arguments   = $arguments
-            Environment = $environment
-        }
+        return ([ordered]@{
+                Arguments   = $arguments
+                Environment = $environment
+            }).AsReadOnly()
     }.GetNewClosure()
     $testRun = Invoke-SharpProofParallelDotnetTests `
         -Tests $tasks `
@@ -573,11 +668,11 @@ try {
         -Label 'Semantic test' `
         -Quiet:$Quiet
     foreach ($result in @($testRun.Completed)) {
-        $timings.Add([pscustomobject]@{
-                name                = $result.Test.Name
-                elapsedMilliseconds = $result.ElapsedMilliseconds
-                exitCode            = $result.ExitCode
-            })
+        $timings.Add(([ordered]@{
+                    name                = $result.Test.Name
+                    elapsedMilliseconds = $result.ElapsedMilliseconds
+                    exitCode            = $result.ExitCode
+                }).AsReadOnly())
     }
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
@@ -592,7 +687,7 @@ try {
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0
             })) {
-        $failures.Add(
+        $failureBuilder.Add(
             "$($failure.Test.Name) exited $($failure.ExitCode).")
     }
 }
@@ -609,10 +704,11 @@ finally {
         Remove-Item -LiteralPath $partitionFilter -Force
     }
     $campaign.Stop()
+    $timingSnapshot = $timings.ToImmutable()
     try {
         $temporaryTiming =
         $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-        [pscustomobject]@{
+        ([ordered]@{
             schemaVersion            = 1
             command                  = 'semantic-tests'
             configuration            = $Configuration
@@ -622,8 +718,8 @@ finally {
             coverageTaskGroup        = $CoverageTaskGroup
             parallelism              = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-            tasks                    = @($timings | Sort-Object name)
-        } | ConvertTo-Json -Depth 5 |
+            tasks                    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($timingSnapshot | Sort-Object { $_.name }))
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
         Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
     }
@@ -635,7 +731,8 @@ finally {
     }
 }
 
-if ($failures.Count -ne 0) {
+$failures = $failureBuilder.ToImmutable()
+if ($failures.Length -ne 0) {
     throw "Parallel semantic tests failed:`n$($failures -join "`n")"
 }
 if (-not $Quiet) {

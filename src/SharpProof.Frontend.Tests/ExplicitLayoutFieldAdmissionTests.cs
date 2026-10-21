@@ -16,7 +16,7 @@ namespace SharpProof.Frontend.Test;
 [NonParallelizable]
 public sealed class ExplicitLayoutFieldAdmissionTests
 {
-    private static readonly byte[] Int32FieldSignature = [0x06, 0x08];
+    private static readonly ImmutableArray<byte> Int32FieldSignature = [0x06, 0x08];
     private static readonly ImmutableArray<string> BclAliases = ["global", "Bcl"];
 
     private const string AutoSource = """
@@ -138,21 +138,20 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
             Optimization = producer.Options.OptimizationLevel.ToString(),
-            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray(),
+            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray(),
             emission.Success,
-            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         AssertNoErrors(producer);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-producer.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-producer.dll"), imageBytes.ToArray());
         var constructed = scenario == "metadata-constructed-auto";
         var typeName = constructed ? "GenericCell\u00601" : "Cell";
         var sourceOwner = producer.GetTypeByMetadataName(typeName);
         Assert.That(sourceOwner, Is.Not.Null);
         await VerifySourceBinding(evidenceDirectory, scenario, producer, sourceOwner!);
-        using var peStream = new MemoryStream(imageBytes, writable: false);
-        using var pe = new PEReader(peStream);
+        using var pe = new PEReader(imageBytes);
         var reader = pe.GetMetadataReader();
         var typeHandle = reader.TypeDefinitions.Single(handle => reader.GetString(reader.GetTypeDefinition(handle).Name) == typeName);
         var typeDefinition = reader.GetTypeDefinition(typeHandle);
@@ -179,7 +178,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         await Save(evidenceDirectory, "pe-layout-binding.json", new
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
-            EmittedPeSha256 = Hash(imageBytes),
+            EmittedPeSha256 = Hash(imageBytes.AsSpan()),
             ModuleMvid = reader.GetGuid(reader.GetModuleDefinition().Mvid),
             TypeToken = MetadataTokens.GetToken(typeHandle),
             ValueToken = MetadataTokens.GetToken(valueHandle),
@@ -250,7 +249,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             Case = scenario,
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
-            EmittedPeSha256 = Hash(imageBytes),
+            EmittedPeSha256 = Hash(imageBytes.AsSpan()),
             Imported = imported,
             Constructed = constructed,
             OwnerMetadataToken = selectedOwner.MetadataToken,
@@ -294,7 +293,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
     private static void AssertNoErrors(Compilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
@@ -403,9 +402,8 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans have a valid SHA256 digest */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 

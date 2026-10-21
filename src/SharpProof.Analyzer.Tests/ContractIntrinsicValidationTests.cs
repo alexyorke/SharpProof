@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Testing;
@@ -51,7 +52,7 @@ public sealed class ContractIntrinsicValidationTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result")
@@ -69,7 +70,7 @@ public sealed class ContractIntrinsicValidationTests
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 2);
         var messages = diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -82,10 +83,11 @@ public sealed class ContractIntrinsicValidationTests
     }
 
     private static void AssertNestingDiagnostic(
-        IReadOnlyCollection<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        ImmutableArray<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
-        System.ArgumentNullException.ThrowIfNull(diagnostics);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        if (diagnostics.IsDefault)
+        { throw new ArgumentNullException(nameof(diagnostics)); }
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),

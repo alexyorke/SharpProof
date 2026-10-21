@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -38,15 +39,15 @@ public sealed class EnumEqualityCompatibilityAuditTests
             "enum-compatibility");
         Directory.CreateDirectory(evidence);
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".observed.cs"), source);
-        var compilation = TestCompilation.Create("EnumEqualityCompatibility_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("EnumEqualityCompatibility_" + caseName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
-        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToArray();
+        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
         Assert.That(warnings, Is.Empty, string.Join("\n", warnings.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, caseName + ".oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, caseName + ".oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("EnumEqualityCompatibility_" + caseName, isCollectible: true);
         string runtimeObservation;
@@ -58,7 +59,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
             var actual = (bool)method.Invoke(null, [witness])!;
             runtimeObservation = $"operator={comparison}; argument=Choice.Second; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
+                $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
                 $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".clr.txt"), runtimeObservation + "\n");
@@ -81,6 +82,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaredClaim.CallableId));
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;

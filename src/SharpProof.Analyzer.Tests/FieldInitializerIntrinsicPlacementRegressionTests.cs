@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -40,7 +41,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
             operationRoot = operationRoot.Parent;
         }
         // An auto-property initializer is enclosed by the implicit backing field.
-        var expectedOwnerKind = SymbolKind.Field;
+        const SymbolKind expectedOwnerKind = SymbolKind.Field;
         var expectedRootKind = property ? OperationKind.PropertyInitializer : OperationKind.FieldInitializer;
         using (Assert.EnterMultipleScope())
         {
@@ -54,7 +55,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         string runtimeFailure;
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>(
                 (Action)(() => Activator.CreateInstance(subject)))!;
@@ -99,7 +100,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         var model = compilation.GetSemanticModel(tree);
         var intrinsicCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
-                method.Name is "Result" or "Old")).ToArray();
+                method.Name is "Result" or "Old")).ToImmutableArray();
         Assert.That(intrinsicCalls, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsicCalls)
         {
@@ -112,7 +113,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         var runtime = new AssemblyLoadContext("FieldInitializerValidLambda", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);

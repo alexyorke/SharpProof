@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -12,15 +13,16 @@ public sealed class ContractSpecializationPolicyTests
     {
         var compilation = CreateCompilation();
         var definition = compilation.GetTypeByMetadataName("Target`1")!;
-        var arguments = wrongArity ? Array.Empty<ITypeSymbol>()
-            : new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_String) };
+        var arguments = wrongArity ? ImmutableArray<ITypeSymbol>.Empty
+            : ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
+        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
         if (wrongArity)
         {
-            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments)));
+            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments, annotations)));
         }
         var success = ContractSpecializationPolicy.TrySpecialize(
-            (definition, arguments),
-            static state => state.definition.Construct(state.arguments),
+            (definition, arguments, annotations),
+            static state => state.definition.Construct(state.arguments, state.annotations),
             out INamedTypeSymbol specialized);
         Assert.That(success, Is.EqualTo(!wrongArity));
         if (wrongArity)
@@ -29,7 +31,7 @@ public sealed class ContractSpecializationPolicyTests
             return;
         }
         Assert.That(SymbolEqualityComparer.Default.Equals(
-            specialized, definition.Construct(arguments)), Is.True);
+            specialized, definition.Construct(arguments, annotations)), Is.True);
         Assert.That(specialized.OriginalDefinition, Is.SameAs(definition));
     }
 
@@ -38,18 +40,21 @@ public sealed class ContractSpecializationPolicyTests
     public void MethodConstructionRetainsTheSdkArityPolicy(bool wrongArity)
     {
         var compilation = CreateCompilation();
-        var owner = compilation.GetTypeByMetadataName("Target`1")!
-            .Construct(compilation.GetSpecialType(SpecialType.System_String));
+        var ownerDefinition = compilation.GetTypeByMetadataName("Target`1")!;
+        var ownerArguments = ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
+        var owner = ownerDefinition.Construct(ownerArguments,
+            ownerArguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray());
         var definition = owner.GetMembers("Echo").OfType<IMethodSymbol>().Single();
-        var arguments = wrongArity ? Array.Empty<ITypeSymbol>()
-            : new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_Int32) };
+        var arguments = wrongArity ? ImmutableArray<ITypeSymbol>.Empty
+            : ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_Int32));
+        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
         if (wrongArity)
         {
-            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments)));
+            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments, annotations)));
         }
         var success = ContractSpecializationPolicy.TrySpecialize(
-            (definition, arguments),
-            static state => state.definition.Construct(state.arguments),
+            (definition, arguments, annotations),
+            static state => state.definition.Construct(state.arguments, state.annotations),
             out IMethodSymbol specialized);
         Assert.That(success, Is.EqualTo(!wrongArity));
         if (wrongArity)
@@ -58,7 +63,7 @@ public sealed class ContractSpecializationPolicyTests
             return;
         }
         Assert.That(SymbolEqualityComparer.Default.Equals(
-            specialized, definition.Construct(arguments)), Is.True);
+            specialized, definition.Construct(arguments, annotations)), Is.True);
         Assert.That(specialized.ContainingType, Is.SameAs(owner));
         Assert.That(specialized.Parameters[0].Type.SpecialType, Is.EqualTo(SpecialType.System_String));
         Assert.That(specialized.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
@@ -68,12 +73,13 @@ public sealed class ContractSpecializationPolicyTests
     public void ReconstructingAnActualConstructedTypeKeepsTheSdkInvalidOperationException()
     {
         var compilation = CreateCompilation();
-        var arguments = new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_String) };
-        var constructed = compilation.GetTypeByMetadataName("Target`1")!.Construct(arguments);
-        Assert.Throws<InvalidOperationException>(new Action(() => constructed.Construct(arguments)));
+        var arguments = ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
+        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
+        var constructed = compilation.GetTypeByMetadataName("Target`1")!.Construct(arguments, annotations);
+        Assert.Throws<InvalidOperationException>(new Action(() => constructed.Construct(arguments, annotations)));
         Assert.Throws<InvalidOperationException>(new Action(() => ContractSpecializationPolicy.TrySpecialize(
-            (constructed, arguments),
-            static state => state.constructed.Construct(state.arguments),
+            (constructed, arguments, annotations),
+            static state => state.constructed.Construct(state.arguments, state.annotations),
             out INamedTypeSymbol _)));
     }
 

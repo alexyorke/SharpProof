@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -14,7 +15,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
 {
     private const string Run = " public static int Run(int x) => Target<int>(x) ? 1 : 0; }";
 
-    private static readonly string[] s_implicit =
+    private static readonly ImmutableArray<string> s_implicit =
     [
         "public static bool Target<T>(T value) { return value is object; }" + Run,
         "public static bool Target<T>(T value) { if (value is object) return true; return false; }" + Run,
@@ -28,7 +29,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         "public static bool Target<T>(T value) { return F<int>(); } static bool F<U>() { U local = default(U); return local is object; }" + Run
     ];
 
-    private static readonly string[] s_folded =
+    private static readonly ImmutableArray<string> s_folded =
     [
         "public static bool Target<T>(T value) { if (value is int) return true; return false; }" + Run,
         "public static bool Target<T>(T value) { return value is System.IComparable; }" + Run,
@@ -50,7 +51,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_implicit[index]);
-        foreach (var input in new[] { 0, 1 })
+        foreach (var input in ImmutableArray.Create(0, 1))
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, input), Is.GreaterThan(0), "x=" + input); }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), native.Reason.ToString());
@@ -66,7 +67,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_implicit[index]);
-        foreach (var input in new[] { 0, 1 })
+        foreach (var input in ImmutableArray.Create(0, 1))
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Release, input), Is.Zero, "x=" + input); }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Release), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
@@ -81,9 +82,9 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_folded[index]);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
         }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -101,7 +102,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("GenericImplicitTypeTest", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericImplicitTypeTest", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();

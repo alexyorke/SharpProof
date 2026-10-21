@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -218,7 +219,7 @@ internal sealed partial class NativeResourceContractTests
         // execution. Instrumentation is not submitted as proof evidence.
         var observed = source.Replace(join, "Task.WhenAll(Observe(new Task[] { Task.Run(()=>Child(n)),Task.Run(()=>Child(3)) }))", StringComparison.Ordinal)
             .Replace("new int[2]", "Observe(new int[2])", StringComparison.Ordinal);
-        var compilation = TestCompilation.Create("TaskSourceObservation", ("Observed.cs", observed));
+        var compilation = TestCompilation.Create("TaskSourceObservation", [("Observed.cs", observed)]);
         using var stream = new System.IO.MemoryStream();
         var emitted = compilation.Emit(stream, cancellationToken: cancellation);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -289,7 +290,13 @@ internal sealed partial class NativeResourceContractTests
         if (mutation is "storage-premise" or "source-premise")
         {
             var id = mutation == "storage-premise" ? storageId : sourceId;
-            target.Entry.Assumptions = target.Entry.Assumptions.Where(assumption => assumption is not null && assumption.Id != id).ToArray();
+            target = target with
+            {
+                Entry = target.Entry with
+                {
+                    Assumptions = target.Entry.Assumptions.Where(assumption => assumption is not null && assumption.Id != id).ToImmutableArray()
+                }
+            };
         }
         if (mutation == "missing-capture")
         { target = target with { ForkJoinProjection = projection with { Carriers = null } }; }

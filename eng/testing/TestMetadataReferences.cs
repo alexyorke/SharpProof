@@ -35,9 +35,7 @@ internal static class TestMetadataReferences
         bool sort)
     {
         System.ArgumentNullException.ThrowIfNull(fileNames);
-        var names = new HashSet<string>(
-            fileNames,
-            StringComparer.OrdinalIgnoreCase);
+        var names = fileNames.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         IEnumerable<string> paths = Platform
             .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display))
             .Where(path => path != null &&

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -59,14 +60,14 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         System.ArgumentNullException.ThrowIfNull(scenario);
         var settings = Settings(scenario);
         var source = Source(settings);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var evidenceDirectory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "explicit-layout-field-alias-audit",
             scenario + "-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), source);
-        var compilation = TestCompilation.Create("ExplicitLayoutFieldAlias_" + scenario, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ExplicitLayoutFieldAlias_" + scenario, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -76,12 +77,12 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         var imageHash = Hash(imageBytes);
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var runtime = new AssemblyLoadContext("ExplicitLayoutFieldAlias_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         int actualReturn;
@@ -94,8 +95,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             var written = cellType.GetField("Written", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
             var target = subjectType.GetMethod("Target", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var constructor = cellType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
-            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(OperatingSystem.IsLinux(), Is.True);
@@ -126,10 +127,10 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
                 Assert.That(observed.IsInitOnly, Is.EqualTo(settings.ReadOnlyObserved));
                 Assert.That(written.IsInitOnly, Is.False);
             }
-            var storedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 3))!;
-            var returnedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl, 9))!;
-            var baseConstructor = constructor.Module.ResolveMethod(BitConverter.ToInt32(constructorIl, 2))!;
-            using var pe = new PEReader(new MemoryStream(imageBytes, writable: false));
+            var storedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl.AsSpan((3)..)))!;
+            var returnedField = target.Module.ResolveField(BitConverter.ToInt32(targetIl.AsSpan((9)..)))!;
+            var baseConstructor = constructor.Module.ResolveMethod(BitConverter.ToInt32(constructorIl.AsSpan((2)..)))!;
+            using var pe = new PEReader(imageBytes);
             var metadata = pe.GetMetadataReader();
             var cellHandle = MetadataTokens.TypeDefinitionHandle(cellType.MetadataToken & 0x00ffffff);
             var observedHandle = MetadataTokens.FieldDefinitionHandle(observed.MetadataToken & 0x00ffffff);
@@ -213,8 +214,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
                 WrittenWidthBytes = sizeof(int),
                 ObservedInitOnly = observed.IsInitOnly,
                 WrittenInitOnly = written.IsInitOnly,
-                TargetIl = Convert.ToHexStringLower(targetIl),
-                ConstructorIl = Convert.ToHexStringLower(constructorIl),
+                TargetIl = Convert.ToHexStringLower(targetIl.AsSpan()),
+                ConstructorIl = Convert.ToHexStringLower(constructorIl.AsSpan()),
                 StoreIlOffset = 2,
                 ReadIlOffset = 8,
                 InitialObserved = initialObserved,
@@ -261,7 +262,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         var returnedSyntax = ((ReturnStatementSyntax)targetSyntax.Body.Statements[4]).Expression!;
         var returnedReference = (IFieldReferenceOperation)model.GetOperation(returnedSyntax)!;
         var requirements = targetSyntax.Body.Statements.Take(2).Select(statement =>
-            statement is null ? throw new System.ArgumentNullException(nameof(statement)) : ((IInvocationOperation)((IExpressionStatementOperation)model.GetOperation(statement)!).Operation)).ToArray();
+            statement is null ? throw new System.ArgumentNullException(nameof(statement)) : ((IInvocationOperation)((IExpressionStatementOperation)model.GetOperation(statement)!).Operation)).ToImmutableArray();
         var observationRequirement = (IBinaryOperation)requirements[1].Arguments.Single().Value;
         var requiredField = (IFieldReferenceOperation)observationRequirement.LeftOperand;
         var discovery = new ClaimManifestBuilder(compilation).Build();
@@ -311,7 +312,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             Written = writtenSymbol.ToDisplayString(),
             ObservedReadOnly = observedSymbol.IsReadOnly,
             WrittenReadOnly = writtenSymbol.IsReadOnly,
-            Requirements = requirements.Select(requirement => requirement is null ? throw new System.ArgumentNullException(nameof(requirement)) : (requirement.Syntax.ToString())).ToArray(),
+            Requirements = requirements.Select(requirement => requirement is null ? throw new System.ArgumentNullException(nameof(requirement)) : (requirement.Syntax.ToString())).ToImmutableArray(),
             Assignment = assignment.Syntax.ToString(),
             Return = returnedReference.Syntax.ToString(),
             RuntimeContractCallsRemoved = true
@@ -319,8 +320,9 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        artifact = project.Artifact;
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
@@ -345,7 +347,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             ClrPostconditionHolds = actualReturn == 0,
             CapturedTotal = callable.Total != null,
             CapturedBodyAbstraction = callable.Total?.IsBodyAbstraction,
-            CapturedClauseKinds = callable.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToArray(),
+            CapturedClauseKinds = callable.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToImmutableArray(),
             SelectedCallableId = selected.Entry.CallableId,
             ClaimId = claim.ClaimId,
             ClaimLocation = manifestClaim.Location,
@@ -443,10 +445,11 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             .Replace("__STORED_VALUE__", settings.StoredValue.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static async Task Save(string directory, string fileName, object value)

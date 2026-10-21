@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,11 +18,11 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class ApiUsageRankingTests
 {
-    private static readonly bool[] FreshDictionaryCalls = [true, false, false];
-    private static readonly bool[] FreshHashSetCalls = [true, true, true, false, false, false];
-    private static readonly bool[] FreshListCalls = [true, false];
-    private static readonly bool[] FreshListIndexers = [true, true, false, false, false];
-    private static readonly bool[] FreshDictionaryIndexers = [true, true, false, false];
+    private static readonly ImmutableArray<bool> FreshDictionaryCalls = [true, false, false];
+    private static readonly ImmutableArray<bool> FreshHashSetCalls = [true, true, true, false, false, false];
+    private static readonly ImmutableArray<bool> FreshListCalls = [true, false];
+    private static readonly ImmutableArray<bool> FreshListIndexers = [true, true, false, false, false];
+    private static readonly ImmutableArray<bool> FreshDictionaryIndexers = [true, true, false, false];
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -40,62 +42,75 @@ public sealed class ApiUsageRankingTests
     public void RankFrameworkApiUsageInSamplesAndOriginalCorpusTargets()
     {
         var root = RepositoryLayout.FindRoot();
-        var inventory = File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")).Select(line => line is null ? throw new global::System.ArgumentNullException(nameof(line)) : (line.Split('\t'))).ToDictionary(parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[0] + "\t" + parts[1]), parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[3]), StringComparer.Ordinal);
+        var inventory = ImmutableDictionaryCapture.Create(File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")).Select(line => line is null ? throw new global::System.ArgumentNullException(nameof(line)) : (line.Split('\t'))), parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[0] + "\t" + parts[1]), parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[3]), StringComparer.Ordinal);
         var dotnetRoot = new DirectoryInfo(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()).Parent!.Parent!.Parent!;
         var manifestPath = Path.Combine(root, "eng/api-coverage/net10.0.manifest.json");
         using var policy = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var pack = Path.Combine(dotnetRoot.FullName, "packs", policy.RootElement.GetProperty("pack").GetString()!, policy.RootElement.GetProperty("version").GetString()!, "ref", policy.RootElement.GetProperty("framework").GetString()!);
         var references = AnalyzerGateHost.CreateReferences([.. Directory.GetFiles(pack, "*.dll").Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), MetadataReference.CreateFromFile(typeof(Contract).Assembly.Location)]);
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        var inputs = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        var inputBuilder = ImmutableSortedDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        void AddInput(string key, string value)
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            ArgumentNullException.ThrowIfNull(value);
+            if (inputBuilder.ContainsKey(key))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + key);
+            }
+            inputBuilder.Add(key, value);
+        }
         var corpusPath = Path.Combine(root, "src/SharpProof.Gates/Corpus/oss-methods.json");
-        inputs.Add("src/SharpProof.Gates/Corpus/oss-methods.json", Hash(File.ReadAllText(corpusPath)));
-        inputs.Add("src/SharpProof.Gates/Corpus/CorpusCatalog.cs", Hash(File.ReadAllText(Path.Combine(root, "src/SharpProof.Gates/Corpus/CorpusCatalog.cs"))));
-        inputs.Add("eng/api-coverage/net10.0.manifest.json", Hash(File.ReadAllText(manifestPath)));
-        inputs.Add("eng/api-coverage/net10.0.tsv", Hash(File.ReadAllText(Path.Combine(root, "eng/api-coverage/net10.0.tsv"))));
+        AddInput("src/SharpProof.Gates/Corpus/oss-methods.json", Hash(File.ReadAllText(corpusPath)));
+        AddInput("src/SharpProof.Gates/Corpus/CorpusCatalog.cs", Hash(File.ReadAllText(Path.Combine(root, "src/SharpProof.Gates/Corpus/CorpusCatalog.cs"))));
+        AddInput("eng/api-coverage/net10.0.manifest.json", Hash(File.ReadAllText(manifestPath)));
+        AddInput("eng/api-coverage/net10.0.tsv", Hash(File.ReadAllText(Path.Combine(root, "eng/api-coverage/net10.0.tsv"))));
         var corpus = OpenSourceCorpusCatalog.Load(root);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(corpus, TestContext.CurrentContext.CancellationToken).WithReferences(references);
         RequireCompilation(compilation);
-        var targets = compilation.SyntaxTrees.SelectMany(tree => tree is null ? throw new global::System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())).Where(method => OpenSourceCorpusRunner.CorpusMethodId(method) != null).ToArray();
+        var targets = compilation.SyntaxTrees.SelectMany(tree => tree is null ? throw new global::System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())).Where(method => OpenSourceCorpusRunner.CorpusMethodId(method) != null).ToImmutableArray();
         Assert.That(targets, Has.Length.EqualTo(corpus.Methods.Length));
         foreach (var target in targets)
         {
-            Scan(compilation, target, "oss", OpenSourceCorpusRunner.CorpusMethodId(target)!, inventory, sites, gaps);
+            Scan(compilation, target, "oss", OpenSourceCorpusRunner.CorpusMethodId(target)!, inventory, siteBuilder, gapBuilder);
         }
 
-        var seeds = CorpusCatalog.CreateSyntheticCases().Where(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.Variant == CorpusVariant.Baseline)).ToArray();
+        var seeds = CorpusCatalog.CreateSyntheticCases().Where(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.Variant == CorpusVariant.Baseline)).ToImmutableArray();
         Assert.That(seeds, Has.Length.EqualTo(CorpusCatalog.Seeds.Length));
         foreach (var seed in seeds)
         {
             var synthetic = AnalyzerGateHost.CreateCompilation(seed.Source).WithReferences(references);
             RequireCompilation(synthetic);
             var target = synthetic.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Focus_" + seed.SeedId));
-            Scan(synthetic, target, "synthetic", seed.SeedId, inventory, sites, gaps);
+            Scan(synthetic, target, "synthetic", seed.SeedId, inventory, siteBuilder, gapBuilder);
         }
 
-        var sampleFiles = Directory.GetFiles(Path.Combine(root, "src/samples"), "*.cs", SearchOption.AllDirectories).Where(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (!path.Replace('\\', '/').Contains("/obj/", StringComparison.Ordinal) && !path.Replace('\\', '/').Contains("/bin/", StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToArray();
+        var sampleFiles = Directory.GetFiles(Path.Combine(root, "src/samples"), "*.cs", SearchOption.AllDirectories).Where(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (!path.Replace('\\', '/').Contains("/obj/", StringComparison.Ordinal) && !path.Replace('\\', '/').Contains("/bin/", StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToImmutableArray();
         var sampleTrees = sampleFiles.Select(path =>
         {
             global::System.ArgumentNullException.ThrowIfNull(path);
             var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
             var source = File.ReadAllText(path);
-            inputs.Add(relative, Hash(source));
+            AddInput(relative, Hash(source));
             return CSharpSyntaxTree.ParseText(source, AnalyzerGateHost.ParseOptions, relative);
-        }).ToArray();
+        }).ToImmutableArray();
         var implicitUsings = CSharpSyntaxTree.ParseText("global using System; global using System.Collections.Generic; global using System.Linq; global using System.Threading.Tasks;", AnalyzerGateHost.ParseOptions);
         var samples = CSharpCompilation.Create("ApiUsageSamples", sampleTrees.Append(implicitUsings), references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         RequireCompilation(samples);
         foreach (var tree in sampleTrees)
         {
-            Scan(samples, tree.GetRoot(), "src/samples", tree.FilePath, inventory, sites, gaps);
+            Scan(samples, tree.GetRoot(), "src/samples", tree.FilePath, inventory, siteBuilder, gapBuilder);
         }
 
-        var ranked = sites.GroupBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Assembly + "\t" + site.Api + "\t" + site.Access + "\t" + site.Status)).Select(group => group is null ? throw new global::System.ArgumentNullException(nameof(group)) : (new { assembly = group.First().Assembly, api = group.First().Api, access = group.First().Access, status = group.First().Status, sites = group.Count(), callers = group.Select(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin + ":" + site.Caller)).Distinct(StringComparer.Ordinal).Count(), samples = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "src/samples")), oss = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "oss")), synthetic = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "synthetic")), locations = group.OrderBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Location), StringComparer.Ordinal).ToArray() })).OrderByDescending(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.sites)).ThenBy(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.api), StringComparer.Ordinal).ToArray();
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
+        var inputs = inputBuilder.ToImmutable();
+        var ranked = sites.GroupBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Assembly + "\t" + site.Api + "\t" + site.Access + "\t" + site.Status)).Select(group => group is null ? throw new global::System.ArgumentNullException(nameof(group)) : (new { assembly = group.First().Assembly, api = group.First().Api, access = group.First().Access, status = group.First().Status, sites = group.Count(), callers = group.Select(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin + ":" + site.Caller)).Distinct(StringComparer.Ordinal).Count(), samples = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "src/samples")), oss = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "oss")), synthetic = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "synthetic")), locations = group.OrderBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Location), StringComparer.Ordinal).ToImmutableArray() })).OrderByDescending(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.sites)).ThenBy(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.api), StringComparer.Ordinal).ToImmutableArray();
         var output = Path.Combine(root, "artifacts/api-coverage");
         Directory.CreateDirectory(output);
         File.WriteAllText(Path.Combine(output, "usage-ranking.json"), JsonSerializer.Serialize(new { schemaVersion = 1, scope = "explicit calls, constructions, and property/indexer uses; selected OSS methods, original synthetic targets, and sample sources; no metamorphic duplicates or dependency-only methods", ossTargets = targets.Length, syntheticTargets = seeds.Length, sampleFiles = sampleFiles.Length, inputs, unresolved = gaps, ranked }, JsonOptions) + "\n");
-        var report = new StringBuilder("# Framework API usage ranking\n\n").Append(CultureInfo.InvariantCulture, $"{targets.Length} original OSS targets, {seeds.Length} synthetic baseline targets, {sampleFiles.Length} sample files. {sites.Count} resolved framework use sites. {gaps.Count} unresolved sites.\n\n").Append("Counts are static source sites, not execution frequency. Dependency-only methods and metamorphic copies are excluded. Contextual lowering may support APIs without catalog evidence. Full source hashes and locations are in usage-ranking.json.\n\n").Append("| API | Access | Sites | Caller units | Samples | OSS | Synthetic | Status |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |\n");
+        var report = new StringBuilder("# Framework API usage ranking\n\n").Append(CultureInfo.InvariantCulture, $"{targets.Length} original OSS targets, {seeds.Length} synthetic baseline targets, {sampleFiles.Length} sample files. {sites.Length} resolved framework use sites. {gaps.Length} unresolved sites.\n\n").Append("Counts are static source sites, not execution frequency. Dependency-only methods and metamorphic copies are excluded. Contextual lowering may support APIs without catalog evidence. Full source hashes and locations are in usage-ranking.json.\n\n").Append("| API | Access | Sites | Caller units | Samples | OSS | Synthetic | Status |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |\n");
         foreach (var item in ranked)
         {
             report.Append(CultureInfo.InvariantCulture, $"| {item.api} | {item.access} | {item.sites} | {item.callers} | {item.samples} | {item.oss} | {item.synthetic} | {item.status} |\n");
@@ -110,15 +125,15 @@ public sealed class ApiUsageRankingTests
         }
         foreach (var line in File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")))
         {
-            var parts = line.Split('\t');
+            var parts = line.Split('\t').ToImmutableArray();
             if (parts[3] == "partially-modeled")
             { Assert.That(backlog, Does.Contain("| " + parts[1] + " | " + parts[4] + " |"), "Every partially modeled declaration must retain its current facet evidence in the backlog."); }
         }
-        TestContext.Out.WriteLine($"Ranked {ranked.Length} framework APIs at {sites.Count} sites; unresolved: {gaps.Count}.");
+        TestContext.Out.WriteLine($"Ranked {ranked.Length} framework APIs at {sites.Length} sites; unresolved: {gaps.Length}.");
         Assert.That(gaps, Is.Empty, "Unresolved sites must be investigated rather than silently omitted.");
     }
 
-    private static void Scan(CSharpCompilation compilation, SyntaxNode region, string origin, string caller, Dictionary<string, string> inventory, List<Site> sites, List<string> gaps)
+    private static void Scan(CSharpCompilation compilation, SyntaxNode region, string origin, string caller, ImmutableDictionary<string, string> inventory, ImmutableArray<Site>.Builder sites, ImmutableArray<string>.Builder gaps)
     {
         global::System.ArgumentNullException.ThrowIfNull(compilation);
         global::System.ArgumentNullException.ThrowIfNull(region);
@@ -282,14 +297,15 @@ public sealed class ApiUsageRankingTests
         var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!;
         var property = list.GetMembers().OfType<IPropertySymbol>().Single(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.IsIndexer));
         var integerMax = compilation.GetTypeByMetadataName("System.Math")!.GetMembers("Max").OfType<IMethodSymbol>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 2 && method.Parameters[0].Type.SpecialType == SpecialType.System_Int32));
-        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()] = "partially-modeled",
-            [integerMax.ContainingAssembly.Name + "\t" + integerMax.GetDocumentationCommentId()] = "partially-modeled"
-        };
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        inventoryBuilder[property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()] = "partially-modeled";
+        inventoryBuilder[integerMax.ContainingAssembly.Name + "\t" + integerMax.GetDocumentationCommentId()] = "partially-modeled";
+        var inventory = inventoryBuilder.ToImmutable();
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "read")), Is.EqualTo(1));
@@ -311,14 +327,15 @@ public sealed class ApiUsageRankingTests
             }
             """, TestContext.CurrentContext.CancellationToken);
         var comparable = compilation.GetTypeByMetadataName("System.IComparable`1")!.GetMembers("CompareTo").OfType<IMethodSymbol>().Single();
-        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [comparable.ContainingAssembly.Name + "\t" + comparable.GetDocumentationCommentId()] = "partially-modeled"
-        };
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
-        Assert.That(sites, Has.Count.EqualTo(2));
+        var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        inventoryBuilder[comparable.ContainingAssembly.Name + "\t" + comparable.GetDocumentationCommentId()] = "partially-modeled";
+        var inventory = inventoryBuilder.ToImmutable();
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
+        Assert.That(sites, Has.Length.EqualTo(2));
         Assert.That(sites.All(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.True);
         Assert.That(gaps, Is.Empty);
     }
@@ -344,14 +361,15 @@ public sealed class ApiUsageRankingTests
         var comparer = compilation.GetTypeByMetadataName("System.Collections.Generic.Comparer`1")!;
         var compare = comparer.GetMembers("Compare").OfType<IMethodSymbol>().Single();
         var getter = comparer.GetMembers("Default").OfType<IPropertySymbol>().Single();
-        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [compare.ContainingAssembly.Name + "\t" + compare.GetDocumentationCommentId()] = "partially-modeled",
-            [getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "partially-modeled"
-        };
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        inventoryBuilder[compare.ContainingAssembly.Name + "\t" + compare.GetDocumentationCommentId()] = "partially-modeled";
+        inventoryBuilder[getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "partially-modeled";
+        var inventory = inventoryBuilder.ToImmutable();
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call" && site.Status == "partially-modeled")), Is.EqualTo(2));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(4));
@@ -383,16 +401,14 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var count = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")!.GetMembers("Count").OfType<IPropertySymbol>().Single();
         var item = compilation.GetTypeByMetadataName("System.Collections.Generic.IList`1")!.GetMembers().OfType<IPropertySymbol>().Single(property => property is null ? throw new global::System.ArgumentNullException(nameof(property)) : (property.IsIndexer));
-        var inventory = new[]
-        {
-            count,
-            item
-        }.ToDictionary(property => property is null ? throw new global::System.ArgumentNullException(nameof(property)) : (property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()), _ => "partially-modeled", StringComparer.Ordinal);
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        var inventory = ImmutableDictionaryCapture.Create(ImmutableArray.Create(count, item), property => property is null ? throw new global::System.ArgumentNullException(nameof(property)) : (property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()), _ => "partially-modeled", StringComparer.Ordinal);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
-        Assert.That(sites, Has.Count.EqualTo(10));
+        Assert.That(sites, Has.Length.EqualTo(10));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "partially-modeled")), Is.EqualTo(5));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "partially-modeled" && site.Access == "write")), Is.EqualTo(2));
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(4));
@@ -412,11 +428,14 @@ public sealed class ApiUsageRankingTests
             }
             """, TestContext.CurrentContext.CancellationToken);
         var property = compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Length").OfType<IPropertySymbol>().Single();
-        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
-        { [property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()] = "unmodeled" };
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        var inventoryBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        inventoryBuilder[property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()] = "unmodeled";
+        var inventory = inventoryBuilder.ToImmutable();
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(1));
         Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "unmodeled"), Is.EqualTo(2));
@@ -438,11 +457,11 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(3));
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshDictionaryCalls));
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(indexers, Has.Length.EqualTo(4));
         Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
             Is.EqualTo(FreshDictionaryIndexers));
@@ -462,14 +481,16 @@ public sealed class ApiUsageRankingTests
             }
             """, TestContext.CurrentContext.CancellationToken);
         var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
-        var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
-            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor })
-            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
+        var inventory = ImmutableDictionaryCapture.Create(dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor }),
+                member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
                 member => member is null ? throw new ArgumentNullException(nameof(member)) : CSharpOperationSemantics.IsDictionaryStateDeclaration(member) ? "partially-modeled" : "unmodeled", StringComparer.Ordinal);
         var tree = compilation.SyntaxTrees.Single();
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, tree.GetRoot(), "test", "capacity", inventory, sites, gaps);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, tree.GetRoot(), "test", "capacity", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(4));
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(2));
@@ -494,7 +515,7 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(6));
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshHashSetCalls));
@@ -518,10 +539,10 @@ public sealed class ApiUsageRankingTests
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
         var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         Assert.That(known.Contains(creation.SpanStart), Is.True);
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshListCalls));
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
             Is.EqualTo(FreshListIndexers));
     }
@@ -558,25 +579,26 @@ public sealed class ApiUsageRankingTests
         var freshMembers = target.DescendantNodes().Where(node => node is null ? throw new ArgumentNullException(nameof(node)) :
             node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" } } } ||
             node is ElementAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Parent: not PostfixUnaryExpressionSyntax } ||
-            node is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Name.Identifier.ValueText: "Count" }).ToArray();
+            node is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Name.Identifier.ValueText: "Count" }).ToImmutableArray();
         Assert.That(freshMembers, Has.Length.EqualTo(5));
         Assert.That(freshMembers.All(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.True);
         var capacityMembers = target.DescendantNodes().Where(node => node is null ? throw new ArgumentNullException(nameof(node)) :
             node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "capacity" } } } ||
-            node is ElementAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "capacity" } }).ToArray();
+            node is ElementAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "capacity" } }).ToImmutableArray();
         Assert.That(capacityMembers, Has.Length.EqualTo(2));
         Assert.That(capacityMembers.All(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.True);
         var unprovenIndexers = target.DescendantNodes().OfType<ElementAccessExpressionSyntax>()
-            .Except(freshMembers.OfType<ElementAccessExpressionSyntax>()).Except(capacityMembers.OfType<ElementAccessExpressionSyntax>()).ToArray();
+            .Except(freshMembers.OfType<ElementAccessExpressionSyntax>()).Except(capacityMembers.OfType<ElementAccessExpressionSyntax>()).ToImmutableArray();
         Assert.That(unprovenIndexers, Has.Length.EqualTo(5));
         Assert.That(unprovenIndexers.Any(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.False);
         var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
-        var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
-            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor })
-            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(), _ => "partially-modeled", StringComparer.Ordinal);
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, target, "test", "probe", inventory, sites, gaps);
+        var inventory = ImmutableDictionaryCapture.Create(dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor }), member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(), _ => "partially-modeled", StringComparer.Ordinal);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, target, "test", "probe", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) :
             site.Status == "partially-modeled" && !site.Api.Contains("#ctor", StringComparison.Ordinal)), Is.EqualTo(7));
@@ -598,12 +620,12 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(known.Contains(calls[0].SpanStart), Is.True);
         Assert.That(known.Contains(calls[1].SpanStart), Is.False);
         Assert.That(known.Contains(calls[2].SpanStart), Is.True);
         Assert.That(known.Contains(calls[3].SpanStart), Is.False);
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(known.Contains(indexers[0].SpanStart), Is.True);
         Assert.That(known.Contains(indexers[1].SpanStart), Is.False);
         Assert.That(known.Contains(indexers[2].SpanStart), Is.True);
@@ -626,25 +648,28 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var set = compilation.GetTypeByMetadataName("System.Collections.Generic.HashSet`1")!;
         var collection = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")!;
-        var inventory = set.GetMembers().Concat(collection.GetMembers()).Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
-                CSharpOperationSemantics.IsHashSetStateDeclaration(member) || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(member))
-            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
-                static _ => "partially-modeled", StringComparer.Ordinal);
+        var inventory = ImmutableDictionaryCapture.Create(
+            set.GetMembers().Concat(collection.GetMembers()).Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+                CSharpOperationSemantics.IsHashSetStateDeclaration(member) || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(member)),
+            member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
+            static _ => "partially-modeled", StringComparer.Ordinal);
         var tree = compilation.SyntaxTrees.Single();
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, tree.GetRoot(), "test", "interface", inventory, sites, gaps);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, tree.GetRoot(), "test", "interface", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
-        Assert.That(sites, Has.Count.EqualTo(9));
+        Assert.That(sites, Has.Length.EqualTo(9));
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(5));
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(4));
     }
 
-    private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
+    private static ImmutableHashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
         global::System.ArgumentNullException.ThrowIfNull(region);
-        var known = new HashSet<int>();
+        var known = ImmutableHashSet.CreateBuilder<int>();
         foreach (var syntax in region.DescendantNodesAndSelf().OfType<MethodDeclarationSyntax>())
         {
             var method = model.GetDeclaredSymbol(syntax)!;
@@ -660,12 +685,12 @@ public sealed class ApiUsageRankingTests
             context.TrackDefaultDictionaries(graph);
             context.TrackDefaultHashSets(graph);
             context.TrackFreshLists(graph);
-            foreach (var creation in graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IObjectCreationOperation>())
+            foreach (var creation in graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue))).SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IObjectCreationOperation>())
             {
                 if (CSharpOperationSemantics.IsEmptyListCreation(creation))
                 { known.Add(creation.Syntax.SpanStart); }
             }
-            foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
+            foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue))).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
                 if (context.IsDefaultIntegerComparison(invocation) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsHashSetStateMember(invocation.TargetMethod) &&
@@ -676,7 +701,7 @@ public sealed class ApiUsageRankingTests
                     (CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod) || context.IsExactList(invocation.Instance)))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
-            foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
+            foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null ||
                     property.Instance != null && CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(property.Property) &&
@@ -701,7 +726,7 @@ public sealed class ApiUsageRankingTests
             }
         }
 
-        return known;
+        return known.ToImmutable();
     }
 
     private static void RequireCompilation(CSharpCompilation compilation)

@@ -34,7 +34,7 @@ public sealed class CompilerSpecificationPackProviderTests
         var rule = model!.Apply([factory.Integer(integerType, left), factory.Integer(integerType, right)]);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var interpreted = new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>());
+        var interpreted = new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(interpreted.Value!.Integer, Is.EqualTo(Math.Max(left, right)));
         Assert.That(interpreted.Value.Type, Is.EqualTo(integerType));
         Assert.That(model.Apply([factory.Boolean(true), factory.Integer(integerType, right)]).Classification.IsExact, Is.False);
@@ -52,8 +52,8 @@ public sealed class CompilerSpecificationPackProviderTests
     [Test]
     public void SerializedPackSelectionsRejectAmbiguousAndForeignIdentities()
     {
-        var version = CompilerSpecificationPackCatalogVersions.Current;
-        var hash = CompilerSpecificationPackCatalogVersions.Sha256;
+        const int version = CompilerSpecificationPackCatalogVersions.Current;
+        const string hash = CompilerSpecificationPackCatalogVersions.Sha256;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(CompilerSpecificationPackSelection.IsValid(["dotnet.scalar"], version, hash), Is.True);
@@ -61,6 +61,11 @@ public sealed class CompilerSpecificationPackProviderTests
             Assert.That(CompilerSpecificationPackSelection.IsValid(["z.pack", "dotnet.scalar"], version, hash), Is.False);
             Assert.That(CompilerSpecificationPackSelection.IsValid(["dotnet.scalar"], version + 1, hash), Is.False);
             Assert.That(CompilerSpecificationPackSelection.IsValid(null, version, hash), Is.False);
+            System.Collections.Immutable.ImmutableArray<string>? presentDefault = default(System.Collections.Immutable.ImmutableArray<string>);
+            Assert.That(presentDefault.HasValue, Is.True);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(presentDefault, version, hash), Is.False);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(default(System.Collections.Immutable.ImmutableArray<string>), version, hash), Is.False);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(System.Collections.Immutable.ImmutableArray<string>.Empty, version, hash), Is.True);
             Assert.That(CompilerSpecificationPackSelection.Matches(new CompilerManifestArtifact
             {
                 SpecificationPackIds = ["dotnet.scalar"],

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,7 +47,7 @@ public sealed class ContractsCoverageBoundaryTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
-            .ToArray();
+            .ToImmutableArray();
         var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
@@ -99,7 +100,7 @@ public sealed class ContractsCoverageBoundaryTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
-            .ToArray();
+            .ToImmutableArray();
         var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
@@ -277,7 +278,7 @@ public sealed class ContractsCoverageBoundaryTests
             }
             """);
         var tree = compilation.SyntaxTrees.Single();
-        var ordinaryOptions = ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        var ordinaryOptions = ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty);
         compilation = compilation.RemoveAllSyntaxTrees()
             .AddSyntaxTrees(tree.WithRootAndOptions(await tree.GetRootAsync(), ordinaryOptions));
         Assert.That(ordinaryOptions.PreprocessorSymbolNames, Is.Empty);
@@ -383,7 +384,7 @@ public sealed class ContractsCoverageBoundaryTests
             : TestMetadataReferences.WithoutSharpProof;
         var compilation = CSharpCompilation.Create("ContractsMetadataBoundaryConsumer",
             [CSharpSyntaxTree.ParseText("public static class Consumer { }")],
-            references.Add(MetadataReference.CreateFromImage(image.ToArray())),
+            references.Add(MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))))),
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         TestCompilation.AssertNoErrors(compilation);
         return compilation;

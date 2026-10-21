@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Reflection;
@@ -22,8 +21,8 @@ namespace SharpProof.Package.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class PackageLayoutSmokeTests
 {
-    private static readonly ConcurrentDictionary<string, string>
-        s_sharedCompilationServerIds = new(StringComparer.Ordinal);
+    private static ImmutableDictionary<string, string>
+        s_sharedCompilationServerIds = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     private static readonly string[] s_nativeResourceMetricNames = ["LoopBodyEntries", "ArrayAllocations", "AllocatedElements"];
     private static readonly int[] s_resourcePerformanceInputSizes = [0, 16, 128];
@@ -42,10 +41,7 @@ public sealed class PackageLayoutSmokeTests
         var feed = await PackagedProductFeed.GetAsync();
         var repository = TestRepository.FindRoot();
         using var directory = new TempDirectory("SharpProof.Performance.Test-");
-        var result = await RunProcessAsync(repository, "pwsh", "-NoProfile", "-File",
-            Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"),
-            "-PackageSource", feed.Source, "-Iterations", "1", "-Workload", workload,
-            "-InputSizes", "0,16,128", "-RuntimeRepetitions", "3", "-OutputDirectory", directory.FullName);
+        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", feed.Source, "-Iterations", "1", "-Workload", workload, "-InputSizes", "0,16,128", "-RuntimeRepetitions", "3", "-OutputDirectory", directory.FullName]);
         Assert.That(result.ExitCode, Is.Zero, result.Output);
         var reports = Directory.GetFiles(directory.FullName, "measurements.json", SearchOption.AllDirectories);
         Assert.That(reports, Has.Length.EqualTo(1), result.Output);
@@ -106,32 +102,29 @@ public sealed class PackageLayoutSmokeTests
     {
         ArgumentNullException.ThrowIfNull(sizes);
         var repository = TestRepository.FindRoot();
-        var result = await RunProcessAsync(repository, "pwsh", "-NoProfile", "-File",
-            Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"),
-            "-PackageSource", Path.Combine(repository, "missing-performance-packages"),
-            "-Workload", "resources", "-InputSizes", sizes);
+        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", Path.Combine(repository, "missing-performance-packages"), "-Workload", "resources", "-InputSizes", sizes]);
         Assert.That(result.ExitCode, Is.Not.Zero);
         Assert.That(result.Output, Does.Contain("Input sizes must be distinct integers"));
     }
 
-    private static readonly byte[] PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    private static readonly ImmutableArray<byte> PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
 
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
-    private static readonly string[] ExpectedAnalyzerEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerEntryFileNames = [
         "SharpProof.Analyzer.dll"
     ];
 
-    private static readonly string[] ExpectedCodeFixEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCodeFixEntryFileNames = [
         "SharpProof.CodeFixes.dll"
     ];
 
-    private static readonly string[] ExpectedGeneratorEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [
         "SharpProof.ContractForGenerator.dll"
     ];
 
-    private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
         "SharpProof.Compiler.Semantics.dll",
         "SharpProof.Contracts.dll",
@@ -153,11 +146,11 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string>
         ExpectedAllocationReplayWitnessKinds = AllocationWitnessKinds.Managed;
 
-    private static readonly string[] ExpectedCollectorEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCollectorEntryFileNames = [
         "SharpProof.CompilerCollector.dll"
     ];
 
-    private static readonly string[] ExpectedSourceAnalyzerProjectFileNames = [
+    private static readonly ImmutableArray<string> ExpectedSourceAnalyzerProjectFileNames = [
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
         "SharpProof.Analyzer.Core.csproj",
@@ -165,7 +158,7 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.CompilerCollector.csproj"
     ];
 
-    private static readonly string[] ExpectedCollectorDependencyFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
         "SharpProof.CompilerArtifact.dll",
         "SharpProof.Worker.Protocol.dll",
@@ -174,7 +167,7 @@ public sealed class PackageLayoutSmokeTests
         "System.Text.Json.dll"
     ];
 
-    private static readonly string[] ExpectedConditionalAnalyzerEntries = [
+    private static readonly ImmutableArray<string> ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
@@ -203,7 +196,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/shared/netstandard2.0/System.Threading.Tasks.Extensions.dll"
     ];
 
-    private static readonly string[] ExpectedToolEntries = [
+    private static readonly ImmutableArray<string> ExpectedToolEntries = [
         "tools/net10/Microsoft.Z3.dll",
         "tools/net10/SharpProof.BuildTasks.deps.json",
         "tools/net10/SharpProof.BuildTasks.dll",
@@ -220,7 +213,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/net10/SharpProof.Worker.runtimeconfig.json"
     ];
 
-    private static readonly string[] ExpectedNativeZ3Entries = [
+    private static readonly ImmutableArray<string> ExpectedNativeZ3Entries = [
         "tools/native/linux-x64/libz3.so",
         "tools/native/linux-arm64/libz3.so",
         "tools/native/win-x64/libz3.dll",
@@ -228,7 +221,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/native/osx-arm64/libz3.dylib",
         "tools/native/osx-x64/libz3.dylib"
     ];
-    private static readonly string[] ExpectedDependencyAttributes = [
+    private static readonly ImmutableArray<string> ExpectedDependencyAttributes = [
         "id",
         "version"
     ];
@@ -256,7 +249,7 @@ public sealed class PackageLayoutSmokeTests
             .SelectMany(static library => library.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(library)) : (library.Value.GetProperty("runtimeTargets").EnumerateObject()))
             .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
                 asset.Value.GetProperty("rid").GetString() is "win" or "win-x64" or "win-arm64")
-            .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToArray();
+            .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToImmutableArray();
         Assert.That(windowsAssets, Is.Empty,
             "The .NET 10 worker uses framework libraries rather than redundant Windows runtime copies.");
         foreach (var asset in windowsAssets)
@@ -287,9 +280,7 @@ public sealed class PackageLayoutSmokeTests
             {
                 foreach (var library in target.Value.EnumerateObject())
                 {
-                    foreach (var assetKind in new[] {
-                                 "native", "runtime", "runtimeTargets"
-                             })
+                    foreach (var assetKind in ImmutableArray.Create("native", "runtime", "runtimeTargets"))
                     {
                         if (!library.Value.TryGetProperty(
                                 assetKind,
@@ -309,11 +300,13 @@ public sealed class PackageLayoutSmokeTests
 
         var runtimeItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-t:CaptureRuntimeAssets",
             "--nologo",
-            "/nodeReuse:false"));
+            "/nodeReuse:false"
+]));
         Assert.That(
             await File.ReadAllTextAsync(Path.Combine(
                 workspace.ConsumerDirectory,
@@ -324,6 +317,7 @@ public sealed class PackageLayoutSmokeTests
         var build = await BuildOkAsync(BuildAnalyzerConsumerAsync(workspace));
         var publish = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "publish",
             workspace.ConsumerProject,
             "-c",
@@ -331,7 +325,8 @@ public sealed class PackageLayoutSmokeTests
             "--no-build",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"));
+            "/nodeReuse:false"
+]));
         Assert.That(
             Directory.EnumerateFiles(
                 workspace.ConsumerDirectory,
@@ -366,7 +361,7 @@ public sealed class PackageLayoutSmokeTests
             "shared",
             "netstandard2.0");
         using var loader = new PackageAnalyzerAssemblyLoader();
-        foreach (var dependencyDirectory in new[] { analyzerDirectory, collectorDirectory, sharedDirectory })
+        foreach (var dependencyDirectory in ImmutableArray.Create(analyzerDirectory, collectorDirectory, sharedDirectory))
         {
             foreach (var dependency in Directory.EnumerateFiles(dependencyDirectory, "*.dll"))
             {
@@ -374,40 +369,36 @@ public sealed class PackageLayoutSmokeTests
             }
         }
 
-        var failures = new List<string>();
-        var analyzers = new List<DiagnosticAnalyzer>();
-        var generators = new List<ISourceGenerator>();
-        foreach (var path in new[]
-                 {
-                     Path.Combine(
+        var failuresBuilder = ImmutableArray.CreateBuilder<string>();
+        var analyzersBuilder = ImmutableArray.CreateBuilder<DiagnosticAnalyzer>();
+        var generatorsBuilder = ImmutableArray.CreateBuilder<ISourceGenerator>();
+        foreach (var path in ImmutableArray.Create(Path.Combine(
                          analyzerDirectory,
-                         "SharpProof.Analyzer.dll"),
-                     Path.Combine(
+                         "SharpProof.Analyzer.dll"), Path.Combine(
                          analyzerDirectory,
-                         "SharpProof.ContractForGenerator.dll"),
-                     Path.Combine(
+                         "SharpProof.ContractForGenerator.dll"), Path.Combine(
                          collectorDirectory,
-                         "SharpProof.CompilerCollector.dll"),
-                     Path.Combine(
+                         "SharpProof.CompilerCollector.dll"), Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Analyzer.Core.dll"),
-                     Path.Combine(
+                         "SharpProof.Analyzer.Core.dll"), Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Compiler.Semantics.dll")
-                 })
+                         "SharpProof.Compiler.Semantics.dll")))
         {
             var reference = new AnalyzerFileReference(path, loader);
             reference.AnalyzerLoadFailed += (_, args) =>
             {
                 System.ArgumentNullException.ThrowIfNull(args);
-                failures.Add(args.ErrorCode + ": " + args.Message);
+                failuresBuilder.Add(args.ErrorCode + ": " + args.Message);
             };
-            analyzers.AddRange(reference.GetAnalyzers(
+            analyzersBuilder.AddRange(reference.GetAnalyzers(
                 LanguageNames.CSharp));
-            generators.AddRange(reference.GetGenerators(
+            generatorsBuilder.AddRange(reference.GetGenerators(
                 LanguageNames.CSharp));
         }
 
+        var failures = failuresBuilder.ToImmutable();
+        var analyzers = analyzersBuilder.ToImmutable();
+        var generators = generatorsBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(failures, Is.Empty);
@@ -427,10 +418,10 @@ public sealed class PackageLayoutSmokeTests
                 Is.EqualTo(1));
             Assert.That(
                 analyzers,
-                Has.Count.EqualTo(2));
+                Has.Length.EqualTo(2));
             Assert.That(
                 generators,
-                Has.Count.EqualTo(1));
+                Has.Length.EqualTo(1));
         }
     }
 
@@ -442,8 +433,10 @@ public sealed class PackageLayoutSmokeTests
         var revision = await BuildOkAsync(RunProcessAsync(
             repositoryRoot,
             "git",
+[
             "rev-parse",
-            "HEAD"));
+            "HEAD"
+]));
         var commit = revision.Output.Trim();
         Assert.That(
             commit,
@@ -476,11 +469,13 @@ public sealed class PackageLayoutSmokeTests
 
         var unsupportedCompiler = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-t:_SharpProofValidateConfiguration",
             "-p:NETCoreSdkVersion=9.0.200",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             unsupportedCompiler.ExitCode,
             Is.Not.Zero,
@@ -491,12 +486,14 @@ public sealed class PackageLayoutSmokeTests
                 .And.Contain("Roslyn 4.14 or newer"));
         var disabledOnUnsupportedCompiler = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-t:_SharpProofValidateConfiguration",
             "-p:SharpProofProfile=off",
             "-p:NETCoreSdkVersion=9.0.200",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             disabledOnUnsupportedCompiler.ExitCode,
             Is.Zero,
@@ -504,11 +501,13 @@ public sealed class PackageLayoutSmokeTests
 
         var runtimeContracts = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-t:_SharpProofValidateConfiguration",
             "-p:DefineConstants=SHARPPROOF_CONTRACTS",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             runtimeContracts.ExitCode,
             Is.Not.Zero,
@@ -519,12 +518,14 @@ public sealed class PackageLayoutSmokeTests
                 "SHARPPROOF_CONTRACTS is reserved and unsupported in every SharpProof profile"));
         var disabledRuntimeContracts = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-t:_SharpProofValidateConfiguration",
             "-p:SharpProofProfile=off",
             "-p:DefineConstants=SHARPPROOF_CONTRACTS",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             disabledRuntimeContracts.ExitCode,
             Is.Not.Zero,
@@ -536,20 +537,24 @@ public sealed class PackageLayoutSmokeTests
 
         var disabledItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
             "-p:SharpProofProfile=off",
-            "--nologo"));
+            "--nologo"
+]));
         Assert.That(
             GetPackagedAnalyzerItems(disabledItems.Output),
             Is.Empty);
         var enabledItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "--nologo"));
+            "--nologo"
+]));
         Assert.That(
             enabledItems.Output,
             Does.Contain("SharpProof.Analyzer.dll")
@@ -574,17 +579,20 @@ public sealed class PackageLayoutSmokeTests
 
         var analyzerBuild = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"));
+            "/nodeReuse:false"
+]));
         Assert.That(analyzerBuild.Output, Does.Contain("SP0045"));
 
         var explicitVerification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -592,7 +600,8 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:SharpProofVerify=true");
+            "-p:SharpProofVerify=true"
+]);
         Assert.That(explicitVerification.ExitCode, Is.Not.Zero, explicitVerification.Output);
         Assert.That(explicitVerification.Output, Does.Contain("SP0051"));
         Assert.That(File.Exists(workspace.ResultPath), Is.True, explicitVerification.Output);
@@ -625,6 +634,7 @@ public sealed class PackageLayoutSmokeTests
         File.Delete(workspace.ResultPath);
         var strict = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -632,7 +642,8 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:SharpProofProfile=strict");
+            "-p:SharpProofProfile=strict"
+]);
         Assert.That(strict.ExitCode, Is.Zero, strict.Output);
         Assert.That(File.Exists(workspace.ResultPath), Is.True, strict.Output);
     }
@@ -673,7 +684,9 @@ public sealed class PackageLayoutSmokeTests
             }
             """,
             "all",
-            "SP0045");
+[
+            "SP0045"
+]);
 
         var consumerProject = XDocument.Load(workspace.ConsumerProject);
         var consumerProperties = consumerProject.Root!
@@ -688,6 +701,7 @@ public sealed class PackageLayoutSmokeTests
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var build = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -696,7 +710,8 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:OutputType=Exe",
-            "-p:UseAppHost=false");
+            "-p:UseAppHost=false"
+]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(
             build.Output,
@@ -724,46 +739,57 @@ public sealed class PackageLayoutSmokeTests
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         AssertPackagedAnalyzerItems(
-            await EvaluatePackagedAnalyzerItemsAsync(workspace),
+            await EvaluatePackagedAnalyzerItemsAsync(workspace, []),
             includePortable: true,
             includeCollector: false);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
-                ("SharpProofVerify", "true")),
+[
+                ("SharpProofVerify", "true")
+]),
             includePortable: true,
             includeCollector: true);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
-                ("SharpProofProfile", "strict")),
+[
+                ("SharpProofProfile", "strict")
+]),
             includePortable: true,
             includeCollector: true);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
+[
                 ("SharpProofProfile", "off"),
-                ("SharpProofVerify", "true")),
+                ("SharpProofVerify", "true")
+]),
             includePortable: false,
             includeCollector: false);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
+[
                 ("SharpProofVerify", "true"),
-                ("DesignTimeBuild", "true")),
+                ("DesignTimeBuild", "true")
+]),
             includePortable: true,
             includeCollector: false,
             includeCodeFix: true);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
+[
                 ("SharpProofVerify", "true"),
-                ("_SharpProofVerifierHostSupported", "false")),
+                ("_SharpProofVerifierHostSupported", "false")
+]),
             includePortable: true,
             includeCollector: true);
 
         var unsupported = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -772,7 +798,8 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:SharpProofVerify=true",
-            "-p:_SharpProofVerifierHostSupported=false");
+            "-p:_SharpProofVerifierHostSupported=false"
+]);
         Assert.That(unsupported.ExitCode, Is.Not.Zero, unsupported.Output);
         Assert.That(
             unsupported.Output,
@@ -788,35 +815,45 @@ public sealed class PackageLayoutSmokeTests
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: true,
-            includeCollector: false);
+            includeCollector: false, []);
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: true,
             includeCollector: true,
-            ("SharpProofVerify", "true"));
+[
+            ("SharpProofVerify", "true")
+]);
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: true,
             includeCollector: true,
-            ("SharpProofProfile", "strict"));
+[
+            ("SharpProofProfile", "strict")
+]);
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: false,
             includeCollector: false,
+[
             ("SharpProofProfile", "off"),
-            ("SharpProofVerify", "true"));
+            ("SharpProofVerify", "true")
+]);
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: true,
             includeCollector: false,
+[
             ("SharpProofVerify", "true"),
-            ("DesignTimeBuild", "true"));
+            ("DesignTimeBuild", "true")
+]);
         await AssertSourceConsumerAnalyzerItemsAsync(
             workspace,
             includePortable: true,
             includeCollector: true,
+[
             ("SharpProofVerify", "true"),
-            ("_SharpProofVerifierHostSupported", "false"));
+            ("_SharpProofVerifierHostSupported", "false")
+]);
     }
 
     [Test]
@@ -830,11 +867,7 @@ public sealed class PackageLayoutSmokeTests
             Path.Combine(root, "package;layout"));
         var packageBuild = Directory.CreateDirectory(
             Path.Combine(packageRoot.FullName, "buildTransitive"));
-        foreach (var fileName in new[] {
-                     "SharpProof.ConsumerContract.props",
-                     "SharpProof.props",
-                     "SharpProof.targets"
-                 })
+        foreach (var fileName in ImmutableArray.Create("SharpProof.ConsumerContract.props", "SharpProof.props", "SharpProof.targets"))
         {
             File.Copy(
                 Path.Combine(
@@ -866,10 +899,12 @@ public sealed class PackageLayoutSmokeTests
                 """);
         var packageEvaluation = await RunDotNetAsync(
             root,
+[
             "msbuild",
             packageProject,
             "-getItem:Analyzer",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             packageEvaluation.ExitCode,
             Is.Zero,
@@ -915,10 +950,12 @@ public sealed class PackageLayoutSmokeTests
             """);
         var sourceEvaluation = await RunDotNetAsync(
             root,
+[
             "msbuild",
             sourceProject,
             "-getItem:Analyzer;ProjectReference",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(
             sourceEvaluation.ExitCode,
             Is.Zero,
@@ -933,7 +970,7 @@ public sealed class PackageLayoutSmokeTests
                 ExpectedCollectorDependencyFileNames.Contains(
                     Path.GetFileName(path),
                     StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var sourceProjects = GetEvaluatedItemIdentities(
             sourceEvaluation.Output,
             "ProjectReference");
@@ -973,13 +1010,15 @@ public sealed class PackageLayoutSmokeTests
 
         var evaluation = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             solution,
             "-target:Consumer:CaptureMappedAnalyzerItems",
             "-property:Configuration=Debug",
             "-property:Platform=Any CPU",
             "-property:DesignTimeBuild=true",
-            "--nologo"));
+            "--nologo"
+]));
         Assert.That(
             await File.ReadAllLinesAsync(
                 workspace.MappedProjectConfigurationsPath),
@@ -992,7 +1031,7 @@ public sealed class PackageLayoutSmokeTests
             .Where(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ExpectedAnalyzerDependencyFileNames.Contains(
                 Path.GetFileName(path),
                 StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             dependencyPaths.Select(Path.GetFileName),
             Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
@@ -1025,14 +1064,16 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(property);
         System.ArgumentNullException.ThrowIfNull(value);
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteSourceConsumerEvaluationProject((property, value));
+        workspace.WriteSourceConsumerEvaluationProject([(property, value)]);
 
         var validation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-target:_SharpProofValidateConsumerConfiguration",
-            "--nologo");
+            "--nologo"
+]);
 
         Assert.That(validation.ExitCode, Is.Not.Zero, validation.Output);
         Assert.That(validation.Output, Does.Contain(expectedMessage));
@@ -1057,10 +1098,12 @@ public sealed class PackageLayoutSmokeTests
 
         var enabledItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "--nologo"));
+            "--nologo"
+]));
         var packagedAnalyzerItems =
             GetPackagedAnalyzerItems(enabledItems.Output);
         Assert.That(
@@ -1098,10 +1141,12 @@ public sealed class PackageLayoutSmokeTests
 
         var enabledItems = await BuildOkAsync(RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "--nologo"));
+            "--nologo"
+]));
         var packagedAnalyzerItems =
             GetPackagedAnalyzerItems(enabledItems.Output);
         Assert.That(
@@ -1125,6 +1170,7 @@ public sealed class PackageLayoutSmokeTests
 
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -1132,7 +1178,8 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:SharpProofVerify=true");
+            "-p:SharpProofVerify=true"
+]);
         Assert.That(
             verification.ExitCode,
             Is.Zero,
@@ -1154,6 +1201,7 @@ public sealed class PackageLayoutSmokeTests
 
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -1162,7 +1210,8 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:SharpProofVerify=true",
-            "-p:SharpProofVerifyCacheEnabled=true");
+            "-p:SharpProofVerifyCacheEnabled=true"
+]);
         Assert.That(
             verification.ExitCode,
             Is.Not.Zero,
@@ -1198,7 +1247,7 @@ public sealed class PackageLayoutSmokeTests
                             .GetString() ?? string.Empty,
                         Claim = claim
                     }))))))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(effectClaims, Has.Length.EqualTo(2));
             Assert.That(
                 effectClaims.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Claim
@@ -1214,7 +1263,7 @@ public sealed class PackageLayoutSmokeTests
         var claims = result.RootElement
             .GetProperty("claimResults")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(claims, Has.Length.EqualTo(2));
@@ -1247,6 +1296,7 @@ public sealed class PackageLayoutSmokeTests
 
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -1256,7 +1306,8 @@ public sealed class PackageLayoutSmokeTests
             "/nodeReuse:false",
             "-p:SharpProofVerify=true",
             "-p:SharpProofVerifyCacheEnabled=false",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath
+]);
         Assert.That(verification.ExitCode, Is.Not.Zero);
         Assert.That(
             verification.Output,
@@ -1285,7 +1336,7 @@ public sealed class PackageLayoutSmokeTests
                 .GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(claims, Has.Length.EqualTo(1));
             var location = claims[0].GetProperty("location");
             JsonAssert.Equal(location, "path", expectedMappedPath);
@@ -1319,13 +1370,9 @@ public sealed class PackageLayoutSmokeTests
             feed.GetPackagePath(PackagedProductFeed.VerifierPackageId), TestContext.CurrentContext.CancellationToken);
         var targets = XDocument.Parse(ReadArchiveText(archive, "buildTransitive/SharpProof.Verifier.targets"));
         var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
-        var registrations = root.Elements("UsingTask").ToArray();
+        var registrations = root.Elements("UsingTask").ToImmutableArray();
         Assert.That(registrations, Has.Length.EqualTo(8));
-        foreach (var taskName in new[]
-                 {
-                     "InvalidatePublishedResult", "RunVerifier",
-                     "ValidatePublishedVerificationResult", "ResetPublishedVerification"
-                 })
+        foreach (var taskName in ImmutableArray.Create("InvalidatePublishedResult", "RunVerifier", "ValidatePublishedVerificationResult", "ResetPublishedVerification"))
         {
             var coreRegistrations = 0;
             var fullRegistrations = 0;
@@ -1368,9 +1415,11 @@ public sealed class PackageLayoutSmokeTests
         await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var evaluation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild", workspace.ConsumerProject,
             "-getProperty:NETCoreSdkVersion,_SharpProofVerifierHostSupported",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
         using var document = JsonDocument.Parse(evaluation.Output);
         var properties = document.RootElement.GetProperty("Properties");
@@ -1392,11 +1441,13 @@ public sealed class PackageLayoutSmokeTests
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild", workspace.ConsumerProject,
             "-t:SharpProofRejectUnsupportedWorkerHost",
             "-p:_SharpProofVerifyActive=true",
             "-p:NETCoreSdkVersion=" + sdkVersion,
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(verification.ExitCode, Is.Not.Zero, verification.Output);
         Assert.That(verification.Output,
             Does.Contain("requires .NET SDK 10.0.100 or newer")
@@ -1415,6 +1466,7 @@ public sealed class PackageLayoutSmokeTests
 
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "build",
             workspace.ConsumerProject,
             "-c",
@@ -1423,7 +1475,8 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:SharpProofVerify=true",
-            "-p:_SharpProofVerifierProcessArchitecture=X86");
+            "-p:_SharpProofVerifierProcessArchitecture=X86"
+]);
 
         Assert.That(
             verification.ExitCode,
@@ -1458,7 +1511,9 @@ public sealed class PackageLayoutSmokeTests
             }
             """,
             "all",
-            "SP0027");
+[
+            "SP0027"
+]);
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         var validBuild = await BuildOkAsync(BuildAnalyzerConsumerAsync(workspace));
@@ -1536,7 +1591,9 @@ public sealed class PackageLayoutSmokeTests
             }
             """,
             "effects",
-            "SP0052");
+[
+            "SP0052"
+]);
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         var build = await BuildAnalyzerConsumerAsync(workspace);
@@ -1563,14 +1620,16 @@ public sealed class PackageLayoutSmokeTests
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         var withoutPath = await BuildOkAsync(
-            RebuildCompilerProbeConsumerAsync(workspace));
+            RebuildCompilerProbeConsumerAsync(workspace, []));
         Assert.That(File.Exists(workspace.ProbeOutputPath), Is.False);
         var profileOff = await BuildOkAsync(RebuildCompilerProbeConsumerAsync(
             workspace,
+[
             ("SharpProofProfile", "off"),
             (
                 CompilerProbeContract.OutputPathPropertyName,
-                workspace.ProbeOutputPath)));
+                workspace.ProbeOutputPath)
+]));
         Assert.That(File.Exists(workspace.ProbeOutputPath), Is.False);
 
         var first = await BuildOkAsync(RebuildProbeAsync(
@@ -1582,7 +1641,7 @@ public sealed class PackageLayoutSmokeTests
             Is.True,
             first.Output);
         var firstBytes =
-            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+            (await File.ReadAllBytesAsync(workspace.ProbeOutputPath)).ToImmutableArray();
         VerifyProbeSnapshot(
             firstBytes,
             "first-input",
@@ -1593,7 +1652,7 @@ public sealed class PackageLayoutSmokeTests
             "first-global",
             "first-metadata"));
         Assert.That(
-            await File.ReadAllBytesAsync(workspace.ProbeOutputPath),
+            (await File.ReadAllBytesAsync(workspace.ProbeOutputPath)).ToImmutableArray(),
             Is.EqualTo(firstBytes));
 
         workspace.WriteProbeInput("second-input");
@@ -1602,7 +1661,7 @@ public sealed class PackageLayoutSmokeTests
             "first-global",
             "first-metadata"));
         var inputBytes =
-            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+            (await File.ReadAllBytesAsync(workspace.ProbeOutputPath)).ToImmutableArray();
         VerifyProbeSnapshot(
             inputBytes,
             "second-input",
@@ -1617,7 +1676,7 @@ public sealed class PackageLayoutSmokeTests
             "second-global",
             "second-metadata"));
         var configuredBytes =
-            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+            (await File.ReadAllBytesAsync(workspace.ProbeOutputPath)).ToImmutableArray();
         VerifyProbeSnapshot(
             configuredBytes,
             "second-input",
@@ -1646,20 +1705,20 @@ public sealed class PackageLayoutSmokeTests
             workspace.ConsumerDirectory,
             feed.Source,
             offlineFrameworkSource);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "restore",
             workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
             "--configfile",
             nugetConfig,
-            "-p:NuGetAudit=false"
-        };
+            "-p:NuGetAudit=false"));
         arguments.Add("--packages");
         arguments.Add(workspace.PackageCache);
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
     private static Task<ProcessResult> BuildAnalyzerConsumerAsync(
@@ -1667,42 +1726,43 @@ public sealed class PackageLayoutSmokeTests
         bool runAnalyzers = true)
     {
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "build",
             workspace.ConsumerProject,
             "-c",
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"
-        };
+            "/nodeReuse:false"));
         if (!runAnalyzers)
         {
             arguments.Add("-p:RunAnalyzersDuringBuild=false");
         }
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
-    private static async Task<PackagedAnalyzerItem[]>
+    private static async Task<ImmutableArray<PackagedAnalyzerItem>>
         EvaluatePackagedAnalyzerItemsAsync(
             PackageWorkspace workspace,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
     {
-        System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+        if (properties.IsDefault)
+        { throw new ArgumentNullException(nameof(properties)); }
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "--nologo"
-        };
+            "--nologo"));
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
         var evaluation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
         return GetPackagedAnalyzerItems(evaluation.Output);
     }
@@ -1711,17 +1771,20 @@ public sealed class PackageLayoutSmokeTests
         PackageWorkspace workspace,
         bool includePortable,
         bool includeCollector,
-        params (string Name, string Value)[] properties)
+        ImmutableArray<(string Name, string Value)> properties)
     {
-        System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+        if (properties.IsDefault)
+        { throw new ArgumentNullException(nameof(properties)); }
         System.ArgumentNullException.ThrowIfNull(workspace);
         workspace.WriteSourceConsumerEvaluationProject(properties);
         var evaluation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
+[
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer;ProjectReference",
-            "--nologo");
+            "--nologo"
+]);
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
         var items = GetSourceConsumerAnalyzerItems(evaluation.Output);
 
@@ -1753,11 +1816,13 @@ public sealed class PackageLayoutSmokeTests
 
     private static Task<ProcessResult> RebuildCompilerProbeConsumerAsync(
         PackageWorkspace workspace,
-        params (string Name, string Value)[] properties)
+        ImmutableArray<(string Name, string Value)> properties)
     {
-        System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+        if (properties.IsDefault)
+        { throw new ArgumentNullException(nameof(properties)); }
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "build",
             workspace.ConsumerProject,
             "-t:Rebuild",
@@ -1765,13 +1830,12 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"
-        };
+            "/nodeReuse:false"));
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
     private static Task<ProcessResult> RebuildProbeAsync(
@@ -1784,6 +1848,7 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(workspace);
         return RebuildCompilerProbeConsumerAsync(
             workspace,
+[
             ("SharpProofProfile", "advisory"),
             (
                 CompilerProbeContract.OutputPathPropertyName,
@@ -1791,20 +1856,22 @@ public sealed class PackageLayoutSmokeTests
             (
                 CompilerProbeContract.GlobalValuePropertyName,
                 globalValue),
-            ("SharpProofProbeAdditionalMetadata", metadataValue));
+            ("SharpProofProbeAdditionalMetadata", metadataValue)
+]);
     }
 
     private static void VerifyProbeSnapshot(
-        byte[] snapshot,
+        ImmutableArray<byte> snapshot,
         string input,
         string globalValue,
         string metadataValue)
     {
-        System.ArgumentNullException.ThrowIfNull(snapshot, nameof(snapshot));
+        if (snapshot.IsDefault)
+        { throw new ArgumentNullException(nameof(snapshot)); }
         System.ArgumentNullException.ThrowIfNull(globalValue);
         System.ArgumentNullException.ThrowIfNull(input);
         System.ArgumentNullException.ThrowIfNull(metadataValue);
-        using var document = JsonDocument.Parse(snapshot);
+        using var document = JsonDocument.Parse(snapshot.AsMemory());
         var root = document.RootElement;
         Assert.That(
             root.EnumerateObject().Select(static property => ((property.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(property)) : (property.Name))),
@@ -1824,7 +1891,7 @@ public sealed class PackageLayoutSmokeTests
 
         var syntaxTrees = root.GetProperty("syntaxTrees")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             syntaxTrees,
             Has.Some.Matches<JsonElement>(tree =>
@@ -1897,7 +1964,7 @@ public sealed class PackageLayoutSmokeTests
 
         var consumedOptions = root.GetProperty("consumedOptions")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         var globalOption = consumedOptions.Single(option =>
             option.GetProperty("key").GetString() ==
                 CompilerProbeContract.GlobalValueOptionKey &&
@@ -1967,22 +2034,17 @@ public sealed class PackageLayoutSmokeTests
     private static void VerifyPackageGraph(PackagedProductFeed feed)
     {
         System.ArgumentNullException.ThrowIfNull(feed);
-        var expectedDependencies =
-            new Dictionary<string, (string Id, string Version)[]>(
-                StringComparer.Ordinal)
-            {
-                [PackagedProductFeed.AttributesPackageId] = [],
-                [PackagedProductFeed.MainPackageId] = [
-                    (
-                        PackagedProductFeed.VerifierPackageId,
-                        "[" + feed.Version + "]")
-                ],
-                [PackagedProductFeed.VerifierPackageId] = [
-                    (
-                        PackagedProductFeed.AttributesPackageId,
-                        "[" + feed.Version + "]")
-                ]
-            };
+        var expectedDependencyBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<(string Id, string Version)>>(StringComparer.Ordinal);
+        expectedDependencyBuilder[PackagedProductFeed.AttributesPackageId] = [];
+        expectedDependencyBuilder[PackagedProductFeed.MainPackageId] =
+        [
+            (PackagedProductFeed.VerifierPackageId, "[" + feed.Version + "]")
+        ];
+        expectedDependencyBuilder[PackagedProductFeed.VerifierPackageId] =
+        [
+            (PackagedProductFeed.AttributesPackageId, "[" + feed.Version + "]")
+        ];
+        var expectedDependencies = expectedDependencyBuilder.ToImmutable();
         foreach (var package in feed.Packages)
         {
             using var archive = ZipFile.OpenRead(package.Path);
@@ -2028,7 +2090,7 @@ public sealed class PackageLayoutSmokeTests
             var dependencies = metadata.Descendants()
                 .Where(element =>
                     element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "dependency"))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 dependencies.Select(static dependency => dependency is null ? throw new System.ArgumentNullException(nameof(dependency)) : ((
                     Id: dependency.Attribute("id")?.Value,
@@ -2117,8 +2179,8 @@ public sealed class PackageLayoutSmokeTests
             using var archive = ZipFile.OpenRead(package.Path);
             return archive.Entries
                 .Select(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : ((package.Id, entry.FullName)))
-                .ToArray();
-        }).ToArray();
+                .ToImmutableArray();
+        }).ToImmutableArray();
         Assert.That(
             allEntries.Where(static entry =>
                 entry.FullName.EndsWith(
@@ -2138,15 +2200,16 @@ public sealed class PackageLayoutSmokeTests
 
     private static void AssertArchiveLayout(
         string packagePath,
-        string[] expectedEntries)
+        ImmutableArray<string> expectedEntries)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedEntries, nameof(expectedEntries));
+        if (expectedEntries.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(expectedEntries)); }
         System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry =>
                 entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (NormalizeGeneratedPackageEntry(entry.FullName)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             entries,
             Is.EquivalentTo(expectedEntries),
@@ -2166,7 +2229,7 @@ public sealed class PackageLayoutSmokeTests
         using var package = ZipFile.OpenRead(packagePath);
         var packageEntries = package.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             packageEntries,
             Has.None.EndsWith(".pdb"),
@@ -2179,7 +2242,7 @@ public sealed class PackageLayoutSmokeTests
                     StringComparison.Ordinal)))
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry[..^".dll".Length] + ".pdb"))
             .Order(StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             expectedPdbEntries,
             Is.Not.Empty,
@@ -2243,7 +2306,7 @@ public sealed class PackageLayoutSmokeTests
             .Select(reader.GetCustomDebugInformation)
             .Where(information =>
                 reader.GetGuid(information.Kind) == SourceLinkKind)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             sourceLinks,
             Has.Length.EqualTo(1),
@@ -2263,7 +2326,7 @@ public sealed class PackageLayoutSmokeTests
             entry.FullName);
         var mappings = documents
             .EnumerateObject()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(mappings, Is.Not.Empty, entry.FullName);
         var expectedUrl =
             "https://raw.githubusercontent.com/alexyorke/" +
@@ -2341,27 +2404,27 @@ public sealed class PackageLayoutSmokeTests
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         var analyzerEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "analyzers/dotnet/cs/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var conditionalAnalyzerEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/analyzers/dotnet/cs/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var collectorEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/collector/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var sharedEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/shared/netstandard2.0/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(analyzerEntries, Is.Empty);
         Assert.That(
             conditionalAnalyzerEntries,
@@ -2440,12 +2503,12 @@ public sealed class PackageLayoutSmokeTests
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         var toolEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/net10/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             toolEntries,
             Is.EquivalentTo(ExpectedToolEntries));
@@ -2481,9 +2544,7 @@ public sealed class PackageLayoutSmokeTests
                 "buildTransitive/SharpProof.Verifier.props"),
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
-        foreach (var dependencies in new[] {
-                     "tools/net10/SharpProof.Worker.deps.json"
-                 })
+        foreach (var dependencies in ImmutableArray.Create("tools/net10/SharpProof.Worker.deps.json"))
         {
             Assert.That(
                 ReadArchiveText(archive, dependencies),
@@ -2540,7 +2601,7 @@ public sealed class PackageLayoutSmokeTests
             "tools/net10/Microsoft.Z3.dll",
             z3.GetProperty("managedAssemblyBytes").GetInt64(),
             z3.GetProperty("managedAssemblySha256").GetString()!);
-        foreach (var architecture in new[] { "arm64", "x64" })
+        foreach (var architecture in ImmutableArray.Create("arm64", "x64"))
         {
             var mac = catalog.RootElement.GetProperty("macos").GetProperty(architecture);
             VerifyPackagePayload(
@@ -2590,9 +2651,10 @@ public sealed class PackageLayoutSmokeTests
 
     private static Task<ProcessResult> RunDotNetAsync(
         string workingDirectory,
-        params string[] arguments)
+        ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return RunProcessAsync(workingDirectory, "dotnet", arguments);
     }
@@ -2600,9 +2662,10 @@ public sealed class PackageLayoutSmokeTests
     private static async Task<ProcessResult> RunProcessAsync(
         string workingDirectory,
         string fileName,
-        params string[] arguments)
+        ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(fileName);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = ProcessRunner.CreateStartInfo(
@@ -2625,18 +2688,19 @@ public sealed class PackageLayoutSmokeTests
     {
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var fullPath = Path.GetFullPath(workingDirectory);
-        return s_sharedCompilationServerIds.GetOrAdd(
+        return ImmutableInterlocked.GetOrAdd(
+            ref s_sharedCompilationServerIds,
             fullPath,
             static _ => "sharpproof-package-layout-" +
                 Guid.NewGuid().ToString("N"));
     }
 
-    private static PackagedAnalyzerItem[]
+    private static ImmutableArray<PackagedAnalyzerItem>
         GetPackagedAnalyzerItems(string output)
     {
         System.ArgumentNullException.ThrowIfNull(output);
         using var document = JsonDocument.Parse(output);
-        var result = new List<PackagedAnalyzerItem>();
+        var result = ImmutableArray.CreateBuilder<PackagedAnalyzerItem>();
         foreach (var item in document.RootElement
             .GetProperty("Items")
             .GetProperty("Analyzer")
@@ -2659,7 +2723,7 @@ public sealed class PackageLayoutSmokeTests
                 Path.GetFileName(identity),
                 role));
         }
-        return [.. result];
+        return result.ToImmutable();
     }
 
     private static SourceConsumerAnalyzerItems
@@ -2681,7 +2745,7 @@ public sealed class PackageLayoutSmokeTests
                 ExpectedCollectorDependencyFileNames.Contains(
                     fileName,
                     StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var entryNames = items.GetProperty("ProjectReference")
             .EnumerateArray()
             .Where(static item =>
@@ -2690,11 +2754,11 @@ public sealed class PackageLayoutSmokeTests
             .Select(static item =>
                 ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (Path.GetFileNameWithoutExtension(
                     item.GetProperty("Identity").GetString()) + ".dll")))
-            .ToArray();
+            .ToImmutableArray();
         return new(entryNames, dependencyNames);
     }
 
-    private static string[] GetEvaluatedItemIdentities(
+    private static ImmutableArray<string> GetEvaluatedItemIdentities(
         string output,
         string itemName,
         string? requiredMetadata = null)
@@ -2722,12 +2786,13 @@ public sealed class PackageLayoutSmokeTests
     }
 
     private static void AssertPackagedAnalyzerItems(
-        PackagedAnalyzerItem[] items,
+        ImmutableArray<PackagedAnalyzerItem> items,
         bool includePortable,
         bool includeCollector,
         bool includeCodeFix = false)
     {
-        System.ArgumentNullException.ThrowIfNull(items, nameof(items));
+        if (items.IsDefault)
+        { throw new ArgumentNullException(nameof(items)); }
         Assert.That(
             items.Where(static item => item.Role == "CodeFix").Select(static item => item.FileName),
             includeCodeFix ? Is.EquivalentTo(ExpectedCodeFixEntryFileNames) : Is.Empty);
@@ -2929,7 +2994,9 @@ public sealed class PackageLayoutSmokeTests
                 }
                 """,
                 "all",
-                "SP0045");
+[
+                "SP0045"
+]);
         }
 
         internal void WritePassingVerifierConsumer(
@@ -2953,7 +3020,9 @@ public sealed class PackageLayoutSmokeTests
                 }
                 """,
                 "all",
-                "SP0045");
+[
+                "SP0045"
+]);
         }
 
         internal void WriteRuntimeAssetIsolationConsumer(string version)
@@ -3007,7 +3076,9 @@ public sealed class PackageLayoutSmokeTests
                 }
                 """,
                 "effects",
-                "SP0016");
+[
+                "SP0016"
+]);
         }
 
         internal string PrepareFrameworkSource(
@@ -3136,9 +3207,10 @@ public sealed class PackageLayoutSmokeTests
         }
 
         internal void WriteSourceConsumerEvaluationProject(
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            { throw new ArgumentNullException(nameof(properties)); }
             var configuredProperties = string.Join(
                 Environment.NewLine,
                 properties.Select(static property =>
@@ -3325,9 +3397,10 @@ public sealed class PackageLayoutSmokeTests
             string packageId,
             string source,
             string features,
-            params string[] enabledDiagnosticIds)
+            ImmutableArray<string> enabledDiagnosticIds)
         {
-            System.ArgumentNullException.ThrowIfNull(enabledDiagnosticIds, nameof(enabledDiagnosticIds));
+            if (enabledDiagnosticIds.IsDefault)
+            { throw new ArgumentNullException(nameof(enabledDiagnosticIds)); }
             System.ArgumentNullException.ThrowIfNull(features);
             System.ArgumentNullException.ThrowIfNull(packageId);
             System.ArgumentNullException.ThrowIfNull(source);
@@ -3464,24 +3537,26 @@ public sealed class PackageLayoutSmokeTests
     }
 
     private readonly record struct SourceConsumerAnalyzerItems(
-        string[] EntryFileNames,
-        string[] DependencyFileNames)
+        ImmutableArray<string> EntryFileNames,
+        ImmutableArray<string> DependencyFileNames)
     {
-        public string[] EntryFileNames { get; init; } = EntryFileNames ?? throw new System.ArgumentNullException(nameof(EntryFileNames));
-        public string[] DependencyFileNames { get; init; } = DependencyFileNames ?? throw new System.ArgumentNullException(nameof(DependencyFileNames));
+        public ImmutableArray<string> EntryFileNames { get; init; } = EntryFileNames.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(EntryFileNames)) : EntryFileNames;
+        public ImmutableArray<string> DependencyFileNames { get; init; } = DependencyFileNames.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(DependencyFileNames)) : DependencyFileNames;
     }
 
     private sealed class PackageAnalyzerAssemblyLoader :
         IAnalyzerAssemblyLoader,
         IDisposable
     {
-        private readonly Dictionary<string, string> _dependencies =
-            new(StringComparer.OrdinalIgnoreCase);
+        private ImmutableDictionary<string, string> _dependencies =
+            ImmutableDictionary.Create<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly PackageAnalyzerLoadContext _context;
 
         internal PackageAnalyzerAssemblyLoader()
         {
-            _context = new PackageAnalyzerLoadContext(_dependencies);
+            _context = new PackageAnalyzerLoadContext(name => name is null
+                ? throw new ArgumentNullException(nameof(name))
+                : System.Threading.Volatile.Read(ref _dependencies).TryGetValue(name, out var path) ? path : null);
         }
 
         public void AddDependencyLocation(string fullPath)
@@ -3490,7 +3565,13 @@ public sealed class PackageLayoutSmokeTests
             var name = AssemblyName.GetAssemblyName(fullPath).Name;
             if (!string.IsNullOrWhiteSpace(name))
             {
-                _dependencies[name] = Path.GetFullPath(fullPath);
+                ImmutableInterlocked.Update(ref _dependencies,
+                    static (map, entry) =>
+                    {
+                        System.ArgumentNullException.ThrowIfNull(map);
+                        return map.SetItem(entry.Name, entry.Path);
+                    },
+                    (Name: name, Path: Path.GetFullPath(fullPath)));
             }
         }
 
@@ -3506,10 +3587,10 @@ public sealed class PackageLayoutSmokeTests
         }
 
         private sealed class PackageAnalyzerLoadContext(
-            IReadOnlyDictionary<string, string> dependencies) :
+            Func<string, string?> dependencies) :
             AssemblyLoadContext(isCollectible: true)
         {
-            private IReadOnlyDictionary<string, string> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
+            private readonly Func<string, string?> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
             internal Assembly LoadPackageAssembly(string path)
             {
                 System.ArgumentNullException.ThrowIfNull(path);
@@ -3532,10 +3613,8 @@ public sealed class PackageLayoutSmokeTests
                 {
                     return compilerAssembly;
                 }
-                return identity.Name != null &&
-                    _guarded_dependencies.TryGetValue(identity.Name, out var path)
-                    ? LoadWithoutLock(path)
-                    : null;
+                var path = identity.Name != null ? _guarded_dependencies(identity.Name) : null;
+                return path != null ? LoadWithoutLock(path) : null;
             }
 
             private Assembly LoadWithoutLock(string path)
@@ -3569,13 +3648,10 @@ public sealed class PackageLayoutSmokeTests
             ? "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,1,nameof(n),1)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,24,nameof(n),24)]"
             : "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,2)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,48)]";
         var body = recursive ? "if(n<=0) return; Target(n-1);" : "Leaf(n);";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " + attributes +
-            " public static void Target(int n) { " + body + " } private static void Leaf(int value) {} }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " + attributes +
+            " public static void Target(int n) { " + body + " } private static void Leaf(int value) {} }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
@@ -3594,13 +3670,10 @@ public sealed class PackageLayoutSmokeTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3623,21 +3696,16 @@ public sealed class PackageLayoutSmokeTests
         var scope = metric == "LoopBodyEntries" ? "joined-isolated-source-callbacks" : "joined-isolated-source-allocation-prefixes";
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
             "[ResourceUpperBound(ResourceMetric." + metric + "," + constant + ",nameof(n)," + coefficient + ")] public static " + (configuredAwait ? "async " : "") +
             "Task Target(int n) => " + (configuredAwait ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
-            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){" + (metric == "LoopBodyEntries" ? "" : "var data=new int[2];") + "}} }", "all");
+            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){" + (metric == "LoopBodyEntries" ? "" : "var data=new int[2];") + "}} }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
         Assert.That(strict.Output, Does.Contain("Proven=1"));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3663,21 +3731,16 @@ public sealed class PackageLayoutSmokeTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
             $"[ResourceUpperBound((ResourceMetric){metric},1000)] public static " + (configured ? "async " : "") +
             "Task Target(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
-            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {for(int i=0;i<n;i++){}} }", "all");
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {for(int i=0;i<n;i++){}} }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
         Assert.That(strict.Output, Does.Contain("Proven=1"));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
-            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3701,12 +3764,10 @@ public sealed class PackageLayoutSmokeTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int n) {} }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int n) {} }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true");
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true"]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3726,19 +3787,14 @@ public sealed class PackageLayoutSmokeTests
         var method = !crossBlock ? "public static int[] Target(int n) => new int[n];" : metric == 5
             ? "public static int Target(int n) {var value=new int[n]; return value.Length;}"
             : "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " +
-            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
         Assert.That(strict.Output, Does.Contain("Proven=1"));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
-            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3784,17 +3840,13 @@ public sealed class PackageLayoutSmokeTests
                 "[ResourceUpperBound(ResourceMetric.RetainedBytes,128)] public static System.Func<int,System.Func<int>> Target(int value) {var values=new int[2]; return item => () => value+item+values.Length;} }",
             _ => throw new ArgumentOutOfRangeException(nameof(factoryKind))
         };
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
         Assert.That(strict.Output, Does.Contain("Proven=1"));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
-            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         var resourceReason = "result unavailable";
         if (File.Exists(workspace.ResultPath))
         {
@@ -3824,13 +3876,10 @@ public sealed class PackageLayoutSmokeTests
         var body = elements
             ? "for(int i=0;i<n;i++) { if(selected) {var a=new int[7];} else {var b=new int[2];} }"
             : "if(selected) { for(int i=0;i<n;i++) {} }";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n)," + coefficient + ")] public static void Target(int n,[ResourceBooleanInput(1,3)] bool selected) { " + body + " } }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n)," + coefficient + ")] public static void Target(int n,[ResourceBooleanInput(1,3)] bool selected) { " + body + " } }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3858,14 +3907,11 @@ public sealed class PackageLayoutSmokeTests
         using var workspace = PackageWorkspace.Create();
         var metric = elements ? "AllocatedElements" : "LoopBodyEntries";
         var spending = elements ? "var a=new int[2];" : "";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " +
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
             "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n),2)] public static void Target(int n,bool flush) { " +
-            "int credit=0; for(int i=0;i<n;i++) { credit++; if(flush) { while(credit>0) { " + spending + " credit--; } } } } }", "all");
+            "int credit=0; for(int i=0;i<n;i++) { credit++; if(flush) { while(credit>0) { " + spending + " credit--; } } } } }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3894,13 +3940,10 @@ public sealed class PackageLayoutSmokeTests
         var body = kind == 2 ? "var a=new int[n];" : "for(int i=0;i<n;i++) { for(int j=0;j<" + inner + ";j++) {} }";
         var expectedLower = kind == 0 ? "Omega(n^2)" : "Omega(n)";
         var expectedTight = kind == 0 ? "Theta(n^2)" : "Theta(n)";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { " +
-            "[ResourceUpperBound(ResourceMetric." + metric + ",long.MaxValue)] public static void Target(int n) { " + body + " } }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",long.MaxValue)] public static void Target(int n) { " + body + " } }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -3930,11 +3973,10 @@ public sealed class PackageLayoutSmokeTests
         var body = multipleInputs ? "for(int i=0;i<n;i++) {} for(int j=0;j<m;j++) {}" :
             "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }";
         workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "public static class Subject { public static void Target(int n,int m) { " + body + " } }", "all", "SP0060");
+            "public static class Subject { public static void Target(int n,int m) { " + body + " } }", "all", ["SP0060"]);
         await WriteUtf8Async(Path.Combine(workspace.ConsumerDirectory, ".editorconfig"), "root = true\n[*.cs]\ndotnet_diagnostic.SP0060.severity = warning\n");
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofVerify=false");
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofVerify=false"]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SP0060"));
         Assert.That(build.Output, Does.Contain("asymptotic upper bounds of the unbounded formula extension"));
@@ -3955,13 +3997,10 @@ public sealed class PackageLayoutSmokeTests
         { body = "for(int i=0;i<text.Length;i++) {}"; }
         var parameters = kind == 2 ? "string text" : "int n,int m";
         var bound = kind == 2 ? "0," + JsonSerializer.Serialize("text.Length") + ",1" : "long.MaxValue";
-        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
-            "using SharpProof.Attributes; public static class Subject { [ResourceUpperBound(ResourceMetric.LoopBodyEntries," + bound +
-            ")] public static void Target(" + parameters + ") { " + body + " } }", "all");
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { [ResourceUpperBound(ResourceMetric.LoopBodyEntries," + bound +
+            ")] public static void Target(" + parameters + ") { " + body + " } }", "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
@@ -4003,11 +4042,9 @@ public sealed class PackageLayoutSmokeTests
                 [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, "n", 3)]
                 public static void Allocate(int n) { for(int i=0;i<n;i++) { var buffer=new int[3]; } }
             }
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
         var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
@@ -4036,11 +4073,9 @@ public sealed class PackageLayoutSmokeTests
                 [ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]
                 public static void Allocate() { var first=new int[1]; var second=new int[2]; }
             }
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
@@ -4071,11 +4106,9 @@ public sealed class PackageLayoutSmokeTests
                 [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 2)]
                 public static void Target() { for(int i=0;i<3;i++) {} }
             }
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
@@ -4104,17 +4137,13 @@ public sealed class PackageLayoutSmokeTests
                 [ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]
                 public static void Target(int n) { int value=System.Math.Max(n,0); }
             }
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SP0048"));
         Assert.That(build.Output, Does.Contain("Proven=3"));
-        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
         Assert.That(advisory.Output, Does.Contain("Proven=3"));
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
@@ -4158,11 +4187,9 @@ public sealed class PackageLayoutSmokeTests
                     }
                 }
             }
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         if (violates)
         {
             Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
@@ -4279,17 +4306,13 @@ public sealed class PackageLayoutSmokeTests
                 public static {{returnType}} Target({{parameters}}) { {{body}} }
             }
             {{declarations}}
-            """, "all");
+            """, "all", []);
         _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
-        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict",
-            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(strict.Output, Does.Contain("SP0048"));
         Assert.That(strict.Output, Does.Contain(expected + "=1"));
-        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64",
-            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
         Assert.That(advisory.ExitCode, violates ? Is.Not.Zero : Is.Zero, advisory.Output);
         if (violates)
         { Assert.That(advisory.Output, Does.Contain("SP0051")); }
@@ -4318,9 +4341,7 @@ public sealed class PackageLayoutSmokeTests
         var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof." + expected);
         Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
-        var incompatible = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
-            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=AnyCPU",
-            "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true");
+        var incompatible = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=AnyCPU", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true"]);
         Assert.That(incompatible.ExitCode, Is.Zero, incompatible.Output);
         using var unknown = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
         var rejected = unknown.RootElement.GetProperty("claimResults").EnumerateArray().Single();

@@ -17,7 +17,7 @@ public sealed class DeferredStringConcatenationCoverageTests
         Assert.That(subject.Invoke([input!, choose]), Is.EqualTo(expected));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding =>
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding =>
             binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Name == "choose" ? subject.Factory.CreateBooleanValue(choose) : input == null
                 ? subject.Factory.CreateNullValue(subject.Factory.GetVariableInfo(binding.Entry).Type)
                 : subject.Factory.CreateStringValue(input)));

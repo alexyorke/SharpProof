@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -13,12 +14,12 @@ public sealed class IrCSharpDifferentialOracleTests
         var factory = new IrFactory();
         var generator = new WellSortedIrGenerator(factory, seed: 0x5A17);
         var oracle = new IrCSharpDifferentialOracle(factory);
-        var categories = new HashSet<GeneratedIrCategory>();
+        var categoryBuilder = ImmutableHashSet.CreateBuilder<GeneratedIrCategory>();
 
         for (var index = 0; index < 200; index++)
         {
             var generated = generator.Next(maximumDepth: 4);
-            categories.Add(generated.Category);
+            categoryBuilder.Add(generated.Category);
             var result = oracle.Compare(generated.Term, generated.Variables);
             Assert.That(
                 result.Status,
@@ -26,6 +27,7 @@ public sealed class IrCSharpDifferentialOracleTests
                 $"case {index}: {result.Detail}; term " +
                 new IrPrinter(factory).Print(generated.Term));
         }
+        var categories = categoryBuilder.ToImmutable();
         Assert.That(
             categories,
             Is.EquivalentTo(Enum.GetValues<GeneratedIrCategory>()));
@@ -43,7 +45,7 @@ public sealed class IrCSharpDifferentialOracleTests
             var term = factory.Integer(index);
             var result = oracle.Compare(
                 term,
-                new Dictionary<IrVarId, IrValue>());
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
             Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement));
         }
 
@@ -77,10 +79,7 @@ public sealed class IrCSharpDifferentialOracleTests
         object?[] arguments =
         [
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [input] = factory.CreateIntegerValue(0)
-            },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input,factory.CreateIntegerValue(0)),
             null,
             null,
             null
@@ -117,7 +116,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             term,
-            new Dictionary<IrVarId, IrValue>());
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
 
         Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement));
         Assert.That(result.Interpreted.Value!.Boolean, Is.False);
@@ -137,7 +136,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             term,
-            new Dictionary<IrVarId, IrValue>());
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
 
         Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
     }
@@ -161,10 +160,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             factory.Variable(value),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = binding
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, binding));
 
         using (Assert.EnterMultipleScope())
         {
@@ -192,27 +188,15 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var value = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateSequenceValue(
                     sequenceType,
-                    [factory.CreateIntegerValue(17)]),
-                [index] = factory.CreateIntegerValue(0)
-            });
+                    [factory.CreateIntegerValue(17)])).SetItem(index, factory.CreateIntegerValue(0)));
         var outOfRange = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateSequenceValue(sequenceType, []),
-                [index] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateSequenceValue(sequenceType, [])).SetItem(index, factory.CreateIntegerValue(0)));
         var nullReceiver = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateNullValue(sequenceType),
-                [index] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateNullValue(sequenceType)).SetItem(index, factory.CreateIntegerValue(0)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -247,48 +231,30 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var empty = oracle.Compare(
             factory.Variable(integerValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [integerValues] = factory.CreateSequenceValue(integers, [])
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(integerValues, factory.CreateSequenceValue(integers, [])));
         var scalarElements = oracle.Compare(
             factory.Variable(integerValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [integerValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(integerValues, factory.CreateSequenceValue(
                     integers,
-                    [factory.CreateIntegerValue(17)])
-            });
+                    [factory.CreateIntegerValue(17)])));
         var nestedElements = oracle.Compare(
             factory.Variable(nestedValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [nestedValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(nestedValues, factory.CreateSequenceValue(
                     nested,
                     [
                         factory.CreateSequenceValue(
                             integers,
                             [factory.CreateIntegerValue(1)]),
                         factory.CreateSequenceValue(integers, [])
-                    ])
-            });
+                    ])));
         var nullElement = oracle.Compare(
             factory.Variable(stringValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [stringValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(stringValues, factory.CreateSequenceValue(
                     strings,
-                    [factory.CreateNullValue(factory.StringType)])
-            });
+                    [factory.CreateNullValue(factory.StringType)])));
 
         Assert.That(
-            new[]
-            {
-                empty.Status,
-                scalarElements.Status,
-                nestedElements.Status,
-                nullElement.Status
-            },
+            ImmutableArray.Create(empty.Status, scalarElements.Status, nestedElements.Status, nullElement.Status),
             Is.All.EqualTo(DifferentialStatus.Agreement));
     }
 

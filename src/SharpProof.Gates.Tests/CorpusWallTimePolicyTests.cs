@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusWallTimePolicyTests
 {
-    private static readonly string[] ExpectedFailure = ["Corpus wall time 300.0s exceeds the 300s budget."];
+    private static readonly ImmutableArray<string> ExpectedFailure = ["Corpus wall time 300.0s exceeds the 300s budget."];
 
     [TestCase(299999, false)]
     [TestCase(300000, false)]

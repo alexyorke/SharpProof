@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -41,8 +42,8 @@ public sealed class StackTypeCalculusCoverageTests
         }
         """;
 
-    private static readonly string[] Categories = ["bool", "int", "long", "object", "string", "null"];
-    private static readonly string?[][] JoinTable =
+    private static readonly ImmutableArray<string> Categories = ["bool", "int", "long", "object", "string", "null"];
+    private static readonly ImmutableArray<ImmutableArray<string?>> JoinTable =
     [
         ["bool", "int", null, null, null, null],
         ["int", "int", null, null, null, null],
@@ -51,7 +52,7 @@ public sealed class StackTypeCalculusCoverageTests
         [null, null, null, null, "string", "string"],
         [null, null, null, "object", "string", "null"]
     ];
-    private static readonly bool[][] ReferenceTable =
+    private static readonly ImmutableArray<ImmutableArray<bool>> ReferenceTable =
     [
         [false, false, false, false, false, false],
         [false, false, false, false, false, false],
@@ -61,7 +62,7 @@ public sealed class StackTypeCalculusCoverageTests
         [false, false, false, true, true, true]
     ];
     // Target columns: Boolean, I4, I8, object, string, unsupported.
-    private static readonly bool[][] AcceptanceTable =
+    private static readonly ImmutableArray<ImmutableArray<bool>> AcceptanceTable =
     [
         [true, true, false, false, false, false],
         [false, true, false, false, false, false],
@@ -70,29 +71,30 @@ public sealed class StackTypeCalculusCoverageTests
         [false, false, false, false, true, false],
         [false, false, false, true, true, false]
     ];
-    private static readonly string[] Targets = ["bool", "int", "long", "object", "string", "byte", "char", "uint", "ulong", "decimal", "array", "nullable", "float", "double", "void"];
-    private static readonly int[] TargetColumns = [0, 1, 2, 3, 4, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5];
-    private static readonly Dictionary<string, string> Methods = new(StringComparer.Ordinal)
-    {
-        ["bool"] = "Bool",
-        ["int"] = "I4",
-        ["long"] = "I8",
-        ["object"] = "Object",
-        ["string"] = "Text",
-        ["sbyte"] = "I1",
-        ["byte"] = "U1",
-        ["short"] = "I2",
-        ["ushort"] = "U2",
-        ["char"] = "Character",
-        ["uint"] = "U4",
-        ["ulong"] = "U8",
-        ["decimal"] = "Unsupported",
-        ["array"] = "UnsupportedArray",
-        ["nullable"] = "NullableNull",
-        ["float"] = "Single",
-        ["double"] = "Double",
-        ["void"] = "NoValue"
-    };
+    private static readonly ImmutableArray<string> Targets = ["bool", "int", "long", "object", "string", "byte", "char", "uint", "ulong", "decimal", "array", "nullable", "float", "double", "void"];
+    private static readonly ImmutableArray<int> TargetColumns = [0, 1, 2, 3, 4, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5];
+    private static readonly ImmutableDictionary<string, string> Methods =
+        ImmutableDictionary.CreateRange<string, string>(StringComparer.Ordinal,
+        [
+        new("bool", "Bool"),
+        new("int", "I4"),
+        new("long", "I8"),
+        new("object", "Object"),
+        new("string", "Text"),
+        new("sbyte", "I1"),
+        new("byte", "U1"),
+        new("short", "I2"),
+        new("ushort", "U2"),
+        new("char", "Character"),
+        new("uint", "U4"),
+        new("ulong", "U8"),
+        new("decimal", "Unsupported"),
+        new("array", "UnsupportedArray"),
+        new("nullable", "NullableNull"),
+        new("float", "Single"),
+        new("double", "Double"),
+        new("void", "NoValue")
+            ]);
 
     private CSharpCompilation _compilation = null!;
     private SemanticModel _model = null!;
@@ -122,32 +124,32 @@ public sealed class StackTypeCalculusCoverageTests
     [Test]
     public void ExactInputSourceHasIndependentClrControls()
     {
-        Assert.That(Invoke("Bool", true), Is.EqualTo(true));
-        Assert.That(Invoke("Bool", false), Is.EqualTo(false));
-        Assert.That(Invoke("I4", 17), Is.EqualTo(17));
-        Assert.That(Invoke("I8", -19L), Is.EqualTo(-19L));
+        Assert.That(Invoke("Bool", [true]), Is.EqualTo(true));
+        Assert.That(Invoke("Bool", [false]), Is.EqualTo(false));
+        Assert.That(Invoke("I4", [17]), Is.EqualTo(17));
+        Assert.That(Invoke("I8", [-19L]), Is.EqualTo(-19L));
         var instance = new object();
-        Assert.That(Invoke("Object", instance), Is.SameAs(instance));
+        Assert.That(Invoke("Object", [instance]), Is.SameAs(instance));
         const string text = "owned";
-        Assert.That(Invoke("Text", text), Is.SameAs(text));
-        Assert.That(Invoke("Object", (object?)null), Is.Null);
-        Assert.That(Invoke("Text", (object?)null), Is.Null);
-        Assert.That(Invoke("NullObject"), Is.Null);
-        Assert.That(Invoke("NullText"), Is.Null);
-        Assert.That(Invoke("NullableNull"), Is.Null);
-        Assert.That(Invoke("Unsupported", 1.25m), Is.EqualTo(1.25m));
+        Assert.That(Invoke("Text", [text]), Is.SameAs(text));
+        Assert.That(Invoke("Object", [(object?)null]), Is.Null);
+        Assert.That(Invoke("Text", [(object?)null]), Is.Null);
+        Assert.That(Invoke("NullObject", []), Is.Null);
+        Assert.That(Invoke("NullText", []), Is.Null);
+        Assert.That(Invoke("NullableNull", []), Is.Null);
+        Assert.That(Invoke("Unsupported", [1.25m]), Is.EqualTo(1.25m));
         int[] array = [0, 17, -19];
-        Assert.That(Invoke("UnsupportedArray", array), Is.SameAs(array));
-        Assert.That(Invoke("I1", (sbyte)-17), Is.EqualTo((sbyte)-17));
-        Assert.That(Invoke("U1", byte.MaxValue), Is.EqualTo(byte.MaxValue));
-        Assert.That(Invoke("I2", short.MinValue), Is.EqualTo(short.MinValue));
-        Assert.That(Invoke("U2", ushort.MaxValue), Is.EqualTo(ushort.MaxValue));
-        Assert.That(Invoke("Character", 'x'), Is.EqualTo('x'));
-        Assert.That(Invoke("U4", uint.MaxValue), Is.EqualTo(uint.MaxValue));
-        Assert.That(Invoke("U8", ulong.MaxValue), Is.EqualTo(ulong.MaxValue));
-        Assert.That(Invoke("Single", 1.25f), Is.EqualTo(1.25f));
-        Assert.That(Invoke("Double", 1.25d), Is.EqualTo(1.25d));
-        Assert.That(Invoke("NoValue"), Is.Null);
+        Assert.That(Invoke("UnsupportedArray", [array]), Is.SameAs(array));
+        Assert.That(Invoke("I1", [(sbyte)-17]), Is.EqualTo((sbyte)-17));
+        Assert.That(Invoke("U1", [byte.MaxValue]), Is.EqualTo(byte.MaxValue));
+        Assert.That(Invoke("I2", [short.MinValue]), Is.EqualTo(short.MinValue));
+        Assert.That(Invoke("U2", [ushort.MaxValue]), Is.EqualTo(ushort.MaxValue));
+        Assert.That(Invoke("Character", ['x']), Is.EqualTo('x'));
+        Assert.That(Invoke("U4", [uint.MaxValue]), Is.EqualTo(uint.MaxValue));
+        Assert.That(Invoke("U8", [ulong.MaxValue]), Is.EqualTo(ulong.MaxValue));
+        Assert.That(Invoke("Single", [1.25f]), Is.EqualTo(1.25f));
+        Assert.That(Invoke("Double", [1.25d]), Is.EqualTo(1.25d));
+        Assert.That(Invoke("NoValue", []), Is.Null);
     }
 
     private static IEnumerable<TestCaseData> Joins()
@@ -288,7 +290,7 @@ public sealed class StackTypeCalculusCoverageTests
         var operation = Expression(method);
         Assert.That(operation.ConstantValue.HasValue, Is.True);
         Assert.That(operation.ConstantValue.Value, Is.EqualTo(constant));
-        Assert.That(Invoke(method), Is.EqualTo(constant));
+        Assert.That(Invoke(method, []), Is.EqualTo(constant));
         var shape = TotalIlStackType.FromInt32Constant((int)operation.ConstantValue.Value!);
         Assert.That(shape.Equals(Shape(expected)), Is.True);
         Assert.That(shape.WidenBooleanCompatibleI4().Equals(Shape("int")), Is.True);
@@ -297,7 +299,7 @@ public sealed class StackTypeCalculusCoverageTests
     [Test]
     public void ActualTypeFactoriesHaveTheirDeclaredValueEquivalenceClasses()
     {
-        var values = new HashSet<TotalIlStackType>();
+        var values = ImmutableHashSet.CreateBuilder<TotalIlStackType>();
         foreach (var type in Methods.Keys)
         {
             if (TotalIlStackType.TryFromTypeSymbol(Type(type), out var shape))
@@ -343,6 +345,6 @@ public sealed class StackTypeCalculusCoverageTests
         return TotalIlStackType.NullFromIl;
     }
 
-    private object? Invoke(string method, params object?[] arguments)
-    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments); }
+    private object? Invoke(string method, ImmutableArray<object?> arguments)
+    { if (arguments.IsDefault) { throw new System.ArgumentNullException(nameof(arguments)); } System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments.ToArray()); }
 }

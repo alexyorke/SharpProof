@@ -11,24 +11,24 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
-$contract = [ordered]@{
-    schemaVersion                    = 3
-    contractVersion                  = [int]$catalog.containerContractVersion
-    platform                         = [string]$catalog.platform
-    dotnetSdkVersion                 = [string]$catalog.dotnet.sdkVersion
-    dotnetMinimumSdkVersion          = [string]$catalog.dotnet.minimumSdkVersion
-    dotnetMinimumSdkFrameworkVersion =
-    [string]$catalog.dotnet.minimumSdkFrameworkVersion
-    dotnetTestRuntimeVersion         = [string]$catalog.dotnet.testRuntimeVersion
-    dotnetBaseImage                  = [string]$catalog.dotnet.baseImage
-    dotnetBaseImageDigest            = [string]$catalog.dotnet.baseImageDigest
-    powershellVersionLine            = [string]$catalog.powershell.versionLine
-    powershellArchiveSha256          = [string]$catalog.powershell.archiveSha256
-    z3Version                        = [string]$catalog.z3.version
-    z3LibraryBytes                   = [int64]$catalog.z3.libraryBytes
-    z3LibrarySha256                  = [string]$catalog.z3.librarySha256
-    verifierPackageId                = [string]$catalog.support.verifierPackageId
-}
+$contract = ([ordered]@{
+        schemaVersion                    = 3
+        contractVersion                  = [int]$catalog.containerContractVersion
+        platform                         = [string]$catalog.platform
+        dotnetSdkVersion                 = [string]$catalog.dotnet.sdkVersion
+        dotnetMinimumSdkVersion          = [string]$catalog.dotnet.minimumSdkVersion
+        dotnetMinimumSdkFrameworkVersion =
+        [string]$catalog.dotnet.minimumSdkFrameworkVersion
+        dotnetTestRuntimeVersion         = [string]$catalog.dotnet.testRuntimeVersion
+        dotnetBaseImage                  = [string]$catalog.dotnet.baseImage
+        dotnetBaseImageDigest            = [string]$catalog.dotnet.baseImageDigest
+        powershellVersionLine            = [string]$catalog.powershell.versionLine
+        powershellArchiveSha256          = [string]$catalog.powershell.archiveSha256
+        z3Version                        = [string]$catalog.z3.version
+        z3LibraryBytes                   = [int64]$catalog.z3.libraryBytes
+        z3LibrarySha256                  = [string]$catalog.z3.librarySha256
+        verifierPackageId                = [string]$catalog.support.verifierPackageId
+    }).AsReadOnly()
 
 $parent = Split-Path -Parent ([System.IO.Path]::GetFullPath($OutputPath))
 [System.IO.Directory]::CreateDirectory($parent) | Out-Null

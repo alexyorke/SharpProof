@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -74,7 +75,7 @@ public sealed class WorkerFactorResourceBoundaryTests
     {
         System.ArgumentNullException.ThrowIfNull(label);
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("FactorTheoremObservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("FactorTheoremObservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);
@@ -89,7 +90,7 @@ public sealed class WorkerFactorResourceBoundaryTests
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(instructions.Single(instruction =>
@@ -127,7 +128,7 @@ public sealed class WorkerFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedLabels = Enumerable.Range(0, candidate!.Requires.Length)
-                .Select(ordinal => "requires:" + ordinal).ToHashSet(StringComparer.Ordinal);
+                .Select(ordinal => "requires:" + ordinal).ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(result.Core.All(ownedLabels.Contains), Is.True);
         }
         else
@@ -164,10 +165,10 @@ public sealed class WorkerFactorResourceBoundaryTests
             outcome = result.Outcome?.GetType().Name,
             reason = result.Reason.ToString(),
             result.QueryCompleted,
-            core = result.Core.ToArray(),
+            core = result.Core,
             model = result.EntryModel.OrderBy(pair => pair.Key.Value).Select(pair => new
-            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToArray(),
-            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToArray(),
+            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToImmutableArray(),
+            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToImmutableArray(),
             callPreconditionWitness = result.CallPreconditionWitness?.Value,
             consumedBefore = before,
             consumedAfter = after,

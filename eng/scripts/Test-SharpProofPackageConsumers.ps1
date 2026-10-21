@@ -33,33 +33,36 @@ function Resolve-SharpProofPackageSource {
     if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
         throw "SharpProof package source is not a directory: $resolved"
     }
-    $packageSourceFiles = @(Get-ChildItem -LiteralPath $resolved -File)
-    $packageFiles = @(
-        $packageSourceFiles | Where-Object Extension -EQ '.nupkg'
-    )
-    if ($packageFiles.Count -ne 3) {
-        throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Count)."
+    $packageSourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $resolved -File))
+    $packageFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            $packageSourceFiles | Where-Object Extension -EQ '.nupkg'
+        ))
+    if ($packageFiles.Length -ne 3) {
+        throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Length)."
     }
-    $symbolPackageFiles = @(
-        $packageSourceFiles | Where-Object Extension -EQ '.snupkg'
-    )
-    if ($symbolPackageFiles.Count -ne 2) {
-        throw "SharpProof package source must contain exactly two snupkg files (Attributes and Verifier; the facade has no executable payload); found $($symbolPackageFiles.Count)."
+    $symbolPackageFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            $packageSourceFiles | Where-Object Extension -EQ '.snupkg'
+        ))
+    if ($symbolPackageFiles.Length -ne 2) {
+        throw "SharpProof package source must contain exactly two snupkg files (Attributes and Verifier; the facade has no executable payload); found $($symbolPackageFiles.Length)."
     }
+    $identityFileBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $identityFileBuilder.AddRange($packageFiles)
+    $identityFileBuilder.AddRange($symbolPackageFiles)
     $identitySet = Get-SharpProofPackageIdentitySet `
-        -Files @($packageFiles + $symbolPackageFiles)
-    $identities = @(
-        $identitySet.Identities |
-            Where-Object { $_.File.Extension -eq '.nupkg' } |
-            ForEach-Object { $_.Identity }
-    )
-    $symbolIdentities = @(
-        $identitySet.Identities |
-            Where-Object { $_.File.Extension -eq '.snupkg' } |
-            ForEach-Object { $_.Identity }
-    )
+        -Files ([object[]]@($identityFileBuilder.ToImmutable()))
+    $identities = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(
+                $identitySet.Identities |
+                    Where-Object { $_.File.Extension -eq '.nupkg' } |
+                    ForEach-Object { $_.Identity }
+            )))
+    $symbolIdentities = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(
+                $identitySet.Identities |
+                    Where-Object { $_.File.Extension -eq '.snupkg' } |
+                    ForEach-Object { $_.Identity }
+            )))
     $expectedIds = $SharpProofSymbolPackageIds
-    $versions = @($identitySet.Version)
+    $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($identitySet.Version))
 
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
     $repositoryCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -67,12 +70,12 @@ function Resolve-SharpProofPackageSource {
         $repositoryCommit -notmatch '^[0-9a-f]{40}$') {
         throw 'Could not resolve the package-source checkout commit.'
     }
-    $facade = @($identities | Where-Object Id -EQ 'SharpProof')[0]
+    $facade = @($identities | Where-Object { $_.Id -eq 'SharpProof' })[0]
     $null = Test-SharpProofFacadePackage -PackagePath $facade.Path `
         -PackageVersion $versions[0] -RepositoryCommit $repositoryCommit
     foreach ($packageId in $expectedIds) {
-        $main = @($identities | Where-Object Id -EQ $packageId)[0]
-        $symbols = @($symbolIdentities | Where-Object Id -EQ $packageId)[0]
+        $main = @($identities | Where-Object { $_.Id -eq $packageId })[0]
+        $symbols = @($symbolIdentities | Where-Object { $_.Id -eq $packageId })[0]
         $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $main.Path `
             -SymbolPackagePath $symbols.Path `
@@ -82,10 +85,10 @@ function Resolve-SharpProofPackageSource {
     }
     & (Join-Path $PSScriptRoot 'Test-SharpProofThirdPartyInventory.ps1') `
         -PackageSource $resolved
-    return [pscustomobject][ordered]@{
-        Path    = [string]$resolved
-        Version = [string]$versions[0]
-    }
+    return ([ordered]@{
+            Path    = [string]$resolved
+            Version = [string]$versions[0]
+        }).AsReadOnly()
 }
 
 function New-FrameworkPackageSource {
@@ -130,48 +133,52 @@ function New-FrameworkPackageSource {
             -WorkingDirectory $Root `
             -Arguments @('msbuild', $frameworkProbe, '-nologo',
             '-getItem:KnownFrameworkReference') -Quiet) | ConvertFrom-Json
-    $frameworkReferences = @($frameworkEvaluation.Items.KnownFrameworkReference |
-            Where-Object { $_.TargetFramework -eq 'net8.0' })
-    $targetingPacks = @(
-        'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref')
-    if ($IsWindows) { $targetingPacks += 'Microsoft.WindowsDesktop.App.Ref' }
-    $frameworkPackages = @(
-        [pscustomobject]@{
-            Id      = 'netstandard.library'
-            Version = '2.0.3'
-            Pattern = 'NETStandard.Library'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netcore.platforms'
-            Version = '1.1.0'
-            Pattern = 'Microsoft.NETCore.Platforms'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netframework.referenceassemblies'
-            Version = '1.0.3'
-            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
-        }
-        [pscustomobject]@{
-            Id      = 'microsoft.netframework.referenceassemblies.net472'
-            Version = '1.0.3'
-            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
-        }
-    )
+    $frameworkReferences = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($frameworkEvaluation.Items.KnownFrameworkReference |
+                    Where-Object { $_.TargetFramework -eq 'net8.0' })))
+    $targetingPackBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$targetingPackBuilder.AddRange([string[]]@(
+            'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref'))
+    if ($IsWindows) { [void]$targetingPackBuilder.Add('Microsoft.WindowsDesktop.App.Ref') }
+    $targetingPacks = $targetingPackBuilder.ToImmutable()
+    $frameworkPackageBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    [void]$frameworkPackageBuilder.AddRange([object[]]@(
+            ([ordered]@{
+                Id      = 'netstandard.library'
+                Version = '2.0.3'
+                Pattern = 'NETStandard.Library'
+            }).AsReadOnly()
+            ([ordered]@{
+                Id      = 'microsoft.netcore.platforms'
+                Version = '1.1.0'
+                Pattern = 'Microsoft.NETCore.Platforms'
+            }).AsReadOnly()
+            ([ordered]@{
+                Id      = 'microsoft.netframework.referenceassemblies'
+                Version = '1.0.3'
+                Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+            }).AsReadOnly()
+            ([ordered]@{
+                Id      = 'microsoft.netframework.referenceassemblies.net472'
+                Version = '1.0.3'
+                Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+            }).AsReadOnly()
+        ))
     foreach ($targetingPack in $targetingPacks) {
-        $packVersions = @($frameworkReferences |
-                Where-Object { $_.TargetingPackName -eq $targetingPack } |
-                Select-Object -ExpandProperty TargetingPackVersion -Unique)
+        $packVersions = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($frameworkReferences |
+                        Where-Object { $_.TargetingPackName -eq $targetingPack } |
+                        Select-Object -ExpandProperty TargetingPackVersion -Unique)))
         if ($packVersions.Count -ne 1 -or
             [string]$packVersions[0] -notmatch '^8\.0\.[0-9]+$') {
             throw "The selected consumer SDK did not declare one net8.0 targeting-pack version for '$targetingPack'."
         }
         Write-Host "Consumer SDK requires $targetingPack $($packVersions[0])."
-        $frameworkPackages += [pscustomobject]@{
-            Id      = $targetingPack.ToLowerInvariant()
-            Version = [string]$packVersions[0]
-            Pattern = $targetingPack
-        }
+        [void]$frameworkPackageBuilder.Add(([ordered]@{
+                    Id      = $targetingPack.ToLowerInvariant()
+                    Version = [string]$packVersions[0]
+                    Pattern = $targetingPack
+                }).AsReadOnly())
     }
+    $frameworkPackages = $frameworkPackageBuilder.ToImmutable()
     foreach ($package in $frameworkPackages) {
         $fileName = "$($package.Id).$($package.Version).nupkg"
         $source = [IO.Path]::Combine(
@@ -254,26 +261,26 @@ function New-FrameworkPackageSource {
         }
     }
 
-    $unexpectedPackages = @(
-        Get-ChildItem -LiteralPath $frameworkSource -File -Filter '*.nupkg' |
-            ForEach-Object {
-                Get-SharpProofPackageIdentity -Path $_.FullName
-            } |
-            Where-Object {
-                $_.Id.StartsWith(
-                    'SharpProof',
-                    [StringComparison]::OrdinalIgnoreCase)
-            }
-    )
+    $unexpectedPackages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(
+                Get-ChildItem -LiteralPath $frameworkSource -File -Filter '*.nupkg' |
+                    ForEach-Object {
+                        Get-SharpProofPackageIdentity -Path $_.FullName
+                    } |
+                    Where-Object {
+                        $_.Id.StartsWith(
+                            'SharpProof',
+                            [StringComparison]::OrdinalIgnoreCase)
+                    }
+            )))
     if ($unexpectedPackages.Count -ne 0) {
         throw (
             'The framework-only package source unexpectedly contains ' +
             'SharpProof packages.')
     }
-    return [pscustomobject][ordered]@{
-        Source   = $frameworkSource
-        Packages = $frameworkPackages
-    }
+    return ([ordered]@{
+            Source   = $frameworkSource
+            Packages = $frameworkPackages
+        }).AsReadOnly()
 }
 
 function Invoke-ConsumerDotNet {
@@ -325,30 +332,34 @@ function Assert-SharpProofAnalyzerItems {
             "MSBuild analyzer items: $($_.Exception.Message)")
     }
 
-    $analyzerItems = @($evaluation.Items.Analyzer)
-    $sharpProofItems = @(
-        $analyzerItems |
-            Where-Object {
-                ([string]$_.Identity) -match
-                '[/\\]SharpProof\.[^/\\]+\.dll$'
-            }
-    )
-    $entryPointNames = [Collections.Generic.List[string]]::new()
-    $generatorNames = [Collections.Generic.List[string]]::new()
-    $legacyEntryPoints = [Collections.Generic.List[object]]::new()
+    $analyzerItems = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($evaluation.Items.Analyzer)))
+    $sharpProofItems = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(
+                $analyzerItems |
+                    Where-Object {
+                        ([string]$_.Identity) -match
+                        '[/\\]SharpProof\.[^/\\]+\.dll$'
+                    }
+            )))
+    $entryPointNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $generatorNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $legacyEntryPointBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($item in $sharpProofItems) {
         $identity = ([string]$item.Identity).Replace('\', '/')
         $name = ($identity -split '/')[-1]
         if ($item.SharpProofAnalyzerRole -eq 'EntryPoint') {
-            $entryPointNames.Add($name)
+            $entryPointNameBuilder.Add($name)
         }
         if ($item.SharpProofAnalyzerRole -eq 'Generator') {
-            $generatorNames.Add($name)
+            $generatorNameBuilder.Add($name)
         }
         if ($identity -match '/SharpProof\.PortableAnalyzer\.dll$') {
-            $legacyEntryPoints.Add($item)
+            $legacyEntryPointBuilder.Add($item)
         }
     }
+
+    $entryPointNames = $entryPointNameBuilder.ToImmutable()
+    $generatorNames = $generatorNameBuilder.ToImmutable()
+    $legacyEntryPoints = $legacyEntryPointBuilder.ToImmutable()
 
     if ($entryPointNames.Count -ne 1 -or
         $entryPointNames[0] -ne 'SharpProof.Analyzer.dll' -or
@@ -390,12 +401,12 @@ function Test-SharpProofFrameworkConsumers {
                 $globalJson)
         }
         else {
-            $json = [ordered]@{
-                sdk = [ordered]@{
-                    version     = $SdkVersion
-                    rollForward = 'disable'
-                }
-            } | ConvertTo-Json -Depth 3
+            $json = ([ordered]@{
+                    sdk = ([ordered]@{
+                            version     = $SdkVersion
+                            rollForward = 'disable'
+                        }).AsReadOnly()
+                }).AsReadOnly() | ConvertTo-Json -Depth 3
             [IO.File]::WriteAllText(
                 $globalJson,
                 $json + "`n",
@@ -410,28 +421,29 @@ function Test-SharpProofFrameworkConsumers {
         $escapedFrameworkSource =
         [Security.SecurityElement]::Escape($frameworkSource)
         $nugetConfig = Join-Path $root 'NuGet.config'
-        $nugetConfigLines = @(
-            '<?xml version="1.0" encoding="utf-8"?>'
-            '<configuration>'
-            '  <packageSources>'
-            '    <clear />'
-            "    <add key=`"SharpProofLocal`" value=`"$escapedSource`" />"
-            "    <add key=`"FrameworkOffline`" value=`"$escapedFrameworkSource`" />"
-            '  </packageSources>'
-            '  <packageSourceMapping>'
-            '    <packageSource key="SharpProofLocal">'
-            '      <package pattern="SharpProof*" />'
-            '    </packageSource>'
-            '    <packageSource key="FrameworkOffline">'
-            $frameworkCatalog.Packages |
-                Select-Object -ExpandProperty Pattern -Unique |
-                ForEach-Object {
-                    "      <package pattern=`"$_`" />"
-                }
-            '    </packageSource>'
-            '  </packageSourceMapping>'
-            '</configuration>'
-        )
+        $nugetConfigLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                '<?xml version="1.0" encoding="utf-8"?>'
+                '<configuration>'
+                '  <packageSources>'
+                '    <clear />'
+                "    <add key=`"SharpProofLocal`" value=`"$escapedSource`" />"
+                "    <add key=`"FrameworkOffline`" value=`"$escapedFrameworkSource`" />"
+                '  </packageSources>'
+                '  <packageSourceMapping>'
+                '    <packageSource key="SharpProofLocal">'
+                '      <package pattern="SharpProof*" />'
+                '    </packageSource>'
+                '    <packageSource key="FrameworkOffline">'
+                $frameworkCatalog.Packages |
+                    ForEach-Object { $_.Pattern } |
+                    Select-Object -Unique |
+                    ForEach-Object {
+                        "      <package pattern=`"$_`" />"
+                    }
+                '    </packageSource>'
+                '  </packageSourceMapping>'
+                '</configuration>'
+            ))
         [IO.File]::WriteAllText(
             $nugetConfig,
             ($nugetConfigLines -join "`n") + "`n",
@@ -450,9 +462,9 @@ function Test-SharpProofFrameworkConsumers {
         $contract = Get-Content -LiteralPath (Join-Path `
                 $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
             ConvertFrom-Json
-        $frameworks = @($contract.supportedTargetFrameworks | ForEach-Object {
-                [string]$_
-            })
+        $frameworks = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($contract.supportedTargetFrameworks | ForEach-Object {
+                        [string]$_
+                    })))
         if ($frameworks.Count -eq 0) {
             throw 'The acceptance contract must declare supported target frameworks.'
         }
@@ -461,40 +473,40 @@ function Test-SharpProofFrameworkConsumers {
         foreach ($framework in $frameworks) {
             $consumer = Join-Path $root $framework
             [IO.Directory]::CreateDirectory($consumer) | Out-Null
-            $projectLines = @(
-                '<Project Sdk="Microsoft.NET.Sdk">'
-                '  <PropertyGroup>'
-                "    <TargetFramework>$framework</TargetFramework>"
-                '    <LangVersion>12.0</LangVersion>'
-                '    <SharpProofProfile>advisory</SharpProofProfile>'
-                '    <SharpProofVerify>false</SharpProofVerify>'
-                '    <SharpProofFeatures>all</SharpProofFeatures>'
-                '    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>'
-                '    <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>'
-                '    <NuGetAudit>false</NuGetAudit>'
-                '    <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>'
-                '  </PropertyGroup>'
-                '  <ItemGroup>'
-                '    <PackageReference Include="SharpProof"'
-                "                      Version=`"$escapedVersion`" />"
-                if ($framework -eq 'net472') {
-                    '    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />'
-                }
-                '  </ItemGroup>'
-                '</Project>'
-            )
+            $projectLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    '<Project Sdk="Microsoft.NET.Sdk">'
+                    '  <PropertyGroup>'
+                    "    <TargetFramework>$framework</TargetFramework>"
+                    '    <LangVersion>12.0</LangVersion>'
+                    '    <SharpProofProfile>advisory</SharpProofProfile>'
+                    '    <SharpProofVerify>false</SharpProofVerify>'
+                    '    <SharpProofFeatures>all</SharpProofFeatures>'
+                    '    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>'
+                    '    <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>'
+                    '    <NuGetAudit>false</NuGetAudit>'
+                    '    <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>'
+                    '  </PropertyGroup>'
+                    '  <ItemGroup>'
+                    '    <PackageReference Include="SharpProof"'
+                    "                      Version=`"$escapedVersion`" />"
+                    if ($framework -eq 'net472') {
+                        '    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />'
+                    }
+                    '  </ItemGroup>'
+                    '</Project>'
+                ))
             [IO.File]::WriteAllText(
                 (Join-Path $consumer 'Consumer.csproj'),
                 ($projectLines -join "`n") + "`n",
                 $encoding)
-            $sourceLines = @(
-                'using SharpProof.Attributes;'
-                ''
-                'public static class Subject {'
-                '    [ZeroAllocations]'
-                '    public static int Identity(int value) => value;'
-                '}'
-            )
+            $sourceLines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'using SharpProof.Attributes;'
+                    ''
+                    'public static class Subject {'
+                    '    [ZeroAllocations]'
+                    '    public static int Identity(int value) => value;'
+                    '}'
+                ))
             [IO.File]::WriteAllText(
                 (Join-Path $consumer 'Subject.cs'),
                 ($sourceLines -join "`n") + "`n",
@@ -608,14 +620,15 @@ if ($null -ne $resolvedPackageSource) {
 
 Push-Location $repositoryRoot
 try {
-    $packageTestArguments = @(
-        'test',
-        $testProject,
-        '--configuration',
-        $Configuration,
-        '--no-restore',
-        '--logger',
-        'console;verbosity=minimal')
+    $packageTestArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$packageTestArgumentBuilder.AddRange([string[]]@(
+            'test',
+            $testProject,
+            '--configuration',
+            $Configuration,
+            '--no-restore',
+            '--logger',
+            'console;verbosity=minimal'))
     if ($null -ne $resolvedPackageSource) {
         # Framework compatibility is exercised above. Re-run only the exact
         # package graph, analyzer discovery, and real verifier proof here;
@@ -625,8 +638,9 @@ try {
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
         'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
-        $packageTestArguments += @('--filter', $focusedPackageFilter)
+        [void]$packageTestArgumentBuilder.AddRange([string[]]@('--filter', $focusedPackageFilter))
     }
+    $packageTestArguments = [string[]]@($packageTestArgumentBuilder.ToImmutable())
     & dotnet @packageTestArguments
     if ($LASTEXITCODE -ne 0) {
         throw "SharpProof package consumer tests failed with exit code $LASTEXITCODE."

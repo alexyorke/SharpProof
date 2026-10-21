@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -84,10 +85,7 @@ internal sealed class IrProgramTests
 
         var execution = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [flag] = factory.CreateBooleanValue(condition)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(condition)));
 
         Assert.That(
             execution.Status,
@@ -139,10 +137,7 @@ internal sealed class IrProgramTests
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [flag] = malformed
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, malformed));
 
         using (Assert.EnterMultipleScope())
         {
@@ -211,14 +206,14 @@ internal sealed class IrProgramTests
             factory.Variable(result));
 
         var instructions = builder.Build().Blocks.Single().Instructions;
-        IrInstructionKind[] expectedKinds = [
+        ImmutableArray<IrInstructionKind> expectedKinds = [
             IrInstructionKind.Store,
             IrInstructionKind.Load,
             IrInstructionKind.Call,
             IrInstructionKind.Havoc,
             IrInstructionKind.Return
         ];
-        int[] expectedIds = [0, 1, 2, 3, 4];
+        ImmutableArray<int> expectedIds = [0, 1, 2, 3, 4];
 
         Assert.That(
             instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)),
@@ -475,10 +470,7 @@ internal sealed class IrProgramTests
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = factory.CreateIntegerValue(7)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, factory.CreateIntegerValue(7)));
         return (result, havoc, value);
     }
 
@@ -566,10 +558,7 @@ internal sealed class IrProgramTests
             "bounds-store",
             "bounds-return",
             factory.Integer(7));
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [sequence] = factory.CreateSequenceValue(sequenceType, [])
-        };
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, factory.CreateSequenceValue(sequenceType, []));
         var interpreter = new IrProgramInterpreter(factory);
 
         var failing =

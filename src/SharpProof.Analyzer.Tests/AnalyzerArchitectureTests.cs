@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
@@ -10,7 +12,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerArchitectureTests
 {
-    private static readonly string[] ExpectedAnalyzerReferences = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerReferences = [
         "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.CompilerArtifact",
@@ -23,7 +25,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Worker.Protocol"
     ];
 
-    private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
@@ -91,8 +93,8 @@ public sealed class AnalyzerArchitectureTests
                 source,
                 "effects",
                 ["SP0002", "SP0045"]))
-            .ToArray();
-        var results = await Task.WhenAll(tasks);
+            .ToImmutableArray();
+        var results = (await Task.WhenAll(tasks)).ToImmutableArray();
         var expected = Snapshot(results[0]);
 
         Assert.That(
@@ -110,7 +112,7 @@ public sealed class AnalyzerArchitectureTests
                                   name.StartsWith(
                                       "SharpProof.",
                                       StringComparison.Ordinal))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(
             references,
@@ -120,10 +122,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes()
     {
-        var assemblies = new[] {
-            typeof(SharpProofAnalyzer).Assembly,
-            typeof(SharpProof.Effects.EffectSummaryProjector).Assembly
-        };
+        var assemblies = ImmutableArray.Create(typeof(SharpProofAnalyzer).Assembly, typeof(SharpProof.Effects.EffectSummaryProjector).Assembly);
 
         foreach (var assembly in assemblies)
         {
@@ -144,7 +143,7 @@ public sealed class AnalyzerArchitectureTests
         var names = Directory.EnumerateFiles(output, "*.dll")
             .Select(Path.GetFileNameWithoutExtension)
             .OfType<string>()
-            .ToArray();
+            .ToImmutableArray();
         var testAssembly =
             typeof(AnalyzerArchitectureTests).Assembly.GetName().Name;
         var sharpProofNames = names
@@ -157,7 +156,7 @@ public sealed class AnalyzerArchitectureTests
                         typeof(SharpProof.DefensiveCodingAnalyzer.ParameterGuardAnalyzer).Assembly.GetName().Name,
                         StringComparison.Ordinal);
             })
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -186,7 +185,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void OperationKindGateCatalogIsExhaustive()
     {
-        var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToArray();
+        var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToImmutableArray();
 
         Assert.That(
             OperationSubsetClassifier.GetKnownOperationKinds(),
@@ -210,14 +209,11 @@ public sealed class AnalyzerArchitectureTests
                 analyzerDirectory,
                 "AnalyzerReleases.Unshipped.md"),
             "New Rules");
-        var descriptors = new SharpProofAnalyzer()
+        var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
             .SupportedDiagnostics
             .Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (!descriptor.Id.StartsWith(
                 "SPCF",
-                StringComparison.Ordinal)))
-            .ToDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
-                StringComparer.Ordinal);
+                StringComparison.Ordinal))), static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
@@ -250,26 +246,9 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void CompilationEndOnlyDescriptorsCarryCompilationEndTag()
     {
-        var descriptors = new SharpProofAnalyzer()
-            .SupportedDiagnostics
-            .ToDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
-                StringComparer.Ordinal);
-        var expected = new[]
-        {
-            "SP0025",
-            "SP0050",
-            "SPCF0001",
-            "SPCF0002",
-            "SPCF0003",
-            "SPCF0004",
-            "SPCF0005",
-            "SPCF0006",
-            "SPCF0007",
-            "SPCF0008",
-            "SPCF0009",
-            "SPCF0010"
-        };
+        var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
+            .SupportedDiagnostics, static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+        var expected = ImmutableArray.Create("SP0025", "SP0050", "SPCF0001", "SPCF0002", "SPCF0003", "SPCF0004", "SPCF0005", "SPCF0006", "SPCF0007", "SPCF0008", "SPCF0009", "SPCF0010");
 
         foreach (var id in expected)
         {
@@ -280,14 +259,14 @@ public sealed class AnalyzerArchitectureTests
         }
     }
 
-    private static Dictionary<string, ReleaseRule>
+    private static ImmutableDictionary<string, ReleaseRule>
         ReadReleaseSection(
             string path,
             string section)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         System.ArgumentNullException.ThrowIfNull(section);
-        var result = new Dictionary<string, ReleaseRule>(
+        var result = ImmutableDictionary.CreateBuilder<string, ReleaseRule>(
             StringComparer.Ordinal);
         var inSection = false;
         foreach (var line in File.ReadLines(path))
@@ -308,7 +287,7 @@ public sealed class AnalyzerArchitectureTests
             var columns = line
                 .Split('|')
                 .Select(static column => column is null ? throw new System.ArgumentNullException(nameof(column)) : (column.Trim()))
-                .ToArray();
+                .ToImmutableArray();
             if (columns.Length < 4 ||
                 columns[0].Length != 6 ||
                 !columns[0].StartsWith("SP", StringComparison.Ordinal) ||
@@ -322,11 +301,12 @@ public sealed class AnalyzerArchitectureTests
                 columns[1],
                 columns[2]);
             Assert.That(
-                result.TryAdd(rule.Id, rule),
+                !result.ContainsKey(rule.Id),
                 Is.True,
                 "Duplicate release row " + rule.Id + " in " + path + ".");
+            result.Add(rule.Id, rule);
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static string ReleaseSeverity(

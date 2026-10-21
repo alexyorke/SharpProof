@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -45,7 +46,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
         }
     }
 
@@ -141,7 +142,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
     }
 
@@ -173,7 +174,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
     }
 
@@ -212,8 +213,8 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(closedContractDiagnostics, "SP0027");
-        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, "SP0046");
+        AnalyzerTestHost.AssertIds(closedContractDiagnostics, ["SP0027"]);
+        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, ["SP0046"]);
     }
 
     [Test]
@@ -269,7 +270,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
     }
 
     [Test]
@@ -349,7 +350,7 @@ public sealed class AdvisoryActivationTests
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
             var messages = diagnostics.Select(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture))).ToArray();
+                    System.Globalization.CultureInfo.InvariantCulture))).ToImmutableArray();
             Assert.That(
                 messages.Count(static message =>
                     message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
@@ -381,7 +382,7 @@ public sealed class AdvisoryActivationTests
             }
             """,
             []);
-        MetadataReference[] references =
+        ImmutableArray<MetadataReference> references =
         [
             external.ToMetadataReference(),
             MetadataReference.CreateFromImage(
@@ -405,7 +406,7 @@ public sealed class AdvisoryActivationTests
             }
             """;
 
-        foreach (var source in new[] { callerSource, ActivatedCallerSource })
+        foreach (var source in ImmutableArray.Create(callerSource, ActivatedCallerSource))
         {
             foreach (var reference in references)
             {

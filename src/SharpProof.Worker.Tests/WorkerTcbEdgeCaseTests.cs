@@ -53,25 +53,37 @@ internal sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)).B = -1;
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)) with { B = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnboundCall:
                 var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
-                call.Kind = IrInstructionKind.Call;
-                call.B = int.MaxValue;
+                {
+                    {
+                        var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { Kind = IrInstructionKind.Call });
+                        call = changedFixture.Item1;
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+                    }
+                }
+                {
+                    {
+                        var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { B = int.MaxValue });
+                        call = changedFixture.Item1;
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+                    }
+                }
                 break;
             case MalformedBodyKind.MissingBranchCondition:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)).A = -1;
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.MissingReturnValue:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)).A = -1;
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
-                instructions[0].Kind = (IrInstructionKind)int.MaxValue;
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions[0], instructions[0] with { Kind = (IrInstructionKind)int.MaxValue }) } }) }; }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
@@ -82,7 +94,7 @@ internal sealed class WorkerTcbEdgeCaseTests
     public void ContractClaimOrderMismatchFailsClosedBeforeBackendInvocation()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
-        artifact.Callables.Single().Total!.Clauses.Single().ClaimId = "foreign-claim";
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Clauses = artifact.Callables.Single().Total!.Clauses.ReplaceReference(artifact.Callables.Single().Total!.Clauses.Single(), artifact.Callables.Single().Total!.Clauses.Single() with { ClaimId = "foreign-claim" }) } }) }; }
         RejectMalformedArtifact(artifact);
     }
     [Test]
@@ -90,7 +102,10 @@ internal sealed class WorkerTcbEdgeCaseTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
         var total = artifact.Callables.Single().Total!;
-        total.Clauses = [total.Clauses.Single(), total.Clauses.Single()];
+        {
+            total = total with { Clauses = [total.Clauses.Single(), total.Clauses.Single()] };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+        }
         RejectMalformedArtifact(artifact);
     }
     [Test]
@@ -239,7 +254,7 @@ internal sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var backend = new ScriptedBackend(BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure));
+        var backend = new ScriptedBackend([BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure)]);
         var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend, project.Request.Budgets);
         Assert.That(backend.CallCount, Is.EqualTo(1));
         Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -299,7 +314,7 @@ internal sealed class WorkerTcbEdgeCaseTests
     public void UnknownCompilerClauseKindIsRejectedExhaustively()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
-        artifact.Callables.Single().Total!.Clauses.Single().Kind = (CompilerContractKind)int.MaxValue;
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Clauses = artifact.Callables.Single().Total!.Clauses.ReplaceReference(artifact.Callables.Single().Total!.Clauses.Single(), artifact.Callables.Single().Total!.Clauses.Single() with { Kind = (CompilerContractKind)int.MaxValue }) } }) }; }
         RejectMalformedArtifact(artifact);
     }
 
@@ -334,8 +349,8 @@ internal sealed class WorkerTcbEdgeCaseTests
             0,
             WorkerClaimReason.UnsupportedExpression);
 
-        first.Assumptions[0].Id = "mutated";
-        first.Assumptions[0].Used = true;
+        { first = first with { Assumptions = first.Assumptions.ReplaceAt(0, first.Assumptions[0] with { Id = "mutated" }) }; }
+        { first = first with { Assumptions = first.Assumptions.ReplaceAt(0, first.Assumptions[0] with { Used = true }) }; }
 
         using (Assert.EnterMultipleScope())
         {
@@ -367,7 +382,7 @@ internal sealed class WorkerTcbEdgeCaseTests
             directory,
             inputHash,
             differentManifest ? new string('c', 64) : manifest.Hash,
-            differentManifest ? [] : null,
+            differentManifest ? ImmutableArray<WorkerCallableResult>.Empty : null,
             []);
         var cache = new VerificationCache(directory, 1024 * 1024);
 
@@ -418,11 +433,7 @@ internal sealed class WorkerTcbEdgeCaseTests
                 ProofCore = [new string('x', WorkerProtocolJson.MaximumJsonBytes)]
             }]
         };
-        foreach (var maximumBytes in new[]
-        {
-            1L,
-            (long)WorkerProtocolJson.MaximumJsonBytes * 2
-        })
+        foreach (var maximumBytes in ImmutableArray.Create(1L, (long)WorkerProtocolJson.MaximumJsonBytes * 2))
         {
             using var temporaryDirectory = new TempDirectory(
                 "worker-cache-write-size-");
@@ -447,10 +458,11 @@ internal sealed class WorkerTcbEdgeCaseTests
         string directory,
         string inputHash,
         string manifestHash,
-        WorkerCallableResult[]? callableResults,
-        WorkerClaimResult[] claimResults)
+        ImmutableArray<WorkerCallableResult>? callableResults,
+        ImmutableArray<WorkerClaimResult> claimResults)
     {
-        System.ArgumentNullException.ThrowIfNull(claimResults, nameof(claimResults));
+        if (claimResults.IsDefault)
+        { throw new ArgumentNullException(nameof(claimResults)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(inputHash);
         System.ArgumentNullException.ThrowIfNull(manifestHash);
@@ -548,9 +560,9 @@ internal sealed class WorkerTcbEdgeCaseTests
     }
 
     private sealed class ScriptedBackend(
-        params BackendCheckResult[] results) : ISmtBackend
+        ImmutableArray<BackendCheckResult> results) : ISmtBackend
     {
-        private readonly Queue<BackendCheckResult> _results = new((results ?? throw new System.ArgumentNullException(nameof(results))));
+        private ImmutableQueue<BackendCheckResult> _results = ImmutableQueue.CreateRange(results.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(results)) : results);
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
@@ -562,7 +574,8 @@ internal sealed class WorkerTcbEdgeCaseTests
             System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
-            return Task.FromResult(_results.Dequeue());
+            _results = _results.Dequeue(out var result);
+            return Task.FromResult(result);
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -99,7 +100,7 @@ public sealed class TypedMetadataCallTests
         var type = factory.GetVariableInfo(entry).Type;
         var value = input is bool boolean ? factory.CreateBooleanValue(boolean) : input is ulong unsigned
             ? factory.CreateIntegerValue(type, unsigned) : factory.CreateIntegerValue(type, Convert.ToInt64(input, CultureInfo.InvariantCulture));
-        var execution = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue> { [entry] = value });
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
         if (expected is Type)
         { Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.Overflow)); }
         else if (expected is bool expectedBoolean)
@@ -128,7 +129,7 @@ public sealed class TypedMetadataCallTests
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(input).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(input).Type, 0)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(1));
     }
@@ -389,7 +390,7 @@ internal sealed class MetadataTestSubject : IDisposable
     internal CSharpCompilation Compilation { get; }
     internal MethodInfo Method { get; }
     internal string ImagePath { get; }
-    internal byte[] Image { get; }
+    internal ImmutableArray<byte> Image { get; }
     internal MethodInfo RootMethod { get; }
 
     internal MetadataTestSubject(string librarySource, string source, Platform platform = Platform.AnyCpu)
@@ -404,10 +405,10 @@ internal sealed class MetadataTestSubject : IDisposable
             using var stream = new MemoryStream();
             var emitted = implementation.Emit(stream);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            Image = stream.ToArray();
+            Image = ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
             ImagePath = Path.Combine(_directory.FullName, "implementation.dll");
-            File.WriteAllBytes(ImagePath, Image);
-            using var runtimeImage = new MemoryStream(Image, writable: false);
+            File.WriteAllBytes(ImagePath, Image.AsSpan());
+            using var runtimeImage = new MemoryStream(Image.ToArray(), writable: false);
             var assembly = _runtime.LoadFromStream(runtimeImage);
             Method = assembly.GetType("Library")!.GetMethod("Target")!;
             Compilation = CSharpCompilation.Create("TypedIlSubject_" + Guid.NewGuid().ToString("N"),
@@ -453,7 +454,7 @@ internal sealed class MetadataTestSubject : IDisposable
         System.ArgumentNullException.ThrowIfNull(mutation);
         var bytes = Image.ToArray();
         int header;
-        using (var image = new PEReader(new MemoryStream(Image, writable: false)))
+        using (var image = new PEReader(Image))
         {
             var definition = image.GetMetadataReader().GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(Method.MetadataToken & 0x00ffffff));
             var section = image.PEHeaders.SectionHeaders[image.PEHeaders.GetContainingSectionIndex(definition.RelativeVirtualAddress)];

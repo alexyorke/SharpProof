@@ -58,7 +58,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0 && input is ulong unsigned
                 ? factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, unsigned)
                 : factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,

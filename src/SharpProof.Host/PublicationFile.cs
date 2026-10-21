@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 
 namespace SharpProof.Host;
@@ -26,8 +27,8 @@ internal static class PublicationFile
     {
         System.ArgumentNullException.ThrowIfNull(destination);
         System.ArgumentNullException.ThrowIfNull(text);
-        var bytes = Encoding.UTF8.GetBytes(text);
-        Write(destination, stream => { System.ArgumentNullException.ThrowIfNull(stream); stream.Write(bytes); }, cancellationToken);
+        var bytes = Encoding.UTF8.GetBytes(text).ToImmutableArray();
+        Write(destination, stream => { System.ArgumentNullException.ThrowIfNull(stream); stream.Write(bytes.AsSpan()); }, cancellationToken);
     }
 
     private static void Write(string destination, Action<FileStream> write, CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -21,11 +22,11 @@ public sealed class NativeFieldGoalAdmissionTests
 
     public static IEnumerable<TestCaseData> RemainingPrimitiveCases()
     {
-        foreach (var type in new[] { "Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64" })
+        foreach (var type in ImmutableArray.Create("Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64"))
         {
-            foreach (var upcast in new[] { false, true })
+            foreach (var upcast in ImmutableArray.Create(false, true))
             {
-                foreach (var old in new[] { false, true })
+                foreach (var old in ImmutableArray.Create(false, true))
                 { yield return new TestCaseData(type, upcast, old).SetName("FieldGoal_" + type + (upcast ? "_Object" : "_Nominal") + (old ? "_Old" : "_Current")); }
             }
         }
@@ -66,24 +67,17 @@ public sealed class NativeFieldGoalAdmissionTests
             : factory.Variable(parameter.Current);
         builder.FieldStore(block, site, IrWriteRegion.Field, target, field, storedTerm);
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site));
         var ensures = new PassiveContractClause(Equal(Read(oldSnapshot ? parameter.Old : parameter.Current),
             oldSnapshot ? initialTerm : storedTerm), factory.Boolean(true), site);
         var candidate = new PassiveCallableCandidate("postcondition-field-view", builder.Build(), [parameter], null,
             [.. requires], [ensures]);
 
         var owner = factory.CreateReferenceValue(boxType, new IrObjectState().WithField(field, initialValue));
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, owner).SetItem(parameter.Current, owner).SetItem(parameter.Old, owner);
         var execution = new IrProgramInterpreter(factory).Execute(candidate.Program, inputs);
         using (Assert.EnterMultipleScope())
         {

@@ -1,0 +1,28 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
+param([string]$Baseline)
+$ErrorActionPreference='Stop'
+$validator=Join-Path $PSScriptRoot 'check-type-reference-authority.ps1'
+& $validator -OutputRoot $Baseline
+$cases=@('MissingReferences','InvalidHash','UnsortedAliases','WrongReferenceContext','WrongTypeId','WrongResidualAssembly','UnknownSourcePath','DuplicateType','MissingResidual','UnhashedReference','DuplicateCompilerReport')
+foreach($case in $cases){
+ $target=Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-authority-negative-'+[Guid]::NewGuid().ToString('N'));[IO.Directory]::CreateDirectory($target)|Out-Null;Copy-Item -LiteralPath (Join-Path $Baseline 'references'),(Join-Path $Baseline 'residual'),(Join-Path $Baseline 'types') -Destination $target -Recurse;Get-ChildItem -LiteralPath $Baseline -File|Copy-Item -Destination $target
+ $kind=if($case -in 'WrongTypeId','UnknownSourcePath','DuplicateType'){'types'}elseif($case -in 'WrongResidualAssembly','MissingResidual'){'residual'}else{'references'}
+ $file=Get-ChildItem (Join-Path $target $kind) -Filter '*.tsv'|Select-Object -First 1;$rows=@(Import-Csv $file.FullName -Delimiter ([char]9))
+ switch($case){
+ 'MissingReferences'{Remove-Item -LiteralPath $file.FullName}
+ 'InvalidHash'{$rows[0].ContentSha256='invalid'}
+ 'UnsortedAliases'{$rows[0].Aliases='z;a'}
+ 'WrongReferenceContext'{$rows[0].ContextSha256='0'*64}
+ 'WrongTypeId'{$rows[0].TypeId='0'*64}
+ 'WrongResidualAssembly'{($rows|Where-Object Kind -ne 'Unit'|Select-Object -First 1).AssemblyIdentity='wrong assembly'}
+ 'UnknownSourcePath'{($rows|Where-Object Origin -eq 'Source'|Select-Object -First 1).SourcePaths='Missing.cs'}
+ 'DuplicateType'{$rows+=,$rows[0]}
+ 'MissingResidual'{Remove-Item -LiteralPath $file.FullName}
+ 'UnhashedReference'{$rows[0].Authority='UnhashedMetadataReference';$rows[0].ContentSha256=''}
+ 'DuplicateCompilerReport'{$top=Get-ChildItem -LiteralPath $target -Filter '*.tsv'|Select-Object -First 1;Copy-Item -LiteralPath $top.FullName -Destination (Join-Path $target 'duplicate.tsv');Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($top.FullName,'.paths.txt')) -Destination (Join-Path $target 'duplicate.paths.txt')}
+ }
+ if($case -notin 'MissingReferences','MissingResidual','DuplicateCompilerReport'){$rows|Export-Csv -LiteralPath $file.FullName -Delimiter ([char]9) -NoTypeInformation -UseQuotes Never}
+ $rejected=$false;try{& $validator -OutputRoot $target|Out-Null}catch{$rejected=$true}
+ if(-not $rejected){throw "Validator accepted tamper case $case"};Write-Output "Rejected $case"
+}
+Write-Output 'Eleven authority tamper controls pass.'

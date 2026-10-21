@@ -52,7 +52,7 @@ public sealed class ProtocolExpandedManifestAuthorityTests
         response = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
         if (rejected)
         {
-            response.Manifest.Callables.Single().Location.Path = new string('<', WorkerProtocolJson.MaximumJsonBytes / 6 + 1);
+            { response = response with { Manifest = response.Manifest with { Callables = response.Manifest.Callables.ReplaceReference(response.Manifest.Callables.Single(), response.Manifest.Callables.Single() with { Location = response.Manifest.Callables.Single().Location with { Path = new string('<', WorkerProtocolJson.MaximumJsonBytes / 6 + 1) } }) } }; }
         }
         var options = WorkerProtocolJson.Options;
         options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;

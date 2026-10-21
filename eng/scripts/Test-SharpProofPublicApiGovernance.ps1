@@ -11,7 +11,7 @@ $scratch = Join-Path $temporaryParent ('SharpProofPublicApiGovernance.' + [Guid]
 $evidence = Join-Path $repository ('artifacts/public-api-governance/' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($evidence) | Out-Null
 $priorRepository = $env:SHARPPROOF_REPO_ROOT
-$receipts = [Collections.Generic.List[object]]::new()
+$receipts = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
 function Invoke-CheckedGit {
     param([string[]]$Arguments)
@@ -23,8 +23,10 @@ function Invoke-GovernanceBuild {
     param([string]$Name, [string]$ExpectedDiagnostic = '')
     $buildArguments = @('build', (Join-Path $scratch 'src/SharpProof.Attributes/SharpProof.Attributes.csproj'),
         '--configuration', 'Release', '--no-restore', '--nologo', '-t:Rebuild', '-p:UseSharedCompilation=false')
-    $output = @(& dotnet @buildArguments 2>&1)
+    $outputBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & dotnet @buildArguments 2>&1 | ForEach-Object { $outputBuilder.Add([string]$_) }
     $exitCode = $LASTEXITCODE
+    $output = $outputBuilder.ToImmutable()
     $text = $output -join "`n"
     [IO.File]::WriteAllText((Join-Path $evidence ($Name + '.log')), $text + "`n")
     if ([string]::IsNullOrEmpty($ExpectedDiagnostic)) {
@@ -36,7 +38,7 @@ function Invoke-GovernanceBuild {
     if ($text -match ': error (?!RS\d{4}:)[A-Z]+\d+:') {
         throw "The '$Name' control encountered a separate compiler, restore, or MSBuild error; see $evidence."
     }
-    $receipts.Add([ordered]@{ name = $Name; exitCode = $exitCode; expectedDiagnostic = $ExpectedDiagnostic })
+    $receipts.Add(([ordered]@{ name = $Name; exitCode = $exitCode; expectedDiagnostic = $ExpectedDiagnostic }).AsReadOnly())
     Write-Host "Public API governance: $Name passed (expected diagnostic: '$ExpectedDiagnostic')."
 }
 
@@ -49,8 +51,10 @@ try {
     if ((Get-Item -LiteralPath $patch).Length -gt 0) {
         Invoke-CheckedGit @('-C', $scratch, 'apply', '--binary', '--whitespace=nowarn', $patch)
     }
-    $untracked = @(& git -C $repository ls-files --others --exclude-standard -z)
+    $untrackedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & git -C $repository ls-files --others --exclude-standard -z | ForEach-Object { $untrackedBuilder.Add([string]$_) }
     if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate untracked source inputs.' }
+    $untracked = $untrackedBuilder.ToImmutable()
     foreach ($relative in (($untracked -join "`n") -split [char]0)) {
         if ([string]::IsNullOrEmpty($relative)) { continue }
         $source = [IO.Path]::GetFullPath((Join-Path $repository $relative))
@@ -65,19 +69,23 @@ try {
     $env:SHARPPROOF_REPO_ROOT = $scratch
     Push-Location $scratch
     try {
-        $restore = @(& dotnet restore src/SharpProof.Attributes/SharpProof.Attributes.csproj --locked-mode --nologo 2>&1)
-        if ($LASTEXITCODE -ne 0) {
+        $restoreBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        & dotnet restore src/SharpProof.Attributes/SharpProof.Attributes.csproj --locked-mode --nologo 2>&1 | ForEach-Object { $restoreBuilder.Add([string]$_) }
+        $restoreExitCode = $LASTEXITCODE
+        $restore = $restoreBuilder.ToImmutable()
+        if ($restoreExitCode -ne 0) {
             [IO.File]::WriteAllLines((Join-Path $evidence 'restore.log'), [string[]]$restore)
             throw "The isolated restore failed; see $evidence."
         }
         Invoke-GovernanceBuild 'baseline'
-        $apiFiles = @('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
-                Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
-            })
-        $apiContents = [Collections.Generic.List[byte[]]]::new()
-        foreach ($file in $apiFiles) { $apiContents.Add([IO.File]::ReadAllBytes($file)) }
+        $apiFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
+                    Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
+                }))
+        $apiContentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[Collections.Immutable.ImmutableArray[byte]]()
+        foreach ($file in $apiFiles) { $apiContentBuilder.Add([Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($file))) }
+        $apiContents = $apiContentBuilder.ToImmutable()
         $project = Join-Path $scratch 'src/SharpProof.Attributes/SharpProof.Attributes.csproj'
-        $projectContents = [IO.File]::ReadAllBytes($project)
+        $projectContents = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($project))
         try {
             foreach ($file in $apiFiles) { [IO.File]::Delete($file) }
             # The repository explicitly enrolls these files. Remove absent compiler inputs in
@@ -89,25 +97,26 @@ try {
     </ItemGroup>
   </Target>
 '@
-            [IO.File]::WriteAllText($project, [Text.Encoding]::UTF8.GetString($projectContents).Replace(
+            [IO.File]::WriteAllText($project, [Text.Encoding]::UTF8.GetString([byte[]]@($projectContents)).Replace(
                     '</Project>', $missingFileControl + "`n</Project>"))
             Invoke-GovernanceBuild 'missing-api-files' 'RS0016'
         }
         finally {
-            [IO.File]::WriteAllBytes($project, $projectContents)
-            for ($index = 0; $index -lt $apiFiles.Count; $index++) {
-                [IO.File]::WriteAllBytes($apiFiles[$index], $apiContents[$index])
+            [IO.File]::WriteAllBytes($project, [byte[]]@($projectContents))
+            for ($index = 0; $index -lt $apiFiles.Length; $index++) {
+                [IO.File]::WriteAllBytes($apiFiles[$index], [byte[]]@($apiContents[$index]))
             }
         }
         $nullableSource = Join-Path $scratch 'src/SharpProof.Attributes/AllowedExceptionsAttribute.cs'
-        $nullableContents = [IO.File]::ReadAllBytes($nullableSource)
+        $nullableContents = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($nullableSource))
         try {
-            [IO.File]::WriteAllText($nullableSource, "#nullable disable`n" + [Text.Encoding]::UTF8.GetString($nullableContents))
+            [IO.File]::WriteAllText($nullableSource, "#nullable disable`n" + [Text.Encoding]::UTF8.GetString([byte[]]@($nullableContents)))
             Invoke-GovernanceBuild 'oblivious-public-api' 'RS0041'
         }
-        finally { [IO.File]::WriteAllBytes($nullableSource, $nullableContents) }
+        finally { [IO.File]::WriteAllBytes($nullableSource, [byte[]]@($nullableContents)) }
         Invoke-GovernanceBuild 'restored'
-        [ordered]@{ schemaVersion = 1; controls = $receipts.ToArray() } | ConvertTo-Json -Depth 4 |
+        $receiptSnapshot = $receipts.ToImmutable()
+        ([ordered]@{ schemaVersion = 1; controls = $receiptSnapshot }).AsReadOnly() | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath (Join-Path $evidence 'controls.json') -Encoding utf8NoBOM
     }
     finally { Pop-Location }

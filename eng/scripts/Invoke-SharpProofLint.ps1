@@ -14,14 +14,14 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 }
 $reportRoot = Join-Path $repositoryRoot 'artifacts/lint'
 [IO.Directory]::CreateDirectory($reportRoot) | Out-Null
-$sourceFiles = @(& git ls-files --cached --others --exclude-standard)
-if ($LASTEXITCODE -ne 0 -or $sourceFiles.Count -eq 0) { throw 'Lint requires a nonempty Git source inventory.' }
-$sourceFiles = @($sourceFiles | Sort-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+$sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git ls-files --cached --others --exclude-standard))
+if ($LASTEXITCODE -ne 0 -or $sourceFiles.Length -eq 0) { throw 'Lint requires a nonempty Git source inventory.' }
+$sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Sort-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }))
 if (Test-Path -LiteralPath (Join-Path $repositoryRoot 'eng/arcade-source.json')) {
     & (Join-Path $PSScriptRoot 'Test-SharpProofRepositoryLayout.ps1')
 }
-$sourceFiles = @($sourceFiles | Where-Object { -not $_.StartsWith('eng/common/', [StringComparison]::Ordinal) })
-$checks = [Collections.Generic.List[object]]::new()
+$sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { -not $_.StartsWith('eng/common/', [StringComparison]::Ordinal) }))
+$checks = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
 function Invoke-LintNative([string]$Executable, [string[]]$Arguments) {
     & $Executable @Arguments
@@ -40,7 +40,7 @@ function Invoke-LintCheck([string]$Name, [scriptblock]$Check) {
         $passed = $false
         $_.ToString() | Tee-Object -FilePath (Join-Path $reportRoot "$Name.log") -Append | Write-Host
     }
-    $checks.Add([ordered]@{ check = $Name; passed = $passed })
+    $checks.Add(([ordered]@{ check = $Name; passed = $passed }).AsReadOnly())
 }
 
 Invoke-LintCheck 'Workflows' { Invoke-LintNative 'actionlint' @('-oneline') }
@@ -50,21 +50,21 @@ Invoke-LintCheck 'WorkflowSecurity' {
 }
 Invoke-LintCheck 'PowerShell' {
     Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
-    $paths = @($sourceFiles | Where-Object { $_ -match '\.ps[md]?1$' })
-    if ($paths.Count -eq 0) { throw 'No PowerShell inputs found.' }
-    $findings = @($paths | ForEach-Object {
-            Invoke-ScriptAnalyzer -Path $_ -Settings eng/lint/PSScriptAnalyzerSettings.psd1
-        })
+    $paths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { $_ -match '\.ps[md]?1$' }))
+    if ($paths.Length -eq 0) { throw 'No PowerShell inputs found.' }
+    $findings = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($paths | ForEach-Object {
+                Invoke-ScriptAnalyzer -Path $_ -Settings eng/lint/PSScriptAnalyzerSettings.psd1
+            }))
     $findings | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $reportRoot 'powershell.json')
-    if ($findings.Count -gt 0) {
+    if ($findings.Length -gt 0) {
         $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -Wrap
-        throw "PSScriptAnalyzer reported $($findings.Count) findings."
+        throw "PSScriptAnalyzer reported $($findings.Length) findings."
     }
 }
 Invoke-LintCheck 'Shell' {
-    $paths = @($sourceFiles | Where-Object { $_ -match '\.sh$' })
-    if ($paths.Count -eq 0) { throw 'No shell inputs found.' }
-    Invoke-LintNative 'shellcheck' (@('--format=gcc') + $paths)
+    $paths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { $_ -match '\.sh$' }))
+    if ($paths.Length -eq 0) { throw 'No shell inputs found.' }
+    Invoke-LintNative 'shellcheck' (@('--format=gcc') + [string[]]@($paths))
 }
 Invoke-LintCheck 'Markdown' { Invoke-LintNative 'node' @('eng/lint/markdownlint.mjs') }
 Invoke-LintCheck 'Spelling' { Invoke-LintNative 'cspell' @('lint', '--config', 'cspell.json', '--no-progress', '--no-cache') }
@@ -80,13 +80,15 @@ Invoke-LintCheck 'ToolDependencies' {
 Invoke-LintCheck 'Compatibility' { & (Join-Path $PSScriptRoot 'Test-SharpProofPackageCompatibility.ps1') }
 Invoke-LintCheck 'GateRegressions' { & (Join-Path $PSScriptRoot 'Test-SharpProofLint.ps1') }
 
-$checks | ConvertTo-Json | Set-Content (Join-Path $reportRoot 'results.json')
-$summary = @('# Repository quality checks', '', '| Check | Result |', '| --- | --- |')
-foreach ($check in $checks) {
+$checkSnapshot = $checks.ToImmutable()
+$checkSnapshot | ConvertTo-Json | Set-Content (Join-Path $reportRoot 'results.json')
+$summary = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$summary.AddRange([string[]]@('# Repository quality checks', '', '| Check | Result |', '| --- | --- |'))
+foreach ($check in $checkSnapshot) {
     $result = if ($check.passed) { 'PASS' } else { 'FAIL' }
-    $summary += "| $($check.check) | $result |"
+    $summary.Add("| $($check.check) | $result |")
 }
-$summary | Set-Content (Join-Path $reportRoot 'summary.md')
-if ($checks.Count -eq 0 -or @($checks | Where-Object { -not $_.passed }).Count -gt 0) {
+$summary.ToImmutable() | Set-Content (Join-Path $reportRoot 'summary.md')
+if ($checkSnapshot.Length -eq 0 -or @($checkSnapshot | Where-Object { -not $_.passed }).Count -gt 0) {
     throw 'Repository quality checks failed. See artifacts/lint for individual reports.'
 }

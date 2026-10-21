@@ -26,7 +26,7 @@ internal static class NativeResourceContractVerifier
                 var lifetimeLayout = new NativeResourceLayoutBinding(target);
                 if (lifetimeLayout.Bind() is null)
                 { return result; }
-                lifetimeLayout.Project(violation);
+                violation = lifetimeLayout.Project(violation);
                 return violation;
             }
             var metadata = new NativeResourceMetadataBinding(target);
@@ -36,15 +36,15 @@ internal static class NativeResourceContractVerifier
             var layout = new NativeResourceLayoutBinding(target);
             if (claim.Constraint.ResourceUpperBound!.Metric == WorkerResourceMetric.AllocatedBytes && layout.Bind() is null)
             { return result; }
-            metadata.Project(violation);
+            violation = metadata.Project(violation);
             if (claim.Constraint.ResourceUpperBound.Metric == WorkerResourceMetric.AllocatedBytes)
-            { layout.Project(violation); }
+            { violation = layout.Project(violation); }
             return violation;
         }
         catch (ResourceExpressionLimitException)
         {
-            result.Reason = WorkerClaimReason.ResourceLimit;
-            result.ResourceBound.UnknownReason = "ResourceReplayBudgetExceeded";
+            result = result with { Reason = WorkerClaimReason.ResourceLimit };
+            result = result with { ResourceBound = result.ResourceBound! with { UnknownReason = "ResourceReplayBudgetExceeded" } };
             return result;
         }
     }
@@ -103,22 +103,22 @@ internal static class NativeResourceContractVerifier
                 { return Unknown("ResourceBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
                 var memoryResult = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
                     WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
-                memoryResult.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, new HashSet<string>(StringComparer.Ordinal));
+                memoryResult.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal));
                 memoryResult.ProofCore = ["native-resource:" + claim.ClaimId,
                     "resource-memory-model:" + ResourceMemoryTrace.ModelId,
-                    "resource-memory-program:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(
-                        PortableIrGraphCodec.Encode(owner.Program, [], cancellation).Graph))];
-                memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null, memoryUpper);
-                memoryResult.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedMetricUnsupported" };
+                    "resource-memory-program:" + WorkerProtocolJson.ComputeSha256([.. JsonSerializer.SerializeToUtf8Bytes(
+                        PortableIrGraphCodec.Encode(owner.Program, [], cancellation).Graph)])];
+                memoryResult = memoryResult with { ResourceBound = Evidence(memoryUpper.ToDisplayString(), null, memoryUpper) };
+                memoryResult = memoryResult with { ResourceBound = memoryResult.ResourceBound! with { Expected = new() { UnknownReason = "ResourceExpectedMetricUnsupported" } } };
                 memoryResult.ProofCore = [.. memoryResult.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
                 if (envelopeMetadata != null)
                 {
                     memoryResult.ProofCore = [.. memoryResult.ProofCore,
                         "resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId,
-                        "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram!, cancellation))];
-                    envelopeMetadata.Project(memoryResult);
+                        "resource-program:" + WorkerProtocolJson.ComputeSha256([.. ResourceProgramCodec.Encode(target.ResourceProgram!, cancellation)])];
+                    memoryResult = envelopeMetadata.Project(memoryResult);
                 }
-                lifetimeLayout.Project(memoryResult);
+                memoryResult = lifetimeLayout.Project(memoryResult);
                 return memoryResult;
             }
             if (target.ResourceProgram is null)
@@ -162,24 +162,30 @@ internal static class NativeResourceContractVerifier
             { return Unknown("ResourceBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
             var result = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
-            result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, new HashSet<string>(StringComparer.Ordinal));
+            result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal));
             result.ProofCore = ["native-resource:" + claim.ClaimId,
-                "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram, cancellation))];
+                "resource-program:" + WorkerProtocolJson.ComputeSha256([.. ResourceProgramCodec.Encode(target.ResourceProgram, cancellation)])];
             if (stackUpper != null)
             { result.ProofCore = [.. result.ProofCore, "resource-stack-model:" + NativeResourceStackVerifier.ModelId]; }
-            result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
+            result = result with { ResourceBound = Evidence(upper.ToDisplayString(), null, upper) };
             if (stackUpper is null)
             {
-                result.ResourceBound.Accounting = NativeResourceAccountingVerifier.Evidence(target.ResourceProgram, cancellation);
-                if (result.ResourceBound.Accounting.Length != 0)
+                result = result with { ResourceBound = result.ResourceBound! with { Accounting = NativeResourceAccountingVerifier.Evidence(target.ResourceProgram, cancellation) } };
+                if (result.ResourceBound!.Accounting.Length != 0)
                 { result.ProofCore = [.. result.ProofCore, "resource-accounting:" + NativeResourceAccountingVerifier.ModelId]; }
             }
-            result.ResourceBound.Expected = NativeResourceExpectedVerifier.Project(NativeResourceExpectedVerifier.Verify(
-                target.ResourceProgram, (ResourceCostMetric)constraint.Metric, target.Entry.CallableId, owner, expectedLayout, cancellation));
-            if (result.ResourceBound.Expected.UnknownReason is null)
+            result = result with
+            {
+                ResourceBound = result.ResourceBound! with
+                {
+                    Expected = NativeResourceExpectedVerifier.Project(NativeResourceExpectedVerifier.Verify(
+                target.ResourceProgram, (ResourceCostMetric)constraint.Metric, target.Entry.CallableId, owner, expectedLayout, cancellation))
+                }
+            };
+            if (result.ResourceBound!.Expected!.UnknownReason is null)
             {
                 result.ProofCore = [.. result.ProofCore, "resource-input-model:" + NativeResourceExpectedVerifier.ModelId,
-                "resource-input-record:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(result.ResourceBound.Expected, WorkerProtocolJson.Options))];
+                "resource-input-record:" + WorkerProtocolJson.ComputeSha256([.. JsonSerializer.SerializeToUtf8Bytes(result.ResourceBound!.Expected, WorkerProtocolJson.Options)])];
             }
             var lower = constraint.Metric switch
             {
@@ -188,14 +194,23 @@ internal static class NativeResourceContractVerifier
                 WorkerResourceMetric.AllocatedElements => check.LowerCost?.Elements,
                 _ => null
             };
-            result.ResourceBound.Asymptotic!.Lower = LowerEvidence(result.ResourceBound.Asymptotic, lower,
-                check.LowerDomainUnknownReason, cancellation);
-            if (result.ResourceBound.Asymptotic.Lower.UnknownReason is null)
+            result = result with
+            {
+                ResourceBound = result.ResourceBound! with
+                {
+                    Asymptotic = result.ResourceBound!.Asymptotic! with
+                    {
+                        Lower = LowerEvidence(result.ResourceBound!.Asymptotic!, lower,
+                check.LowerDomainUnknownReason, cancellation)
+                    }
+                }
+            };
+            if (result.ResourceBound!.Asymptotic!.Lower!.UnknownReason is null)
             { result.ProofCore = [.. result.ProofCore, "resource-normal-domain:" + NativeResourceNormalDomain.ModelId]; }
             result.ProofCore = [.. result.ProofCore, "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
-            metadata.Project(result);
+            result = metadata.Project(result);
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
-            { layout.Project(result); }
+            { result = layout.Project(result); }
             return result;
         }
         catch (InvalidDataException) { return Unknown("MalformedResourceEvidence", WorkerClaimReason.UnsupportedContract); }
@@ -254,24 +269,30 @@ internal static class NativeResourceContractVerifier
                 var used = new HashSet<string>(StringComparer.Ordinal) { dependency.AssumptionId };
                 if (storage != null)
                 { used.Add(storage.AssumptionId); }
-                result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, used);
+                result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, used.ToImmutableHashSet(StringComparer.Ordinal));
                 result.ProofCore = ["native-resource:" + claim.ClaimId,
                     "resource-task-model:" + dependency.RuntimeModel,
-                    "resource-task-projection:" + WorkerProtocolJson.ComputeSha256(CompilerForkJoinProjectionCodec.Encode(projection, entry, cancellation)),
+                    "resource-task-projection:" + WorkerProtocolJson.ComputeSha256([.. CompilerForkJoinProjectionCodec.Encode(projection, entry, cancellation)]),
                     "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
                 if (storage != null)
                 {
                     result.ProofCore = [.. result.ProofCore, "resource-task-storage-model:" + storage.RuntimeModel,
                         "resource-task-compiler-carriers:" + NativeTaskCarrierStorageVerifier.Model];
                 }
-                result.ResourceBound = Evidence(upper.ToDisplayString(), null, upper);
-                result.ResourceBound.ExecutionScope = lifetime ? WorkerResourceModels.TaskStorageScope :
-                    sourceAllocation ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope;
-                result.ResourceBound.MetadataAssumptions = storage == null ? [dependency] : [dependency, storage];
-                result.ResourceBound.Asymptotic!.Lower = new() { UnknownReason = "ResourceLowerTaskDomainUnproved" };
-                result.ResourceBound.Expected = new() { UnknownReason = "ResourceExpectedTaskModelUnsupported" };
+                result = result with { ResourceBound = Evidence(upper.ToDisplayString(), null, upper) };
+                result = result with
+                {
+                    ResourceBound = result.ResourceBound! with
+                    {
+                        ExecutionScope = lifetime ? WorkerResourceModels.TaskStorageScope :
+                    sourceAllocation ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope
+                    }
+                };
+                result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = storage == null ? [dependency] : [dependency, storage] } };
+                result = result with { ResourceBound = result.ResourceBound! with { Asymptotic = result.ResourceBound!.Asymptotic! with { Lower = new() { UnknownReason = "ResourceLowerTaskDomainUnproved" } } } };
+                result = result with { ResourceBound = result.ResourceBound! with { Expected = new() { UnknownReason = "ResourceExpectedTaskModelUnsupported" } } };
                 if (lifetime)
-                { layout!.Project(result); }
+                { result = layout!.Project(result); }
                 return result;
             }
             catch (ResourceExpressionLimitException)
@@ -286,7 +307,7 @@ internal static class NativeResourceContractVerifier
             {
                 Metric = constraint.Metric,
                 CostModel = constraint.CostModel,
-                DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256(constraint.UpperBound),
+                DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256([.. constraint.UpperBound]),
                 InferredUpperBound = inferred,
                 UnknownReason = reason,
                 Asymptotic = upper is null ? null : AsymptoticEvidence(upper, cancellation)
@@ -297,7 +318,7 @@ internal static class NativeResourceContractVerifier
         {
             reason = ArgumentNullGuard.NotNull(reason, nameof(reason));
             var result = NativeEffectClaims.Unknown(target, claim.ClaimId, kind);
-            result.ResourceBound = Evidence(null, reason);
+            result = result with { ResourceBound = Evidence(null, reason) };
             return result;
         }
     }
@@ -318,7 +339,7 @@ internal static class NativeResourceContractVerifier
         if (growth.InputOrdinal is not null && (growth.InputOrdinal != upper.InputOrdinal || growth.InputKind != upper.InputKind || growth.InputName != upper.InputName))
         { return new() { UnknownReason = "ResourceLowerInputMismatch" }; }
         // The nested growth describes the lower formula, not another source claim.
-        growth.Lower = null;
+        growth = growth with { Lower = null };
         return new()
         {
             InferredBound = lower!.ToDisplayString(),

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 
@@ -9,7 +10,7 @@ internal static class GoldenTest
     {
         System.ArgumentNullException.ThrowIfNull(stage);
         var directory = StageDirectory(repositoryRoot ?? TestRepository.FindRoot(), stage);
-        var sources = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly);
+        var sources = Directory.EnumerateFiles(directory, "*.cs", SearchOption.TopDirectoryOnly).ToImmutableArray();
         foreach (var expected in Directory.EnumerateFiles(directory, "*.expected", SearchOption.TopDirectoryOnly))
         {
             if (!File.Exists(Path.ChangeExtension(expected, ".cs")))
@@ -33,11 +34,11 @@ internal static class GoldenTest
         var relative = Path.GetRelativePath(root, Path.Combine(directory, name + ".cs"));
         var source = ReadPlainFile(root, relative);
         var expected = ReadExpectation(root, Path.ChangeExtension(relative, ".expected"));
-        if (expected == null && Environment.GetEnvironmentVariable("SHARPPROOF_UPDATE_GOLDEN") != "1")
+        if (expected is null && Environment.GetEnvironmentVariable("SHARPPROOF_UPDATE_GOLDEN") != "1")
         {
             throw new InvalidDataException("Missing paired golden expectation: " + relative.Replace('\\', '/'));
         }
-        return new GoldenCase(root, relative, source, expected, Decode(source), expected == null ? "" : Decode(expected));
+        return new GoldenCase(root, relative, source, expected, Decode(source), expected is null ? "" : Decode(expected.Value));
     }
 
     internal static void Compare(GoldenCase fixture, string actual)
@@ -56,11 +57,13 @@ internal static class GoldenTest
             Assert.That(actual, Is.EqualTo(fixture.Expected), fixture.RelativePath.Replace('\\', '/'));
             return;
         }
-        Update(fixture, Utf8.GetBytes(actual));
+        Update(fixture, Utf8.GetBytes(actual).ToImmutableArray());
     }
 
-    private static void Update(GoldenCase fixture, byte[] actual)
+    private static void Update(GoldenCase fixture, ImmutableArray<byte> actual)
     {
+        if (actual.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(actual)); }
         var sourceRoot = Environment.GetEnvironmentVariable("SHARPPROOF_GOLDEN_SOURCE_ROOT");
         if (string.IsNullOrWhiteSpace(sourceRoot) || !Path.IsPathFullyQualified(sourceRoot))
         {
@@ -79,7 +82,7 @@ internal static class GoldenTest
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                stream.Write(actual);
+                stream.Write(actual.AsSpan());
                 stream.Flush(flushToDisk: true);
             }
             RequireSame(ReadPlainFile(sourceRoot, fixture.RelativePath), fixture.SourceBytes, "Original golden source changed during update.");
@@ -120,14 +123,14 @@ internal static class GoldenTest
         }
     }
 
-    private static byte[] ReadPlainFile(string root, string relative)
+    private static ImmutableArray<byte> ReadPlainFile(string root, string relative)
     {
         System.ArgumentNullException.ThrowIfNull(relative);
         System.ArgumentNullException.ThrowIfNull(root);
-        return File.ReadAllBytes(PlainPath(root, relative));
+        return File.ReadAllBytes(PlainPath(root, relative)).ToImmutableArray();
     }
 
-    private static byte[]? ReadExpectation(string root, string relative)
+    private static ImmutableArray<byte>? ReadExpectation(string root, string relative)
     {
         System.ArgumentNullException.ThrowIfNull(relative);
         System.ArgumentNullException.ThrowIfNull(root);
@@ -136,7 +139,7 @@ internal static class GoldenTest
         {
             throw new InvalidDataException("Golden expectation is a directory.");
         }
-        return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        return File.Exists(path) ? File.ReadAllBytes(path).ToImmutableArray() : null;
     }
 
     private static string PlainPath(string root, string relative, bool allowMissingLeaf = false)
@@ -169,19 +172,29 @@ internal static class GoldenTest
         }
     }
 
-    private static void RequireSame(byte[]? actual, byte[]? expected, string message)
+    private static void RequireSame(ImmutableArray<byte>? actual, ImmutableArray<byte>? expected, string message)
     {
         System.ArgumentNullException.ThrowIfNull(message);
-        if ((actual == null) != (expected == null) || actual != null && !actual.AsSpan().SequenceEqual(expected))
+        if (actual.HasValue && actual.Value.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(actual));
+        }
+        if (expected.HasValue && expected.Value.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(expected));
+        }
+        if (actual.HasValue != expected.HasValue ||
+            actual.HasValue && !actual.Value.AsSpan().SequenceEqual(expected.GetValueOrDefault().AsSpan()))
         {
             throw new InvalidDataException(message);
         }
     }
 
-    private static string Decode(byte[] bytes)
+    private static string Decode(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        var text = Utf8.GetString(bytes);
+        if (bytes.IsDefault)
+        { throw new System.ArgumentNullException(nameof(bytes)); }
+        var text = Utf8.GetString(bytes.AsSpan());
         if (text.Contains('\r', StringComparison.Ordinal) || text.StartsWith('\uFEFF'))
         {
             throw new InvalidDataException("Golden files require UTF-8 without BOM and LF line endings.");
@@ -190,12 +203,15 @@ internal static class GoldenTest
     }
 }
 
-internal sealed class GoldenCase(string root, string relativePath, byte[] sourceBytes, byte[]? expectedBytes, string source, string expected)
+internal sealed class GoldenCase(string root, string relativePath, ImmutableArray<byte> sourceBytes, ImmutableArray<byte>? expectedBytes, string source, string expected)
 {
     internal string Root { get; } = (root ?? throw new System.ArgumentNullException(nameof(root)));
     internal string RelativePath { get; } = (relativePath ?? throw new System.ArgumentNullException(nameof(relativePath)));
-    internal byte[] SourceBytes { get; } = (sourceBytes ?? throw new System.ArgumentNullException(nameof(sourceBytes)));
-    internal byte[]? ExpectedBytes { get; } = expectedBytes;
+    internal ImmutableArray<byte> SourceBytes { get; } =
+        sourceBytes.IsDefault ? throw new System.ArgumentNullException(nameof(sourceBytes)) : sourceBytes;
+    internal ImmutableArray<byte>? ExpectedBytes { get; } =
+        expectedBytes.HasValue && expectedBytes.Value.IsDefault
+            ? throw new ArgumentException("Array must be initialized.", nameof(expectedBytes)) : expectedBytes;
     internal string Source { get; } = (source ?? throw new System.ArgumentNullException(nameof(source)));
     internal string Expected { get; } = (expected ?? throw new System.ArgumentNullException(nameof(expected)));
 }

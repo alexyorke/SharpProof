@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -54,7 +55,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         // Small CI samples measured each flat leaf as six structural nodes plus its empty statements.
         var leafStatementCounts = Enumerable.Range(0, leafCount).Select(index => sharedSyntaxBoundary
             ? 65521 + (index < 7 ? 1 : 0) + (exceedsBudget && index == 0 ? 1 : 0)
-            : statementsPerLeaf).ToArray();
+            : statementsPerLeaf).ToImmutableArray();
         var leaves = Enumerable.Range(0, leafCount).Select(index =>
         {
             if (index < 0)
@@ -67,8 +68,8 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
             return AnalyzerTestHost.CreateCompilation(source, [], filePath: "BudgetLeaf" + number + ".cs")
                 .WithAssemblyName("BudgetShapeLeaf_" + suffix + "_" + number)
                 .WithReferences(TestMetadataReferences.CoreLibraryOnly);
-        }).ToArray();
-        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToArray();
+        }).ToImmutableArray();
+        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToImmutableArray();
         var callerSource = statementsPerLeaf == 0
             ? "public static class BudgetRoot { public static int Read() => 7; }"
             : "public static class BudgetRoot { public static int Read() { " +
@@ -78,7 +79,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         var caller = AnalyzerTestHost.CreateCompilation(callerSource, [], filePath: "BudgetRoot.cs")
             .WithAssemblyName("BudgetShapeRoot_" + suffix)
             .WithReferences(TestMetadataReferences.CoreLibraryOnly.Concat(references));
-        var compilations = leaves.Append(caller).ToArray();
+        var compilations = leaves.Append(caller).ToImmutableArray();
         var creationMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
         foreach (var compilation in compilations)
@@ -89,7 +90,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         var diagnosticsMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
         var leafNodeCounts = leaves.Select(static leaf =>
-            leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count())).ToArray();
+            leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count())).ToImmutableArray();
         var rootNodeCount = caller.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count();
         var maximumDepth = compilations.SelectMany(static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (compilation.SyntaxTrees))
             .SelectMany(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodesAndSelf()))
@@ -133,7 +134,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         }
         var inspectionMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
-        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToArray();
+        var images = compilations.Select(AnalyzerTestHost.EmitImage).ToImmutableArray();
         var emitMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
         var loadContext = new AssemblyLoadContext("BudgetShapeControl_" + suffix, isCollectible: true);
@@ -141,11 +142,11 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         {
             for (var index = 0; index < leaves.Length; index++)
             {
-                using var stream = new MemoryStream(images[index], writable: false);
+                using var stream = new MemoryStream((images[index]).ToArray(), writable: false);
                 var loaded = loadContext.LoadFromStream(stream);
                 Assert.That(loaded.GetName().Name, Is.EqualTo(leaves[index].AssemblyName));
             }
-            using var rootStream = new MemoryStream(images[^1], writable: false);
+            using var rootStream = new MemoryStream((images[^1]).ToArray(), writable: false);
             var runtimeRoot = loadContext.LoadFromStream(rootStream);
             Assert.That(runtimeRoot.GetType("BudgetRoot", throwOnError: true)!.GetMethod("Read")!
                 .Invoke(null, []), Is.EqualTo(7));

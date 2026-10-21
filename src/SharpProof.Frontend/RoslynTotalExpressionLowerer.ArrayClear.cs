@@ -12,15 +12,17 @@ internal sealed partial class RoslynTotalExpressionLowerer
         // storage. Peel only the actual compiler reference conversion from T[].
         if (CSharpOperationSemantics.TypedArrayClearReceiver(invocation) is not { Type: IArrayTypeSymbol arrayType } arrayOperation)
         { return null; }
-        var values = new IrTerm[invocation.Arguments.Length];
+        var valueBuilder = ImmutableArray.CreateBuilder<IrTerm>(invocation.Arguments.Length);
+        valueBuilder.Count = invocation.Arguments.Length;
         foreach (var argument in invocation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
         {
             var value = Pin(invocation, LowerBodyValue(argument.Parameter!.Ordinal == 0 ? arrayOperation : argument.Value, block, depth + 1));
             if (!value.Classification.IsExact)
             { return Approximate(invocation, value.Continuation, value.Classification.Abstention); }
-            values[argument.Parameter.Ordinal] = value.Value;
+            valueBuilder[argument.Parameter.Ordinal] = value.Value;
             block = value.Continuation;
         }
+        var values = valueBuilder.MoveToImmutable();
         var array = values[0];
         var index = values.Length == 1 ? _factory.Integer(0) : values[1];
         var length = values.Length == 1 ? _factory.Length(array) : values[2];

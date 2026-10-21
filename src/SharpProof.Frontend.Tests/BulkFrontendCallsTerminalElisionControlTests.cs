@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -67,7 +68,7 @@ public sealed class BulkFrontendCallsTerminalElisionControlTests
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
-        var throws = tree.GetRoot().DescendantNodes().OfType<ThrowExpressionSyntax>().ToArray();
+        var throws = tree.GetRoot().DescendantNodes().OfType<ThrowExpressionSyntax>().ToImmutableArray();
         Assert.That(throws, Has.Length.EqualTo(2));
         foreach (var syntax in throws)
         {
@@ -83,7 +84,7 @@ public sealed class BulkFrontendCallsTerminalElisionControlTests
         System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var assignments = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>().ToArray();
+        var assignments = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>().ToImmutableArray();
         Assert.That(assignments, Is.Not.Empty);
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
         foreach (var syntax in assignments)

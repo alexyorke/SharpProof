@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -39,7 +40,7 @@ public sealed class GeneratedLocalWorkflowControlTests
             filePath: generatedBy == "filename" ? "Subject.g.cs" : "Subject.cs");
         if (selected && mutates)
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
             Assert.That(diagnostics.Single().Location.SourceTree?.FilePath,
                 Is.EqualTo(generatedBy == "filename" ? "Subject.g.cs" : "Subject.cs"));
         }
@@ -62,7 +63,7 @@ public sealed class GeneratedLocalWorkflowControlTests
             "using SharpProof.Attributes; public static class Subject { public static void Run() { " + nested + " } }",
             mode: null, enabledIds: ["SP0024"], profile: "advisory", features: "effects",
             filePath: "Subject.g.cs");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
     }
 
     [TestCase("local")]
@@ -85,7 +86,7 @@ public sealed class GeneratedLocalWorkflowControlTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             source, mode: null, enabledIds: ["SP0047"], profile: "advisory", features: "effects",
             filePath: "Subject.g.cs");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "ContractApiIdentityRejected");
     }
 }

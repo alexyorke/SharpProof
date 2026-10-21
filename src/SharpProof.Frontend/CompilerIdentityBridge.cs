@@ -14,7 +14,7 @@ internal static class CompilerIdentityBridge
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsStatic: false, SpecialType: SpecialType.None })
         { return false; }
         var remainingWork = 4096;
-        var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+        var visited = ImmutableDictionary.CreateBuilder<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool Closed(ITypeSymbol current, int depth)
         {
             cancellationToken.ThrowIfCancellationRequested();

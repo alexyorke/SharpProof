@@ -34,9 +34,7 @@ public sealed class CallableReplayBoundaryTests
             readInGuard ? factory.Boolean(false) : heapRead,
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
             postconditionGuard: readInGuard ? heapRead : factory.Boolean(true), replayOptions: null);
-        var outcome = await Replay(factory,
-            [KeyValuePair.Create(owner, factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]))],
-            context, owner);
+        var outcome = await Replay(factory, [KeyValuePair.Create(owner, factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]))], context, [owner]);
 
         if (restoreCell)
         {
@@ -62,12 +60,10 @@ public sealed class CallableReplayBoundaryTests
         var program = builder.Build();
         var bindings = ImmutableDictionary<IrVarId, IrVarId>.Empty.Add(body, entry);
 
-        var noProgram = await Replay(factory, [], Context(factory, null, false));
+        var noProgram = await Replay(factory, [], Context(factory, null, false), []);
         var missingEntry = await Replay(factory, [], Context(factory, program, false,
-            parameterBindings: bindings));
-        var valid = await Replay(factory,
-            [KeyValuePair.Create(entry, factory.CreateIntegerValue(1))],
-            Context(factory, program, false, parameterBindings: bindings), entry);
+            parameterBindings: bindings), []);
+        var valid = await Replay(factory, [KeyValuePair.Create(entry, factory.CreateIntegerValue(1))], Context(factory, program, false, parameterBindings: bindings), [entry]);
 
         AssertReplayFailed(noProgram);
         AssertReplayFailed(missingEntry);
@@ -82,8 +78,8 @@ public sealed class CallableReplayBoundaryTests
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation());
 
-        AssertReplayFailed(await Replay(factory, [], Context(factory, builder.Build(), true)));
-        Assert.That(await Replay(factory, [], Context(factory, null, true)),
+        AssertReplayFailed(await Replay(factory, [], Context(factory, builder.Build(), true), []));
+        Assert.That(await Replay(factory, [], Context(factory, null, true), []),
             Is.TypeOf<RefutedOutcome>());
     }
 
@@ -95,14 +91,14 @@ public sealed class CallableReplayBoundaryTests
         var old = factory.CreateVariable("old", factory.IntegerType);
         var foreignFactory = new IrFactory(IrExecutionSemantics.Total);
         var foreign = foreignFactory.CreateVariable("foreign", foreignFactory.IntegerType);
-        var model = new[] { KeyValuePair.Create(entry, factory.CreateIntegerValue(1)) };
+        var model = ImmutableArray.Create(KeyValuePair.Create(entry, factory.CreateIntegerValue(1)));
         var foreignContext = Context(factory, null, true,
             preStateBindings: ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(foreign, entry));
         var localContext = Context(factory, null, true,
             preStateBindings: ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(old, entry));
 
-        AssertReplayFailed(await Replay(factory, model, foreignContext, entry));
-        Assert.That(await Replay(factory, model, localContext, entry),
+        AssertReplayFailed(await Replay(factory, model, foreignContext, [entry]));
+        Assert.That(await Replay(factory, model, localContext, [entry]),
             Is.TypeOf<RefutedOutcome>());
     }
 
@@ -119,9 +115,9 @@ public sealed class CallableReplayBoundaryTests
         withValue.Return(valueBlock, factory.CreateOperation(), factory.Integer(1));
 
         AssertReplayFailed(await Replay(factory, [], Context(factory, noValue.Build(), false,
-            resultVariables: [result])));
+            resultVariables: [result]), []));
         Assert.That(await Replay(factory, [], Context(factory, withValue.Build(), false,
-            resultVariables: [result])), Is.TypeOf<RefutedOutcome>());
+            resultVariables: [result]), []), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -132,14 +128,11 @@ public sealed class CallableReplayBoundaryTests
         var divisionByZero = factory.Binary(IrBinaryOperator.Equal,
             factory.Binary(IrBinaryOperator.Divide,
                 factory.Integer(0), factory.Variable(divisor)), factory.Integer(0));
-        var model = new[] { KeyValuePair.Create(divisor, factory.CreateIntegerValue(0)) };
+        var model = ImmutableArray.Create(KeyValuePair.Create(divisor, factory.CreateIntegerValue(0)));
 
-        var falsePostcondition = await Replay(factory, model,
-            Context(factory, null, true), divisor);
-        var truePostcondition = await Replay(factory, model,
-            Context(factory, null, true, postcondition: factory.Boolean(true)), divisor);
-        var exceptionalPostcondition = await Replay(factory, model,
-            Context(factory, null, true, postcondition: divisionByZero), divisor);
+        var falsePostcondition = await Replay(factory, model, Context(factory, null, true), [divisor]);
+        var truePostcondition = await Replay(factory, model, Context(factory, null, true, postcondition: factory.Boolean(true)), [divisor]);
+        var exceptionalPostcondition = await Replay(factory, model, Context(factory, null, true, postcondition: divisionByZero), [divisor]);
 
         Assert.That(falsePostcondition, Is.TypeOf<RefutedOutcome>());
         AssertReplayFailed(truePostcondition);
@@ -167,15 +160,17 @@ public sealed class CallableReplayBoundaryTests
     }
 
     private static async Task<ProofOutcome> Replay(IrFactory factory,
-        IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments,
-        CallableReplayContext context, params IrVarId[] variables)
+        ImmutableArray<KeyValuePair<IrVarId, IrValue>> assignments,
+        CallableReplayContext context, ImmutableArray<IrVarId> variables)
     {
-        System.ArgumentNullException.ThrowIfNull(variables, nameof(variables));
-        System.ArgumentNullException.ThrowIfNull(assignments);
+        if (variables.IsDefault)
+        { throw new ArgumentNullException(nameof(variables)); }
+        if (assignments.IsDefault)
+        { throw new ArgumentNullException(nameof(assignments)); }
         System.ArgumentNullException.ThrowIfNull(context);
         System.ArgumentNullException.ThrowIfNull(factory);
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
-            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
         return await new ProofKernel(new ModelBackend(new BackendModel(assignments)))
             .VerifyCallableAsync(query, context, TestContext.CurrentContext.CancellationToken);
     }
@@ -190,7 +185,7 @@ public sealed class CallableReplayBoundaryTests
 
     private sealed class ModelBackend(BackendModel model) : ISmtBackend
     {
-        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
+        private readonly BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query,
             CancellationToken cancellationToken)
         {

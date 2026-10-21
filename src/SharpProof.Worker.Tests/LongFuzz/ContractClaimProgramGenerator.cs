@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 
@@ -8,19 +9,19 @@ namespace SharpProof.Worker.Test.LongFuzz;
 // Ensures clause), plus Pre/Post mirrors of the contract for the CLR oracle.
 internal sealed class ContractClaimProgramGenerator(Random random)
 {
-    private Random _guarded_random = random ?? throw new System.ArgumentNullException(nameof(random));
+    private readonly Random _guarded_random = random ?? throw new System.ArgumentNullException(nameof(random));
     internal const string DoesNotThrow = "DoesNotThrow";
     internal const string EnforcePure = "EnforcePure";
     internal const string ZeroAllocations = "ZeroAllocations";
     internal const string Ensures = "Ensures";
 
-    private static readonly string[] s_modes = [DoesNotThrow, EnforcePure, ZeroAllocations, Ensures];
-    private static readonly string[] s_comparisons = ["==", "!=", "<", ">=", ">"];
-    private static readonly int[] s_simpleStatements = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
-    private static readonly int[] s_simpleInts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 25, 28, 29, 30];
-    private static readonly string[] s_compoundOperators = [" += ", " -= ", " *= ", " /= ", " %= ", " &= ", " |= ", " ^= ", " <<= "];
-    private static readonly string[] s_exceptions = ["InvalidOperationException()", "ArgumentException(\"m\")", "System.IO.IOException()"];
-    private static readonly string[] s_extremes = ["int.MaxValue", "int.MinValue", "-1", "0"];
+    private static readonly ImmutableArray<string> s_modes = [DoesNotThrow, EnforcePure, ZeroAllocations, Ensures];
+    private static readonly ImmutableArray<string> s_comparisons = ["==", "!=", "<", ">=", ">"];
+    private static readonly ImmutableArray<int> s_simpleStatements = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+    private static readonly ImmutableArray<int> s_simpleInts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 25, 28, 29, 30];
+    private static readonly ImmutableArray<string> s_compoundOperators = [" += ", " -= ", " *= ", " /= ", " %= ", " &= ", " |= ", " ^= ", " <<= "];
+    private static readonly ImmutableArray<string> s_exceptions = ["InvalidOperationException()", "ArgumentException(\"m\")", "System.IO.IOException()"];
+    private static readonly ImmutableArray<string> s_extremes = ["int.MaxValue", "int.MinValue", "-1", "0"];
     private int _locals;
     private bool _simple;
     private bool _insideFinally;
@@ -29,10 +30,10 @@ internal sealed class ContractClaimProgramGenerator(Random random)
     {
         _simple = Chance(60);
         var mode = s_modes[Next(s_modes.Length)];
-        var requires = Chance(60) ? Bool([], Next(3) + 1, true) : "true";
+        var requires = Chance(60) ? Bool(ImmutableArray.CreateBuilder<string>(), Next(3) + 1, true) : "true";
         var body = new StringBuilder();
-        Statements(body, [], 2, Next(5) + 1);
-        body.Append("return ").Append(Int([], 2)).Append(';');
+        Statements(body, ImmutableArray.CreateBuilder<string>(), 2, Next(5) + 1);
+        body.Append("return ").Append(Int(ImmutableArray.CreateBuilder<string>(), 2)).Append(';');
         var ensuresExpression = "true";
         if (mode == Ensures)
         {
@@ -159,18 +160,28 @@ internal sealed class ContractClaimProgramGenerator(Random random)
         };
     }
 
-    private void Statements(StringBuilder sb, List<string> scope, int depth, int count)
+    private static ImmutableArray<string>.Builder NestedScope(ImmutableArray<string>.Builder scope, string name)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(name);
+        var nested = ImmutableArray.CreateBuilder<string>();
+        nested.AddRange(scope);
+        nested.Add(name);
+        return nested;
+    }
+    private void Statements(StringBuilder sb, ImmutableArray<string>.Builder scope, int depth, int count)
     {
         System.ArgumentNullException.ThrowIfNull(sb);
         System.ArgumentNullException.ThrowIfNull(scope);
-        var local = new List<string>(scope);
+        var local = ImmutableArray.CreateBuilder<string>();
+        local.AddRange(scope);
         for (var i = 0; i < count; i++)
         {
             Statement(sb, local, depth);
         }
     }
 
-    private void Block(StringBuilder sb, List<string> scope, int depth)
+    private void Block(StringBuilder sb, ImmutableArray<string>.Builder scope, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(sb);
         System.ArgumentNullException.ThrowIfNull(scope);
@@ -179,7 +190,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
         sb.Append("} ");
     }
 
-    private void Statement(StringBuilder sb, List<string> scope, int depth)
+    private void Statement(StringBuilder sb, ImmutableArray<string>.Builder scope, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(sb);
         System.ArgumentNullException.ThrowIfNull(scope);
@@ -265,7 +276,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                     var name = "i" + _locals++;
                     sb.Append("for (int ").Append(name).Append(" = 0; ").Append(name).Append(" < ").Append(Next(4)).Append("; ")
                         .Append(name).Append("++) ");
-                    Block(sb, [.. scope, name], depth - 1);
+                    Block(sb, NestedScope(scope, name), depth - 1);
                     break;
                 }
             case 16:
@@ -310,7 +321,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                 {
                     var name = "e" + _locals++;
                     sb.Append("if (a != null) foreach (var ").Append(name).Append(" in a) ");
-                    Block(sb, [.. scope, name], depth - 1);
+                    Block(sb, NestedScope(scope, name), depth - 1);
                     break;
                 }
             case 20:
@@ -356,7 +367,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
         }
     }
 
-    private void FinallyBlock(StringBuilder sb, List<string> scope, int depth)
+    private void FinallyBlock(StringBuilder sb, ImmutableArray<string>.Builder scope, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(sb);
         System.ArgumentNullException.ThrowIfNull(scope);
@@ -372,17 +383,18 @@ internal sealed class ContractClaimProgramGenerator(Random random)
         }
     }
 
-    private string Target(List<string> scope)
+    private string Target(ImmutableArray<string>.Builder scope)
     {
         System.ArgumentNullException.ThrowIfNull(scope);
-        var assignable = scope.Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith('v') || name.StartsWith('t'))).ToList();
+        var assignable = ImmutableArray.CreateBuilder<string>();
+        assignable.AddRange(scope.Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith('v') || name.StartsWith('t'))));
         assignable.Add("x");
         assignable.Add("y");
         assignable.Add("State");
         return assignable[Next(assignable.Count)];
     }
 
-    private string Int(List<string> scope, int depth)
+    private string Int(ImmutableArray<string>.Builder scope, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(scope);
         if (depth == 0 || Chance(30))
@@ -441,7 +453,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
         };
     }
 
-    private string Bool(List<string> scope, int depth, bool requiresOnly = false)
+    private string Bool(ImmutableArray<string>.Builder scope, int depth, bool requiresOnly = false)
     {
         System.ArgumentNullException.ThrowIfNull(scope);
         if (depth == 0 || Chance(25))

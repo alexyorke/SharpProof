@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
@@ -39,12 +40,13 @@ public sealed class NativeMetadataReferenceOwnerTests
         var entryType = factory.GetVariableInfo(entry).Type;
         var input = runtime == null ? factory.CreateNullValue(entryType) : type == "string" ?
             factory.CreateStringValue((string)runtime) : factory.CreateReferenceValue(entryType, runtime);
-        var observed = new List<bool>();
+        var observationBuilder = ImmutableArray.CreateBuilder<bool>();
         var marker = body.Body.CallPreconditions.Single().Instruction;
         var execution = new IrProgramInterpreter(factory).Execute(body.Body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = input }, 10000,
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, input), 10000,
             new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observed.Add(value.Boolean); } } });
+            { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observationBuilder.Add(value.Boolean); } } });
+        var observed = observationBuilder.ToImmutable();
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         if (guarded && isNull)
@@ -52,8 +54,8 @@ public sealed class NativeMetadataReferenceOwnerTests
         else
         { Assert.That(execution.ReturnValue, Is.SameAs(input)); }
         Assert.That(subject.RootMethod.Invoke(null, [runtime]), Is.SameAs(runtime));
-        Assert.That(observed.Count, Is.EqualTo(guarded && isNull ? 0 : 1));
-        if (observed.Count != 0)
+        Assert.That(observed.Length, Is.EqualTo(guarded && isNull ? 0 : 1));
+        if (observed.Length != 0)
         { Assert.That(observed.Single(), Is.EqualTo(!isNull)); }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(body);
@@ -82,7 +84,7 @@ public sealed class NativeMetadataReferenceOwnerTests
         var observations = 0;
         var marker = decoded.CallPreconditions.Single().Instruction;
         var result = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = decoded.Program.Factory.CreateNullValue(decoded.Program.Factory.StringType) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, decoded.Program.Factory.CreateNullValue(decoded.Program.Factory.StringType)),
             10000, new IrProgramReplayOptions(static _ => null)
             { AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations++; } } });
         Assert.That(observations, Is.Zero);
@@ -105,25 +107,27 @@ public sealed class NativeMetadataReferenceOwnerTests
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSignature"));
     }
 
-    private static CompilerReferenceSnapshot[] Capture(MetadataTestSubject subject)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(MetadataTestSubject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, CompilerReferenceSnapshot[] references, bool enabled)
+    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, ImmutableArray<CompilerReferenceSnapshot> references, bool enabled)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new System.ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: enabled);
     }
 
-    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
+    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new System.ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(body);
         return CompilerDecodedShadowBody.Decode(body.CallableId, JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(
             JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(body)))!, TestContext.CurrentContext.CancellationToken, references);

@@ -29,7 +29,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
                 private static int Invoke<T>(int value) where T : IStaticRoot => T.Root(value);
             }
             """;
-        var compilation = TestCompilation.Create("ExplicitStaticInterface", ("static-interface.cs", source));
+        var compilation = TestCompilation.CreateExact("ExplicitStaticInterface", [("static-interface.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -83,6 +83,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
         Assert.That(callable.Total, Is.Not.Null);
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

@@ -15,7 +15,7 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
     public void Schema30CannotSupplyTheOldExceptionAdmissionMeaning()
     {
         var artifact = Create();
-        artifact.SchemaVersion = 30;
+        { artifact = artifact with { SchemaVersion = 30 }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -28,7 +28,12 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
         var total = artifact.Callables.Single().Total!;
         Assert.That(total.ExceptionConstraints, Has.Length.EqualTo(1));
         if (omit)
-        { total.ExceptionConstraints = []; }
+        {
+            {
+                total = total with { ExceptionConstraints = [] };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (omit)
@@ -36,6 +41,7 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
         else
         { Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>()); }
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
@@ -47,8 +53,8 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
 
     private static CompilerManifestArtifact Create()
     {
-        var compilation = TestCompilation.Create("Wave8InitializationCompatibility", ("Subject.cs",
-            "using SharpProof.Attributes; public static class Subject { [DoesNotThrow] public static int Target() { return 7; } }"));
+        var compilation = TestCompilation.CreateExact("Wave8InitializationCompatibility", [("Subject.cs",
+            "using SharpProof.Attributes; public static class Subject { [DoesNotThrow] public static int Target() { return 7; } }")]);
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
         Assert.That(((CSharpParseOptions)compilation.SyntaxTrees.Single().Options).LanguageVersion, Is.EqualTo(LanguageVersion.CSharp12));

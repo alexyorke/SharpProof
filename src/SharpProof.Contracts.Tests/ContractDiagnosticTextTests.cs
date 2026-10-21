@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -24,16 +25,15 @@ public sealed class ContractDiagnosticTextTests
         var emitted = library.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var compilation = TestCompilation.Create("DiagnosticConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         var target = compilation.GetTypeByMetadataName("Library")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();
         var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)),
-            Is.EquivalentTo(new[] {
-                nameLength == 4 ? "[NotNull] text" : "[condition exceeds the display limit]",
-                "[Positive] count", "[InRange(1, 10)] count" }));
+            Is.EquivalentTo(ImmutableArray.Create(nameLength == 4 ? "[NotNull] text" : "[condition exceeds the display limit]",
+                "[Positive] count", "[InRange(1, 10)] count")));
         Assert.That(result.Contracts.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)), Is.True);
     }
 

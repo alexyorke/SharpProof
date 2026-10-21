@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -56,7 +57,7 @@ public sealed class InterpolatedStringHandlerNeighborRegressionTests
             profile: "advisory", features: "effects");
         TestContext.WriteLine($"runtime_state={expectedState}; diagnostics={string.Join(",", diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)))}; " +
             $"target_outcome={(factory.Outcomes.TryGetValue("Target", out var outcome) ? outcome.ToString() : "<unrecorded>")}");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
     }
 }

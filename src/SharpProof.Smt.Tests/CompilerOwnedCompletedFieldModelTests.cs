@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -135,7 +136,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, lowering);
         Assert.That(lowered.IsExact, Is.True);
         var assignments = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAssignInstruction>().ToArray();
+            .OfType<IrAssignInstruction>().ToImmutableArray();
         var actualRead = assignments.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Value))
             .OfType<IrOpaqueTerm>().Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetString(factory.GetMemberInfo(term.Member).Name)
                 .StartsWith("field:", StringComparison.Ordinal)));
@@ -148,11 +149,11 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         var actualReceiver = (IrVariableTerm)receiverCast.Operand;
         Assert.That(actualReceiver.Type, Is.EqualTo(factory.GetVariableInfo(lowering.Parameters.Single().Entry).Type));
         var cursor = actualReceiver.Variable;
-        var visited = new HashSet<IrVarId>();
+        var visited = ImmutableHashSet.CreateBuilder<IrVarId>();
         while (cursor != lowering.Parameters.Single().Entry)
         {
             Assert.That(visited.Add(cursor), Is.True, "Compiler receiver copy chain must terminate at the source input.");
-            var copies = assignments.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == cursor)).ToArray();
+            var copies = assignments.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == cursor)).ToImmutableArray();
             Assert.That(copies.Length, Is.EqualTo(1));
             Assert.That(copies[0].Value, Is.TypeOf<IrVariableTerm>());
             cursor = ((IrVariableTerm)copies[0].Value).Variable;
@@ -161,10 +162,11 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         return (factory, actualReceiver.Variable, actualRead, declaredType);
     }
 
-    private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,
-        Action<BvEncoder, Model, SmtQueryResourceMeter, Dictionary<IrVarId, IrValue>> inspect, bool decode = true)
+    private static void WithNativeModel(IrFactory factory, IrVarId variable, ImmutableArray<IrTerm> predicates,
+        Action<BvEncoder, Model, SmtQueryResourceMeter, ImmutableDictionary<IrVarId, IrValue>> inspect, bool decode = true)
     {
-        System.ArgumentNullException.ThrowIfNull(predicates, nameof(predicates));
+        if (predicates.IsDefault)
+        { throw new ArgumentNullException(nameof(predicates)); }
         if (variable.IsDefault)
         {
             throw new System.ArgumentOutOfRangeException(nameof(variable));
@@ -195,9 +197,9 @@ public sealed class CompilerOwnedCompletedFieldModelTests
             Assert.That(SmtNativeCheck.Run(solver, [goalSelector], meter), Is.EqualTo(Status.SATISFIABLE));
             using var model = solver.Model;
             Assert.That(model, Is.Not.Null);
-            var values = decode ? encoder.DecodeModel(query, model, meter)! : new Dictionary<IrVarId, IrValue>();
+            var values = decode ? encoder.DecodeModel(query, model, meter)! : ImmutableDictionary<IrVarId, IrValue>.Empty;
             if (decode)
-            { Assert.That(values.Keys, Is.EquivalentTo(new[] { variable })); }
+            { Assert.That(values.Keys, Is.EquivalentTo(ImmutableArray.Create(variable))); }
             inspect(encoder, model, meter, values);
         }
         finally

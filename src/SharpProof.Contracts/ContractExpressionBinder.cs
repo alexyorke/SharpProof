@@ -6,10 +6,12 @@ internal sealed class ContractExpressionBinder
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
     private readonly RoslynOperationLowerer _lowerer;
-    private readonly HashSet<IrVarId> _boundVariables = [];
-    private readonly HashSet<IrVarId> _receiverVariables = [];
-    private readonly Dictionary<IrVarId, IrVarId> _preState = [];
-    private readonly HashSet<IrVarId> _preStateValues = [];
+    private readonly ImmutableHashSet<IrVarId>.Builder _boundVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableHashSet<IrVarId>.Builder _receiverVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableDictionary<IrVarId, IrVarId>.Builder _preState = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
+    private readonly ImmutableArray<KeyValuePair<IrVarId, IrVarId>>.Builder _preStateOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrVarId>>();
+    private readonly ImmutableHashSet<IrVarId>.Builder _preStateValues = ImmutableHashSet.CreateBuilder<IrVarId>();
+    private readonly ImmutableArray<IrVarId>.Builder _receiverOrder = ImmutableArray.CreateBuilder<IrVarId>();
     private ImmutableArray<FrontendVariableBinding> _variableBindings;
     private IrVarId? _result;
 
@@ -22,11 +24,8 @@ internal sealed class ContractExpressionBinder
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ArgumentNullGuard.NotNull(api, nameof(api));
         _source = ArgumentNullGuard.NotNull(source, nameof(source));
-        _lowerer = new RoslynOperationLowerer(factory)
-        {
-            TypeSpecializer = specializeType ?? (static type => type),
-            CustomLowering = BindIntrinsic
-        };
+        _lowerer = RoslynOperationLowerer.CreateConfigured(
+            factory, specializeType ?? (static type => type), BindIntrinsic);
     }
 
     internal ImmutableArray<FrontendVariableBinding> VariableBindings
@@ -35,9 +34,10 @@ internal sealed class ContractExpressionBinder
     }
 
     internal ImmutableArray<IrVarId> ReceiverVariables =>
-        [.. _receiverVariables];
+        _receiverOrder.ToImmutable();
 
-    internal IReadOnlyDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
+    internal ImmutableDictionary<IrVarId, IrVarId> PreStateVariables => _preState.ToImmutable();
+    internal ImmutableArray<KeyValuePair<IrVarId, IrVarId>> PreStateVariablePairs => _preStateOrder.ToImmutable();
 
     internal IrVarId? ResultVariable => _result;
 
@@ -80,7 +80,7 @@ internal sealed class ContractExpressionBinder
             return (true, null);
         }
 
-        var substitutions = new Dictionary<IrVarId, IrTerm>();
+        var substitutions = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var variable in value.Variables)
         {
             if (!_preState.TryGetValue(variable, out var preState))
@@ -92,6 +92,7 @@ internal sealed class ContractExpressionBinder
                         System.Globalization.CultureInfo.InvariantCulture),
                     info.Type);
                 _preState.Add(variable, preState);
+                _preStateOrder.Add(new(variable, preState));
                 _preStateValues.Add(preState);
             }
             substitutions[variable] = _factory.Variable(preState);
@@ -100,7 +101,7 @@ internal sealed class ContractExpressionBinder
             _factory,
             value.Term ?? throw new InvalidOperationException(
                 "A successful old() binding must carry a term."),
-            substitutions));
+            substitutions.ToImmutable()));
     }
 
     internal ExpressionBindingResult Bind(IOperation operation)
@@ -132,7 +133,10 @@ internal sealed class ContractExpressionBinder
                 return ExpressionBindingResult.Unsupported;
             }
 
-            _receiverVariables.Add(variable);
+            if (_receiverVariables.Add(variable))
+            {
+                _receiverOrder.Add(variable);
+            }
         }
         return ExpressionBindingResult.Success(result.Term, variables);
     }

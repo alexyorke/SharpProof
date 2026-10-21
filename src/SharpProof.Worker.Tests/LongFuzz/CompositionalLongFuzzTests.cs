@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -35,12 +36,12 @@ public sealed class CompositionalLongFuzzTests
         public string ClaimMode { get; init; } = ClaimMode ?? throw new System.ArgumentNullException(nameof(ClaimMode));
     }
     private sealed record Observation(int Input, int? Value, string? Exception, int State, int Writes);
-    private sealed record ClrResult(Observation[] Runs, string? Error)
+    private sealed record ClrResult(ImmutableArray<Observation> Runs, string? Error)
     {
-        public Observation[] Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+        public ImmutableArray<Observation> Runs { get; init; } = Runs.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Runs)) : Runs;
     }
 
-    private static readonly Operation[] s_operations =
+    private static readonly ImmutableArray<Operation> s_operations =
     [
         new("checked-add", "checked(y + 1)", int.MaxValue),
         new("shift-divide", "8 / (y & 3) + (y << 1)", 0),
@@ -51,7 +52,7 @@ public sealed class CompositionalLongFuzzTests
 
     // @@ is always an int expression over y. Each scope contains a return,
     // so every operation/scope pair is syntactically valid C#.
-    private static readonly Scope[] s_scopes =
+    private static readonly ImmutableArray<Scope> s_scopes =
     [
         new("pure-finally", "int y = x; try { return @@; } finally { _ = y; }", "Auto"),
         new("state-finally", "int y = x; try { return @@; } finally { Mark(y); }", "EnforcePure"),
@@ -63,10 +64,10 @@ public sealed class CompositionalLongFuzzTests
             "EnforcePure")
     ];
 
-    private static readonly int[] s_inputs =
+    private static readonly ImmutableArray<int> s_inputs =
         [int.MinValue, int.MinValue + 1, -4, -3, -2, -1, 0, 1, 2, 3, 4, 7, 255, 256,
             int.MaxValue - 1, int.MaxValue];
-    private static readonly (int Operation, int Scope)[] s_cycle = BuildCycle();
+    private static readonly ImmutableArray<(int Operation, int Scope)> s_cycle = BuildCycle();
 
     [Test]
     public async Task GeneratedCompositionsAgreeWithClr()
@@ -98,9 +99,9 @@ public sealed class CompositionalLongFuzzTests
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    private static (int Operation, int Scope)[] BuildCycle()
+    private static ImmutableArray<(int Operation, int Scope)> BuildCycle()
     {
-        var slots = new List<(int Operation, int Scope)>();
+        var slots = ImmutableArray.CreateBuilder<(int Operation, int Scope)>();
         for (var operation = 0; operation < s_operations.Length; operation++)
         {
             for (var scope = 0; scope < s_scopes.Length; scope++)
@@ -118,7 +119,7 @@ public sealed class CompositionalLongFuzzTests
                 }
             }
         }
-        return [.. slots];
+        return slots.ToImmutable();
     }
 
     private static Operation Vary(Operation operation, int cycle)
@@ -143,7 +144,7 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var delta = new[] { 1, 2, -1, -2 }[cycle % 4];
+        var delta = ImmutableArray.Create(1, 2, -1, -2)[cycle % 4];
         return new("checked-add", "checked(y + " + Literal(delta) + ")",
             delta < 0 ? int.MinValue : int.MaxValue);
     }
@@ -153,8 +154,8 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var mask = new[] { 3, 7 }[cycle % 2];
-        var shift = new[] { 1, 31, 32, 33 }[cycle % 4];
+        var mask = ImmutableArray.Create(3, 7)[cycle % 2];
+        var shift = ImmutableArray.Create(1, 31, 32, 33)[cycle % 4];
         return new("shift-divide", "8 / (y & " + mask + ") + (y << " + shift + ")", 0);
     }
 
@@ -175,7 +176,7 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var shift = new[] { 1, 2, 31, 32 }[cycle % 4];
+        var shift = ImmutableArray.Create(1, 2, 31, 32)[cycle % 4];
         return new("switch-pattern", "y switch { < 0 => checked(y * 2), 0 => 0, _ => y << " +
             shift + " }", 2);
     }
@@ -197,7 +198,7 @@ public sealed class CompositionalLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(scope);
         var plainBody = scope.Template.Replace("@@", operation.Expression, StringComparison.Ordinal);
         var body = recover ? "try { " + plainBody + " } catch (Exception) { Mark(5); return 5; }" : plainBody;
-        var inputs = new[] { operation.Anchor }.Concat(s_inputs).Distinct().ToArray();
+        var inputs = s_inputs.Prepend(operation.Anchor).Distinct().ToImmutableArray();
         var probeSource = Source("", body);
         rememberSource(probeSource);
         var probe = RunClr(probeSource, inputs);
@@ -241,7 +242,7 @@ public sealed class CompositionalLongFuzzTests
         }
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, pair,
@@ -253,6 +254,7 @@ public sealed class CompositionalLongFuzzTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
@@ -263,7 +265,7 @@ public sealed class CompositionalLongFuzzTests
             return;
         }
         var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, pair,
@@ -297,9 +299,10 @@ public sealed class CompositionalLongFuzzTests
     }
 
     private static bool CheckRecovery(LongFuzzSession session, int seed, string pair, string plainBody,
-        int[] inputs, Observation[] recovered, string recoveredSource)
+        ImmutableArray<int> inputs, ImmutableArray<Observation> recovered, string recoveredSource)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(pair);
         System.ArgumentNullException.ThrowIfNull(plainBody);
         System.ArgumentNullException.ThrowIfNull(recoveredSource);
@@ -374,9 +377,12 @@ public sealed class CompositionalLongFuzzTests
             " || Contract.Result<int>() == " + Literal(expected) + ");";
     }
 
-    private static Observation? Witness(string claim, Operation operation, Observation atAnchor, Observation[] runs)
+    private static Observation? Witness(string claim, Operation operation, Observation atAnchor, ImmutableArray<Observation> runs)
     {
-        System.ArgumentNullException.ThrowIfNull(runs, nameof(runs));
+        if (runs.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(runs));
+        }
         System.ArgumentNullException.ThrowIfNull(atAnchor);
         System.ArgumentNullException.ThrowIfNull(operation);
         if (claim == "[DoesNotThrow]")
@@ -427,7 +433,7 @@ public sealed class CompositionalLongFuzzTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
         return CSharpCompilation.Create("CompositionProbe_" + Guid.NewGuid().ToString("N"), [tree],
@@ -436,12 +442,13 @@ public sealed class CompositionalLongFuzzTests
                 optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static ClrResult RunClr(string source, int[] inputs)
+    private static ClrResult RunClr(string source, ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
@@ -460,7 +467,7 @@ public sealed class CompositionalLongFuzzTests
             var state = type.GetField("State")!;
             var writes = type.GetField("Writes")!;
             var method = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = new List<Observation>(inputs.Length);
+            var runs = ImmutableArray.CreateBuilder<Observation>();
             foreach (var input in inputs)
             {
                 state.SetValue(null, 0);
@@ -477,7 +484,7 @@ public sealed class CompositionalLongFuzzTests
                 }
                 runs.Add(new(input, value, exceptionName, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
             }
-            return new([.. runs], null);
+            return new(runs.ToImmutable(), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

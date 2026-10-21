@@ -92,19 +92,21 @@ internal sealed partial class NativeResourceContractTests
         var artifact = CreateArtifact("using SharpProof.Attributes; using System.Threading.Tasks; public static class C { [ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }");
         var callable = artifact.Callables.Single();
         if (mutation == "entry")
-        { callable.TotalEntry = null; }
+        { callable = callable with { TotalEntry = null }; }
         else if (mutation == "ordinary-body")
         {
             var ordinary = CreateArtifact("using SharpProof.Attributes; public static class C { [ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static void Target(int n) {for(int i=0;i<n;i++){}} }");
-            ordinary.Callables.Single().ForkJoinProjection = callable.ForkJoinProjection;
+            ordinary = ordinary with { Callables = ordinary.Callables.SetItem(0, ordinary.Callables.Single() with { ForkJoinProjection = callable.ForkJoinProjection }) };
             artifact = ordinary;
         }
         else
         {
             var json = System.Text.Json.Nodes.JsonNode.Parse(callable.ForkJoinProjection!)!.AsObject();
             json["root"] = "other";
-            callable.ForkJoinProjection = System.Text.Encoding.UTF8.GetBytes(json.ToJsonString());
+            callable = callable with { ForkJoinProjection = System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()) };
         }
+        if (mutation != "ordinary-body")
+        { artifact = artifact with { Callables = artifact.Callables.SetItem(0, callable) }; }
         Action read = () => { _ = Read(artifact); };
         Rejects(read);
     }

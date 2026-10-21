@@ -59,7 +59,7 @@ internal sealed class SmtQueryResourceMeter(
 
 internal static class SmtNativeCheck
 {
-    internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
+    internal static Status Run(Solver solver, IEnumerable<BoolExpr> assumptions, SmtQueryResourceMeter meter)
     {
         solver = RepositoryParameterGuard.NotNull(solver, nameof(solver));
         assumptions = RepositoryParameterGuard.NotNull(assumptions, nameof(assumptions));

@@ -43,11 +43,7 @@ internal sealed class AnalyzerCoreInterpreterCoverageTests
             for (var secondValue = right; secondValue <= right + 1; secondValue++)
             {
                 var concrete = new IrProgramInterpreter(factory).Execute(program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        [first] = factory.CreateIntegerValue(firstValue),
-                        [second] = factory.CreateIntegerValue(secondValue)
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(first, factory.CreateIntegerValue(firstValue)).SetItem(second, factory.CreateIntegerValue(secondValue)));
                 var concreteValue = concrete.ReturnValue!.Boolean ? 1 : 0;
                 Assert.That(interval.Contains(concreteValue), Is.True);
                 Assert.That(marker.Contains(concreteValue), Is.True);

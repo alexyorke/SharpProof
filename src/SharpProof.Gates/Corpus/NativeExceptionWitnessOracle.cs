@@ -38,21 +38,22 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
             if (owner.StaticConstructors.Length != 0)
             { return "StaticInitializationNotModeled"; }
         }
-        var values = new object?[method.Parameters.Length];
-        var types = new Type[method.Parameters.Length];
+        var valueBuilder = ImmutableArray.CreateBuilder<object?>(method.Parameters.Length);
+        var typeBuilder = ImmutableArray.CreateBuilder<Type>(method.Parameters.Length);
         for (var ordinal = 0; ordinal < method.Parameters.Length; ordinal++)
         {
             var type = RuntimeType(method.Parameters[ordinal].Type);
             if (type == null || !inputs.TryGetValue(preparation.Parameters[ordinal].Entry, out var input) ||
-                !TryValue(method.Parameters[ordinal].Type, input, out values[ordinal]))
+                !TryValue(method.Parameters[ordinal].Type, input, out var value))
             { return "NonConcreteInput"; }
-            types[ordinal] = type;
+            typeBuilder.Add(type);
+            valueBuilder.Add(value);
         }
         EnsureAssembly(cancellationToken);
         var declaring = _assembly!.GetType(MetadataName(method.ContainingType), throwOnError: true)!;
         var callable = declaring.GetMethod(method.MetadataName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null, types, modifiers: null) ?? throw new InvalidDataException("A source witness has no matching emitted method.");
-        var actual = ObserveInvocationException(callable, values);
+            binder: null, typeBuilder.ToImmutable().ToArray(), modifiers: null) ?? throw new InvalidDataException("A source witness has no matching emitted method.");
+        var actual = ObserveInvocationException(callable, valueBuilder.ToImmutable().ToArray());
         var confirmed = actual != null && (expected.Kind == IrExceptionKind.Explicit && expected.Site is { } site
             ? MatchesExplicitException(preparation.Program.Factory, site, actual)
             : IrExceptionKindFacts.FromException(actual) == expected.Kind);
@@ -118,13 +119,13 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     private static string MetadataName(INamedTypeSymbol type)
     {
         System.ArgumentNullException.ThrowIfNull(type);
-        var names = new Stack<string>();
+        var names = ImmutableStack<string>.Empty;
         for (var current = type; current != null; current = current.ContainingType)
-        { names.Push(current.MetadataName); }
-        var namespaces = new Stack<string>();
+        { names = names.Push(current.MetadataName); }
+        var namespaces = ImmutableStack<string>.Empty;
         for (var current = type.ContainingNamespace; !current.IsGlobalNamespace; current = current.ContainingNamespace)
-        { namespaces.Push(current.MetadataName); }
-        return (namespaces.Count == 0 ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
+        { namespaces = namespaces.Push(current.MetadataName); }
+        return (namespaces.IsEmpty ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
     }
 
     private static Type? RuntimeType(ITypeSymbol type)

@@ -22,35 +22,37 @@ internal static class IrSemanticTerms
 
     public static IrTerm Conjoin(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms)
+        ImmutableArray<IrTerm> terms)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(terms, nameof(terms));
+        if (terms.IsDefault)
+        { throw new ArgumentNullException(nameof(terms)); }
         return Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
     }
 
     public static IrTerm Disjoin(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms)
+        ImmutableArray<IrTerm> terms)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(terms, nameof(terms));
+        if (terms.IsDefault)
+        { throw new ArgumentNullException(nameof(terms)); }
         return Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
     }
 
     private static IrTerm Combine(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms,
+        ImmutableArray<IrTerm> terms,
         IrBinaryOperator @operator,
         bool identity)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        if (terms.Count == 0)
+        if (terms.Length == 0)
         {
             return factory.Boolean(identity);
         }
 
-        return Visit(0, terms.Count);
+        return Visit(0, terms.Length);
 
         IrTerm Visit(int start, int count)
         {
@@ -88,13 +90,13 @@ internal static class IrTermAnalysis
     public static int GetDepth(IrTerm root)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
-        var memo = new Dictionary<IrId, int>();
-        return GetDepth(root, memo);
+        var memo = ImmutableDictionary<IrId, int>.Empty;
+        return GetDepth(root, memo).Value;
     }
 
-    internal static int GetDepth(
+    internal static (int Value, ImmutableDictionary<IrId, int> Memo) GetDepth(
         IrTerm root,
-        Dictionary<IrId, int> memo)
+        ImmutableDictionary<IrId, int> memo)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));

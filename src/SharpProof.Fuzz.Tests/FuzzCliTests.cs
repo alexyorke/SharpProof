@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using NUnit.Framework;
@@ -8,6 +9,21 @@ namespace SharpProof.Fuzz.Test;
 [NonParallelizable]
 public sealed class FuzzCliTests
 {
+    [Test]
+    public void DefaultArgumentVectorRejectsBeforeLogging()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await FuzzRunner.RunCliAsync(default, output, error,
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
     [Test]
     [NonParallelizable]
     public async Task CliPrintsHelpAndCanBeCalledAgain()
@@ -80,11 +96,12 @@ public sealed class FuzzCliTests
     }
 
     private static async Task<int> RunEntryPointAsync(
-        string[] arguments,
+        ImmutableArray<string> arguments,
         TextWriter output,
         TextWriter error)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(error);
         System.ArgumentNullException.ThrowIfNull(output);
         var originalOutput = Console.Out;
@@ -95,7 +112,7 @@ public sealed class FuzzCliTests
         {
             var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
             Assert.That(entryPoint, Is.Not.Null);
-            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments]));
+            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments.ToArray()]));
             return result switch
             {
                 Task<int> task => await task,

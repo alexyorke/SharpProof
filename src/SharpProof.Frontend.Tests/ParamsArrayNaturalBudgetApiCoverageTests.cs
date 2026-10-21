@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -13,7 +14,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
     [Test]
     public void ActualParamsInvocationsConsumeTheDefaultArrayModelScanBudget()
     {
-        var callCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
+        const int callCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
         var callsSource = string.Join("\n", Enumerable.Repeat("sum += Helper();", callCount));
         var source = "int Target() { int sum = 0; " + callsSource +
             " return sum; } static int Helper(params int[] values) => values.Length + 1;";
@@ -24,7 +25,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
         var target = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var calls = target.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToArray();
+            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(callCount));
         var session = new TotalSourceCallSession(subject.Compilation, null, null, default,
             method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ResolveArrayEmpty(subject.Factory, method)));

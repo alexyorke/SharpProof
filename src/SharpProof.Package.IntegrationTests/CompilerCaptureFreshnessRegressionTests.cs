@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -24,32 +25,36 @@ public sealed class CompilerCaptureFreshnessRegressionTests
             System.ArgumentNullException.ThrowIfNull(name);
             return (string)consumerType.GetProperty(name, Members)!.GetValue(consumer)!;
         }
-        async Task<(int Code, string Output)> Build(params (string Name, string Value)[] properties)
+        async Task<(int Code, string Output)> Build(ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             var task = (Task)consumerType.GetMethod("BuildAsync", Members)!.Invoke(consumer, [true, properties])!;
             await task;
             var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
             return ((int)result.GetType().GetProperty("ExitCode")!.GetValue(result)!,
                 (string)result.GetType().GetProperty("Output")!.GetValue(result)!);
         }
-        var first = await Build(("SharpProofRunAnalyzersForPackageTests", "true"));
+        var first = await Build([("SharpProofRunAnalyzersForPackageTests", "true")]);
         await TestContext.Out.WriteLineAsync("FIRST BUILD\n" + first.Output);
         Assert.That(first.Code, Is.Zero, first.Output);
         var firstResult = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(PathProperty("ResultPath")))!;
         Assert.That(firstResult.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        var firstManifest = await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"));
-        string Digest(byte[] bytes)
+        var firstManifest = (await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"))).ToImmutableArray();
+        string Digest(ImmutableArray<byte> bytes)
         {
-            System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+            if (bytes.IsDefault)
+            { throw new ArgumentNullException(nameof(bytes)); }
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan()));
         }
-        await TestContext.Out.WriteLineAsync("First source SHA256: " + Digest(await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "Subject.cs"))));
+        await TestContext.Out.WriteLineAsync("First source SHA256: " + Digest((await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "Subject.cs"))).ToImmutableArray()));
         await TestContext.Out.WriteLineAsync("First manifest SHA256: " + Digest(firstManifest));
-        await TestContext.Out.WriteLineAsync("First result SHA256: " + Digest(await File.ReadAllBytesAsync(PathProperty("ResultPath"))));
-        await TestContext.Out.WriteLineAsync("First assembly SHA256: " + Digest(await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "bin", "Release", "net8.0", "Consumer.dll"))));
+        await TestContext.Out.WriteLineAsync("First result SHA256: " + Digest((await File.ReadAllBytesAsync(PathProperty("ResultPath"))).ToImmutableArray()));
+        await TestContext.Out.WriteLineAsync("First assembly SHA256: " + Digest((await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "bin", "Release", "net8.0", "Consumer.dll"))).ToImmutableArray()));
         await File.WriteAllTextAsync(Path.Combine(PathProperty("Root"), "Subject.cs"), ImpureSource, new System.Text.UTF8Encoding(false));
-        var second = await Build(("SharpProofRunAnalyzersForPackageTests", "true"), ("RunAnalyzersDuringBuild", "false"));
+        var second = await Build([("SharpProofRunAnalyzersForPackageTests", "true"), ("RunAnalyzersDuringBuild", "false")]);
         await TestContext.Out.WriteLineAsync("SECOND BUILD\n" + second.Output);
         var assemblyPath = Path.Combine(PathProperty("Root"), "obj", "Release", "net8.0", "Consumer.dll");
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("IncrementalPackageAuditRuntime", isCollectible: true);
@@ -63,15 +68,15 @@ public sealed class CompilerCaptureFreshnessRegressionTests
         finally { runtime.Unload(); }
         var secondResult = File.Exists(PathProperty("ResultPath"))
             ? WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(PathProperty("ResultPath"))) : null;
-        await TestContext.Out.WriteLineAsync("Manifest unchanged: " + firstManifest.SequenceEqual(await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"))));
+        await TestContext.Out.WriteLineAsync("Manifest unchanged: " + firstManifest.SequenceEqual((await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"))).ToImmutableArray()));
         await TestContext.Out.WriteLineAsync("Second outcome: " + secondResult?.ClaimResults.Single().Outcome);
-        await TestContext.Out.WriteLineAsync("Second source SHA256: " + Digest(await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "Subject.cs"))));
-        await TestContext.Out.WriteLineAsync("Second manifest SHA256: " + Digest(await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"))));
+        await TestContext.Out.WriteLineAsync("Second source SHA256: " + Digest((await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "Subject.cs"))).ToImmutableArray()));
+        await TestContext.Out.WriteLineAsync("Second manifest SHA256: " + Digest((await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"))).ToImmutableArray()));
         if (secondResult != null)
         {
-            await TestContext.Out.WriteLineAsync("Second result SHA256: " + Digest(await File.ReadAllBytesAsync(PathProperty("ResultPath"))));
+            await TestContext.Out.WriteLineAsync("Second result SHA256: " + Digest((await File.ReadAllBytesAsync(PathProperty("ResultPath"))).ToImmutableArray()));
         }
-        await TestContext.Out.WriteLineAsync("Second assembly SHA256: " + Digest(await File.ReadAllBytesAsync(assemblyPath)));
+        await TestContext.Out.WriteLineAsync("Second assembly SHA256: " + Digest((await File.ReadAllBytesAsync(assemblyPath)).ToImmutableArray()));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(second.Code, Is.Not.Zero, "Verification must fail closed when the compiler collector is disabled after editing source.");

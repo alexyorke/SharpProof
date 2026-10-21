@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorBinaryApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0019"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0019"];
 
     [TestCase("&", BinaryOperatorKind.And)]
     [TestCase("==", BinaryOperatorKind.Equals)]
@@ -49,7 +50,7 @@ public sealed class CompilerErrorBinaryApiCoverageTests
         Assert.That(lowered.Term, Is.TypeOf<IrOpaqueTerm>());
 
         using var control = TypedProgramSubject.Create("bool Target(bool left, bool right) => left " + token + " right;");
-        object[] inputs = [true, false];
+        ImmutableArray<object> inputs = [true, false];
         Assert.That(control.Invoke(inputs), Is.False);
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);

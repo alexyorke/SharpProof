@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -82,13 +83,13 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         var model = compilation.GetSemanticModel(tree);
         var invocations = GetIntrinsicInvocations(root, model, compilation);
         Assert.That(invocations, Has.Length.EqualTo(4));
-        var owners = new List<IMethodSymbol>();
+        var ownersBuilder = ImmutableArray.CreateBuilder<IMethodSymbol>();
         foreach (var invocation in invocations)
         {
             var operation = GetInvocationFromFieldInitializer(invocation, model);
             var owner = AssertIntrinsicCallableAndFieldOwner(
                 invocation, operation!, model, compilation);
-            owners.Add(owner);
+            ownersBuilder.Add(owner);
             Assert.That(GetOwnEnsuresContexts(operation!, owner, model, compilation),
                 Has.Length.EqualTo(1));
             var callable = GetNearestCallable(operation!);
@@ -101,6 +102,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
             Assert.That(body, Is.Not.Null);
             AssertDirectEnsuresPrologue(body!, owner, model, compilation);
         }
+        var owners = ownersBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(owners.Count(static owner =>
@@ -115,7 +117,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         var runtime = new AssemblyLoadContext("NestedFieldValidContracts", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);
@@ -174,7 +176,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         string runtimeFailure;
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var instance = Activator.CreateInstance(subject);
             Assert.That(instance, Is.Not.Null);
@@ -206,7 +208,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         Assert.That(actual, Is.EqualTo(expectedDiagnostics), observation);
     }
 
-    private static InvocationExpressionSyntax[] GetIntrinsicInvocations(
+    private static ImmutableArray<InvocationExpressionSyntax> GetIntrinsicInvocations(
         SyntaxNode root, SemanticModel model, CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -218,7 +220,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
             .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
                 (method.Name == "Result" || method.Name == "Old") &&
                 SymbolEqualityComparer.Default.Equals(method.ContainingType, api)))
-            .ToArray();
+            .ToImmutableArray();
     }
 
     private static IInvocationOperation GetInvocationFromFieldInitializer(
@@ -296,7 +298,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         return current!;
     }
 
-    private static IInvocationOperation[] GetOwnEnsuresContexts(
+    private static ImmutableArray<IInvocationOperation> GetOwnEnsuresContexts(
         IOperation operation,
         IMethodSymbol owner,
         SemanticModel model,
@@ -306,7 +308,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         System.ArgumentNullException.ThrowIfNull(model);
         System.ArgumentNullException.ThrowIfNull(operation);
         System.ArgumentNullException.ThrowIfNull(owner);
-        var contexts = new List<IInvocationOperation>();
+        var contexts = ImmutableArray.CreateBuilder<IInvocationOperation>();
         var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
         for (var current = operation.Parent; current != null; current = current.Parent)
         {
@@ -323,7 +325,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
                 contexts.Add(invocation);
             }
         }
-        return contexts.ToArray();
+        return contexts.ToImmutable();
     }
 
     private static void AssertDirectEnsuresPrologue(

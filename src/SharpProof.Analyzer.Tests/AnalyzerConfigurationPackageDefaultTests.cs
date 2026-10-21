@@ -12,14 +12,14 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     {
         var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
+                new DictionaryAnalyzerConfigOptions([
                     ("build_property.SharpProofProfile", "strict"),
                     ("build_property._SharpProofProfileWasDefaulted", "false"),
                     ("build_property.SharpProofFeatures", "all"),
                     ("build_property._SharpProofFeaturesWasDefaulted", "true"),
                     ("build_property.SharpProofVerify", "true"),
                     ("sharpproof_profile", "strict"),
-                    ("sharpproof_features", "contracts"))));
+                    ("sharpproof_features", "contracts")])));
 
         using (Assert.EnterMultipleScope())
         {
@@ -34,13 +34,13 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     {
         var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
+                new DictionaryAnalyzerConfigOptions([
                     ("build_property.SharpProofProfile", "advisory"),
                     ("build_property._SharpProofProfileWasDefaulted", "true"),
                     ("build_property.SharpProofFeatures", "effects"),
                     ("build_property._SharpProofFeaturesWasDefaulted", "false"),
                     ("build_property.SharpProofVerify", "false"),
-                    ("sharpproof_profile", "strict"))));
+                    ("sharpproof_profile", "strict")])));
 
         using (Assert.EnterMultipleScope())
         {
@@ -55,11 +55,11 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     [Test]
     public void TreeAnalyzerConfigurationCannotOverridePackageProfileDefault()
     {
-        var global = new DictionaryAnalyzerConfigOptions(
+        var global = new DictionaryAnalyzerConfigOptions([
             ("build_property.SharpProofProfile", "advisory"),
-            ("build_property.SharpProofFeatures", "all"));
-        var tree = new DictionaryAnalyzerConfigOptions(
-            ("sharpproof_profile", "strict"));
+            ("build_property.SharpProofFeatures", "all")]);
+        var tree = new DictionaryAnalyzerConfigOptions([
+            ("sharpproof_profile", "strict")]);
 
         var invalid = CompilerConfiguration.GetInvalidTreeConfigurationValues(
             tree,
@@ -73,12 +73,12 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     {
         var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
-                new DictionaryAnalyzerConfigOptions(
+                new DictionaryAnalyzerConfigOptions([
                     ("build_property.SharpProofProfile", "off"),
                     ("build_property._SharpProofProfileWasDefaulted", "false"),
                     ("build_property.SharpProofFeatures", "all"),
                     ("build_property._SharpProofFeaturesWasDefaulted", "true"),
-                    ("sharpproof_profile", "strict"))));
+                    ("sharpproof_profile", "strict")])));
 
         using (Assert.EnterMultipleScope())
         {

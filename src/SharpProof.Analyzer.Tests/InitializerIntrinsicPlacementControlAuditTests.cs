@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 
@@ -19,7 +20,7 @@ public sealed class InitializerIntrinsicPlacementControlAuditTests
                 public Subject() : base(1) { _ = Contract.Result<int>(); }
             }
             """, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result").And.Contain("<placement>")
                 .And.Contain("expected use inside Contract.Ensures"));
@@ -38,6 +39,6 @@ public sealed class InitializerIntrinsicPlacementControlAuditTests
                 public Subject() : base(1) { }
             }
             """, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 }

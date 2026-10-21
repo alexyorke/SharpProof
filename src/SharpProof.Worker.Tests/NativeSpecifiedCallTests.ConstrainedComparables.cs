@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 using SharpProof.Ir;
@@ -17,7 +18,7 @@ internal sealed partial class NativeSpecifiedCallTests
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         var messages = candidate.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
             .OfType<IrHavocInstruction>().Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
-                candidate.Factory.GetString(candidate.Factory.GetOperationInfo(instruction.Operation).Description!.Value)).ToArray();
+                candidate.Factory.GetString(candidate.Factory.GetOperationInfo(instruction.Operation).Description!.Value)).ToImmutableArray();
         Assert.That(messages, Is.Empty);
     }
 

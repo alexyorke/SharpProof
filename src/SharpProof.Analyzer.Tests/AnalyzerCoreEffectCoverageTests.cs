@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -18,8 +19,9 @@ public sealed class AnalyzerCoreEffectCoverageTests
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
-        var diagnostics = new List<Diagnostic>();
-        var outcome = EffectContractDiagnostics.Analyze(method, declaration, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var outcome = EffectContractDiagnostics.Analyze(method, declaration, session, diagnosticsBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnostics = diagnosticsBuilder.ToImmutable();
         Assert.That(outcome, Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
         Assert.That(diagnostics, Is.Empty);
     }
@@ -38,7 +40,7 @@ public sealed class AnalyzerCoreEffectCoverageTests
             "[AllowedCapabilities(SharpProofCapability.None)] " +
             "public static int Target() => ExternalFixture.Synchronize(); }",
             "effects", ["SP0016"], new SharpProofAnalyzer(factory), additionalReferences: [external]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0016");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0016"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "Synchronization");
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }
@@ -75,7 +77,7 @@ public sealed class AnalyzerCoreEffectCoverageTests
             "[EffectContract(" + declaredEffects + ", ThrownExceptions = new[] { typeof(System.Exception) }, Complete = true)] " +
             "public int Target(int x, object gate, int[] values) { " + body + " } }",
             "effects", ["SP0052"], new SharpProofAnalyzer(factory));
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0052");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0052"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], detail);
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }
@@ -106,7 +108,7 @@ public sealed class AnalyzerCoreEffectCoverageTests
             "[EffectContract(SharpProofEffect.None, Complete = true)] " +
             "public static int Target(int[] values) => ExternalFixture.Value(values); }",
             "effects", ["SP0052"], new SharpProofAnalyzer(factory), additionalReferences: [external]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0052");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0052"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], detail);
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         var callee = (IMethodSymbol)factory.Session!.Compilation.GetTypeByMetadataName("ExternalFixture")!
@@ -125,7 +127,7 @@ public sealed class AnalyzerCoreEffectCoverageTests
             "[EffectContract(SharpProofEffect.None, Complete = true)] " +
             "public static int Target() => ExternalFixture.Value(); }",
             "effects", ["SP0052"], additionalReferences: [external]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0052");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0052"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "UsesReflection");
     }
 }

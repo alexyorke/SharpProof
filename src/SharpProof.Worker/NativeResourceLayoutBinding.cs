@@ -11,7 +11,7 @@ internal sealed class NativeResourceLayoutBinding
     internal ResourceRuntimeLayoutContext? Bind()
     {
         _bound = null;
-        if (_target.Entry.Assumptions is null || _target.Compilation.ResourceTargetPlatform != "X64" ||
+        if (_target.Entry.Assumptions.IsDefault || _target.Compilation.ResourceTargetPlatform != "X64" ||
             !(_target.Compilation.TargetFramework == "net8.0" || (_target.Compilation.TargetFramework?.StartsWith("net8.0-", StringComparison.Ordinal) ?? false)) ||
             _target.Compilation.ResourceMetadataReferences is not { Length: > 0 } references || references.Any(static reference => reference is null))
         { return null; }
@@ -45,7 +45,7 @@ internal sealed class NativeResourceLayoutBinding
             ResourceRuntimeLayout.TargetArchitecture, ResourceRuntimeLayout.PointerBytes);
     }
 
-    internal void Project(WorkerClaimResult result)
+    internal WorkerClaimResult Project(WorkerClaimResult result)
     {
         result = ArgumentNullGuard.NotNull(result, nameof(result));
         if (_bound is not { } dependency || result.ResourceBound is null || result.Outcome is not (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
@@ -53,7 +53,8 @@ internal sealed class NativeResourceLayoutBinding
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used)
             .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id), StringComparer.Ordinal)
         { dependency.AssumptionId };
-        result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(_target, used);
-        result.ResourceBound.MetadataAssumptions = [.. result.ResourceBound.MetadataAssumptions, dependency];
+        result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(_target, used.ToImmutableHashSet(StringComparer.Ordinal));
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [.. result.ResourceBound.MetadataAssumptions, dependency] } };
+        return result;
     }
 }

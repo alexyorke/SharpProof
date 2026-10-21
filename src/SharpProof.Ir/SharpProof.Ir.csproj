@@ -9,6 +9,7 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\eng\shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
@@ -21,6 +22,7 @@
     <InternalsVisibleTo Include="SharpProof.Effects" />
     <InternalsVisibleTo Include="SharpProof.Frontend" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Specs" />
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
@@ -28,16 +30,15 @@
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.Contracts" />
+    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
     <InternalsVisibleTo Include="SharpProof.Ir.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt" />
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
     <InternalsVisibleTo Include="SharpProof.Effects.Test" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
     <InternalsVisibleTo Include="SharpProof.Testing.Test" />
     <InternalsVisibleTo Include="SharpProof.Verify.Test" />

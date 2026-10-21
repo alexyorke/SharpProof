@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using SharpProof.Ir;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -37,11 +38,14 @@ internal static class AnalyzerTestHost
 
     internal static void AssertIds(
         IEnumerable<Diagnostic> diagnostics,
-        params string[] expected)
+        ImmutableArray<string> expected)
     {
-        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
+        if (expected.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(expected));
+        }
         System.ArgumentNullException.ThrowIfNull(diagnostics);
-        var actual = diagnostics.ToArray();
+        var actual = diagnostics.ToImmutableArray();
         Assert.That(
             actual.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(expected),
@@ -128,9 +132,12 @@ internal static class AnalyzerTestHost
 
     internal static CSharpCompilation WithEnabledDiagnostics(
         CSharpCompilation compilation,
-        params string[] enabledIds)
+        ImmutableArray<string> enabledIds)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(enabledIds));
+        }
         System.ArgumentNullException.ThrowIfNull(compilation);
         var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
         var options = compilation.Options.WithSpecificDiagnosticOptions(
@@ -166,8 +173,7 @@ internal static class AnalyzerTestHost
         bool allowCompilationErrors = false)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
         if (mode != null)
         {
             switch (mode.ToUpperInvariant())
@@ -183,24 +189,24 @@ internal static class AnalyzerTestHost
                     features ??= "all";
                     break;
                 default:
-                    values.Add("sharpproof_mode", mode);
+                    values.AddUnique("sharpproof_mode", mode);
                     break;
             }
         }
 
         if (profile != null)
         {
-            values.Add("build_property.SharpProofProfile", profile);
+            values.AddUnique("build_property.SharpProofProfile", profile);
         }
 
         if (features != null)
         {
-            values.Add("build_property.SharpProofFeatures", features);
+            values.AddUnique("build_property.SharpProofFeatures", features);
         }
 
         return await AnalyzeAsync(
                 compilation,
-                values,
+                values.ToImmutable(),
                 analyzer: analyzer,
                 allowCompilationErrors: allowCompilationErrors,
                 cancellationToken: cancellationToken)
@@ -209,7 +215,7 @@ internal static class AnalyzerTestHost
 
     internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
@@ -222,7 +228,7 @@ internal static class AnalyzerTestHost
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        ImmutableDictionary<string, string> values,
         CancellationToken cancellationToken,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
@@ -304,7 +310,7 @@ internal static class AnalyzerTestHost
             string.Join(Environment.NewLine, errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
     }
 
-    internal static byte[] EmitImage(CSharpCompilation compilation)
+    internal static ImmutableArray<byte> EmitImage(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
@@ -318,7 +324,7 @@ internal static class AnalyzerTestHost
                         diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
-        return stream.ToArray();
+        return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 
     internal static MetadataReference EmitReference(

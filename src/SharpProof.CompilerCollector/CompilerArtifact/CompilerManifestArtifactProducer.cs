@@ -24,11 +24,12 @@ internal static class CompilerManifestArtifactProducer
                 specificationPacks.IsDefault ? [] : specificationPacks);
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
-        snapshot.SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds];
-        snapshot.SpecificationPackCatalogVersion =
-            specificationPackAuthority.SpecificationPackCatalogVersion;
-        snapshot.SpecificationPackCatalogSha256 =
-            specificationPackAuthority.SpecificationPackCatalogSha256;
+        snapshot = snapshot with
+        {
+            SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
+            SpecificationPackCatalogVersion = specificationPackAuthority.SpecificationPackCatalogVersion,
+            SpecificationPackCatalogSha256 = specificationPackAuthority.SpecificationPackCatalogSha256
+        };
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error &&
                 !item.IsSuppressed))
@@ -36,7 +37,7 @@ internal static class CompilerManifestArtifactProducer
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
-        CompilerCallableArtifact[] callables;
+        ImmutableArray<CompilerCallableArtifact> callables;
         if (diagnosticArtifacts.Length != 0)
         {
             callables = [.. targets.Select(item =>
@@ -105,11 +106,14 @@ internal static class CompilerManifestArtifactProducer
         if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
         {
-            snapshot.ResourceTargetPlatform = compilation.Options.Platform.ToString();
+            snapshot = snapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
             resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
         }
-        snapshot.ResourceMetadataReferences = snapshot.References.Where(reference =>
-            reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToArray();
+        snapshot = snapshot with
+        {
+            ResourceMetadataReferences = snapshot.References.Where(reference =>
+            reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
+        };
         var artifact = new CompilerManifestArtifact
         {
             SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
@@ -137,16 +141,16 @@ internal static class CompilerManifestArtifactProducer
         artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var claims = target.EffectClaims;
-        var evidence = new CompilerEffectClaimArtifact[claims.Length];
+        var evidence = ImmutableArray.CreateBuilder<CompilerEffectClaimArtifact>(claims.Length);
         for (var index = 0; index < claims.Length; index++)
         {
             var claim = claims[index];
-            evidence[index] = claim.Evidence;
+            evidence.Add(claim.Evidence);
         }
-        artifact.EffectClaims = evidence;
-        if (evidence.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+        artifact = artifact with { EffectClaims = evidence.ToImmutable() };
+        if (artifact.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
             artifact.ResourceProgram is null && artifact.ResourceUnknownReason is null)
-        { artifact.ResourceUnknownReason = "CompilationOrBodyUnavailable"; }
+        { artifact = artifact with { ResourceUnknownReason = "CompilationOrBodyUnavailable" }; }
         return artifact;
     }
 
@@ -158,29 +162,30 @@ internal static class CompilerManifestArtifactProducer
         diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
-        var result = new CompilerDiagnosticArtifact
+        var sourceTreeOrdinal = -1;
+        var sourceTreePath = string.Empty;
+        var sourceTreeSha256 = string.Empty;
+        var sourceLineMapSha256 = string.Empty;
+        if (source)
+        {
+            CompilerSourceCoordinates.Bind(
+                location,
+                compilation,
+                out sourceTreeOrdinal,
+                out sourceTreePath,
+                out sourceTreeSha256,
+                out sourceLineMapSha256);
+        }
+        return new CompilerDiagnosticArtifact
         {
             Code = "compiler." + diagnostic.Id,
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             IsSource = source,
-            Location = location
+            Location = location,
+            SourceTreeOrdinal = sourceTreeOrdinal,
+            SourceTreePath = sourceTreePath,
+            SourceTreeSha256 = sourceTreeSha256,
+            SourceLineMapSha256 = sourceLineMapSha256
         };
-        if (!source)
-        {
-            return result;
-        }
-
-        CompilerSourceCoordinates.Bind(
-            location,
-            compilation,
-            out var sourceTreeOrdinal,
-            out var sourceTreePath,
-            out var sourceTreeSha256,
-            out var sourceLineMapSha256);
-        result.SourceTreeOrdinal = sourceTreeOrdinal;
-        result.SourceTreePath = sourceTreePath;
-        result.SourceTreeSha256 = sourceTreeSha256;
-        result.SourceLineMapSha256 = sourceLineMapSha256;
-        return result;
     }
 }

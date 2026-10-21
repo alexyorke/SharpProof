@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -12,7 +13,7 @@ namespace SharpProof.Worker.Test;
 // allocates in Debug.
 public sealed class GenericNullableTypeTestAllocationTests
 {
-    private static readonly (string Members, string Run, bool ReleaseAllocates)[] s_nullable =
+    private static readonly ImmutableArray<(string Members, string Run, bool ReleaseAllocates)> s_nullable =
     [
         ("public static bool Target<T>(T value) { return value is int?; }",
             "Target<int?>(x == 0 ? null : x)", true),
@@ -34,7 +35,7 @@ public sealed class GenericNullableTypeTestAllocationTests
             "Target<S>(new S { A = x })", false)
     ];
 
-    private static readonly (string Members, string Run)[] s_nonNullable =
+    private static readonly ImmutableArray<(string Members, string Run)> s_nonNullable =
     [
         ("public static bool Target<T>(T value) { return value is int; }", "Target<int?>(x == 0 ? null : x)"),
         ("public static bool Target<T>(T value) { if (value is S) return true; return false; }", "Target<S?>(x == 0 ? null : new S { A = x })"),
@@ -60,7 +61,7 @@ public sealed class GenericNullableTypeTestAllocationTests
         var source = Source(members, run);
         Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, 1), Is.GreaterThan(0), "Debug x=1");
         Assert.That(AllocatedBytes(source, OptimizationLevel.Release, 1), releaseAllocates ? Is.GreaterThan(0) : Is.Zero, "Release x=1");
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
             if (optimization == OptimizationLevel.Release && !releaseAllocates)
             { continue; }
@@ -80,9 +81,9 @@ public sealed class GenericNullableTypeTestAllocationTests
 
         var (members, run) = s_nonNullable[index];
         var source = Source(members, run);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
             var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), optimization + ": " + native.Reason);
@@ -100,7 +101,7 @@ public sealed class GenericNullableTypeTestAllocationTests
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("GenericNullableTypeTest", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericNullableTypeTest", [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();

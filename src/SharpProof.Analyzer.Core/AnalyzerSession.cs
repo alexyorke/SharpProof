@@ -30,24 +30,24 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 internal sealed class AnalyzerSession
 {
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
-    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
-        _validatedAttributes = new();
-    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
-        _validatedContractIntrinsics = new();
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+    private ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _validatedAttributes = ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>.Empty;
+    private ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _validatedContractIntrinsics = ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>.Empty;
+    private ImmutableDictionary<IMethodSymbol, byte>
         _reportedRejectedContractApis =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
-        _reportedRejectedControlAttributes = new();
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+            ImmutableDictionary.Create<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _reportedRejectedControlAttributes = ImmutableDictionary<(SyntaxTree Tree, TextSpan Span), byte>.Empty;
+    private ImmutableDictionary<IMethodSymbol, byte>
         _executableAnalyses =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+            ImmutableDictionary.Create<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, byte>
         _selectedSemicolonAccessors =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+            ImmutableDictionary.Create<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, byte>
         _semanticOutcomes =
-            new(SymbolEqualityComparer.Default);
+            ImmutableDictionary.Create<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -130,9 +130,9 @@ internal sealed class AnalyzerSession
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return _executableAnalyses.TryAdd(
+        return ImmutableInterlocked.TryAdd(ref _executableAnalyses,
             NormalizeMethod(method),
-            0);
+            (byte)0);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
@@ -169,16 +169,16 @@ internal sealed class AnalyzerSession
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         method = NormalizeMethod(method);
-        _semanticOutcomes.TryAdd(method, 0);
+        ImmutableInterlocked.TryAdd(ref _semanticOutcomes, method, (byte)0);
         _outcomeObserver?.Invoke(method, outcome);
     }
 
     internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        _selectedSemicolonAccessors.TryAdd(
+        ImmutableInterlocked.TryAdd(ref _selectedSemicolonAccessors,
             NormalizeMethod(method),
-            0);
+            (byte)0);
     }
 
     internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
@@ -214,25 +214,25 @@ internal sealed class AnalyzerSession
         TextSpan span)
     {
         tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
-        return _validatedAttributes.TryAdd((tree, span), 0);
+        return ImmutableInterlocked.TryAdd(ref _validatedAttributes, (tree, span), (byte)0);
     }
 
     internal bool TryMarkContractIntrinsicValidated(
         ContractIntrinsicViolation violation)
     {
-        return _validatedContractIntrinsics.TryAdd(
+        return ImmutableInterlocked.TryAdd(ref _validatedContractIntrinsics,
             (violation.Operation.Syntax.SyntaxTree,
              violation.Operation.Syntax.Span),
-            0);
+            (byte)0);
     }
 
     internal bool TryMarkRejectedContractApiReported(
         IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return _reportedRejectedContractApis.TryAdd(
+        return ImmutableInterlocked.TryAdd(ref _reportedRejectedContractApis,
             ContractClauseInventoryBuilder.NormalizeCallable(method),
-            0);
+            (byte)0);
     }
 
     internal bool TryMarkRejectedControlAttributeReported(
@@ -241,9 +241,9 @@ internal sealed class AnalyzerSession
         attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
-            _reportedRejectedControlAttributes.TryAdd(
+            ImmutableInterlocked.TryAdd(ref _reportedRejectedControlAttributes,
                 (reference.SyntaxTree, reference.Span),
-                0);
+                (byte)0);
     }
 
 }

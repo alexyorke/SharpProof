@@ -24,8 +24,7 @@ internal sealed partial class LauncherArguments
     ];
     private static readonly System.Collections.Immutable.ImmutableHashSet<string> s_allowed =
         System.Collections.Immutable.ImmutableHashSet.CreateRange(
-            System.StringComparer.Ordinal, new[]
-            {
+            System.StringComparer.Ordinal, System.Collections.Immutable.ImmutableArray.Create(
                 "worker",
                 "request",
                 "result",
@@ -45,8 +44,7 @@ internal sealed partial class LauncherArguments
                 "max-expression-depth",
                 "cache-enabled",
                 "cache-directory",
-                "cache-maximum-bytes",
-            });
+                "cache-maximum-bytes"));
 
     internal string RequestPath => FullPath("request");
     internal string ResultPath => FullPath("result");

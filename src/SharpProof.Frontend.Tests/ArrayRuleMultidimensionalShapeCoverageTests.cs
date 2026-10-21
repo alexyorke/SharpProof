@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -20,14 +21,14 @@ public sealed class ArrayRuleMultidimensionalShapeCoverageTests
         var operation = (IArrayElementReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.Indices, Has.Length.EqualTo(2));
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(3));
         Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
         var rule = CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]);
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         Assert.That(rule.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.False);
         Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));

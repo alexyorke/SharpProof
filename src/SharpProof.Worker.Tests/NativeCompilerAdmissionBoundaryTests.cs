@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -89,11 +90,10 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         Assert.That(IrTermAnalysis.GetDepth(candidate.Requires.Single().Safe), Is.LessThanOrEqualTo(depth));
         var budgets = new WorkerBudgets();
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
-        var checks = new[] {
+        var checks = ImmutableArray.Create(
             await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
             await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
-            await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken)
-        };
+            await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken));
         foreach (var check in checks)
         {
             if (depth == 65)
@@ -110,7 +110,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
     private static CompilerCallablePreparation Prepare(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("NativeAdmissionBoundary", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("NativeAdmissionBoundary", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
         var emitted = compilation.Emit(assembly);

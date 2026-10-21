@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -31,12 +32,12 @@ public sealed class EmptyIteratorAllocationAuditTests
     private const int MeasuredIterations = 128;
     private const int MeasurementRounds = 3;
     private static object? s_escaped;
-    private static readonly Dictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-    private static readonly Case[] s_cases =
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+    private static readonly ImmutableArray<Case> s_cases =
     [
         new("own-empty-iterator",
             "using System.Collections.Generic; using SharpProof.Attributes; public static class Subject { [ZeroAllocations] public static IEnumerable<int> Target() { yield break; } }",
@@ -82,22 +83,22 @@ public sealed class EmptyIteratorAllocationAuditTests
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
             Language = parseOptions.LanguageVersion.ToString(),
-            Symbols = parseOptions.PreprocessorSymbolNames.ToArray(),
+            Symbols = parseOptions.PreprocessorSymbolNames.ToImmutableArray(),
             Optimization = compilation.Options.OptimizationLevel.ToString(),
-            Diagnostics = diagnostics.Select(DiagnosticObservation).ToArray(),
-            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToArray(),
+            Diagnostics = diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
+            EmissionDiagnostics = emission.Diagnostics.Select(DiagnosticObservation).ToImmutableArray(),
             emission.Success
         });
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
         Assert.That(diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var warnings = diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToArray();
+        var warnings = diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
         if (caseIndex == 3)
         { Assert.That(warnings.All(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8321")), Is.True); }
         else
         { Assert.That(warnings, Is.Empty); }
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
 
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
@@ -141,7 +142,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             WarmupIterations,
             MeasuredIterations,
             MeasurementRounds,
@@ -152,18 +153,24 @@ public sealed class EmptyIteratorAllocationAuditTests
 
         var manifestPath = Path.Combine(evidence, "public-compiler-manifest.json");
         Assert.That(File.Exists(manifestPath), Is.False);
-        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        ImmutableArray<(string Key, string Value)> optionEntries =
+        [
+            ("build_property._SharpProofCompilerManifestPath", manifestPath),
+            ("build_property._SharpProofCompilationTargetFramework", "net9.0"),
+            ("build_property._SharpProofProjectDirectory", evidence),
+            ("build_property.SharpProofVerifyMaximumExpressionDepth", WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture)),
+            ("build_property.SharpProofProfile", "advisory"),
+            ("build_property.SharpProofFeatures", "all"),
+            ("build_property.SharpProofVerifyPolicy", "advisory"),
+            ("build_property.SharpProofAssumptionPolicy", "allow")
+        ];
+        var optionsBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in optionEntries)
         {
-            ["build_property._SharpProofCompilerManifestPath"] = manifestPath,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net9.0",
-            ["build_property._SharpProofProjectDirectory"] = evidence,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture),
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow"
-        };
-        await Save(evidence, "collector-options.json", options);
+            optionsBuilder[key] = value;
+        }
+        var options = optionsBuilder.ToImmutable();
+        await SaveOptions(evidence, optionEntries);
         var analyzerOptions = new AnalyzerOptions([], new OptionsProvider(options));
         var collectorDiagnostics = await compilation.WithAnalyzers([new FinalCompilationCollectorAnalyzer()], analyzerOptions)
             .GetAnalyzerDiagnosticsAsync();
@@ -172,18 +179,19 @@ public sealed class EmptyIteratorAllocationAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             OutputExists = outputExists,
-            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToArray()
+            Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray()
         });
         Assert.That(collectorDiagnostics, Is.Empty);
         Assert.That(outputExists, Is.True, "A fresh public artifact must retain the selected allocation claim.");
 
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes);
+        artifact = project.Artifact;
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
         var preparation = project.Snapshot.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == callableId));
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -193,14 +201,14 @@ public sealed class EmptyIteratorAllocationAuditTests
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAllocationInstruction>().ToArray() ?? [];
+            .OfType<IrAllocationInstruction>().ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
-            ArtifactSha256 = Hash(artifactBytes),
+            ArtifactSha256 = Hash(artifactBytes.AsSpan()),
             project.Request.CompilerManifest.Sha256,
             ArtifactDigest = project.Bind().ArtifactDigest,
             CacheEnabled = project.Request.Cache.Enabled,
@@ -213,7 +221,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             native.QueryCompleted,
             native.HasFeasibleEntryWitness,
             NativeAllocationWitness = native.AllocationWitness?.ToString(),
-            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToArray(),
+            NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
             Allocations = allocations.Select(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (new
             {
                 Operation = allocation.Operation.ToString(),
@@ -221,7 +229,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 Target = allocation.Target?.ToString(),
                 Length = allocation.Length?.ToString(),
                 MatchesWitness = allocation.Operation == native.AllocationWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
@@ -232,7 +240,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
             {
                 item.ClaimId,
@@ -241,13 +249,13 @@ public sealed class EmptyIteratorAllocationAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToArray(),
+            })).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome?.ToString() ?? "SemanticNotProven"
         });
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
-            Assert.That(Hash(artifactBytes), Is.EqualTo(project.Bind().ArtifactDigest));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Request.CompilerManifest.Sha256));
+            Assert.That(Hash(artifactBytes.AsSpan()), Is.EqualTo(project.Bind().ArtifactDigest));
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(JsonSerializer.Serialize(project.Request.Budgets), Is.EqualTo(JsonSerializer.Serialize(new WorkerBudgets())));
             Assert.That(validation.IsValid, Is.True, JsonSerializer.Serialize(validation.Errors));
@@ -318,13 +326,16 @@ public sealed class EmptyIteratorAllocationAuditTests
         { Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), "A positive warmed iterator-creation allocation cannot receive a valid allocation-free proof."); }
     }
 
-    private static RuntimeObservation ObserveRuntime(byte[] bytes, int caseIndex)
+    private static RuntimeObservation ObserveRuntime(ImmutableArray<byte> bytes, int caseIndex)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         var context = new AssemblyLoadContext("EmptyIterator_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(bytes);
+            using var stream = new MemoryStream(bytes.ToArray(), writable: false);
             var type = context.LoadFromStream(stream).GetType("Subject")!;
             var method = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var iteratorType = method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
@@ -337,8 +348,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 using var enumerator = sequence.GetEnumerator();
                 enumerationHasElement = enumerator.MoveNext();
             }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
             var attributes = definition.GetCustomAttributes().Select(handle =>
@@ -351,7 +361,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 return new AttributeObservation(MetadataTokens.GetRowNumber(handle), constructor.DeclaringType!.FullName!,
                     constructor.DeclaringType.Assembly.FullName!, MetadataTokens.GetToken(attribute.Constructor),
                     Convert.ToHexStringLower(metadata.GetBlobBytes(attribute.Value)));
-            }).ToArray();
+            }).ToImmutableArray();
             return new(method.Module.ModuleVersionId, metadata.GetGuid(metadata.GetModuleDefinition().Mvid), method.MetadataToken,
                 measured.DelegateMethodToken, measured.DelegateMvid, measured.DelegateHasNoTarget,
                 type.TypeInitializer != null, attributes, iteratorType?.FullName, iteratorType?.MetadataToken,
@@ -379,17 +389,17 @@ public sealed class EmptyIteratorAllocationAuditTests
         var first = target();
         var second = target();
         s_escaped = second;
-        var rounds = new Measurement[MeasurementRounds];
+        var rounds = ImmutableArray.CreateBuilder<Measurement>(MeasurementRounds);
         for (var round = 0; round < MeasurementRounds; round++)
         {
             var before = Measure(control);
             var subject = Measure(target);
             var after = Measure(control);
-            rounds[round] = new(round, before, subject, after);
+            rounds.Add(new(round, before, subject, after));
         }
         GC.KeepAlive(first);
         GC.KeepAlive(second);
-        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds);
+        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds.MoveToImmutable());
     }
 
     private static T? Null<T>() where T : class
@@ -431,7 +441,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 else
                 { Assert.That(round.SubjectBytes, Is.Zero); }
             }
-            var allocations = observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToArray();
+            var allocations = observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToImmutableArray();
             if (caseIndex == 0)
             {
                 Assert.That(observation.Attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName)), Is.EqualTo(1));
@@ -473,17 +483,19 @@ public sealed class EmptyIteratorAllocationAuditTests
         }
     }
 
-    private static IlObservation DecodeIl(MethodInfo method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodInfo method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(method);
-        var body = method.GetMethodBody()!.GetILAsByteArray()!;
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -497,15 +509,15 @@ public sealed class EmptyIteratorAllocationAuditTests
                 OperandType.ShortInlineI or OperandType.ShortInlineVar or OperandType.ShortInlineBrTarget => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(body.AsSpan((offset)..)),
                 _ => 4
             };
-            var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
+            var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body.AsSpan((offset)..))) : null;
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset..(offset + size))), called?.MetadataToken,
                 called?.Module.ModuleVersionId, called?.DeclaringType?.FullName, called?.DeclaringType?.MetadataToken, called?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), [.. instructions]);
+        return new(method.MetadataToken, Convert.ToHexStringLower(body.AsSpan()), instructions.ToImmutable());
     }
 
     private static object DiagnosticObservation(Diagnostic diagnostic)
@@ -521,9 +533,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans hash the empty payload */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
 
@@ -535,7 +546,27 @@ public sealed class EmptyIteratorAllocationAuditTests
         await File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value));
     }
 
-    private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
+    private static async Task SaveOptions(string directory, ImmutableArray<(string Key, string Value)> entries)
+    {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        if (entries.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(entries));
+        }
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var (key, value) in entries)
+            {
+                writer.WriteString(key, value);
+            }
+            writer.WriteEndObject();
+        }
+        await File.WriteAllBytesAsync(Path.Combine(directory, "collector-options.json"), stream.ToArray());
+    }
+
+    private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
         public override AnalyzerConfigOptions GlobalOptions => _options;
@@ -553,9 +584,9 @@ public sealed class EmptyIteratorAllocationAuditTests
         }
     }
 
-    private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    private sealed class DictionaryOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))
@@ -575,9 +606,9 @@ public sealed class EmptyIteratorAllocationAuditTests
     }
     private sealed record Measurement(int Round, long ControlBeforeBytes, long SubjectBytes, long ControlAfterBytes);
     private sealed record MeasuredCalls(object? First, object? Second, int DelegateMethodToken, Guid DelegateMvid,
-        bool DelegateHasNoTarget, Measurement[] Rounds)
+        bool DelegateHasNoTarget, ImmutableArray<Measurement> Rounds)
     {
-        public Measurement[] Rounds { get; init; } = Rounds ?? throw new System.ArgumentNullException(nameof(Rounds));
+        public ImmutableArray<Measurement> Rounds { get; init; } = Rounds.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Rounds)) : Rounds;
     }
     private sealed record AttributeObservation(int Row, string TypeName, string Assembly, int ConstructorToken, string Blob)
     {
@@ -591,19 +622,19 @@ public sealed class EmptyIteratorAllocationAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, string Bytes, IlInstruction[] Instructions)
+    private sealed record IlObservation(int MethodToken, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public IlInstruction[] Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(Guid LoadedMvid, Guid PeMvid, int MethodToken, int DelegateMethodToken,
-        Guid DelegateMvid, bool DelegateHasNoTarget, bool HasTypeInitializer, AttributeObservation[] Attributes,
+        Guid DelegateMvid, bool DelegateHasNoTarget, bool HasTypeInitializer, ImmutableArray<AttributeObservation> Attributes,
         string? IteratorType, int? IteratorTypeToken, Guid? IteratorMvid, bool IteratorDeclaringTypeMatches,
         bool? ResultMatchesIteratorType, bool FirstIsNull, bool SecondIsNull, bool SameReference, string? ResultType,
-        bool? EnumerationHasElement, Measurement[] Rounds, IlObservation Target)
+        bool? EnumerationHasElement, ImmutableArray<Measurement> Rounds, IlObservation Target)
     {
         public IlObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
-        public AttributeObservation[] Attributes { get; init; } = Attributes ?? throw new System.ArgumentNullException(nameof(Attributes));
-        public Measurement[] Rounds { get; init; } = Rounds ?? throw new System.ArgumentNullException(nameof(Rounds));
+        public ImmutableArray<AttributeObservation> Attributes { get; init; } = Attributes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Attributes)) : Attributes;
+        public ImmutableArray<Measurement> Rounds { get; init; } = Rounds.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Rounds)) : Rounds;
     }
 }

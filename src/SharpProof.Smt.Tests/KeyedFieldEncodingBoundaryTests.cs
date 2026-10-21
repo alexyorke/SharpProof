@@ -5,6 +5,37 @@ namespace SharpProof.Smt.Test;
 public sealed class KeyedFieldEncodingBoundaryTests
 {
     [Test]
+    public void RevisitedFieldEncodingReplacesItsObservationWithoutDuplicatingIt()
+    {
+        var factory = new IrFactory();
+        var receiver = factory.CreateVariable("owner", factory.ObjectType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            "field:presence", factory.BooleanType, false);
+        var read = factory.PureOpaque(field, factory.Variable(receiver));
+        using var context = new Context();
+        using var owner = new Z3ExpressionOwner();
+        var encoder = new BvEncoder(context, factory, owner);
+        try
+        {
+            var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit,
+                TestContext.CurrentContext.CancellationToken);
+            var first = encoder.EncodeBoolean(read, meter);
+            var revisit = typeof(BvEncoder).GetMethod("EncodeFieldRead",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var repeated = (Expr)revisit.Invoke(encoder, [read, meter])!;
+            var observations = (System.Collections.Immutable.ImmutableDictionary<ScopedIrId<IrMemberTag>,
+                System.Collections.Immutable.ImmutableList<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>.Builder>.Builder)
+                typeof(BvEncoder).GetField("_fieldReads",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(encoder)!;
+            Assert.That(repeated.Equals(first), Is.True);
+            Assert.That(observations[field].Count, Is.EqualTo(1));
+            Assert.That(observations[field][0].Read, Is.SameAs(read));
+        }
+        finally
+        { encoder.DisposeReferences(); }
+    }
+
+    [Test]
     public void MathematicalIntegerKeysCannotBeEncodedAsFixedWidthHeapKeys()
     {
         var factory = new IrFactory();

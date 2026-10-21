@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -44,12 +45,12 @@ public sealed class NativeCallAssumptionProvenanceTests
         // Assumed proofs are conditional evidence, with no compiler publication claim.
         var candidate = new PassiveCallableCandidate("conditional-call", builder.Build(), [first, second], null, [], [],
             callPreconditions: [new(marker.Id, value, safe)]);
-        foreach (var a in new[] { false, true })
+        foreach (var a in ImmutableArray.Create(false, true))
         {
-            foreach (var b in new[] { false, true })
+            foreach (var b in ImmutableArray.Create(false, true))
             {
                 var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                    new Dictionary<IrVarId, IrValue> { [first.Entry] = factory.CreateBooleanValue(a), [second.Entry] = factory.CreateBooleanValue(b) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(first.Entry, factory.CreateBooleanValue(a)).SetItem(second.Entry, factory.CreateBooleanValue(b)));
                 var stopped = assumed && !(a && b);
                 Assert.That(execution.Status, Is.EqualTo(stopped ? IrProgramExecutionStatus.AssumptionViolated : IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);
@@ -71,7 +72,7 @@ public sealed class NativeCallAssumptionProvenanceTests
         var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, assumed ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(proof.BodyAssumptions, Is.EqualTo(assumed ? new[] { firstSite, secondSite } : []));
+        Assert.That(proof.BodyAssumptions, Is.EqualTo(assumed ? ImmutableArray.Create(firstSite, secondSite) : []));
         Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.EqualTo(assumed));
         Assert.That(proof.CallPreconditionWitness, assumed ? Is.Null : Is.EqualTo(site));
         if (!assumed)

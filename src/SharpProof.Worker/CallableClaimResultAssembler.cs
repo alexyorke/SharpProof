@@ -12,29 +12,32 @@ internal static class CallableClaimResultAssembler
         var record = Create(target, check.ClaimId, WorkerClaimOutcome.Unknown,
             check.Evidence.Reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : check.Evidence.Reason,
             WorkerEffectEvidenceCertainty.Unspecified, projectAssumptions: false);
-        record.Assumptions = ProjectAssumptions(target, static _ => false);
+        record = record with { Assumptions = ProjectAssumptions(target, static _ => false) };
         if (!check.Checked || !check.Enrolled)
         {
             if (check.Checked)
-            { record.Reason = WorkerClaimReason.MalformedBackendResult; }
+            { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; }
             return record;
         }
         if (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome && check.Evidence.Reason != WorkerClaimReason.None)
-        { record.Reason = WorkerClaimReason.MalformedBackendResult; return record; }
-        var declarations = target.Entry.Assumptions.ToDictionary(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind), StringComparer.Ordinal);
+        { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; return record; }
+        var declarations = ImmutableDictionaryCapture.Create(target.Entry.Assumptions, assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind), StringComparer.Ordinal);
         if (check.Assumptions.Length != declarations.Count ||
             check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct(StringComparer.Ordinal).Count() != declarations.Count ||
             check.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (!declarations.TryGetValue(assumption.Id, out var kind) || kind != assumption.Kind)))
-        { record.Reason = WorkerClaimReason.MalformedBackendResult; return record; }
-        record.Assumptions = [.. check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (new WorkerAssumptionEvidence
-        { Id = assumption.Id, Kind = assumption.Kind, Used = assumption.Used }))];
+        { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; return record; }
+        record = record with
+        {
+            Assumptions = [.. check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (new WorkerAssumptionEvidence
+        { Id = assumption.Id, Kind = assumption.Kind, Used = assumption.Used }))]
+        };
         switch (check.Evidence.Outcome)
         {
             case ProvenOutcome:
-                record.Outcome = WorkerClaimOutcome.Proven;
-                record.Reason = WorkerClaimReason.None;
-                record.Vacuity = check.Vacuity;
-                record.ProofCore = [.. check.Evidence.Core.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+                record = record with { Outcome = WorkerClaimOutcome.Proven };
+                record = record with { Reason = WorkerClaimReason.None };
+                record = record with { Vacuity = check.Vacuity };
+                record = record with { ProofCore = [.. check.Evidence.Core.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] };
                 break;
             case RefutedOutcome when check.Vacuity == WorkerVacuityKind.None:
                 // These variables belong to the Total factory. Legacy variable
@@ -42,10 +45,12 @@ internal static class CallableClaimResultAssembler
                 if (check.Evidence.EntryModel.Count != total.Parameters.Length ||
                     total.Parameters.Any(parameter => !check.Evidence.EntryModel.TryGetValue(parameter.Entry, out var value) ||
                         value.Type != total.Program.Factory.GetVariableInfo(parameter.Entry).Type))
-                { record.Reason = WorkerClaimReason.MalformedBackendResult; break; }
-                record.Outcome = WorkerClaimOutcome.Refuted;
-                record.Reason = WorkerClaimReason.None;
-                record.Model = [.. total.Parameters.Select((parameter, ordinal) =>
+                { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; break; }
+                record = record with { Outcome = WorkerClaimOutcome.Refuted };
+                record = record with { Reason = WorkerClaimReason.None };
+                record = record with
+                {
+                    Model = [.. total.Parameters.Select((parameter, ordinal) =>
                 {
 RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault, nameof(parameter), "Value must be initialized.");
 
@@ -58,7 +63,8 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
                         Kind = formatted.Kind,
                         Value = formatted.Value
                     };
-                }).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable), StringComparer.Ordinal)];
+                }).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable), StringComparer.Ordinal)]
+                };
                 break;
             case UnknownOutcome:
             case null when check.Evidence.QueryCompleted && check.Evidence.Reason != WorkerClaimReason.None:
@@ -67,7 +73,7 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         return record;
     }
 
-    private static WorkerAssumptionEvidence[] ProjectAssumptions(
+    private static ImmutableArray<WorkerAssumptionEvidence> ProjectAssumptions(
         CompilerCallablePreparation target,
         Func<WorkerAssumptionEvidence, bool> isUsed)
     {
@@ -116,13 +122,12 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
             effectClaimIds.Contains(claimId))))];
     }
 
-    internal static HashSet<string> EffectClaimIds(
+    internal static ImmutableHashSet<string> EffectClaimIds(
         CompilerCallablePreparation target)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        return new HashSet<string>(
-            target.EffectClaims.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId)),
-            StringComparer.Ordinal);
+        return target.EffectClaims.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId))
+            .ToImmutableHashSet(StringComparer.Ordinal);
     }
 
     private static WorkerClaimResult CreateUnknown(
@@ -162,9 +167,12 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         };
         if (projectAssumptions)
         {
-            record.Assumptions = ProjectAssumptions(
+            record = record with
+            {
+                Assumptions = ProjectAssumptions(
                 target,
-                static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used));
+                static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used))
+            };
         }
         return record;
     }
@@ -173,12 +181,12 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         CompilerCallablePreparation target,
         string claimId,
         WorkerEffectEvidenceCertainty certainty,
-        IReadOnlyList<string> proofCore,
-        IReadOnlySet<string> usedAssumptionIds)
+        ImmutableArray<string> proofCore,
+        ImmutableHashSet<string> usedAssumptionIds)
     {
         System.ArgumentNullException.ThrowIfNull(claimId);
         ArgumentNullGuard.NotNull(target, nameof(target));
-        ArgumentNullGuard.NotNull(proofCore, nameof(proofCore));
+        RepositoryParameterGuard.ThrowIfMissing(proofCore.IsDefault, nameof(proofCore));
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         var record = Create(
             target,
@@ -187,15 +195,15 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
             WorkerClaimReason.None,
             certainty,
             projectAssumptions: false);
-        record.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
-        record.ProofCore = [.. proofCore];
-        record.Assumptions = MarkAssumptionsUsed(target, usedAssumptionIds);
+        record = record with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions };
+        record = record with { ProofCore = proofCore };
+        record = record with { Assumptions = MarkAssumptionsUsed(target, usedAssumptionIds) };
         return record;
     }
 
-    internal static WorkerAssumptionEvidence[] MarkAssumptionsUsed(
+    internal static ImmutableArray<WorkerAssumptionEvidence> MarkAssumptionsUsed(
         CompilerCallablePreparation target,
-        IReadOnlySet<string> usedAssumptionIds)
+        ImmutableHashSet<string> usedAssumptionIds)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));

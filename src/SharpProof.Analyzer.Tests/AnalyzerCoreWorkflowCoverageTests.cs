@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -12,7 +13,7 @@ public sealed class AnalyzerCoreWorkflowCoverageTests
             "using SharpProof.Attributes; public static class Fixture { public static int Target() { " +
             "var callback = (int value) => { Contract.Requires(value > 0); return value; }; return callback(1); } }",
             "contracts", ["SP0024"]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0],
             "preconditions inside lambda and anonymous methods cannot be enforced at delegate invocation sites");
     }
@@ -26,7 +27,7 @@ public sealed class AnalyzerCoreWorkflowCoverageTests
             "using SharpProof.Attributes; public static class Fixture { public static int Target() { " +
             "var callback = [" + attribute + "(null)] () => 1; return callback(); } }",
             "effects", ["SP0024"]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
     }
 
@@ -38,7 +39,7 @@ public sealed class AnalyzerCoreWorkflowCoverageTests
             "using SharpProof.Attributes; [SharpProofTrusted(\"\")] public static class Fixture { " +
             "[EnforcePure] public static int Target() => 1; }",
             "effects", ["SP0024"], new SharpProofAnalyzer(factory));
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }

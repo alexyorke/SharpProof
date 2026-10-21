@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace SharpProof.Smt;
 
 // String content is a sequence of UTF-16 code units, read through `text` from
@@ -10,8 +8,8 @@ internal sealed partial class BvEncoder
     private Sort? _codeUnitSort;
     private SeqSort? _textSort;
     private FuncDecl? _text;
-    private readonly HashSet<uint> _textLinked = [];
-    private readonly List<(Expr Value, Expr Left, Expr Right)> _concatenations = [];
+    private readonly ImmutableHashSet<uint>.Builder _textLinked = ImmutableHashSet.CreateBuilder<uint>();
+    private readonly ImmutableList<(Expr Value, Expr Left, Expr Right)>.Builder _concatenations = ImmutableList.CreateBuilder<(Expr Value, Expr Left, Expr Right)>();
 
     private Expr EncodeStringEquals(Expr left, Expr right, SmtQueryResourceMeter meter)
     {
@@ -32,10 +30,11 @@ internal sealed partial class BvEncoder
         meter.Consume();
         EnsureText(meter);
         var text = (SeqExpr)owner.Own(context.MkApp(_text!, value));
-        if (_textLinked.Add(value.Id))
+        if (!_textLinked.Contains(value.Id))
         {
+            _textLinked.Add(value.Id);
             var length = owner.Own(context.MkBV2Int((BitVecExpr)EncodeLength(value, meter), false));
-            ReferenceFacts.Add(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
+            AddReferenceFact(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
                 owner.Own(context.MkEq(length, owner.Own(context.MkLength(text)))))));
         }
         return text;
@@ -49,9 +48,9 @@ internal sealed partial class BvEncoder
         _codeUnitSort = context.MkBitVecSort(16);
         _textSort = context.MkSeqSort(_codeUnitSort);
         _text = context.MkFuncDecl("text", ReferenceSort, _textSort);
-        foreach (var literal in _stringLiterals)
+        foreach (var literal in _stringLiteralOrder.ToImmutable())
         { AddLiteralText(literal.Value, factory.GetString(literal.Key), meter); }
-        foreach (var concatenation in _concatenations)
+        foreach (var concatenation in _concatenations.ToImmutable())
         { AddConcatenationText(concatenation, meter); }
     }
 
@@ -61,7 +60,7 @@ internal sealed partial class BvEncoder
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume(content.Length + 1L);
-        ReferenceFacts.Add(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
+        AddReferenceFact(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
     }
 
     private void RegisterConcatenation(Expr value, Expr left, Expr right, SmtQueryResourceMeter meter)
@@ -93,11 +92,11 @@ internal sealed partial class BvEncoder
         // its result facts must never restrict the operands' entry lengths.
         // Two nonnegative Int32 lengths cannot overflow the unsigned sum.
         var fits = owner.Own(context.MkBVULE(sum, owner.Own(context.MkBV(int.MaxValue, 32))));
-        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+        AddReferenceFact(owner.Own(context.MkImplies(fits,
             owner.Own(context.MkEq(Text(concatenation.Value, meter),
                 owner.Own(context.MkConcat(Operand(concatenation.Left), Operand(concatenation.Right))))))));
         // The same total in the length sort spares Z3 relating the two.
-        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+        AddReferenceFact(owner.Own(context.MkImplies(fits,
             owner.Own(context.MkEq(EncodeLength(concatenation.Value, meter), sum)))));
     }
 
@@ -105,8 +104,8 @@ internal sealed partial class BvEncoder
     {
         if (content.Length == 0)
         { return (SeqExpr)owner.Own(context.MkEmptySeq(_textSort!)); }
-        var units = content.Select(unit => (SeqExpr)owner.Own(context.MkUnit(owner.Own(context.MkBV(unit, 16))))).ToArray();
-        return units.Length == 1 ? units[0] : (SeqExpr)owner.Own(context.MkConcat(units));
+        var units = content.Select(unit => (SeqExpr)owner.Own(context.MkUnit(owner.Own(context.MkBV(unit, 16))))).ToImmutableArray();
+        return units.Length == 1 ? units[0] : (SeqExpr)owner.Own(context.MkConcat(units.ToArray()));
     }
 
     // The model's content for a string, or null when no query read content.
@@ -120,7 +119,7 @@ internal sealed partial class BvEncoder
         if (_text == null)
         { return null; }
         using var evaluated = model.Evaluate(owner.Own(context.MkApp(_text, value)), true);
-        var units = new StringBuilder();
+        var units = ImmutableArray.CreateBuilder<char>();
         void Append(Expr sequence)
         {
             meter.Consume();
@@ -129,7 +128,7 @@ internal sealed partial class BvEncoder
                 case Z3_decl_kind.Z3_OP_SEQ_EMPTY:
                     return;
                 case Z3_decl_kind.Z3_OP_SEQ_UNIT when sequence.Args[0] is BitVecNum unit:
-                    units.Append((char)unit.UInt);
+                    units.Add((char)unit.UInt);
                     return;
                 case Z3_decl_kind.Z3_OP_SEQ_CONCAT:
                     foreach (var part in sequence.Args)
@@ -140,7 +139,7 @@ internal sealed partial class BvEncoder
             }
         }
         Append(evaluated);
-        return units.ToString();
+        return string.Concat(units.ToImmutable());
     }
 
     private void DisposeStrings()

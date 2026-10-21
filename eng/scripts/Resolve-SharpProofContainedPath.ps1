@@ -8,7 +8,7 @@ function Resolve-SharpProofPhysicalPath {
     if ([string]::IsNullOrEmpty($pathRoot)) { throw "Path has no filesystem root: $fullPath" }
     $resolvedBasePath = if ([string]::IsNullOrEmpty($BasePath)) { $null } else { [IO.Path]::GetFullPath($BasePath) }
     $relativePath = if ($null -eq $resolvedBasePath) { $fullPath.Substring($pathRoot.Length) } else { $fullPath.Substring($resolvedBasePath.Length) }
-    $components = @($relativePath.Split([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar), [StringSplitOptions]::RemoveEmptyEntries))
+    $components = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($relativePath.Split([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar), [StringSplitOptions]::RemoveEmptyEntries)))
     $current = if ($null -eq $resolvedBasePath) { $pathRoot } else { [IO.Path]::GetFullPath($BasePhysicalPath) }
     for ($index = 0; $index -lt $components.Count; $index++) {
         $next = Join-Path $current $components[$index]
@@ -16,7 +16,7 @@ function Resolve-SharpProofPhysicalPath {
             $item = Get-Item -LiteralPath $next -Force -ErrorAction Stop
         }
         catch [Management.Automation.ItemNotFoundException] {
-            return [IO.Path]::GetFullPath((Join-Path $current ($components[$index..($components.Count - 1)] -join [IO.Path]::DirectorySeparatorChar)))
+            return [IO.Path]::GetFullPath((Join-Path $current (($index..($components.Length - 1) | ForEach-Object { $components[$_] }) -join [IO.Path]::DirectorySeparatorChar)))
         }
 
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {

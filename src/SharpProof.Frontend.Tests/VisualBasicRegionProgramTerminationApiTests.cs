@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -36,13 +37,13 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
         Assert.That(target.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(graph.OriginalOperation.Descendants().OfType<IEndOperation>().Count(), Is.EqualTo(terminate ? 1 : 0));
-        var regions = EnumerateRegions(graph.Root).ToArray();
+        var regions = EnumerateRegions(graph.Root).ToImmutableArray();
         Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.EqualTo(1));
         Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Try)), Is.EqualTo(1));
         Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Finally)), Is.EqualTo(1));
         var edges = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor))
             .Where(edge => edge?.Semantics == (terminate
-                ? ControlFlowBranchSemantics.ProgramTermination : ControlFlowBranchSemantics.Return)).ToArray();
+                ? ControlFlowBranchSemantics.ProgramTermination : ControlFlowBranchSemantics.Return)).ToImmutableArray();
         Assert.That(edges, Has.Length.EqualTo(1));
         var edge = edges.Single()!;
         Assert.That(edge.Source.IsReachable, Is.True);
@@ -82,7 +83,7 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
             Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!.Invoke(null, [3]), Is.EqualTo(4));
             var entry = context.Parameters.Single().Entry;
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 3) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 3)));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(4)));
             Assert.That(replay.ConsumedApproximation, Is.False);

@@ -26,10 +26,7 @@ public sealed class ScalarUnaryAlgebraCoverageTests
         var variable = factory.CreateVariable("value", inputType);
         var rule = CSharpOperationSemantics.ApplyUnaryScalar(
             factory, kind, isChecked, factory.Variable(variable), target);
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateIntegerValue(inputType, input)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(inputType, input));
         var interpreter = new IrInterpreter(factory);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Value.Type, Is.EqualTo(target));

@@ -27,11 +27,11 @@ Assert-SharpProofContainer 'Run consumer performance measurements in the canonic
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
-$packageFiles = @(Get-ChildItem -LiteralPath $feed -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') })
-$identity = Get-SharpProofPackageIdentitySet -Files $packageFiles -RequireRepository
+$packageFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $feed -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }))
+$identity = Get-SharpProofPackageIdentitySet -Files ([object[]]@($packageFiles)) -RequireRepository
 $sourceCommit = (& git -C $repositoryRoot rev-parse --verify HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify the benchmark repository commit.' }
-$trackedChanges = @(& git -C $repositoryRoot status --porcelain --untracked-files=no)
+$trackedChanges = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git -C $repositoryRoot status --porcelain --untracked-files=no))
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify benchmark working tree changes.' }
 $harnessHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $output = [IO.Path]::GetFullPath($OutputDirectory, $repositoryRoot)
@@ -42,9 +42,9 @@ $compilerServerId = 'sharpproof-performance-' + [Guid]::NewGuid().ToString('N')
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $workspace = Join-Path $temporaryParent ('SharpProof.ConsumerPerformance.' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($workspace) | Out-Null
-$measurements = [Collections.Generic.List[object]]::new()
-$runtimeMeasurements = [Collections.Generic.List[object]]::new()
-$runtimeComparisons = [Collections.Generic.List[object]]::new()
+$measurements = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$runtimeMeasurements = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$runtimeComparisons = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $ordinal = 0
 $originalLocation = Get-Location
 $completed = $false
@@ -67,15 +67,16 @@ function Invoke-MeasuredDotnet {
 
 function New-SubjectSource {
     param([int]$Increment)
-    $methods = foreach ($index in 1..8) {
+    $methodBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    for ($index = 1; $index -le 8; $index++) {
         if ($Workload -eq 'resources') {
-            "    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, ""n"", $Increment)] public static int[] Allocate$index(int n) { Contract.Requires(n >= 0 && n <= 1000); var result = new int[0]; for (int i = 0; i < n; i++) { result = new int[$Increment]; } return result; }"
+            $methodBuilder.Add("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, ""n"", $Increment)] public static int[] Allocate$index(int n) { Contract.Requires(n >= 0 && n <= 1000); var result = new int[0]; for (int i = 0; i < n; i++) { result = new int[$Increment]; } return result; }")
         }
         else {
-            "    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }"
+            $methodBuilder.Add("    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }")
         }
     }
-    return "using SharpProof.Attributes;`npublic static class Subject {`n" + ($methods -join "`n") + "`n}`n"
+    return "using SharpProof.Attributes;`npublic static class Subject {`n" + ($methodBuilder.ToImmutable() -join "`n") + "`n}`n"
 }
 
 function New-RuntimeSource {
@@ -140,7 +141,7 @@ try {
     else { $null }
     foreach ($iteration in 1..$Iterations) {
         # Rotate the order to reduce systematic first-run/compiler warmup bias.
-        $variants = @('baseline', 'portable', 'verified')
+        $variants = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('baseline', 'portable', 'verified'))
         for ($offset = 0; $offset -lt 3; $offset++) {
             $variant = $variants[($offset + $iteration - 1) % 3]
             $consumer = Join-Path $workspace "$iteration-$variant"
@@ -178,13 +179,15 @@ try {
             }
             Set-Location $consumer
             $restoreMilliseconds = Invoke-MeasuredDotnet "$iteration-$variant-restore" @('restore', 'Consumer.csproj', '--packages', $cache)
-            $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null })
-            foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
+            $measurements.Add(([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null }).AsReadOnly())
+            foreach ($scenario in [Collections.Immutable.ImmutableArray]::Create[string]('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
                 if ($scenario -eq 'small-edit') {
                     [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 2), [Text.UTF8Encoding]::new($false))
                 }
-                $arguments = @('build', 'Consumer.csproj', '--configuration', 'Release', '--no-restore', '--nologo')
-                if ($scenario -eq 'warm-rebuild') { $arguments += '-t:Rebuild' }
+                $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+                [void]$argumentBuilder.AddRange([string[]]@('build', 'Consumer.csproj', '--configuration', 'Release', '--no-restore', '--nologo'))
+                if ($scenario -eq 'warm-rebuild') { [void]$argumentBuilder.Add('-t:Rebuild') }
+                $arguments = [string[]]@($argumentBuilder.ToImmutable())
                 $elapsed = Invoke-MeasuredDotnet "$iteration-$variant-$scenario" $arguments
                 $claims = 0
                 $proven = 0
@@ -201,7 +204,7 @@ try {
                     }
                     $cacheStatus = [string]$result.summary.cacheStatus
                 }
-                $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = $scenario; elapsedMilliseconds = $elapsed; claims = $claims; proven = $proven; incomplete = $incomplete; cacheStatus = $cacheStatus })
+                $measurements.Add(([ordered]@{ iteration = $iteration; variant = $variant; scenario = $scenario; elapsedMilliseconds = $elapsed; claims = $claims; proven = $proven; incomplete = $incomplete; cacheStatus = $cacheStatus }).AsReadOnly())
             }
             if ($Workload -eq 'resources') {
                 $runtimeResultPath = Join-Path $consumer 'runtime.json'
@@ -256,32 +259,33 @@ try {
 }
 finally {
     Set-Location $originalLocation
-    $report = [ordered]@{
-        schemaVersion            = 3
-        completed                = $completed
-        measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
-        source                   = [ordered]@{
-            commit            = $sourceCommit
-            hasTrackedChanges = $trackedChanges.Count -gt 0
-            harnessSha256     = $harnessHash
-        }
-        packageVersion           = [string]$identity.Version
-        packageRepositoryCommits = @($identity.RepositoryCommits)
-        sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
-        platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
-        processorCount           = [Environment]::ProcessorCount
-        compilerServerScope      = 'One compiler server identity per run, shared by all variants and iterations; independent runs do not share analyzer loading state.'
-        iterations               = $Iterations
-        workload                 = $Workload
-        runtimeSourceSha256      = $runtimeSourceHash
-        runtimeRepetitions       = $RuntimeRepetitions
-        inputSizes               = $scales
-        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof. Resource runtime samples execute the final small-edit source with ten warmups per input. Kernel allocation is cumulative bytes on the current thread, not peak or retained memory. Process time includes startup and serialization. Measurements do not prove asymptotic, tight, expected or amortized bounds.'
-        packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
-        measurements             = @($measurements.ToArray())
-        runtimeMeasurements      = @($runtimeMeasurements.ToArray())
-        runtimeComparisons       = @($runtimeComparisons.ToArray())
-    }
+    $measurementSnapshot = $measurements.ToImmutable()
+    $report = ([ordered]@{
+            schemaVersion            = 3
+            completed                = $completed
+            measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
+            source                   = ([ordered]@{
+                    commit            = $sourceCommit
+                    hasTrackedChanges = $trackedChanges.Length -gt 0
+                    harnessSha256     = $harnessHash
+                }).AsReadOnly()
+            packageVersion           = [string]$identity.Version
+            packageRepositoryCommits = $identity.RepositoryCommits
+            sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
+            platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+            processorCount           = [Environment]::ProcessorCount
+            compilerServerScope      = 'One compiler server identity per run, shared by all variants and iterations; independent runs do not share analyzer loading state.'
+            iterations               = $Iterations
+            workload                 = $Workload
+            runtimeSourceSha256      = $runtimeSourceHash
+            runtimeRepetitions       = $RuntimeRepetitions
+            inputSizes               = $scales
+            scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof. Resource runtime samples execute the final small-edit source with ten warmups per input. Kernel allocation is cumulative bytes on the current thread, not peak or retained memory. Process time includes startup and serialization. Measurements do not prove asymptotic, tight, expected or amortized bounds.'
+            packages                 = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($packageFiles | Sort-Object Name | ForEach-Object { ([ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }).AsReadOnly() })))
+            measurements             = $measurementSnapshot
+            runtimeMeasurements      = $runtimeMeasurements.ToImmutable()
+            runtimeComparisons       = $runtimeComparisons.ToImmutable()
+        }).AsReadOnly()
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM
     Write-Host "Consumer performance report: $reportPath"
@@ -289,16 +293,17 @@ finally {
     Remove-Item -LiteralPath $resolvedWorkspace -Recurse -Force
 }
 if ($MaximumBuildMilliseconds -gt 0) {
-    $overBudget = @($measurements | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds })
-    if ($overBudget.Count -gt 0) { throw "$($overBudget.Count) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
+    $overBudget = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($measurementSnapshot | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds }))
+    if ($overBudget.Length -gt 0) { throw "$($overBudget.Length) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
 }
-foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
-    $medians = @{}
-    foreach ($variant in @('baseline', 'portable', 'verified')) {
-        $times = @($measurements | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object)
-        $middle = [int][Math]::Floor($times.Count / 2)
-        $median = if ($times.Count % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
-        $medians[$variant] = $median
+foreach ($scenario in [Collections.Immutable.ImmutableArray]::Create[string]('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
+    $medianBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+    foreach ($variant in [Collections.Immutable.ImmutableArray]::Create[string]('baseline', 'portable', 'verified')) {
+        $times = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($measurementSnapshot | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object))
+        $middle = [int][Math]::Floor($times.Length / 2)
+        $median = if ($times.Length % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
+        $medianBuilder[$variant] = $median
     }
-    Write-Host ("{0}: baseline={1}ms portable={2}ms ({3:+0.##;-0.##;0}ms) verified={4}ms ({5:+0.##;-0.##;0}ms)" -f $scenario, $medians.baseline, $medians.portable, ($medians.portable - $medians.baseline), $medians.verified, ($medians.verified - $medians.baseline))
+    $medians = $medianBuilder.ToImmutable()
+    Write-Host ("{0}: baseline={1}ms portable={2}ms ({3:+0.##;-0.##;0}ms) verified={4}ms ({5:+0.##;-0.##;0}ms)" -f $scenario, $medians['baseline'], $medians['portable'], ($medians['portable'] - $medians['baseline']), $medians['verified'], ($medians['verified'] - $medians['baseline']))
 }

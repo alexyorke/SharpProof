@@ -18,7 +18,7 @@ public sealed class DirectConsoleWriteAnalyzerTests
         System.ArgumentNullException.ThrowIfNull(call);
         var diagnostics = await AnalyzeAsync("class Subject { void Run() { " + call + " } }");
         Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
-            Is.EqualTo(new[] { DirectConsoleWriteAnalyzer.DiagnosticId }));
+            Is.EqualTo(ImmutableArray.Create(DirectConsoleWriteAnalyzer.DiagnosticId)));
     }
 
     [Test]

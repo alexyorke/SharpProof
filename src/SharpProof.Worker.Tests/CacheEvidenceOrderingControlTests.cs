@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
@@ -7,9 +8,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CacheEvidenceOrderingControlTests
 {
-    private static readonly string[] s_unordered = ["z", "a"];
-    private static readonly string[] s_ordered = ["a", "z"];
-    private static readonly string[] s_orderedClaims = ["a.claim", "z.claim"];
+    private static readonly ImmutableArray<string> s_unordered = ["z", "a"];
+    private static readonly ImmutableArray<string> s_ordered = ["a", "z"];
+    private static readonly ImmutableArray<string> s_orderedClaims = ["a.claim", "z.claim"];
 
     [Test]
     public async Task ValidUnorderedEvidenceIsCanonicalizedAfterAdmission()
@@ -64,11 +65,11 @@ public sealed class CacheEvidenceOrderingControlTests
                 Reason = WorkerClaimReason.None,
                 ProofCore = ["z", "a"]
             })), budgets, WorkerCacheStatus.Written, 0);
-        Array.Reverse(response.CallableResults);
-        Array.Reverse(response.ClaimResults);
+        response.CallableResults = [.. response.CallableResults.Reverse()];
+        response.ClaimResults = [.. response.ClaimResults.Reverse()];
         foreach (var claim in response.ClaimResults)
         {
-            Array.Reverse(claim.ProofCore);
+            claim.ProofCore = [.. claim.ProofCore.Reverse()];
         }
         Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.True);
         var cache = new VerificationCache(directory.FullName, 100_000);

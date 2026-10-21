@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
@@ -30,8 +29,8 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
     : IAnalyzerSessionFactory
     where TKey : notnull
 {
-    protected readonly ConcurrentDictionary<TKey, AnalyzerSemanticOutcome>
-        Outcomes = new((comparer ?? throw new System.ArgumentNullException(nameof(comparer))));
+    protected ImmutableDictionary<TKey, AnalyzerSemanticOutcome>
+        Outcomes = ImmutableDictionary.Create<TKey, AnalyzerSemanticOutcome>(comparer ?? throw new System.ArgumentNullException(nameof(comparer)));
 
     public AnalyzerSession Create(
         Compilation compilation,
@@ -53,12 +52,11 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        Outcomes.AddOrUpdate(
+        ImmutableInterlocked.AddOrUpdate(
+            ref Outcomes,
             key,
-            static (_, incoming) => incoming,
-            static (_, current, incoming) =>
-                AnalyzerSemanticOutcomes.Combine(current, incoming),
-            outcome);
+            outcome,
+            (_, current) => AnalyzerSemanticOutcomes.Combine(current, outcome));
     }
 }
 
@@ -224,11 +222,7 @@ internal static class AnalyzerGateHost
         }
         else
         {
-            var values = new Dictionary<string, string>(
-                StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_features"] = mode
-            };
+            var values = ImmutableDictionary.Create<string, string>(StringComparer.OrdinalIgnoreCase).Add("sharpproof_features", mode);
             options = new AnalyzerOptions(
                 [],
                 new DictionaryAnalyzerConfigOptionsProvider(values));
@@ -261,7 +255,7 @@ internal static class AnalyzerGateHost
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .Take(limit)
             .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
-            .ToArray();
+            .ToImmutableArray();
         if (errors.Length != 0)
         {
             throw createException(string.Join(Environment.NewLine, errors));
@@ -331,7 +325,7 @@ internal static class AnalyzerGateHost
         // Keep the generated image alive for this process's compilation cache.
         var directory = Directory.CreateTempSubdirectory("sharpproof-gates-reference-");
         var path = Path.Combine(directory.FullName, "SharpProof.Gates.ExternalEffects.dll");
-        File.WriteAllBytes(path, stream.ToArray());
+        File.WriteAllBytes(path, stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
         return references.Add(MetadataReference.CreateFromFile(path));
     }
 

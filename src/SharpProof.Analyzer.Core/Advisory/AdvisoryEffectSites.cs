@@ -36,7 +36,7 @@ internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite>
 // claim.
 internal static class AdvisoryEffectSites
 {
-    private static readonly string[] ReadPrefixes =
+    private static readonly ImmutableArray<string> ReadPrefixes =
         ["FieldReference@", "StaticFieldReference@", "PropertyReference@", "ArrayElementReference@", "Increment@", "Decrement@",
             "CompoundAssignment@"];
 
@@ -107,40 +107,47 @@ internal static class AdvisoryEffectSites
     private static AdvisoryEffectAnalysis Gap(string reason)
     { reason = RepositoryParameterGuard.NotNull(reason, nameof(reason)); return new([], reason); }
 
-    private static HashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
+    private static ImmutableHashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
-        var reachable = new HashSet<IrBlockId>();
-        var pending = new Stack<IrBlockId>(roots);
-        while (pending.Count != 0)
+        var reachable = ImmutableHashSet.CreateBuilder<IrBlockId>();
+        var pending = ImmutableStack<IrBlockId>.Empty;
+        foreach (var root in roots)
+        { pending = pending.Push(root); }
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!reachable.Add(current))
             { continue; }
             foreach (var successor in Successors(program.GetBlock(current)))
-            { pending.Push(successor); }
+            { pending = pending.Push(successor); }
         }
-        return reachable;
+        return reachable.ToImmutable();
     }
 
-    private static HashSet<IrBlockId> Escaping(IrProgram program)
+    private static ImmutableHashSet<IrBlockId> Escaping(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var predecessors = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (Successors(block).Select(successor => successor.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(successor)) : ((successor, block.Id)))))
             .ToLookup(edge => edge.successor, edge => edge.Id);
-        var escaping = new HashSet<IrBlockId>();
-        var pending = new Stack<IrBlockId>(program.Blocks
-            .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id)));
-        while (pending.Count != 0)
+        var escaping = ImmutableHashSet.CreateBuilder<IrBlockId>();
+        var roots = program.Blocks
+            .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id));
+        var pending = ImmutableStack<IrBlockId>.Empty;
+        foreach (var root in roots)
+        { pending = pending.Push(root); }
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!escaping.Add(current))
             { continue; }
             foreach (var predecessor in predecessors[current])
-            { pending.Push(predecessor); }
+            { pending = pending.Push(predecessor); }
         }
-        return escaping;
+        return escaping.ToImmutable();
     }
 
     private static IEnumerable<IrBlockId> Successors(IrBasicBlock block)

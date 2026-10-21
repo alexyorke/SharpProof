@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RequiresOnlyNestedInitializerContinuationTests
 {
-    private static readonly bool[] RuntimeInputs = [false, true];
+    private static readonly ImmutableArray<bool> RuntimeInputs = [false, true];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -32,7 +33,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
             }
             """);
         var originalTree = compilation.SyntaxTrees.Single();
-        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty);
         compilation = compilation.ReplaceSyntaxTree(originalTree,
             CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
@@ -52,7 +53,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToImmutableArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
@@ -63,7 +64,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
             ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)), Is.True);
         var additions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Select(operation =>
             operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((Block: block, Operation: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))))
-            .Where(pair => pair.Operation is IInvocationOperation { TargetMethod.Name: "Add" }).ToArray();
+            .Where(pair => pair.Operation is IInvocationOperation { TargetMethod.Name: "Add" }).ToImmutableArray();
         Assert.That(additions, Has.Length.EqualTo(initializers ? 2 : 0));
         var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
         Assert.That(list, Is.Not.Null);
@@ -84,8 +85,8 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         {
             Assert.That(additions[0].Block, Is.Not.SameAs(additions[1].Block));
             Assert.That(additions[0].Operation.Syntax.Span, Is.Not.EqualTo(additions[1].Operation.Syntax.Span));
-            var fall = Reachable(conditionals[0].FallThroughSuccessor!.Destination!).ToHashSet();
-            var conditional = Reachable(conditionals[0].ConditionalSuccessor!.Destination!).ToHashSet();
+            var fall = Reachable(conditionals[0].FallThroughSuccessor!.Destination!).ToImmutableHashSet();
+            var conditional = Reachable(conditionals[0].ConditionalSuccessor!.Destination!).ToImmutableHashSet();
             Assert.That(additions.Count(addition => fall.Contains(addition.Block)), Is.EqualTo(1));
             Assert.That(additions.Count(addition => conditional.Contains(addition.Block)), Is.EqualTo(1));
             Assert.That(additions.Any(addition => fall.Contains(addition.Block) && conditional.Contains(addition.Block)), Is.False);
@@ -119,7 +120,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
             foreach (var input in RuntimeInputs)
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(input)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
@@ -140,18 +141,19 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
     private static IEnumerable<BasicBlock> Reachable(BasicBlock first)
     {
         System.ArgumentNullException.ThrowIfNull(first);
-        var visited = new HashSet<BasicBlock>();
-        var pending = new Stack<BasicBlock>();
-        pending.Push(first);
-        while (pending.TryPop(out var block))
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        var pending = ImmutableStack<BasicBlock>.Empty;
+        pending = pending.Push(first);
+        while (!pending.IsEmpty)
         {
+            pending = pending.Pop(out var block);
             if (!visited.Add(block))
             { continue; }
             yield return block;
             if (block.FallThroughSuccessor?.Destination is { } fall)
-            { pending.Push(fall); }
+            { pending = pending.Push(fall); }
             if (block.ConditionalSuccessor?.Destination is { } conditional)
-            { pending.Push(conditional); }
+            { pending = pending.Push(conditional); }
         }
     }
 

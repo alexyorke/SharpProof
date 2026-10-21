@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -65,19 +66,17 @@ public sealed class CompilerContractBindingCaptureWorkflowTests
             var request = Path.Combine(directory, "request");
             const string invocation = "00112233445566778899aabbccddeeff";
             await File.WriteAllTextAsync(request, invocation);
-            var options = new Dictionary<string, string>
-            {
-                ["build_property.SharpProofProfile"] = "advisory",
-                ["build_property.SharpProofFeatures"] = "all",
-                ["build_property.SharpProofVerifyPolicy"] = "advisory",
-                ["build_property.SharpProofAssumptionPolicy"] = "allow",
-                ["build_property._SharpProofCompilerManifestPath"] = path,
-                ["build_property._SharpProofCompilationTargetFramework"] = "net8.0",
-                ["build_property._SharpProofProjectDirectory"] = directory,
-                ["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64",
-                ["build_property._SharpProofCompilerCaptureRequestPath"] = request
-            };
-            var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, options,
+            var options = ImmutableDictionary.CreateBuilder<string, string>();
+            options["build_property.SharpProofProfile"] = "advisory";
+            options["build_property.SharpProofFeatures"] = "all";
+            options["build_property.SharpProofVerifyPolicy"] = "advisory";
+            options["build_property.SharpProofAssumptionPolicy"] = "allow";
+            options["build_property._SharpProofCompilerManifestPath"] = path;
+            options["build_property._SharpProofCompilationTargetFramework"] = "net8.0";
+            options["build_property._SharpProofProjectDirectory"] = directory;
+            options["build_property.SharpProofVerifyMaximumExpressionDepth"] = "64";
+            options["build_property._SharpProofCompilerCaptureRequestPath"] = request;
+            var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, options.ToImmutable(),
                 analyzer: new FinalCompilationCollectorAnalyzer());
             Assert.That(diagnostics, Is.Empty);
             Assert.That(await File.ReadAllTextAsync(request + ".completed"), Is.EqualTo(invocation));

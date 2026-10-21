@@ -33,7 +33,7 @@ internal sealed class ArrayCreationMaxLengthTests
     [Test]
     public void RuntimeRejectsLengthsBeyondItsMaximum()
     {
-        var length = int.MaxValue;
+        const int length = int.MaxValue;
         Assert.Throws<OutOfMemoryException>(new Action(() => AllocateBytes(length)));
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -8,10 +9,10 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class OperationPurityScopeCoverageTests
 {
-    private static readonly bool[] ExpectedBatchResults = [true, true, false, false, true, false, false];
-    private static readonly string[] ExpectedBatchCalls = ["Read", "Read", "Read", "Unknown"];
-    private static readonly string[] ExpectedReentryCalls = ["Read", "Read", "Read", "Outer", "Read", "Read"];
-    private static readonly string[] ExpectedBothScopeCalls =
+    private static readonly ImmutableArray<bool> ExpectedBatchResults = [true, true, false, false, true, false, false];
+    private static readonly ImmutableArray<string> ExpectedBatchCalls = ["Read", "Read", "Read", "Unknown"];
+    private static readonly ImmutableArray<string> ExpectedReentryCalls = ["Read", "Read", "Read", "Outer", "Read", "Read"];
+    private static readonly ImmutableArray<string> ExpectedBothScopeCalls =
     [
         "Read", "Read", "Read", "Outer", "Read", "Read",
         "Read", "Read", "Outer", "Read", "Read"
@@ -27,10 +28,9 @@ public sealed class OperationPurityScopeCoverageTests
         var pure = invocations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 1)"));
         var impure = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x++)"));
         var unknown = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.TargetMethod.Name == "Unknown"));
-        var calls = new List<string>();
+        var calls = ImmutableArray.CreateBuilder<string>();
         var classifier = new RoslynOperationPurityClassifier(KnownPure, 256);
-        Assert.That(new[]
-        {
+        Assert.That(ImmutableArray.Create(
             classifier.IsDemonstrablyPure(pure, 0),
             classifier.IsDemonstrablyPure(pure, 0),
             classifier.IsDemonstrablyPure(impure, 0),
@@ -38,8 +38,8 @@ public sealed class OperationPurityScopeCoverageTests
             classifier.IsDemonstrablyPure(pure, 1),
             classifier.IsDemonstrablyPure(unknown, 0),
             classifier.IsDemonstrablyPure(pure, 256)
-        }, Is.EqualTo(ExpectedBatchResults));
-        Assert.That(calls, Is.EqualTo(ExpectedBatchCalls));
+        ), Is.EqualTo(ExpectedBatchResults));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedBatchCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
@@ -74,7 +74,7 @@ public sealed class OperationPurityScopeCoverageTests
         var nested = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 2)"));
         FrontendLoweringResult? nestedResult = null;
         var reentered = false;
-        var calls = new List<string>();
+        var calls = ImmutableArray.CreateBuilder<string>();
         RoslynOperationLowerer? lowerer = null;
         // Reenter while the first argument is being classified. The second
         // argument still needs the restored classifier from the outer scope.
@@ -84,13 +84,13 @@ public sealed class OperationPurityScopeCoverageTests
         Assert.That(nestedResult, Is.Not.Null);
         AssertOpaque(nestedResult!, IrOpaquePurity.Pure);
         AssertOpaque(result, IrOpaquePurity.Pure);
-        Assert.That(calls, Is.EqualTo(ExpectedReentryCalls));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedReentryCalls));
         // The one-shot callback now follows the same policy without reentering.
         // Reuse the lowerer's bindings while requiring a fresh purity scope.
         var control = lowerer.Lower(outer);
         AssertOpaque(control, IrOpaquePurity.Pure);
         Assert.That(result.Term, Is.SameAs(control.Term));
-        Assert.That(calls, Is.EqualTo(ExpectedBothScopeCalls));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedBothScopeCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
@@ -105,7 +105,7 @@ public sealed class OperationPurityScopeCoverageTests
         }
     }
 
-    private static IInvocationOperation[] Invocations(TypedProgramSubject subject)
+    private static ImmutableArray<IInvocationOperation> Invocations(TypedProgramSubject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
@@ -113,7 +113,7 @@ public sealed class OperationPurityScopeCoverageTests
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = subject.Compilation.GetSemanticModel(tree);
         return syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : ((IInvocationOperation)model.GetOperation(invocation)!)).ToArray();
+            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : ((IInvocationOperation)model.GetOperation(invocation)!)).ToImmutableArray();
     }
 
     private static void AssertOpaque(FrontendLoweringResult result, IrOpaquePurity purity)

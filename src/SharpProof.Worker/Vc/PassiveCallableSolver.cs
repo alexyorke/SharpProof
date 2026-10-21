@@ -259,8 +259,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         var queries = _plan.CallPreconditionQueries(ordinal);
         PassiveCallableCheckResult? proven = null;
         PassiveCallableCheckResult? incomplete = null;
-        var cores = new HashSet<string>(StringComparer.Ordinal);
-        var assumptions = new HashSet<OperationId>();
+        var cores = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var assumptions = ImmutableHashSet.CreateBuilder<OperationId>();
         foreach (var query in queries)
         {
             var evidence = await VerifyAsync(query, null, cancellationToken).ConfigureAwait(false);
@@ -417,9 +417,11 @@ internal sealed class PassiveCallableSolver : IDisposable
                 { return new(plan, active, together.Core, together.BodyAssumptions); }
             }
             rechecking = true;
-            var failed = new HashSet<int>();
-            var cores = new HashSet<string>(StringComparer.Ordinal);
-            var assumptions = new HashSet<OperationId>();
+            var failed = ImmutableHashSet.CreateBuilder<int>();
+            var cores = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            var assumptions = ImmutableHashSet.CreateBuilder<OperationId>();
+            var coreOrder = ImmutableArray.CreateBuilder<string>();
+            var assumptionOrder = ImmutableArray.CreateBuilder<OperationId>();
             foreach (var (invariant, query) in plan.InvariantQueries())
             {
                 if (failed.Contains(invariant))
@@ -429,14 +431,22 @@ internal sealed class PassiveCallableSolver : IDisposable
                 { return null; }
                 if (evidence.Outcome is ProvenOutcome)
                 {
-                    cores.UnionWith(evidence.Core);
-                    assumptions.UnionWith(evidence.BodyAssumptions);
+                    foreach (var core in evidence.Core)
+                    {
+                        if (cores.Add(core))
+                        { coreOrder.Add(core); }
+                    }
+                    foreach (var assumption in evidence.BodyAssumptions)
+                    {
+                        if (assumptions.Add(assumption))
+                        { assumptionOrder.Add(assumption); }
+                    }
                 }
                 else
                 { failed.Add(invariant); }
             }
             if (failed.Count == 0)
-            { return new(plan, active, [.. cores], [.. assumptions]); }
+            { return new(plan, active, coreOrder.ToImmutable(), assumptionOrder.ToImmutable()); }
             active = [.. active.Where((_, ordinal) => !failed.Contains(ordinal))];
         }
         return null;
@@ -451,7 +461,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         System.ArgumentNullException.ThrowIfNull(query);
         var candidate = _plan.Candidate;
         var factory = candidate.Factory;
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>();
+        var states = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
         var relations = ImmutableArray.CreateBuilder<PassiveLoopCutter.Invariant>();
         foreach (var loop in PassiveLoopCutter.Loops(candidate, cancellationToken))
         {
@@ -461,14 +471,15 @@ internal sealed class PassiveCallableSolver : IDisposable
             if (state.IsEmpty)
             { continue; }
             var relation = IrInvariantRelations.Create(factory, relations.Count, state);
-            states.Add(relation.Member, state);
+            states.AddUnique(relation.Member, state);
             relations.Add(new(loop.Header, relation));
         }
         if (relations.Count == 0 ||
             PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, relations.ToImmutable(), cancellationToken) is not { } plan)
         { return []; }
-        var proposals = HornInvariantSearch.Propose(factory, [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)],
-            states, WorkerBudgets.DefaultQueryRlimit, cancellationToken);
+        ImmutableArray<VerificationQuery> clauses = [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)];
+        var proposals = HornInvariantSearch.Propose(factory, clauses,
+            states.ToImmutable(), WorkerBudgets.DefaultQueryRlimit, cancellationToken);
         return [.. relations.SelectMany(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
             ? Conjuncts(invariant).Select(conjunct => conjunct is null ? throw new System.ArgumentNullException(nameof(conjunct)) : (new PassiveLoopCutter.Invariant(relation.Header, conjunct)))
             : []))];

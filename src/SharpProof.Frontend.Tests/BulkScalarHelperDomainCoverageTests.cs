@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -14,18 +15,18 @@ public sealed class BulkScalarHelperDomainCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(bool flag, int first, int second) => flag ? first : second;");
         var operation = (IConditionalOperation)Expression(subject);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(3));
         Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
         Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UnsupportedOperationKind);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.True);
-        foreach (var flag in new[] { true, false })
+        foreach (var flag in ImmutableArray.Create(true, false))
         {
-            object[] inputs = [flag, 17, 23];
+            ImmutableArray<object> inputs = [flag, 17, 23];
             var expected = flag ? 17 : 23;
             Assert.That(subject.Invoke(inputs), Is.EqualTo(expected));
-            var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
+            var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.SafeCondition, environment).Value!.Boolean, Is.True);
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
             Replay(subject, inputs, expected);
@@ -42,7 +43,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var operation = (IBinaryOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.OperatorMethod, Is.Not.Null);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(2));
         Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
         Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UserDefinedOperator);
@@ -95,7 +96,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var rule = CSharpOperationSemantics.Bitwise(supported.Factory, binary.Operator, binary.Left, binary.Right);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = supported.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3)));
+        var environment = ImmutableDictionaryCapture.Create(supported.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3)));
         Assert.That(new IrInterpreter(supported.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(3)));
         Replay(supported, [7, 3], 3);
     }
@@ -111,7 +112,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), _ => subject.Factory.CreateStringValue("word"));
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), _ => subject.Factory.CreateStringValue("word"));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -135,12 +136,13 @@ public sealed class BulkScalarHelperDomainCoverageTests
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(reason));
         Assert.That(rule.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
     }
 
-    private static void Replay(TypedProgramSubject subject, object[] inputs, int expected)
+    private static void Replay(TypedProgramSubject subject, ImmutableArray<object> inputs, int expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new System.ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);

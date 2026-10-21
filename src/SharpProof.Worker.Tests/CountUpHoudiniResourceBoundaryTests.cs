@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -122,7 +123,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
 
     private const uint BoundaryMethodRlimit = 3_096_189;
 
-    private static readonly int[] RuntimeInputs = [0, 1, 2, 4, 16];
+    private static readonly ImmutableArray<int> RuntimeInputs = [0, 1, 2, 4, 16];
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     [Test]
@@ -134,12 +135,12 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Directory.CreateDirectory(output);
         await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
             "{\"captureComplete\":false,\"stage\":\"setup\",\"coverageClaim\":false}", new UTF8Encoding(false));
-        var compilation = TestCompilation.Create("CountUpNativeResourceObservation", [("Subject.cs", Source)]);
+        var compilation = TestCompilation.CreateExact("CountUpNativeResourceObservation", [("Subject.cs", Source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
             ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
                 ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
@@ -147,8 +148,8 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         TestCompilation.AssertNoErrors(runtimeCompilation);
         using var runtimeImage = new MemoryStream();
         Assert.That(runtimeCompilation.Emit(runtimeImage).Success, Is.True);
-        var runtimeBytes = runtimeImage.ToArray();
-        var runtimeMethod = Assembly.Load(runtimeBytes).GetType("Subject")!.GetMethod("CountUp")!;
+        var runtimeBytes = ImmutableArray.Create<byte>(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length)));
+        var runtimeMethod = Assembly.Load(runtimeBytes.ToArray()).GetType("Subject")!.GetMethod("CountUp")!;
         foreach (var input in RuntimeInputs)
         {
             Assert.That(runtimeMethod.Invoke(null, [input]), Is.EqualTo(input));
@@ -172,11 +173,15 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         await File.WriteAllTextAsync(Path.Combine(output, "source.cs.txt"), Source, new UTF8Encoding(false));
         await File.WriteAllTextAsync(Path.Combine(output, "artifact.json"), artifactJson, new UTF8Encoding(false));
-        await File.WriteAllBytesAsync(Path.Combine(output, "native-image.dll"), imageBytes);
-        var checks = new List<TotalCallableClaimCheck>();
-        var reads = new List<long>();
-        var budgetReads = new List<BudgetRead>();
+        await File.WriteAllBytesAsync(Path.Combine(output, "native-image.dll"), imageBytes.AsMemory());
+        var checks = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
+        var reads = ImmutableArray.CreateBuilder<long>();
+        var budgetReads = ImmutableArray.CreateBuilder<BudgetRead>();
         var recorder = new QueryRecords();
+        ImmutableArray<TotalCallableClaimCheck> checkSnapshot = default;
+        ImmutableArray<long> readSnapshot = default;
+        ImmutableArray<BudgetRead> budgetSnapshot = default;
+        ImmutableArray<QueryRecord> querySnapshot = default;
         long? baseline = null;
         long? finalConsumed = null;
         var droppedReads = 0;
@@ -185,17 +190,17 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         var projectCanceled = false;
         string? failureType = null;
         var sourceRoot = TestRepository.FindRoot();
-        var solverSource = await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
-            "src/SharpProof.Worker", "Vc", "PassiveCallableSolver.cs"), TestContext.CurrentContext.CancellationToken);
-        var budgetSource = await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
-            "src/SharpProof.Worker", "MethodResourceBudget.cs"), TestContext.CurrentContext.CancellationToken);
-        var firstPassLine = Array.IndexOf(solverSource,
+        var solverSource = (await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
+            "src/SharpProof.Worker", "Vc", "PassiveCallableSolver.cs"), TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        var budgetSource = (await File.ReadAllLinesAsync(Path.Combine(sourceRoot,
+            "src/SharpProof.Worker", "MethodResourceBudget.cs"), TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        var firstPassLine = solverSource.IndexOf(
             "                var evidence = await VerifyAsync(query, null, cancellationToken, plan).ConfigureAwait(false);") + 1;
-        var combinedRecheckLine = Array.IndexOf(solverSource,
+        var combinedRecheckLine = solverSource.IndexOf(
             "                var together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);") + 1;
-        var verifyQueryLine = Array.IndexOf(solverSource,
+        var verifyQueryLine = solverSource.IndexOf(
             "        if (!_budget.TryStartQuery())") + 1;
-        var budgetReadLine = Array.IndexOf(budgetSource,
+        var budgetReadLine = budgetSource.IndexOf(
             "        var current = _readConsumedResourceCount();") + 1;
         Assert.That(firstPassLine, Is.GreaterThan(0));
         Assert.That(combinedRecheckLine, Is.GreaterThan(0));
@@ -217,7 +222,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                         frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.GetMethod()?.DeclaringType == typeof(MethodResourceBudget) ||
                         frame.GetMethod()?.DeclaringType?.FullName?.StartsWith(typeof(PassiveCallableSolver).FullName!, StringComparison.Ordinal) == true))
                         .Select(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (new CallFrame(frame.GetMethod()?.DeclaringType?.FullName,
-                            frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToArray();
+                            frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToImmutableArray();
                     budgetReads.Add(new(actual, recorder.Started,
                         frames.Any(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "TryStartQuery")) ||
                         frames.Any(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" &&
@@ -260,14 +265,18 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         }
         finally
         {
+            checkSnapshot = checks.ToImmutable();
+            readSnapshot = reads.ToImmutable();
+            budgetSnapshot = budgetReads.ToImmutable();
+            querySnapshot = recorder.Values.ToImmutable();
             // One post-session-disposal file. No per-query console or file writes.
             var payload = new
             {
                 captureComplete = true,
                 sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Source))),
                 artifactSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(artifactJson))),
-                imageSha256 = Convert.ToHexString(SHA256.HashData(imageBytes)),
-                runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeBytes)),
+                imageSha256 = Convert.ToHexString(SHA256.HashData(imageBytes.AsSpan())),
+                runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeBytes.AsSpan())),
                 callableId = preparation.Entry.CallableId,
                 claimId = ownedClaim,
                 runtimeInputs = RuntimeInputs,
@@ -276,16 +285,16 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 finalConsumed,
                 completed,
                 failureType,
-                meterReads = reads,
-                budgetReads,
+                meterReads = readSnapshot,
+                budgetReads = budgetSnapshot,
                 methodCanceled,
                 projectCanceled,
                 droppedReads,
                 startedQueries = recorder.Started,
                 droppedQueryRecords = recorder.Dropped,
                 nativeDelta = recorder.NativeDelta,
-                queries = recorder.Values,
-                published = checks.Select(check =>
+                queries = querySnapshot,
+                published = checkSnapshot.Select(check =>
                 {
                     System.ArgumentNullException.ThrowIfNull(check);
                     return new
@@ -310,7 +319,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
                 JsonSerializer.Serialize(payload, JsonOptions), new UTF8Encoding(false));
         }
-        var final = checks.Last(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId == ownedClaim));
+        var final = checkSnapshot.Last(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId == ownedClaim));
         Assert.That(completed, Is.True);
         Assert.That(methodCanceled, Is.False);
         Assert.That(projectCanceled, Is.False);
@@ -328,27 +337,27 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         Assert.That(droppedReads, Is.Zero);
         Assert.That(recorder.NativeDelta, Is.EqualTo(finalConsumed - baseline));
         Assert.That(recorder.Started, Is.EqualTo(15), "Five real prelude checks and ten first-pass checks; no later supplied-session reservation fits.");
-        Assert.That(recorder.Values, Has.Count.EqualTo(15));
-        Assert.That(recorder.Values.Take(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
-            "Satisfiable,Satisfiable,Satisfiable,Satisfiable,Unsatisfiable".Split(',')));
-        Assert.That(recorder.Values.Skip(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
-            "Unsatisfiable,Satisfiable,Satisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable".Split(',')));
-        Assert.That(recorder.Values.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Reason == "None" && query.FailureType == null)), Is.True);
+        Assert.That(querySnapshot, Has.Length.EqualTo(15));
+        Assert.That(querySnapshot.Take(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
+            "Satisfiable,Satisfiable,Satisfiable,Satisfiable,Unsatisfiable".Split(',').ToImmutableArray()));
+        Assert.That(querySnapshot.Skip(5).Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Status)), Is.EqualTo(
+            "Unsatisfiable,Satisfiable,Satisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable".Split(',').ToImmutableArray()));
+        Assert.That(querySnapshot.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Reason == "None" && query.FailureType == null)), Is.True);
 
-        Assert.That(recorder.Values.Skip(5).All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Frames.Any(frame =>
+        Assert.That(querySnapshot.Skip(5).All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Frames.Any(frame =>
             frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == firstPassLine)))), Is.True);
-        Assert.That(recorder.Values.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (!query.Frames.Any(frame =>
+        Assert.That(querySnapshot.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (!query.Frames.Any(frame =>
             frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == combinedRecheckLine)))), Is.True);
-        var denied = budgetReads.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery &&
-            budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit)).ToArray();
+        var denied = budgetSnapshot.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery &&
+            budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit)).ToImmutableArray();
         Assert.That(denied, Is.Not.Empty, "Actual reader evidence of reservation denial is required.");
         var firstDenied = denied[0];
         Assert.That(firstDenied.InCombinedRecheck, Is.True);
         Assert.That(firstDenied.CompletedNativeQueries, Is.EqualTo(15));
-        Assert.That(firstDenied.Actual, Is.EqualTo(recorder.Values[^1].After));
+        Assert.That(firstDenied.Actual, Is.EqualTo(querySnapshot[^1].After));
         Assert.That(firstDenied.Actual - baseline!.Value, Is.LessThanOrEqualTo(budgets.MethodRlimit));
         Assert.That(budgets.MethodRlimit - (firstDenied.Actual - baseline!.Value), Is.LessThan(budgets.QueryRlimit));
-        Assert.That(budgetReads.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery)).TakeWhile(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (!ReferenceEquals(read, firstDenied)))
+        Assert.That(budgetSnapshot.Where(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.InTryStartQuery)).TakeWhile(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (!ReferenceEquals(read, firstDenied)))
             .All(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (budgets.MethodRlimit - (read.Actual - baseline!.Value) >= budgets.QueryRlimit)), Is.True);
         Assert.That(denied.All(read => read is null ? throw new System.ArgumentNullException(nameof(read)) : (read.Actual == firstDenied.Actual)), Is.True);
         Assert.That(finalConsumed, Is.EqualTo(firstDenied.Actual));
@@ -359,31 +368,31 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         internal int Started { get; set; }
         internal int Dropped { get; set; }
         internal long NativeDelta { get; set; }
-        internal List<QueryRecord> Values { get; } = [];
+        internal ImmutableArray<QueryRecord>.Builder Values { get; } = ImmutableArray.CreateBuilder<QueryRecord>();
     }
 
     private sealed record BudgetRead(long Actual, int CompletedNativeQueries,
-        bool InTryStartQuery, bool InCombinedRecheck, CallFrame[] Frames)
+        bool InTryStartQuery, bool InCombinedRecheck, ImmutableArray<CallFrame> Frames)
     {
-        public CallFrame[] Frames { get; init; } = Frames ?? throw new System.ArgumentNullException(nameof(Frames));
+        public ImmutableArray<CallFrame> Frames { get; init; } = Frames.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Frames)) : Frames;
     }
 
     private sealed record CallFrame(string? Type, string? Method, string? File, int Line);
 
     private sealed record QueryRecord(int Ordinal, string Diagnostic, int Location, int AssumptionCount,
         int ModelVariableCount, long Before, long After, long RelativeBefore, long RelativeAfter,
-        long Delta, string? Status, string? Reason, int[]? UnsatCore, bool? HasModel,
-        string? FailureType, CallFrame[] Frames)
+        long Delta, string? Status, string? Reason, ImmutableArray<int>? UnsatCore, bool? HasModel,
+        string? FailureType, ImmutableArray<CallFrame> Frames)
     {
         public string Diagnostic { get; init; } = Diagnostic ?? throw new System.ArgumentNullException(nameof(Diagnostic));
-        public CallFrame[] Frames { get; init; } = Frames ?? throw new System.ArgumentNullException(nameof(Frames));
+        public ImmutableArray<CallFrame> Frames { get; init; } = Frames.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Frames)) : Frames;
     }
 
     // No manufactured BackendCheckResult: exactly one real call, exact returned object.
     private sealed class RecordingNativeBackend(CallableSolverSession session, long baseline, QueryRecords records) : ISmtBackend
     {
-        private QueryRecords _guarded_records = records ?? throw new System.ArgumentNullException(nameof(records));
-        private CallableSolverSession _guarded_session = baseline < 0 ? throw new ArgumentOutOfRangeException(nameof(baseline)) : session ?? throw new System.ArgumentNullException(nameof(session));
+        private readonly QueryRecords _guarded_records = records ?? throw new System.ArgumentNullException(nameof(records));
+        private readonly CallableSolverSession _guarded_session = baseline < 0 ? throw new ArgumentOutOfRangeException(nameof(baseline)) : session ?? throw new System.ArgumentNullException(nameof(session));
         public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             var ordinal = _guarded_records.Started++;
@@ -392,7 +401,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 ? new StackTrace(true).GetFrames().Where(frame =>
                     frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.GetMethod()?.DeclaringType?.FullName?.StartsWith(typeof(PassiveCallableSolver).FullName!, StringComparison.Ordinal) == true))
                     .Select(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (new CallFrame(frame.GetMethod()?.DeclaringType?.FullName,
-                        frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToArray()
+                        frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToImmutableArray()
                 : [];
             BackendCheckResult? result = null;
             string? failureType = null;
@@ -416,7 +425,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                     _guarded_records.Values.Add(new QueryRecord(ordinal, query.Goal.Diagnostic.ToString(), query.Goal.Location.Value,
                         query.Assumptions.Length, query.ModelVariables.Length, before, after, checked(before - baseline),
                         checked(after - baseline), delta, result?.Status.ToString(), result?.FailureReason.ToString(),
-                        result?.UnsatCore.ToArray(), result == null ? null : result.Model != null, failureType, frames));
+                        result?.UnsatCore, result == null ? null : result.Model != null, failureType, frames));
                 }
                 else
                 {

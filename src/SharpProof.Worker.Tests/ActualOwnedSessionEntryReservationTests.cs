@@ -32,7 +32,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                 }
             }
             """;
-        var compilation = TestCompilation.Create("OwnedSessionEntryReservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedSessionEntryReservation", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -71,7 +71,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
         var domain = entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new Assumption(factory,
             factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value),
             new LoweredJustification(clause.Operation)))).ToImmutableArray();
-        long[] primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
+        ImmutableArray<long> primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
         const long maximumInput = 1000000033L;
         foreach (var prime in primes)
         {
@@ -98,13 +98,12 @@ public sealed class ActualOwnedSessionEntryReservationTests
                     methodAdmissionDenied = true;
                     break;
                 }
-                var constraints = new[]
-                {
+                var constraints = ImmutableArray.Create<IrTerm>(
                     factory.Binary(IrBinaryOperator.Equal,
                         factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)),
                     factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p)),
                     factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, q))
-                };
+                );
                 // Manually constructed IR/Smt API lemmas use compiler-decoded
                 // bindings. They are not compiler-produced contract clauses.
                 var assumptions = domain.AddRange(constraints.Select(predicate =>
@@ -133,7 +132,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                     q,
                     outcome = outcome.GetType().Name,
                     reason = outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : "None",
-                    core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToArray() : [],
+                    core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToImmutableArray() : [],
                     delta,
                     consumed = session.ConsumedResourceCount
                 }));
@@ -168,7 +167,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
         {
             sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             artifactSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(artifactJson))),
-            imageSha256 = Convert.ToHexString(SHA256.HashData(image.ToArray())),
+            imageSha256 = Convert.ToHexString(SHA256.HashData(image.GetBuffer().AsSpan(0, checked((int)image.Length)))),
             controlKind = control.Kind.ToString(),
             controlReason = control.Reason.ToString(),
             algorithm = "Manually constructed IR/Smt API lemmas over compiler-decoded bindings",
@@ -176,7 +175,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
             {
                 prime,
                 isPrime = IsPrime(prime)
-            }).ToArray(),
+            }).ToImmutableArray(),
             maximumProduct = maximumProduct.ToString(System.Globalization.CultureInfo.InvariantCulture),
             startedQueries,
             observedBatchDelta,

@@ -91,7 +91,7 @@ internal static class ResourceRuntimeLayout
         string.Join("\n", Enum.GetValues(typeof(ResourceStorageKind)).Cast<ResourceStorageKind>()
             .Where(static storage => storage != ResourceStorageKind.Unspecified)
             .Select(static storage => storage + ":" + Width(storage).ToString(CultureInfo.InvariantCulture))) +
-        "\nobject:aligned-packed-lower,aligned-pointer-slot-upper;closure:frame+delegate;fresh-instances-only\n"));
+        "\nobject:aligned-packed-lower,aligned-pointer-slot-upper;closure:frame+delegate;fresh-instances-only\n").ToImmutableArray());
 
     internal static ResourceLayoutCheck Bound(ResourceAllocationShape shape, ResourceRuntimeLayoutContext context, CancellationToken cancellation)
     {

@@ -22,7 +22,7 @@ internal sealed partial class NativeResourceContractTests
     {
         ArgumentNullException.ThrowIfNull(source);
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        var initial = TestCompilation.Create("ResourceContract", ("Subject.cs", source));
+        var initial = TestCompilation.Create("ResourceContract", [("Subject.cs", source)]);
         if (reviewedRuntime)
         {
             const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
@@ -140,8 +140,9 @@ internal sealed partial class NativeResourceContractTests
     {
         var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
         var claim = artifact.Callables.Single().EffectClaims.Single();
-        claim.Constraint.ResourceUpperBound!.Metric = WorkerResourceMetric.ArrayAllocations;
+        claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = claim.Constraint.ResourceUpperBound! with { Metric = WorkerResourceMetric.ArrayAllocations } } };
         CompilerEffectClaimArtifactCodec.Seal(claim);
+        artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { EffectClaims = [claim] }) };
         Action serialize = () => Read(artifact);
         Rejects(serialize);
     }
@@ -151,11 +152,11 @@ internal sealed partial class NativeResourceContractTests
     {
         var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
         var foreign = ResourceExpression.InputSize(new ResourceInput(99, ResourceInputKind.NonNegativeScalar, "foreign", int.MaxValue));
-        artifact.Callables.Single().ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Array(foreign), TestContext.CurrentContext.CancellationToken);
+        artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Array(foreign), TestContext.CurrentContext.CancellationToken) }) };
         Action foreignInput = () => Read(artifact);
         Rejects(foreignInput);
         var other = CreateArtifact(Source("[ZeroAllocations]", ""));
-        other.Callables.Single().ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Zero, TestContext.CurrentContext.CancellationToken);
+        other = other with { Callables = other.Callables.SetItem(0, other.Callables.Single() with { ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Zero, TestContext.CurrentContext.CancellationToken) }) };
         Action unowned = () => Read(other);
         Rejects(unowned);
     }
@@ -165,7 +166,7 @@ internal sealed partial class NativeResourceContractTests
     {
         var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
         var before = artifact.Manifest.Hash;
-        artifact.Manifest.Claims.Single().ResourceUpperBound!.UpperBound = ResourceExpressionCodec.Encode(ResourceExpression.Literal(4), TestContext.CurrentContext.CancellationToken);
+        artifact = artifact with { Manifest = artifact.Manifest with { Claims = artifact.Manifest.Claims.SetItem(0, artifact.Manifest.Claims.Single() with { ResourceUpperBound = artifact.Manifest.Claims.Single().ResourceUpperBound! with { UpperBound = ResourceExpressionCodec.Encode(ResourceExpression.Literal(4), TestContext.CurrentContext.CancellationToken) } }) } };
         WorkerProtocolJson.SealManifest(artifact.Manifest);
         Assert.That(artifact.Manifest.Hash, Is.Not.EqualTo(before));
     }
@@ -185,10 +186,11 @@ internal sealed partial class NativeResourceContractTests
     {
         var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0)]", ""));
         var claim = artifact.Callables.Single().EffectClaims.Single();
-        claim.Outcome = WorkerClaimOutcome.Proven;
-        claim.Reason = WorkerClaimReason.None;
-        claim.Certainty = WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
+        claim = claim with { Outcome = WorkerClaimOutcome.Proven };
+        claim = claim with { Reason = WorkerClaimReason.None };
+        claim = claim with { Certainty = WorkerEffectEvidenceCertainty.TrustedCompleteBoundary };
         CompilerEffectClaimArtifactCodec.Seal(claim);
+        artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { EffectClaims = [claim] }) };
         Action serialize = () => Read(artifact);
         Rejects(serialize);
     }
@@ -226,8 +228,9 @@ internal sealed partial class NativeResourceContractTests
                 preparation = preparation with { ResourceProgram = ResourceProgram.MetadataBoundary };
                 break;
             default:
-                claim.Constraint.ResourceUpperBound!.UpperBound = System.Text.Encoding.UTF8.GetBytes("{}");
+                claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = claim.Constraint.ResourceUpperBound! with { UpperBound = System.Text.Encoding.UTF8.GetBytes("{}") } } };
                 CompilerEffectClaimArtifactCodec.Seal(claim);
+                preparation = preparation with { EffectClaims = [claim] };
                 break;
         }
         var result = NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
@@ -242,7 +245,7 @@ internal sealed partial class NativeResourceContractTests
     {
         var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
         var claim = preparation.EffectClaims.Single();
-        claim.ClaimId = "foreign";
+        claim = claim with { ClaimId = "foreign" };
         CompilerEffectClaimArtifactCodec.Seal(claim);
         Action verify = () => NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<ArgumentException>(verify);
@@ -442,37 +445,45 @@ internal sealed partial class NativeResourceContractTests
         ArgumentNullException.ThrowIfNull(corruption);
         var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]", "int value=System.Math.Max(n,0);"), reviewedRuntime: true));
         var reference = preparation.ResourceProgram!.Children.Single().Metadata!;
+        var capturedReference = preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity);
         switch (corruption)
         {
             case "undeclared":
                 preparation.Entry.Assumptions = [];
                 break;
             case "foreign-owner":
-                preparation.Entry.Assumptions.Single().Id = "foreign";
+                preparation = preparation with { Entry = preparation.Entry with { Assumptions = preparation.Entry.Assumptions.SetItem(0, preparation.Entry.Assumptions.Single() with { Id = "foreign" }) } };
                 break;
             case "missing-reference":
                 preparation = preparation with { Compilation = new CompilerCompilationSnapshot() };
                 break;
             case "wrong-target-framework":
-                preparation.Compilation.TargetFramework = "net10.0";
+                preparation = preparation with { Compilation = preparation.Compilation with { TargetFramework = "net10.0" } };
                 break;
             case "null-references":
-                preparation.Compilation.ResourceMetadataReferences = null!;
+                preparation = preparation with { Compilation = preparation.Compilation with { ResourceMetadataReferences = default } };
                 break;
             case "null-reference":
-                preparation.Compilation.ResourceMetadataReferences = [null!];
+                preparation = preparation with { Compilation = preparation.Compilation with { ResourceMetadataReferences = [null!] } };
                 break;
             case "missing-module":
-                preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity).Modules = [];
+                preparation = preparation with { Compilation = preparation.Compilation with { ResourceMetadataReferences = preparation.Compilation.ResourceMetadataReferences.SetItem(preparation.Compilation.ResourceMetadataReferences.IndexOf(capturedReference), capturedReference with { Modules = [] }) } };
                 break;
             case "conflicting-reference":
-                preparation.Compilation.ResourceMetadataReferences = [.. preparation.Compilation.ResourceMetadataReferences, new CompilerReferenceSnapshot {
-                    Kind = "Assembly", Identity = reference.AssemblyIdentity,
-                    Modules = [new CompilerReferenceModuleSnapshot { Sha256 = new string('0',64) }]
-                }];
+                preparation = preparation with
+                {
+                    Compilation = preparation.Compilation with
+                    {
+                        ResourceMetadataReferences = [.. preparation.Compilation.ResourceMetadataReferences, new CompilerReferenceSnapshot
+                    {
+                        Kind = "Assembly", Identity = reference.AssemblyIdentity,
+                        Modules = [new CompilerReferenceModuleSnapshot { Sha256 = new string('0',64) }]
+                    }]
+                    }
+                };
                 break;
             case "invalid-reference-hash":
-                preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity).Modules[0].Sha256 = "invalid";
+                preparation = preparation with { Compilation = preparation.Compilation with { ResourceMetadataReferences = preparation.Compilation.ResourceMetadataReferences.SetItem(preparation.Compilation.ResourceMetadataReferences.IndexOf(capturedReference), capturedReference with { Modules = capturedReference.Modules.SetItem(0, capturedReference.Modules[0] with { Sha256 = "invalid" }) }) } };
                 break;
             default:
                 preparation = preparation with

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -42,10 +43,8 @@ public sealed class TotalSourceLoopPostconditionControls
             ControlFlowGraph.Create(syntax, model)!, loweringContext, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var parameter = loweringContext.Parameters.Single();
-        var entries = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)
-        };
+        var entries = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(parameter.Entry,
+            factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input));
         var executed = new IrProgramInterpreter(factory).Execute(lowered.Program, entries);
         Assert.That(executed.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(executed.ConsumedApproximation, Is.False);
@@ -84,7 +83,7 @@ public sealed class TotalSourceLoopPostconditionControls
             Assert.That(result.Agreements, Is.Zero);
             Assert.That(result.Failures, Has.Length.EqualTo(1));
             Assert.That(result.Failures[0].Detail, Does.StartWith("Target0: native agreement "));
-            var reproducer = Member + "\n// inputs: [7]";
+            const string reproducer = Member + "\n// inputs: [7]";
             Assert.That(result.Failures[0].Original, Is.EqualTo(reproducer));
             Assert.That(result.Failures[0].Minimized, Is.EqualTo(reproducer));
         }

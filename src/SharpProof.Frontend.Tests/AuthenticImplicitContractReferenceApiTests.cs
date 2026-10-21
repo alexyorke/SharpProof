@@ -19,10 +19,9 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         // ResolveMissingAssemblies. Neither consumer is enrolled as proof input.
         var loaded = typeof(SharpProof.Attributes.Contract).Assembly;
         var attributesPath = loaded.Location;
-        var attributesBytes = File.ReadAllBytes(attributesPath);
-        var attributesHash = Convert.ToHexString(SHA256.HashData(attributesBytes));
-        using (var image = new MemoryStream(attributesBytes, writable: false))
-        using (var pe = new PEReader(image))
+        var attributesBytes = File.ReadAllBytes(attributesPath).ToImmutableArray();
+        var attributesHash = Convert.ToHexString(SHA256.HashData(attributesBytes.AsSpan()));
+        using (var pe = new PEReader(attributesBytes))
         {
             var reader = pe.GetMetadataReader();
             Assert.That(reader.GetGuid(reader.GetModuleDefinition().Mvid),
@@ -69,7 +68,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         Assert.That(implicitConsumer.References.Any(reference =>
             reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
                 implicitConsumer.GetAssemblyOrModuleSymbol(reference)))), Is.False);
-        var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToArray();
+        var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToImmutableArray();
         Assert.That(requested, Is.Not.Empty);
         foreach (var request in requested)
         {
@@ -125,7 +124,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private static void RequireNoErrors(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
@@ -140,7 +139,10 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private sealed class AuthenticMissingReferenceResolver(AssemblyIdentity identity,
         PortableExecutableReference reference) : MetadataReferenceResolver
     {
-        internal List<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests { get; } = (reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (identity is null ? throw new System.ArgumentNullException(nameof(identity)) : []));
+        private readonly ImmutableArray<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)>.Builder _requests =
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : identity is null ? throw new System.ArgumentNullException(nameof(identity)) :
+            ImmutableArray.CreateBuilder<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)>();
+        internal ImmutableArray<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests => _requests.ToImmutable();
         public override bool ResolveMissingAssemblies => true;
 
         public override PortableExecutableReference? ResolveMissingAssembly(MetadataReference definition,
@@ -149,7 +151,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
             System.ArgumentNullException.ThrowIfNull(definition);
             System.ArgumentNullException.ThrowIfNull(referenceIdentity);
             var result = referenceIdentity.Equals(identity) ? reference : null;
-            Requests.Add((definition, referenceIdentity, result));
+            _requests.Add((definition, referenceIdentity, result));
             return result;
         }
 

@@ -401,7 +401,7 @@ public sealed class NativeForkJoinProjectionTests
     private static CompilerForkJoinProjection LowerSource(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("ForkJoinProjection", ("Subject.cs", source));
+        var compilation = TestCompilation.Create("ForkJoinProjection", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()

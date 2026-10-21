@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -29,7 +30,7 @@ public sealed class IrOpaqueRewriteIdentityTests
             : factory.PureOpaque(member, null, replacement);
         Assert.That(changed, Is.SameAs(expected));
         Assert.That(changed, Is.Not.SameAs(opaque));
-        Assert.That(((IrOpaqueTerm)changed).Arguments, Is.EqualTo(new[] { replacement }));
+        Assert.That(((IrOpaqueTerm)changed).Arguments, Is.EqualTo(ImmutableArray.Create(replacement)));
         Assert.That(((IrOpaqueTerm)changed).Operation, Is.EqualTo(opaque.Operation));
         Assert.That(((IrOpaqueTerm)changed).Purity, Is.EqualTo(opaque.Purity));
     }

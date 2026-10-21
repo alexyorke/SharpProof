@@ -42,40 +42,40 @@ public sealed class CorpusImportWorkflowTests
     public async Task ImportRejectsAnUnsupportedUpstreamGitObjectFormat()
     {
         using var upstream = new TempDirectory("SharpProof-import-git-format-");
-        await GitAsync(upstream.FullName, "init", "--quiet", "--object-format=sha256");
-        await GitAsync(upstream.FullName, "config", "user.name", "SharpProof Test");
-        await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
+        await GitAsync(upstream.FullName, ["init", "--quiet", "--object-format=sha256"]);
+        await GitAsync(upstream.FullName, ["config", "user.name", "SharpProof Test"]);
+        await GitAsync(upstream.FullName, ["config", "user.email", "test@example.invalid"]);
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "ordinary.cs"),
             "public static class C { public static int Value() => 1; }\n");
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
-        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "ordinary source fixture"]);
+        var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
         Assert.That(commit, Has.Length.EqualTo(64));
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await OpenSourceCorpusImporter.PrepareAsync(upstream.FullName, upstream.FullName, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo($"Upstream HEAD is not a full Git commit: {commit}"));
-        Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+        Assert.That(await GitAsync(upstream.FullName, ["status", "--porcelain"]), Is.Empty);
     }
 
     [Test]
     public async Task SourceDiscoveryRejectsAnIncompleteUpstreamDirectoryLayout()
     {
         using var upstream = new TempDirectory("SharpProof-import-directory-layout-");
-        await GitAsync(upstream.FullName, "init", "--quiet");
-        await GitAsync(upstream.FullName, "config", "user.name", "SharpProof Test");
-        await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
+        await GitAsync(upstream.FullName, ["init", "--quiet"]);
+        await GitAsync(upstream.FullName, ["config", "user.name", "SharpProof Test"]);
+        await GitAsync(upstream.FullName, ["config", "user.email", "test@example.invalid"]);
         var algorithms = Path.Combine(upstream.FullName, "Algorithms");
         Directory.CreateDirectory(algorithms);
         await File.WriteAllTextAsync(Path.Combine(algorithms, "ordinary.cs"),
             "public static class C { public static int Value() => 1; }\n");
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
-        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "ordinary source fixture"]);
+        var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName, commit, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo(
             $"Expected upstream source directory is missing: {Path.Combine(upstream.FullName, "DataStructures")}"));
-        Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+        Assert.That(await GitAsync(upstream.FullName, ["status", "--porcelain"]), Is.Empty);
     }
 
     [TestCase("reviewed")]
@@ -86,9 +86,9 @@ public sealed class CorpusImportWorkflowTests
         using var upstream = new TempDirectory("SharpProof-import-source-");
         using var target = new TempDirectory("SharpProof-import-target-");
         using var configuration = new TempDirectory("SharpProof-import-config-");
-        await GitAsync(upstream.FullName, "init", "--quiet");
-        await GitAsync(upstream.FullName, "config", "user.name", "SharpProof Test");
-        await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
+        await GitAsync(upstream.FullName, ["init", "--quiet"]);
+        await GitAsync(upstream.FullName, ["config", "user.name", "SharpProof Test"]);
+        await GitAsync(upstream.FullName, ["config", "user.email", "test@example.invalid"]);
         var pinned = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
         var pinnedSource = pinned.Sources.Single();
         var license = await File.ReadAllTextAsync(Path.Combine(
@@ -108,10 +108,10 @@ public sealed class CorpusImportWorkflowTests
             source.AppendLine("}");
             await File.WriteAllTextAsync(path, source.ToString());
         }
-        await GitAsync(upstream.FullName, "add", ".");
-        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
-        await GitAsync(upstream.FullName, "remote", "add", "origin", ApprovedRepository);
-        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        await GitAsync(upstream.FullName, ["add", "."]);
+        await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "ordinary source fixture"]);
+        await GitAsync(upstream.FullName, ["remote", "add", "origin", ApprovedRepository]);
+        var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
         var (files, candidates) = await OpenSourceCorpusImporter.DiscoverSourcesAsync(
             upstream.FullName, commit, TestContext.CurrentContext.CancellationToken);
         var selected = OpenSourceCorpusImporter.SelectDiverseCandidates(candidates, 200);
@@ -162,7 +162,7 @@ public sealed class CorpusImportWorkflowTests
                     Assert.That(missingMethodsError!.Message,
                         Is.EqualTo("The existing OSS corpus manifest has no methods array."));
                     Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(missingMethodsManifest));
-                    Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+                    Assert.That(await GitAsync(upstream.FullName, ["status", "--porcelain"]), Is.Empty);
                 }
                 return;
             }
@@ -185,7 +185,7 @@ public sealed class CorpusImportWorkflowTests
             Assert.That(imported.Methods, Is.EqualTo(plan.Document.Methods));
             Assert.That(imported.Files, Is.EqualTo(plan.Document.Files));
             Assert.That(await File.ReadAllTextAsync(Path.Combine(corpusDirectory, pinnedSource.LicenseFile)), Is.EqualTo(license));
-            Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+            Assert.That(await GitAsync(upstream.FullName, ["status", "--porcelain"]), Is.Empty);
         }
         finally
         {
@@ -194,9 +194,10 @@ public sealed class CorpusImportWorkflowTests
         }
     }
 
-    private static Task<string> GitAsync(string path, params string[] arguments)
+    private static Task<string> GitAsync(string path, ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(path);
         return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, TestContext.CurrentContext.CancellationToken);
     }

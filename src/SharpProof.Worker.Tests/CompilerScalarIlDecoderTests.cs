@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -54,9 +55,9 @@ public sealed class CompilerScalarIlDecoderTests
         Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
 
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(trees, Has.Length.EqualTo(compilation.SyntaxTrees.Length));
+        Assert.That(trees, Has.Count.EqualTo(compilation.SyntaxTrees.Length));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            trees, null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
+            trees.ToImmutableArray(), null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSourceReference"));
     }
@@ -78,9 +79,9 @@ public sealed class CompilerScalarIlDecoderTests
             using var imageStream = new MemoryStream();
             var emitted = dependency.Emit(imageStream);
             Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-            var image = imageStream.ToArray();
+            var image = ImmutableArray.Create<byte>(imageStream.GetBuffer().AsSpan(0, checked((int)imageStream.Length)));
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, image.AsSpan());
             var reference = MetadataReference.CreateFromFile(path);
             var compilation = CSharpCompilation.Create("ScalarIlCaller_" + Guid.NewGuid().ToString("N"),
                 [CSharpSyntaxTree.ParseText(
@@ -93,7 +94,7 @@ public sealed class CompilerScalarIlDecoderTests
             var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
             var method = (IMethodSymbol)assembly.GetTypeByMetadataName("ScalarBody")!.GetMembers("Read").Single();
             Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, assembly), Is.True);
-            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
             var body = pe.GetMethodBody(definition.RelativeVirtualAddress);

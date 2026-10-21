@@ -7,34 +7,53 @@ namespace SharpProof.Ir;
 // from approximation sites.
 internal static class IrSequenceReads
 {
-    internal static HashSet<IrInstructionId> Readers(IrProgram program)
+    internal static ImmutableHashSet<IrInstructionId> Readers(IrProgram program)
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
-        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
-        var writes = new Dictionary<IrVarId, List<IrInstruction>>();
+        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var writes = ImmutableDictionary.CreateBuilder<IrVarId, ImmutableArray<IrInstruction>.Builder>();
         foreach (var instruction in instructions)
         {
             foreach (var variable in IrInstructionFacts.WrittenVariables(instruction))
             {
                 if (!writes.TryGetValue(variable, out var writers))
-                { writes.Add(variable, writers = []); }
+                {
+                    writers = ImmutableArray.CreateBuilder<IrInstruction>();
+                    writes[variable] = writers;
+                }
                 writers.Add(instruction);
             }
         }
         // A fresh variable only ever holds a sequence this body allocated or
         // a literal.
-        var fresh = new HashSet<IrVarId>(writes.Where(pair => pair.Value.All(writer =>
-            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key));
-        while (fresh.RemoveWhere(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (writes[variable].Any(writer =>
-            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh))))) != 0)
-        { }
-        var readers = new HashSet<IrInstructionId>();
+        var fresh = writes.Where(pair => pair.Value.All(writer =>
+            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key).ToImmutableHashSet().ToBuilder();
+        while (true)
+        {
+            var previous = fresh.ToImmutable();
+            foreach (var variable in previous)
+            {
+                RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+                if (writes[variable].Any(writer =>
+                    writer is null ? throw new ArgumentNullException(nameof(writer)) :
+                    writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh)))
+                {
+                    fresh.Remove(variable);
+                }
+            }
+            if (fresh.Count == previous.Count)
+            { break; }
+        }
+        var readers = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         foreach (var instruction in instructions)
         {
-            var pending = new Stack<IrTerm>(IrInstructionFacts.ReadTerms(instruction));
-            while (pending.Count != 0)
+            var pending = ImmutableStack<IrTerm>.Empty;
+            foreach (var root in IrInstructionFacts.ReadTerms(instruction))
+            { pending = pending.Push(root); }
+            while (!pending.IsEmpty)
             {
-                var term = pending.Pop();
+                var term = pending.Peek();
+                pending = pending.Pop();
                 if (term is IrSequenceAccessTerm { Sequence: var accessed } && !IsLocal(accessed, fresh) ||
                     term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh) ||
                     IrFieldSites.IsFieldRead(program.Factory, term) && !IsLocal(((IrOpaqueTerm)term).Receiver!, fresh))
@@ -42,13 +61,13 @@ internal static class IrSequenceReads
                     readers.Add(instruction.Id);
                     break;
                 }
-                IrTraversal.PushChildren(term, pending);
+                pending = IrTraversal.PushChildren(term, pending);
             }
         }
-        return readers;
+        return readers.ToImmutable();
     }
 
-    private static bool IsLocal(IrTerm sequence, HashSet<IrVarId> fresh)
+    private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId>.Builder fresh)
     {
         fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
         sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));

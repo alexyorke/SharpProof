@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,7 +10,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class FrontendBoundaryCoverageTests
 {
-    private static readonly string[] ExpectedDefinedSymbols = ["LOCAL", "RETAINED"];
+    private static readonly ImmutableArray<string> ExpectedDefinedSymbols = ["LOCAL", "RETAINED"];
     [Test]
     public void ProgramAbstentionRequiresIdentityAndReason()
     {
@@ -39,14 +40,14 @@ public sealed class FrontendBoundaryCoverageTests
             [CSharpSyntaxTree.ParseText("namespace N { public class Outer { public class Inner {} } }")],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var first = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
-        var second = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
+        var first = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
+        var second = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
         Assert.That(first, Is.EqualTo(second));
         Assert.That(first.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())), Does.Contain("N.Outer.Inner"));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>((Action)(() =>
-            _ = ReferencedTypeSymbols.GetAllCached(compilation, cancellation.Token).ToArray()));
+            _ = ReferencedTypeSymbols.GetAllCached(compilation, cancellation.Token).ToImmutableArray()));
     }
 
     [Test]

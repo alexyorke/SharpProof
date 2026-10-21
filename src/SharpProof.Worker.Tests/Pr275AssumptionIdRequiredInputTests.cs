@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Smt;
@@ -23,7 +24,7 @@ public sealed class Pr275AssumptionIdRequiredInputTests
         var core = ((ProvenOutcome)outcome).Core;
         Assert.That(core.IsDefault, Is.False);
         Assert.That(core, Is.Empty);
-        var assumptionIds = new Dictionary<ProofJustification, string>();
+        var assumptionIds = ImmutableDictionary<ProofJustification, string>.Empty;
         Assert.That(CallableProofCore.AssumptionIds(core, assumptionIds), Is.Empty);
 
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>

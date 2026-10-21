@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using NUnit.Framework;
@@ -14,7 +15,7 @@ public sealed class ContractApiCatalogParityTests
         var methods = typeof(Contract).GetMethods(
             BindingFlags.Public |
             BindingFlags.Static |
-            BindingFlags.DeclaredOnly);
+            BindingFlags.DeclaredOnly).ToImmutableArray();
         var attributes = typeof(Contract).Assembly.GetExportedTypes()
             .Where(static type =>
                 type is null ? throw new System.ArgumentNullException(nameof(type)) : (!type.IsAbstract &&
@@ -117,7 +118,7 @@ public sealed class ContractApiCatalogParityTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(descriptor)); }
 
         System.ArgumentNullException.ThrowIfNull(method);
-        var parameters = method.GetParameters();
+        var parameters = method.GetParameters().ToImmutableArray();
         switch (descriptor.Shape)
         {
             case ContractApiMethodShape.Clause:
@@ -147,12 +148,13 @@ public sealed class ContractApiCatalogParityTests
 
     private static void AssertGenericIntrinsic(
         MethodInfo method,
-        ParameterInfo[] parameters,
+        ImmutableArray<ParameterInfo> parameters,
         int parameterCount)
     {
-        System.ArgumentNullException.ThrowIfNull(parameters, nameof(parameters));
+        if (parameters.IsDefault)
+        { throw new System.ArgumentNullException(nameof(parameters)); }
         System.ArgumentNullException.ThrowIfNull(method);
-        var generic = method.GetGenericArguments();
+        var generic = method.GetGenericArguments().ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(method.IsGenericMethodDefinition, Is.True);

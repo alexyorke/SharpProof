@@ -57,7 +57,7 @@ public sealed class FieldMutationMaterializationCoverageTests
         var parameter = subject.Context.Parameters.Single().Entry;
         var type = subject.Factory.GetVariableInfo(parameter).Type;
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program,
-            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Factory.CreateNullValue(type) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Factory.CreateNullValue(type)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(replay.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference));
         Assert.That(replay.ConsumedApproximation, Is.False);

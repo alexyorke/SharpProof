@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -33,12 +34,11 @@ public sealed class NullableComparerDomainTests
         }
         Assert.That(lowered.Classification.IsExact, Is.True);
         var type = factory.GetVariableInfo(context.Parameters[0].Current).Type;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [context.Parameters[0].Current] = isNull ? factory.CreateNullValue(type) : factory.CreateReferenceValue(type, Comparer<int>.Default),
-            [context.Parameters[1].Current] = factory.CreateIntegerValue(1),
-            [context.Parameters[2].Current] = factory.CreateIntegerValue(2)
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[context.Parameters[0].Current] = isNull ? factory.CreateNullValue(type) : factory.CreateReferenceValue(type, Comparer<int>.Default);
+        inputBuilder[context.Parameters[1].Current] = factory.CreateIntegerValue(1);
+        inputBuilder[context.Parameters[2].Current] = factory.CreateIntegerValue(2);
+        var inputs = inputBuilder.ToImmutable();
         var interpreter = new IrInterpreter(factory);
         var safe = interpreter.Evaluate(lowered.SafeCondition, inputs);
         Assert.That(safe.Status, Is.EqualTo(IrEvaluationStatus.Value));

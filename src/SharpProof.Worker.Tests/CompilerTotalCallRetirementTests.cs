@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -41,7 +42,7 @@ public sealed class CompilerTotalCallRetirementTests
     [Test]
     public async Task ClosedGenericSourceFramesRemainIndependent()
     {
-        var targets = new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values.ToArray();
+        var targets = new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values.ToImmutableArray();
         Assert.That(targets, Has.Length.EqualTo(2));
         foreach (var target in targets)
         {
@@ -100,12 +101,13 @@ public sealed class CompilerTotalCallRetirementTests
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         // Excessive expansion either yields no Total body (nothing is published,
         // so nothing can be proven) or only non-proven results.
-        if (results.Count == 0)
+        if (results.Length == 0)
         { Assert.That(preparation.Total, Is.Null, "Published nothing despite an admitted Total body."); }
         Assert.That(results.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome != WorkerClaimOutcome.Proven)), Is.True);
     }
@@ -114,9 +116,10 @@ public sealed class CompilerTotalCallRetirementTests
     {
         System.ArgumentNullException.ThrowIfNull(preparation);
         Assert.That(preparation.Total, Is.Not.Null);
-        var results = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+        var resultBuilder = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results.Values.Single().Outcome, Is.EqualTo(expected), results.Values.Single().Reason.ToString());
     }
@@ -184,15 +187,14 @@ public sealed class CompilerTotalCallRetirementTests
             }
             """,
             Path.Combine(temporary.FullName, "Subject.cs"),
-            firstReference,
-            secondReference);
+            [firstReference, secondReference]);
         var method = GetCall(compilation, "Verify", "Identity");
         var resolution = new CompilerMetadataResolution.MetadataResolutionContext(compilation);
         for (var lookup = 0; lookup < 2; lookup++)
         {
             Assert.That(resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name,
                 TestContext.CurrentContext.CancellationToken, out _, out _, out var selectedPath), Is.True);
-            Assert.That(new[] { implementationPath, duplicatePath }, Does.Contain(selectedPath));
+            Assert.That(ImmutableArray.Create(implementationPath, duplicatePath), Does.Contain(selectedPath));
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
 
@@ -231,17 +233,18 @@ public sealed class CompilerTotalCallRetirementTests
     private static CSharpCompilation CreateCompilation(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        return TestCompilation.Create(
+        return TestCompilation.CreateExact(
             "CompilerRelationalSummaryProviderTests",
-            ("Subject.cs", source));
+            [("Subject.cs", source)]);
     }
 
     private static CSharpCompilation CreateCompilationWithReferences(
         string source,
         string sourcePath,
-        params MetadataReference[] additionalReferences)
+        ImmutableArray<MetadataReference> additionalReferences)
     {
-        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        if (additionalReferences.IsDefault)
+        { throw new ArgumentNullException(nameof(additionalReferences)); }
         System.ArgumentNullException.ThrowIfNull(source);
         System.ArgumentNullException.ThrowIfNull(sourcePath);
         var compilation = CSharpCompilation.Create(

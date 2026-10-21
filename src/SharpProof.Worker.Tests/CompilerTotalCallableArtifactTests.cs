@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -52,7 +53,7 @@ public sealed class CompilerTotalCallableArtifactTests
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(static preparation =>
             preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Total is { CallPreconditions.Length: 1 })).Total!;
-        var instructions = total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -101,7 +102,7 @@ public sealed class CompilerTotalCallableArtifactTests
             "Contract.Ensures(Contract.Result<int[]>() == items); return items; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
         Assert.That(index < graph.Types.Length, Is.True);
-        graph.Types[index].ClosedSealedReference = true;
+        { graph = graph with { Types = graph.Types.SetItem(index, graph.Types[index] with { ClosedSealedReference = true }) }; { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; } }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -132,7 +133,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
-        Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(new CompilerDisjointInputPair[] { new(0, 1), new(0, 2), new(1, 2) }));
+        Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(ImmutableArray.Create(new CompilerDisjointInputPair(0, 1), new CompilerDisjointInputPair(0, 2), new CompilerDisjointInputPair(1, 2))));
         Assert.That(CompilerTotalCallableArtifactCodec.Encode(preparation.Total)!.DisjointInputs, Is.EqualTo(artifact.Callables.Single().Total!.DisjointInputs));
         Assert.That((await Check(preparation, 0)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
@@ -158,37 +159,67 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "null-row":
-                total.DisjointInputs = [null!];
+                {
+                    total = total with { DisjointInputs = [null!] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "negative":
-                total.DisjointInputs = [new(-1, 1)];
+                {
+                    total = total with { DisjointInputs = [new(-1, 1)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "self":
-                total.DisjointInputs = [new(0, 0)];
+                {
+                    total = total with { DisjointInputs = [new(0, 0)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "reversed":
-                total.DisjointInputs = [new(1, 0)];
+                {
+                    total = total with { DisjointInputs = [new(1, 0)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "range":
-                total.DisjointInputs = [new(0, 5)];
+                {
+                    total = total with { DisjointInputs = [new(0, 5)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "duplicate":
-                total.DisjointInputs = [new(0, 1), new(0, 1)];
+                {
+                    total = total with { DisjointInputs = [new(0, 1), new(0, 1)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "unsorted":
-                total.DisjointInputs = [new(1, 2), new(0, 1)];
+                {
+                    total = total with { DisjointInputs = [new(1, 2), new(0, 1)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "object":
-                total.DisjointInputs = [new(0, 3)];
+                {
+                    total = total with { DisjointInputs = [new(0, 3)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "scalar":
-                total.DisjointInputs = [new(0, 4)];
+                {
+                    total = total with { DisjointInputs = [new(0, 4)] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "entry":
-                artifact.Callables.Single().TotalEntry!.DisjointInputs = [new(0, 1)];
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = artifact.Callables.Single().TotalEntry! with { DisjointInputs = [new(0, 1)] } }) }; }
                 break;
             case "abstraction":
-                total.IsBodyAbstraction = true;
+                {
+                    total = total with { IsBodyAbstraction = true };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -280,34 +311,34 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "clauses":
-                dto.Clauses = [new CompilerTotalClauseArtifact()];
+                { dto = dto with { Clauses = [new CompilerTotalClauseArtifact()] }; }
                 break;
             case "null-clauses":
-                dto.Clauses = null!;
+                { dto = dto with { Clauses = default }; }
                 break;
             case "effects":
-                dto.ValidEffectClaimIds = ["unowned"];
+                { dto = dto with { ValidEffectClaimIds = ["unowned"] }; }
                 break;
             case "null-effects":
-                dto.ValidEffectClaimIds = null!;
+                { dto = dto with { ValidEffectClaimIds = default }; }
                 break;
             case "exceptions":
-                dto.ExceptionConstraints = [new CompilerTotalExceptionConstraintArtifact()];
+                { dto = dto with { ExceptionConstraints = [new CompilerTotalExceptionConstraintArtifact()] }; }
                 break;
             case "null-exceptions":
-                dto.ExceptionConstraints = null!;
+                { dto = dto with { ExceptionConstraints = default }; }
                 break;
             case "abstraction":
-                dto.IsBodyAbstraction = true;
+                { dto = dto with { IsBodyAbstraction = true }; }
                 break;
             case "entry-effects":
-                dto.EffectsCompleteAtEntry = true;
+                { dto = dto with { EffectsCompleteAtEntry = true }; }
                 break;
             case "markers":
-                dto.CallPreconditions = [];
+                { dto = dto with { CallPreconditions = [] }; }
                 break;
             case "null-markers":
-                dto.CallPreconditions = null!;
+                { dto = dto with { CallPreconditions = default }; }
                 break;
             case "owner":
                 ownerId = " ";
@@ -329,10 +360,10 @@ public sealed class CompilerTotalCallableArtifactTests
         var before = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(before.Outcome, Is.TypeOf<RefutedOutcome>(), before.Reason.ToString());
         Assert.That(before.CallPreconditionWitness, Is.Not.Null);
-        dto.Graph.Roots = [];
-        dto.Parameters[0].Entry = dto.Parameters[0].Current;
-        dto.CallPreconditions[0].CalleeIdentity = "unrelated::M:Other.Helper";
-        dto.CallPreconditions[0].InstructionIndex = -1;
+        { dto = dto with { Graph = dto.Graph with { Roots = [] } }; }
+        { dto = dto with { Parameters = dto.Parameters.SetItem(0, dto.Parameters[0] with { Entry = dto.Parameters[0].Current }) }; }
+        { dto = dto with { CallPreconditions = dto.CallPreconditions.SetItem(0, dto.CallPreconditions[0] with { CalleeIdentity = "unrelated::M:Other.Helper" }) }; }
+        { dto = dto with { CallPreconditions = dto.CallPreconditions.SetItem(0, dto.CallPreconditions[0] with { InstructionIndex = -1 }) }; }
         var after = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(after.Outcome, Is.TypeOf<RefutedOutcome>(), after.Reason.ToString());
         Assert.That(after.CallPreconditionWitness, Is.EqualTo(before.CallPreconditionWitness));
@@ -357,9 +388,21 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
         var callable = artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }));
         var total = callable.Total!;
-        total.EffectsCompleteAtEntry = false;
-        total.ValidEffectClaimIds = [];
-        total.ExceptionConstraints = [];
+        {
+            total = total with { EffectsCompleteAtEntry = false };
+            callable = callable with { Total = total };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+        }
+        {
+            total = total with { ValidEffectClaimIds = [] };
+            callable = callable with { Total = total };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+        }
+        {
+            total = total with { ExceptionConstraints = [] };
+            callable = callable with { Total = total };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+        }
         return (callable.CallableId, total);
     }
 
@@ -413,8 +456,7 @@ public sealed class CompilerTotalCallableArtifactTests
             Assert.That(decoded.CallableId, Is.EqualTo(ordinary.CallableId));
             var input = decoded.Parameters.Single().Entry;
             var execution = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
-                new Dictionary<IrVarId, IrValue>
-                { [input] = decoded.Program.Factory.CreateIntegerValue(decoded.Program.Factory.GetVariableInfo(input).Type, 0L) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, decoded.Program.Factory.CreateIntegerValue(decoded.Program.Factory.GetVariableInfo(input).Type, 0L)));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.GetCurrentValue(input)!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
             Assert.That(execution.GetCurrentValue(decoded.Parameters.Single().Old)!.IntegerNumericValue,
@@ -442,25 +484,46 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "roots":
-                total.Graph.Roots = Enumerable.Repeat(0, 65_536).ToArray();
+                {
+                    total = total with { Graph = total.Graph with { Roots = Enumerable.Repeat(0, 65_536).ToImmutableArray() } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "blocks":
-                total.Graph.Blocks = Enumerable.Repeat(total.Graph.Blocks[0], 4097).ToArray();
+                {
+                    total = total with { Graph = total.Graph with { Blocks = Enumerable.Repeat(total.Graph.Blocks[0], 4097).ToImmutableArray() } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "instructions":
-                total.Graph.Blocks[0].Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToArray();
+                {
+                    total = total with { Graph = total.Graph with { Blocks = total.Graph.Blocks.SetItem(0, total.Graph.Blocks[0] with { Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToImmutableArray() }) } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-roots":
-                total.Graph.Roots = null!;
+                {
+                    total = total with { Graph = total.Graph with { Roots = default } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-blocks":
-                total.Graph.Blocks = null!;
+                {
+                    total = total with { Graph = total.Graph with { Blocks = default } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-instructions":
-                total.Graph.Blocks[0].Instructions = null!;
+                {
+                    total = total with { Graph = total.Graph with { Blocks = total.Graph.Blocks.SetItem(0, total.Graph.Blocks[0] with { Instructions = default }) } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
         }
-        total.Graph.Terms[0].Type = -1;
+        {
+            total = total with { Graph = total.Graph with { Terms = total.Graph.Terms.SetItem(0, total.Graph.Terms[0] with { Type = -1 }) } };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+        }
         var failure = Assert.Throws<InvalidDataException>(new Action(() =>
             CompilerTotalCallableArtifactCodec.Decode(total, artifact.Manifest.Callables.Single(),
                 [.. artifact.Manifest.Claims], TestContext.CurrentContext.CancellationToken)));
@@ -493,11 +556,11 @@ public sealed class CompilerTotalCallableArtifactTests
             _ => throw new AssertionException("Unknown mutation.")
         };
         var encoded = CompilerTotalCallableArtifactCodec.Encode(modified)!;
-        artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)).Total = encoded;
-        var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))
-            .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToArray();
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)) with { Total = encoded }) }; }
+        var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old)))
+            .Concat(encoded.Result == -1 ? ImmutableArray<int>.Empty : ImmutableArray.Create(encoded.Result)).Distinct().OrderBy(index => index).ToImmutableArray();
         var operations = encoded.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Operation))
-            .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToArray();
+            .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToImmutableArray();
         Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations, TestContext.CurrentContext.CancellationToken)));
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -521,28 +584,57 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "missing":
-                total.CallPreconditions = [];
+                {
+                    total = total with { CallPreconditions = [] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "duplicate":
-                total.CallPreconditions[1].InstructionIndex = row.InstructionIndex;
+                {
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(1, total.CallPreconditions[1] with { InstructionIndex = row.InstructionIndex }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "index":
-                row.InstructionIndex = -1;
+                {
+                    row = row with { InstructionIndex = -1 };
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "callee":
-                row.CalleeIdentity = "";
+                {
+                    row = row with { CalleeIdentity = "" };
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "ordinal":
-                row.ClauseOrdinal = -1;
+                {
+                    row = row with { ClauseOrdinal = -1 };
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "site":
-                row.ClauseSite = -1;
+                {
+                    row = row with { ClauseSite = -1 };
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "root":
-                row.ValueRoot = row.SafeRoot;
+                {
+                    row = row with { ValueRoot = row.SafeRoot };
+                    total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
             case "abstraction":
-                total.IsBodyAbstraction = true;
+                {
+                    total = total with { IsBodyAbstraction = true };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -564,7 +656,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var comparison = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Binary &&
             (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual));
-        comparison.C = comparison.B;
+        (comparison, graph) = graph.ChangeRow(comparison, comparison with { C = comparison.B });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -587,7 +680,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
         var interpreter = new IrProgramInterpreter(total.Program.Factory);
-        var entries = new Dictionary<IrVarId, IrValue>();
+        var entries = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var result = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -602,7 +695,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(EmptyArraySource);
         var graph = artifact.Callables.Single().Total!.Graph;
         var empty = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.EmptyArray));
-        empty.Type = Array.FindIndex(graph.Types, type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Boolean));
+        (empty, graph) = graph.ChangeRow(empty, empty with { Type = PortableGraphChanges.FindIndex(graph.Types, type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Boolean)) });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -655,29 +749,59 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "body":
-                entry.Graph.HasProgram = true;
+                {
+                    entry = entry with { Graph = entry.Graph with { HasProgram = true } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "ensures":
-                entry.Clauses[0].Kind = CompilerContractKind.Ensures;
+                {
+                    entry = entry with { Clauses = entry.Clauses.SetItem(0, entry.Clauses[0] with { Kind = CompilerContractKind.Ensures }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "id":
-                entry.Clauses[0].AssumptionId = "foreign";
+                {
+                    entry = entry with { Clauses = entry.Clauses.SetItem(0, entry.Clauses[0] with { AssumptionId = "foreign" }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "count":
-                entry.Clauses = [];
-                entry.Graph.Roots = [];
+                {
+                    entry = entry with { Clauses = [] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
+                {
+                    entry = entry with { Graph = entry.Graph with { Roots = [] } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "current":
-                (entry.Parameters[0].Entry, entry.Parameters[0].Current) = (entry.Parameters[0].Current, entry.Parameters[0].Entry);
+                {
+                    var changedFixture = (entry.Parameters[0].Current, entry.Parameters[0].Entry);
+                    entry = entry with { Parameters = entry.Parameters.SetItem(0, entry.Parameters[0] with { Entry = changedFixture.Item1 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                    entry = entry with { Parameters = entry.Parameters.SetItem(0, entry.Parameters[0] with { Current = changedFixture.Item2 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "result":
-                entry.Result = entry.Parameters[0].Entry;
+                {
+                    entry = entry with { Result = entry.Parameters[0].Entry };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "mode":
-                entry.Graph.Semantics = IrExecutionSemantics.Legacy;
+                {
+                    entry = entry with { Graph = entry.Graph with { Semantics = IrExecutionSemantics.Legacy } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
             case "span":
-                entry.Graph.Operations[entry.Clauses[0].Operation].SourceSpan = null;
+                {
+                    entry = entry with { Graph = entry.Graph with { Operations = entry.Graph.Operations.SetItem(entry.Clauses[0].Operation, entry.Graph.Operations[entry.Clauses[0].Operation] with { SourceSpan = null }) } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -690,7 +814,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(EntryOnlySource);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        roundTrip.Callables.Single().TotalEntry!.Graph.Roots = [];
+        { roundTrip = roundTrip with { Callables = roundTrip.Callables.ReplaceReference(roundTrip.Callables.Single(), roundTrip.Callables.Single() with { TotalEntry = roundTrip.Callables.Single().TotalEntry! with { Graph = roundTrip.Callables.Single().TotalEntry!.Graph with { Roots = [] } } }) }; }
         var result = await TotalCallableVerifier.VerifyEntryAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
     }
@@ -769,7 +893,7 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(candidate.CallableId, Is.EqualTo(preparation.Entry.CallableId));
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         // Mutating the wire DTO after decoding cannot alter the owned program.
-        roundTrip.Callables.Single().Total!.Graph.Roots = [];
+        { roundTrip = roundTrip with { Callables = roundTrip.Callables.ReplaceReference(roundTrip.Callables.Single(), roundTrip.Callables.Single() with { Total = roundTrip.Callables.Single().Total! with { Graph = roundTrip.Callables.Single().Total!.Graph with { Roots = [] } } }) }; }
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -882,7 +1006,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public void TotalOperationDocumentsUseCapturedTreeIdentity(string document)
     {
         System.ArgumentNullException.ThrowIfNull(document);
-        var compilation = TestCompilation.Create("DocumentIdentity", (document, DiamondSource));
+        var compilation = TestCompilation.CreateExact("DocumentIdentity", [(document, DiamondSource)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
@@ -898,14 +1022,14 @@ public sealed class CompilerTotalCallableArtifactTests
     [Test]
     public void SameSpanTreesKeepDistinctCapturedDocumentsAndMappedReporting()
     {
-        var source = "#line 100 \"mapped.cs\"\n" + DiamondSource;
-        var compilation = TestCompilation.Create("MultipleDocuments", ("shared.cs", source),
-            ("shared.cs", source.Replace("class Subject", "class Another", StringComparison.Ordinal)));
+        const string source = "#line 100 \"mapped.cs\"\n" + DiamondSource;
+        var compilation = TestCompilation.CreateExact("MultipleDocuments", [("shared.cs", source),
+            ("shared.cs", source.Replace("class Subject", "class Another", StringComparison.Ordinal))]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var documents = artifact.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!)).ToArray();
+        var documents = artifact.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!)).ToImmutableArray();
         Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Document)), Is.EquivalentTo(artifact.Compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))));
         Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Start)).Distinct().Count(), Is.EqualTo(1));
         Assert.That(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)), Is.All.EqualTo("mapped.cs"));
@@ -994,50 +1118,110 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "mode":
-                total.Graph.Semantics = IrExecutionSemantics.Legacy;
+                {
+                    total = total with { Graph = total.Graph with { Semantics = IrExecutionSemantics.Legacy } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "roots":
-                total.Graph.Roots = [];
+                {
+                    total = total with { Graph = total.Graph with { Roots = [] } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "alias":
-                parameter.Old = parameter.Current;
+                {
+                    parameter = parameter with { Old = parameter.Current };
+                    total = total with { Parameters = total.Parameters.SetItem(0, parameter) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "result-alias":
-                total.Result = parameter.Entry;
+                {
+                    total = total with { Result = parameter.Entry };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "role-swap":
-                (parameter.Entry, parameter.Current) = (parameter.Current, parameter.Entry);
+                {
+                    var changedFixture = (parameter.Current, parameter.Entry);
+                    parameter = parameter with { Entry = changedFixture.Item1 };
+                    total = total with { Parameters = total.Parameters.SetItem(0, parameter) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    parameter = parameter with { Current = changedFixture.Item2 };
+                    total = total with { Parameters = total.Parameters.SetItem(0, parameter) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "type":
-                total.Graph.Variables[parameter.Old].Type = total.Graph.Variables[total.Parameters[1].Entry].Type;
+                {
+                    total = total with { Graph = total.Graph with { Variables = total.Graph.Variables.SetItem(parameter.Old, total.Graph.Variables[parameter.Old] with { Type = total.Graph.Variables[total.Parameters[1].Entry].Type }) } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "claim":
-                total.Clauses[1].ClaimId = total.Clauses[2].ClaimId;
+                {
+                    total = total with { Clauses = total.Clauses.SetItem(1, total.Clauses[1] with { ClaimId = total.Clauses[2].ClaimId }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "assumption":
-                total.Clauses[0].AssumptionId = "foreign";
+                {
+                    total = total with { Clauses = total.Clauses.SetItem(0, total.Clauses[0] with { AssumptionId = "foreign" }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "site-swap":
-                (total.Clauses[1].Operation, total.Clauses[2].Operation) = (total.Clauses[2].Operation, total.Clauses[1].Operation);
+                {
+                    var changedFixture = (total.Clauses[2].Operation, total.Clauses[1].Operation);
+                    total = total with { Clauses = total.Clauses.SetItem(1, total.Clauses[1] with { Operation = changedFixture.Item1 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    total = total with { Clauses = total.Clauses.SetItem(2, total.Clauses[2] with { Operation = changedFixture.Item2 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "root-swap":
-                (total.Clauses[1].ValueRoot, total.Clauses[2].ValueRoot) = (total.Clauses[2].ValueRoot, total.Clauses[1].ValueRoot);
+                {
+                    var changedFixture = (total.Clauses[2].ValueRoot, total.Clauses[1].ValueRoot);
+                    total = total with { Clauses = total.Clauses.SetItem(1, total.Clauses[1] with { ValueRoot = changedFixture.Item1 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    total = total with { Clauses = total.Clauses.SetItem(2, total.Clauses[2] with { ValueRoot = changedFixture.Item2 }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "assume-kind":
-                total.Clauses[0].Kind = CompilerContractKind.Assume;
+                {
+                    total = total with { Clauses = total.Clauses.SetItem(0, total.Clauses[0] with { Kind = CompilerContractKind.Assume }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-program":
-                total.Graph.HasProgram = false;
+                {
+                    total = total with { Graph = total.Graph with { HasProgram = false } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-span":
-                total.Graph.Operations[total.Clauses[0].Operation].SourceSpan = null;
+                {
+                    total = total with { Graph = total.Graph with { Operations = total.Graph.Operations.SetItem(total.Clauses[0].Operation, total.Graph.Operations[total.Clauses[0].Operation] with { SourceSpan = null }) } };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "missing-roles":
-                total.Parameters = null!;
+                {
+                    total = total with { Parameters = default };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "foreign-graph":
-                total.Graph = CreateArtifact(DiamondSource.Replace("int x, bool choose, int unused", "long x, bool choose, long unused", StringComparison.Ordinal)
-                    .Replace("Result<int>", "Result<long>", StringComparison.Ordinal).Replace("static int Target", "static long Target", StringComparison.Ordinal)).Callables.Single().Total!.Graph;
+                {
+                    total = total with
+                    {
+                        Graph = CreateArtifact(DiamondSource.Replace("int x, bool choose, int unused", "long x, bool choose, long unused", StringComparison.Ordinal)
+                    .Replace("Result<int>", "Result<long>", StringComparison.Ordinal).Replace("static int Target", "static long Target", StringComparison.Ordinal)).Callables.Single().Total!.Graph
+                    };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -1057,7 +1241,7 @@ public sealed class CompilerTotalCallableArtifactTests
         int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("TotalArtifact", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("TotalArtifact", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,

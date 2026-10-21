@@ -180,7 +180,7 @@ public sealed class ResourceMemoryReplayTests
         { builder.Assign(entry, factory.CreateOperation(), output, factory.Variable(input)); }
         builder.Return(entry, factory.CreateOperation(), factory.Variable(copy ? output : input));
         var program = builder.Build();
-        var observed = Replay(program, Layout, new Dictionary<IrVarId, IrValue> { [input] = factory.CreateSequenceValue(array, [factory.CreateIntegerValue(1)]) });
+        var observed = Replay(program, Layout, ImmutableDictionary<IrVarId, IrValue>.Empty.Add(input, factory.CreateSequenceValue(array, [factory.CreateIntegerValue(1)])));
         Assert.That(observed.Bounds, Is.Null);
         Assert.That(observed.UnknownReason, Is.EqualTo("MemoryReplayBorrowedReference"));
     }
@@ -378,7 +378,7 @@ public sealed class ResourceMemoryReplayTests
         var alias = factory.CreateVariable("alias", factory.StringType);
         builder.Assign(entry, factory.CreateOperation(), alias, empty ? factory.String(string.Empty) : factory.Variable(input));
         builder.Return(entry, factory.CreateOperation(), factory.Variable(alias));
-        var inputs = new Dictionary<IrVarId, IrValue> { [input] = IrValue.WithUnknownStringIdentity(factory.CreateStringValue("opaque")) };
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty.Add(input, IrValue.WithUnknownStringIdentity(factory.CreateStringValue("opaque")));
         var check = Replay(builder.Build(), Layout, inputs);
         if (empty)
         { Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(0, 0, 0, 0, 0, 0))); }
@@ -453,7 +453,7 @@ public sealed class ResourceMemoryReplayTests
     }
 
     private static ResourceMemoryCheck Replay(IrProgram program, ResourceRuntimeLayoutContext layout,
-        IReadOnlyDictionary<IrVarId, IrValue>? inputs = null)
+        ImmutableDictionary<IrVarId, IrValue>? inputs = null)
     {
         ArgumentNullException.ThrowIfNull(program);
         ArgumentNullException.ThrowIfNull(layout);

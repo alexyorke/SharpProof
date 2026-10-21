@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -60,7 +61,7 @@ public sealed class AdvisoryInstructionDeltaTests
         var markers = decoded.Instructions.OfType<IrHavocInstruction>().Where(instruction =>
             instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation &&
             instruction.HavocKind == IrHavocKind.Variables &&
-            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect)).ToArray();
+            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect)).ToImmutableArray();
         Assert.That(markers, Is.Not.Empty, "The unchanged compiler producer must supply the declared marker.");
         foreach (var marker in markers)
         {

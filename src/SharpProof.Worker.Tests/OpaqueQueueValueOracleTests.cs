@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -27,14 +28,14 @@ public sealed class OpaqueQueueValueOracleTests
     {
         ArgumentNullException.ThrowIfNull(domain);
         var (type, first, second) = Inputs(domain);
-        var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new Queue<T>(); data.Enqueue(first); data.Enqueue(second); data.Dequeue(); return Read<T>(data); } static U Read<U>(Queue<U> data) => data.Dequeue(); }";
+        const string source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new Queue<T>(); data.Enqueue(first); data.Enqueue(second); data.Dequeue(); return Read<T>(data); } static U Read<U>(Queue<U> data) => data.Dequeue(); }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         for (var ordinal = 0; ordinal < total.Parameters.Length; ordinal++)
         {
             var parameter = total.Parameters[ordinal].Entry;
@@ -42,9 +43,10 @@ public sealed class OpaqueQueueValueOracleTests
             var value = ordinal == 0 ? first : second;
             // Each opaque value is an abstract atom. Struct payloads are never
             // interpreted as fields or numbers by this differential execution.
-            inputs[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
+            inputBuilder[parameter] = !type.IsValueType && value == null ? factory.CreateNullValue(parameterType)
                 : factory.CreateReferenceValue(parameterType, new IrObjectState());
         }
+        var inputs = inputBuilder.ToImmutable();
         var choices = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -59,10 +61,10 @@ public sealed class OpaqueQueueValueOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Reference, Is.SameAs(expected.Reference)); }
 
-        var compilation = TestCompilation.Create("OpaqueQueueValueOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("OpaqueQueueValueOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new AssemblyLoadContext("OpaqueQueueValueOracle", isCollectible: true);

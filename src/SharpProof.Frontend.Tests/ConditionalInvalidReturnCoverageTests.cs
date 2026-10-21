@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -14,8 +15,8 @@ namespace SharpProof.Frontend.Test;
 public sealed class ConditionalInvalidReturnCoverageTests
 {
     private static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12);
-    private static readonly string[] VoidReturnErrors = ["CS0029"];
-    private static readonly string[] NonVoidConditionalErrors = ["CS0578"];
+    private static readonly ImmutableArray<string> VoidReturnErrors = ["CS0029"];
+    private static readonly ImmutableArray<string> NonVoidConditionalErrors = ["CS0578"];
 
     private const string VoidReturnSource = """
         public static class Subject
@@ -73,7 +74,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var execution = new IrProgramInterpreter(factory).Execute(lowering.Program, new Dictionary<IrVarId, IrValue>());
+        var execution = new IrProgramInterpreter(factory).Execute(lowering.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
@@ -90,12 +91,15 @@ public sealed class ConditionalInvalidReturnCoverageTests
         }
     }
 
-    private static void AssertRejectedReturn(string source, string[] expectedErrors, bool failedConversion)
+    private static void AssertRejectedReturn(string source, ImmutableArray<string> expectedErrors, bool failedConversion)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedErrors);
+        if (expectedErrors.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(expectedErrors));
+        }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(expectedErrors));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

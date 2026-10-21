@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using SharpProof.Ir;
@@ -26,18 +27,19 @@ internal static class CompilerReachableSourceValidator
         var artifact = manifest.ReachableSource;
         if (artifact == null)
         { return; }
-        Require(artifact.Bodies != null && artifact.Roots != null && artifact.Bodies.Length <= 4096);
-        Require(artifact.Documents != null && artifact.Documents.Length <= artifact.Bodies!.Length);
-        var documents = new Dictionary<int, CompilerSourceDocumentArtifact>();
+        Require(!artifact.Bodies.IsDefault && !artifact.Roots.IsDefault && artifact.Bodies.Length <= 4096);
+        Require(!artifact.Documents.IsDefault && artifact.Documents.Length <= artifact.Bodies!.Length);
+        var documentBuilder = ImmutableDictionary.CreateBuilder<int, CompilerSourceDocumentArtifact>();
         foreach (var document in artifact.Documents!)
         {
             Require(document != null && document.SourceTreeOrdinal >= 0 && document.MaximumBodyEnd >= 0 &&
                 !string.IsNullOrWhiteSpace(document.Path) &&
-                !documents.ContainsKey(document.SourceTreeOrdinal));
-            documents.Add(document!.SourceTreeOrdinal, document);
+                !documentBuilder.ContainsKey(document.SourceTreeOrdinal));
+            documentBuilder.AddUnique(document!.SourceTreeOrdinal, document);
         }
-        var bodies = new Dictionary<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
-        var graphs = new Dictionary<string, DecodedPortableIrGraph>(StringComparer.Ordinal);
+        var documents = documentBuilder.ToImmutable();
+        var bodyBuilder = ImmutableDictionary.CreateBuilder<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
+        var graphBuilder = ImmutableDictionary.CreateBuilder<string, DecodedPortableIrGraph>(StringComparer.Ordinal);
         foreach (var body in artifact.Bodies!)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -46,17 +48,17 @@ internal static class CompilerReachableSourceValidator
             Require(body!.Start >= 0 && body.Length > 0 &&
                 body.Start <= documents[body.SourceTreeOrdinal].MaximumBodyEnd - body.Length &&
                 body.BodyId == BodyId(body.SourceTreeOrdinal, body.Start, body.Length) &&
-                !bodies.ContainsKey(body.BodyId) && body.Callees != null && body.Callees.Length <= 4096 &&
-                body.SourceCalls != null && body.SourceCalls.Length <= 4096 &&
-                body.ParameterTypes != null && body.ParameterTypes.Length <= 4096 &&
+                !bodyBuilder.ContainsKey(body.BodyId) && !body.Callees.IsDefault && body.Callees.Length <= 4096 &&
+                !body.SourceCalls.IsDefault && body.SourceCalls.Length <= 4096 &&
+                !body.ParameterTypes.IsDefault && body.ParameterTypes.Length <= 4096 &&
                 body.ParameterTypes.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (!string.IsNullOrWhiteSpace(type))));
-            bodies.Add(body.BodyId, body);
+            bodyBuilder.AddUnique(body.BodyId, body);
             if (body.Graph != null)
             {
                 var decoded = PortableIrGraphCodec.Decode(body.Graph, externalVariableIndices: null, cancellationToken: cancellationToken);
                 Require(decoded.Factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null &&
-                    decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Count <= 4096);
-                graphs.Add(body.BodyId, decoded);
+                    decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Length <= 4096);
+                graphBuilder.AddUnique(body.BodyId, decoded);
                 foreach (var operation in body.Graph.Operations)
                 {
                     if (operation.SourceSpan is { } span)
@@ -70,13 +72,15 @@ internal static class CompilerReachableSourceValidator
             else
             { Require(!body.IsCallSkeleton && body.SourceCalls!.Length == 0); }
         }
-        Require(bodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().Count() == documents.Count);
-        foreach (var document in documents.Values)
+        var bodies = bodyBuilder.ToImmutable();
+        var graphs = graphBuilder.ToImmutable();
+        Require(artifact.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().Count() == documents.Count);
+        foreach (var document in artifact.Documents)
         {
-            Require(document.MaximumBodyEnd == bodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == document.SourceTreeOrdinal))
+            Require(document.MaximumBodyEnd == artifact.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == document.SourceTreeOrdinal))
                 .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length)));
         }
-        foreach (var body in bodies.Values)
+        foreach (var body in artifact.Bodies)
         {
             Require(body.Callees.All(callee => callee is null ? throw new System.ArgumentNullException(nameof(callee)) : (callee != null && bodies.ContainsKey(callee))) &&
                 body.Callees.Distinct(StringComparer.Ordinal).Count() == body.Callees.Length);
@@ -84,13 +88,13 @@ internal static class CompilerReachableSourceValidator
             { Require(body.CallsComplete); }
             if (graphs.TryGetValue(body.BodyId, out var graph))
             {
-                var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
+                var calls = graph.Instructions.OfType<IrCallInstruction>().ToImmutableArray();
                 Require(body.IsCallSkeleton == (calls.Length != 0) && body.SourceCalls.Length == calls.Length);
-                var seen = new HashSet<int>();
+                var seen = ImmutableHashSet.CreateBuilder<int>();
                 foreach (var row in body.SourceCalls)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    Require(row != null && row.InstructionIndex >= 0 && row.InstructionIndex < graph.Instructions.Count &&
+                    Require(row != null && row.InstructionIndex >= 0 && row.InstructionIndex < graph.Instructions.Length &&
                         seen.Add(row.InstructionIndex) && row.CalleeBodyId != null && bodies.ContainsKey(row.CalleeBodyId));
                     Require(graph.Instructions[row!.InstructionIndex] is IrCallInstruction);
                     var call = (IrCallInstruction)graph.Instructions[row.InstructionIndex];
@@ -110,31 +114,31 @@ internal static class CompilerReachableSourceValidator
                             call.Arguments[index].Type == member.ParameterTypes[index]);
                     }
                 }
-                Require(new HashSet<string>(body.Callees, StringComparer.Ordinal).SetEquals(
+                Require(body.Callees.ToImmutableHashSet(StringComparer.Ordinal).SetEquals(
                     body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId))));
             }
         }
-        var callableIds = new HashSet<string>(manifest.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)), StringComparer.Ordinal);
-        var rootIds = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
+        var callableIds = manifest.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).ToImmutableHashSet(StringComparer.Ordinal);
+        var rootIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var pending = ImmutableStack<string>.Empty;
         foreach (var root in artifact.Roots!)
         {
             Require(root != null && root.CallableId != null && callableIds.Contains(root.CallableId) &&
                 rootIds.Add(root.CallableId) && root.BodyId != null && bodies.ContainsKey(root.BodyId));
             Require(bodies[root!.BodyId!].MethodIdentity == root.CallableId);
-            pending.Push(root!.BodyId!);
+            pending = pending.Push(root!.BodyId!);
         }
         if (artifact.CollectionComplete)
         { Require(rootIds.Count == callableIds.Count); }
-        var reachable = new HashSet<string>(StringComparer.Ordinal);
-        while (pending.Count != 0)
+        var reachable = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var id = pending.Pop();
+            pending = pending.Pop(out var id);
             if (!reachable.Add(id))
             { continue; }
             foreach (var callee in bodies[id].Callees)
-            { pending.Push(callee); }
+            { pending = pending.Push(callee); }
         }
         Require(reachable.Count == bodies.Count);
     }

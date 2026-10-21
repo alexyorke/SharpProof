@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -23,17 +24,19 @@ public sealed class OperationFreeRegionCycleApiCoverageTests
                 finally { x++; }
             }
             """);
-        var regions = new Stack<ControlFlowRegion>();
-        regions.Push(subject.Graph.Root);
-        var allRegions = new List<ControlFlowRegion>();
-        while (regions.TryPop(out var region))
+        var regions = ImmutableStack<ControlFlowRegion>.Empty;
+        regions = regions.Push(subject.Graph.Root);
+        var allRegionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        while (!regions.IsEmpty)
         {
-            allRegions.Add(region);
+            regions = regions.Pop(out var region);
+            allRegionsBuilder.Add(region);
             foreach (var child in region.NestedRegions)
             {
-                regions.Push(child);
+                regions = regions.Push(child);
             }
         }
+        var allRegions = allRegionsBuilder.ToImmutable();
         Assert.That(allRegions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.True);
         var local = allRegions.SelectMany(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals)).Single(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Name == "unused"));
         using (Assert.EnterMultipleScope())
@@ -44,7 +47,7 @@ public sealed class OperationFreeRegionCycleApiCoverageTests
             Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         }
         var block = subject.Graph.Blocks[0];
-        var visited = new HashSet<BasicBlock>();
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
         while (visited.Add(block))
         {
             using (Assert.EnterMultipleScope())

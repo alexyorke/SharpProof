@@ -20,7 +20,7 @@ internal sealed class NativeResourceMetadataBinding
         if (!_target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
             assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
         { return false; }
-        if (_target.Compilation.ResourceMetadataReferences is null || _target.Compilation.ResourceMetadataReferences.Any(static candidate => candidate is null))
+        if (_target.Compilation.ResourceMetadataReferences.IsDefault || _target.Compilation.ResourceMetadataReferences.Any(static candidate => candidate is null))
         { return false; }
         var references = _target.Compilation.ResourceMetadataReferences.Where(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
             candidate.Kind == "Assembly" && candidate.Identity == reference.AssemblyIdentity).ToArray();
@@ -44,12 +44,13 @@ internal sealed class NativeResourceMetadataBinding
         return true;
     }
 
-    internal void Project(WorkerClaimResult result)
+    internal WorkerClaimResult Project(WorkerClaimResult result)
     {
         result = ArgumentNullGuard.NotNull(result, nameof(result));
         if (result.ResourceBound is null || result.Outcome is not (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
         { throw new ArgumentException("Metadata dependencies require a decided owned resource claim.", nameof(result)); }
-        result.ResourceBound.MetadataAssumptions = [.. _bound.Values];
-        result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(_target, _bound.Keys.ToHashSet(StringComparer.Ordinal));
+        result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [.. _bound.Values] } };
+        result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(_target, _bound.Keys.ToImmutableHashSet(StringComparer.Ordinal));
+        return result;
     }
 }

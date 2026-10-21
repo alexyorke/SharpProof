@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -108,7 +109,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
-        var trees = new List<SyntaxTree>();
+        var trees = ImmutableArray.CreateBuilder<SyntaxTree>(compilation.SyntaxTrees.Length);
         foreach (var tree in compilation.SyntaxTrees)
         {
             var treeRoot = await tree.GetRootAsync();
@@ -116,7 +117,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
                 ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames
                     .Append(SharpProof.Attributes.Contract.ConditionalSymbol))));
         }
-        compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(trees);
+        compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(trees.ToImmutable());
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }

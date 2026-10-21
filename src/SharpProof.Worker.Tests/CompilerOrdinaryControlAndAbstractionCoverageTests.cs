@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -20,7 +21,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public static class Subject { " +
             (emptyReason ? "[SharpProofSuppress(\"\")]" : string.Empty) +
             "public static int Root() { Contract.Ensures(Contract.Result<int>()==1); return 1; } }";
-        var compilation = TestCompilation.Create("ControlReasonBoundary", ("control-reason.cs", source));
+        var compilation = TestCompilation.CreateExact("ControlReasonBoundary", [("control-reason.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         EmitAndInvoke(compilation, false);
         var tree = compilation.SyntaxTrees.Single();
@@ -35,11 +36,12 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
             Assert.That(attribute.ConstructorArguments.Single().Value, Is.EqualTo(string.Empty));
             Assert.That(attribute.ApplicationSyntaxReference, Is.Not.Null);
         }
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(SharpProofControlAttributePolicy.ValidateAndShouldSuppress(method, session,
-            diagnostics.Add, TestContext.CurrentContext.CancellationToken), Is.False);
-        Assert.That(diagnostics, Has.Count.EqualTo(emptyReason ? 1 : 0));
+            diagnosticBuilder.Add, TestContext.CurrentContext.CancellationToken), Is.False);
+        var diagnostics = diagnosticBuilder.ToImmutable();
+        Assert.That(diagnostics, Has.Length.EqualTo(emptyReason ? 1 : 0));
         if (emptyReason)
         {
             Assert.That(diagnostics.Single().GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("expected a non-empty reason"));
@@ -53,6 +55,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         Assert.That(callable.Total, Is.Not.Null);
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

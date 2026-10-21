@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
@@ -178,34 +179,37 @@ public sealed class WorkerVcShadowSourceGateTests
     {
         Assert.That(Universe.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(Universe.Length));
         Assert.That(Universe.Length, Is.EqualTo(54));
-        var results = new List<WorkerClaimResult>();
-        var checks = new List<TotalCallableClaimCheck>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
         var manifestPostconditions = 0;
         foreach (var sourceCase in Universe)
         {
             using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
-            var sourceChecks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+            var sourceCheckBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                    check => { System.ArgumentNullException.ThrowIfNull(check); sourceChecks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+                    check => { System.ArgumentNullException.ThrowIfNull(check); sourceCheckBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
             }
             using var worker = SharpProofWorker.Create(project.Request.Budgets);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
+            var sourceChecks = sourceCheckBuilder.ToImmutable();
             var posts = AssertNativeResults(response, project, sourceCase, sourceChecks);
             manifestPostconditions += response.Manifest.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition));
-            results.AddRange(posts);
-            checks.AddRange(sourceChecks.Values);
+            resultBuilder.AddRange(posts);
+            checkBuilder.AddRange(sourceChecks.Values);
         }
+        var results = resultBuilder.ToImmutable();
+        var checks = checkBuilder.ToImmutable();
         Assert.That(manifestPostconditions, Is.EqualTo(87));
-        Assert.That(results, Has.Count.EqualTo(manifestPostconditions));
+        Assert.That(results, Has.Length.EqualTo(manifestPostconditions));
         Assert.That(checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled)), Is.EqualTo(86));
-        Assert.That(results.Count - checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled)), Is.EqualTo(1));
+        Assert.That(results.Length - checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled)), Is.EqualTo(1));
         Assert.That(checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)), Is.EqualTo(86));
         Assert.That(results.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown)), Is.EqualTo(5));
         Assert.That(results.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven &&
             result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)))), Is.EqualTo(2));
-        await TestContext.Out.WriteLineAsync($"native source-worker universe: sources={Universe.Length} posts={results.Count} enrolled={checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled))} checked={checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked))} unknown={results.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown))}");
+        await TestContext.Out.WriteLineAsync($"native source-worker universe: sources={Universe.Length} posts={results.Length} enrolled={checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled))} checked={checks.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked))} unknown={results.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown))}");
     }
 
     [Test]
@@ -261,7 +265,7 @@ public sealed class WorkerVcShadowSourceGateTests
         await TestContext.Out.WriteLineAsync($"entry-worker universe: sources={sourceCount} callables={callableCount} enrolled={enrolledCount} old-known={oldKnown} native-known={nativeKnown} unknown={unknownCount} disagreements={disagreements} degradations={degradations}");
     }
 
-    internal static ShadowSourceCase[] QualificationCases()
+    internal static ImmutableArray<ShadowSourceCase> QualificationCases()
     {
         // Reachable-source, synchronization projection, metadata Requires and direct IR replay cases qualify through
         // dedicated drivers. They are outside the frozen Phase 2 callable
@@ -276,7 +280,7 @@ public sealed class WorkerVcShadowSourceGateTests
                 !source.StartsWith("// golden-scenario: shadow-call-ancestry-tampered-predicate\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: write-operand-approximation\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: mixed-snapshot-owners\n", StringComparison.Ordinal);
-        }).ToArray();
+        }).ToImmutableArray();
         Assert.That(goldenNames, Has.Length.EqualTo(64));
         var cases = Universe.Concat(goldenNames.Select(name =>
         {
@@ -286,7 +290,7 @@ public sealed class WorkerVcShadowSourceGateTests
             var boundary = source.IndexOf(marker, StringComparison.Ordinal);
             return boundary < 0 ? new ShadowSourceCase("golden:" + name, source, [])
                 : new ShadowSourceCase("golden:" + name, source[..boundary], [], LibrarySource: source[(boundary + marker.Length)..]);
-        })).ToArray();
+        })).ToImmutableArray();
         Assert.That(cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(cases.Length));
         Assert.That(Universe, Has.Length.EqualTo(54));
         return cases;
@@ -297,7 +301,7 @@ public sealed class WorkerVcShadowSourceGateTests
     {
         var cases = QualificationCases();
         var baseline = QualificationBaseline("postconditions", "CallableId");
-        var proofLosses = new List<string>();
+        var proofLossBuilder = ImmutableArray.CreateBuilder<string>();
         var callableCount = 0;
         var postconditions = 0;
         var oldProven = 0;
@@ -310,14 +314,19 @@ public sealed class WorkerVcShadowSourceGateTests
         {
             using var project = new ShadowTestProject(CreateGateArtifact(sourceCase));
             callableCount += project.Snapshot.Callables.Length;
-            var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+            var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                    check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+                    check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
             }
-            var owned = project.Snapshot.Callables.ToDictionary(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId), StringComparer.Ordinal);
-            var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
+            var checks = checkBuilder.ToImmutable();
+            var owned = ImmutableDictionaryCapture.Create(
+                project.Snapshot.Callables,
+                preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId),
+                static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+                StringComparer.Ordinal);
+            var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
             Assert.That(checks.Keys, Is.SubsetOf(expected.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))), sourceCase.Name);
             postconditions += expected.Length;
             foreach (var claim in expected)
@@ -342,7 +351,7 @@ public sealed class WorkerVcShadowSourceGateTests
                 {
                     oldProven++;
                     if (newOutcome != WorkerClaimOutcome.Proven)
-                    { proofLosses.Add(sourceCase.Name + ":" + claim.ClaimId); }
+                    { proofLossBuilder.Add(sourceCase.Name + ":" + claim.ClaimId); }
                 }
                 if (newOutcome == WorkerClaimOutcome.Proven)
                 { nativeProven++; }
@@ -354,7 +363,8 @@ public sealed class WorkerVcShadowSourceGateTests
                 { disagreements++; }
             }
         }
-        await TestContext.Out.WriteLineAsync($"post-worker universe: sources={cases.Length} callables={callableCount} posts={postconditions} enrolled={enrolled} checked={checkedCount} unknown={unknown} old-proven={oldProven} native-proven={nativeProven} disagreements={disagreements} proof-losses={proofLosses.Count}");
+        var proofLosses = proofLossBuilder.ToImmutable();
+        await TestContext.Out.WriteLineAsync($"post-worker universe: sources={cases.Length} callables={callableCount} posts={postconditions} enrolled={enrolled} checked={checkedCount} unknown={unknown} old-proven={oldProven} native-proven={nativeProven} disagreements={disagreements} proof-losses={proofLosses.Length}");
         Assert.That(postconditions, Is.EqualTo(baseline.Count));
         Assert.That(oldProven, Is.EqualTo(18));
         Assert.That(nativeProven, Is.GreaterThanOrEqualTo(oldProven));
@@ -362,14 +372,14 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(proofLosses, Is.Empty, string.Join(", ", proofLosses));
     }
 
-    private static Dictionary<string, JsonElement> QualificationBaseline(string section, string id)
+    private static ImmutableDictionary<string, JsonElement> QualificationBaseline(string section, string id)
     {
         System.ArgumentNullException.ThrowIfNull(id);
         System.ArgumentNullException.ThrowIfNull(section);
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(),
             "tests", "qualification", "phase2-native-authority-baseline.json")));
         Assert.That(document.RootElement.GetProperty("commit").GetString(), Is.EqualTo("86fa6ea9039a0883e1a8f2baf492738b8224fba6"));
-        return document.RootElement.GetProperty(section).EnumerateArray().ToDictionary(
+        return document.RootElement.GetProperty(section).EnumerateArray().ToImmutableDictionary(
             item => ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (item.GetProperty("Fixture").GetString() + ":" + item.GetProperty(id).GetString() +
                 (section == "postconditions" ? ":" + item.GetProperty("Ordinal").GetRawText() : ""))),
             item => ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (item.Clone())), StringComparer.Ordinal);
@@ -396,16 +406,17 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(response.Manifest.Claims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)), Is.False);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        var checks = new List<TotalCallableClaimCheck>();
+        var checkBuilder = ImmutableArray.CreateBuilder<TotalCallableClaimCheck>();
         foreach (var preparation in project.Snapshot.Callables)
         {
-            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, checks.Add, TestContext.CurrentContext.CancellationToken);
+            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, checkBuilder.Add, TestContext.CurrentContext.CancellationToken);
         }
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks, Is.Empty);
     }
 
-    private static WorkerClaimResult[] AssertNativeResults(WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase,
-        IReadOnlyDictionary<string, TotalCallableClaimCheck> checks)
+    private static ImmutableArray<WorkerClaimResult> AssertNativeResults(WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase,
+        ImmutableDictionary<string, TotalCallableClaimCheck> checks)
     {
         System.ArgumentNullException.ThrowIfNull(checks);
         System.ArgumentNullException.ThrowIfNull(sourceCase);
@@ -413,12 +424,12 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         Assert.That(response.Errors, Is.Empty, sourceCase.Name);
         var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+            .ToImmutableDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
         if (sourceCase.TotalPresent)
         { Assert.That(checks.Keys, Is.EquivalentTo(ordinals.Keys), sourceCase.Name); }
         else
         { Assert.That(checks, Is.Empty, sourceCase.Name); }
-        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EquivalentTo(ordinals.Keys), sourceCase.Name);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
         if (sourceCase.Reasons.IsDefault)

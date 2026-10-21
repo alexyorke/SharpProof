@@ -24,7 +24,8 @@ internal sealed record AllocationOracleObservation(string RuntimeOracle, string 
 internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilation) : IDisposable
 {
     private readonly CSharpCompilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-    private readonly Dictionary<OptimizationLevel, (AssemblyLoadContext Context, Assembly Assembly)> _assemblies = [];
+    private ImmutableDictionary<OptimizationLevel, (AssemblyLoadContext Context, Assembly Assembly)> _assemblies = ImmutableDictionary<OptimizationLevel, (AssemblyLoadContext Context, Assembly Assembly)>.Empty;
+    private readonly ImmutableArray<(AssemblyLoadContext Context, Assembly Assembly)>.Builder _assemblyOrder = ImmutableArray.CreateBuilder<(AssemblyLoadContext Context, Assembly Assembly)>();
 
     internal AllocationOracleObservation Check(IMethodSymbol method, CompilerTotalCallablePreparation preparation,
         PassiveCallableCheckResult evidence, WorkerClaimOutcome outcome, CancellationToken cancellationToken)
@@ -39,13 +40,14 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
             preparation.Parameters.Length != method.Parameters.Length)
         { return Gap("UnsupportedInvocationShape"); }
         var inputs = evidence.EntryModel;
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {
             var value = inputs[parameter.Entry];
-            initial[parameter.Entry] = value;
-            initial[parameter.Current] = value;
+            initialBuilder[parameter.Entry] = value;
+            initialBuilder[parameter.Current] = value;
         }
+        var initial = initialBuilder.ToImmutable();
         var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, cancellationToken: cancellationToken);
         if (replay.ConsumedApproximation || replay.Status is not (IrProgramExecutionStatus.Returned or IrProgramExecutionStatus.Exception))
@@ -53,7 +55,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         var assembly = EnsureAssembly(outcome, cancellationToken);
         var definition = assembly.GetType(MetadataName(method.ContainingType), throwOnError: true)!;
         var generic = method.Arity != 0 || definition.ContainsGenericParameters;
-        var choices = generic ? new[] { typeof(int), typeof(string) } : new[] { typeof(int) };
+        var choices = generic ? ImmutableArray.Create<Type>(typeof(int), typeof(string)) : ImmutableArray.Create<Type>(typeof(int));
         var checks = 0;
         long maximumBytes = 0;
         var il = "NoReachableAllocationOpcode";
@@ -63,9 +65,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryBind(method, definition, choice, out var callable))
             { continue; }
-            var parameters = callable!.GetParameters();
+            var parameters = callable!.GetParameters().ToImmutableArray();
             var values = new object?[parameters.Length];
-            var aliases = new Dictionary<object, object>();
+            var aliases = ImmutableDictionary.CreateBuilder<object, object>();
             var concrete = true;
             // Materialize nominal objects before object-typed aliases.
             foreach (var ordinal in Enumerable.Range(0, parameters.Length).OrderBy(index => parameters[index].ParameterType == typeof(object)))
@@ -110,7 +112,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         try
         {
             var assembly = context.LoadFromStream(image);
-            _assemblies.Add(optimization, (context, assembly));
+            var assemblies = _assemblies.AddUnique(optimization, (context, assembly));
+            _assemblyOrder.Add((context, assembly));
+            _assemblies = assemblies;
             return assembly;
         }
         catch
@@ -136,7 +140,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
                 { continue; }
                 var closed = candidate.IsGenericMethodDefinition
                     ? candidate.MakeGenericMethod(Enumerable.Repeat(choice, symbol.Arity).ToArray()) : candidate;
-                var parameters = closed.GetParameters();
+                var parameters = closed.GetParameters().ToImmutableArray();
                 if (parameters.Length == symbol.Parameters.Length && parameters.Select((parameter, ordinal) =>
                         parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (Matches(symbol.Parameters[ordinal].Type, parameter.ParameterType, choice))).All(match => match))
                 {
@@ -154,7 +158,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
     private static bool Matches(ITypeSymbol symbol, Type runtime, Type choice)
     { System.ArgumentNullException.ThrowIfNull(choice, nameof(choice)); System.ArgumentNullException.ThrowIfNull(runtime, nameof(runtime)); System.ArgumentNullException.ThrowIfNull(symbol, nameof(symbol)); return CompilerClrTypeMatcher.Matches(symbol, runtime, choice); }
 
-    private static bool TryValue(Type type, IrValue value, Dictionary<object, object> aliases, out object? result)
+    private static bool TryValue(Type type, IrValue value, ImmutableDictionary<object, object>.Builder aliases, out object? result)
     {
         System.ArgumentNullException.ThrowIfNull(aliases);
         result = null;
@@ -181,7 +185,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         System.ArgumentNullException.ThrowIfNull(callable);
         var wrapper = new DynamicMethod("allocation-witness", typeof(void), [typeof(object[])], callable.Module, skipVisibility: true);
         var il = wrapper.GetILGenerator();
-        var parameters = callable.GetParameters();
+        var parameters = callable.GetParameters().ToImmutableArray();
         for (var ordinal = 0; ordinal < parameters.Length; ordinal++)
         {
             il.Emit(OpCodes.Ldarg_0);
@@ -210,8 +214,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
 
     public void Dispose()
     {
-        foreach (var image in _assemblies.Values)
+        foreach (var image in _assemblyOrder)
         { image.Context.Unload(); }
-        _assemblies.Clear();
+        _assemblies = _assemblies.Clear();
+        _assemblyOrder.Clear();
     }
 }

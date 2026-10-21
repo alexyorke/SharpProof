@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -6,7 +7,19 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusTransactionWorkflowTests
 {
-    private static readonly string[] ExpectedFiles = ["snapshot.txt"];
+    [Test]
+    public void DefaultUpdatesRejectBeforeCreatingTheTransactionDirectory()
+    {
+        using var temporary = new TempDirectory("SharpProof-corpus-default-update-");
+        var transactionRoot = Path.Combine(temporary.FullName, "not-created");
+        var exception = Assert.ThrowsAsync<ArgumentNullException>((Func<Task>)(() =>
+            CorpusFileTransaction.WriteAllAsync(transactionRoot, default, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(exception!.ParamName, Is.EqualTo("updates"));
+        Assert.That(Directory.Exists(transactionRoot), Is.False);
+        Assert.That(Directory.EnumerateFileSystemEntries(temporary.FullName), Is.Empty);
+    }
+
+    private static readonly ImmutableArray<string> ExpectedFiles = ["snapshot.txt"];
 
     [Test]
     public async Task EmptyUpdateLeavesExistingCorpusFilesUnchanged()

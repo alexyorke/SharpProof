@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -24,7 +25,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             ? "public static bool Target0(object x, object y) { return x == y; }"
             : "public static bool Target0(object x, object y, object z) { return x == y && y == z; }";
         var shared = new object();
-        object?[] arguments = [.. Enumerable.Range(0, parameterCount)
+        ImmutableArray<object?> arguments = [.. Enumerable.Range(0, parameterCount)
             .Select(_ => sharedIdentity ? shared : new object())];
         Assert.That(ReferenceEquals(arguments[0], arguments[1]), Is.EqualTo(sharedIdentity));
         if (parameterCount == 3)
@@ -48,9 +49,10 @@ public sealed class TotalProgramAliasSourceReplayTests
     }
 
     private static void AssertActualCompilerAndInterpreter(string member,
-        object?[] arguments, bool expected)
+        ImmutableArray<object?> arguments, bool expected)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(member);
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " + member + " }",
             new CSharpParseOptions(LanguageVersion.CSharp12), "total-object-alias-control.cs");
@@ -73,7 +75,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             image.Position = 0;
             var actualType = runtime.LoadFromStream(image).GetType("TotalGenerated")!;
             var actualValue = actualType.GetMethod("Target0", BindingFlags.Public | BindingFlags.Static)!
-                .Invoke(null, arguments);
+                .Invoke(null, arguments.ToArray());
             Assert.That(actualValue, Is.EqualTo(expected));
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, declared);
@@ -87,7 +89,9 @@ public sealed class TotalProgramAliasSourceReplayTests
                 .OfType<IrCallInstruction>(), Is.Empty);
             Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrHavocInstruction>(), Is.Empty);
-            var entries = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            var entries = ImmutableDictionaryCapture.Create(
+                context.Parameters,
+                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                 binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateReferenceValue(factory.GetVariableInfo(binding.Entry).Type,
                     arguments[binding.Parameter.Ordinal]!)));
             var interpreted = new IrProgramInterpreter(factory).Execute(lowering.Program, entries);

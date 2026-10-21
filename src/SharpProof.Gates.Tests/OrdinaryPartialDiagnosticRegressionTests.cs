@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryPartialDiagnosticRegressionTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0002", "SP0045"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0002", "SP0045"];
 
     private const string Source = """
         public static partial class PartialDiagnostics {
@@ -33,7 +34,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
     public async Task BothActualPartialSelectionsPreserveNativeRefutationAndDiagnostics(bool selectImplementation)
     {
         var root = CSharpSyntaxTree.ParseText(Source).GetCompilationUnitRoot();
-        var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
         var definition = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body == null && method.ExpressionBody == null));
         var implementation = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
@@ -51,7 +52,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var preparedTree = compilation.SyntaxTrees.Single(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath == "ordinary-partial-diagnostics.cs"));
-        var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var preparedDefinition = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body == null && item.ExpressionBody == null));
         var preparedImplementation = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body != null || item.ExpressionBody != null));
         var model = compilation.GetSemanticModel(preparedTree);
@@ -105,7 +106,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
             Is.EqualTo(observation.Diagnostics.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), StringComparer.Ordinal)));
         foreach (var diagnostic in observation.Diagnostics)
         {
-            var fields = diagnostic.Split('@');
+            var fields = diagnostic.Split('@').ToImmutableArray();
             Assert.That(fields, Has.Length.EqualTo(4));
             Assert.That(fields[1], Is.EqualTo("Warning"));
             Assert.That(fields[2], Does.StartWith(file.Path + ":"));

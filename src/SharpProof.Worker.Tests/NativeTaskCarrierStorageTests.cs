@@ -574,7 +574,7 @@ public sealed class NativeTaskCarrierStorageTests
         var source = "using System.Threading.Tasks; public static class C {public static " + (configured ? "async Task" : "Task") +
             " Root(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(n)))" +
             (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {" + body + "} }";
-        var initial = TestCompilation.Create("CarrierStorage", ("Subject.cs", source));
+        var initial = TestCompilation.Create("CarrierStorage", [("Subject.cs", source)]);
         var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();

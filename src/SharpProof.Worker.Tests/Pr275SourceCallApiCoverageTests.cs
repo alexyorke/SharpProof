@@ -17,8 +17,8 @@ public sealed class Pr275SourceCallApiCoverageTests
     public void ConstructorFramesAdmitScalarFieldBodies(bool conditional)
     {
         var body = conditional ? "if(Count==0) Count=2;" : "Count=2;";
-        var compilation = TestCompilation.Create("ConstructorFrameControl", ("Subject.cs",
-            "public class Node { public int Count; public Node() { " + body + " } } public static class Subject { public static Node Caller() => new Node(); }"));
+        var compilation = TestCompilation.Create("ConstructorFrameControl", [("Subject.cs",
+            "public class Node { public int Count; public Node() { " + body + " } } public static class Subject { public static Node Caller() => new Node(); }")]);
         var caller = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Caller").OfType<IMethodSymbol>().Single();
         var constructor = compilation.GetTypeByMetadataName("Node")!.InstanceConstructors.Single();
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
@@ -58,13 +58,13 @@ public sealed class Pr275SourceCallApiCoverageTests
         }
     }
 
-    private static readonly CSharpCompilation Compilation = TestCompilation.Create(
-        "Pr275SourceCallApi", ("Subject.cs", """
+    private static readonly CSharpCompilation Compilation = TestCompilation.CreateExact(
+        "Pr275SourceCallApi", [("Subject.cs", """
             internal static class Subject {
                 internal static void Caller() { }
                 internal static void Callee() { }
             }
-            """));
+            """)]);
 
     private static bool PrepareCallee(TotalLoweringContext context)
     {

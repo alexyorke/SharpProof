@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,13 +11,13 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275BulkContractsApiTests
 {
-    private static readonly BoundContractKind[] FullClauseKinds =
+    private static readonly ImmutableArray<BoundContractKind> FullClauseKinds =
         [BoundContractKind.Requires, BoundContractKind.Requires, BoundContractKind.Ensures];
-    private static readonly BoundContractKind[] RequiresClauseKinds =
+    private static readonly ImmutableArray<BoundContractKind> RequiresClauseKinds =
         [BoundContractKind.Requires, BoundContractKind.Requires];
-    private static readonly string[] FullClauseTexts =
+    private static readonly ImmutableArray<string> FullClauseTexts =
         ["value != 0", "value >= 0", "Contract.Result<int>() == value"];
-    private static readonly string[] RequiresClauseTexts = ["value != 0", "value >= 0"];
+    private static readonly ImmutableArray<string> RequiresClauseTexts = ["value != 0", "value >= 0"];
 
     [Test]
     public void SuccessfulSourceBindingReturnsTheWholeDirectContractSetAndRequiresView()

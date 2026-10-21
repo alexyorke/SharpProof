@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -29,7 +30,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("OwnedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var root = runtime.LoadFromStream(stream).GetType("Subject")!.GetMethod("Root")!;
             Assert.That(root.GetParameters(), Has.Length.EqualTo(count));
             Assert.That(root.Invoke(null, new object?[count]), Is.EqualTo(count));
@@ -40,7 +41,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         Assert.That(pairs.Length, Is.LessThanOrEqualTo(CompilerArtifactLimits.MaximumInstructions));
         var expected = (from left in Enumerable.Range(0, count)
                         from right in Enumerable.Range(left + 1, count - left - 1)
-                        select (left, right)).Take(expectedPairs).ToArray();
+                        select (left, right)).Take(expectedPairs).ToImmutableArray();
         Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(expected));
         foreach (var pair in pairs)
         {
@@ -59,7 +60,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("RelatedDisjointInputs", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             var assembly = runtime.LoadFromStream(stream);
             var first = Activator.CreateInstance(assembly.GetType("A")!);
             var second = Activator.CreateInstance(assembly.GetType("A")!);
@@ -70,7 +71,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         }
         finally { runtime.Unload(); }
         var pairs = CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken);
-        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(new[] { (0, 2), (1, 2) }));
+        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(ImmutableArray.Create((0, 2), (1, 2))));
         foreach (var pair in pairs)
         {
             Assert.That(compilation.ClassifyConversion(method.Parameters[pair.Left].Type, method.Parameters[pair.Right].Type).Exists, Is.False);
@@ -86,10 +87,10 @@ public sealed class CompilerDisjointInputAnalysisTests
         Assert.That(CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
     }
 
-    private static (CSharpCompilation Compilation, IMethodSymbol Method, byte[] Image) Compile(string source)
+    private static (CSharpCompilation Compilation, IMethodSymbol Method, ImmutableArray<byte> Image) Compile(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("OwnedDisjointInputAnalysis", ("disjoint-analysis.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedDisjointInputAnalysis", [("disjoint-analysis.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -97,6 +98,6 @@ public sealed class CompilerDisjointInputAnalysisTests
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
-        return (compilation, method, image.ToArray());
+        return (compilation, method, ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
     }
 }

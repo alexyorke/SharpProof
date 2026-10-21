@@ -121,7 +121,7 @@ internal sealed class CompilerTaskCarrierCollector
         var inspection = CSharpCompilation.Create("SharpProof.TaskCarrierInspection", references: _compilation.References.Append(reference),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithMetadataImportOptions(MetadataImportOptions.All));
         _assembly = inspection.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-        _moduleHash = HashEncoding.ComputeSha256Hex(image);
+        _moduleHash = HashEncoding.ComputeSha256Hex([.. image]);
         if (_assembly is null)
         { _emissionFailure = "TaskCarrierEmissionMetadataUnavailable"; }
         return _assembly != null;

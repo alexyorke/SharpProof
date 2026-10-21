@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -26,7 +27,7 @@ public sealed class InitializerIntrinsicAnalyzerPolicyControlAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Is.EqualTo("SharpProof could not completely analyze selected method '.ctor': Advisory:UnsupportedCallable"));
     }
@@ -46,6 +47,6 @@ public sealed class InitializerIntrinsicAnalyzerPolicyControlAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 }

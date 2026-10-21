@@ -5,18 +5,18 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerTotalCallableLowerer
 {
     internal static CompilerTotalEntryPreparation? PrepareEntry(CSharpCompilation compilation,
-        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
+        ManifestCallableTarget target, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfMissing(capturedTrees.IsDefault, nameof(capturedTrees));
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         RequireCapturedTrees(compilation, capturedTrees);
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
-            .ToDictionary(item => item.Tree, item => item.Path);
+        var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
+            , static item => item.Tree, static item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
         context.ModelReceiver();
         if (target.Method.IsAsync)
@@ -37,7 +37,7 @@ internal static class CompilerTotalCallableLowerer
         var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToArray();
+        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions ||
             binding.Clauses.Length != preconditions.Length)
         { return null; }
@@ -49,24 +49,29 @@ internal static class CompilerTotalCallableLowerer
     }
 
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
-        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        ManifestCallableTarget target, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
+        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfMissing(capturedTrees.IsDefault, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfMissing(capturedReferences is { IsDefault: true }, nameof(capturedReferences));
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var declaration = target.Declaration!;
         var autoAccessor = TotalBodyLowering.AutoAccessor(declaration);
         RequireCapturedTrees(compilation, capturedTrees);
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
-            .ToDictionary(item => item.Tree, item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
+        var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
+            , static item => item.Tree, static item => item.Path);
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
+        {
+            CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
+        };
         context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
@@ -75,14 +80,14 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
-        var ensures = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToArray();
+        var ensures = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToImmutableArray();
         // A postcondition on an overridable method is a contract for every
         // override; only effect claims, which describe this body, are verified.
         if (ensures.Length != 0 && (target.Method.IsVirtual || target.Method.IsOverride))
         { return null; }
-        var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToArray();
-        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToArray();
-        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).ToArray();
+        var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToImmutableArray();
+        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
             binding.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) != assumptions.Length)
         { return null; }
@@ -98,8 +103,6 @@ internal static class CompilerTotalCallableLowerer
                 !documents.TryGetValue(syntax.SyntaxTree, out var clauseDocument) || clauseDocument != span.Document)
             { return null; }
         }
-        context.CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound);
         ControlFlowGraph? graph = null;
         FrontendProgramLoweringResult? lowering;
         if (autoAccessor != null)
@@ -135,11 +138,13 @@ internal static class CompilerTotalCallableLowerer
                 builder.Assign(block, site, parameter.Current, context.Factory.Variable(parameter.Entry));
                 builder.Assign(block, site, parameter.PreState, context.Factory.Variable(parameter.Entry));
             }
-            var mutable = context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Current))
-                .Concat(context.Result is { } resultId ? [resultId] : Array.Empty<IrVarId>()).ToArray();
-            if (mutable.Length == 0)
-            { mutable = [context.Factory.CreateVariable("abstract-body", context.Factory.BooleanType)]; }
-            builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mutable);
+            var havocVariables = ImmutableArray.CreateBuilder<IrVarId>();
+            havocVariables.AddRange(context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Current)));
+            if (context.Result is { } resultId)
+            { havocVariables.Add(resultId); }
+            if (havocVariables.Count == 0)
+            { havocVariables.Add(context.Factory.CreateVariable("abstract-body", context.Factory.BooleanType)); }
+            builder.HavocSnapshot(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, havocVariables.ToImmutable());
             builder.Return(block, site, context.Result is { } returned ? context.Factory.Variable(returned) : null);
             program = builder.Build();
             isBodyAbstraction = true;
@@ -179,7 +184,7 @@ internal static class CompilerTotalCallableLowerer
 
     // Captured snapshots are indexed by compilation tree ordinal; a mismatch
     // is a caller contract violation, not an admission decision.
-    private static void RequireCapturedTrees(CSharpCompilation compilation, CompilerSyntaxTreeSnapshot[] capturedTrees)
+    private static void RequireCapturedTrees(CSharpCompilation compilation, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees)
     {
         if (capturedTrees.Length != compilation.SyntaxTrees.Length)
         {
@@ -192,19 +197,20 @@ internal static class CompilerTotalCallableLowerer
     // Rebuild the bounded source census inside this batch. Callers cannot
     // provide a forged owner or bypass the all-tree contract-binding guard.
     internal static CompilerShadowPreparationBatch PrepareShadowCallers(CSharpCompilation compilation,
-        WorkerFeatureSet features, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        WorkerFeatureSet features, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
+        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
-        if (enableMetadataRequires && capturedReferences == null)
+        RepositoryParameterGuard.ThrowIfMissing(capturedTrees.IsDefault, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfMissing(capturedReferences is { IsDefault: true }, nameof(capturedReferences));
+        if (enableMetadataRequires && capturedReferences is null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference)))
         { return new([], [new(0, 0, 0, "UnsupportedSourceReference")]); }
-        var trees = compilation.SyntaxTrees.ToArray();
+        var trees = compilation.SyntaxTrees;
         if (trees.Length > CompilerArtifactLimits.MaximumInstructions)
         { return new([], [new(0, 0, 0, "InventoryBudget")]); }
         if (trees.Length != capturedTrees.Length)
@@ -233,14 +239,14 @@ internal static class CompilerTotalCallableLowerer
         var published = discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))
             .ToImmutableHashSet(StringComparer.Ordinal);
         // Use producer-owned paths instead of caller-supplied reporting metadata.
-        var authoritativeTrees = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken);
+        var authoritativeTrees = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray();
         var initializationFree = CreateShadowInitializationPredicate(compilation, cancellationToken);
         foreach (var owner in inventory.Owners.OrderBy(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.CallableId), StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (published.Contains(owner.CallableId) || !owner.DiscoveryComplete)
             { continue; }
-            var treeOrdinal = Array.IndexOf(trees, owner.Declaration.SyntaxTree);
+            var treeOrdinal = trees.IndexOf(owner.Declaration.SyntaxTree);
             var body = PrepareShadow(compilation, owner, authoritativeTrees, capturedReferences,
                 specificationPackAuthority, initializationFree, cancellationToken, out var reason, enableMetadataRequires);
             if (body == null)
@@ -254,11 +260,11 @@ internal static class CompilerTotalCallableLowerer
     }
 
     private static CompilerTotalCallablePreparation? PrepareShadow(CSharpCompilation compilation,
-        CompilerPotentialCallOwner owner, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        CompilerPotentialCallOwner owner, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
+        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         Func<INamedTypeSymbol, bool> initializationFree, CancellationToken cancellationToken, out string reason, bool enableMetadataRequires = false)
     {
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfInvalid(capturedTrees.IsDefault, nameof(capturedTrees));
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         reason = "UnsupportedBody";
@@ -270,8 +276,8 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         if (!initializationFree(owner.Method.ContainingType))
         { reason = "UnsupportedEntryInitialization"; return null; }
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
-            .ToDictionary(item => item.Tree, item => item.Path);
+        var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
+            , static item => item.Tree, static item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree])) { CaptureShadowCallAncestry = true };
         var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
             cancellationToken: cancellationToken);
@@ -312,7 +318,7 @@ internal static class CompilerTotalCallableLowerer
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
-        ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
+        ControlFlowGraph graph, TotalLoweringContext context, ImmutableArray<CompilerReferenceSnapshot>? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
         Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
     {
@@ -331,7 +337,7 @@ internal static class CompilerTotalCallableLowerer
         CSharpCompilation compilation, CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        var types = new Dictionary<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
+        var types = ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool? moduleSafe = null;
         return type =>
         {
@@ -342,7 +348,7 @@ internal static class CompilerTotalCallableLowerer
             if (!types.TryGetValue(type, out var typeSafe))
             {
                 typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
-                types.Add(type, typeSafe);
+                types.AddUnique(type, typeSafe);
             }
             if (!typeSafe)
             { return false; }
@@ -399,22 +405,24 @@ internal static class CompilerTotalCallableLowerer
     private static bool HasNoModuleEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        var pending = new Stack<INamespaceOrTypeSymbol>();
-        pending.Push(compilation.Assembly.GlobalNamespace);
+        var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
+        pending = pending.Push(compilation.Assembly.GlobalNamespace);
         var remaining = CompilerArtifactLimits.MaximumInstructions;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var member in pending.Pop().GetMembers())
+            var pendingOwner = pending.Peek();
+            pending = pending.Pop();
+            foreach (var member in pendingOwner.GetMembers())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (--remaining < 0)
                 { return false; }
                 if (member is INamespaceOrTypeSymbol nested)
-                { pending.Push(nested); }
+                { pending = pending.Push(nested); }
                 if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
                         attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                        CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices"))))
+                        CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))))
                 { return false; }
             }
         }
@@ -426,8 +434,8 @@ internal static class CompilerTotalCallableLowerer
     // initializer code cannot supply a complete exception constraint row.
     private sealed class ExceptionEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
-        private readonly Dictionary<INamedTypeSymbol, bool> _checked = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : new(SymbolEqualityComparer.Default));
-        private readonly HashSet<INamedTypeSymbol> _active = new(SymbolEqualityComparer.Default);
+        private readonly ImmutableDictionary<INamedTypeSymbol, bool>.Builder _checked = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default));
+        private readonly ImmutableHashSet<INamedTypeSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         private int _remaining = CompilerArtifactLimits.MaximumInstructions;
 
         internal bool NoFault(INamedTypeSymbol type)
@@ -445,8 +453,9 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             if (_checked.TryGetValue(type, out var known))
             { return known; }
-            if (type.DeclaringSyntaxReferences.Length == 0 || !_active.Add(type))
+            if (type.DeclaringSyntaxReferences.Length == 0 || _active.Contains(type))
             { return false; }
+            _active.Add(type);
             var safe = false;
             try
             {
@@ -501,19 +510,21 @@ internal static class CompilerTotalCallableLowerer
 
         private bool NoFaultModule()
         {
-            var pending = new Stack<INamespaceOrTypeSymbol>();
-            pending.Push(compilation.Assembly.GlobalNamespace);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
+            pending = pending.Push(compilation.Assembly.GlobalNamespace);
+            while (!pending.IsEmpty)
             {
-                foreach (var member in pending.Pop().GetMembers())
+                var pendingOwner = pending.Peek();
+                pending = pending.Pop();
+                foreach (var member in pendingOwner.GetMembers())
                 {
                     if (!Spend())
                     { return false; }
                     if (member is INamespaceOrTypeSymbol nested)
-                    { pending.Push(nested); }
+                    { pending = pending.Push(nested); }
                     if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
                             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                            CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices"))) &&
+                            CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))) &&
                         (!NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType)))
                     { return false; }
                 }

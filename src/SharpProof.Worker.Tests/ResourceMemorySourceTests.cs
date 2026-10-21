@@ -50,7 +50,7 @@ internal sealed partial class NativeResourceContractTests
     private static int[] ObserveMemoryArrayReturn(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("MemorySource", ("Subject.cs", source));
+        var compilation = TestCompilation.Create("MemorySource", [("Subject.cs", source)]);
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

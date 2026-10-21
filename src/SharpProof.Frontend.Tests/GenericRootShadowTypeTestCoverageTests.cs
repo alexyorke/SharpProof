@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -42,7 +43,7 @@ public sealed class GenericRootShadowTypeTestCoverageTests
             Assert.That(shadow.IsShadowCallSkeleton, Is.True);
             Assert.That(shadow.IsExact, Is.False);
             Assert.That(shadow.PreservedSourceCalls, Is.Empty);
-            var instructions = shadow.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+            var instructions = shadow.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
             Assert.That(instructions.OfType<IrCallInstruction>(), Is.Empty);
             Assert.That(instructions.OfType<IrAllocationInstruction>(), Is.Empty);
             var havoc = instructions.OfType<IrHavocInstruction>().Single();

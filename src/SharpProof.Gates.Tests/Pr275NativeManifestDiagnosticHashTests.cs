@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -27,10 +28,10 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        var hash = ComputeSha256(bytes);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        var hash = ComputeSha256(bytes.AsSpan());
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
-        await File.WriteAllBytesAsync(path, bytes);
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference { Path = path, Sha256 = hash },
@@ -59,9 +60,8 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
         }
     }
 
-    private static string ComputeSha256(byte[] bytes)
+    private static string ComputeSha256(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - every byte span including empty has a SHA256 digest */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return string.Concat(SHA256.HashData(bytes).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
     }
 }

@@ -13,7 +13,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 internal sealed class FrontendLoweringTests
 {
-    private static readonly long[] ElementValues = [4L, 8L, 15L];
+    private static readonly ImmutableArray<long> ElementValues = [4L, 8L, 15L];
 
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
     [TestCase(-7L, false, 3L, ExpectedResult = -2L)]
@@ -27,7 +27,7 @@ internal sealed class FrontendLoweringTests
             public static long Target(long value, bool enabled, long divisor) =>
                 enabled ? checked((value + 2L) * 3L) : value / divisor;
             """);
-        return compiled.CompareWithInterpreter(value, enabled, divisor);
+        return compiled.CompareWithInterpreter([value, enabled, divisor]);
     }
 
     [Test]
@@ -39,10 +39,10 @@ internal sealed class FrontendLoweringTests
                 enabled && value > 0L && text != null;
             """);
         Assert.That(
-            boolean.CompareWithInterpreter(true, 5L, "ok"),
+            boolean.CompareWithInterpreter([true, 5L, "ok"]),
             Is.EqualTo(true));
         Assert.That(
-            boolean.CompareWithInterpreter(false, 5L, null),
+            boolean.CompareWithInterpreter([false, 5L, null]),
             Is.EqualTo(false));
 
         using var concatenation = CompiledMethod.Create(
@@ -50,7 +50,7 @@ internal sealed class FrontendLoweringTests
             public static string Target(string text) => text + "proof";
             """);
         Assert.That(
-            concatenation.CompareWithInterpreter((object?)null),
+            concatenation.CompareWithInterpreter([(object?)null]),
             Is.EqualTo("proof"));
 
         using var length = CompiledMethod.Create(
@@ -58,7 +58,7 @@ internal sealed class FrontendLoweringTests
             public static long Target(string text) => (long)text.Length;
             """);
         Assert.That(
-            length.CompareWithInterpreter("sharp"),
+            length.CompareWithInterpreter(["sharp"]),
             Is.EqualTo(5L));
 
         using var nullable = CompiledMethod.Create(
@@ -67,10 +67,10 @@ internal sealed class FrontendLoweringTests
                 text == null ? 0L : text.Length;
             """);
         Assert.That(
-            nullable.CompareWithInterpreter((object?)null),
+            nullable.CompareWithInterpreter([(object?)null]),
             Is.EqualTo(0L));
         Assert.That(
-            nullable.CompareWithInterpreter("proof"),
+            nullable.CompareWithInterpreter(["proof"]),
             Is.EqualTo(5L));
     }
 
@@ -106,8 +106,8 @@ internal sealed class FrontendLoweringTests
             """
             public static string Target() => "\uFFFD";
             """);
-        var pairValue = pair.CompareWithInterpreter();
-        var replacementValue = replacement.CompareWithInterpreter();
+        var pairValue = pair.CompareWithInterpreter([]);
+        var replacementValue = replacement.CompareWithInterpreter([]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(pairValue, Is.EqualTo("\U0001F600"));
@@ -125,7 +125,7 @@ internal sealed class FrontendLoweringTests
                 checked(values[index] + values.LongLength);
             """);
         Assert.That(
-            element.CompareWithInterpreter(ElementValues, 1),
+            element.CompareWithInterpreter([ElementValues.ToArray(), 1]),
             Is.EqualTo(11L));
     }
 
@@ -150,10 +150,10 @@ internal sealed class FrontendLoweringTests
         var loweredOrder = order.Lower();
         var environment = order.CreateEnvironment(
             loweredOrder,
-            10L,
+            [10L,
             0L,
             long.MinValue,
-            -1L);
+            -1L]);
         var orderResult = new IrInterpreter(order.Factory)
             .Evaluate(loweredOrder.Term, environment);
         Assert.That(orderResult.Status, Is.EqualTo(IrEvaluationStatus.Exception));
@@ -167,7 +167,7 @@ internal sealed class FrontendLoweringTests
                 enabled && 10L / divisor > 0L;
             """);
         Assert.That(
-            shortCircuit.CompareWithInterpreter(false, 0L),
+            shortCircuit.CompareWithInterpreter([false, 0L]),
             Is.EqualTo(false));
     }
 
@@ -195,7 +195,7 @@ internal sealed class FrontendLoweringTests
     [Test]
     public void BoxingConversionsOfConstantsCannotLowerToNull()
     {
-        foreach (var expression in new[] { "(object)5", "(object)\"x\"", "(object)true" })
+        foreach (var expression in ImmutableArray.Create("(object)5", "(object)\"x\"", "(object)true"))
         {
             using var compiled = CompiledMethod.Create(
                 "public static object Target() => " + expression + ";");
@@ -252,10 +252,10 @@ internal sealed class FrontendLoweringTests
             """);
 
         Assert.That(
-            compiled.CompareWithInterpreter(uint.MaxValue, uint.MinValue),
+            compiled.CompareWithInterpreter([uint.MaxValue, uint.MinValue]),
             Is.EqualTo(true));
         Assert.That(
-            compiled.CompareWithInterpreter(uint.MinValue, uint.MaxValue),
+            compiled.CompareWithInterpreter([uint.MinValue, uint.MaxValue]),
             Is.EqualTo(false));
     }
 
@@ -331,7 +331,7 @@ internal sealed class FrontendLoweringTests
             .OfType<IBinaryOperation>()
             .Where(static operation =>
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind == BinaryOperatorKind.And))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(pureOperations, Has.Length.EqualTo(2));
         var pureLowerer = new RoslynOperationLowerer(pure.Factory);
         var firstPure = pureLowerer.Lower(pureOperations[0]);
@@ -348,7 +348,7 @@ internal sealed class FrontendLoweringTests
         var invocations = impure.TargetExpression
             .DescendantsAndSelf()
             .OfType<IInvocationOperation>()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(invocations, Has.Length.EqualTo(2));
         var impureLowerer = new RoslynOperationLowerer(impure.Factory);
         var firstImpure = impureLowerer.Lower(invocations[0]);
@@ -383,7 +383,7 @@ internal sealed class FrontendLoweringTests
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind is
                     BinaryOperatorKind.And or
                     BinaryOperatorKind.Or))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(operations, Has.Length.EqualTo(2));
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
 
@@ -427,7 +427,7 @@ internal sealed class FrontendLoweringTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -442,7 +442,7 @@ internal sealed class FrontendLoweringTests
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node)))
             .OfType<IParameterReferenceOperation>()
             .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Parameter.Ordinal))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(2));
 
         var factory = new IrFactory();
@@ -497,7 +497,7 @@ internal sealed class FrontendLoweringTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -513,7 +513,7 @@ internal sealed class FrontendLoweringTests
         var overloads = subject.GetMembers("Overload")
             .OfType<IMethodSymbol>()
             .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters[0].RefKind))
-            .ToArray();
+            .ToImmutableArray();
         var local = tree.GetRoot().DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetDeclaredSymbol(node)))
@@ -523,7 +523,7 @@ internal sealed class FrontendLoweringTests
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
             .Single()!;
         var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
-        ITypeSymbol[] types = [
+        ImmutableArray<ITypeSymbol> types = [
             subject,
             constructed,
             subject.TypeParameters[0],
@@ -537,7 +537,7 @@ internal sealed class FrontendLoweringTests
             nullable.Parameters[1].Type
         ];
 
-        foreach (var symbol in new ISymbol[] { echo, value, addition })
+        foreach (var symbol in ImmutableArray.Create<ISymbol>(echo, value, addition))
         {
             Assert.That(
                 DocumentationCommentId.CreateDeclarationId(symbol),
@@ -638,7 +638,7 @@ internal sealed class FrontendLoweringTests
             """,
             returnExpressionOnly: false);
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
-        var operations = compiled.TargetRoot.DescendantsAndSelf().ToArray();
+        var operations = compiled.TargetRoot.DescendantsAndSelf().ToImmutableArray();
         Assert.That(operations.Length, Is.GreaterThan(8));
         foreach (var operation in operations)
         {
@@ -666,29 +666,26 @@ internal sealed class FrontendLoweringTests
             """);
         var operations = compiled.TargetExpression
             .DescendantsAndSelf()
-            .ToArray();
-        var visits = new Dictionary<IOperation, int>(
+            .ToImmutableArray();
+        var visitBuilder = ImmutableDictionary.CreateBuilder<IOperation, int>(
             ReferenceEqualityComparer.Instance);
-        var lowerer = new RoslynOperationLowerer(compiled.Factory)
-        {
-            CustomLowering = operation =>
+        var lowerer = RoslynOperationLowerer.CreateConfigured(
+            compiled.Factory, static type => type, operation =>
             {
                 ArgumentNullException.ThrowIfNull(operation);
-                visits[operation] = visits.GetValueOrDefault(operation) + 1;
+                visitBuilder[operation] = visitBuilder.TryGetValue(operation, out var count) ? count + 1 : 1;
                 return default;
-            }
-        };
+            });
 
         var result = lowerer.Lower(compiled.TargetExpression);
+        var visits = visitBuilder.ToImmutable();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 result.Classification.Abstention,
                 Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
-            var expectedOperations = new HashSet<IOperation>(
-                operations,
-                ReferenceEqualityComparer.Instance);
+            var expectedOperations = operations.ToImmutableHashSet<IOperation>(ReferenceEqualityComparer.Instance);
             Assert.That(expectedOperations.Count, Is.EqualTo(operations.Length));
             Assert.That(visits.Count, Is.EqualTo(expectedOperations.Count));
             Assert.That(expectedOperations.SetEquals(visits.Keys), Is.True);
@@ -699,7 +696,7 @@ internal sealed class FrontendLoweringTests
     [Test]
     public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
     {
-        var stage = OperationSupportStage.ContractExpressionLowering;
+        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
         Assert.That(kinds, Is.Not.Empty);
         Assert.That(kinds, Is.Ordered);
@@ -740,7 +737,7 @@ internal sealed class FrontendLoweringTests
     [Test]
     public void FieldReferencesAreAdmittedToContractExpressionStage()
     {
-        var stage = OperationSupportStage.ContractExpressionLowering;
+        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         Assert.That(
             OperationSubsetClassifier.Classify(stage, OperationKind.FieldReference)
                 .IsExact,
@@ -1186,7 +1183,7 @@ internal sealed class FrontendLoweringTests
             pureWalkLeaf = unary.Operand;
             pureWalkDepth++;
         }
-        var nativeValue = (bool)compiled.Invoke(true)!;
+        var nativeValue = (bool)compiled.Invoke([true])!;
 
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Echo"));
         Assert.That(sourceUnaryCount, Is.EqualTo(unaryCount));
@@ -1233,7 +1230,7 @@ internal sealed class FrontendLoweringTests
     private static int MeasureOperationDepth(IOperation operation, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(operation);
-        var children = operation.ChildOperations.ToArray();
+        var children = operation.ChildOperations.ToImmutableArray();
         return children.Length == 0
             ? depth
             : children.Max(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (MeasureOperationDepth(child, depth + 1)));
@@ -1299,7 +1296,7 @@ internal sealed class FrontendLoweringTests
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 diagnostics,
                 Is.Empty,
@@ -1331,7 +1328,7 @@ internal sealed class FrontendLoweringTests
                 emit.Success,
                 Is.True,
                 string.Join(Environment.NewLine, emit.Diagnostics));
-            var assembly = AssemblyLoadContextHandle.Load(stream.ToArray());
+            var assembly = AssemblyLoadContextHandle.Load(ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
             var method = assembly.Assembly
                 .GetType("Subject")!
                 .GetMethod(
@@ -1345,10 +1342,11 @@ internal sealed class FrontendLoweringTests
                 expression);
         }
 
-        internal object? Invoke(params object?[] arguments)
+        internal object? Invoke(ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
-            return _method!.Invoke(null, arguments);
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
+            return _method!.Invoke(null, arguments.ToArray());
         }
 
         internal FrontendLoweringResult Lower()
@@ -1356,10 +1354,11 @@ internal sealed class FrontendLoweringTests
             return new RoslynOperationLowerer(Factory).Lower(TargetExpression);
         }
 
-        internal object? CompareWithInterpreter(params object?[] arguments)
+        internal object? CompareWithInterpreter(ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
-            var actual = _method!.Invoke(null, arguments);
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
+            var actual = _method!.Invoke(null, arguments.ToArray());
             var lowered = Lower();
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             var environment = CreateEnvironment(lowered, arguments);
@@ -1377,13 +1376,14 @@ internal sealed class FrontendLoweringTests
             return interpreted;
         }
 
-        internal Dictionary<IrVarId, IrValue> CreateEnvironment(
+        internal ImmutableDictionary<IrVarId, IrValue> CreateEnvironment(
             FrontendLoweringResult lowering,
-            params object?[] arguments)
+             ImmutableArray<object?> arguments)
         {
-            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+            if (arguments.IsDefault)
+            { throw new System.ArgumentNullException(nameof(arguments)); }
             System.ArgumentNullException.ThrowIfNull(lowering);
-            var values = new Dictionary<IrVarId, IrValue>();
+            var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
             foreach (var binding in lowering.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||
@@ -1401,7 +1401,7 @@ internal sealed class FrontendLoweringTests
                         Factory.GetVariableInfo(binding.Variable).Type,
                         arguments[parameter.Ordinal]));
             }
-            return values;
+            return values.ToImmutable();
         }
 
         public void Dispose()
@@ -1496,13 +1496,16 @@ internal sealed class FrontendLoweringTests
             get;
         }
 
-        internal static AssemblyLoadContextHandle Load(byte[] image)
+        internal static AssemblyLoadContextHandle Load(ImmutableArray<byte> image)
         {
-            System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+            if (image.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(image));
+            }
             var context = new System.Runtime.Loader.AssemblyLoadContext(
                 "SharpProof.Frontend.Test." + Guid.NewGuid().ToString("N"),
                 isCollectible: true);
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             return new AssemblyLoadContextHandle(
                 context,
                 context.LoadFromStream(stream));
@@ -1540,7 +1543,7 @@ internal sealed class FrontendLoweringTests
             Is.True,
             string.Join(Environment.NewLine, emit.Diagnostics));
         return MetadataReference.CreateFromImage(
-            stream.ToArray().ToImmutableArray(),
+            ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
             new MetadataReferenceProperties(
                 MetadataImageKind.Assembly,
                 aliases: [alias]));

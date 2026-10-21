@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.CompilerProbe.TestAsset;
 
 internal static class ProbeHash
@@ -5,7 +6,7 @@ internal static class ProbeHash
     internal static string Text(string value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return Bytes(Encoding.UTF8.GetBytes(value));
+        return SharpProof.Ir.HashEncoding.ComputeSha256Hex((Encoding.UTF8.GetBytes(value)).ToImmutableArray());
     }
 
     internal static string File(string path)
@@ -15,9 +16,9 @@ internal static class ProbeHash
         return SharpProof.Ir.HashEncoding.ComputeSha256Hex(stream);
     }
 
-    internal static string Bytes(byte[] value)
+    internal static string Bytes(ImmutableArray<byte> value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfMissing(value.IsDefault, nameof(value));
         return SharpProof.Ir.HashEncoding.ComputeSha256Hex(value);
     }
 }

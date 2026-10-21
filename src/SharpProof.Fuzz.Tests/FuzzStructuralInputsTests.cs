@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -27,7 +28,7 @@ public sealed class FuzzStructuralInputsTests
         var arithmetic = factory.Binary(IrBinaryOperator.Add, integer, factory.Integer(1));
         var cast = factory.Cast(factory.StringType,
             factory.Conditional(condition, firstObject, secondObject));
-        IrTerm[] parents =
+        ImmutableArray<IrTerm> parents =
         [
             cast,
             factory.Length(cast),
@@ -57,8 +58,8 @@ public sealed class FuzzStructuralInputsTests
         var text = GeneratedCSharpExpression.Text();
         var reference = GeneratedCSharpExpression.Reference();
         var values = GeneratedCSharpExpression.Values();
-        var parents = new[]
-        {
+        ImmutableArray<GeneratedCSharpExpression> parents =
+        [
             GeneratedCSharpExpression.Length(GeneratedCSharpExpression.Binary(
                 GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("xy"))),
             GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.Conditional(
@@ -67,8 +68,8 @@ public sealed class FuzzStructuralInputsTests
                 condition, values, values), GeneratedCSharpExpression.Binary(
                 GeneratedExpressionKind.Add, GeneratedCSharpExpression.Left(),
                 GeneratedCSharpExpression.Right()))
-        };
-        var cases = new List<GeneratedCSharpCase>();
+        ];
+        var caseBuilder = ImmutableArray.CreateBuilder<GeneratedCSharpCase>();
         foreach (var parent in parents)
         {
             var candidates = CSharpStructuralShrinker.GetCandidates(parent);
@@ -77,7 +78,7 @@ public sealed class FuzzStructuralInputsTests
             {
                 Assert.That(candidate.Type, Is.EqualTo(parent.Type));
                 Assert.That(candidate.NodeCount, Is.LessThan(parent.NodeCount));
-                cases.Add(new(candidate, 1, 1, true)
+                caseBuilder.Add(new(candidate, 1, 1, true)
                 {
                     Text = "abcd",
                     Values = [8L, 9L, 10L],
@@ -86,8 +87,9 @@ public sealed class FuzzStructuralInputsTests
             }
         }
 
+        var cases = caseBuilder.ToImmutable();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(results, Has.Length.EqualTo(cases.Count));
+        Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)
         {
             Assert.That(results[index].Status, Is.EqualTo(FuzzOracleStatus.Agreement),

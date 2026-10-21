@@ -57,7 +57,9 @@ internal sealed partial class NativeResourceContractTests
         ArgumentNullException.ThrowIfNull(mutation);
         var target = TaskBindingTarget();
         var projection = target.ForkJoinProjection!;
-        var reference = target.Compilation.ResourceMetadataReferences.Single();
+        var compilation = target.Compilation;
+        var entry = target.Entry;
+        var reference = compilation.ResourceMetadataReferences.Single();
         switch (mutation)
         {
             case "projection":
@@ -79,55 +81,61 @@ internal sealed partial class NativeResourceContractTests
                 target = target with { ForkJoinProjection = projection with { FrameworkAssemblyIdentity = projection.FrameworkAssemblyIdentity.Replace("8.0.0.0", "9.0.0.0", StringComparison.Ordinal) } };
                 break;
             case "assumption":
-                target.Entry.Assumptions = [];
+                entry = entry with { Assumptions = [] };
                 break;
             case "assumption-kind":
-                target.Entry.Assumptions.Single().Kind = WorkerAssumptionKind.Unspecified;
+                entry = entry with { Assumptions = entry.Assumptions.SetItem(0, entry.Assumptions.Single() with { Kind = WorkerAssumptionKind.Unspecified }) };
                 break;
             case "assumption-owner":
-                target.Entry.Assumptions.Single().Id = ResourceTaskCatalog.AssumptionId("other", projection.FrameworkAssemblyIdentity);
+                entry = entry with { Assumptions = entry.Assumptions.SetItem(0, entry.Assumptions.Single() with { Id = ResourceTaskCatalog.AssumptionId("other", projection.FrameworkAssemblyIdentity) }) };
                 break;
             case "duplicate-assumption":
-                target.Entry.Assumptions = [.. target.Entry.Assumptions, target.Entry.Assumptions.Single()];
+                entry = entry with { Assumptions = [.. entry.Assumptions, entry.Assumptions.Single()] };
                 break;
             case "references":
-                target.Compilation.ResourceMetadataReferences = [];
+                compilation = compilation with { ResourceMetadataReferences = [] };
                 break;
             case "null-reference":
-                target.Compilation.ResourceMetadataReferences = [null!];
+                compilation = compilation with { ResourceMetadataReferences = [null!] };
                 break;
             case "reference-identity":
-                reference.Identity = "foreign";
+                reference = reference with { Identity = "foreign" };
                 break;
             case "reference-kind":
-                reference.Kind = "Module";
+                reference = reference with { Kind = "Module" };
                 break;
             case "reference-hash":
-                reference.Modules.Single().Sha256 = "bad";
+                reference = reference with { Modules = reference.Modules.SetItem(0, reference.Modules.Single() with { Sha256 = "bad" }) };
                 break;
             case "module-count":
-                reference.Modules = [];
+                reference = reference with { Modules = [] };
                 break;
             case "null-module":
-                reference.Modules = [null!];
+                reference = reference with { Modules = [null!] };
                 break;
             case "conflicting-hash":
-                target.Compilation.ResourceMetadataReferences = [reference, new CompilerReferenceSnapshot
+                compilation = compilation with
+                {
+                    ResourceMetadataReferences = [reference, new CompilerReferenceSnapshot
                 {
                     Kind = reference.Kind, Identity = reference.Identity,
                     Modules = [new CompilerReferenceModuleSnapshot { Sha256 = new string('a', 64) }]
-                }];
+                }]
+                };
                 break;
             case "target-framework":
-                target.Compilation.TargetFramework = "net9.0";
+                compilation = compilation with { TargetFramework = "net9.0" };
                 break;
             case "target-framework-null":
-                target.Compilation.TargetFramework = null!;
+                compilation = compilation with { TargetFramework = null! };
                 break;
             default:
                 Assert.Fail("Unknown mutation");
                 break;
         }
+        if (mutation is "reference-identity" or "reference-kind" or "reference-hash" or "module-count" or "null-module")
+        { compilation = compilation with { ResourceMetadataReferences = [reference] }; }
+        target = target with { Compilation = compilation, Entry = entry };
         Assert.That(NativeResourceTaskBinding.Bind(target, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
 
@@ -135,9 +143,9 @@ internal sealed partial class NativeResourceContractTests
     public void TaskRuntimeBindingAcceptsMatchingImagesAndPlatformQualifiedTarget()
     {
         var target = TaskBindingTarget();
-        target.Compilation.TargetFramework = "net8.0-windows";
+        target = target with { Compilation = target.Compilation with { TargetFramework = "net8.0-windows" } };
         var reference = target.Compilation.ResourceMetadataReferences.Single();
-        target.Compilation.ResourceMetadataReferences = [reference, reference, new CompilerReferenceSnapshot { Identity = "unrelated" }];
+        target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = [reference, reference, new CompilerReferenceSnapshot { Identity = "unrelated" }] } };
         Assert.That(NativeResourceTaskBinding.Bind(target, TestContext.CurrentContext.CancellationToken), Is.Not.Null);
     }
 

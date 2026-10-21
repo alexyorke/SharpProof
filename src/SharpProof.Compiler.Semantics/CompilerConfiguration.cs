@@ -100,7 +100,7 @@ internal sealed class CompilerConfiguration
             parseValues: true,
             profileAliases: profileAliases,
             featuresAliases: featuresAliases)
-            .ToList();
+            .ToImmutableArray().ToBuilder();
         if (!invalid.Any(static value =>
                 value.Key == CompilerConfigurationOptionRegistry.Profile.Key) &&
             options.TryGetValue(
@@ -134,20 +134,21 @@ internal sealed class CompilerConfiguration
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
-        var candidates = new List<(string Key, string Value)>();
-        foreach (var key in new[] {
+        var candidateBuffer = ImmutableArray.CreateBuilder<(string Key, string Value)>(3);
+        foreach (var key in ImmutableArray.Create(
                      option.Key,
                      "build_property." + option.Key,
                      "build_property." + option.BuildPropertyName
-                 })
+                 ))
         {
             if (!options.TryGetValue(key, out var candidate))
             {
                 continue;
             }
-            candidates.Add((key, candidate));
+            candidateBuffer.Add((key, candidate));
         }
 
+        var candidates = candidateBuffer.ToImmutable();
         var hasExplicitAnalyzerValue = candidates.Any(
             candidate => string.Equals(
                 candidate.Key,
@@ -171,16 +172,16 @@ internal sealed class CompilerConfiguration
                     candidate.Key,
                     candidate.Value))
             .Select(static candidate => candidate.Value.Trim())
-            .ToArray();
+            .ToImmutableArray();
         var effective = hasExplicitAnalyzerValue
             ? explicitAnalyzerValue
-            : candidates.Count == 0
+            : candidates.Length == 0
                 ? string.Empty
                 : candidates[0].Value;
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .ToImmutableArray();
         return (
-            candidates.Count != 0,
+            candidates.Length != 0,
             effective,
             distinct.Length > 1,
             string.Join(" / ", distinct));
@@ -281,11 +282,11 @@ internal sealed class CompilerConfiguration
         AnalyzerConfigOptions options,
         out string value)
     {
-        foreach (var key in new[] {
+        foreach (var key in ImmutableArray.Create(
                      "sharpproof_mode",
                      "build_property.sharpproof_mode",
                      "build_property.SharpProofMode"
-                 })
+                 ))
         {
             if (options.TryGetValue(key, out var candidate) &&
                 !string.IsNullOrWhiteSpace(candidate))
@@ -338,11 +339,10 @@ internal sealed class CompilerConfiguration
         out string value)
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
-        var keys = new[] {
+        var keys = ImmutableArray.Create(
             option.Key,
             "build_property." + option.Key,
-            "build_property." + option.BuildPropertyName
-        };
+            "build_property." + option.BuildPropertyName);
         foreach (var key in keys)
         {
             if (options.TryGetValue(key, out var found))

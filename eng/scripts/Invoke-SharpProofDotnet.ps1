@@ -18,9 +18,7 @@ Import-Module (Join-Path `
         $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 Assert-SharpProofContainer `
     'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
-$effectiveArguments = @(
-    Add-SharpProofStaticGraphArgument -Arguments $DotnetArgs
-)
+$effectiveArguments = Add-SharpProofStaticGraphArgument -Arguments $DotnetArgs
 
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = 'dotnet'

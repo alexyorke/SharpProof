@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -72,7 +73,7 @@ internal sealed class LauncherWorkflowTests
     {
         System.ArgumentNullException.ThrowIfNull(invalid);
         using var directory = new TempDirectory("sharpproof-direct-invalid-");
-        var arguments = invalid == "missing" ? [] : Arguments(directory.FullName);
+        ImmutableArray<string> arguments = invalid == "missing" ? [] : Arguments(directory.FullName);
         arguments = invalid switch
         {
             "unknown" => [.. arguments, "--unknown", "value"],
@@ -91,11 +92,12 @@ internal sealed class LauncherWorkflowTests
     public async Task PreManifestTimeoutIsPromotedOnlyWhenItsRequestAuthorityIsValid(bool invalidAuthority, bool requireProven)
     {
         using var directory = new TempDirectory("sharpproof-pre-manifest-timeout-");
-        var arguments = Arguments(directory.FullName);
+        var argumentBuilder = Arguments(directory.FullName).ToBuilder();
         if (requireProven)
         {
-            arguments[Array.IndexOf(arguments, "--verify-policy") + 1] = "require-proven";
+            argumentBuilder[argumentBuilder.IndexOf("--verify-policy") + 1] = "require-proven";
         }
+        var arguments = argumentBuilder.ToImmutable();
         var exit = await Program.RunMain(arguments, (request, _) =>
             request is null ? throw new System.ArgumentNullException(nameof(request)) : (Task.FromResult(WorkerResultAssembler.Create(
                 WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
@@ -184,8 +186,8 @@ internal sealed class LauncherWorkflowTests
         Assert.That(output.ToString(), Does.Contain("; SARIF=" + sarif));
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(publishedRequest))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult))!;
-        var manifestBytes = await File.ReadAllBytesAsync(publishedManifest);
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
+        var manifestBytes = (await File.ReadAllBytesAsync(publishedManifest)).ToImmutableArray();
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(request.CompilerManifest.Path, Is.EqualTo(publishedManifest));
@@ -226,8 +228,8 @@ internal sealed class LauncherWorkflowTests
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "request.json")))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
-        var bytes = await File.ReadAllBytesAsync(Path.Combine(directory.FullName, "manifest.json"));
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
+        var bytes = (await File.ReadAllBytesAsync(Path.Combine(directory.FullName, "manifest.json"))).ToImmutableArray();
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exit, Is.Not.Zero);
@@ -270,7 +272,7 @@ internal sealed class LauncherWorkflowTests
         }
     }
 
-    private static string[] Arguments(string directory)
+    private static ImmutableArray<string> Arguments(string directory)
     {
         System.ArgumentNullException.ThrowIfNull(directory);
         var manifest = new WorkerClaimManifest();

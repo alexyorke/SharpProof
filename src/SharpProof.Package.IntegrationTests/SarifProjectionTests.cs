@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Worker.Launcher;
@@ -88,17 +89,22 @@ internal sealed class SarifProjectionTests
         };
         if (outcome == WorkerClaimOutcome.Refuted)
         {
-            result.EffectWitness = new WorkerEffectViolationWitness
             {
-                Kind = "write",
-                Detail = "observable state",
-                Location = new WorkerSourceLocation
+                result = result with
                 {
-                    Path = "Witness.cs",
-                    Line = 7,
-                    Column = 8
-                }
-            };
+                    EffectWitness = new WorkerEffectViolationWitness
+                    {
+                        Kind = "write",
+                        Detail = "observable state",
+                        Location = new WorkerSourceLocation
+                        {
+                            Path = "Witness.cs",
+                            Line = 7,
+                            Column = 8
+                        }
+                    }
+                };
+            }
         }
         using var document = JsonDocument.Parse(SarifProjection.Serialize(
             new WorkerVerifyRequest { VerifyPolicy = policy },
@@ -231,7 +237,7 @@ internal sealed class SarifProjectionTests
     public void AbsolutePathsInsideSourceRootAreRelativeAndOutsidePathsStayAbsolute()
     {
         const string projectDirectory = "/workspace/consumer project";
-        (string CallableId, string ClaimId, string Path)[] sources =
+        ImmutableArray<(string CallableId, string ClaimId, string Path)> sources =
         [
             ("Consumer.Subject.Root()", "claim-root", projectDirectory),
             ("Consumer.Subject.Inside()", "claim-inside",
@@ -249,7 +255,7 @@ internal sealed class SarifProjectionTests
                 Length = 1,
                 Line = 1,
                 Column = 1
-            }).ToArray();
+            }).ToImmutableArray();
         var manifest = new WorkerClaimManifest
         {
             Callables = [.. sources.Select((source, index) =>

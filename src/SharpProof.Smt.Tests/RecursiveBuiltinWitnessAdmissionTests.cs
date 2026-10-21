@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -42,7 +43,7 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var alias = factory.Binary(requireAlias ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
             factory.Cast(factory.ObjectType, field), factory.Cast(factory.ObjectType, receiverTerm));
         var query = new VerificationQuery(factory,
-            new[] { nonnullReceiver, nonnullField, alias }.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate,
+            ImmutableArray.Create(nonnullReceiver, nonnullField, alias).Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate,
                 new LoweredJustification(factory.CreateOperation())))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [receiver]);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());

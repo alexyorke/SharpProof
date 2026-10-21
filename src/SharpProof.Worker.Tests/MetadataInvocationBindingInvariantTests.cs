@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,8 +15,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataInvocationBindingInvariantTests
 {
-    private static readonly int[] ExpectedOrdinals = [0, 1];
-    private static readonly string[] ExpectedRecoveryDiagnostics = ["CS1739"];
+    private static readonly ImmutableArray<int> ExpectedOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> ExpectedRecoveryDiagnostics = ["CS1739"];
 
     [TestCase("Library.Target(value, 7)", ArgumentKind.Explicit)]
     [TestCase("Library.Target(right: 7, left: value)", ArgumentKind.Explicit)]
@@ -48,12 +49,12 @@ public sealed class MetadataInvocationBindingInvariantTests
         var owned = total!;
         var factory = owned.Program.Factory;
         var entry = owned.Parameters.Single().Entry;
-        foreach (var input in new[] { -17, 0, 23 })
+        foreach (var input in ImmutableArray.Create(-17, 0, 23))
         {
             var expected = input - 7;
             Assert.That(subject.InvokeRoot(input), Is.EqualTo(expected));
             var replay = new IrProgramInterpreter(factory).Execute(owned.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input)));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(expected)));

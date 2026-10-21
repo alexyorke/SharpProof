@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -35,7 +36,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, []), Is.EqualTo(17));
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [null]), Is.EqualTo(17));
             var model = compilation.GetSemanticModel(tree);
-            var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+            var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
             var targetSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Target"));
             var helperSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Helper"));
             var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
@@ -79,7 +80,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(direct.IsExact, Is.True);
             Assert.That(direct.ConstructionLimitExceeded, Is.False);
             var replay = new IrProgramInterpreter(factory).Execute(direct.Program,
-                helperContext.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type))));
+                ImmutableDictionaryCapture.Create(helperContext.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type))));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17)));

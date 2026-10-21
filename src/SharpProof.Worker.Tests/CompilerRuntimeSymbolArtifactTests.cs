@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
@@ -51,9 +52,9 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
             """;
-        var compilation = TestCompilation.Create(
+        var compilation = TestCompilation.CreateExact(
             "CompilerRuntimeSymbolArtifactTests",
-            ("Subject.cs", source));
+            [("Subject.cs", source)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(
             compilation,
@@ -71,8 +72,8 @@ public sealed class CompilerRuntimeSymbolArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(json);
         System.ArgumentNullException.ThrowIfNull(path);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await File.WriteAllBytesAsync(path, bytes);
+        var bytes = Encoding.UTF8.GetBytes(json).ToImmutableArray();
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         return new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference

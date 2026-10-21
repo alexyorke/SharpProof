@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Dataflow.Test;
 
 internal static class GeneratedDomainLawAssertions
@@ -6,11 +7,12 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertLatticeAndBottomLaws<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values,
+        ImmutableArray<T> values,
         int seed)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
         var comparer = EqualityComparer<T>.Default;
@@ -111,15 +113,18 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertTransfersAreMonotone<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values,
+        ImmutableArray<T> values,
         int seed,
-        IReadOnlyList<(string Name, Func<T, T> Transfer)> unaryTransfers,
-        IReadOnlyList<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
+        ImmutableArray<(string Name, Func<T, T> Transfer)> unaryTransfers,
+        ImmutableArray<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
     {
-        System.ArgumentNullException.ThrowIfNull(binaryTransfers);
+        if (binaryTransfers.IsDefault)
+        { throw new ArgumentNullException(nameof(binaryTransfers)); }
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(unaryTransfers);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (unaryTransfers.IsDefault)
+        { throw new ArgumentNullException(nameof(unaryTransfers)); }
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
 
@@ -158,10 +163,11 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertWideningTerminates<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> ascendingChain,
+        ImmutableArray<T> ascendingChain,
         int maximumChanges)
     {
-        System.ArgumentNullException.ThrowIfNull(ascendingChain);
+        if (ascendingChain.IsDefault)
+        { throw new ArgumentNullException(nameof(ascendingChain)); }
         System.ArgumentNullException.ThrowIfNull(domain);
         Assert.That(ascendingChain, Is.Not.Empty);
         var previousChainValue = domain.Bottom;
@@ -210,10 +216,11 @@ internal static class GeneratedDomainLawAssertions
 
     public static void AssertHavocIsConservative<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values)
+        ImmutableArray<T> values)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        System.ArgumentNullException.ThrowIfNull(values);
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         foreach (var value in values)
         {
             var havoced = domain.Havoc(value);
@@ -236,29 +243,31 @@ internal static class GeneratedDomainLawAssertions
         }
     }
 
-    private static T Pick<T>(IReadOnlyList<T> values, Random random)
+    private static T Pick<T>(ImmutableArray<T> values, Random random)
     {
         System.ArgumentNullException.ThrowIfNull(random);
-        System.ArgumentNullException.ThrowIfNull(values);
-        return values[random.Next(values.Count)];
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
+        return values[random.Next(values.Length)];
     }
 }
 
 internal static class GeneratedDomainSamples
 {
-    private static readonly int[] Moduli = [1, 2, 3, 4, 5, 8, 16];
+    private static readonly ImmutableArray<int> Moduli = [1, 2, 3, 4, 5, 8, 16];
 
-    public static IReadOnlyList<IntervalValue> Intervals(int seed, int count)
+    public static ImmutableArray<IntervalValue> Intervals(int seed, int count)
     {
         var domain = IntervalDomain.Instance;
         var random = new Random(seed);
-        var values = new List<IntervalValue> {
+        ImmutableArray<IntervalValue> initialValues = [
             domain.Bottom,
             domain.Top,
             domain.Constant(long.MinValue),
             domain.Constant(long.MaxValue),
             domain.Range(long.MinValue, long.MaxValue)
-        };
+        ];
+        var values = initialValues.ToBuilder();
 
         for (var index = 0; index < count; index++)
         {
@@ -283,20 +292,21 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
-    public static IReadOnlyList<SequenceCardinalityValue> Sequences(int seed, int count)
+    public static ImmutableArray<SequenceCardinalityValue> Sequences(int seed, int count)
     {
         var domain = SequenceCardinalityDomain.Instance;
         var random = new Random(seed);
-        var values = new List<SequenceCardinalityValue> {
+        ImmutableArray<SequenceCardinalityValue> initialValues = [
             domain.Bottom,
             domain.Empty,
             domain.NonEmpty,
             domain.Top,
             domain.KnownLength(long.MaxValue)
-        };
+        ];
+        var values = initialValues.ToBuilder();
 
         for (var index = 0; index < count; index++)
         {
@@ -327,7 +337,7 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values;
+        return values.ToImmutable();
     }
 
     private static long NextSignedValue(Random random)
@@ -360,7 +370,7 @@ internal abstract class GeneratedDomainPropertyTests<T>
 {
     protected abstract IAbstractDomain<T> Domain { get; }
     protected abstract int Seed { get; }
-    protected abstract IReadOnlyList<T> Values { get; }
+    protected abstract ImmutableArray<T> Values { get; }
 
     [Test]
     public void GeneratedValuesSatisfyLatticeAndBottomLaws()
@@ -387,7 +397,7 @@ internal sealed class GeneratedIntervalDomainPropertyTests :
     protected override int Seed => 0x51A2;
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
     protected override IAbstractDomain<IntervalValue> Domain => _domain;
-    protected override IReadOnlyList<IntervalValue> Values =>
+    protected override ImmutableArray<IntervalValue> Values =>
         GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
@@ -407,8 +417,12 @@ internal sealed class GeneratedIntervalDomainPropertyTests :
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
     {
-        var oneSided = new List<IntervalValue> { _domain.Bottom, _domain.Constant(11) };
-        var congruent = new List<IntervalValue> { _domain.Bottom, _domain.Constant(0) };
+        var oneSided = ImmutableArray.CreateBuilder<IntervalValue>();
+        oneSided.Add(_domain.Bottom);
+        oneSided.Add(_domain.Constant(11));
+        var congruent = ImmutableArray.CreateBuilder<IntervalValue>();
+        congruent.Add(_domain.Bottom);
+        congruent.Add(_domain.Constant(0));
         for (var step = 1; step <= 128; step++)
         {
             oneSided.Add(_domain.Range(11, 11 + step));
@@ -418,11 +432,11 @@ internal sealed class GeneratedIntervalDomainPropertyTests :
 
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            oneSided,
+            oneSided.ToImmutable(),
             maximumChanges: 2);
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            congruent,
+            congruent.ToImmutable(),
             maximumChanges: 3);
     }
 
@@ -437,16 +451,15 @@ internal sealed class GeneratedSequenceCardinalityDomainPropertyTests :
         SequenceCardinalityDomain.Instance;
     protected override IAbstractDomain<SequenceCardinalityValue> Domain =>
         _domain;
-    protected override IReadOnlyList<SequenceCardinalityValue> Values =>
+    protected override ImmutableArray<SequenceCardinalityValue> Values =>
         GeneratedDomainSamples.Sequences(Seed, 256);
 
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
     {
-        var chain = new List<SequenceCardinalityValue> {
-            _domain.Bottom,
-            _domain.Empty
-        };
+        var chain = ImmutableArray.CreateBuilder<SequenceCardinalityValue>();
+        chain.Add(_domain.Bottom);
+        chain.Add(_domain.Empty);
         for (var step = 1; step <= 128; step++)
         {
             chain.Add(_domain.Create(
@@ -456,7 +469,7 @@ internal sealed class GeneratedSequenceCardinalityDomainPropertyTests :
 
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            chain,
+            chain.ToImmutable(),
             maximumChanges: 2);
     }
 
@@ -469,7 +482,7 @@ internal sealed class GeneratedNullnessDomainPropertyTests :
     protected override int Seed => 0x19F3;
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
     protected override IAbstractDomain<NullnessValue> Domain => _domain;
-    protected override IReadOnlyList<NullnessValue> Values
+    protected override ImmutableArray<NullnessValue> Values
     {
         get
         {
@@ -478,7 +491,7 @@ internal sealed class GeneratedNullnessDomainPropertyTests :
                 .Select(_ => (NullnessValue)random.Next(4))
                 .Prepend(NullnessValue.Bottom)
                 .Prepend(NullnessValue.MaybeNull)
-                .ToArray();
+                .ToImmutableArray();
         }
     }
 

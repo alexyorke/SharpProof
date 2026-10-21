@@ -158,7 +158,7 @@ public sealed class NativeResourceAllocationTests
         ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { [ZeroAllocations] public static void Target(int n) { " + body +
             " } private static void Leaf(int size) { for(int i=0;i<size;i++) { var a = new int[2]; } } }";
-        var compilation = TestCompilation.Create("ResourceBytes", ("Subject.cs", source));
+        var compilation = TestCompilation.Create("ResourceBytes", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()

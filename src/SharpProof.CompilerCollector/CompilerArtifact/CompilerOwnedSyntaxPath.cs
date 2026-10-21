@@ -11,7 +11,7 @@ internal static class CompilerOwnedSyntaxPath
             writer.Add(-1);
             return;
         }
-        var path = new Stack<int>();
+        var path = ImmutableArray.CreateBuilder<int>();
         for (var current = declaration; !SyntaxSite.IsSame(current, owner); current = current.Parent!)
         {
             if (current.Parent == null)
@@ -19,11 +19,11 @@ internal static class CompilerOwnedSyntaxPath
                 writer.Add(-1);
                 return;
             }
-            path.Push(current.Parent.ChildNodes().TakeWhile(
+            path.Add(current.Parent.ChildNodes().TakeWhile(
                 child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!SyntaxSite.IsSame(child, current))).Count());
         }
         writer.Add(path.Count);
-        foreach (var ordinal in path)
+        foreach (var ordinal in path.ToImmutable().Reverse())
         {
             writer.Add(ordinal);
         }

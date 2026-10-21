@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -50,14 +51,14 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
         Assert.That(reason.HasValue, Is.True);
         Assert.That(reason.Value, Is.EqualTo("reviewed"));
 
-        var reported = new List<Diagnostic>();
+        var reportedBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
-            declaration, model, session, reported.Add, TestContext.CurrentContext.CancellationToken);
-        Assert.That(reported, Is.Empty);
+            declaration, model, session, reportedBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        Assert.That(reportedBuilder.Count, Is.Zero);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
         Action validateCancelled = () => SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
-            declaration, model, session, reported.Add, cancellation.Token);
+            declaration, model, session, reportedBuilder.Add, cancellation.Token);
         if (localDeclaration)
         {
             var cancelled = Assert.Throws<OperationCanceledException>(validateCancelled);
@@ -67,6 +68,7 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
         {
             Assert.DoesNotThrow(validateCancelled);
         }
+        var reported = reportedBuilder.ToImmutable();
         Assert.That(reported, Is.Empty);
         Assert.That(factory.GetNamedOutcome("Target"), Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }

@@ -43,8 +43,8 @@ internal static partial class CSharpOperationSemantics
 
 internal sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _exactLists = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _exactListCaptures = [];
+    private readonly ImmutableHashSet<ISymbol>.Builder _exactLists = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+    private readonly ImmutableHashSet<CaptureId>.Builder _exactListCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
 
     internal void TrackFreshLists(ControlFlowGraph graph)
     {
@@ -68,7 +68,7 @@ internal sealed partial class TotalLoweringContext
         _exactLists.Add(parameter);
     }
 
-    private static bool IsKnownList(IOperation operation, HashSet<ISymbol> symbols, HashSet<CaptureId> captures)
+    private static bool IsKnownList(IOperation operation, ImmutableHashSet<ISymbol>.Builder symbols, ImmutableHashSet<CaptureId>.Builder captures)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         symbols = RepositoryParameterGuard.NotNull(symbols, nameof(symbols));

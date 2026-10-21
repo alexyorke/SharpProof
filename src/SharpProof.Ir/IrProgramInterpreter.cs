@@ -16,7 +16,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     private readonly IrInterpreter _terms =
         new(factory);
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
@@ -25,7 +25,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
         CancellationToken cancellationToken)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
@@ -35,7 +35,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     internal IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         CancellationToken cancellationToken)
@@ -45,7 +45,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions)
     {
         replayOptions = RepositoryParameterGuard.NotNull(replayOptions, nameof(replayOptions));
@@ -57,7 +57,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions,
         CancellationToken cancellationToken)
     {
@@ -67,7 +67,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     }
 
     internal IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        IrProgram program, ImmutableDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         IrProgramReplayOptions? replayOptions, CancellationToken cancellationToken)
@@ -108,7 +108,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
             }
         }
         var entry = program.Entry;
-        var occurrences = new Dictionary<IrInstructionId, int>();
+        var occurrences = ImmutableDictionary.CreateBuilder<IrInstructionId, int>();
         var state = new ExecutionState
         {
             Interpreter = this,
@@ -175,7 +175,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         internal CancellationToken CancellationToken;
         internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost;
         internal IrProgramReplayOptions? ReplayOptions;
-        internal Dictionary<IrInstructionId, int> Occurrences;
+        internal ImmutableDictionary<IrInstructionId, int>.Builder Occurrences;
         internal IrBlockId Current;
         internal int Steps;
         internal IrThrowInstruction? PendingException;
@@ -280,11 +280,12 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         }
     }
     internal IrEvaluationResult? EvaluateCallOperands(
-        IrTerm? receiver, IReadOnlyList<IrTerm> arguments, IrTerm? storedValue,
+        IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrTerm? storedValue,
         ReplayValues values, string nullReceiverDetail,
         CancellationToken cancellationToken)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         nullReceiverDetail = RepositoryParameterGuard.NotNull(nullReceiverDetail, nameof(nullReceiverDetail));
         IrValue? receiverValue = null;
         if (receiver != null)
@@ -399,14 +400,14 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
     internal sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
     {
         private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-        private readonly HashSet<IrVarId> _approximations = [];
+        private readonly ImmutableHashSet<IrVarId>.Builder _approximations = ImmutableHashSet.CreateBuilder<IrVarId>();
         private bool _consumedApproximation;
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
-        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
+        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutable();
         internal IrHeap Heap { get; } = new();
-        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
+        internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; init; }
         internal ImmutableHashSet<IrVarId> Snapshots { get; } = (snapshots ?? throw new System.ArgumentNullException(nameof(snapshots)));
-        internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
+        internal ImmutableDictionary<IrVarId, IrValue> Current => _values.ToImmutable();
         internal IrValue this[IrVarId key]
         {
             set
@@ -494,13 +495,13 @@ internal sealed partial class IrAllocationInstruction
             var elements = Enumerable.Repeat(initial, count);
             if (!this.InitialValues.IsEmpty)
             {
-                var evaluatedElements = new IrValue[this.InitialValues.Length];
-                for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
+                var evaluatedElements = ImmutableArray.CreateBuilder<IrValue>();
+                foreach (var initialValueTerm in this.InitialValues)
                 {
-                    var initialValue = state.Interpreter.Evaluate(this.InitialValues[initialIndex], state.Values, state.CancellationToken);
-                    evaluatedElements[initialIndex] = initialValue.Value!;
+                    var initialValue = state.Interpreter.Evaluate(initialValueTerm, state.Values, state.CancellationToken);
+                    evaluatedElements.Add(initialValue.Value!);
                 }
-                elements = evaluatedElements;
+                elements = evaluatedElements.ToImmutable();
             }
             var createdArray = state.Interpreter._factory.CreateSequenceValue(this.AllocatedType, elements);
             state.Values[this.Target!.Value] = createdArray;

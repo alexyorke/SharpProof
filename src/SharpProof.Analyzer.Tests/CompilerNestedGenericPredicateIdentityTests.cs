@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -67,7 +68,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
             .Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Contract.Ensures"));
         var clause = (IInvocationOperation)model.GetOperation(clauseSyntax)!;
         var references = clause.Arguments.Single().Value.DescendantsAndSelf()
-            .OfType<IParameterReferenceOperation>().ToArray();
+            .OfType<IParameterReferenceOperation>().ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(1));
         var reference = references.Single();
         Assert.That(reference.Type, Is.InstanceOf<ITypeParameterSymbol>());
@@ -90,7 +91,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("NestedGenericPredicateControl", isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject", throwOnError: true)!;
             var observed = subject.GetField("Observed")!;
             Assert.That(observed.GetValue(null), Is.EqualTo(!expectedResult));

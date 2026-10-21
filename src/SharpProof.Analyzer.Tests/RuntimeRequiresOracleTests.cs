@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -12,14 +13,16 @@ public sealed class RuntimeRequiresOracleTests
     public async Task RandomizedRequiresDiagnosticsMatchRuntimePredicates()
     {
         var random = new Random(41873);
-        var cases = Enumerable.Range(0, 192)
+        var pendingCases = Enumerable.Range(0, 192)
             .Select(index => new RangeCase(
                 index,
                 random.Next(-100, 101),
                 random.Next(-100, 101),
                 random.Next(-100, 101)))
-            .ToArray();
-        var lines = new List<string> {
+            .ToImmutableArray();
+        var caseBuilder = ImmutableArray.CreateBuilder<RangeCase>(pendingCases.Length);
+        var lines = ImmutableArray.CreateBuilder<string>();
+        lines.AddRange(ImmutableArray.Create(
             "using System;",
             "using SharpProof.Attributes;",
             "public static class RuntimeRequiresFixture {",
@@ -28,16 +31,16 @@ public sealed class RuntimeRequiresOracleTests
             "        return value >= minimum && value <= maximum;",
             "    }",
             "    private static int Throwing() =>",
-            "        throw new InvalidOperationException();"
-        };
-        foreach (var item in cases)
+            "        throw new InvalidOperationException();"));
+        foreach (var item in pendingCases)
         {
             lines.Add($"    public static void Case{item.Index:D3}() {{");
             lines.Add(
                 $"        Range({item.Value}, {item.Minimum}, {item.Maximum});");
-            item.CallLine = lines.Count - 1;
+            caseBuilder.Add(item with { CallLine = lines.Count - 1 });
             lines.Add("    }");
         }
+        var cases = caseBuilder.MoveToImmutable();
         lines.Add("    public static void ThrowingArgument() {");
         lines.Add("        Range(-1, Throwing(), 0);");
         var throwingArgumentLine = lines.Count - 1;
@@ -48,7 +51,7 @@ public sealed class RuntimeRequiresOracleTests
         var throwingPrefixLine = lines.Count - 1;
         lines.Add("    }");
         lines.Add("}");
-        var source = string.Join("\n", lines);
+        var source = string.Join("\n", lines.ToImmutable());
         var compilation = AnalyzerTestHost.CreateCompilation(
             source,
             ["SP0027"]);
@@ -78,14 +81,14 @@ public sealed class RuntimeRequiresOracleTests
                     [item.Value, item.Minimum, item.Maximum])!))
                 .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallLine))
                 .Order()
-                .ToArray();
+                .ToImmutableArray();
             var diagnosticLines = diagnostics
                 .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0027"))
                 .Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.GetLineSpan()
                         .StartLinePosition.Line))
                 .Order()
-                .ToArray();
+                .ToImmutableArray();
 
             Assert.That(runtimeRefutationLines, Is.Not.Empty);
             Assert.That(
@@ -116,19 +119,5 @@ public sealed class RuntimeRequiresOracleTests
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
     }
 
-    private sealed class RangeCase(
-        int index,
-        int value,
-        int minimum,
-        int maximum)
-    {
-        internal int Index { get; } = index;
-        internal int Value { get; } = value;
-        internal int Minimum { get; } = minimum;
-        internal int Maximum { get; } = maximum;
-        internal int CallLine
-        {
-            get; set;
-        }
-    }
+    private sealed record RangeCase(int Index, int Value, int Minimum, int Maximum, int CallLine = 0);
 }

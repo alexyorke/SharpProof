@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -46,7 +47,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, [5]), Is.EqualTo(6));
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5]), Is.EqualTo(6));
             var model = compilation.GetSemanticModel(tree);
-            var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+            var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
             var targetSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Target"));
             var helperSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Helper"));
             var targetGraph = ControlFlowGraph.Create(targetSyntax, model)!;
@@ -80,7 +81,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(prepared.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrAssumeInstruction>().Count(),
                     Is.EqualTo(clauseKind == "assume" ? 1 : 0));
                 var direct = new IrProgramInterpreter(factory).Execute(prepared.Program,
-                    candidate.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(candidate.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
                 Assert.That(direct.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(direct.ConsumedApproximation, Is.False);
                 Assert.That(direct.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));
@@ -102,7 +103,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauseKind == "requires" ? 1 : 0));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    context.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(context.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));

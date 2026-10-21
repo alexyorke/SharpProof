@@ -27,12 +27,18 @@ public sealed partial class DotnetApiInventoryTests
             "System.Boolean" => ("bool", "0", "1"),
             _ => throw new ArgumentOutOfRangeException(nameof(api))
         };
-        var edges = new List<string> { minimum, "0", maximum };
+        var edges = ImmutableArray.CreateBuilder<string>();
+        edges.Add(minimum);
+        edges.Add("0");
+        edges.Add(maximum);
         if (type == "ulong")
-        { edges.AddRange(["9223372036854775807", "9223372036854775808"]); }
+        {
+            edges.Add("9223372036854775807");
+            edges.Add("9223372036854775808");
+        }
         if (type == "char")
         { edges.Add("55296"); }
-        foreach (var edge in edges)
+        foreach (var edge in edges.ToImmutable())
         {
             var number = BigInteger.Parse(edge, System.Globalization.CultureInfo.InvariantCulture);
             var expression = type == "bool" ? (number.IsZero ? "false" : "true") : "(" + type + ")(" + edge + ")";

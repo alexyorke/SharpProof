@@ -29,7 +29,7 @@ internal sealed partial class VerificationCache
         int SchemaVersion,
         string InputHash,
         string ManifestHash,
-        WorkerCallableResult[] CallableResults,
-        WorkerClaimResult[] ClaimResults
+        [property: System.Text.Json.Serialization.JsonConverter(typeof(ProtocolArrayJsonConverter))] ImmutableArray<WorkerCallableResult> CallableResults,
+        [property: System.Text.Json.Serialization.JsonConverter(typeof(ProtocolArrayJsonConverter))] ImmutableArray<WorkerClaimResult> ClaimResults
     );
 }

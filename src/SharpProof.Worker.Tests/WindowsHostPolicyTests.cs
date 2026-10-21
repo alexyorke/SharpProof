@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.Host;
@@ -99,7 +100,7 @@ public sealed class WindowsHostPolicyTests
             PublicationLease.ValidateWindowsMember(path, _ => false, _ => false)));
         Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => true)));
-        var visited = new List<string>();
+        var visited = ImmutableArray.CreateBuilder<string>();
         Assert.DoesNotThrow((Action)(() => PublicationLease.ValidateWindowsMember(path,
             root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root == @"C:\"), member =>
             {
@@ -107,7 +108,7 @@ public sealed class WindowsHostPolicyTests
                 visited.Add(member);
                 return false;
             })));
-        Assert.That(visited, Is.EqualTo(new[] { @"C:\folder with spaces", path }));
+        Assert.That(visited.ToImmutable(), Is.EqualTo(ImmutableArray.Create(@"C:\folder with spaces", path)));
         Assert.That(PublicationLease.IsLocalNtfs("/"), Is.False);
     }
 

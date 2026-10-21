@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -11,7 +12,7 @@ public sealed class RegisteredTotalDefaultDomainCoverageTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var types = new[] { factory.BooleanType, factory.IntegerType, factory.StringType, factory.ObjectType, sequence };
+        var types = ImmutableArray.Create<IrTypeId>(factory.BooleanType, factory.IntegerType, factory.StringType, factory.ObjectType, sequence);
         Assert.That(types.Select(type => type.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(type)) : (factory.GetTypeInfo(type).Kind)),
             Is.EquivalentTo(Enum.GetValues<IrTypeKind>()));
         foreach (var type in types)

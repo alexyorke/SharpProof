@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -194,7 +195,7 @@ public sealed partial class ResourceBoundsTests
         var compilation = AnalyzerTestHost.CreateCompilation("public class C { public int M() => 1; }", ["SP0060"])
             .WithReferences(TestMetadataReferences.WithoutSharpProof);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation,
-            new Dictionary<string, string> { ["dotnet_diagnostic.SP0060.severity"] = "suggestion" });
+            ImmutableDictionary<string, string>.Empty.Add("dotnet_diagnostic.SP0060.severity", "suggestion"));
         Assert.That(diagnostics, Has.Length.EqualTo(1));
         Assert.That(diagnostics[0].Properties["ResourceStatus"], Is.EqualTo("Proven"));
     }
@@ -204,7 +205,7 @@ public sealed partial class ResourceBoundsTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation("public class C { public void M() { while(true) {} } }", ["SP0060"]);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation,
-            new Dictionary<string, string> { ["dotnet_diagnostic.SP0060.severity"] = "none" });
+            ImmutableDictionary<string, string>.Empty.Add("dotnet_diagnostic.SP0060.severity", "none"));
         Assert.That(diagnostics, Is.Empty);
     }
 

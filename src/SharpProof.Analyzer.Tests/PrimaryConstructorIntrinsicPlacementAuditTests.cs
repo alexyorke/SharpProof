@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0024"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0024"];
 
     private const string Source = """
         using SharpProof.Attributes;
@@ -45,7 +46,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
         string runtimeFailure;
         try
         {
-            using var stream = new MemoryStream(image);
+            using var stream = new MemoryStream((image).ToArray(), writable: false);
             var subject = runtime.LoadFromStream(stream).GetType("Subject")!;
             var exception = Assert.Throws<TargetInvocationException>(
                 (Action)(() => Activator.CreateInstance(subject)))!;
@@ -92,7 +93,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [Test]
@@ -108,7 +109,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result").And.Contain("<placement>")
                 .And.Contain("expected use inside Contract.Ensures"));

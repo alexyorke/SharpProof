@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -23,7 +24,7 @@ public sealed class ListSourceParameterOracleTests
         using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "src/SharpProof.Gates/Corpus/oss-methods.json")));
         var method = corpus.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = corpus.RootElement.GetProperty("files").EnumerateArray().Single(item => item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var lines = file.GetProperty("content").GetString()!.Split('\n');
+        var lines = file.GetProperty("content").GetString()!.Split('\n').ToImmutableArray();
         var start = method.GetProperty("startLine").GetInt32();
         var end = method.GetProperty("endLine").GetInt32();
         var swap = string.Join("\n", lines.Skip(start - 1).Take(end - start + 1));
@@ -43,10 +44,10 @@ public sealed class ListSourceParameterOracleTests
         });
         var interpreted = new IrProgramInterpreter(factory).Execute(program, null, 10000, choices);
         Assert.That(interpreted.ConsumedApproximation, Is.True, "Normal growth and ancillary fault choices are differential evidence, not native replay authority.");
-        var compilation = TestCompilation.Create("ListSourceParameterOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("ListSourceParameterOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new AssemblyLoadContext("ListSourceParameterOracle", isCollectible: true);

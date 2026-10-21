@@ -20,7 +20,7 @@ public sealed class OperationSupportStageBoundaryCoverageTests
         Assert.That(operation.Kind, Is.EqualTo(OperationKind.Literal));
         Assert.That(CSharpOperationSemantics.IsSupported(OperationSupportStage.ContractExpressionLowering, operation.Kind), Is.True);
         Assert.That(CSharpOperationSemantics.IsSupported(OperationSupportStage.EffectDiscovery, operation.Kind), Is.True);
-        var invalid = (OperationSupportStage)int.MaxValue;
+        const OperationSupportStage invalid = (OperationSupportStage)int.MaxValue;
         var exception = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
             _ = CSharpOperationSemantics.IsSupported(invalid, operation.Kind)));
         Assert.That(exception!.ParamName, Is.EqualTo("stage"));

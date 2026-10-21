@@ -4,14 +4,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     internal readonly struct RegionFilterEdgeResolver(RoslynTotalProgramLowerer lowerer,
         ControlFlowRegion region, ControlFlowRegion caught, IrBlockId accepted, IrBlockId rejected,
-        IReadOnlyDictionary<BasicBlock, IrBlockId> blocks)
+        ImmutableDictionary<BasicBlock, IrBlockId> blocks)
     {
         private readonly RoslynTotalProgramLowerer _lowerer = lowerer ?? throw new System.ArgumentNullException(nameof(lowerer));
         private readonly ControlFlowRegion _region = region ?? throw new System.ArgumentNullException(nameof(region));
         private readonly ControlFlowRegion _caught = caught ?? throw new System.ArgumentNullException(nameof(caught));
         private readonly IrBlockId _accepted = accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(accepted)) : accepted;
         private readonly IrBlockId _rejected = rejected.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(rejected)) : rejected;
-        private readonly IReadOnlyDictionary<BasicBlock, IrBlockId> _blocks = blocks ?? throw new System.ArgumentNullException(nameof(blocks));
+        private readonly ImmutableDictionary<BasicBlock, IrBlockId> _blocks = blocks ?? throw new System.ArgumentNullException(nameof(blocks));
         internal IrBlockId Resolve(ControlFlowBranch? branch)
         {
             _lowerer.SpendRegion();

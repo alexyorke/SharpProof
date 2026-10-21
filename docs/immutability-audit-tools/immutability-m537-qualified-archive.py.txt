@@ -1,0 +1,77 @@
+Historical audit reproduction source. Restore exact payload using the source manifest.
+import csv,gzip,hashlib,io,json,pathlib,subprocess,sys,tempfile,collections
+root=pathlib.Path.cwd();head='4a646d7ac';ledger='docs/immutability-residuals.tsv'
+def git(*args):return subprocess.check_output(['git','-C',str(root),*args])
+head=git('rev-parse',head).decode().strip()
+commits=git('log','--reverse','--format=%H',head,'--',ledger).decode().splitlines()
+if commits[0]!='d0be2e21b0f6c3a1c868a1f129a3f33ef2826719' or commits[-1]!=head:raise RuntimeError('Unexpected epoch endpoints')
+base=root/'artifacts/immutability-legacy-provenance';out=pathlib.Path(tempfile.mkdtemp(prefix='m537-qualified-archive-',dir=base));(out/'blobs').mkdir()
+current=base.parent/'immutability-const-semantic/current-verified-results'
+if (current/'completion-status.txt').read_text().strip()!='exitCode=0':raise RuntimeError('Incomplete current census')
+if (current/'head.txt').read_text().strip()!=head:raise RuntimeError('Current census and archive code checkpoint differ')
+current_units={r['Path']:r for r in csv.DictReader((current/'residual-unit-manifest.txt').open(encoding='utf-8'),delimiter='\t')}
+observations={};by_path=collections.defaultdict(list);locations=collections.defaultdict(list)
+for path in sorted((current/'residual').glob('*.tsv')):
+ for row in csv.DictReader(path.open(encoding='utf-8'),delimiter='\t'):
+  key=(row['ContextSha256'],row['StableId'])
+  if key in observations:raise RuntimeError('Duplicate current key')
+  observations[key]=row;by_path[row['Path']].append(key);locations[(row['Path'],row['Line'],row['Column'])].append(key)
+current_tracked=set(git('ls-files','-z').decode().split('\0'))-{''}
+current_outside={}
+source_objects={};epochs=[];legacy=[]
+for ordinal,commit in enumerate(commits,1):
+ blob=git('rev-parse',commit+':'+ledger).decode().strip();raw=git('cat-file','blob',blob)
+ (out/'blobs'/(blob+'.tsv.gz')).write_bytes(gzip.compress(raw,mtime=0))
+ rows=list(csv.DictReader(io.StringIO(raw.decode('utf-8-sig')),delimiter='\t'))
+ if len({r['Id'] for r in rows})!=len(rows):raise RuntimeError('Duplicate legacy IDs')
+ tree={}
+ for entry in git('ls-tree','-r','-z',commit).split(b'\0'):
+  if not entry:continue
+  metadata,path=entry.split(b'\t',1);mode,kind,oid=metadata.decode().split();tree[path.decode('utf-8')]=oid if kind=='blob' else ''
+ for number,row in enumerate(rows,1):
+  oid=tree.get(row['Path'],'');source_objects.setdefault(oid,None)
+  legacy.append(dict(EpochOrdinal=ordinal,CommitSha=commit,LegacyRowKey=f'{ordinal}|{row["Id"]}|{number}',LegacyId=row['Id'],RowOrdinal=number,LedgerGitBlob=blob,SourceGitBlob=oid,SourceAuthority='GitBlob' if oid else 'MissingHistoricalSource',**{k:row[k] for k in ['Path','Line','Column','Kind','Owner','Detail']},LegacyStatus=row['Status'],ScannerAuthority='UnknownHistoricalScanner',EffectiveStatus='NoAutomaticTransfer'))
+ epochs.append(dict(EpochOrdinal=ordinal,CommitSha=commit,LedgerGitBlob=blob,LedgerSha256=hashlib.sha256(raw).hexdigest(),Rows=len(rows),Paths=len({r['Path'] for r in rows})))
+source_objects.pop('',None)
+request=''.join(oid+'\n' for oid in source_objects).encode()
+process=subprocess.run(['git','-C',str(root),'cat-file','--batch'],input=request,stdout=subprocess.PIPE,check=True)
+stream=io.BytesIO(process.stdout)
+for oid in source_objects:
+ header=stream.readline().decode().strip().split()
+ if len(header)!=3 or header[0]!=oid or header[1]!='blob':raise RuntimeError('Invalid source blob')
+ content=stream.read(int(header[2]));tail=stream.read(1)
+ if tail!=b'\n':raise RuntimeError('Invalid blob frame')
+ source_objects[oid]=hashlib.sha256(content).hexdigest()
+def write_gzip(name,rows,fields=None):
+ if fields is None:fields=list(rows[0])
+ buffer=io.StringIO(newline='');writer=csv.DictWriter(buffer,fieldnames=fields,delimiter='\t',lineterminator='\n');writer.writeheader();writer.writerows(rows)
+ (out/name).write_bytes(gzip.compress(buffer.getvalue().encode(),mtime=0))
+write_gzip('legacy-rows.tsv.gz',legacy)
+write_gzip('current-observations.tsv.gz',list(observations.values()))
+authorities={};relations=[];matched=set();counts=collections.Counter()
+for row in legacy:
+ path=row['Path'];unit=current_units.get(path);oldhash=source_objects.get(row['SourceGitBlob'],'')
+ if not unit and path in current_tracked and path not in current_outside:current_outside[path]=hashlib.sha256(git('show',head+':'+path)).hexdigest()
+ newhash=unit['SourceSha256'] if unit else current_outside.get(path,'')
+ source_key=(row['CommitSha'],path)
+ authorities[source_key]=dict(SourceTreeRevision=row['CommitSha'],Path=path,SourceGitBlob=row['SourceGitBlob'],HistoricalSourceSha256=oldhash,CurrentSourceSha256=newhash,CanonicalCurrentPath=path if unit or path in current_tracked else '',Authority='ExactTrackedPathNoRenameInference' if unit else 'ExactTrackedPathOutsideSelectedCSharpUniverse' if path in current_tracked else 'MissingCurrentTrackedPath')
+ candidates=locations.get((path,row['Line'],row['Column']),[])
+ if not unit and path in current_tracked:state='OutsideCurrentSelectedCSharpUniverse'
+ elif not unit:state='MissingPathTombstone'
+ elif not oldhash:state='MissingHistoricalSource'
+ elif oldhash!=newhash:state='ChangedSource'
+ elif not by_path[path]:state='OutsideSelectedContext'
+ elif not candidates:state='UnrepresentedForm'
+ elif len(candidates)>1:state='Ambiguous'
+ else:state='ExactSourceLocationCandidateRequiresScannerReplay';matched.add(candidates[0])
+ counts[state]+=1
+ relations.append(dict(LegacyRowKey=row['LegacyRowKey'],State=state,CurrentLocationCandidates=len(candidates),LegacyStatus=row['LegacyStatus'],EffectiveStatus='NoAutomaticTransfer'))
+write_gzip('source-authority.tsv.gz',list(authorities.values()))
+write_gzip('historical-current-relations.tsv.gz',relations)
+newrows=[dict(ContextSha256=k[0],StableId=k[1],State='NewSemanticUnit' if r['Kind']=='Unit' else 'NewSemanticObservation',EffectiveStatus='RequiresCurrentRoleReview') for k,r in observations.items() if k not in matched]
+write_gzip('unmatched-current.tsv.gz',newrows)
+if len(relations)!=len(legacy) or sum(counts.values())!=len(legacy):raise RuntimeError('Legacy conservation')
+if len(newrows)+len(matched)!=len(observations):raise RuntimeError('Current conservation')
+summary=dict(PinnedHead=head,Epochs=len(epochs),HistoricalRows=len(legacy),CurrentObservations=len(observations),CurrentUnits=sum(r['Kind']=='Unit' for r in observations.values()),SourceAuthorities=len(authorities),SourceBlobs=len(source_objects),HistoricalRelations=dict(counts),CurrentUnmatched=len(newrows),CurrentLocationCandidates=len(matched),StatusTransfers=0,InitialEpoch=epochs[0],FinalEpoch=epochs[-1],RenameAuthority='No rename inferred; missing paths retain tombstones',Scope='Lossless historical/current union. Exact coordinates are candidates only; no unknown-scanner status transfers.')
+(out/'reconciliation-summary.json').write_text(json.dumps(summary,indent=2)+'\n',encoding='utf-8')
+print(json.dumps(summary));print('Archive='+str(out))

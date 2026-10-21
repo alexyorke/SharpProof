@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -100,7 +101,7 @@ public sealed class CoverageFloorPolicyTests
         using var results = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())
         {
-            foreach (var policy in new[] { "project", "aggregate", "changedTcb" })
+            foreach (var policy in ImmutableArray.Create("project", "aggregate", "changedTcb"))
             {
                 Assert.That(results.RootElement.GetProperty(policy).GetBoolean(),
                     Is.EqualTo(expected), $"{policy}: {covered}/{coverable}, floor {minimum}");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -37,7 +38,7 @@ internal sealed class PassiveLoopCutterTests
         var flagType = shape == "array-length" ? factory.GetOrCreateSequenceType(factory.IntegerType)
             : shape is "string-content" or "string-length" ? factory.StringType : factory.BooleanType;
         var flag = Parameter("flag", flagType);
-        var parameters = new[] { subject.Parameter, owner, other, flag };
+        var parameters = ImmutableArray.Create(subject.Parameter, owner, other, flag);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
         var entry = builder.CreateBlock();
         var header = builder.CreateBlock();
@@ -78,7 +79,7 @@ internal sealed class PassiveLoopCutterTests
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Has.Length.EqualTo(1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.False);
         var cell = instructions.OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (factory.GetOperationInfo(write.Operation).Description is { } id &&
@@ -136,7 +137,7 @@ internal sealed class PassiveLoopCutterTests
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Is.Empty);
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
+    internal static (PassiveCallableCandidate Candidate, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
         ChangingHeapReceiverCandidate(bool conditional)
     {
         var subject = new PassiveCallableVcTests.ScalarSubject();
@@ -159,14 +160,14 @@ internal sealed class PassiveLoopCutterTests
         var body = builder.CreateBlock();
         var exit = builder.CreateBlock();
         var headerSite = factory.CreateOperation("header");
-        foreach (var parameter in new[] { a, b, c, subject.Parameter })
+        foreach (var parameter in ImmutableArray.Create(a, b, c, subject.Parameter))
         {
             builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
             builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
         }
         builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(a.Current), selector,
             conditional ? factory.Boolean(false) : factory.Variable(b.Current));
-        foreach (var parameter in new[] { b, c })
+        foreach (var parameter in ImmutableArray.Create(b, c))
         { builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(parameter.Current), value, factory.Integer(0)); }
         builder.Goto(entry, subject.Site, header);
         builder.Branch(header, headerSite, factory.Binary(IrBinaryOperator.GreaterThan,
@@ -180,21 +181,15 @@ internal sealed class PassiveLoopCutterTests
             factory.Variable(subject.Parameter.Current), factory.Integer(1)));
         builder.Goto(body, subject.Site, header);
         builder.Return(exit, subject.Site, factory.PureOpaque(value, factory.Variable(c.Current)));
-        var requires = new List<PassiveContractClause>();
-        foreach (var parameter in new[] { a, b, c })
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        foreach (var parameter in ImmutableArray.Create(a, b, c))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(factory.ObjectType)), factory.Boolean(true), subject.Site)); }
-        foreach (var pair in new[] { (a, b), (a, c), (b, c) })
+        foreach (var pair in ImmutableArray.Create((a, b), (a, c), (b, c)))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(pair.Item1.Entry), factory.Variable(pair.Item2.Entry)), factory.Boolean(true), subject.Site)); }
         requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         var candidate = new PassiveCallableCandidate("changing-heap-receiver", builder.Build(), [a, b, c, subject.Parameter], subject.Result,
-            [.. requires], [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
-        return (candidate, new Dictionary<IrVarId, IrValue>
-        {
-            [a.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [b.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [c.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
-        }, headerSite);
+            requires.ToImmutable(), [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
+        return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(a.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(b.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(c.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)), headerSite);
     }
 
     [TestCase(false)]
@@ -215,7 +210,7 @@ internal sealed class PassiveLoopCutterTests
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
+    internal static (PassiveCallableCandidate Candidate, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
     {
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var factory = subject.Factory;
@@ -239,7 +234,7 @@ internal sealed class PassiveLoopCutterTests
             else
             { builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(value)); }
         }
-        foreach (var parameter in new[] { owner, subject.Parameter })
+        foreach (var parameter in ImmutableArray.Create(owner, subject.Parameter))
         {
             builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
             builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
@@ -254,22 +249,16 @@ internal sealed class PassiveLoopCutterTests
         builder.Throw(body, subject.Site, IrExceptionKind.Overflow, header);
         builder.Return(exit, subject.Site, array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
             : factory.PureOpaque(field, factory.Variable(owner.Current)));
-        var requires = new List<PassiveContractClause>
-        {
-            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(ownerType)), factory.Boolean(true), subject.Site),
-            new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site)
-        };
+        var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+        requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(ownerType)), factory.Boolean(true), subject.Site));
+        requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         if (array)
         { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
         var candidate = new PassiveCallableCandidate("exception-loop-heap", builder.Build(), [owner, subject.Parameter], subject.Result,
-            [.. requires],
+            requires.ToImmutable(),
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
-        return (candidate, new Dictionary<IrVarId, IrValue>
-        {
-            [owner.Entry] = array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
-                : factory.CreateReferenceValue(ownerType, new IrObjectState()),
-            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
-        });
+        return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner.Entry, array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
+                : factory.CreateReferenceValue(ownerType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)));
     }
 
     [TestCase(false)]
@@ -329,7 +318,7 @@ internal sealed class PassiveLoopCutterTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("large-loop");
-        var blocks = Enumerable.Range(0, 1000).Select(_ => builder.CreateBlock()).ToArray();
+        var blocks = Enumerable.Range(0, 1000).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var ordinal = 0; ordinal < blocks.Length; ordinal++)
         { builder.Goto(blocks[ordinal], site, blocks[(ordinal + 1) % blocks.Length]); }
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);

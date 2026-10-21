@@ -1,10 +1,8 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Frontend;
 
 internal sealed class ContractApiMetadataNameMatcher
 {
-    private readonly ConcurrentDictionary<string, MetadataNameParts> _parts = new(StringComparer.Ordinal);
+    private ImmutableDictionary<string, MetadataNameParts> _parts = ImmutableDictionary.Create<string, MetadataNameParts>(StringComparer.Ordinal);
 
     internal bool Matches(
         INamedTypeSymbol? type,
@@ -16,7 +14,7 @@ internal sealed class ContractApiMetadataNameMatcher
             return false;
         }
 
-        var parts = _parts.GetOrAdd(
+        var parts = ImmutableInterlocked.GetOrAdd(ref _parts,
             metadataName,
             static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new MetadataNameParts(value)));
         return string.Equals(
@@ -30,8 +28,9 @@ internal sealed class ContractApiMetadataNameMatcher
 
     private static bool NamespaceMatches(
         INamespaceSymbol @namespace,
-        string[] segments)
+        ImmutableArray<string> segments)
     {
+        RepositoryParameterGuard.RequireInitialized(segments.IsDefault, nameof(segments), "Array must be initialized.");
         for (var index = segments.Length - 1; index >= 0; index--)
         {
             if (@namespace.IsGlobalNamespace ||
@@ -59,7 +58,7 @@ internal sealed class ContractApiMetadataNameMatcher
             TypeName = metadataName.Substring(separator + 1);
             NamespaceSegments = metadataName
                 .Substring(0, separator)
-                .Split('.');
+                .Split('.').ToImmutableArray();
         }
 
         internal string TypeName
@@ -67,7 +66,7 @@ internal sealed class ContractApiMetadataNameMatcher
             get;
         }
 
-        internal string[] NamespaceSegments
+        internal ImmutableArray<string> NamespaceSegments
         {
             get;
         }

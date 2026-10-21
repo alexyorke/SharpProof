@@ -44,11 +44,7 @@ internal sealed class Pr275AdvisoryMarkerComparisonTests
             for (var right = rightMinimum; right <= rightMinimum + 1; right++)
             {
                 var concrete = new IrProgramInterpreter(built.Program.Factory).Execute(built.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        { built.Left, built.Program.Factory.CreateIntegerValue(left) },
-                        { built.Right, built.Program.Factory.CreateIntegerValue(right) }
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(built.Left, built.Program.Factory.CreateIntegerValue(left)).SetItem(built.Right, built.Program.Factory.CreateIntegerValue(right)));
                 Assert.That(concrete.ReturnValue!.Boolean, Is.EqualTo(expected != 0));
             }
         }
@@ -75,20 +71,17 @@ internal sealed class Pr275AdvisoryMarkerComparisonTests
         Assert.That(result.Markers[0].Marker, Is.SameAs(built.Marker));
         Assert.That(result.Markers[0].Value, Is.EqualTo(IntervalValue.Range(0, 1)));
         Assert.That(result.Markers[0].PrefixHasGap, Is.False);
-        var observed = new HashSet<bool>();
+        var observedBuilder = ImmutableHashSet.CreateBuilder<bool>();
         for (var left = 0; left <= 2; left++)
         {
             for (var right = 1; right <= 3; right++)
             {
                 var concrete = new IrProgramInterpreter(built.Program.Factory).Execute(built.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        { built.Left, built.Program.Factory.CreateIntegerValue(left) },
-                        { built.Right, built.Program.Factory.CreateIntegerValue(right) }
-                    });
-                observed.Add(concrete.ReturnValue!.Boolean);
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(built.Left, built.Program.Factory.CreateIntegerValue(left)).SetItem(built.Right, built.Program.Factory.CreateIntegerValue(right)));
+                observedBuilder.Add(concrete.ReturnValue!.Boolean);
             }
         }
+        var observed = observedBuilder.ToImmutable();
         Assert.That(observed.Count, Is.EqualTo(2));
         Assert.That(observed, Does.Contain(false));
         Assert.That(observed, Does.Contain(true));

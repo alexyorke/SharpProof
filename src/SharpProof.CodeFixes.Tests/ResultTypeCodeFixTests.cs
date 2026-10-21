@@ -24,7 +24,7 @@ public sealed class ResultTypeCodeFixTests
         var diagnostics = await AnalyzeAsync(document);
         Assert.That(diagnostics.Single().Id, Is.EqualTo("SP0024"));
         var fixes = await GetFixesAsync(document, diagnostics[0]);
-        Assert.That(fixes, Has.Count.EqualTo(1));
+        Assert.That(fixes, Has.Length.EqualTo(1));
         var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
         var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
         var text = (await changed.GetTextAsync()).ToString();
@@ -80,7 +80,7 @@ public sealed class ResultTypeCodeFixTests
         var document = CreateDocument(workspace, expression).WithText(SourceText.From(source));
         var actual = (await AnalyzeAsync(document)).Single();
         var fixes = await GetFixesAsync(document, actual);
-        Assert.That(fixes, Has.Count.EqualTo(1));
+        Assert.That(fixes, Has.Length.EqualTo(1));
         var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
         var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
         using (Assert.EnterMultipleScope())
@@ -134,7 +134,7 @@ public sealed class ResultTypeCodeFixTests
             "using SharpProof.Attributes; public static class Fixture { public static int Run() { " +
             "short Local() { Contract.Ensures(Contract.Result<long>() >= 0); return 1; } return Local(); } }"));
         var fixes = await GetFixesAsync(document, (await AnalyzeAsync(document)).Single());
-        Assert.That(fixes, Has.Count.EqualTo(1));
+        Assert.That(fixes, Has.Length.EqualTo(1));
         var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
         var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
         using (Assert.EnterMultipleScope())
@@ -220,7 +220,7 @@ public sealed class ResultTypeCodeFixTests
         var project = workspace.AddProject("Fixture", LanguageNames.CSharp)
             .WithMetadataReferences(TestMetadataReferences.WithSharpProof)
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithSpecificDiagnosticOptions(new Dictionary<string, ReportDiagnostic> { ["SP0024"] = ReportDiagnostic.Error }));
+                .WithSpecificDiagnosticOptions(ImmutableDictionary<string, ReportDiagnostic>.Empty.WithComparers(StringComparer.Ordinal).Add("SP0024", ReportDiagnostic.Error)));
         return project.AddDocument("Fixture.cs", SourceText.From(Source(expression)));
     }
 
@@ -238,14 +238,14 @@ public sealed class ResultTypeCodeFixTests
         return await compilation!.WithAnalyzers([new SharpProofAnalyzer()]).GetAnalyzerDiagnosticsAsync();
     }
 
-    private static async Task<List<CodeAction>> GetFixesAsync(Document document, Diagnostic diagnostic)
+    private static async Task<ImmutableArray<CodeAction>> GetFixesAsync(Document document, Diagnostic diagnostic)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(diagnostic);
-        var fixes = new List<CodeAction>();
+        var fixes = ImmutableArray.CreateBuilder<CodeAction>();
         await new ResultTypeCodeFixProvider().RegisterCodeFixesAsync(new CodeFixContext(
             document, diagnostic, (action, _) => fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
             TestContext.CurrentContext.CancellationToken));
-        return fixes;
+        return fixes.ToImmutable();
     }
 }

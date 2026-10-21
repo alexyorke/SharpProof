@@ -77,7 +77,7 @@ internal sealed class IrTotalExecutionTests
         var third = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
         builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.DivideByZero, exit);
         builder.ExceptionalExit(exit, factory.CreateOperation());
-        var observed = new List<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
+        var observed = ImmutableArray.CreateBuilder<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
         var replay = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(true))
         {
             AssignmentObserver = (instruction, value, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction); System.ArgumentNullException.ThrowIfNull(value); observed.Add((instruction, value.Boolean, approximation)); }
@@ -85,7 +85,7 @@ internal sealed class IrTotalExecutionTests
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(result.ConsumedApproximation, Is.True);
-        Assert.That(observed, Is.EqualTo(new[] { (first, false, false), (second, true, true), (third, false, true) }));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create((first, false, false), (second, true, true), (third, false, true))));
     }
 
     [Test]
@@ -99,14 +99,14 @@ internal sealed class IrTotalExecutionTests
         var first = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
         builder.Assign(entry, factory.CreateOperation(), marker, factory.Variable(missing));
         builder.Return(entry, factory.CreateOperation());
-        var observed = new List<IrAssignInstruction>();
+        var observed = ImmutableArray.CreateBuilder<IrAssignInstruction>();
         var replay = new IrProgramReplayOptions(_ => null)
         {
             AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction); observed.Add(instruction); }
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(observed, Is.EqualTo(new[] { first }));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create(first)));
     }
 
     [TestCase("allocation", true)]
@@ -135,7 +135,7 @@ internal sealed class IrTotalExecutionTests
             builder.Lock(entry, site, factory.Variable(operand));
             builder.Return(entry, factory.CreateOperation());
         }
-        var observed = new List<(OperationId Site, bool Approximation)>();
+        var observed = ImmutableArray.CreateBuilder<(OperationId Site, bool Approximation)>();
         var replay = new IrProgramReplayOptions(_ => kind == "allocation"
             ? factory.CreateIntegerValue(0) : factory.CreateReferenceValue(factory.ObjectType, new object()))
         {
@@ -146,9 +146,9 @@ internal sealed class IrTotalExecutionTests
         Assert.That(result.Status, Is.EqualTo(kind == "allocation" && supplied
             ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
         if (supplied)
-        { Assert.That(observed, Is.EqualTo(new[] { (site, true) })); }
+        { Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create((site, true)))); }
         else
-        { Assert.That(observed, Is.Empty); }
+        { Assert.That(observed.ToImmutable(), Is.Empty); }
     }
 
     [Test]
@@ -190,14 +190,13 @@ internal sealed class IrTotalExecutionTests
     {
         var first = new string('x', 3);
         var second = alias ? first : new string('x', 3);
-        foreach (var semantics in new[] { IrExecutionSemantics.Legacy, IrExecutionSemantics.Total })
+        foreach (var semantics in ImmutableArray.Create(IrExecutionSemantics.Legacy, IrExecutionSemantics.Total))
         {
             var factory = new IrFactory(semantics);
             var x = factory.CreateVariable("x", factory.StringType);
             var y = factory.CreateVariable("y", factory.StringType);
             var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.Variable(y));
-            var values = new Dictionary<IrVarId, IrValue>
-            { [x] = factory.CreateStringValue(first), [y] = factory.CreateStringValue(second) };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, factory.CreateStringValue(first)).SetItem(y, factory.CreateStringValue(second));
             var evaluated = new IrInterpreter(factory).Evaluate(equal, values);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
             Assert.That(evaluated.Value!.Boolean, Is.EqualTo(alias || semantics == IrExecutionSemantics.Legacy));
@@ -286,7 +285,7 @@ internal sealed class IrTotalExecutionTests
         var program = builder.Build();
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out var failure);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(order, Is.EqualTo(new[] { entry, cleanup, exit }));
+        Assert.That(order, Is.EqualTo(ImmutableArray.Create(entry, cleanup, exit)));
         var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(entry).Terminator);
         Assert.That(successors!.Value.First, Is.EqualTo(cleanup));
         Assert.That(successors.Value.Second, Is.Null);
@@ -388,7 +387,7 @@ internal sealed class IrTotalExecutionTests
         builder.Branch(entry, factory.CreateOperation(), factory.Binary(IrBinaryOperator.LessThan,
             factory.Variable(x), factory.Integer(1)), entry, exit);
         builder.Return(exit, factory.CreateOperation(), factory.Variable(y));
-        var requests = new List<IrHavocRequest>();
+        var requests = ImmutableArray.CreateBuilder<IrHavocRequest>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
             new IrProgramReplayOptions(request =>
             {
@@ -398,9 +397,9 @@ internal sealed class IrTotalExecutionTests
             }));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(1));
-        int[] expectedOccurrences = [0, 0, 1, 1];
-        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
-        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
+        ImmutableArray<int> expectedOccurrences = [0, 0, 1, 1];
+        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
+        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(approximate));
     }
 
@@ -461,14 +460,15 @@ internal sealed class IrTotalExecutionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var unknown = factory.CreateVariable("unknown", factory.IntegerType);
         var missing = factory.CreateVariable("missing", factory.IntegerType);
-        var arguments = scenario == "missing-first" ? new IrTerm[] { factory.Variable(missing), factory.Variable(unknown) }
-            : new IrTerm[] { scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown) };
-        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
-            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToArray());
+        ImmutableArray<IrTerm> arguments = scenario == "missing-first"
+            ? [factory.Variable(missing), factory.Variable(unknown)]
+            : [scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown)];
+        var member = factory.GetOrCreateMemberSnapshot(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
+            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToImmutableArray());
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
-        builder.Call(entry, factory.CreateOperation(), null, member, null, arguments);
+        builder.CallSnapshot(entry, factory.CreateOperation(), null, member, null, arguments);
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
             new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
@@ -508,7 +508,7 @@ internal sealed class IrTotalExecutionTests
         var initial = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = initial, [alias] = initial }, 100,
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, initial).SetItem(alias, initial), 100,
             (_, _, values) => values.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(values)) : (values.Single()),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -531,9 +531,10 @@ internal sealed class IrTotalExecutionTests
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, argument);
         builder.Call(entry, factory.CreateOperation(), null, member, factory.Variable(owner), factory.Variable(argument));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (!missing)
-        { initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        { initialBuilder.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        var initial = initialBuilder.ToImmutable();
         var hostCalls = 0;
         IrValue? Host(IrCallInstruction call, IrValue? receiver, ImmutableArray<IrValue> arguments)
         { System.ArgumentNullException.ThrowIfNull(call, nameof(call)); if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } hostCalls++; return factory.CreateIntegerValue(0); }
@@ -568,12 +569,7 @@ internal sealed class IrTotalExecutionTests
         builder.Call(entry, factory.CreateOperation(), target, member, factory.PureOpaque(field, factory.Variable(snapshot ? alias : holder)));
         builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
         var initialHolder = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, oldValue));
-        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), new Dictionary<IrVarId, IrValue>
-        {
-            [holder] = initialHolder,
-            [alias] = initialHolder,
-            [replacement] = newValue
-        }, 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(holder, initialHolder).SetItem(alias, initialHolder).SetItem(replacement, newValue), 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
@@ -605,13 +601,12 @@ internal sealed class IrTotalExecutionTests
         var values = ImmutableDictionary<IrVarId, IrValue>.Empty
             .Add(sequence, factory.CreateSequenceValue(sequenceType, []))
             .Add(boxed, factory.CreateReferenceValue(factory.ObjectType, 1));
-        var terms = new[]
-        {
+        var terms = ImmutableArray.Create(
             factory.SequenceAccess(factory.Null(sequenceType), factory.Integer(0)),
             factory.SequenceAccess(factory.Variable(sequence), factory.Integer(-1)),
             factory.Cast(elementType, factory.Null(factory.ObjectType)),
             factory.Cast(elementType, factory.Variable(boxed))
-        };
+        );
         foreach (var term in terms)
         {
             var result = new IrInterpreter(factory).Evaluate(term, values);
@@ -651,12 +646,13 @@ internal sealed class IrTotalExecutionTests
             builder.Load(entry, site, value, location);
         }
         builder.Return(entry, factory.CreateOperation());
-        var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var initialBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (receiverKind != "missing")
         {
-            initial = initial.Add(receiver, receiverKind == "null" ? factory.CreateNullValue(factory.ObjectType)
+            initialBuilder.Add(receiver, receiverKind == "null" ? factory.CreateNullValue(factory.ObjectType)
                 : factory.CreateReferenceValue(factory.ObjectType, new object()));
         }
+        var initial = initialBuilder.ToImmutable();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
             new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(consumed));
@@ -697,17 +693,18 @@ internal sealed class IrTotalExecutionTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
-        var values = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (present)
         {
-            values = values.Add(variable, factory.CreateBooleanValue(true));
+            valueBuilder.Add(variable, factory.CreateBooleanValue(true));
         }
-        var observed = new List<IrVarId>();
+        var values = valueBuilder.ToImmutable();
+        var observed = ImmutableArray.CreateBuilder<IrVarId>();
         var result = new IrInterpreter(factory).Evaluate(factory.Variable(variable), values,
             observed.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(result.Unsupported!.Reason, Is.EqualTo(reason));
-        Assert.That(observed, Is.EqualTo(present ? new[] { variable } : Array.Empty<IrVarId>()));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(present ? ImmutableArray.Create(variable) : ImmutableArray<IrVarId>.Empty));
     }
 
     [Test]
@@ -720,21 +717,19 @@ internal sealed class IrTotalExecutionTests
         var term = factory.Conditional(factory.Variable(flag), factory.Variable(x), factory.Variable(y));
         var interpreter = new IrInterpreter(factory);
         using var barrier = new Barrier(2);
-        var whenTrue = new List<IrVarId>();
-        var whenFalse = new List<IrVarId>();
-        var tasks = new[]
-        {
+        var whenTrue = ImmutableArray.CreateBuilder<IrVarId>();
+        var whenFalse = ImmutableArray.CreateBuilder<IrVarId>();
+        var tasks = ImmutableArray.Create(
             Task.Run(() => Evaluate(true, whenTrue)),
-            Task.Run(() => Evaluate(false, whenFalse))
-        };
-        var results = await Task.WhenAll(tasks);
+            Task.Run(() => Evaluate(false, whenFalse)));
+        var results = (await Task.WhenAll(tasks)).ToImmutableArray();
         Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(IrEvaluationStatus.Value));
         Assert.That(results[0].Value!.Integer, Is.EqualTo(11));
         Assert.That(results[1].Value!.Integer, Is.EqualTo(22));
-        Assert.That(whenTrue, Is.EqualTo(new[] { flag, x }));
-        Assert.That(whenFalse, Is.EqualTo(new[] { flag, y }));
+        Assert.That(whenTrue.ToImmutable(), Is.EqualTo(ImmutableArray.Create(flag, x)));
+        Assert.That(whenFalse.ToImmutable(), Is.EqualTo(ImmutableArray.Create(flag, y)));
 
-        IrEvaluationResult Evaluate(bool selected, List<IrVarId> observed)
+        IrEvaluationResult Evaluate(bool selected, ImmutableArray<IrVarId>.Builder observed)
         {
             System.ArgumentNullException.ThrowIfNull(observed);
             var values = ImmutableDictionary<IrVarId, IrValue>.Empty

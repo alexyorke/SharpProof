@@ -21,21 +21,21 @@ internal static class NativeEffectClaims
         // A trusted complete boundary is a declared assumption about a body
         // SharpProof does not see; it is published as declared.
         var claims = target.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (IsNative(claim.ContractKind) &&
-            claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)).ToArray();
+            claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)).ToImmutableArray();
         // An invalid contract has nothing to verify, whatever the entry.
         bool Invalid(CompilerEffectClaimArtifact claim)
         { System.ArgumentNullException.ThrowIfNull(claim, nameof(claim)); return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
-        var invalid = claims.Where(Invalid).Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract))).ToArray();
-        claims = [.. claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (!Invalid(claim)))];
-        if (claims.Length == 0)
+        var invalid = claims.Where(Invalid).Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract))).ToImmutableArray();
+        var validClaims = claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (!Invalid(claim))).ToImmutableArray();
+        if (validClaims.Length == 0)
         { return [.. invalid]; }
-        return [.. invalid, .. await VerifyValidAsync(target, claims, entry, budgets, cancellationToken).ConfigureAwait(false)];
+        return [.. invalid, .. await VerifyValidAsync(target, validClaims, entry, budgets, cancellationToken).ConfigureAwait(false)];
     }
 
     private static async Task<ImmutableArray<WorkerClaimResult>> VerifyValidAsync(CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact[] claims, CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
+        ImmutableArray<CompilerEffectClaimArtifact> claims, CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(claims, nameof(claims));
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         System.ArgumentNullException.ThrowIfNull(budgets);
         System.ArgumentNullException.ThrowIfNull(target);
         if (entry.IsContradictory)
@@ -83,33 +83,33 @@ internal static class NativeEffectClaims
         {
             var record = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Proven,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
-            record.ProofCore = ["native-effect:" + claimId];
-            record.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedRequires(target, check.Core));
+            record = record with { ProofCore = ["native-effect:" + claimId] };
+            record = record with { Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedRequires(target, check.Core)) };
             return record;
         }
         if (check.Outcome is RefutedOutcome && check.Reason == WorkerClaimReason.None && Witness(target, check) is { } witness)
         {
             var record = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Refuted,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation);
-            record.EffectWitness = witness;
+            record = record with { EffectWitness = witness };
             return record;
         }
         return Unknown(target, claimId, check.Outcome is RefutedOutcome ? WorkerClaimReason.CounterexampleNotReplayable : check.Reason);
     }
 
     // Requires clauses are labelled by ordinal in the passive VC.
-    private static HashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
+    private static ImmutableHashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
     {
 
         RepositoryParameterGuard.RequireInitialized(core.IsDefault, nameof(core), "Array must be initialized.");
-        var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToArray();
-        var used = new HashSet<string>(StringComparer.Ordinal);
+        var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
+        var used = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
             if (core.Contains("requires:" + ordinal.ToString(CultureInfo.InvariantCulture)) && requires[ordinal].AssumptionId is { } id)
             { used.Add(id); }
         }
-        return used;
+        return used.ToImmutable();
     }
 
     // A witness names a source site; a site without a source position (an

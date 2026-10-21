@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 public sealed class VerificationTargetSchedulerTests
 {
     // The three pairs emitted by the worker after actual lane renewal failure.
-    private static readonly (WorkerCallableCoverageReason Callable, WorkerClaimReason Claim)[] Retirements =
+    private static readonly ImmutableArray<(WorkerCallableCoverageReason Callable, WorkerClaimReason Claim)> Retirements =
     [
         (WorkerCallableCoverageReason.MethodTimeout, WorkerClaimReason.MethodTimeout),
         (WorkerCallableCoverageReason.InfrastructureFailure, WorkerClaimReason.InfrastructureFailure),
@@ -44,16 +44,19 @@ public sealed class VerificationTargetSchedulerTests
     {
         const int targetCount = 128;
         var scheduler = new VerificationTargetScheduler(targetCount);
-        var claimed = new ConcurrentBag<int>();
+        var claimed = ImmutableArray.CreateBuilder<int>();
         var workers = Enumerable.Range(0, 8).Select(laneIndex => Task.Run(() =>
         {
             while (scheduler.TryClaim(out var index))
             {
-                claimed.Add(index);
+                lock (claimed)
+                {
+                    claimed.Add(index);
+                }
             }
-        })).ToArray();
+        })).ToImmutableArray();
         await Task.WhenAll(workers);
-        Assert.That(claimed, Is.EquivalentTo(Enumerable.Range(0, targetCount)));
+        Assert.That(claimed.ToImmutable(), Is.EquivalentTo(Enumerable.Range(0, targetCount)));
         Assert.That(scheduler.TryClaim(out _), Is.False);
     }
 
@@ -64,19 +67,22 @@ public sealed class VerificationTargetSchedulerTests
         var scheduler = new VerificationTargetScheduler(laneCount * 2);
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var claimed = new ConcurrentBag<int>();
+        var claimed = ImmutableArray.CreateBuilder<int>();
         var entered = 0;
         var workers = Enumerable.Range(0, laneCount).Select(laneIndex => Task.Run(async () =>
         {
             Assert.That(scheduler.TryClaim(out var index), Is.True);
-            claimed.Add(index);
+            lock (claimed)
+            {
+                claimed.Add(index);
+            }
             if (Interlocked.Increment(ref entered) == laneCount)
             {
                 ready.TrySetResult();
             }
             await release.Task;
             Assert.That(scheduler.TryClaim(out _), Is.False);
-        })).ToArray();
+        })).ToImmutableArray();
         try
         {
             await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -88,7 +94,7 @@ public sealed class VerificationTargetSchedulerTests
             release.TrySetResult();
         }
         await Task.WhenAll(workers);
-        Assert.That(claimed, Is.EquivalentTo(Enumerable.Range(0, laneCount)));
+        Assert.That(claimed.ToImmutable(), Is.EquivalentTo(Enumerable.Range(0, laneCount)));
         Assert.That(scheduler.SnapshotRetirement(), Is.EqualTo(Retirements[1]));
     }
 

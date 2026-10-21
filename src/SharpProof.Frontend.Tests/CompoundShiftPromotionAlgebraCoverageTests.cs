@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -25,11 +26,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
         Assert.That(rule.Value.Type, Is.EqualTo(width < 32 ? factory.IntegerType : type));
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [valueVariable] = factory.CreateIntegerValue(type, input),
-            [countVariable] = factory.CreateIntegerValue(factory.IntegerType, count)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueVariable, factory.CreateIntegerValue(type, input)).SetItem(countVariable, factory.CreateIntegerValue(factory.IntegerType, count));
         Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));
     }
@@ -61,7 +58,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         System.ArgumentNullException.ThrowIfNull(input);
         System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
-        object[] inputs = [input, count];
+        ImmutableArray<object> inputs = [input, count];
         Assert.That(subject.Invoke(inputs), Is.EqualTo(input is sbyte ? (object)(sbyte)expected
             : input is long ? expected : (object)(int)expected));
         var tree = subject.Compilation.SyntaxTrees.Single();
@@ -78,7 +75,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         var rule = CSharpOperationSemantics.Compound(subject.Factory, operation, left.Value, right.Value, false);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
         Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));

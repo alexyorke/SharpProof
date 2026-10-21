@@ -96,11 +96,13 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total, Is.Not.Null);
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var factory = total.Program.Factory;
-        var values = new[] { left, right };
+        var values = ImmutableArray.Create(left, right);
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.Select((parameter, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: values[ordinal] is { } text
-                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type)))))))
-                .ToDictionary(item => item.Entry, item => item.Value));
+            ImmutableDictionaryCapture.Create(
+                total.Parameters.Select((parameter, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: values[ordinal] is { } text
+                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type))))))),
+                item => item.Entry,
+                item => item.Value));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         using var runtime = project.EmitRuntimeAssembly();
@@ -146,7 +148,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total, Is.Not.Null);
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var interpreter = new IrProgramInterpreter(total.Program.Factory);
-        var entries = total.Parameters.ToDictionary(parameter => parameter.Entry,
+        var entries = ImmutableDictionaryCapture.Create(
+            total.Parameters,
+            parameter => parameter.Entry,
             parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L))));
         Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var execution = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
@@ -182,7 +186,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var factory = total.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.ToDictionary(parameter => parameter.Entry,
+            ImmutableDictionaryCapture.Create(
+                total.Parameters,
+                parameter => parameter.Entry,
                 parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 0L)))));
         Assert.That(execution.ConsumedApproximation, Is.False);
         using var runtime = project.EmitRuntimeAssembly();
@@ -206,7 +212,7 @@ public sealed class ScalarDifferentialMatrixTests
         }
     }
 
-    private static readonly ScalarCase[] SupportedCases = [
+    private static readonly ImmutableArray<ScalarCase> SupportedCases = [
         new(
             "SByte",
             "sbyte",
@@ -241,7 +247,7 @@ public sealed class ScalarDifferentialMatrixTests
             [long.MinValue, -1L, 0L, 1L, long.MaxValue])
     ];
 
-    private static readonly WideningCase[] WideningCases = [
+    private static readonly ImmutableArray<WideningCase> WideningCases = [
         Widen("SByte", "sbyte", "Int16", "short"),
         Widen("SByte", "sbyte", "Int32", "int"),
         Widen("SByte", "sbyte", "Int64", "long"),
@@ -265,7 +271,7 @@ public sealed class ScalarDifferentialMatrixTests
         Widen("UInt32", "uint", "Int64", "long")
     ];
 
-    private static readonly ArithmeticCase[] ArithmeticCases = [
+    private static readonly ImmutableArray<ArithmeticCase> ArithmeticCases = [
         Binary("AddNormal", "checked(left + right)", 2L, 3L, 5L),
         Binary(
             "AddBoundary",
@@ -350,15 +356,15 @@ public sealed class ScalarDifferentialMatrixTests
             IrExceptionKind.Overflow)
     ];
 
-    private static readonly string[] RequiredReferenceFileNames = [
+    private static readonly ImmutableArray<string> RequiredReferenceFileNames = [
         "System.Private.CoreLib.dll",
         "System.Linq.dll",
         "System.Runtime.dll",
         "netstandard.dll"
     ];
 
-    private static readonly string[] UnaryParameterNames = ["value"];
-    private static readonly string[] BinaryParameterNames = ["left", "right"];
+    private static readonly ImmutableArray<string> UnaryParameterNames = ["value"];
+    private static readonly ImmutableArray<string> BinaryParameterNames = ["left", "right"];
 
     [Test]
     public async Task SupportedScalarMatrixAgreesAcrossRuntimeIrAndSmt()
@@ -373,9 +379,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         var supportedResults = response.ClaimResults;
         var proven = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)).ToImmutableArray();
         var refuted = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(supportedResults, Has.Length.EqualTo(64));
@@ -404,7 +410,7 @@ public sealed class ScalarDifferentialMatrixTests
             var methodResults = supportedResults.Where(result =>
                 result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                     "." + item.MethodName + "(",
-                    StringComparison.Ordinal))).ToArray();
+                    StringComparison.Ordinal))).ToImmutableArray();
             Assert.That(
                 methodResults.Where(result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) is 0 or 1))
@@ -434,14 +440,14 @@ public sealed class ScalarDifferentialMatrixTests
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
-                foreach (var chooseFirst in new[] { true, false })
+                foreach (var chooseFirst in ImmutableArray.Create(true, false))
                 {
                     Assert.That(
                         method.Invoke(null, [input, chooseFirst]),
                         Is.EqualTo(input),
                         $"{item.MethodName}({Format(input)}, {chooseFirst})");
                     AssertIntegerReturn(
-                        ExecuteIr(target, input, chooseFirst),
+                        ExecuteIr(target, [input, chooseFirst]),
                         Convert.ToInt64(input, CultureInfo.InvariantCulture),
                         $"{item.MethodName}({Format(input)}, {chooseFirst})");
                 }
@@ -451,7 +457,7 @@ public sealed class ScalarDifferentialMatrixTests
             var comparisonResults = supportedResults.Where(result =>
                 result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                     "." + comparisonName + "(",
-                    StringComparison.Ordinal))).ToArray();
+                    StringComparison.Ordinal))).ToImmutableArray();
             Assert.That(
                 comparisonResults.Where(result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) < 4))
@@ -480,7 +486,7 @@ public sealed class ScalarDifferentialMatrixTests
                         Is.EqualTo(expected),
                         $"{comparisonName}({Format(left)}, {Format(right)})");
                     AssertIntegerReturn(
-                        ExecuteIr(comparisonTarget, left, right),
+                        ExecuteIr(comparisonTarget, [left, right]),
                         expected,
                         $"{comparisonName}({Format(left)}, {Format(right)})");
                 }
@@ -538,7 +544,7 @@ public sealed class ScalarDifferentialMatrixTests
                     Is.EqualTo(expected),
                     $"{item.MethodName}({Format(input)})");
                 AssertIntegerReturn(
-                    ExecuteIr(target, input),
+                    ExecuteIr(target, [input]),
                     expected,
                     $"{item.MethodName}({Format(input)})");
             }
@@ -592,7 +598,7 @@ public sealed class ScalarDifferentialMatrixTests
                 using (Assert.EnterMultipleScope())
                 {
                     Assert.That(
-                        method.Invoke(null, item.Inputs),
+                        method.Invoke(null, item.Inputs.ToArray()),
                         Is.EqualTo(item.ExpectedResult),
                         item.MethodName);
                     AssertIntegerReturn(
@@ -610,7 +616,7 @@ public sealed class ScalarDifferentialMatrixTests
                 var thrown = Assert.Throws<TargetInvocationException>(
                     (Action)(() =>
                     {
-                        method.Invoke(null, item.Inputs);
+                        method.Invoke(null, item.Inputs.ToArray());
                     }),
                     item.MethodName);
                 using (Assert.EnterMultipleScope())
@@ -657,15 +663,13 @@ public sealed class ScalarDifferentialMatrixTests
             .Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                 "Conversion(",
                 StringComparison.Ordinal)))
-            .ToArray();
-        var methodNames = new[]
-        {
+            .ToImmutableArray();
+        var methodNames = ImmutableArray.Create(
             "UncheckedLongConversion",
             "CheckedLongConversion",
             "UncheckedNegativeByteConversion",
             "UncheckedAboveRangeByteConversion",
-            "UncheckedUnsignedConversion"
-        };
+            "UncheckedUnsignedConversion");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);
@@ -934,21 +938,25 @@ public sealed class ScalarDifferentialMatrixTests
 
     private static IrProgramExecutionResult ExecuteIr(
         CompilerCallablePreparation target,
-        params object[] inputs)
+        ImmutableArray<object> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         var total = target.Total ??
             throw new InvalidOperationException(
                 $"Callable '{target.Entry.CallableId}' has no Total program.");
         var factory = total.Program.Factory;
-        var initial = total.Parameters.Select((parameter, ordinal) => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: inputs[ordinal] switch
-        {
-            bool value => factory.CreateBooleanValue(value),
-            { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
-                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-            _ => throw new InvalidOperationException(
-                "Null is not a supported scalar matrix input.")
-        })))).ToDictionary(static item => item.Entry, static item => item.Value);
+        var initial = ImmutableDictionaryCapture.Create(
+            total.Parameters.Select((parameter, ordinal) => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: inputs[ordinal] switch
+            {
+                bool value => factory.CreateBooleanValue(value),
+                { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
+                    Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+                _ => throw new InvalidOperationException(
+                    "Null is not a supported scalar matrix input.")
+            })))),
+            static item => item.Entry,
+            static item => item.Value);
         return new IrProgramInterpreter(factory).Execute(total.Program, initial);
     }
 
@@ -1067,43 +1075,43 @@ public sealed class ScalarDifferentialMatrixTests
     private sealed record ScalarCase(
         string MethodName,
         string TypeName,
-        object[] BoundaryValues)
+        ImmutableArray<object> BoundaryValues)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string TypeName { get; init; } = TypeName ?? throw new System.ArgumentNullException(nameof(TypeName));
-        public object[] BoundaryValues { get; init; } = BoundaryValues ?? throw new System.ArgumentNullException(nameof(BoundaryValues));
+        public ImmutableArray<object> BoundaryValues { get; init; } = BoundaryValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(BoundaryValues)) : BoundaryValues;
     }
 
     private sealed record WideningCase(
         string MethodName,
         string SourceType,
         string TargetType,
-        object[] BoundaryValues)
+        ImmutableArray<object> BoundaryValues)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string SourceType { get; init; } = SourceType ?? throw new System.ArgumentNullException(nameof(SourceType));
         public string TargetType { get; init; } = TargetType ?? throw new System.ArgumentNullException(nameof(TargetType));
-        public object[] BoundaryValues { get; init; } = BoundaryValues ?? throw new System.ArgumentNullException(nameof(BoundaryValues));
+        public ImmutableArray<object> BoundaryValues { get; init; } = BoundaryValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(BoundaryValues)) : BoundaryValues;
     }
 
     private sealed record ArithmeticCase(
         string MethodName,
         string Expression,
-        object[] Inputs,
+        ImmutableArray<object> Inputs,
         long? ExpectedResult,
         Type? ExpectedException,
         IrExceptionKind? ExpectedIrException)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
-        public object[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ImmutableArray<object> Inputs { get; init; } = Inputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
     }
 
     private sealed class DifferentialProject : IDisposable
     {
         private readonly TempDirectory _temporary;
         private readonly string _sourcePath;
-        private CompilerCallablePreparation[] _callables = [];
+        private ImmutableArray<CompilerCallablePreparation> _callables = [];
         private CSharpCompilation? _compilation;
 
         private DifferentialProject(TempDirectory temporary)
@@ -1160,11 +1168,11 @@ public sealed class ScalarDifferentialMatrixTests
                 .. CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
             ];
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             var artifactPath = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest.json");
-            File.WriteAllBytes(artifactPath, bytes);
+            File.WriteAllBytes(artifactPath, bytes.AsSpan());
             return new WorkerVerifyRequest
             {
                 CompilerManifest = new WorkerFileReference

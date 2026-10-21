@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
@@ -56,9 +57,10 @@ public sealed class Pr275CompiledGateEntryPointInputTests
         Assert.That(usage.Error, Does.Contain("Usage: SharpProof.Gates"));
     }
 
-    private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(string[] arguments)
+    private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new System.ArgumentNullException(nameof(arguments)); }
         var entryPoint = typeof(CorpusGate).Assembly.EntryPoint;
         Assert.That(entryPoint, Is.Not.Null);
         Assert.That(entryPoint!.ReturnType, Is.EqualTo(typeof(int)));
@@ -70,7 +72,7 @@ public sealed class Pr275CompiledGateEntryPointInputTests
         {
             Console.SetOut(output);
             Console.SetError(error);
-            var exit = (int)entryPoint.Invoke(null, [arguments])!;
+            var exit = (int)entryPoint.Invoke(null, [arguments.ToArray()])!;
             return (exit, output.ToString(), error.ToString());
         }
         finally

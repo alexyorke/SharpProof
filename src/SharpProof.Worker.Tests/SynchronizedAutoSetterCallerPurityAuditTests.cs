@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -18,7 +19,7 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedAutoSetterCallerPurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, 42];
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, 42];
     private const string SubjectTemplate = """
         using System.Runtime.CompilerServices;
         using SharpProof.Attributes;
@@ -51,7 +52,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
         var options = synchronized ? "MethodImplOptions.NoInlining | MethodImplOptions.Synchronized"
             : "MethodImplOptions.NoInlining";
         var source = SubjectTemplate.Replace("__METHOD_IMPL_OPTIONS__", options, StringComparison.Ordinal);
-        var sourceHash = Hash(Encoding.UTF8.GetBytes(source));
+        var sourceHash = Hash(Encoding.UTF8.GetBytes(source).ToImmutableArray());
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var caseName = synchronized ? "synchronized" : "no-inlining-control";
@@ -59,7 +60,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             caseName + "-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "subject-source.cs"), source);
-        var compilation = TestCompilation.Create("SynchronizedAutoSetterCallerPurity_" + caseName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SynchronizedAutoSetterCallerPurity_" + caseName, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -69,11 +70,11 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-subject.dll"), imageBytes.AsMemory());
         image.Position = 0;
         var loadContext = new AssemblyLoadContext("SynchronizedAutoSetterCallerPurity_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         MethodImplAttributes setterFlags;
@@ -86,9 +87,9 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             var setter = cell.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!.SetMethod!;
             var field = cell.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Single();
             var constructor = cell.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Single();
-            var targetIl = target.GetMethodBody()!.GetILAsByteArray()!;
-            var setterIl = setter.GetMethodBody()!.GetILAsByteArray()!;
-            var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
+            var targetIl = (target.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var setterIl = (setter.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
+            var constructorIl = (constructor.GetMethodBody()!.GetILAsByteArray()!).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(targetIl, Has.Length.EqualTo(13));
@@ -107,17 +108,17 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
                 Assert.That(constructorIl[1], Is.EqualTo(0x28));
                 Assert.That(constructorIl[6], Is.EqualTo(0x2a));
             }
-            var constructorToken = BitConverter.ToInt32(targetIl, 1);
-            var setterToken = BitConverter.ToInt32(targetIl, 7);
-            var fieldToken = BitConverter.ToInt32(setterIl, 3);
-            var baseConstructorToken = BitConverter.ToInt32(constructorIl, 2);
+            var constructorToken = BitConverter.ToInt32(targetIl.AsSpan(1..));
+            var setterToken = BitConverter.ToInt32(targetIl.AsSpan(7..));
+            var fieldToken = BitConverter.ToInt32(setterIl.AsSpan(3..));
+            var baseConstructorToken = BitConverter.ToInt32(constructorIl.AsSpan(2..));
             var calledConstructor = (ConstructorInfo)target.Module.ResolveMethod(constructorToken)!;
             var calledSetter = (MethodInfo)target.Module.ResolveMethod(setterToken)!;
             var storedField = setter.Module.ResolveField(fieldToken)!;
             var baseConstructor = (ConstructorInfo)constructor.Module.ResolveMethod(baseConstructorToken)!;
             setterFlags = setter.GetMethodImplementationFlags();
             var execute = target.CreateDelegate<Func<int, int>>();
-            var returnValues = s_inputValues.Select(input => execute(input)).ToArray();
+            var returnValues = s_inputValues.Select(input => execute(input)).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(calledConstructor.DeclaringType, Is.EqualTo(cell));
@@ -153,15 +154,15 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
                 SourceSha256 = sourceHash,
                 EmittedPeSha256 = Hash(imageBytes),
                 TargetMetadataToken = target.MetadataToken,
-                TargetIlHex = Convert.ToHexStringLower(targetIl),
+                TargetIlHex = Convert.ToHexStringLower(targetIl.AsSpan()),
                 ConstructorMetadataToken = constructor.MetadataToken,
                 ConstructorCallToken = constructorToken,
-                ConstructorIlHex = Convert.ToHexStringLower(constructorIl),
+                ConstructorIlHex = Convert.ToHexStringLower(constructorIl.AsSpan()),
                 BaseConstructorCallToken = baseConstructorToken,
                 BaseConstructorDeclaringType = baseConstructor.DeclaringType!.FullName,
                 SetterMetadataToken = setter.MetadataToken,
                 SetterCallToken = setterToken,
-                SetterIlHex = Convert.ToHexStringLower(setterIl),
+                SetterIlHex = Convert.ToHexStringLower(setterIl.AsSpan()),
                 BackingFieldMetadataToken = field.MetadataToken,
                 SetterStoreFieldToken = fieldToken,
                 SetterImplementationFlags = (int)setterFlags,
@@ -266,8 +267,9 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
+        artifact = project.Artifact;
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
@@ -297,7 +299,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToArray(),
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -305,7 +307,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The fresh-receiver caller of the synchronized auto setter cannot be Proven EnforcePure."
                 : "The fresh-receiver caller of the NoInlining-only auto setter remains complete Proven EnforcePure."
         });
@@ -345,10 +347,11 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
         }
     }
 
-    private static string Hash(byte[] value)
+    private static string Hash(ImmutableArray<byte> value)
     {
-        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
-        return Convert.ToHexStringLower(SHA256.HashData(value));
+        if (value.IsDefault)
+        { throw new ArgumentNullException(nameof(value)); }
+        return Convert.ToHexStringLower(SHA256.HashData(value.AsSpan()));
     }
 
     private static Task Save(string directory, string name, object value)

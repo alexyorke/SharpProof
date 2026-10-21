@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -20,7 +21,7 @@ public sealed class IrResourceBoundTests
 
         var complete = IrBlockOrder.TryCreateAcyclicOrder(program, _ => true, out failure);
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.None));
-        Assert.That(complete, Is.EqualTo(new[] { entry }));
+        Assert.That(complete, Is.EqualTo(ImmutableArray.Create(entry)));
     }
 
     [TestCase(true, 3L)]
@@ -47,7 +48,7 @@ public sealed class IrResourceBoundTests
         Assert.That(fixture.Heap.ConsumedApproximation, Is.False);
     }
 
-    private static (IrInterpreter Interpreter, IrTerm Read, Dictionary<IrVarId, IrValue> Values,
+    private static (IrInterpreter Interpreter, IrTerm Read, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Values,
         IrHeap Heap, IrVarId First) BuildSnapshotSelectionFixture(int leafCount, bool chooseFirst)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -56,32 +57,31 @@ public sealed class IrResourceBoundTests
         var heap = new IrHeap();
         heap.StoreElement(sequence, 0, factory.CreateIntegerValue(7));
         var choice = factory.CreateVariable("choice", factory.BooleanType);
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [choice] = factory.CreateBooleanValue(chooseFirst)
-        };
-        var leaves = new List<IrTerm>(leafCount);
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        valueBuilder[choice] = factory.CreateBooleanValue(chooseFirst);
+        var leafBuilder = ImmutableArray.CreateBuilder<IrTerm>();
         IrVarId first = default;
         for (var index = 0; index < leafCount; index++)
         {
             var variable = factory.CreateVariable("owner" + index, type);
             if (index == 0)
             { first = variable; }
-            values.Add(variable, sequence);
-            leaves.Add(factory.Variable(variable));
+            valueBuilder.Add(variable, sequence);
+            leafBuilder.Add(factory.Variable(variable));
         }
 
-        while (leaves.Count > 1)
+        var leaves = leafBuilder.ToImmutable();
+        while (leaves.Length > 1)
         {
-            var next = new List<IrTerm>(leaves.Count / 2);
-            for (var index = 0; index < leaves.Count; index += 2)
+            var next = ImmutableArray.CreateBuilder<IrTerm>();
+            for (var index = 0; index < leaves.Length; index += 2)
             {
                 next.Add(factory.Conditional(factory.Variable(choice), leaves[index], leaves[index + 1]));
             }
-            leaves = next;
+            leaves = next.ToImmutable();
         }
 
         return (new IrInterpreter(factory), factory.SequenceAccess(leaves[0], factory.Integer(0)),
-            values, heap, first);
+            valueBuilder.ToImmutable(), heap, first);
     }
 }

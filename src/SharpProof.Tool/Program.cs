@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Tool;
 
 internal static class Program
@@ -6,12 +8,13 @@ internal static class Program
     {
         ArgumentNullException.ThrowIfNull(args);
         using var cancellation = new ConsoleCancellationScope();
-        return await RunMainAsync(args, cancellation.Token).ConfigureAwait(false);
+        return await RunMainAsync(args.ToImmutableArray(), cancellation.Token).ConfigureAwait(false);
     }
 
-    internal static async Task<int> RunMainAsync(string[] args, CancellationToken cancellationToken)
+    internal static async Task<int> RunMainAsync(ImmutableArray<string> args, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        if (args.IsDefault)
+        { throw new ArgumentNullException(nameof(args)); }
         try
         {
             return await ToolApplication.RunAsync(args, Console.Out, Console.Error, SdkProbe.ReadAsync, cancellationToken)

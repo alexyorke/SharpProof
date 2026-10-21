@@ -11,7 +11,7 @@ internal sealed partial class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.Directory += "\0";
+        { request = request with { Cache = request.Cache with { Directory = request.Cache.Directory + ("\0") } }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -26,7 +26,7 @@ internal sealed partial class WorkerTests
     {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.CompilerManifest.Path += "\0";
+        { request = request with { CompilerManifest = request.CompilerManifest with { Path = request.CompilerManifest.Path + ("\0") } }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -108,7 +108,7 @@ internal sealed partial class WorkerTests
 
     private sealed class QueryExceptionBackend(Exception failure) : ISmtBackend
     {
-        private Exception _guarded_failure = failure ?? throw new System.ArgumentNullException(nameof(failure));
+        private readonly Exception _guarded_failure = failure ?? throw new System.ArgumentNullException(nameof(failure));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(query);

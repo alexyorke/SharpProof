@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -30,8 +31,8 @@ public sealed class NativeArrayRangeWriteTests
         var candidate = new PassiveCallableCandidate("range-loop", builder.Build(), [subject.Parameter], subject.Result, [],
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out _, out var search, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [subject.Parameter.Entry] = factory.CreateIntegerValue(1) };
-        foreach (var program in new[] { candidate.Program, search!.Program })
+        var inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(subject.Parameter.Entry, factory.CreateIntegerValue(1));
+        foreach (var program in ImmutableArray.Create(candidate.Program, search!.Program))
         {
             var execution = new IrProgramInterpreter(factory).Execute(program, inputs, 1000);
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), execution.Unsupported?.Detail);

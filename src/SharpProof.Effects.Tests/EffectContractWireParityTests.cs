@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,12 +8,12 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 internal sealed class EffectContractWireParityTests
 {
-    private static readonly (
+    private static readonly ImmutableArray<(
         EffectRegionKind Region,
         EffectContractKind Read,
         EffectContractKind Write,
         EffectRegionId? RegionId,
-        bool ExpandsParameters)[] s_regionMappings =
+        bool ExpandsParameters)> s_regionMappings =
     [
         (
             EffectRegionKind.Receiver,
@@ -70,7 +71,7 @@ internal sealed class EffectContractWireParityTests
             new CSharpParseOptions(LanguageVersion.Preview));
         var parseErrors = syntaxTree.GetDiagnostics()
             .Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
+            .ToImmutableArray();
         var executableSyntax = FindExecutableCatalogSyntax(syntaxTree.GetRoot());
 
         using (Assert.EnterMultipleScope())
@@ -104,12 +105,12 @@ internal sealed class EffectContractWireParityTests
                     .Any(method => method.ExpressionBody is not null),
                 Is.True);
             Assert.That(
-                probeSyntax.OfType<IfStatementSyntax>().ToArray(),
+                probeSyntax.OfType<IfStatementSyntax>().ToImmutableArray(),
                 Has.Length.EqualTo(1));
         }
     }
 
-    private static SyntaxNode[] FindExecutableCatalogSyntax(SyntaxNode root)
+    private static ImmutableArray<SyntaxNode> FindExecutableCatalogSyntax(SyntaxNode root)
     {
         ArgumentNullException.ThrowIfNull(root);
         return root.DescendantNodesAndSelf()
@@ -126,7 +127,7 @@ internal sealed class EffectContractWireParityTests
                 || node is AccessorDeclarationSyntax accessor &&
                     (accessor.Body is not null || accessor.ExpressionBody is not null)
                 || node is InvocationExpressionSyntax invocation && !IsCatalogDataFactory(invocation))
-            .ToArray();
+            .ToImmutableArray();
     }
 
     private static bool IsCatalogDataFactory(InvocationExpressionSyntax invocation)
@@ -333,8 +334,7 @@ internal sealed class EffectContractWireParityTests
     [Test]
     public void DirectEventWireCatalogIsClosedAndBijective()
     {
-        var expected = new[]
-        {
+        var expected = ImmutableArray.Create(
             (
                 EffectDirectEventKind.ManagedObjectAllocation,
                 "managed-allocation"),
@@ -359,7 +359,7 @@ internal sealed class EffectContractWireParityTests
             (
                 EffectDirectEventKind.VolatileFieldAccess,
                 "volatile-field-access")
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {
@@ -431,15 +431,19 @@ internal sealed class EffectContractWireParityTests
         }
     }
 
-    private static Dictionary<string, long> GetNamedValues(Type enumType)
+    private static ImmutableDictionary<string, long> GetNamedValues(Type enumType)
     {
         System.ArgumentNullException.ThrowIfNull(enumType);
-        return Enum.GetNames(enumType).ToDictionary(
-            static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
-            name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (Convert.ToInt64(
-                Enum.Parse(enumType, name),
-                System.Globalization.CultureInfo.InvariantCulture)),
-            StringComparer.Ordinal);
+        var values = ImmutableDictionary.CreateBuilder<string, long>(StringComparer.Ordinal);
+        foreach (var name in Enum.GetNames(enumType))
+        {
+            ArgumentNullException.ThrowIfNull(name);
+            var value = Convert.ToInt64(Enum.Parse(enumType, name), System.Globalization.CultureInfo.InvariantCulture);
+            if (values.ContainsKey(name))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + name); }
+            values.Add(name, value);
+        }
+        return values.ToImmutable();
     }
 
 }

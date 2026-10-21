@@ -343,15 +343,36 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
-### Master integration (in progress)
+### Master integration
 
-MR #334 now conflicts with master after its immutable-model migration
-`015c1db92`. The merge preview identifies 21 conflicting files across protocol,
-compiler artifacts, lowering, replay/manifest tests and the benchmark script.
-The field-fact and trace-layout controls above are verified before integration.
-Save that checkpoint, merge the reviewed master revision, preserve the resource
-features while adopting immutable model updates, and verify the combined state.
-No pre-merge result qualifies the resulting merge commit.
+Integrated reviewed master `015c1db92` after its immutable-model migration caused
+21 textual conflicts. Resource metadata and guards are retained. Constructor
+arguments are pinned in the builder before snapshotting; closure storage is
+prepared before constructing immutable lowering configuration. Resource result
+and metadata projection return updated records, and replay observers are supplied
+when constructing options. Fixtures now replace and reattach immutable records
+and collections. No tampering/rejection cases were removed.
+
+Merged-source verification passed all 2248 frontend, 182 memory, 161 Specs and
+1489 analyzer tests. The complete worker run passed 7600 cases and failed one
+new master assertion for the specific default-interface-metadata rejection
+message. Replacing nullable immutable-array comparisons with null patterns
+preserved that assertion; all 1155 selected codec/resource/protocol regressions
+then passed, including the failed case. This is not a second full-worker run.
+
+Both packaged contract/resource benchmark workflows passed after converting 44
+variadic command/diagnostic call sites to immutable argument collections, keeping
+argument values and order. Full repository formatting, quality/API lint, layout
+(2848 source files, 59 projects, 151 pinned common files) and documentation gates
+passed. Logs use the `resource-immutable-master` artifact prefix; the successful
+worker regression and benchmark logs end in `codec-regression.log` and
+`performance-consumers-2.log` respectively. The temporary syntax rewriter and
+private-workspace formatter are ignored verification helpers.
+
+Exact-head CI and changed-TCB coverage must qualify the published integration.
+The last complete coverage measurement remains 96.32% at `c1cab0c1e`, below the
+unchanged 100% floor. Cumulative task runtime bytes remain Unknown; this merge
+does not complete the remaining fault-cost model or the final roadmap audit.
 
 ### Exception trace element layout controls
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -21,11 +22,11 @@ public sealed class Pr275InstructionFactsCoverageTests
         var location = builder.MemberLocation(member, isStatic ? null : receiver, argument);
         var load = builder.Load(entry, factory.CreateOperation("load"), target, location);
         var store = builder.Store(entry, factory.CreateOperation("store"), location, value);
-        IrTerm[] expectedRead = isStatic ? [argument] : [receiver, argument];
+        ImmutableArray<IrTerm> expectedRead = isStatic ? [argument] : [receiver, argument];
 
         Assert.That(IrInstructionFacts.ReadTerms(load), Is.EqualTo(expectedRead));
-        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(expectedRead.Concat([value])));
-        Assert.That(IrInstructionFacts.WrittenVariables(load), Is.EqualTo(new[] { target }));
+        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(expectedRead.Add(value)));
+        Assert.That(IrInstructionFacts.WrittenVariables(load), Is.EqualTo(ImmutableArray.Create(target)));
         Assert.That(IrInstructionFacts.WrittenVariables(store), Is.Empty);
     }
 
@@ -45,9 +46,9 @@ public sealed class Pr275InstructionFactsCoverageTests
         var store = builder.Store(entry, factory.CreateOperation("store"), location, value);
         var elementStore = builder.ElementStore(entry, factory.CreateOperation("element store"), array, index, value);
 
-        Assert.That(IrInstructionFacts.ReadTerms(load), Is.EqualTo(new IrTerm[] { array, index }));
-        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(new IrTerm[] { array, index, value }));
-        Assert.That(IrInstructionFacts.ReadTerms(elementStore), Is.EqualTo(new IrTerm[] { array, index, value }));
+        Assert.That(IrInstructionFacts.ReadTerms(load), Is.EqualTo(ImmutableArray.Create<IrTerm>(array, index)));
+        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(ImmutableArray.Create<IrTerm>(array, index, value)));
+        Assert.That(IrInstructionFacts.ReadTerms(elementStore), Is.EqualTo(ImmutableArray.Create<IrTerm>(array, index, value)));
     }
 
     [TestCase(false)]
@@ -66,11 +67,11 @@ public sealed class Pr275InstructionFactsCoverageTests
             member, isStatic ? null : receiver, argument);
         var discarded = builder.Call(entry, factory.CreateOperation("discard result"), null,
             member, isStatic ? null : receiver, argument);
-        IrTerm[] expectedRead = isStatic ? [argument] : [receiver, argument];
+        ImmutableArray<IrTerm> expectedRead = isStatic ? [argument] : [receiver, argument];
 
         Assert.That(IrInstructionFacts.ReadTerms(withResult), Is.EqualTo(expectedRead));
         Assert.That(IrInstructionFacts.ReadTerms(discarded), Is.EqualTo(expectedRead));
-        Assert.That(IrInstructionFacts.WrittenVariables(withResult), Is.EqualTo(new[] { target }));
+        Assert.That(IrInstructionFacts.WrittenVariables(withResult), Is.EqualTo(ImmutableArray.Create(target)));
         Assert.That(IrInstructionFacts.WrittenVariables(discarded), Is.Empty);
     }
 
@@ -89,8 +90,8 @@ public sealed class Pr275InstructionFactsCoverageTests
             sequenceType, target, length, [first, second]);
         var objectAllocation = builder.Allocate(entry, factory.CreateOperation("object"), factory.ObjectType);
 
-        Assert.That(IrInstructionFacts.ReadTerms(allocation), Is.EqualTo(new[] { length, first, second }));
-        Assert.That(IrInstructionFacts.WrittenVariables(allocation), Is.EqualTo(new[] { target }));
+        Assert.That(IrInstructionFacts.ReadTerms(allocation), Is.EqualTo(ImmutableArray.Create(length, first, second)));
+        Assert.That(IrInstructionFacts.WrittenVariables(allocation), Is.EqualTo(ImmutableArray.Create(target)));
         Assert.That(IrInstructionFacts.ReadTerms(objectAllocation), Is.Empty);
         Assert.That(IrInstructionFacts.WrittenVariables(objectAllocation), Is.Empty);
     }

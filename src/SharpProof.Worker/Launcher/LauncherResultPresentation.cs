@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;
@@ -14,13 +15,13 @@ internal static partial class LauncherPresentation
             .Where(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
                 assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary)
             .GroupBy(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                (assumption.Kind, assumption.Id)).ToArray();
+                (assumption.Kind, assumption.Id)).ToImmutableArray();
         var used = response.CallableResults.SelectMany(static result =>
                 result is null ? throw new ArgumentNullException(nameof(result)) : result.Assumptions)
             .Concat(claims.SelectMany(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Assumptions))
             .Where(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used)
             .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                (assumption.Kind, assumption.Id)).ToHashSet();
+                (assumption.Kind, assumption.Id)).ToImmutableHashSet();
         var proven = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
             result.Outcome == WorkerClaimOutcome.Proven);
         var refuted = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :

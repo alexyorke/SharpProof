@@ -98,7 +98,7 @@ internal sealed class CompilerDecodedShadowBody
     internal CompilerTotalCallablePreparation Body { get; }
 
     internal static CompilerDecodedShadowBody Decode(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken, metadataReferences));
     }
@@ -122,23 +122,28 @@ internal sealed record CompilerDisjointInputPair([property: JsonRequired] int Le
 internal sealed record CompilerTotalClause(CompilerContractKind Kind, IrTerm Value, IrTerm Safe,
     OperationId Operation, string? ClaimId, string? AssumptionId);
 
-internal sealed class CompilerTotalCallableArtifact
+internal sealed record CompilerTotalCallableArtifact
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CompilerDisjointInputPair[]? DisjointInputs { get; set; }
+    public ImmutableArray<CompilerDisjointInputPair>? DisjointInputs { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public bool EffectsCompleteAtEntry { get; set; }
-    public string[] ValidEffectClaimIds { get; set; } = [];
+    public bool EffectsCompleteAtEntry { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public bool IsBodyAbstraction { get; set; }
+    public bool IsBodyAbstraction { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public bool HasReceiver { get; set; }
-    public PortableIrGraph Graph { get; set; } = new();
-    public CompilerTotalParameterArtifact[] Parameters { get; set; } = [];
-    public int Result { get; set; } = -1;
-    public CompilerTotalClauseArtifact[] Clauses { get; set; } = [];
-    public CompilerTotalExceptionConstraintArtifact[] ExceptionConstraints { get; set; } = [];
-    public CompilerTotalCallPreconditionArtifact[] CallPreconditions { get; set; } = [];
+    public bool HasReceiver { get; init; }
+    public PortableIrGraph Graph { get; init; } = new();
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerTotalParameterArtifact> Parameters { get; init; } = [];
+    public int Result { get; init; } = -1;
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerTotalClauseArtifact> Clauses { get; init; } = [];
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerTotalExceptionConstraintArtifact> ExceptionConstraints { get; init; } = [];
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerTotalCallPreconditionArtifact> CallPreconditions { get; init; } = [];
 }
 
 internal sealed record CompilerMetadataClauseOrigin(string AssemblyIdentity, string ImageSha256,
@@ -147,40 +152,41 @@ internal sealed record CompilerMetadataClauseOrigin(string AssemblyIdentity, str
     string ConstructorIdentity, string Kind, long Minimum, long Maximum,
     ImmutableArray<byte> ConstructorSignature, ImmutableArray<byte> ValueBlob);
 
-internal sealed class CompilerTotalCallPreconditionArtifact
+internal sealed record CompilerTotalCallPreconditionArtifact
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CompilerMetadataClauseOrigin? MetadataClause { get; set; }
+    public CompilerMetadataClauseOrigin? MetadataClause { get; init; }
 
-    public int InstructionIndex { get; set; } = -1;
-    public string CalleeIdentity { get; set; } = string.Empty;
-    public int ClauseOrdinal { get; set; } = -1;
-    public int ClauseSite { get; set; } = -1;
-    public int ValueRoot { get; set; } = -1;
-    public int SafeRoot { get; set; } = -1;
+    public int InstructionIndex { get; init; } = -1;
+    public string CalleeIdentity { get; init; } = string.Empty;
+    public int ClauseOrdinal { get; init; } = -1;
+    public int ClauseSite { get; init; } = -1;
+    public int ValueRoot { get; init; } = -1;
+    public int SafeRoot { get; init; } = -1;
 }
 
-internal sealed class CompilerTotalExceptionConstraintArtifact
+internal sealed record CompilerTotalExceptionConstraintArtifact
 {
-    public string ClaimId { get; set; } = string.Empty;
-    public IrExceptionKind[] AllowedKinds { get; set; } = [];
+    public string ClaimId { get; init; } = string.Empty;
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<IrExceptionKind> AllowedKinds { get; init; } = [];
 }
 
-internal sealed class CompilerTotalParameterArtifact
+internal sealed record CompilerTotalParameterArtifact
 {
-    public int Entry { get; set; } = -1;
-    public int Current { get; set; } = -1;
-    public int Old { get; set; } = -1;
+    public int Entry { get; init; } = -1;
+    public int Current { get; init; } = -1;
+    public int Old { get; init; } = -1;
 }
 
-internal sealed class CompilerTotalClauseArtifact
+internal sealed record CompilerTotalClauseArtifact
 {
-    public CompilerContractKind Kind { get; set; }
-    public int ValueRoot { get; set; } = -1;
-    public int SafeRoot { get; set; } = -1;
-    public int Operation { get; set; } = -1;
-    public string? ClaimId { get; set; }
-    public string? AssumptionId { get; set; }
+    public CompilerContractKind Kind { get; init; }
+    public int ValueRoot { get; init; } = -1;
+    public int SafeRoot { get; init; } = -1;
+    public int Operation { get; init; } = -1;
+    public string? ClaimId { get; init; }
+    public string? AssumptionId { get; init; }
 }
 
 internal static class CompilerArtifactLimits
@@ -188,49 +194,52 @@ internal static class CompilerArtifactLimits
     internal const int MaximumInstructions = 4096;
 }
 
-internal sealed class CompilerSpecificationPackConfiguration
+internal sealed record CompilerSpecificationPackConfiguration
 {
-    public string[] SpecificationPackIds { get; set; } = [];
-    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
-    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> SpecificationPackIds { get; init; } = [];
+    public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
 }
 
-internal sealed class CompilerCallableArtifact
+internal sealed record CompilerCallableArtifact
 {
-    public string CallableId { get; set; } = string.Empty;
-    public WorkerClaimReason FailureReason { get; set; }
-    public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
+    public string CallableId { get; init; } = string.Empty;
+    public WorkerClaimReason FailureReason { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CompilerTotalCallableArtifact? Total { get; set; }
+    public CompilerTotalCallableArtifact? Total { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CompilerTotalCallableArtifact? TotalEntry { get; set; }
+    public CompilerTotalCallableArtifact? TotalEntry { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public byte[]? ResourceProgram { get; set; }
+    public byte[]? ResourceProgram { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ResourceUnknownReason { get; set; }
+    public string? ResourceUnknownReason { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public byte[]? ForkJoinProjection { get; set; }
+    public byte[]? ForkJoinProjection { get; init; }
 }
 
-internal sealed class CompilerEffectClaimArtifact
+internal sealed record CompilerEffectClaimArtifact
 {
-    public string ClaimId { get; set; } = string.Empty;
-    public WorkerEffectContractKind ContractKind { get; set; }
-    public WorkerClaimOutcome Outcome { get; set; }
-    public WorkerClaimReason Reason { get; set; }
-    public WorkerEffectEvidenceCertainty Certainty { get; set; }
-    public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
-    public string Evidence { get; set; } = string.Empty;
+    public string ClaimId { get; init; } = string.Empty;
+    public WorkerEffectContractKind ContractKind { get; init; }
+    public WorkerClaimOutcome Outcome { get; init; }
+    public WorkerClaimReason Reason { get; init; }
+    public WorkerEffectEvidenceCertainty Certainty { get; init; }
+    public CompilerEffectConstraintArtifact Constraint { get; init; } = new();
+    public string Evidence { get; init; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerEffectConstraintArtifact
+internal sealed record CompilerEffectConstraintArtifact
 {
-    public WorkerEffectSet AllowedEffects { get; set; }
-    public WorkerEffectCapabilitySet AllowedCapabilities { get; set; }
-    public string[] AllowedExceptionTypes { get; set; } = [];
+    public WorkerEffectSet AllowedEffects { get; init; }
+    public WorkerEffectCapabilitySet AllowedCapabilities { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> AllowedExceptionTypes { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public WorkerResourceConstraint? ResourceUpperBound { get; set; }
+    public WorkerResourceConstraint? ResourceUpperBound { get; init; }
 }
 
 internal enum CompilerOutputKind
@@ -286,87 +295,96 @@ internal enum CompilerResolverPolicy
     EvidenceOnly = 0
 }
 
-internal sealed class CompilerDiagnosticArtifact
+internal sealed record CompilerDiagnosticArtifact
 {
-    public string Code { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public bool IsSource { get; set; }
-    public WorkerSourceLocation Location { get; set; } = new();
+    public string Code { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public bool IsSource { get; init; }
+    public WorkerSourceLocation Location { get; init; } = new();
     [JsonIgnore]
-    public int SourceTreeOrdinal { get; set; } = -1;
+    public int SourceTreeOrdinal { get; init; } = -1;
     [JsonIgnore]
-    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreePath { get; init; } = string.Empty;
     [JsonIgnore]
-    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; init; } = string.Empty;
     [JsonIgnore]
-    public string SourceLineMapSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; init; } = string.Empty;
 }
 
-internal sealed class CompilerManifestArtifact
+internal sealed record CompilerManifestArtifact
 {
-    public string Schema { get; set; } = CompilerManifestArtifactVersions.Schema;
-    public int SchemaVersion { get; set; } = CompilerManifestArtifactVersions.Current;
-    public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
-    public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
-    public int SpecificationPackSchemaVersion { get; set; } = CompilerSpecificationPackVersions.Current;
-    public string[] SpecificationPackIds { get; set; } = [];
-    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
-    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
-    public WorkerFeatureSet Features { get; set; }
-    public CompilerCompilationSnapshot Compilation { get; set; } = new();
-    public WorkerClaimManifest Manifest { get; set; } = new();
-    public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
-    public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
-    public CompilerCallableArtifact[] Callables { get; set; } = [];
-    public CompilerReachableSourceArtifact? ReachableSource { get; set; }
+    public string Schema { get; init; } = CompilerManifestArtifactVersions.Schema;
+    public int SchemaVersion { get; init; } = CompilerManifestArtifactVersions.Current;
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
+    public int RelationalSummarySchemaVersion { get; init; } = CompilerRelationalSummaryVersions.Current;
+    public int SpecificationPackSchemaVersion { get; init; } = CompilerSpecificationPackVersions.Current;
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> SpecificationPackIds { get; init; } = [];
+    public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
+    public WorkerFeatureSet Features { get; init; }
+    public CompilerCompilationSnapshot Compilation { get; init; } = new();
+    public WorkerClaimManifest Manifest { get; init; } = new();
+    public int MaximumExpressionDepth { get; init; } = WorkerBudgets.DefaultMaximumExpressionDepth;
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerDiagnosticArtifact> CompilerDiagnostics { get; init; } = [];
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerCallableArtifact> Callables { get; init; } = [];
+    public CompilerReachableSourceArtifact? ReachableSource { get; init; }
 }
 
 // Shadow input for interprocedural effect analysis. An absent or incomplete
 // body never supplies an effect fact or a normal-completion guarantee.
-internal sealed class CompilerReachableSourceArtifact
+internal sealed record CompilerReachableSourceArtifact
 {
-    public bool CollectionComplete { get; set; }
-    public CompilerSourceRootArtifact[] Roots { get; set; } = [];
-    public CompilerSourceBodyArtifact[] Bodies { get; set; } = [];
-    public CompilerSourceDocumentArtifact[] Documents { get; set; } = [];
+    public bool CollectionComplete { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerSourceRootArtifact> Roots { get; init; } = [];
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerSourceBodyArtifact> Bodies { get; init; } = [];
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerSourceDocumentArtifact> Documents { get; init; } = [];
 }
 
-internal sealed class CompilerSourceDocumentArtifact
+internal sealed record CompilerSourceDocumentArtifact
 {
-    public int SourceTreeOrdinal { get; set; }
-    public string Path { get; set; } = string.Empty;
-    public int MaximumBodyEnd { get; set; }
+    public int SourceTreeOrdinal { get; init; }
+    public string Path { get; init; } = string.Empty;
+    public int MaximumBodyEnd { get; init; }
 }
 
-internal sealed class CompilerSourceRootArtifact
+internal sealed record CompilerSourceRootArtifact
 {
-    public string CallableId { get; set; } = string.Empty;
-    public string BodyId { get; set; } = string.Empty;
+    public string CallableId { get; init; } = string.Empty;
+    public string BodyId { get; init; } = string.Empty;
 }
 
-internal sealed class CompilerSourceBodyArtifact
+internal sealed record CompilerSourceBodyArtifact
 {
-    public string BodyId { get; set; } = string.Empty;
-    public string MethodIdentity { get; set; } = string.Empty;
-    public string CallIdentity { get; set; } = string.Empty;
-    public bool IsStatic { get; set; }
-    public string[] ParameterTypes { get; set; } = [];
-    public string? ReturnType { get; set; }
-    public int SourceTreeOrdinal { get; set; }
-    public int Start { get; set; }
-    public int Length { get; set; }
-    public bool CallsComplete { get; set; }
-    public bool EffectsCompleteAtEntry { get; set; }
-    public string[] Callees { get; set; } = [];
-    public PortableIrGraph? Graph { get; set; }
-    public bool IsCallSkeleton { get; set; }
-    public CompilerSourceCallArtifact[] SourceCalls { get; set; } = [];
+    public string BodyId { get; init; } = string.Empty;
+    public string MethodIdentity { get; init; } = string.Empty;
+    public string CallIdentity { get; init; } = string.Empty;
+    public bool IsStatic { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> ParameterTypes { get; init; } = [];
+    public string? ReturnType { get; init; }
+    public int SourceTreeOrdinal { get; init; }
+    public int Start { get; init; }
+    public int Length { get; init; }
+    public bool CallsComplete { get; init; }
+    public bool EffectsCompleteAtEntry { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<string> Callees { get; init; } = [];
+    public PortableIrGraph? Graph { get; init; }
+    public bool IsCallSkeleton { get; init; }
+    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<CompilerSourceCallArtifact> SourceCalls { get; init; } = [];
 }
 
-internal sealed class CompilerSourceCallArtifact
+internal sealed record CompilerSourceCallArtifact
 {
-    public int InstructionIndex { get; set; }
-    public string CalleeBodyId { get; set; } = string.Empty;
+    public int InstructionIndex { get; init; }
+    public string CalleeBodyId { get; init; } = string.Empty;
 }
 
 internal readonly struct CompilerEffectConstraintRule(

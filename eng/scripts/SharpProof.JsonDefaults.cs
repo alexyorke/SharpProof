@@ -4,8 +4,12 @@ namespace SharpProof;
 
 internal static class SharpProofJsonDefaults
 {
-    internal static JsonSerializerOptions Indented { get; } = new()
+    internal static JsonSerializerOptions Indented { get; } = CreateIndented();
+
+    private static JsonSerializerOptions CreateIndented()
     {
-        WriteIndented = true
-    };
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
 }

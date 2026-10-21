@@ -4,7 +4,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
 {
     private readonly ISmtBackend _backend =
         ArgumentNullGuard.NotNull(backend, nameof(backend));
-    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; set; }
+    internal Func<IrOpaqueTerm, IrValue?>? ConcreteOpaqueValueProvider { get; init; }
 
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken)
@@ -88,9 +88,8 @@ internal sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        var justifications = ImmutableArray.CreateBuilder<ProofJustification>(
-            result.UnsatCore.Length);
-        var seen = new HashSet<int>();
+        var justifications = ImmutableArray.CreateBuilder<ProofJustification>();
+        var seen = ImmutableHashSet.CreateBuilder<int>();
         foreach (var index in result.UnsatCore)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -131,7 +130,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
 
         var interpreter = new IrInterpreter(query.Factory);
         var unavailable = false;
-        var observedCaches = new Dictionary<IrMemberId, (object Identity, IrTypeId Type)>();
+        var observedCaches = ImmutableDictionary.CreateBuilder<IrMemberId, (object Identity, IrTypeId Type)>();
         IrValue? Observe(IrOpaqueTerm term)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
@@ -170,12 +169,13 @@ internal sealed class ProofKernel(ISmtBackend backend)
         {
             return Unknown(unavailable ? AbstentionReason.CounterexampleNotReplayable : AbstentionReason.CounterexampleReplayFailed);
         }
+        var observedCacheSnapshot = observedCaches.ToImmutable();
         foreach (var assignment in model.Assignments)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (assignment.Value.Kind != IrValueKind.Reference)
             { continue; }
-            foreach (var observed in observedCaches.Values)
+            foreach (var observed in observedCacheSnapshot.Values)
             {
                 if (ReferenceEquals(assignment.Value.Reference, observed.Identity) &&
                     !IrOpaqueCallSite.IsDefaultComparerValueView(query.Factory, observed.Type, assignment.Value.Type))

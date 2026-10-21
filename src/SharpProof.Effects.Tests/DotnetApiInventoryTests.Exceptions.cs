@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -11,7 +12,7 @@ public sealed partial class DotnetApiInventoryTests
     {
         ArgumentNullException.ThrowIfNull(references);
         ArgumentNullException.ThrowIfNull(id);
-        foreach (var message in resourceOnly ? new[] { "(string)null" } : new[] { "(string)null", "\"\"", "\"message\"" })
+        foreach (var message in resourceOnly ? ImmutableArray.Create("(string)null") : ImmutableArray.Create("(string)null", "\"\"", "\"message\""))
         {
             var expression = resourceOnly ? ResourceConstructorExpression(id) : id switch
             {

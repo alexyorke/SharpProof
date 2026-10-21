@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -23,7 +24,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
     private const int WarmupCount = 10_000;
     private const int MeasurementCount = 4_096;
     private const int InputValue = 7;
-    private static readonly string[] ClosedRuntimeTypes = ["System.Int32", "System.Object"];
+    private static readonly ImmutableArray<string> ClosedRuntimeTypes = ["System.Int32", "System.Object"];
 
     [Test]
     public async Task AdmittedOpenTestedTypePatternsRespectMeasuredAllocation()
@@ -37,11 +38,12 @@ public sealed class GenericTestedTypePatternControlAuditTests
             "pattern-readiness", "observations", runLabel!);
         Assert.That(Directory.Exists(evidenceDirectory), Is.False, "Preserve every previous observation run.");
         Directory.CreateDirectory(evidenceDirectory);
-        var observations = new List<PatternObservation>();
-        foreach (var form in new[] { "discard-declaration", "parenthesized-type" })
+        var observationBuilder = ImmutableArray.CreateBuilder<PatternObservation>();
+        foreach (var form in ImmutableArray.Create("discard-declaration", "parenthesized-type"))
         {
-            observations.Add(await ObserveForm(form, evidenceDirectory));
+            observationBuilder.Add(await ObserveForm(form, evidenceDirectory));
         }
+        var observations = observationBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             foreach (var observation in observations)
@@ -61,7 +63,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen pattern source changed.");
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, form + "-subject.cs"), source);
-        var compilation = TestCompilation.Create("GenericTestedTypePattern_" + form, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("GenericTestedTypePattern_" + form, [("Subject.cs", source)]);
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
@@ -72,14 +74,14 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var expression = method.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!;
         var operation = model.GetOperation(expression);
         var graph = ControlFlowGraph.Create(method, model, TestContext.CurrentContext.CancellationToken)!;
-        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToArray();
+        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToImmutableArray();
         var expectedPattern = form == "discard-declaration" ? OperationKind.DeclarationPattern : OperationKind.TypePattern;
         await Save(evidenceDirectory, form + "-shape.json", new
         {
             SourceSha256 = sourceHash,
             ExpectedPattern = expectedPattern.ToString(),
             Operation = Shape(operation),
-            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToArray(),
+            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToImmutableArray(),
             Roslyn = typeof(IOperation).Assembly.GetName().Version!.ToString(),
             Role = "Compiler/CFG setup qualification; shape mismatch is not a product allocation red."
         });
@@ -104,8 +106,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
             control = Measure(form + "/typed-control", typedControl, expected: true);
             var flags = generic.GetMethodImplementationFlags();
             var controlFlags = controlMethod.GetMethodImplementationFlags();
-            var il = generic.GetMethodBody()!.GetILAsByteArray()!;
-            var instructions = ReadIl(il);
+            var il = generic.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            var instructions = ReadIl(il.AsSpan());
             var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
             var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
             await Save(evidenceDirectory, form + "-runtime.json", new
@@ -126,7 +128,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
                 HasBox = hasBox,
                 HasIsinst = hasIsinst,
-                IlHex = Convert.ToHexString(il),
+                IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Target = measured,
                 Control = control,
@@ -144,7 +146,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 Assert.That((controlFlags & MethodImplAttributes.NoOptimization) != 0, Is.False);
                 Assert.That(hasBox, Is.True, form + ": decoded generic box opcode.");
                 Assert.That(hasIsinst, Is.True, form + ": decoded generic isinst opcode.");
-                foreach (var observation in new[] { measured, control })
+                foreach (var observation in ImmutableArray.Create(measured, control))
                 {
                     Assert.That(observation.Actual, Is.EqualTo(observation.Expected), observation.Name);
                     Assert.That(observation.TrueResults, Is.EqualTo(MeasurementCount), observation.Name);
@@ -161,6 +163,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await Save(evidenceDirectory, form + "-native.json", new
@@ -175,13 +178,13 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Target = measured,
             Control = control,
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven. Zero measured allocation rejects this hypothesis for the tested form/runtime."
@@ -322,14 +325,13 @@ public sealed class GenericTestedTypePatternControlAuditTests
         return new(name, expected, actual, trueResults, allocated, allocated / (double)MeasurementCount);
     }
 
-    private static IlInstruction[] ReadIl(byte[] bytes)
+    private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
             .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-        var instructions = new List<IlInstruction>();
+            .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
             var offset = position;
@@ -345,13 +347,13 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, position),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.Slice(position, sizeof(int))),
                 _ => 4
             };
-            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.AsSpan(position, operandSize))));
+            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.Slice(position, operandSize))));
             position += operandSize;
         }
-        return [.. instructions];
+        return instructions.ToImmutable();
     }
 
     private static Task Save(string directory, string name, object value)

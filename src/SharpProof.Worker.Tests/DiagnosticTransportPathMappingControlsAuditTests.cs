@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -51,11 +52,11 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
             }
             Assert.That(expectedUri.LocalPath, Is.EqualTo(input.ExpectedPath), "Independent literal file URI oracle.");
             Assert.That(File.Exists(expectedUri.LocalPath), Is.True, "The expected diagnostic target exists.");
-            var targetLines = await File.ReadAllLinesAsync(expectedUri.LocalPath);
+            var targetLines = (await File.ReadAllLinesAsync(expectedUri.LocalPath)).ToImmutableArray();
             Assert.That(targetLines[expectedLine - 1], Is.EqualTo("    [return: Positive]"));
         }
 
-        var compilation = TestCompilation.Create("DiagnosticTransportPathMappingAudit",
+        var compilation = TestCompilation.CreateExact("DiagnosticTransportPathMappingAudit",
             OutputKind.DynamicallyLinkedLibrary, [(input.SourcePath, source)]);
         var tree = compilation.SyntaxTrees.Single();
         var attribute = (await tree.GetRootAsync()).DescendantNodes().OfType<AttributeSyntax>().Single();
@@ -78,21 +79,21 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
             var target = assembly.GetType("Subject")!.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
             Assert.That(target(-1), Is.EqualTo(-1));
         });
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), image.ToArray());
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, input.ProjectDirectory, "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         var artifactPath = Path.Combine(evidenceDirectory, "input-manifest.json");
-        await File.WriteAllBytesAsync(artifactPath, artifactBytes);
+        await File.WriteAllBytesAsync(artifactPath, artifactBytes.AsMemory());
         var requestPath = Path.Combine(evidenceDirectory, "published-request.json");
         var resultPath = Path.Combine(evidenceDirectory, "published-result.json");
         var manifestPath = Path.Combine(evidenceDirectory, "published-manifest.json");
         var sarifPath = Path.Combine(evidenceDirectory, "published.sarif");
-        string[] arguments = [
+        ImmutableArray<string> arguments = [
             "verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
             "--request", Path.Combine(evidenceDirectory, "private-request.json"),
             "--result", Path.Combine(evidenceDirectory, "private-result.json"),
@@ -124,8 +125,8 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         Assert.That(exitCode, Is.EqualTo(5), errors.ToString());
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(requestPath))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
-        var publishedBytes = await File.ReadAllBytesAsync(manifestPath);
-        var publishedArtifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(publishedBytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
+        var publishedBytes = (await File.ReadAllBytesAsync(manifestPath)).ToImmutableArray();
+        var publishedArtifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(publishedBytes.AsSpan()), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(WorkerProtocolJson.ValidateForRequest(response,
@@ -141,7 +142,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
             Assert.That(JsonSerializer.Serialize(request.Budgets, WorkerProtocolJson.SharedOptions),
                 Is.EqualTo(JsonSerializer.Serialize(new WorkerBudgets(), WorkerProtocolJson.SharedOptions)));
         }
-        var diagnosticLines = errors.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var diagnosticLines = errors.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).ToImmutableArray();
         Assert.That(diagnosticLines, Has.Length.EqualTo(1));
         Assert.That(VerifierDiagnosticTransport.TryDeserialize(diagnosticLines.Single().TrimEnd('\r'),
             out var diagnostic), Is.True);

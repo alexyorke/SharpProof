@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -9,25 +10,25 @@ public sealed class RuntimeDependencyTests
     [Test]
     public void WorkerAssemblyHasCompilerNeutralRuntimeClosure()
     {
-        var forbidden = new HashSet<string>([
+        var forbidden = ImmutableHashSet.Create(StringComparer.Ordinal,
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
             "SharpProof.Effects", "SharpProof.Frontend"
-        ], StringComparer.Ordinal);
-        var pending = new Queue<Assembly>();
-        var queued = new HashSet<string>(StringComparer.Ordinal);
+        );
+        var pending = ImmutableQueue<Assembly>.Empty;
+        var queued = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         void Enqueue(Assembly assembly)
         {
             System.ArgumentNullException.ThrowIfNull(assembly);
             if (queued.Add(assembly.GetName().Name!))
             {
-                pending.Enqueue(assembly);
+                pending = pending.Enqueue(assembly);
             }
         }
 
         Enqueue(typeof(SharpProofWorker).Assembly);
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var assembly = pending.Dequeue();
+            pending = pending.Dequeue(out var assembly);
             foreach (var reference in assembly.GetReferencedAssemblies())
             {
                 var name = reference.Name!;

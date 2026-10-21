@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -108,14 +109,15 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ if (other) { Log(flag && other); } else { Log(flag || other); } return 7; }");
         var children = subject.Graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None &&
-            block.BranchValue != null && subject.Emission.IsElided(block.BranchValue)).ToArray();
+            block.BranchValue != null && subject.Emission.IsElided(block.BranchValue)).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(2));
-        var targets = new HashSet<BasicBlock>();
+        var targetBuilder = ImmutableHashSet.CreateBuilder<BasicBlock>();
         foreach (var child in children)
         {
             Assert.That(subject.Planner.TryElidedSpecificationContinuation(child, out var continuation, compilerMode: true), Is.True);
-            targets.Add(continuation);
+            targetBuilder.Add(continuation);
         }
+        var targets = targetBuilder.ToImmutable();
         Assert.That(targets, Has.Count.EqualTo(2));
         var source = subject.Graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
             block.BranchValue != null && !subject.Emission.IsElided(block.BranchValue));
@@ -178,6 +180,25 @@ public sealed class CompilerElisionContinuationPlannerTests
         }
     }
 
+    [Test]
+    public void ReusedStopSlotsRetainContinuationRepairPriority()
+    {
+        var subject = Create("{ if (flag) return 1; if (other) return 2; return 3; }");
+        var blocks = subject.Graph.Blocks;
+        Assert.That(blocks.Length, Is.GreaterThanOrEqualTo(5));
+        var stops = new CompilerElisionContinuationPlanner.OrderedStops();
+        Assert.That(stops.Add(blocks[0]), Is.True);
+        Assert.That(stops.Add(blocks[1]), Is.True);
+        Assert.That(stops.Add(blocks[2]), Is.True);
+        Assert.That(stops.Add(blocks[2]), Is.False);
+        Assert.That(stops.Remove(blocks[1]), Is.True);
+        Assert.That(stops.Remove(blocks[0]), Is.True);
+        Assert.That(stops.Remove(blocks[1]), Is.False);
+        Assert.That(stops.Add(blocks[3]), Is.True);
+        Assert.That(stops.Add(blocks[4]), Is.True);
+        Assert.That(stops.Count, Is.EqualTo(3));
+        Assert.That(stops, Is.EqualTo(System.Collections.Immutable.ImmutableArray.Create(blocks[3], blocks[4], blocks[2])));
+    }
     private static BasicBlock ElidedBranch(Subject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);

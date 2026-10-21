@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -13,7 +13,7 @@ internal static class SharpProofDeclarationLines
     public static int Main(string[] args)
     {
         using var request = JsonDocument.Parse(File.ReadAllText(args[0]));
-        var results = new List<object>();
+        var results = ImmutableArray.CreateBuilder<object>();
         foreach (var item in request.RootElement.EnumerateArray())
         {
             string path = item.GetProperty("path").GetString();
@@ -27,17 +27,17 @@ internal static class SharpProofDeclarationLines
                 new CSharpParseOptions(languageVersion, preprocessorSymbols: symbols));
             var text = tree.GetText();
             var root = tree.GetRoot();
-            var safe = new List<TextSpan>();
-            var unsafeSpans = new List<TextSpan>();
+            var safeBuilder = ImmutableArray.CreateBuilder<TextSpan>();
+            var unsafeSpanBuilder = ImmutableArray.CreateBuilder<TextSpan>();
             foreach (var node in root.DescendantNodes())
             {
                 switch (node)
                 {
                     case BaseTypeDeclarationSyntax type when type.OpenBraceToken.RawKind != 0 && !type.OpenBraceToken.IsMissing:
-                        safe.Add(TextSpan.FromBounds(type.SpanStart, type.OpenBraceToken.SpanStart));
+                        safeBuilder.Add(TextSpan.FromBounds(type.SpanStart, type.OpenBraceToken.SpanStart));
                         // Primary constructors can perform implicit assignments.
                         if (type is TypeDeclarationSyntax declaration && declaration.ParameterList != null)
-                            unsafeSpans.Add(declaration.ParameterList.Span);
+                            unsafeSpanBuilder.Add(declaration.ParameterList.Span);
                         break;
                     case BaseMethodDeclarationSyntax:
                     case DelegateDeclarationSyntax:
@@ -45,7 +45,7 @@ internal static class SharpProofDeclarationLines
                     case PropertyDeclarationSyntax:
                     case EventDeclarationSyntax:
                     case EnumMemberDeclarationSyntax:
-                        safe.Add(node.Span);
+                        safeBuilder.Add(node.Span);
                         break;
                 }
                 // These regions have executable behavior or affect it without
@@ -63,9 +63,9 @@ internal static class SharpProofDeclarationLines
                     {
                         Parent: VariableDeclarationSyntax { Parent: FieldDeclarationSyntax field }
                     } && field.Modifiers.Any(SyntaxKind.ConstKeyword)))
-                    unsafeSpans.Add(node.Span);
+                    unsafeSpanBuilder.Add(node.Span);
             }
-            var tokensByLine = new Dictionary<int, List<SyntaxToken>>();
+            var tokensByLineBuilder = ImmutableDictionary.CreateBuilder<int, ImmutableArray<SyntaxToken>.Builder>();
             foreach (var token in root.DescendantTokens())
             {
                 if (token.Span.Length == 0)
@@ -74,19 +74,22 @@ internal static class SharpProofDeclarationLines
                 int end = text.Lines.GetLineFromPosition(token.Span.End - 1).LineNumber + 1;
                 for (int line = start; line <= end; line++)
                 {
-                    if (!tokensByLine.TryGetValue(line, out var tokens))
-                        tokensByLine[line] = tokens = new List<SyntaxToken>();
+                    if (!tokensByLineBuilder.TryGetValue(line, out var tokens))
+                        tokensByLineBuilder[line] = tokens = ImmutableArray.CreateBuilder<SyntaxToken>();
                     tokens.Add(token);
                 }
             }
             bool valid = !tree.GetDiagnostics().Any(d => d.Severity == DiagnosticSeverity.Error);
-            int[] lines = valid ? tokensByLine.Where(pair => pair.Value.All(token =>
+            var safe = safeBuilder.ToImmutable();
+            var unsafeSpans = unsafeSpanBuilder.ToImmutable();
+            var lines = valid ? tokensByLineBuilder.ToImmutableDictionary(
+                pair => pair.Key, pair => pair.Value.ToImmutable()).Where(pair => pair.Value.All(token =>
                 safe.Any(span => span.Contains(token.Span)) &&
                 !unsafeSpans.Any(span => span.OverlapsWith(token.Span))))
-                .Select(pair => pair.Key).OrderBy(line => line).ToArray() : Array.Empty<int>();
+                .Select(pair => pair.Key).OrderBy(line => line).ToImmutableArray() : ImmutableArray<int>.Empty;
             results.Add(new { path, declarationLines = lines, validSyntax = valid });
         }
-        File.WriteAllText(args[1], JsonSerializer.Serialize(results));
+        File.WriteAllText(args[1], JsonSerializer.Serialize(results.ToImmutable()));
         return 0;
     }
 }

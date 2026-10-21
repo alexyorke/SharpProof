@@ -47,7 +47,7 @@ public sealed class ExceptionIdentityReplayTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -214,7 +214,7 @@ public sealed class ExceptionIdentityReplayTests
                 emit.Diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         return MetadataReference.CreateFromImage(
-            stream.ToArray().ToImmutableArray(),
+            ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
             new MetadataReferenceProperties(
                 MetadataImageKind.Assembly,
                 aliases: [alias]));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorReferenceNullComparisonApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0019"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0019"];
 
     [TestCase(false)]
     [TestCase(true)]
@@ -60,17 +61,14 @@ public sealed class CompilerErrorReferenceNullComparisonApiCoverageTests
 
         using var control = TypedProgramSubject.Create("bool Target(object value) => value " +
             (unequal ? "!=" : "==") + " null;");
-        object[] inputs = [null!];
+        ImmutableArray<object> inputs = [null!];
         Assert.That(control.Invoke(inputs), Is.EqualTo(!unequal));
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);
         Assert.That(program.ConstructionLimitExceeded, Is.False);
         var parameter = control.Context.Parameters.Single().Entry;
         var inputType = control.Factory.GetVariableInfo(parameter).Type;
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter] = control.Factory.CreateNullValue(inputType)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, control.Factory.CreateNullValue(inputType));
         var replay = new IrProgramInterpreter(control.Factory).Execute(program.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);

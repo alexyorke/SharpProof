@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -56,11 +57,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
             factory.Variable(value), factory.Variable(count), isChecked);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Value.Type, Is.EqualTo(type));
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [value] = factory.CreateIntegerValue(type, input),
-            [count] = factory.CreateIntegerValue(factory.IntegerType, 1)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, factory.CreateIntegerValue(type, input)).SetItem(count, factory.CreateIntegerValue(factory.IntegerType, 1));
         var interpreter = new IrInterpreter(factory);
         Assert.That(interpreter.Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));
@@ -86,7 +83,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
-        object[] inputs = [input, 1];
+        ImmutableArray<object> inputs = [input, 1];
         var native = subject.Invoke(inputs);
         if (overflow)
         {

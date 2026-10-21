@@ -50,37 +50,37 @@ internal sealed partial class NativeResourceContractTests
         switch (mutation)
         {
             case 0:
-                target.Compilation.ResourceTargetPlatform = "AnyCpu";
+                target = target with { Compilation = target.Compilation with { ResourceTargetPlatform = "AnyCpu" } };
                 break;
             case 1:
-                target.Compilation.TargetFramework = "net10.0";
+                target = target with { Compilation = target.Compilation with { TargetFramework = "net10.0" } };
                 break;
             case 2:
-                target.Compilation.ResourceMetadataReferences = [];
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = [] } };
                 break;
             case 3:
-                target.Compilation.ResourceMetadataReferences[0].Modules[0].Sha256 = "invalid";
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = target.Compilation.ResourceMetadataReferences.SetItem(0, target.Compilation.ResourceMetadataReferences[0] with { Modules = target.Compilation.ResourceMetadataReferences[0].Modules.SetItem(0, target.Compilation.ResourceMetadataReferences[0].Modules[0] with { Sha256 = "invalid" }) }) } };
                 break;
             case 4:
-                target.Entry.Assumptions = [];
+                target = target with { Entry = target.Entry with { Assumptions = [] } };
                 break;
             case 5:
-                target.Entry.Assumptions[0].Id += "wrong-owner";
+                target = target with { Entry = target.Entry with { Assumptions = target.Entry.Assumptions.SetItem(0, target.Entry.Assumptions[0] with { Id = target.Entry.Assumptions[0].Id + "wrong-owner" }) } };
                 break;
             case 6:
-                target.Compilation.ResourceMetadataReferences[0].Identity = "System.Runtime, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = target.Compilation.ResourceMetadataReferences.SetItem(0, target.Compilation.ResourceMetadataReferences[0] with { Identity = "System.Runtime, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" }) } };
                 break;
             case 7:
-                target.Compilation.ResourceMetadataReferences[0].Kind = "Module";
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = target.Compilation.ResourceMetadataReferences.SetItem(0, target.Compilation.ResourceMetadataReferences[0] with { Kind = "Module" }) } };
                 break;
             case 8:
-                target.Compilation.ResourceMetadataReferences[0].Modules = [];
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = target.Compilation.ResourceMetadataReferences.SetItem(0, target.Compilation.ResourceMetadataReferences[0] with { Modules = [] }) } };
                 break;
             case 9:
                 var reference = target.Compilation.ResourceMetadataReferences[0];
                 var conflicting = System.Text.Json.JsonSerializer.Deserialize<CompilerReferenceSnapshot>(System.Text.Json.JsonSerializer.Serialize(reference))!;
-                conflicting.Modules[0].Sha256 = new string('0', 64);
-                target.Compilation.ResourceMetadataReferences = [reference, conflicting];
+                conflicting = conflicting with { Modules = conflicting.Modules.SetItem(0, conflicting.Modules[0] with { Sha256 = new string('0', 64) }) };
+                target = target with { Compilation = target.Compilation with { ResourceMetadataReferences = [reference, conflicting] } };
                 break;
         }
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();

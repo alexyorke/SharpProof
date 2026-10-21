@@ -44,7 +44,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     public DifferentialResult Compare(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> variables)
+        ImmutableDictionary<IrVarId, IrValue> variables)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
         variables = ArgumentNullGuard.NotNull(variables, nameof(variables));
@@ -86,7 +86,7 @@ internal sealed class IrCSharpDifferentialOracle
                 ?? throw new InvalidOperationException("Generated oracle type is missing."))
                 .GetMethod("Evaluate", BindingFlags.Public | BindingFlags.Static)
                 ?? throw new InvalidOperationException("Generated oracle entry point is missing.");
-            var runtimeValues = new Dictionary<IrValue, object?>(
+            var runtimeValues = ImmutableDictionary.CreateBuilder<IrValue, object?>(
                 ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
                 null,
@@ -118,19 +118,19 @@ internal sealed class IrCSharpDifferentialOracle
 
     private bool TryCreateProgram(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> values,
+        ImmutableDictionary<IrVarId, IrValue> values,
         out string program,
         out ImmutableArray<IrVarId> orderedVariables,
         out string reason)
     {
-        var variables = new SortedDictionary<int, IrVarId>();
-        var variableTypes = new Dictionary<IrVarId, IrTypeId>();
-        var csharpTypes = new Dictionary<IrTypeId, string>();
-        var terms = new List<IrTerm>();
+        var variables = ImmutableSortedDictionary.CreateBuilder<int, IrVarId>();
+        var variableTypes = ImmutableDictionary.CreateBuilder<IrVarId, IrTypeId>();
+        var csharpTypes = ImmutableDictionary.CreateBuilder<IrTypeId, string>();
+        var terms = ImmutableArray.CreateBuilder<IrTerm>();
         if (!TryCollectTerms(
                 term,
                 variables,
-                new HashSet<IrId>(),
+                ImmutableHashSet.CreateBuilder<IrId>(),
                 terms,
                 csharpTypes,
                 out reason))
@@ -140,7 +140,7 @@ internal sealed class IrCSharpDifferentialOracle
             return false;
         }
 
-        orderedVariables = [.. variables.Values];
+        orderedVariables = [.. variables.ToImmutable().Values];
         foreach (var variable in orderedVariables)
         {
             if (!values.TryGetValue(variable, out var value))
@@ -151,7 +151,7 @@ internal sealed class IrCSharpDifferentialOracle
             }
 
             var variableType = _factory.GetVariableInfo(variable).Type;
-            variableTypes.Add(variable, variableType);
+            variableTypes.AddUnique(variable, variableType);
             if (value == null || value.Type != variableType)
             {
                 program = "";
@@ -196,7 +196,7 @@ internal sealed class IrCSharpDifferentialOracle
             source.Append(variable.Value.ToString(CultureInfo.InvariantCulture));
         }
         source.AppendLine(") {");
-        foreach (var current in terms)
+        foreach (var current in terms.ToImmutable())
         {
             if (!TryAppendLazyDeclaration(
                     source,
@@ -220,21 +220,22 @@ internal sealed class IrCSharpDifferentialOracle
 
     private bool TryCollectTerms(
         IrTerm term,
-        SortedDictionary<int, IrVarId> variables,
-        HashSet<IrId> visited,
-        List<IrTerm> terms,
-        Dictionary<IrTypeId, string> csharpTypes,
+        ImmutableSortedDictionary<int, IrVarId>.Builder variables,
+        ImmutableHashSet<IrId>.Builder visited,
+        ImmutableArray<IrTerm>.Builder terms,
+        ImmutableDictionary<IrTypeId, string>.Builder csharpTypes,
         out string reason)
     {
         System.ArgumentNullException.ThrowIfNull(term);
         System.ArgumentNullException.ThrowIfNull(terms);
         System.ArgumentNullException.ThrowIfNull(variables);
         System.ArgumentNullException.ThrowIfNull(visited);
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((term, ChildrenReady: false));
-        while (pending.Count != 0)
+        var pending = ImmutableStack<(IrTerm Term, bool ChildrenReady)>.Empty;
+        pending = pending.Push((term, ChildrenReady: false));
+        while (!pending.IsEmpty)
         {
-            var (current, childrenReady) = pending.Pop();
+            pending = pending.Pop(out var frame);
+            var (current, childrenReady) = frame;
             if (childrenReady)
             {
                 terms.Add(current);
@@ -269,11 +270,11 @@ internal sealed class IrCSharpDifferentialOracle
                 variables[variable.Variable.Value] = variable.Variable;
             }
 
-            pending.Push((current, ChildrenReady: true));
+            pending = pending.Push((current, ChildrenReady: true));
             var children = IrTraversal.GetChildren(current);
             for (var index = children.Length - 1; index >= 0; index--)
             {
-                pending.Push((children[index], ChildrenReady: false));
+                pending = pending.Push((children[index], ChildrenReady: false));
             }
         }
 
@@ -284,7 +285,7 @@ internal sealed class IrCSharpDifferentialOracle
     private bool TryAppendLazyDeclaration(
         StringBuilder builder,
         IrTerm term,
-        Dictionary<IrTypeId, string> csharpTypes,
+        ImmutableDictionary<IrTypeId, string>.Builder csharpTypes,
         out string reason)
     {
         System.ArgumentNullException.ThrowIfNull(builder);
@@ -411,7 +412,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     private bool TryGetCSharpType(
         IrTypeId type,
-        Dictionary<IrTypeId, string> csharpTypes,
+        ImmutableDictionary<IrTypeId, string>.Builder csharpTypes,
         out string name)
     {
         if (csharpTypes.TryGetValue(type, out name!))
@@ -484,7 +485,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     private object? ToRuntimeValue(
         IrValue value,
-        IDictionary<IrValue, object?> converted)
+        ImmutableDictionary<IrValue, object?>.Builder converted)
     {
         if (converted.TryGetValue(value, out var existing))
         {
@@ -543,7 +544,7 @@ internal sealed class IrCSharpDifferentialOracle
 
     private Array ToRuntimeArray(
         IrValue value,
-        IDictionary<IrValue, object?> converted)
+        ImmutableDictionary<IrValue, object?>.Builder converted)
     {
         System.ArgumentNullException.ThrowIfNull(converted);
         System.ArgumentNullException.ThrowIfNull(value);
@@ -620,7 +621,7 @@ internal sealed class IrCSharpDifferentialOracle
     private static bool ValuesAgree(IrValue interpreted, object? actual)
     {
         System.ArgumentNullException.ThrowIfNull(interpreted);
-        var comparedSequences = new Dictionary<IrValue, HashSet<Array>>(
+        var comparedSequences = ImmutableDictionary.CreateBuilder<IrValue, ImmutableHashSet<Array>.Builder>(
             ReferenceEqualityComparer.Instance);
         return ValuesAgreeCore(interpreted, actual, comparedSequences);
     }
@@ -628,7 +629,7 @@ internal sealed class IrCSharpDifferentialOracle
     private static bool ValuesAgreeCore(
         IrValue interpreted,
         object? actual,
-        IDictionary<IrValue, HashSet<Array>> comparedSequences)
+        ImmutableDictionary<IrValue, ImmutableHashSet<Array>.Builder>.Builder comparedSequences)
     {
         System.ArgumentNullException.ThrowIfNull(comparedSequences);
         System.ArgumentNullException.ThrowIfNull(interpreted);
@@ -654,7 +655,7 @@ internal sealed class IrCSharpDifferentialOracle
     private static bool SequenceAgrees(
         IrValue interpreted,
         object? actual,
-        IDictionary<IrValue, HashSet<Array>> comparedSequences)
+        ImmutableDictionary<IrValue, ImmutableHashSet<Array>.Builder>.Builder comparedSequences)
     {
         if (actual is not Array array ||
             array.Rank != 1 ||
@@ -664,8 +665,8 @@ internal sealed class IrCSharpDifferentialOracle
         }
         if (!comparedSequences.TryGetValue(interpreted, out var comparedArrays))
         {
-            comparedArrays = new HashSet<Array>(ReferenceEqualityComparer.Instance);
-            comparedSequences.Add(interpreted, comparedArrays);
+            comparedArrays = ImmutableHashSet.CreateBuilder<Array>(ReferenceEqualityComparer.Instance);
+            comparedSequences.AddUnique(interpreted, comparedArrays);
         }
         if (!comparedArrays.Add(array))
         {

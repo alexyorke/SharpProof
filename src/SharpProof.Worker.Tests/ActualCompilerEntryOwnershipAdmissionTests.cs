@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -17,7 +18,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
                 public static int Second(int value) { Contract.Requires(value <= 0); Contract.Ensures(Contract.Result<int>() == value); return value; }
             }
             """;
-        var compilation = TestCompilation.Create("ActualEntryOwnershipAdmission", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("ActualEntryOwnershipAdmission", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -25,7 +26,8 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var targets = project.Snapshot.Callables.ToArray();
+        artifact = project.Artifact;
+        var targets = project.Snapshot.Callables;
         Assert.That(targets, Has.Length.EqualTo(2));
         Assert.That(targets[0].Entry.CallableId, Is.Not.EqualTo(targets[1].Entry.CallableId));
         foreach (var target in targets)
@@ -38,7 +40,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
             Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         }
         // Wrong actual owner at the raw validator only: no preparation constructed, rebound or enrolled.
-        foreach (var (target, other) in new[] { (targets[0], targets[1]), (targets[1], targets[0]) })
+        foreach (var (target, other) in ImmutableArray.Create((targets[0], targets[1]), (targets[1], targets[0])))
         {
             var exception = Assert.Throws<ArgumentException>(new Action(() =>
                 TotalCallableVerifier.ValidateEntryOwner(target, other.TotalEntry!)));

@@ -21,17 +21,17 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
 {
-    private static readonly int[] RetainedInputs = [-7, 0, 42];
-    private static readonly int[] OmittedInputs = [0, 1];
+    private static readonly ImmutableArray<int> RetainedInputs = [-7, 0, 42];
+    private static readonly ImmutableArray<int> OmittedInputs = [0, 1];
     private static readonly ImmutableArray<string> ShadowAliases = ["Shadow"];
     private static readonly ImmutableArray<string> PriorAliases = ["Prior"];
     private static readonly ImmutableArray<string> PresentSymbols = ["PRIVATE_PRESENT"];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string ObjectProducer = """
         namespace System.Diagnostics
@@ -218,14 +218,15 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         var producerBytes = await Emit(directory, "producer", producer);
         var shadow = MetadataReference.CreateFromFile(Path.Combine(directory, "producer.dll"),
             MetadataReferenceProperties.Assembly.WithAliases(ShadowAliases));
-        var references = TestMetadataReferences.WithSharpProof.Add(shadow);
-        byte[]? priorBytes = null;
+        var referenceBuilder = TestMetadataReferences.WithSharpProof.ToBuilder();
+        referenceBuilder.Add(shadow);
+        ImmutableArray<byte>? priorBytes = null;
         IMethodSymbol? originalSourceLog = null;
         if (settings.Imported)
         {
             var priorSource = settings.Mixed ? MixedOneArgumentCaller : OneArgumentCaller;
             await File.WriteAllTextAsync(Path.Combine(directory, "Prior.cs"), priorSource);
-            var prior = CreateCompilation("BoundaryPrior", priorSource, settings.Symbols, references);
+            var prior = CreateCompilation("BoundaryPrior", priorSource, settings.Symbols, referenceBuilder.ToImmutable());
             priorBytes = await Emit(directory, "prior", prior);
             originalSourceLog = prior.GetTypeByMetadataName("Fixture")!.GetMembers("Log")
                 .OfType<IMethodSymbol>().Single();
@@ -236,7 +237,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 originalSourceLog.IsConditional,
                 SourceSha256 = Hash(Encoding.UTF8.GetBytes(priorSource)),
                 Attributes = DescribeAttributes(originalSourceLog),
-                Pe = DescribePe(priorBytes)
+                Pe = DescribePe(priorBytes.Value)
             });
             Assert.That(originalSourceLog.IsConditional, Is.True);
             var priorAttributes = originalSourceLog.GetAttributes();
@@ -249,9 +250,10 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 QualifyOfficialAttribute(priorAttributes.Single(attribute =>
                     attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, priorOfficial))), priorOfficial, "OFFICIAL_ABSENT");
             }
-            references = references.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "prior.dll"),
+            referenceBuilder.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "prior.dll"),
                 MetadataReferenceProperties.Assembly.WithAliases(PriorAliases)));
         }
+        var references = referenceBuilder.ToImmutable();
         var compilation = CreateCompilation("BoundaryCaller", settings.Source, settings.Symbols, references);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -271,11 +273,11 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             Scenario = scenario,
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(settings.Source)),
             ProducerSourceSha256 = Hash(Encoding.UTF8.GetBytes(settings.Producer)),
-            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToArray(),
+            CallerSymbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             ProducerPe = DescribePe(producerBytes),
-            PriorPe = priorBytes == null ? null : DescribePe(priorBytes),
+            PriorPe = priorBytes is null ? null : DescribePe(priorBytes.Value),
             CallerPe = DescribePe(callerBytes),
             ShadowReference = new { shadow.FilePath, shadow.Properties.Aliases },
             Log = new
@@ -286,7 +288,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 MetadataToken = log.OriginalDefinition.MetadataToken,
                 Attributes = DescribeAttributes(log),
                 Overridden = log.OverriddenMethod?.ToDisplayString(),
-                InheritedAttributes = log.OverriddenMethod == null ? null : DescribeAttributes(log.OverriddenMethod)
+                InheritedAttributes = log.OverriddenMethod == null ? (ImmutableArray<object>?)null : DescribeAttributes(log.OverriddenMethod)
             },
             SourceLogWasConditional = originalSourceLog?.IsConditional,
             ActualPolicyElided = actualElided,
@@ -330,7 +332,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             Assert.That(SymbolEqualityComparer.Default.Equals(log.ContainingAssembly, compilation.Assembly), Is.False);
             var importedMetadata = log.ContainingModule.GetMetadata()!;
             var reader = importedMetadata.GetMetadataReader();
-            Assert.That(reader.GetGuid(reader.GetModuleDefinition().Mvid), Is.EqualTo(DescribePe(priorBytes!).Mvid));
+            Assert.That(reader.GetGuid(reader.GetModuleDefinition().Mvid), Is.EqualTo(DescribePe(priorBytes!.Value).Mvid));
             Assert.That(log.OriginalDefinition.MetadataToken, Is.GreaterThan(0));
             Assert.That(privateAttribute.ApplicationSyntaxReference, Is.Null);
         }
@@ -398,7 +400,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         }
     }
 
-    private static object[] DescribeAttributes(IMethodSymbol method)
+    private static ImmutableArray<object> DescribeAttributes(IMethodSymbol method)
     {
         System.ArgumentNullException.ThrowIfNull(method);
         return method.GetAttributes().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : ((object)new
@@ -415,17 +417,17 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 parameter.IsOptional,
                 parameter.HasExplicitDefaultValue,
                 DefaultValue = parameter.HasExplicitDefaultValue ? parameter.ExplicitDefaultValue : null
-            })).ToArray(),
+            })).ToImmutableArray(),
             Arguments = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (new
             {
                 Kind = argument.Kind.ToString(),
                 Type = argument.Type?.ToDisplayString(),
                 argument.Value
-            }))).ToArray(),
+            }))).ToImmutableArray(),
             SuppliedArguments = attribute.ApplicationSyntaxReference == null ? (int?)null :
                 ((AttributeSyntax)attribute.ApplicationSyntaxReference.GetSyntax()).ArgumentList!.Arguments
                     .Count(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.NameEquals == null))
-        })).ToArray();
+        })).ToImmutableArray();
     }
 
     private static CSharpCompilation CreateCompilation(string prefix, string source,
@@ -450,7 +452,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 .WithOptimizationLevel(OptimizationLevel.Release));
     }
 
-    private static async Task<byte[]> Emit(string directory, string name, CSharpCompilation compilation)
+    private static async Task<ImmutableArray<byte>> Emit(string directory, string name, CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(directory);
@@ -461,8 +463,8 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         await Save(directory, name + "-emit-diagnostics.json", Diagnostics(result.Diagnostics));
         Assert.That(result.Success, Is.True);
         Assert.That(result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes.AsMemory());
         await Save(directory, name + "-pe.json", DescribePe(bytes));
         return bytes;
     }
@@ -494,25 +496,27 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         public string Source { get; init; } = Source ?? throw new System.ArgumentNullException(nameof(Source));
         public ImmutableArray<string> Symbols { get; init; } = Symbols.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Symbols)) : Symbols;
     }
-    private static async Task ObserveEmission(string directory, byte[] producerBytes, byte[]? priorBytes,
-        byte[] callerBytes, CaseSettings settings, int symbolToken)
+    private static async Task ObserveEmission(string directory, ImmutableArray<byte> producerBytes, ImmutableArray<byte>? priorBytes,
+        ImmutableArray<byte> callerBytes, CaseSettings settings, int symbolToken)
     {
-        System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
-        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        if (callerBytes.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(callerBytes)); }
+        if (producerBytes.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(producerBytes)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(settings);
         var context = new AssemblyLoadContext("conditional-boundary-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var producerStream = new MemoryStream(producerBytes);
+            using var producerStream = new MemoryStream(producerBytes.ToArray(), writable: false);
             var producer = context.LoadFromStream(producerStream);
             Assembly? prior = null;
-            if (priorBytes != null)
+            if (priorBytes.HasValue)
             {
-                using var priorStream = new MemoryStream(priorBytes);
+                using var priorStream = new MemoryStream(priorBytes.Value.ToArray(), writable: false);
                 prior = context.LoadFromStream(priorStream);
             }
-            using var callerStream = new MemoryStream(callerBytes);
+            using var callerStream = new MemoryStream(callerBytes.ToArray(), writable: false);
             var caller = context.LoadFromStream(callerStream);
             var targetType = caller.GetType(settings.Imported ? "ImportedCaller" : "Fixture")!;
             var targetMethod = targetType.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
@@ -522,12 +526,12 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, priorBytes ?? callerBytes);
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
-            var creations = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToArray();
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
+            var creations = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToImmutableArray();
             var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
             var inputs = settings.Retained ? RetainedInputs : OmittedInputs;
-            var observations = inputs.Select(input => Invoke(target, input)).ToArray();
+            var observations = inputs.Select(input => Invoke(target, input)).ToImmutableArray();
             await Save(directory, "emission-and-clr.json", new
             {
                 Producer = new { Name = producer.GetName().Name, Mvid = producer.ManifestModule.ModuleVersionId },
@@ -541,13 +545,13 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                     Assembly = attribute.AttributeType.Assembly.GetName().Name,
                     Mvid = attribute.AttributeType.Module.ModuleVersionId,
                     ConstructorToken = attribute.Constructor.MetadataToken,
-                    ParameterTypes = attribute.Constructor.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                    ParameterTypes = attribute.Constructor.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                     Arguments = attribute.ConstructorArguments.Select(argument => ((argument.ArgumentType is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (new
                     {
                         Type = argument.ArgumentType.FullName,
                         argument.Value
-                    }))).ToArray()
-                })).ToArray(),
+                    }))).ToImmutableArray()
+                })).ToImmutableArray(),
                 DelegateMethodToken = target.Method.MetadataToken,
                 DelegateMvid = target.Method.Module.ModuleVersionId,
                 DelegateTargetIsNull = target.Target == null,
@@ -556,9 +560,9 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             });
             Assert.That(producer.ManifestModule.ModuleVersionId, Is.EqualTo(DescribePe(producerBytes).Mvid));
             Assert.That(caller.ManifestModule.ModuleVersionId, Is.EqualTo(DescribePe(callerBytes).Mvid));
-            if (priorBytes != null)
+            if (priorBytes.HasValue)
             {
-                Assert.That(prior!.ManifestModule.ModuleVersionId, Is.EqualTo(DescribePe(priorBytes).Mvid));
+                Assert.That(prior!.ManifestModule.ModuleVersionId, Is.EqualTo(DescribePe(priorBytes.Value).Mvid));
                 Assert.That(logMethod.MetadataToken, Is.EqualTo(symbolToken));
             }
             Assert.That(target.Target, Is.Null);
@@ -630,17 +634,17 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             return new(input, null, exception.GetType().FullName);
         }
     }
-    private static IlObservation DecodeIl(MethodBase method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodBase method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(bytes)); }
         System.ArgumentNullException.ThrowIfNull(method);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
-        var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
+        var il = (pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!).ToImmutableArray();
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -656,7 +660,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il.AsSpan(offset..)),
                 _ => 4
             };
             Assert.That(offset + size, Is.LessThanOrEqualTo(il.Length));
@@ -664,27 +668,27 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             MethodBase? resolved = null;
             if (opcode.OperandType == OperandType.InlineMethod)
             {
-                token = BitConverter.ToInt32(il, offset);
+                token = BitConverter.ToInt32(il.AsSpan(offset..));
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
             instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions);
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il.AsSpan()), instructions.ToImmutable());
     }
 
-    private static PeObservation DescribePe(byte[] bytes)
+    private static PeObservation DescribePe(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(bytes)); }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
-        return new(Hash(bytes), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
+        return new(Hash(bytes.AsSpan()), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
             metadata.GetGuid(metadata.GetModuleDefinition().Mvid));
     }
 
-    private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
+    private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
@@ -694,7 +698,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        })).ToArray();
+        })).ToImmutableArray();
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -707,9 +711,10 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value, JsonOptions) + "\n");
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(
+        ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans hash the empty payload */
+        bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 
@@ -724,10 +729,10 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, List<IlInstruction> Instructions)
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
 }

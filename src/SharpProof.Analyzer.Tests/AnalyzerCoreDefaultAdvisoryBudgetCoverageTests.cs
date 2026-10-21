@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,7 +47,7 @@ public sealed class AnalyzerCoreDefaultAdvisoryBudgetCoverageTests
         }
         else
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
             Assert.That(factory.GetNamedOutcome("Target"), Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
         }
     }

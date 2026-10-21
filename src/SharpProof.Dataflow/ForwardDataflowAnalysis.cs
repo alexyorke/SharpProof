@@ -183,14 +183,14 @@ internal static class ForwardDataflowAnalysis
 
         var blockCount = graph.Blocks.Length;
         var bottom = domain.Bottom;
-        var inputs = Enumerable.Repeat(bottom, blockCount).ToArray();
-        var outputs = Enumerable.Repeat(bottom, blockCount).ToArray();
-        var updateCounts = new int[blockCount];
+        var inputs = Enumerable.Repeat(bottom, blockCount).ToImmutableArray().ToBuilder();
+        var outputs = Enumerable.Repeat(bottom, blockCount).ToImmutableArray().ToBuilder();
+        var updateCounts = Enumerable.Repeat(0, blockCount).ToImmutableArray().ToBuilder();
         inputs[graph.EntryBlockId] = initialState;
 
-        var pending = FindReachableBlocks(graph);
-        var changedOutputs = new List<int>();
-        var affected = new SortedSet<int>();
+        var pending = FindReachableBlocks(graph).ToBuilder();
+        var changedOutputs = ImmutableArray.CreateBuilder<int>();
+        var affected = ImmutableSortedSet.CreateBuilder<int>();
         var iterations = 0;
         while (pending.Count != 0)
         {
@@ -201,7 +201,7 @@ internal static class ForwardDataflowAnalysis
 
             iterations++;
 
-            var batch = pending.ToImmutableArray();
+            var batch = pending.ToImmutable();
             pending.Clear();
 
             changedOutputs.Clear();
@@ -268,7 +268,7 @@ internal static class ForwardDataflowAnalysis
                     throw new InvalidOperationException("Domain widening must be an upper bound.");
                 }
 
-                updateCounts[blockId]++;
+                updateCounts[blockId] = updateCounts[blockId] + 1;
                 if (!shouldWiden || !domain.AreEquivalent(inputs[blockId], updated))
                 {
                     inputs[blockId] = updated;
@@ -278,7 +278,7 @@ internal static class ForwardDataflowAnalysis
         }
 
         return produceResult
-            ? new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations)
+            ? new DataflowAnalysisResult<T>(inputs.ToImmutable(), outputs.ToImmutable(), iterations)
             : null;
     }
 
@@ -305,25 +305,26 @@ internal static class ForwardDataflowAnalysis
         }
     }
 
-    private static SortedSet<int> FindReachableBlocks<T>(
+    private static ImmutableSortedSet<int> FindReachableBlocks<T>(
         DataflowGraph<T> graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var reachable = new SortedSet<int> { graph.EntryBlockId };
-        var pending = new Stack<int>();
-        pending.Push(graph.EntryBlockId);
-        while (pending.Count != 0)
+        var reachable = ImmutableSortedSet.Create(graph.EntryBlockId).ToBuilder();
+        var pending = ImmutableStack<int>.Empty;
+        pending = pending.Push(graph.EntryBlockId);
+        while (!pending.IsEmpty)
         {
-            var blockId = pending.Pop();
+            var blockId = pending.Peek();
+            pending = pending.Pop();
             foreach (var successor in graph.GetSuccessors(blockId))
             {
                 if (reachable.Add(successor))
                 {
-                    pending.Push(successor);
+                    pending = pending.Push(successor);
                 }
             }
         }
 
-        return reachable;
+        return reachable.ToImmutable();
     }
 }

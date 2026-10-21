@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ErrorBuilder = System.Collections.Immutable.ImmutableArray<SharpProof.Worker.Protocol.WorkerProtocolError>.Builder;
 
 namespace SharpProof.Worker.Protocol;
 
@@ -26,11 +25,10 @@ internal static partial class WorkerProtocolJson
 
     private sealed class Validator
     {
-        private readonly ErrorBuilder _errors =
-            ImmutableArray.CreateBuilder<WorkerProtocolError>();
+        private readonly ImmutableArray<WorkerProtocolError>.Builder _errors = ImmutableArray.CreateBuilder<WorkerProtocolError>();
 
         internal int Count => _errors.Count;
-        internal WorkerProtocolValidationResult Result => new(_errors);
+        internal WorkerProtocolValidationResult Result => new(_errors.ToImmutable());
 
         internal void Add(string code)
         {

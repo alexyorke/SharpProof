@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Frontend.Test;
@@ -18,7 +19,7 @@ internal sealed class ArrayChildConversionAdmissionCoverageTests
             _ => "bool Target(int[] values, object next) { values[0] += (int)next; return values[0] == 3; }"
         };
         using var rejected = TypedProgramSubject.Create(source);
-        object[] arguments = route == "compound" ? [new[] { 1 }, 2]
+        ImmutableArray<object> arguments = route == "compound" ? [new[] { 1 }, 2]
             : route == "index" ? [new[] { 1f }, 0] : [new[] { 1f }];
         Assert.That(rejected.Invoke(arguments), Is.True);
         if (route == "compound")
@@ -35,7 +36,7 @@ internal sealed class ArrayChildConversionAdmissionCoverageTests
             _ => "bool Target(int[] values, int next) { values[0] += next; return values[0] == 3; }"
         };
         using var supported = TypedProgramSubject.Create(control);
-        object[] controlArguments = route == "compound" ? [new[] { 1 }, 2]
+        ImmutableArray<object> controlArguments = route == "compound" ? [new[] { 1 }, 2]
             : route == "index" ? [new[] { 1f }, 0] : [new[] { 1f }];
         Assert.That(supported.Invoke(controlArguments), Is.True);
         if (route == "compound")

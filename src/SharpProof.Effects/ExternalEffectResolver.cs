@@ -50,7 +50,7 @@ internal sealed class ExternalEffectResolver
     internal EffectThrowSet ResolveExceptionSet(IEnumerable<string> metadataNames)
     {
         metadataNames = RepositoryParameterGuard.NotNull(metadataNames, nameof(metadataNames));
-        var types = new List<INamedTypeSymbol>();
+        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         foreach (var metadataName in metadataNames)
         {
             var type = _compilation.GetTypeByMetadataName(metadataName);
@@ -61,7 +61,7 @@ internal sealed class ExternalEffectResolver
 
             types.Add(type);
         }
-        return EffectThrowSet.Create(types);
+        return EffectThrowSet.Create(types.ToImmutable());
     }
 
     internal EffectContractResolution ResolveContract(IMethodSymbol method)
@@ -212,7 +212,7 @@ internal sealed class ExternalEffectResolver
             }
         }
 
-        var exceptionTypes = new List<INamedTypeSymbol>();
+        var exceptionTypes = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         foreach (var constant in thrown)
         {
             if (constant.Value is not INamedTypeSymbol type || !IsException(type))
@@ -271,7 +271,7 @@ internal sealed class ExternalEffectResolver
 
         summary = new EffectSummary(
             reads, writes, allocation, new EffectCapabilitySet(capabilityKinds),
-            EffectThrowSet.Create(exceptionTypes), EffectTermination.Unknown,
+            EffectThrowSet.Create(exceptionTypes.ToImmutable()), EffectTermination.Unknown,
             complete ? EffectCompleteness.Complete : EffectCompleteness.Incomplete,
             EffectUncertainty.None);
         return true;

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -8,7 +9,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReferenceStackMergeCoverageTests
 {
-    private static readonly bool[] Choices = [false, true];
+    private static readonly ImmutableArray<bool> Choices = [false, true];
 
     [TestCase("int")]
     [TestCase("uint")]
@@ -98,18 +99,18 @@ public sealed class CompilerReferenceStackMergeCoverageTests
             Assert.That(shapes[callIndex]!.Value, Has.Length.EqualTo(1));
             Assert.That(shapes[callIndex]!.Value[0].Accepts(call.Method.Parameters[0].Type), Is.True);
         }
-        object?[] firstValues = [null, firstType == "string" ? "first" : new object()];
-        object?[] secondValues = [null, secondType == "string" ? "second" : new object()];
+        ImmutableArray<object?> firstValues = [null, firstType == "string" ? "first" : new object()];
+        ImmutableArray<object?> secondValues = [null, secondType == "string" ? "second" : new object()];
         foreach (var first in firstValues)
         {
             foreach (var second in secondValues)
             {
                 foreach (var choose in Choices)
                 {
-                    object?[] arguments = [choose, first, second];
+                    ImmutableArray<object?> arguments = [choose, first, second];
                     var expected = choose ? first == null : second == null;
-                    Assert.That(subject.Method.Invoke(null, arguments), Is.EqualTo(expected));
-                    Assert.That(subject.RootMethod.Invoke(null, arguments), Is.EqualTo(expected));
+                    Assert.That(subject.Method.Invoke(null, arguments.ToArray()), Is.EqualTo(expected));
+                    Assert.That(subject.RootMethod.Invoke(null, arguments.ToArray()), Is.EqualTo(expected));
                 }
             }
         }

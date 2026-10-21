@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Ir;
@@ -203,7 +204,7 @@ public sealed class WorkerVcSourceCallTests
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response, target.Entry.CallableId);
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
@@ -257,19 +258,19 @@ public sealed class WorkerVcSourceCallTests
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response, target.Entry.CallableId);
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
 
-    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response, string callableId)
+    private static ImmutableArray<WorkerClaimResult> Postconditions(WorkerVerifyResponse response, string callableId)
     {
         System.ArgumentNullException.ThrowIfNull(callableId);
         System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
         var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == callableId && claim.Kind == WorkerClaimKind.Postcondition))
-            .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+            .ToImmutableDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
     }
 
     [TestCase(false)]
@@ -294,12 +295,12 @@ public sealed class WorkerVcSourceCallTests
     public void OptionalSourceCallEvidencePreservesEveryLegacySerializedByte(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        var compilation = TestCompilation.Create("SourceCallLegacyPreservation", ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact("SourceCallLegacyPreservation", [("Subject.cs", source)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
+        { withTotal = withTotal with { Total = null }; }
         Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }

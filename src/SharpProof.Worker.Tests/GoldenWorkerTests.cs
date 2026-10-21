@@ -65,9 +65,9 @@ public sealed class GoldenWorkerTests
     private static async Task<string> MixedSnapshotOwners()
     {
         var output = new StringBuilder();
-        foreach (var array in new[] { false, true })
+        foreach (var array in ImmutableArray.Create(false, true))
         {
-            foreach (var chooseOld in new[] { false, true })
+            foreach (var chooseOld in ImmutableArray.Create(false, true))
             {
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
@@ -90,8 +90,8 @@ public sealed class GoldenWorkerTests
                 IrTerm Equal(IrTerm left, IrTerm right)
                 { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
                 var site = factory.CreateOperation();
-                var requires = new List<PassiveContractClause>();
-                foreach (var parameter in new[] { a, b })
+                var requires = ImmutableArray.CreateBuilder<PassiveContractClause>();
+                foreach (var parameter in ImmutableArray.Create(a, b))
                 {
                     requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(type)), factory.Boolean(true), site));
                     if (array)
@@ -108,7 +108,7 @@ public sealed class GoldenWorkerTests
                 builder.Return(block, site, factory.Integer(0));
                 var result = factory.CreateVariable("result", factory.IntegerType);
                 var mixed = factory.Conditional(factory.Variable(flag.Current), factory.Variable(a.Old), factory.Variable(b.Current));
-                var candidate = new PassiveCallableCandidate("mixed-snapshot", builder.Build(), [a, b, flag], result, [.. requires],
+                var candidate = new PassiveCallableCandidate("mixed-snapshot", builder.Build(), [a, b, flag], result, requires.ToImmutable(),
                     [new(Equal(Read(mixed), factory.Integer(1)), factory.Boolean(true), site)]);
                 Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
                 using var solver = new PassiveCallableSolver(plan!);
@@ -119,12 +119,12 @@ public sealed class GoldenWorkerTests
                     .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
             }
         }
-        foreach (var array in new[] { false, true })
+        foreach (var array in ImmutableArray.Create(false, true))
         {
             var (candidate, _) = PassiveCallableVcTests.BodyOldHeapCandidate(array);
             Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
             using var solver = new PassiveCallableSolver(plan!);
-            foreach (var correct in new[] { false, true })
+            foreach (var correct in ImmutableArray.Create(false, true))
             {
                 var verified = await solver.VerifyEnsuresAsync(correct ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.Append(array ? "array-" : "field-").Append(correct ? "body-old-true: " : "body-old-false: ")
@@ -153,7 +153,7 @@ public sealed class GoldenWorkerTests
         var result = await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder("outcome: " + (result.Outcome == null ? "Unknown" : result.Outcome.GetType().Name) + "\nreason: " +
             result.Reason + "\nwrite-witness: " + (result.WriteWitness != null) + "\n");
-        foreach (var approximate in new[] { false, true })
+        foreach (var approximate in ImmutableArray.Create(false, true))
         {
             var call = PassiveCallableVcTests.SkippedCallEffectCandidate(approximate);
             Assert.That(PassiveCallableVcBuilder.TryBuild(call.Candidate, out var callPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
@@ -162,14 +162,14 @@ public sealed class GoldenWorkerTests
             output.AppendLine("skipped-call-" + (approximate ? "approximation" : "constant") + ": " +
                 (callResult.Outcome?.GetType().Name ?? "Unknown") + "/" + callResult.Reason + "/witness=" + (callResult.WriteWitness != null));
         }
-        foreach (var array in new[] { false, true })
+        foreach (var array in ImmutableArray.Create(false, true))
         {
             var unchanged = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore: false, nonwriter: true);
             Assert.That(PassiveCallableVcBuilder.TryBuild(unchanged, out var unchangedPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
             using var unchangedSolver = new PassiveCallableSolver(unchangedPlan!);
             var unchangedResult = await unchangedSolver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             output.AppendLine((array ? "array" : "field") + "-nonwriter: " + unchangedResult.Outcome!.GetType().Name);
-            foreach (var restore in new[] { false, true })
+            foreach (var restore in ImmutableArray.Create(false, true))
             {
                 var heap = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore);
                 Assert.That(PassiveCallableVcBuilder.TryBuild(heap, out var heapPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
@@ -186,12 +186,13 @@ public sealed class GoldenWorkerTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
-        var claims = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+        var claimBuilder = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => { System.ArgumentNullException.ThrowIfNull(check); claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+                check => { System.ArgumentNullException.ThrowIfNull(check); claimBuilder[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
         }
+        var claims = claimBuilder.ToImmutable();
         var callables = project.Snapshot.Callables.Select(preparation =>
         {
             System.ArgumentNullException.ThrowIfNull(preparation);
@@ -203,7 +204,7 @@ public sealed class GoldenWorkerTests
                 Reason = reason,
                 Assumptions = preparation.Entry.Assumptions
             };
-        }).ToArray();
+        }).ToImmutableArray();
         Assert.That(WorkerResultAssembler.TryProjectRunState(callables, claims.Values, [], out var runStatus, out var failureReason), Is.True);
         var response = WorkerResultAssembler.Create(project.Bind().InputHash, project.Snapshot.CompilerManifest.Manifest,
             runStatus, failureReason, callables, claims.Values, project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
@@ -254,7 +255,7 @@ public sealed class GoldenWorkerTests
         output.AppendLine("false-ensures: " + ensures.Outcome!.GetType().Name);
         output.AppendLine("replay: unchanged owned original");
         output.AppendLine("projection-canonical: " + ensures.EntryModel.IsEmpty);
-        foreach (var array in new[] { false, true })
+        foreach (var array in ImmutableArray.Create(false, true))
         {
             var (heapCandidate, inputs) = PassiveLoopCutterTests.ExceptionLoopHeapCandidate(array);
             var heapExecution = new IrProgramInterpreter(heapCandidate.Factory).Execute(heapCandidate.Program, inputs);
@@ -264,27 +265,28 @@ public sealed class GoldenWorkerTests
             output.AppendLine((array ? "element" : "field") + "-loop-original-return: " + heapExecution.ReturnValue!.IntegerNumericValue);
             output.AppendLine((array ? "element" : "field") + "-loop-false-ensures: " + heapEnsures.Outcome!.GetType().Name);
         }
-        foreach (var explicitThrows in new[] { false, true })
+        foreach (var explicitThrows in ImmutableArray.Create(false, true))
         {
             var pendingCandidate = PassiveExceptionLoopTests.ChangingPendingExceptionCandidate(explicitThrows);
             var pendingExecution = new IrProgramInterpreter(pendingCandidate.Factory).Execute(pendingCandidate.Program);
             var sites = pendingCandidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>()
-                .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToArray();
+                .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToImmutableArray();
             var prefix = explicitThrows ? "explicit-pending" : "builtin-pending";
             output.AppendLine(prefix + "-original-kind: " + pendingExecution.Exception!.Kind);
             Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var pendingSolver = new PassiveCallableSolver(pendingPlan!);
-            foreach (var allowReplacement in new[] { false, true })
+            foreach (var allowReplacement in ImmutableArray.Create(false, true))
             {
-                var allowed = explicitThrows ? ImmutableHashSet<IrExceptionKind>.Empty : ImmutableHashSet.Create(IrExceptionKind.Overflow);
+                var allowedBuilder = (explicitThrows ? ImmutableHashSet<IrExceptionKind>.Empty : ImmutableHashSet.Create(IrExceptionKind.Overflow)).ToBuilder();
                 if (!explicitThrows && allowReplacement)
-                { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
+                { allowedBuilder.Add(IrExceptionKind.DivideByZero); }
+                var allowed = allowedBuilder.ToImmutable();
                 var pendingPolicy = await pendingSolver.VerifyExceptionsAsync(allowed,
                     allowedSite: site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (site == sites[0] || allowReplacement && site == sites[1]), exactSite: _ => true, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.AppendLine(prefix + (allowReplacement ? "-complete-policy: " : "-restricted-policy: ") + pendingPolicy.Outcome!.GetType().Name);
             }
         }
-        foreach (var conditional in new[] { false, true })
+        foreach (var conditional in ImmutableArray.Create(false, true))
         {
             var (receiverCandidate, inputs, _) = PassiveLoopCutterTests.ChangingHeapReceiverCandidate(conditional);
             var receiverExecution = new IrProgramInterpreter(receiverCandidate.Factory).Execute(receiverCandidate.Program, inputs);
@@ -361,7 +363,7 @@ public sealed class GoldenWorkerTests
         await cancellation.CancelAsync();
         var canceled = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
         var next = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { completed, canceled, next })
+        foreach (var response in ImmutableArray.Create(completed, canceled, next))
         { Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True); }
         Assert.That(completed.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
@@ -390,6 +392,7 @@ public sealed class GoldenWorkerTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact, cacheEnabled: true);
+        artifact = project.Artifact;
         return await NativeVc(project);
     }
 
@@ -404,7 +407,7 @@ public sealed class GoldenWorkerTests
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var body = batch.Callers.Single().Body;
@@ -429,11 +432,11 @@ public sealed class GoldenWorkerTests
         var entry = original.Parameters.Single().Entry;
         var nominalInputs = source.Contains("// golden-nominal-inputs", StringComparison.Ordinal);
         var referenceInputs = nominalInputs || source.Contains("// golden-reference-inputs", StringComparison.Ordinal);
-        object?[] inputs = nominalInputs ? [null, Activator.CreateInstance(subject.RootMethod.GetParameters()[0].ParameterType)] :
+        ImmutableArray<object?> inputs = nominalInputs ? [null, Activator.CreateInstance(subject.RootMethod.GetParameters()[0].ParameterType)] :
             referenceInputs ? [null, "hello"] : [0, 1];
         foreach (var input in inputs)
         {
-            var observations = new List<bool>();
+            var observations = ImmutableArray.CreateBuilder<bool>();
             var marker = original.CallPreconditions.Single().Instruction;
             var replay = new IrProgramReplayOptions(static _ => null)
             {
@@ -443,7 +446,7 @@ public sealed class GoldenWorkerTests
             var concrete = referenceInputs ? input == null ? factory.CreateNullValue(factory.GetVariableInfo(entry).Type) :
                 nominalInputs ? factory.CreateReferenceValue(factory.GetVariableInfo(entry).Type, input) : factory.CreateStringValue((string)input) : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)(int)input!);
             var execution = new IrProgramInterpreter(factory).Execute(original.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = concrete },
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, concrete),
                 10000, replay);
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
@@ -467,7 +470,7 @@ public sealed class GoldenWorkerTests
             var renderedReturn = nominalInputs ? execution.ReturnValue!.Kind == IrValueKind.Null ? "null" : "token" : referenceInputs ? execution.ReturnValue!.Kind == IrValueKind.Null ? "null" : execution.ReturnValue.String :
                 execution.ReturnValue!.IntegerNumericValue.ToString(CultureInfo.InvariantCulture);
             output.AppendLine("input " + renderedInput + ": marker " +
-                (observations.Single() ? "true" : "false") + ", return " + renderedReturn);
+                (observations.ToImmutable().Single() ? "true" : "false") + ", return " + renderedReturn);
         }
         return output.ToString();
     }
@@ -485,30 +488,35 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> NativeVc(ShadowTestProject project)
     {
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+                check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
         }
+        var checks = checkBuilder.ToImmutable();
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var output = new StringBuilder();
-        WorkerClaimResult[]? original = null;
-        foreach (var run in new[] { "normal", "cache-hit" })
+        ImmutableArray<WorkerClaimResult> original = default;
+        foreach (var run in ImmutableArray.Create("normal", "cache-hit"))
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.Errors, Is.Empty);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-            if (original != null)
+            if (!original.IsDefault)
             {
                 Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
                 Assert.That(JsonSerializer.Serialize(response.ClaimResults, WorkerProtocolJson.SharedOptions),
                     Is.EqualTo(JsonSerializer.Serialize(original, WorkerProtocolJson.SharedOptions)));
             }
             original = response.ClaimResults;
-            var claims = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
-            var ids = claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
-            var results = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToDictionary(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
+            var claims = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
+            var ids = claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+            var results = ImmutableDictionaryCapture.Create(
+                response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))),
+                result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId),
+                static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+                StringComparer.Ordinal);
             Assert.That(results.Keys, Is.EquivalentTo(ids));
             output.AppendLine("run: " + run);
             output.AppendLine("authority: native");
@@ -574,8 +582,15 @@ public sealed class GoldenWorkerTests
             // Keep the first void member unchanged so canonical graph closure
             // cannot mask the second member's invalid return signature.
             var member = graph.Members.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Name.Contains("Helper", StringComparison.Ordinal)));
-            member.ReturnType = Array.FindIndex(graph.Types,
-                type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed));
+            (member, graph) = graph.ChangeRow(member, member with
+            {
+                ReturnType = PortableGraphChanges.FindIndex(graph.Types,
+                            type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed))
+            });
+            {
+                reachable = reachable with { Bodies = reachable.Bodies.ReplaceReference(reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton), reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton) with { Graph = graph }) };
+                artifact = artifact with { ReachableSource = reachable };
+            }
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
             PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
@@ -615,7 +630,7 @@ public sealed class GoldenWorkerTests
     private static async Task<string> InputHavocWitnesses()
     {
         var output = new StringBuilder();
-        foreach (var kind in new[] { "call", "allocation", "write", "exception" })
+        foreach (var kind in ImmutableArray.Create("call", "allocation", "write", "exception"))
         {
             var subject = new PassiveCallableVcTests.ScalarSubject();
             var factory = subject.Factory;
@@ -738,7 +753,7 @@ public sealed class GoldenWorkerTests
         output.AppendLine("diamond-old: " + proven.Outcome!.GetType().Name);
         output.AppendLine("mutated-equality: " + refuted.Outcome!.GetType().Name);
         output.AppendLine("unused-entry-present: " + refuted.EntryModel.ContainsKey(candidate.Parameters[2].Entry));
-        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
+        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToImmutableHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
         return output.ToString();
     }
 
@@ -756,14 +771,14 @@ public sealed class GoldenWorkerTests
         output.AppendLine("diamond-old: " + proven.Outcome!.GetType().Name);
         output.AppendLine("mutated-equality: " + refuted.Outcome!.GetType().Name);
         output.AppendLine("unused-entry-present: " + refuted.EntryModel.ContainsKey(candidate.Parameters[2].Entry));
-        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
+        output.AppendLine("projection-canonical: " + refuted.EntryModel.Keys.ToImmutableHashSet().SetEquals(candidate.Parameters.Select(parameter => parameter.Entry)));
         return output.ToString();
     }
 
     private static string PassiveOwnership()
     {
         var output = new StringBuilder();
-        foreach (var alias in new[] { "old-current", "old-entry", "cross-input", "result" })
+        foreach (var alias in ImmutableArray.Create("old-current", "old-entry", "cross-input", "result"))
         {
             var subject = new PassiveCallableVcTests.ScalarSubject();
             subject.Builder.Return(subject.Builder.CreateBlock(), subject.Site, subject.Factory.Integer(0));
@@ -773,13 +788,15 @@ public sealed class GoldenWorkerTests
                 "old-entry" => subject.Parameter with { Old = subject.Parameter.Entry },
                 _ => subject.Parameter
             };
-            ImmutableArray<PassiveParameterBinding> parameters = [first];
+            var parameterBuilder = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
+            parameterBuilder.Add(first);
             if (alias == "cross-input")
             {
-                parameters = parameters.Add(new(subject.Parameter.Current,
+                parameterBuilder.Add(new(subject.Parameter.Current,
                     subject.Factory.CreateVariable("other-current", subject.Factory.IntegerType),
                     subject.Factory.CreateVariable("other-old", subject.Factory.IntegerType)));
             }
+            var parameters = parameterBuilder.ToImmutable();
             var rejected = false;
             try
             {
@@ -830,15 +847,15 @@ public sealed class GoldenWorkerTests
         System.ArgumentNullException.ThrowIfNull(fixture);
         using var directory = new TempDirectory("sharpproof-golden-worker-");
         var sourcePath = Path.Combine(directory.FullName, Path.GetFileName(fixture.RelativePath));
-        var compilation = TestCompilation.Create("GoldenWorker", OutputKind.DynamicallyLinkedLibrary,
+        var compilation = TestCompilation.CreateExact("GoldenWorker", OutputKind.DynamicallyLinkedLibrary,
             [(sourcePath, fixture.Source)]);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         var path = Path.Combine(directory.FullName, "artifact.json");
-        await File.WriteAllBytesAsync(path, bytes);
+        await File.WriteAllBytesAsync(path, bytes.AsMemory());
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
@@ -903,15 +920,15 @@ public sealed class GoldenWorkerTests
             File.Copy(typeof(SharpProofWorker).Assembly.Location, workerPath);
             var companionPath = Path.ChangeExtension(workerPath, ".deps.json");
             await File.WriteAllTextAsync(companionPath, "Preserved declared runtime companion.");
-            var workerBytes = await File.ReadAllBytesAsync(workerPath);
-            var companionBytes = await File.ReadAllBytesAsync(companionPath);
+            var workerBytes = (await File.ReadAllBytesAsync(workerPath)).ToImmutableArray();
+            var companionBytes = (await File.ReadAllBytesAsync(companionPath)).ToImmutableArray();
             var runtimeOutput = new StringBuilder();
-            foreach (var name in new[] { "direct", "leaf", "worker-leaf", "executing" })
+            foreach (var name in ImmutableArray.Create("direct", "leaf", "worker-leaf", "executing"))
             {
                 var protectedWorker = name == "executing" ? typeof(Program).Assembly.Location : workerPath;
                 var protectedCompanion = name == "executing" ? Path.ChangeExtension(protectedWorker, ".deps.json") : companionPath;
-                var protectedWorkerBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedWorker) : workerBytes;
-                var protectedCompanionBytes = name == "executing" ? await File.ReadAllBytesAsync(protectedCompanion) : companionBytes;
+                var protectedWorkerBytes = name == "executing" ? (await File.ReadAllBytesAsync(protectedWorker)).ToImmutableArray() : workerBytes;
+                var protectedCompanionBytes = name == "executing" ? (await File.ReadAllBytesAsync(protectedCompanion)).ToImmutableArray() : companionBytes;
                 var declaredWorker = workerPath;
                 var destination = protectedCompanion;
                 if (name == "leaf")
@@ -933,17 +950,18 @@ public sealed class GoldenWorkerTests
                 try
                 {
                     Console.SetError(errors);
-                    var arguments = new List<string> { "verify",
+                    var arguments = ImmutableArray.CreateBuilder<string>();
+                    arguments.AddRange((ImmutableArray<string>)[ "verify",
                         "--request", Path.Combine(directory.FullName, name + "-request.json"),
                         "--result", Path.Combine(directory.FullName, name + "-result.json"),
                         "--compiler-manifest", path, "--verify-policy", "advisory", "--assumption-policy", "allow",
                         "--cache-enabled", "false", "--publish-request", Path.Combine(directory.FullName, name + "-published-request.json"),
-                        "--publish-result", destination, "--publish-compiler-manifest", Path.Combine(directory.FullName, name + "-published-manifest.json") };
+                        "--publish-result", destination, "--publish-compiler-manifest", Path.Combine(directory.FullName, name + "-published-manifest.json") ]);
                     if (name != "executing")
                     {
-                        arguments.AddRange(["--worker", declaredWorker]);
+                        arguments.AddRange((ImmutableArray<string>)["--worker", declaredWorker]);
                     }
-                    runtimeExit = await Program.RunMain(arguments.ToArray(),
+                    runtimeExit = await Program.RunMain(arguments.ToImmutable(),
                         async (invocation, token) =>
                         {
                             System.ArgumentNullException.ThrowIfNull(invocation);
@@ -972,7 +990,7 @@ public sealed class GoldenWorkerTests
         if (scenario == "publication-phases")
         {
             var phaseOutput = new StringBuilder();
-            foreach (var invalidInput in new[] { true, false })
+            foreach (var invalidInput in ImmutableArray.Create(true, false))
             {
                 var name = invalidInput ? "invalid" : "blocked";
                 var privateRequest = Path.Combine(directory.FullName, name + "-request.json");
@@ -1021,7 +1039,7 @@ public sealed class GoldenWorkerTests
         {
             var input = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
             var mixedOutput = new StringBuilder();
-            foreach (var reverseRecords in new[] { false, true })
+            foreach (var reverseRecords in ImmutableArray.Create(false, true))
             {
                 var mixed = WorkerTests.AssembleFatalAndTimedOut(request, input, reverseRecords);
                 mixed = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(mixed))!;
@@ -1093,7 +1111,7 @@ public sealed class GoldenWorkerTests
             Assert.That(scenario, Is.AnyOf("empty-timeout", "empty-canceled", "promotion"));
             var resultPath = Path.Combine(directory.FullName, "result.json");
             var requestPath = Path.Combine(directory.FullName, "request.json");
-            string[] arguments = ["verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
+            ImmutableArray<string> arguments = ["verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
                 "--request", requestPath, "--result", resultPath, "--compiler-manifest", path,
                 "--verify-policy", scenario == "empty-timeout" ? "require-proven" : "advisory",
                 "--assumption-policy", "allow", "--cache-enabled", "false"];
@@ -1137,9 +1155,9 @@ public sealed class GoldenWorkerTests
         if (scenario == "publication-private-binding")
         {
             var substitutedRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(request))!;
-            substitutedRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+            { substitutedRequest = substitutedRequest with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
             var substitutedResponse = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
-            substitutedResponse.RequestHash = WorkerProtocolJson.ComputeRequestHash(substitutedRequest);
+            { substitutedResponse = substitutedResponse with { RequestHash = WorkerProtocolJson.ComputeRequestHash(substitutedRequest) }; }
             var preparedBinding = WorkerProtocolJson.ValidateForRequest(substitutedResponse, WorkerProtocolJson.ComputeRequestHash(request),
                 snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
             output.AppendLine(CultureInfo.InvariantCulture, $"prepared-request-bound: {preparedBinding.IsValid}");
@@ -1211,12 +1229,12 @@ public sealed class GoldenWorkerTests
     private static async Task<string> BooleanModels()
     {
         var output = new StringBuilder();
-        foreach (var semantics in new[] { IrExecutionSemantics.Total })
+        foreach (var semantics in ImmutableArray.Create(IrExecutionSemantics.Total))
         {
             var factory = new IrFactory(semantics);
             var parameter = factory.CreateVariable("entry", factory.BooleanType);
             using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-            foreach (var expected in new[] { false, true })
+            foreach (var expected in ImmutableArray.Create(false, true))
             {
                 var bound = factory.Binary(IrBinaryOperator.Equal, factory.Variable(parameter), factory.Boolean(expected));
                 var query = new VerificationQuery(factory,

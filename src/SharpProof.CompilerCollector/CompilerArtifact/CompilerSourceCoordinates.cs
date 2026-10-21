@@ -142,34 +142,37 @@ internal static class CompilerSourceCoordinates
     {
         return FindUniqueTree(
             location,
-            compilation?.SyntaxTrees,
+            compilation == null ? null : compilation.SyntaxTrees,
             cancellationToken);
     }
 
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
-        CompilerSyntaxTreeSnapshot[]? syntaxTrees,
+        ImmutableArray<CompilerSyntaxTreeSnapshot>? syntaxTrees,
         CancellationToken cancellationToken)
     {
-        if (location == null || syntaxTrees == null)
+        if (location == null || syntaxTrees is null)
         {
             return -1;
         }
 
+        var capturedTrees = syntaxTrees.Value;
+        if (capturedTrees.IsDefault)
+        { throw new ArgumentNullException(nameof(syntaxTrees)); }
         var ordinal = -1;
         var remembered = RememberedTree(location);
-        if (remembered >= 0 && remembered < syntaxTrees.Length &&
+        if (remembered >= 0 && remembered < capturedTrees.Length &&
             HasValidLocationGeometry(
                 location,
-                syntaxTrees[remembered],
+                capturedTrees[remembered],
                 cancellationToken: cancellationToken))
         {
             return remembered;
         }
-        for (var index = 0; index < syntaxTrees.Length; index++)
+        for (var index = 0; index < capturedTrees.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var tree = syntaxTrees[index];
+            var tree = capturedTrees[index];
             if (tree == null || !HasValidLocationGeometry(
                     location,
                     tree,

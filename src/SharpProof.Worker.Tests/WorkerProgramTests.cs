@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using NUnit.Framework;
@@ -50,7 +51,8 @@ public sealed class WorkerProgramTests
             manifestPath,
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
 
-        var arguments = new[] {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange((ImmutableArray<string>)[
             "verify",
             "--worker", typeof(SharpProofWorker).Assembly.Location,
             "--request", requestPath,
@@ -59,14 +61,14 @@ public sealed class WorkerProgramTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow",
             "--max-parallelism", "0"
-        };
-        var exitCode = await InvokeLauncherAsync(arguments);
+        ]);
+        var exitCode = await InvokeLauncherAsync(arguments.ToImmutable());
 
         Assert.That(exitCode, Is.EqualTo(2));
         Assert.That(File.Exists(requestPath), Is.False);
 
         arguments[^1] = "1";
-        var validExitCode = await InvokeLauncherAsync(arguments);
+        var validExitCode = await InvokeLauncherAsync(arguments.ToImmutable());
         Assert.That(validExitCode, Is.Zero);
         Assert.That(File.Exists(requestPath), Is.True);
         Assert.That(File.Exists(resultPath), Is.True);
@@ -98,9 +100,10 @@ public sealed class WorkerProgramTests
         }
     }
 
-    private static Task<int> InvokeLauncherAsync(string[] arguments)
+    private static Task<int> InvokeLauncherAsync(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         // The test host supplies runtime-root overrides. Exercise request handling directly;
         // the dedicated bootstrap tests verify that Main rejects unsafe overrides.
         return SharpProof.Worker.Launcher.Program.RunMain(arguments, verify: null, validatePreflight: null,

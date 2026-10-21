@@ -12,6 +12,7 @@ public sealed class CacheNullEvidenceBoundaryTests
     [TestCase("claimAssumptions")]
     [TestCase("callableAssumptions")]
     [TestCase("valid")]
+    [TestCase("inputHash")]
     public async Task CacheDoesNotRepairNullEvidenceIntoAHit(string shape)
     {
         System.ArgumentNullException.ThrowIfNull(shape);
@@ -61,20 +62,23 @@ public sealed class CacheNullEvidenceBoundaryTests
         var envelope = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
         switch (shape)
         {
+            case "inputHash":
+                envelope["inputHash"] = new string('b', 64);
+                break;
             case "model":
-                response.ClaimResults[0].Model = null!;
+                response.ClaimResults[0].Model = default;
                 envelope["claimResults"]![0]!["model"] = null;
                 break;
             case "claimAssumptions":
-                response.ClaimResults[0].Assumptions = null!;
+                response.ClaimResults[0].Assumptions = default;
                 envelope["claimResults"]![0]!["assumptions"] = null;
                 break;
             case "callableAssumptions":
-                response.CallableResults[0].Assumptions = null!;
+                response.CallableResults[0].Assumptions = default;
                 envelope["callableResults"]![0]!["assumptions"] = null;
                 break;
         }
-        Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.EqualTo(shape == "valid"));
+        Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.EqualTo(shape is "valid" or "inputHash"));
         await File.WriteAllTextAsync(path, envelope.ToJsonString());
         var cached = await cache.TryReadAsync(inputHash, manifest, budgets, TestContext.CurrentContext.CancellationToken);
         if (shape == "valid")

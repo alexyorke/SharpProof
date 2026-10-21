@@ -15,9 +15,9 @@ internal static partial class CallableVerificationPolicy
         { return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token, callerCancellation);
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
-        var completed = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
-        var pending = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
-        var effects = target.EffectClaims.ToDictionary(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId), StringComparer.Ordinal);
+        var completed = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
+        var pending = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
+        var effects = ImmutableDictionaryCapture.Create(target.EffectClaims, evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId), static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : evidence, StringComparer.Ordinal);
         var hasPostconditions = target.Entry.ClaimIds.Any(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!effects.ContainsKey(id)));
         var entryPublished = false;
         var entryFeasibility = CallableEntryFeasibility.Feasible;

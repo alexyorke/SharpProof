@@ -25,7 +25,7 @@ internal sealed class EffectCapabilitySetValidationTests
 
     private static IEnumerable<EffectCapabilityKind> PartialUnknownKinds()
     {
-        var unknownMarker =
+        const EffectCapabilityKind unknownMarker =
             EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown;
 
         yield return unknownMarker;

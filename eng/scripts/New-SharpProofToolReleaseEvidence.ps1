@@ -7,10 +7,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
-$sourceFiles = @(Get-ChildItem -LiteralPath $PackageSource -File)
-$files = @($sourceFiles | Where-Object Extension -CEQ '.nupkg')
+$sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@(Get-ChildItem -LiteralPath $PackageSource -File))
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@($sourceFiles | Where-Object Extension -CEQ '.nupkg'))
 if ($files.Count -ne 1) { throw 'Tool release requires exactly one separately qualified nupkg.' }
-$allowedSidecars = @('packages.tsv', 'packages.lock.json', 'Test-SharpProofPublishedPackages.sh')
+$allowedSidecars = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('packages.tsv', 'packages.lock.json', 'Test-SharpProofPublishedPackages.sh'))
 if (@($sourceFiles | Where-Object { $_.Extension -cne '.nupkg' -and $_.Name -cnotin $allowedSidecars }).Count -ne 0) {
     throw 'Unexpected file in the separately qualified tool feed.'
 }

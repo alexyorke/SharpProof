@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,11 +10,11 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractClauseInventoryTests
 {
-    private static readonly BoundContractKind[] TopLevelInventoryKinds = [
+    private static readonly ImmutableArray<BoundContractKind> TopLevelInventoryKinds = [
         BoundContractKind.Ensures,
         BoundContractKind.Ensures
     ];
-    private static readonly BoundContractKind[] InventoryKinds = [
+    private static readonly ImmutableArray<BoundContractKind> InventoryKinds = [
         BoundContractKind.Requires,
         BoundContractKind.Ensures,
         BoundContractKind.Assume,
@@ -21,7 +22,7 @@ public sealed class ContractClauseInventoryTests
         BoundContractKind.Ensures,
         BoundContractKind.Assume
     ];
-    private static readonly ContractClausePlacement[] InventoryPlacements = [
+    private static readonly ImmutableArray<ContractClausePlacement> InventoryPlacements = [
         ContractClausePlacement.ValidPrologue,
         ContractClausePlacement.ValidPrologue,
         ContractClausePlacement.Conditional,
@@ -29,8 +30,8 @@ public sealed class ContractClauseInventoryTests
         ContractClausePlacement.NestedCallable,
         ContractClausePlacement.Unreachable
     ];
-    private static readonly int[] InventoryOrdinals = [0, 0, 0, 1, 1, 1];
-    private static readonly ContractClausePlacement[] MisplacedPlacements = [
+    private static readonly ImmutableArray<int> InventoryOrdinals = [0, 0, 0, 1, 1, 1];
+    private static readonly ImmutableArray<ContractClausePlacement> MisplacedPlacements = [
         ContractClausePlacement.Misplaced,
         ContractClausePlacement.Late
     ];
@@ -190,7 +191,7 @@ public sealed class ContractClauseInventoryTests
         var entry = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var inventory = new ContractClauseInventoryBuilder(compilation)
             .Create(entry, model.GetOperation(tree.GetRoot()));
-        ContractClausePlacement[] expected = [
+        ImmutableArray<ContractClausePlacement> expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];
@@ -230,7 +231,7 @@ public sealed class ContractClauseInventoryTests
             .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
         var wrongCallable = builder.Create(other, body);
         var declaredOther = builder.Create(other);
-        ContractClausePlacement[] expected = [
+        ImmutableArray<ContractClausePlacement> expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];
@@ -500,6 +501,54 @@ public sealed class ContractClauseInventoryTests
         Assert.That(new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
             callable, foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body))
             .IsSuccess, Is.False);
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ClauseValidityPreservesDeferredFailuresAndShortCircuiting(int shape)
+    {
+        var original = CreateInventory(
+            "using SharpProof.Attributes; public static class Target { public static void Analyze(bool value) { Contract.Requires(value); } }",
+            "Target", "Analyze");
+        var valid = original.Clauses[0];
+        var invalid = new ContractClauseOccurrence(
+            valid.Kind, ContractClausePlacement.Conditional,
+            valid.Ordinal, valid.SourceOrdinal, valid.Invocation);
+        ImmutableArray<ContractClauseOccurrence> clauses = shape switch
+        {
+            0 => default,
+            1 => [],
+            2 => [null!],
+            3 => [invalid],
+            4 => [valid],
+            5 => [invalid, null!, valid],
+            6 => [valid, null!],
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var inventory = new ContractClauseInventory(
+            original.Callable, true, false, original.ImplementationBody, clauses);
+        Action read = () => _ = inventory.HasValidClause;
+        for (var iteration = 0; iteration < 4; iteration++)
+        {
+            if (shape == 0)
+            {
+                Assert.Throws<NullReferenceException>(read);
+            }
+            else if (shape is 2 or 5)
+            {
+                Assert.That(Assert.Throws<ArgumentNullException>(read)!.ParamName,
+                    Is.EqualTo("clause"));
+            }
+            else
+            {
+                Assert.That(inventory.HasValidClause, Is.EqualTo(shape is 4 or 6));
+            }
+        }
     }
 
     private static (CSharpCompilation Owner, CSharpCompilation Foreign)

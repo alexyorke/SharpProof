@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -18,16 +19,12 @@ public sealed class Pr275SemanticGuardCoverageTests
         var term = IrSemanticTerms.Guard(factory,
             factory.Variable(condition), factory.Variable(consequence));
         var result = new IrInterpreter(factory).Evaluate(term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [condition] = factory.CreateBooleanValue(conditionValue),
-                [consequence] = factory.CreateBooleanValue(consequenceValue)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(condition, factory.CreateBooleanValue(conditionValue)).SetItem(consequence, factory.CreateBooleanValue(consequenceValue)));
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Boolean, Is.EqualTo(expected));
         Assert.That(IrTermAnalysis.CollectVariables(term),
-            Is.EquivalentTo(new[] { condition, consequence }));
+            Is.EquivalentTo(ImmutableArray.Create(condition, consequence)));
     }
 
     [TestCase("factory")]
@@ -64,8 +61,8 @@ public sealed class Pr275SemanticGuardCoverageTests
         int count, bool firstValue)
     {
         var factory = new IrFactory();
-        var terms = new List<IrTerm>();
-        var values = new Dictionary<IrVarId, IrValue>();
+        var terms = ImmutableArray.CreateBuilder<IrTerm>();
+        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         var expectedConjunction = true;
         var expectedDisjunction = false;
         for (var index = 0; index < count; index++)
@@ -77,9 +74,11 @@ public sealed class Pr275SemanticGuardCoverageTests
             expectedConjunction &= value;
             expectedDisjunction |= value;
         }
+        var termSnapshot = terms.ToImmutable();
+        var valueSnapshot = values.ToImmutable();
         var interpreter = new IrInterpreter(factory);
-        var conjunction = interpreter.Evaluate(IrSemanticTerms.Conjoin(factory, terms), values);
-        var disjunction = interpreter.Evaluate(IrSemanticTerms.Disjoin(factory, terms), values);
+        var conjunction = interpreter.Evaluate(IrSemanticTerms.Conjoin(factory, termSnapshot), valueSnapshot);
+        var disjunction = interpreter.Evaluate(IrSemanticTerms.Disjoin(factory, termSnapshot), valueSnapshot);
 
         Assert.That(conjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(disjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));

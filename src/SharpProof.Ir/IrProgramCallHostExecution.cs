@@ -21,8 +21,7 @@ internal static class IrProgramCallHostExecution
             receiverValue = receiverResult.Value;
         }
 
-        var arguments = ImmutableArray.CreateBuilder<IrValue>(
-            call.Arguments.Length);
+        var arguments = ImmutableArray.CreateBuilder<IrValue>();
         foreach (var argument in call.Arguments)
         {
             var argumentResult = evaluate(argument);

@@ -48,7 +48,7 @@ public sealed class FuzzBoundaryCoverageTests
     [Test]
     public void OptionsRejectNullAndHelp()
     {
-        Action parseNull = () => FuzzOptions.Parse(null!);
+        Action parseNull = () => FuzzOptions.Parse(default);
         Action parseHelp = () => FuzzOptions.Parse(["--help"]);
         Action parseShortHelp = () => FuzzOptions.Parse(["-h"]);
         Assert.Throws<ArgumentNullException>(parseNull);

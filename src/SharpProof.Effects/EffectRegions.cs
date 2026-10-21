@@ -81,9 +81,12 @@ internal readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
     public bool IsUnknown => !_regions.IsDefaultOrEmpty &&
         _regions.Length == 1 && _regions[0].Kind == EffectRegionKind.Unknown;
 
-    public static EffectRegionSet Create(params EffectRegionId[] regions)
+    public static EffectRegionSet Create(ImmutableArray<EffectRegionId> regions)
     {
-        regions = ArgumentNullGuard.NotNull(regions, nameof(regions));
+        if (regions.IsDefault)
+        {
+            throw new ArgumentNullException(nameof(regions));
+        }
         return regions.Length switch
         {
             0 => Empty,

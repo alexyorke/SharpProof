@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -16,7 +17,7 @@ public sealed class SourceStringIndexFaultCoverageTests
             "catch (System.NullReferenceException) { return 7; } " +
             "catch (System.IndexOutOfRangeException) { return 9; } } " +
             "static string Read(string value) => value;");
-        object[] arguments = [input!];
+        ImmutableArray<object> arguments = [input!];
         Assert.That(subject.Invoke(arguments), Is.EqualTo(expected));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var indexer = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
@@ -35,7 +36,7 @@ public sealed class SourceStringIndexFaultCoverageTests
         var parameter = subject.Context.Parameters.Single().Entry;
         var type = subject.Factory.GetVariableInfo(parameter).Type;
         var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
-        var inputs = new Dictionary<IrVarId, IrValue> { [parameter] = value };
+        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, value);
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, inputs);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -82,7 +83,11 @@ internal sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("if (x == 0) x = 1; return x;"));
         var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
-        row.A = (int)region;
+        {
+            var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = (int)region });
+            row = changedFixture.Item1;
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+        }
         var preparation = Prepare(artifact);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
@@ -99,8 +104,21 @@ internal sealed class NativePurityEffectTests
     public async Task PreconditionsCanExcludeNonlocalWriteEvents()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("Contract.Requires(x != 0); if (x == 0) x = 1; return x;"));
-        artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)).A = (int)IrWriteRegion.Field;
+        {
+            artifact = artifact with
+            {
+                Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with
+                {
+                    Total = artifact.Callables.Single().Total! with
+                    {
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
+            { A = (int)IrWriteRegion.Field })
+                    }
+                })
+            };
+        }
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome,
             Is.TypeOf<ProvenOutcome>());
     }
@@ -109,8 +127,21 @@ internal sealed class NativePurityEffectTests
     public async Task LoopWriteWitnessRequiresOriginalBodyReplay()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("while (x > 0) x--; return x;"));
-        artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)).A = (int)IrWriteRegion.Element;
+        {
+            artifact = artifact with
+            {
+                Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with
+                {
+                    Total = artifact.Callables.Single().Total! with
+                    {
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
+            { A = (int)IrWriteRegion.Element })
+                    }
+                })
+            };
+        }
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
@@ -125,9 +156,19 @@ internal sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("x = 1; return x;"));
         var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
-        row.A = region;
+        {
+            var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = region });
+            row = changedFixture.Item1;
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+        }
         if (unusedSlot)
-        { row.B = 0; }
+        {
+            {
+                var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { B = 0 });
+                row = changedFixture.Item1;
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+            }
+        }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }
 
@@ -278,16 +319,13 @@ internal sealed class NativePurityEffectTests
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         var total = preparation.Total!;
         var factory = total.Program.Factory;
-        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
-        var writes = new List<IrWriteRegion>();
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
+        var writesBuilder = ImmutableArray.CreateBuilder<IrWriteRegion>();
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [entries[0]] = initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
-                    factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object()),
-                [entries[1]] = initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
-                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)
-            }, 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writes.Add(write.Region); } });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
+                    factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object())).SetItem(entries[1], initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
+                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)), 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writesBuilder.Add(write.Region); } });
+        var writes = writesBuilder.ToImmutable();
         Assert.That(execution.Status, Is.EqualTo(initiallyNull ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(writes.Contains(IrWriteRegion.Parameter), Is.EqualTo(!initiallyNull));
@@ -325,9 +363,9 @@ internal sealed class NativePurityEffectTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("Contract.Requires(false); return x;"));
         if (initialization)
-        { artifact.Callables.Single().Total!.EffectsCompleteAtEntry = false; }
+        { { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { EffectsCompleteAtEntry = false } }) }; } }
         else
-        { artifact.Callables.Single().Total!.ValidEffectClaimIds = []; }
+        { { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { ValidEffectClaimIds = [] } }) }; } }
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
@@ -391,7 +429,7 @@ internal sealed class NativePurityEffectTests
         var attempts = 0;
         var allocations = 0;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.ToDictionary(parameter => parameter.Entry, parameter =>
+            ImmutableDictionaryCapture.Create(total.Parameters, parameter => parameter.Entry, parameter =>
                 ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (factory.GetTypeInfo(factory.GetVariableInfo(parameter.Entry).Type).Kind == IrTypeKind.Integer ?
                     factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1L) :
                     factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new object())))),
@@ -448,9 +486,15 @@ internal sealed class NativePurityEffectTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var row = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Lock));
         if (unusedSlot)
-        { row.B = 0; }
+        {
+            (row, graph) = graph.ChangeRow(row, row with { B = 0 });
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+        }
         else
-        { row.A = Array.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Integer)); }
+        {
+            (row, graph) = graph.ChangeRow(row, row with { A = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Integer)) });
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
+        }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }
 
@@ -486,7 +530,7 @@ internal sealed class NativePurityEffectTests
         Assert.That(preparation.Total, Is.Not.Null);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToArray();
+        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         Assert.That(result.WriteWitness, Is.EqualTo(writes[0].Operation));
@@ -494,7 +538,7 @@ internal sealed class NativePurityEffectTests
         var input = preparation.Total.Parameters.Single().Entry;
         var observed = 0;
         var execution = new IrProgramInterpreter(factory).Execute(preparation.Total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 7L) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 7L)),
             maximumSteps: 10000, replayOptions: new IrProgramReplayOptions(static _ => null)
             {
                 WritePrefixObserver = (write, approximate) =>
@@ -589,28 +633,23 @@ internal sealed class NativePurityEffectTests
         Assert.That(write.Region, Is.EqualTo(region));
         Assert.That(result.WriteWitness, faults ? Is.Null : Is.EqualTo(write.Operation));
         var factory = total.Program.Factory;
-        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
         var observed = 0;
         // The objects enter with the field values the runtime run used.
         var field = write.Field!.Value;
         var fieldType = factory.GetMemberInfo(field).ReturnType;
-        var replay = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue>
-        {
-            [entries[0]] = nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(
-                factory.GetVariableInfo(entries[0]).Type, new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 5L))),
-            [entries[1]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type,
-                new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 10L))),
-            [entries[2]] = factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)
-        }, 10000, new IrProgramReplayOptions(static _ => null)
-        {
-            WritePrefixObserver = (item, approximate) =>
-            {
-                System.ArgumentNullException.ThrowIfNull(item);
-                Assert.That(approximate, Is.False);
-                if (item.Region != IrWriteRegion.Local)
-                { Assert.That(item.Operation, Is.EqualTo(write.Operation)); observed++; }
-            }
-        });
+        var replay = new IrProgramInterpreter(factory).Execute(total.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(
+                factory.GetVariableInfo(entries[0]).Type, new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 5L)))).SetItem(entries[1], factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type,
+                new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 10L)))).SetItem(entries[2], factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)), 10000, new IrProgramReplayOptions(static _ => null)
+                {
+                    WritePrefixObserver = (item, approximate) =>
+                    {
+                        System.ArgumentNullException.ThrowIfNull(item);
+                        Assert.That(approximate, Is.False);
+                        if (item.Region != IrWriteRegion.Local)
+                        { Assert.That(item.Operation, Is.EqualTo(write.Operation)); observed++; }
+                    }
+                });
         Assert.That(replay.Status, Is.EqualTo(faults ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(observed, Is.EqualTo(faults ? 0 : 1));

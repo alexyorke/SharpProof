@@ -12,7 +12,17 @@ internal sealed partial class NativeResourceContractTests
     {
         var target = Read(CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,0)] public static void Target() {} }"));
-        target.EffectClaims.Single().Constraint.ResourceUpperBound!.Metric = (WorkerResourceMetric)999;
+        var claim = target.EffectClaims.Single();
+        target = target with
+        {
+            EffectClaims = [claim with
+            {
+                Constraint = claim.Constraint with
+                {
+                    ResourceUpperBound = claim.Constraint.ResourceUpperBound! with { Metric = (WorkerResourceMetric)999 }
+                }
+            }]
+        };
         Assert.That(await FindBoundaryViolation(target, ResourceExpression.Zero), Is.Null);
     }
 

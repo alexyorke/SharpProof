@@ -19,8 +19,8 @@ if ([Environment]::Version.Major -lt 10) {
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$packages = @(Get-ChildItem -LiteralPath $source -File |
-        Where-Object Extension -In @('.nupkg', '.snupkg'))
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@(Get-ChildItem -LiteralPath $source -File |
+            Where-Object Extension -In ([Collections.Immutable.ImmutableArray]::Create[string]('.nupkg', '.snupkg'))))
 $identities = Get-SharpProofPackageIdentitySet -Files $packages
 $version = [string]$identities.Version
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -204,18 +204,18 @@ try {
     # A fresh project build must refuse a missing or modified exact DLL. The
     # isolated package cache belongs only to this test and is restored after it.
     $dll = Join-Path $cache "sharpproof.verifier/$version/tools/native/win-$Architecture/libz3.dll"
-    $original = [IO.File]::ReadAllBytes($dll)
+    $original = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([IO.File]::ReadAllBytes($dll))
     try {
         [IO.File]::Delete($dll)
         $output = Invoke-ProofBuild -ExpectFailure
         if ($output -notmatch 'native payload is missing') { throw 'Missing Z3 did not fail at package validation.' }
-        $modified = [byte[]]$original.Clone()
+        [byte[]]$modified = @($original)
         $modified[0] = $modified[0] -bxor 255
         [IO.File]::WriteAllBytes($dll, $modified)
         $output = Invoke-ProofBuild -ExpectFailure
         if ($output -notmatch 'wrong SHA-256 digest') { throw 'Modified Z3 was not rejected by its pinned digest.' }
     }
-    finally { [IO.File]::WriteAllBytes($dll, $original) }
+    finally { [IO.File]::WriteAllBytes($dll, [byte[]]@($original)) }
 
     Invoke-ProofBuild | Out-Null
     Assert-ProofOutcome 'Proven' | Out-Null

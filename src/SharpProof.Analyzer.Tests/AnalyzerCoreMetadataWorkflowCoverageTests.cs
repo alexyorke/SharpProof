@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -34,13 +35,14 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         Assert.That(attribute.ApplicationSyntaxReference, Is.Null);
         Assert.That(method.Locations, Has.Length.EqualTo(1));
         Assert.That(method.Locations[0].IsInMetadata, Is.True);
-        var diagnostics = new List<Diagnostic>();
+        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
         var suppressed = SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
-            method, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
+            method, session, diagnosticsBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnostics = diagnosticsBuilder.ToImmutable();
         Assert.That(suppressed, Is.EqualTo(suppressing && hasReason));
         if (!hasReason)
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
             Assert.That(diagnostics[0].Location, Is.SameAs(Location.None));
         }

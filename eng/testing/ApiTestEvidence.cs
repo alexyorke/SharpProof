@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -6,10 +7,14 @@ namespace SharpProof.Testing;
 
 internal static class ApiTestEvidence
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateJsonOptions()
     {
-        WriteIndented = true
-    };
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
     internal sealed record Row(string Api, string Facet, string Test, string EdgeInputs, string Status, string Detail)
     {
         public string Api { get; init; } = Api ?? throw new global::System.ArgumentNullException(nameof(Api));
@@ -58,7 +63,7 @@ internal static class ApiTestEvidence
         global::System.ArgumentNullException.ThrowIfNull(root);
         global::System.ArgumentNullException.ThrowIfNull(name);
         global::System.ArgumentNullException.ThrowIfNull(evidence);
-        var rows = evidence.OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api), StringComparer.Ordinal).ThenBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Facet), StringComparer.Ordinal).ToArray();
+        var rows = evidence.OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api), StringComparer.Ordinal).ThenBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Facet), StringComparer.Ordinal).ToImmutableArray();
         var directory = Path.Combine(root, "artifacts", "api-coverage");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, name + ".json"), JsonSerializer.Serialize(rows, JsonOptions) + "\n");

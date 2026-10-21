@@ -27,7 +27,7 @@ internal static class NativeResourceTaskBinding
         { return null; }
         var id = storage ? ResourceTaskStorageCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait) :
             ResourceTaskCatalog.AssumptionId(entry.CallableId, projection.FrameworkAssemblyIdentity, projection.ConfiguredAwait);
-        if (target.Entry.Assumptions is null || target.Entry.Assumptions.Count(assumption => assumption is not null &&
+        if (target.Entry.Assumptions.IsDefault || target.Entry.Assumptions.Count(assumption => assumption is not null &&
                 assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary) != 1 ||
             target.Compilation.ResourceMetadataReferences is not { Length: > 0 } references || references.Any(static reference => reference is null))
         { return null; }

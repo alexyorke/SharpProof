@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -73,28 +74,31 @@ public sealed class DictionarySourceHelperOracleTests
         Compare(source, [type], [first, second], opaqueReturn: true);
     }
 
-    private static void Compare(string source, Type[] genericTypes, object?[] runtimeInputs, bool opaqueReturn)
+    private static void Compare(string source, ImmutableArray<Type> genericTypes, ImmutableArray<object?> runtimeInputs, bool opaqueReturn)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(genericTypes);
-        ArgumentNullException.ThrowIfNull(runtimeInputs);
+        if (genericTypes.IsDefault)
+        { throw new ArgumentNullException(nameof(genericTypes)); }
+        if (runtimeInputs.IsDefault)
+        { throw new ArgumentNullException(nameof(runtimeInputs)); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         for (var ordinal = 0; ordinal < total.Parameters.Length; ordinal++)
         {
             var parameter = total.Parameters[ordinal].Entry;
             var parameterType = factory.GetVariableInfo(parameter).Type;
             // Opaque structs are atoms, including Nullable<T> with no value.
             // Only an actual reference-type null becomes the IR null value.
-            inputs[parameter] = !genericTypes[0].IsValueType && runtimeInputs[ordinal] == null
+            inputBuilder[parameter] = !genericTypes[0].IsValueType && runtimeInputs[ordinal] == null
                 ? factory.CreateNullValue(parameterType)
                 : factory.CreateReferenceValue(parameterType, new IrObjectState());
         }
+        var inputs = inputBuilder.ToImmutable();
         var choices = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -115,10 +119,10 @@ public sealed class DictionarySourceHelperOracleTests
         else
         { Assert.That(interpreted.ReturnValue!.Integer, Is.EqualTo(1)); }
 
-        var compilation = TestCompilation.Create("DictionarySourceHelperOracle", ("Probe.cs", source));
+        var compilation = TestCompilation.CreateExact("DictionarySourceHelperOracle", [("Probe.cs", source)]);
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(";", emitted.Diagnostics));
@@ -128,8 +132,8 @@ public sealed class DictionarySourceHelperOracleTests
             image.Position = 0;
             var target = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!;
             if (genericTypes.Length != 0)
-            { target = target.MakeGenericMethod(genericTypes); }
-            var actual = target.Invoke(null, runtimeInputs);
+            { target = target.MakeGenericMethod(genericTypes.ToArray()); }
+            var actual = target.Invoke(null, runtimeInputs.ToArray());
             if (!opaqueReturn)
             { Assert.That(actual, Is.EqualTo(1)); }
             else if (!genericTypes[0].IsValueType)

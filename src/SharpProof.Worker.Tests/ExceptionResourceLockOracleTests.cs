@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -14,16 +15,12 @@ public sealed class ExceptionResourceLockOracleTests
         Assert.That(core.ManifestModule.ModuleVersionId, Is.EqualTo(new Guid("9f81bf37-7ee9-46d6-8148-5938d2a8d041")));
         var resources = core.GetType("System.SR", throwOnError: true)!;
         const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
-        foreach (var (name, digest) in new[]
-        {
-            ("InternalGetResourceString", "937984798B88E166526578372CAD3CC7A8D14887FDF2EAD89F5377238A91CE16"),
-            ("GetResourceString", "7CE40FA63ED608DE5CE42E1644F5EAF44C19C43B85BF783383FE45C882FF40D5"),
-            ("UsingResourceKeys", "F18D2D1686BF45A38EDAA7249E3683A2CFD67448110A1D01C46D8E1B0C3A5557")
-        })
+        foreach (var (name, digest) in ImmutableArray.Create(("InternalGetResourceString", "937984798B88E166526578372CAD3CC7A8D14887FDF2EAD89F5377238A91CE16"), ("GetResourceString", "7CE40FA63ED608DE5CE42E1644F5EAF44C19C43B85BF783383FE45C882FF40D5"), ("UsingResourceKeys", "F18D2D1686BF45A38EDAA7249E3683A2CFD67448110A1D01C46D8E1B0C3A5557")
+))
         {
             var method = resources.GetMethod(name, flags)!;
-            var body = method.GetMethodBody()!.GetILAsByteArray()!;
-            Assert.That(Convert.ToHexString(SHA256.HashData(body)), Is.EqualTo(digest), name);
+            var body = method.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
+            Assert.That(Convert.ToHexString(SHA256.HashData(body.AsSpan())), Is.EqualTo(digest), name);
         }
     }
 

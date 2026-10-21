@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -11,7 +12,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorCoalesceNullApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0019"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0019"];
 
     [Test]
     public void ActualInvalidCoalesceNullTestRejectsItsScalarCapture()
@@ -33,7 +34,7 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
+            .Concat(block.BranchValue is { } branch ? ImmutableArray.Create<IOperation>(branch) : ImmutableArray<IOperation>.Empty))).ToImmutableArray();
         var nullTest = operations.OfType<IIsNullOperation>().Single();
         Assert.That(nullTest.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(nullTest.Operand, Is.AssignableTo<IFlowCaptureReferenceOperation>());
@@ -54,17 +55,14 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         Assert.That(rejected.Term, Is.TypeOf<IrOpaqueTerm>());
 
         using var control = TypedProgramSubject.Create("string Target(string text) => text ?? \"fallback\";");
-        object[] inputs = [null!];
+        ImmutableArray<object> inputs = [null!];
         Assert.That(control.Invoke(inputs), Is.EqualTo("fallback"));
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);
         Assert.That(program.ConstructionLimitExceeded, Is.False);
         var parameter = control.Context.Parameters.Single().Entry;
         var inputType = control.Factory.GetVariableInfo(parameter).Type;
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter] = control.Factory.CreateNullValue(inputType)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, control.Factory.CreateNullValue(inputType));
         var replay = new IrProgramInterpreter(control.Factory).Execute(program.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);

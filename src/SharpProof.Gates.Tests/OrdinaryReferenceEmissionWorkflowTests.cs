@@ -8,7 +8,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryReferenceEmissionWorkflowTests
 {
-    private static readonly string[] ExpectedAttributeNames = ["SharpProofTrustedAttribute", "EffectContractAttribute"];
+    private static readonly ImmutableArray<string> ExpectedAttributeNames = ["SharpProofTrustedAttribute", "EffectContractAttribute"];
 
     [TestCase(false)]
     [TestCase(true)]

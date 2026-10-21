@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -35,18 +36,18 @@ public sealed class IrPurityWriteWitnessTests
         else
         { builder.FieldStore(block, site, IrWriteRegion.Parameter, target, field, factory.Integer(7)); }
         builder.Return(block, factory.CreateOperation(), array ? factory.SequenceAccess(target, factory.Integer(0)) : factory.PureOpaque(field, target));
-        var writes = new List<OperationId>();
-        var witnesses = new List<OperationId>();
+        var writes = ImmutableArray.CreateBuilder<OperationId>();
+        var witnesses = ImmutableArray.CreateBuilder<OperationId>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = input }, 64, new IrProgramReplayOptions(_ => null)
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, input), 64, new IrProgramReplayOptions(_ => null)
             {
                 WritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); writes.Add(write.Operation); },
                 NonFreshWritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); witnesses.Add(write.Operation); }
             });
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(7));
-        Assert.That(writes, Is.EqualTo(new[] { site }), "Ordinary effect replay observes the successful store regardless of ownership.");
-        Assert.That(witnesses, allocated ? Is.Empty : Is.EqualTo(new[] { site }));
+        Assert.That(writes.ToImmutable(), Is.EqualTo(ImmutableArray.Create(site)), "Ordinary effect replay observes the successful store regardless of ownership.");
+        Assert.That(witnesses.ToImmutable(), allocated ? Is.Empty : Is.EqualTo(ImmutableArray.Create(site)));
     }
 
     [TestCase(false)]
@@ -68,11 +69,11 @@ public sealed class IrPurityWriteWitnessTests
         else
         { builder.FieldStore(block, site, IrWriteRegion.Field, factory.Variable(owner), field, factory.Integer(7)); }
         builder.Return(block, factory.CreateOperation());
-        var witnesses = new List<OperationId>();
+        var witnesses = ImmutableArray.CreateBuilder<OperationId>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, new IrProgramReplayOptions(_ => null)
         { NonFreshWritePrefixObserver = (write, _) => { System.ArgumentNullException.ThrowIfNull(write); witnesses.Add(write.Operation); } });
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-        Assert.That(witnesses, Is.EqualTo(new[] { unknown, site }));
+        Assert.That(witnesses.ToImmutable(), Is.EqualTo(ImmutableArray.Create(unknown, site)));
     }
 
     [TestCase(false)]
@@ -92,7 +93,7 @@ public sealed class IrPurityWriteWitnessTests
         builder.Return(block, factory.CreateOperation());
         var observed = 0;
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(0)]) : factory.CreateNullValue(type) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(0)]) : factory.CreateNullValue(type)),
             64, new IrProgramReplayOptions(_ => null)
             {
                 WritePrefixObserver = (_, _) => observed++,

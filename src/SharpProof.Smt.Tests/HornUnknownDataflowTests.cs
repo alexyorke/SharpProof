@@ -22,8 +22,10 @@ public sealed class HornUnknownDataflowTests
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "invariant:masked-input", factory.BooleanType, isStatic: true, factory.IntegerType);
         var atom = factory.PureOpaque(relation, null, current);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [assigned, zero], atom),
             Query(factory, [atom, belowThree], factory.PureOpaque(relation, null, next)),

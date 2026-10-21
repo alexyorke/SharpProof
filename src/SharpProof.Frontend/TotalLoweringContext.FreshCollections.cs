@@ -8,26 +8,36 @@ internal sealed partial class TotalLoweringContext
         var identityOnly = lists || dictionaryOrigins || hashSetOrigins;
         var tracked = hashSetOrigins ? _defaultHashSetOrigins : lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
         var trackedCaptures = hashSetOrigins ? _defaultHashSetOriginCaptures : lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
-        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
-            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToArray();
-        var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
-        var captures = new Dictionary<CaptureId, List<IOperation>>();
-        var excluded = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var excludedCaptures = new HashSet<CaptureId>();
-        var escapedSymbols = new Queue<ISymbol>();
-        var escapedCaptures = new Queue<CaptureId>();
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToImmutableArray();
+        var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);
+        var captures = ImmutableDictionary.CreateBuilder<CaptureId, ImmutableArray<IOperation>.Builder>();
+        var definitionOrder = ImmutableArray.CreateBuilder<ISymbol>();
+        var captureOrder = ImmutableArray.CreateBuilder<CaptureId>();
+        var excluded = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        var excludedCaptures = ImmutableHashSet.CreateBuilder<CaptureId>();
+        var escapedSymbols = ImmutableQueue<ISymbol>.Empty;
+        var escapedCaptures = ImmutableQueue<CaptureId>.Empty;
         foreach (var operation in graph.OriginalOperation.DescendantsAndSelf().Concat(operations))
         {
             if (operation is ISimpleAssignmentOperation assignment && Symbol(assignment.Target) is { } target)
             {
                 if (!definitions.TryGetValue(target, out var values))
-                { definitions.Add(target, values = []); }
+                {
+                    values = ImmutableArray.CreateBuilder<IOperation>();
+                    definitions.AddUnique(target, values);
+                    definitionOrder.Add(target);
+                }
                 values.Add(assignment.Value);
             }
             if (operation is IFlowCaptureOperation capture)
             {
                 if (!captures.TryGetValue(capture.Id, out var values))
-                { captures.Add(capture.Id, values = []); }
+                {
+                    values = ImmutableArray.CreateBuilder<IOperation>();
+                    captures.AddUnique(capture.Id, values);
+                    captureOrder.Add(capture.Id);
+                }
                 values.Add(capture.Value);
             }
             // Ownership rejects publication of comparer/deserialization state.
@@ -52,11 +62,11 @@ internal sealed partial class TotalLoweringContext
         // Escape is an identity property, not a property of one local spelling.
         // Walk every definition backward once, including CFG captures and joins.
         // The deduplicated queues also terminate on cyclic alias definitions.
-        while (escapedSymbols.Count != 0 || escapedCaptures.Count != 0)
+        while (!escapedSymbols.IsEmpty || !escapedCaptures.IsEmpty)
         {
-            if (escapedSymbols.Count != 0)
+            if (!escapedSymbols.IsEmpty)
             {
-                var symbol = escapedSymbols.Dequeue();
+                escapedSymbols = escapedSymbols.Dequeue(out var symbol);
                 if (definitions.TryGetValue(symbol, out var values))
                 {
                     foreach (var value in values)
@@ -65,7 +75,7 @@ internal sealed partial class TotalLoweringContext
             }
             else
             {
-                var capture = escapedCaptures.Dequeue();
+                escapedCaptures = escapedCaptures.Dequeue(out var capture);
                 if (captures.TryGetValue(capture, out var values))
                 {
                     foreach (var value in values)
@@ -74,39 +84,44 @@ internal sealed partial class TotalLoweringContext
             }
         }
         var remaining = 4096;
-        foreach (var pair in definitions)
+        foreach (var key in definitionOrder)
         {
+            var pair = new KeyValuePair<ISymbol, ImmutableArray<IOperation>.Builder>(key, definitions[key]);
             if (pair.Key is ILocalSymbol { RefKind: RefKind.None } && !excluded.Contains(pair.Key) && All(pair.Value, 0))
-            { tracked.Add(pair.Key); }
+            {
+                tracked.Add(pair.Key);
+            }
         }
-        foreach (var pair in captures)
+        foreach (var key in captureOrder)
         {
+            var pair = new KeyValuePair<CaptureId, ImmutableArray<IOperation>.Builder>(key, captures[key]);
             if (!excludedCaptures.Contains(pair.Key) && All(pair.Value, 0))
-            { trackedCaptures.Add(pair.Key); }
+            {
+                trackedCaptures.Add(pair.Key);
+            }
         }
 
         void Exclude(IOperation operation, bool capturesReceiver = false)
         {
             operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<IOperation>.Empty.Push(operation);
+            while (!pending.IsEmpty)
             {
-                var child = pending.Pop();
+                pending = pending.Pop(out var child);
                 // A framework indexer publishes its stored value, not its owner.
                 // A closure still captures the receiver used to perform that read.
                 if (!capturesReceiver && child is IPropertyReferenceOperation
                     { Property: { IsIndexer: true, GetMethod: { } getter } } && (lists ? CSharpOperationSemantics.IsListStateMember(getter) : CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter)))
                 { continue; }
                 if (Symbol(child) is { } symbol && excluded.Add(symbol))
-                { escapedSymbols.Enqueue(symbol); }
+                { escapedSymbols = escapedSymbols.Enqueue(symbol); }
                 if (child is IFlowCaptureReferenceOperation capture && excludedCaptures.Add(capture.Id))
-                { escapedCaptures.Enqueue(capture.Id); }
+                { escapedCaptures = escapedCaptures.Enqueue(capture.Id); }
                 foreach (var nested in child.ChildOperations)
-                { pending.Push(nested); }
+                { pending = pending.Push(nested); }
             }
         }
-        bool All(List<IOperation> values, int depth)
+        bool All(ImmutableArray<IOperation>.Builder values, int depth)
         {
             values = RepositoryParameterGuard.NotNull(values, nameof(values));
             return values.Count != 0 && values.All(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : Resolve(value, depth + 1));

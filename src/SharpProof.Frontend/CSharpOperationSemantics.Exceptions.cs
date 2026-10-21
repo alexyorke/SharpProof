@@ -2,6 +2,9 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    private static readonly ImmutableArray<IrExceptionKind> RuntimeExceptionKinds =
+        Enum.GetValues(typeof(IrExceptionKind)).Cast<IrExceptionKind>().ToImmutableArray();
+
     internal static string ExceptionMetadataName(IrExceptionKind kind)
     {
         return kind switch
@@ -34,7 +37,7 @@ internal static partial class CSharpOperationSemantics
             return false;
         }
         var matched = ImmutableArray.CreateBuilder<IrExceptionKind>();
-        foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
+        foreach (var kind in RuntimeExceptionKinds)
         {
             var runtime = core.GetTypeByMetadataName(ExceptionMetadataName(kind));
             if (runtime == null)
@@ -153,227 +156,231 @@ internal static partial class CSharpOperationSemantics
         };
     }
 
-    private static readonly HashSet<string> CallbackFreeExceptionConstructors = new(StringComparer.Ordinal)
-    {
-        "M:System.ApplicationException.#ctor(System.String,System.Exception)",
-        "M:System.ApplicationException.#ctor(System.String)",
-        "M:System.ArgumentException.#ctor(System.String,System.Exception)",
-        "M:System.ArgumentException.#ctor(System.String,System.String,System.Exception)",
-        "M:System.ArgumentException.#ctor(System.String,System.String)",
-        "M:System.ArgumentException.#ctor(System.String)",
-        "M:System.BadImageFormatException.#ctor(System.String,System.Exception)",
-        "M:System.BadImageFormatException.#ctor(System.String,System.String,System.Exception)",
-        "M:System.BadImageFormatException.#ctor(System.String,System.String)",
-        "M:System.BadImageFormatException.#ctor(System.String)",
-        "M:System.ComponentModel.Win32Exception.#ctor",
-        "M:System.ContextMarshalException.#ctor(System.String,System.Exception)",
-        "M:System.ContextMarshalException.#ctor(System.String)",
-        "M:System.Exception.#ctor",
-        "M:System.Exception.#ctor(System.String,System.Exception)",
-        "M:System.Exception.#ctor(System.String)",
-        "M:System.InsufficientMemoryException.#ctor",
-        "M:System.InsufficientMemoryException.#ctor(System.String,System.Exception)",
-        "M:System.InsufficientMemoryException.#ctor(System.String)",
-        "M:System.InvalidTimeZoneException.#ctor",
-        "M:System.InvalidTimeZoneException.#ctor(System.String,System.Exception)",
-        "M:System.InvalidTimeZoneException.#ctor(System.String)",
-        "M:System.IO.FileLoadException.#ctor(System.String,System.Exception)",
-        "M:System.IO.FileLoadException.#ctor(System.String,System.String,System.Exception)",
-        "M:System.IO.FileLoadException.#ctor(System.String,System.String)",
-        "M:System.IO.FileLoadException.#ctor(System.String)",
-        "M:System.IO.FileNotFoundException.#ctor(System.String,System.Exception)",
-        "M:System.IO.FileNotFoundException.#ctor(System.String,System.String,System.Exception)",
-        "M:System.IO.FileNotFoundException.#ctor(System.String,System.String)",
-        "M:System.IO.FileNotFoundException.#ctor(System.String)",
-        "M:System.IO.IOException.#ctor(System.String,System.Exception)",
-        "M:System.IO.IOException.#ctor(System.String)",
-        "M:System.OutOfMemoryException.#ctor",
-        "M:System.OutOfMemoryException.#ctor(System.String,System.Exception)",
-        "M:System.OutOfMemoryException.#ctor(System.String)",
-        "M:System.Reflection.TargetException.#ctor",
-        "M:System.Reflection.TargetException.#ctor(System.String,System.Exception)",
-        "M:System.Reflection.TargetException.#ctor(System.String)",
-        "M:System.SystemException.#ctor(System.String,System.Exception)",
-        "M:System.SystemException.#ctor(System.String)",
-        "M:System.Text.DecoderFallbackException.#ctor(System.String,System.Exception)",
-        "M:System.Text.DecoderFallbackException.#ctor(System.String)",
-        "M:System.Text.EncoderFallbackException.#ctor(System.String,System.Exception)",
-        "M:System.Text.EncoderFallbackException.#ctor(System.String)",
-        "M:System.Threading.LockRecursionException.#ctor",
-        "M:System.Threading.LockRecursionException.#ctor(System.String,System.Exception)",
-        "M:System.Threading.LockRecursionException.#ctor(System.String)",
-        "M:System.Threading.ThreadInterruptedException.#ctor",
-        "M:System.Threading.ThreadInterruptedException.#ctor(System.String,System.Exception)",
-        "M:System.Threading.ThreadInterruptedException.#ctor(System.String)",
-        "M:System.TimeZoneNotFoundException.#ctor",
-        "M:System.TimeZoneNotFoundException.#ctor(System.String,System.Exception)",
-        "M:System.TimeZoneNotFoundException.#ctor(System.String)",
-        "M:System.TypeLoadException.#ctor(System.String,System.Exception)",
-        "M:System.TypeLoadException.#ctor(System.String)",
-    };
+    private static readonly ImmutableHashSet<string> CallbackFreeExceptionConstructors =
+        ImmutableHashSet.Create(StringComparer.Ordinal,
+            "M:System.ApplicationException.#ctor(System.String,System.Exception)",
+            "M:System.ApplicationException.#ctor(System.String)",
+            "M:System.ArgumentException.#ctor(System.String,System.Exception)",
+            "M:System.ArgumentException.#ctor(System.String,System.String,System.Exception)",
+            "M:System.ArgumentException.#ctor(System.String,System.String)",
+            "M:System.ArgumentException.#ctor(System.String)",
+            "M:System.BadImageFormatException.#ctor(System.String,System.Exception)",
+            "M:System.BadImageFormatException.#ctor(System.String,System.String,System.Exception)",
+            "M:System.BadImageFormatException.#ctor(System.String,System.String)",
+            "M:System.BadImageFormatException.#ctor(System.String)",
+            "M:System.ComponentModel.Win32Exception.#ctor",
+            "M:System.ContextMarshalException.#ctor(System.String,System.Exception)",
+            "M:System.ContextMarshalException.#ctor(System.String)",
+            "M:System.Exception.#ctor",
+            "M:System.Exception.#ctor(System.String,System.Exception)",
+            "M:System.Exception.#ctor(System.String)",
+            "M:System.InsufficientMemoryException.#ctor",
+            "M:System.InsufficientMemoryException.#ctor(System.String,System.Exception)",
+            "M:System.InsufficientMemoryException.#ctor(System.String)",
+            "M:System.InvalidTimeZoneException.#ctor",
+            "M:System.InvalidTimeZoneException.#ctor(System.String,System.Exception)",
+            "M:System.InvalidTimeZoneException.#ctor(System.String)",
+            "M:System.IO.FileLoadException.#ctor(System.String,System.Exception)",
+            "M:System.IO.FileLoadException.#ctor(System.String,System.String,System.Exception)",
+            "M:System.IO.FileLoadException.#ctor(System.String,System.String)",
+            "M:System.IO.FileLoadException.#ctor(System.String)",
+            "M:System.IO.FileNotFoundException.#ctor(System.String,System.Exception)",
+            "M:System.IO.FileNotFoundException.#ctor(System.String,System.String,System.Exception)",
+            "M:System.IO.FileNotFoundException.#ctor(System.String,System.String)",
+            "M:System.IO.FileNotFoundException.#ctor(System.String)",
+            "M:System.IO.IOException.#ctor(System.String,System.Exception)",
+            "M:System.IO.IOException.#ctor(System.String)",
+            "M:System.OutOfMemoryException.#ctor",
+            "M:System.OutOfMemoryException.#ctor(System.String,System.Exception)",
+            "M:System.OutOfMemoryException.#ctor(System.String)",
+            "M:System.Reflection.TargetException.#ctor",
+            "M:System.Reflection.TargetException.#ctor(System.String,System.Exception)",
+            "M:System.Reflection.TargetException.#ctor(System.String)",
+            "M:System.SystemException.#ctor(System.String,System.Exception)",
+            "M:System.SystemException.#ctor(System.String)",
+            "M:System.Text.DecoderFallbackException.#ctor(System.String,System.Exception)",
+            "M:System.Text.DecoderFallbackException.#ctor(System.String)",
+            "M:System.Text.EncoderFallbackException.#ctor(System.String,System.Exception)",
+            "M:System.Text.EncoderFallbackException.#ctor(System.String)",
+            "M:System.Threading.LockRecursionException.#ctor",
+            "M:System.Threading.LockRecursionException.#ctor(System.String,System.Exception)",
+            "M:System.Threading.LockRecursionException.#ctor(System.String)",
+            "M:System.Threading.ThreadInterruptedException.#ctor",
+            "M:System.Threading.ThreadInterruptedException.#ctor(System.String,System.Exception)",
+            "M:System.Threading.ThreadInterruptedException.#ctor(System.String)",
+            "M:System.TimeZoneNotFoundException.#ctor",
+            "M:System.TimeZoneNotFoundException.#ctor(System.String,System.Exception)",
+            "M:System.TimeZoneNotFoundException.#ctor(System.String)",
+            "M:System.TypeLoadException.#ctor(System.String,System.Exception)",
+            "M:System.TypeLoadException.#ctor(System.String)");
 
-    private static readonly Dictionary<string, int> NullMessageExceptionConstructors = new(StringComparer.Ordinal)
+    private static readonly ImmutableDictionary<string, int> NullMessageExceptionConstructors =
+        CreateNullMessageExceptionConstructors();
+
+    private static ImmutableDictionary<string, int> CreateNullMessageExceptionConstructors()
     {
-        ["M:System.AccessViolationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.AccessViolationException.#ctor(System.String)"] = 0,
-        ["M:System.AggregateException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.AggregateException.#ctor(System.String)"] = 0,
-        ["M:System.AppDomainUnloadedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.AppDomainUnloadedException.#ctor(System.String)"] = 0,
-        ["M:System.ArgumentNullException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ArgumentNullException.#ctor(System.String,System.String)"] = 1,
-        ["M:System.ArgumentOutOfRangeException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ArgumentOutOfRangeException.#ctor(System.String,System.String)"] = 1,
-        ["M:System.ArithmeticException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ArithmeticException.#ctor(System.String)"] = 0,
-        ["M:System.ArrayTypeMismatchException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ArrayTypeMismatchException.#ctor(System.String)"] = 0,
-        ["M:System.CannotUnloadAppDomainException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.CannotUnloadAppDomainException.#ctor(System.String)"] = 0,
-        ["M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String)"] = 0,
-        ["M:System.ComponentModel.Win32Exception.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ComponentModel.Win32Exception.#ctor(System.String)"] = 0,
-        ["M:System.DataMisalignedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.DataMisalignedException.#ctor(System.String)"] = 0,
-        ["M:System.Diagnostics.Tracing.EventSourceException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Diagnostics.Tracing.EventSourceException.#ctor(System.String)"] = 0,
-        ["M:System.Diagnostics.UnreachableException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Diagnostics.UnreachableException.#ctor(System.String)"] = 0,
-        ["M:System.DivideByZeroException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.DivideByZeroException.#ctor(System.String)"] = 0,
-        ["M:System.DllNotFoundException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.DllNotFoundException.#ctor(System.String)"] = 0,
-        ["M:System.DuplicateWaitObjectException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.DuplicateWaitObjectException.#ctor(System.String,System.String)"] = 1,
-        ["M:System.EntryPointNotFoundException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.EntryPointNotFoundException.#ctor(System.String)"] = 0,
-        ["M:System.ExecutionEngineException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ExecutionEngineException.#ctor(System.String)"] = 0,
-        ["M:System.FieldAccessException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.FieldAccessException.#ctor(System.String)"] = 0,
-        ["M:System.FormatException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.FormatException.#ctor(System.String)"] = 0,
-        ["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String,System.Exception)"] = 0,
-        ["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String,System.String)"] = 2,
-        ["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String)"] = 1,
-        ["M:System.Globalization.CultureNotFoundException.#ctor(System.String)"] = 0,
-        ["M:System.IndexOutOfRangeException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.IndexOutOfRangeException.#ctor(System.String)"] = 0,
-        ["M:System.InsufficientExecutionStackException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.InsufficientExecutionStackException.#ctor(System.String)"] = 0,
-        ["M:System.InvalidCastException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.InvalidCastException.#ctor(System.String)"] = 0,
-        ["M:System.InvalidOperationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.InvalidOperationException.#ctor(System.String)"] = 0,
-        ["M:System.InvalidProgramException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.InvalidProgramException.#ctor(System.String)"] = 0,
-        ["M:System.IO.DirectoryNotFoundException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.IO.DirectoryNotFoundException.#ctor(System.String)"] = 0,
-        ["M:System.IO.EndOfStreamException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.IO.EndOfStreamException.#ctor(System.String)"] = 0,
-        ["M:System.IO.InvalidDataException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.IO.InvalidDataException.#ctor(System.String)"] = 0,
-        ["M:System.IO.PathTooLongException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.IO.PathTooLongException.#ctor(System.String)"] = 0,
-        ["M:System.MemberAccessException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MemberAccessException.#ctor(System.String)"] = 0,
-        ["M:System.MethodAccessException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MethodAccessException.#ctor(System.String)"] = 0,
-        ["M:System.MissingFieldException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MissingFieldException.#ctor(System.String)"] = 0,
-        ["M:System.MissingMemberException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MissingMemberException.#ctor(System.String)"] = 0,
-        ["M:System.MissingMethodException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MissingMethodException.#ctor(System.String)"] = 0,
-        ["M:System.MulticastNotSupportedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.MulticastNotSupportedException.#ctor(System.String)"] = 0,
-        ["M:System.NotFiniteNumberException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.NotFiniteNumberException.#ctor(System.String)"] = 0,
-        ["M:System.NotImplementedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.NotImplementedException.#ctor(System.String)"] = 0,
-        ["M:System.NotSupportedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.NotSupportedException.#ctor(System.String)"] = 0,
-        ["M:System.NullReferenceException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.NullReferenceException.#ctor(System.String)"] = 0,
-        ["M:System.ObjectDisposedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.ObjectDisposedException.#ctor(System.String,System.String)"] = 1,
-        ["M:System.OperationCanceledException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.OperationCanceledException.#ctor(System.String)"] = 0,
-        ["M:System.OverflowException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.OverflowException.#ctor(System.String)"] = 0,
-        ["M:System.PlatformNotSupportedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.PlatformNotSupportedException.#ctor(System.String)"] = 0,
-        ["M:System.RankException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.RankException.#ctor(System.String)"] = 0,
-        ["M:System.Reflection.AmbiguousMatchException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Reflection.AmbiguousMatchException.#ctor(System.String)"] = 0,
-        ["M:System.Reflection.CustomAttributeFormatException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Reflection.CustomAttributeFormatException.#ctor(System.String)"] = 0,
-        ["M:System.Reflection.InvalidFilterCriteriaException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Reflection.InvalidFilterCriteriaException.#ctor(System.String)"] = 0,
-        ["M:System.Reflection.TargetInvocationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Reflection.TargetParameterCountException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Reflection.TargetParameterCountException.#ctor(System.String)"] = 0,
-        ["M:System.Resources.MissingManifestResourceException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Resources.MissingManifestResourceException.#ctor(System.String)"] = 0,
-        ["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String,System.String)"] = 0,
-        ["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.AmbiguousImplementationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.AmbiguousImplementationException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.CompilerServices.SwitchExpressionException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.CompilerServices.SwitchExpressionException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.COMException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.COMException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.ExternalException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.ExternalException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.InvalidComObjectException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.InvalidComObjectException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.InvalidOleVariantTypeException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.InvalidOleVariantTypeException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.MarshalDirectiveException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.MarshalDirectiveException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.SafeArrayRankMismatchException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.SafeArrayRankMismatchException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.SafeArrayTypeMismatchException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.SafeArrayTypeMismatchException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.InteropServices.SEHException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.InteropServices.SEHException.#ctor(System.String)"] = 0,
-        ["M:System.Runtime.Serialization.SerializationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Runtime.Serialization.SerializationException.#ctor(System.String)"] = 0,
-        ["M:System.Security.Cryptography.CryptographicException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Security.Cryptography.CryptographicException.#ctor(System.String)"] = 0,
-        ["M:System.Security.SecurityException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Security.SecurityException.#ctor(System.String)"] = 0,
-        ["M:System.Security.VerificationException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Security.VerificationException.#ctor(System.String)"] = 0,
-        ["M:System.StackOverflowException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.StackOverflowException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.AbandonedMutexException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.AbandonedMutexException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.SemaphoreFullException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.SemaphoreFullException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.SynchronizationLockException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.SynchronizationLockException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.Tasks.TaskCanceledException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.Tasks.TaskCanceledException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.Tasks.TaskSchedulerException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.Tasks.TaskSchedulerException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.ThreadStateException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.ThreadStateException.#ctor(System.String)"] = 0,
-        ["M:System.Threading.WaitHandleCannotBeOpenedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.Threading.WaitHandleCannotBeOpenedException.#ctor(System.String)"] = 0,
-        ["M:System.TimeoutException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.TimeoutException.#ctor(System.String)"] = 0,
-        ["M:System.TypeAccessException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.TypeAccessException.#ctor(System.String)"] = 0,
-        ["M:System.TypeUnloadedException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.TypeUnloadedException.#ctor(System.String)"] = 0,
-        ["M:System.UnauthorizedAccessException.#ctor(System.String,System.Exception)"] = 0,
-        ["M:System.UnauthorizedAccessException.#ctor(System.String)"] = 0,
-    };
+        var constructors = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+        constructors["M:System.AccessViolationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.AccessViolationException.#ctor(System.String)"] = 0;
+        constructors["M:System.AggregateException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.AggregateException.#ctor(System.String)"] = 0;
+        constructors["M:System.AppDomainUnloadedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.AppDomainUnloadedException.#ctor(System.String)"] = 0;
+        constructors["M:System.ArgumentNullException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ArgumentNullException.#ctor(System.String,System.String)"] = 1;
+        constructors["M:System.ArgumentOutOfRangeException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ArgumentOutOfRangeException.#ctor(System.String,System.String)"] = 1;
+        constructors["M:System.ArithmeticException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ArithmeticException.#ctor(System.String)"] = 0;
+        constructors["M:System.ArrayTypeMismatchException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ArrayTypeMismatchException.#ctor(System.String)"] = 0;
+        constructors["M:System.CannotUnloadAppDomainException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.CannotUnloadAppDomainException.#ctor(System.String)"] = 0;
+        constructors["M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String)"] = 0;
+        constructors["M:System.ComponentModel.Win32Exception.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ComponentModel.Win32Exception.#ctor(System.String)"] = 0;
+        constructors["M:System.DataMisalignedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.DataMisalignedException.#ctor(System.String)"] = 0;
+        constructors["M:System.Diagnostics.Tracing.EventSourceException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Diagnostics.Tracing.EventSourceException.#ctor(System.String)"] = 0;
+        constructors["M:System.Diagnostics.UnreachableException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Diagnostics.UnreachableException.#ctor(System.String)"] = 0;
+        constructors["M:System.DivideByZeroException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.DivideByZeroException.#ctor(System.String)"] = 0;
+        constructors["M:System.DllNotFoundException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.DllNotFoundException.#ctor(System.String)"] = 0;
+        constructors["M:System.DuplicateWaitObjectException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.DuplicateWaitObjectException.#ctor(System.String,System.String)"] = 1;
+        constructors["M:System.EntryPointNotFoundException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.EntryPointNotFoundException.#ctor(System.String)"] = 0;
+        constructors["M:System.ExecutionEngineException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ExecutionEngineException.#ctor(System.String)"] = 0;
+        constructors["M:System.FieldAccessException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.FieldAccessException.#ctor(System.String)"] = 0;
+        constructors["M:System.FormatException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.FormatException.#ctor(System.String)"] = 0;
+        constructors["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String,System.Exception)"] = 0;
+        constructors["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String,System.String)"] = 2;
+        constructors["M:System.Globalization.CultureNotFoundException.#ctor(System.String,System.String)"] = 1;
+        constructors["M:System.Globalization.CultureNotFoundException.#ctor(System.String)"] = 0;
+        constructors["M:System.IndexOutOfRangeException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.IndexOutOfRangeException.#ctor(System.String)"] = 0;
+        constructors["M:System.InsufficientExecutionStackException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.InsufficientExecutionStackException.#ctor(System.String)"] = 0;
+        constructors["M:System.InvalidCastException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.InvalidCastException.#ctor(System.String)"] = 0;
+        constructors["M:System.InvalidOperationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.InvalidOperationException.#ctor(System.String)"] = 0;
+        constructors["M:System.InvalidProgramException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.InvalidProgramException.#ctor(System.String)"] = 0;
+        constructors["M:System.IO.DirectoryNotFoundException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.IO.DirectoryNotFoundException.#ctor(System.String)"] = 0;
+        constructors["M:System.IO.EndOfStreamException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.IO.EndOfStreamException.#ctor(System.String)"] = 0;
+        constructors["M:System.IO.InvalidDataException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.IO.InvalidDataException.#ctor(System.String)"] = 0;
+        constructors["M:System.IO.PathTooLongException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.IO.PathTooLongException.#ctor(System.String)"] = 0;
+        constructors["M:System.MemberAccessException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MemberAccessException.#ctor(System.String)"] = 0;
+        constructors["M:System.MethodAccessException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MethodAccessException.#ctor(System.String)"] = 0;
+        constructors["M:System.MissingFieldException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MissingFieldException.#ctor(System.String)"] = 0;
+        constructors["M:System.MissingMemberException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MissingMemberException.#ctor(System.String)"] = 0;
+        constructors["M:System.MissingMethodException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MissingMethodException.#ctor(System.String)"] = 0;
+        constructors["M:System.MulticastNotSupportedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.MulticastNotSupportedException.#ctor(System.String)"] = 0;
+        constructors["M:System.NotFiniteNumberException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.NotFiniteNumberException.#ctor(System.String)"] = 0;
+        constructors["M:System.NotImplementedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.NotImplementedException.#ctor(System.String)"] = 0;
+        constructors["M:System.NotSupportedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.NotSupportedException.#ctor(System.String)"] = 0;
+        constructors["M:System.NullReferenceException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.NullReferenceException.#ctor(System.String)"] = 0;
+        constructors["M:System.ObjectDisposedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.ObjectDisposedException.#ctor(System.String,System.String)"] = 1;
+        constructors["M:System.OperationCanceledException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.OperationCanceledException.#ctor(System.String)"] = 0;
+        constructors["M:System.OverflowException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.OverflowException.#ctor(System.String)"] = 0;
+        constructors["M:System.PlatformNotSupportedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.PlatformNotSupportedException.#ctor(System.String)"] = 0;
+        constructors["M:System.RankException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.RankException.#ctor(System.String)"] = 0;
+        constructors["M:System.Reflection.AmbiguousMatchException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Reflection.AmbiguousMatchException.#ctor(System.String)"] = 0;
+        constructors["M:System.Reflection.CustomAttributeFormatException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Reflection.CustomAttributeFormatException.#ctor(System.String)"] = 0;
+        constructors["M:System.Reflection.InvalidFilterCriteriaException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Reflection.InvalidFilterCriteriaException.#ctor(System.String)"] = 0;
+        constructors["M:System.Reflection.TargetInvocationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Reflection.TargetParameterCountException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Reflection.TargetParameterCountException.#ctor(System.String)"] = 0;
+        constructors["M:System.Resources.MissingManifestResourceException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Resources.MissingManifestResourceException.#ctor(System.String)"] = 0;
+        constructors["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String,System.String)"] = 0;
+        constructors["M:System.Resources.MissingSatelliteAssemblyException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.AmbiguousImplementationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.AmbiguousImplementationException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.CompilerServices.SwitchExpressionException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.CompilerServices.SwitchExpressionException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.COMException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.COMException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.ExternalException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.ExternalException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.InvalidComObjectException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.InvalidComObjectException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.InvalidOleVariantTypeException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.InvalidOleVariantTypeException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.MarshalDirectiveException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.MarshalDirectiveException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SafeArrayRankMismatchException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SafeArrayRankMismatchException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SafeArrayTypeMismatchException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SafeArrayTypeMismatchException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SEHException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.InteropServices.SEHException.#ctor(System.String)"] = 0;
+        constructors["M:System.Runtime.Serialization.SerializationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Runtime.Serialization.SerializationException.#ctor(System.String)"] = 0;
+        constructors["M:System.Security.Cryptography.CryptographicException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Security.Cryptography.CryptographicException.#ctor(System.String)"] = 0;
+        constructors["M:System.Security.SecurityException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Security.SecurityException.#ctor(System.String)"] = 0;
+        constructors["M:System.Security.VerificationException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Security.VerificationException.#ctor(System.String)"] = 0;
+        constructors["M:System.StackOverflowException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.StackOverflowException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.AbandonedMutexException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.AbandonedMutexException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.SemaphoreFullException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.SemaphoreFullException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.SynchronizationLockException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.SynchronizationLockException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.Tasks.TaskCanceledException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.Tasks.TaskCanceledException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.Tasks.TaskSchedulerException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.Tasks.TaskSchedulerException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.ThreadStateException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.ThreadStateException.#ctor(System.String)"] = 0;
+        constructors["M:System.Threading.WaitHandleCannotBeOpenedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.Threading.WaitHandleCannotBeOpenedException.#ctor(System.String)"] = 0;
+        constructors["M:System.TimeoutException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.TimeoutException.#ctor(System.String)"] = 0;
+        constructors["M:System.TypeAccessException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.TypeAccessException.#ctor(System.String)"] = 0;
+        constructors["M:System.TypeUnloadedException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.TypeUnloadedException.#ctor(System.String)"] = 0;
+        constructors["M:System.UnauthorizedAccessException.#ctor(System.String,System.Exception)"] = 0;
+        constructors["M:System.UnauthorizedAccessException.#ctor(System.String)"] = 0;
+        return constructors.ToImmutable();
+    }
 
     private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception)
     {

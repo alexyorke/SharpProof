@@ -38,7 +38,7 @@ internal static class ContractVariableTransfer
         var parameters = destinationVariables
             .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
             .OrderBy(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal)).Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable)).ToImmutableArray();
-        var replacements = new Dictionary<IrVarId, IrVariableTerm>();
+        var replacements = ImmutableDictionary.CreateBuilder<IrVarId, IrVariableTerm>();
         foreach (var binding in sourceParameters)
         {
             IrVarId? canonicalVariable = null;
@@ -91,6 +91,6 @@ internal static class ContractVariableTransfer
         }
         // Each insertion path stores factory.Variable's statically
         // guaranteed IrVariableTerm. No arbitrary replacement term is admitted.
-        return replacements.ToImmutableDictionary(pair => pair.Key, pair => (IrTerm)pair.Value);
+        return replacements.ToImmutable().ToImmutableDictionary(pair => pair.Key, pair => (IrTerm)pair.Value);
     }
 }

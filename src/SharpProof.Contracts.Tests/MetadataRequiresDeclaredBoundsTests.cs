@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Frontend;
@@ -13,7 +14,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
     {
         var (compilation, target) = Import("Valid");
         Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
-            Is.EqualTo(new object[] { -2L, 2L }));
+            Is.EqualTo(ImmutableArray.Create<object>(-2L, 2L)));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var result = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
@@ -25,12 +26,9 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var variable = context.Parameters.Single().Entry;
         var type = factory.GetVariableInfo(variable).Type;
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -3, -2, 0, 2, 3 })
+        foreach (var input in ImmutableArray.Create(-3, -2, 0, 2, 3))
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(type, (long)input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(type, (long)input));
             Assert.That(interpreter.Evaluate(result.Clauses[0].Value, values).Value!.Boolean,
                 Is.EqualTo(input >= -2 && input <= 2));
             Assert.That(interpreter.Evaluate(result.Clauses[0].SafeCondition, values).Value!.Boolean, Is.True);
@@ -46,7 +44,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         Assert.That(target.Parameters.Length, Is.EqualTo(parameterCount));
         var invalid = target.Parameters.Last().GetAttributes().Single();
         Assert.That(invalid.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
-            Is.EqualTo(new object[] { 2L, 1L }));
+            Is.EqualTo(ImmutableArray.Create<object>(2L, 1L)));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var result = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
@@ -55,7 +53,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         if (parameterCount == 2)
         {
             Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
-                Is.EqualTo(new object[] { -2L, 2L }));
+                Is.EqualTo(ImmutableArray.Create<object>(-2L, 2L)));
         }
     }
 
@@ -75,7 +73,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var emitted = library.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var compilation = TestCompilation.Create("DeclaredMetadataBoundsConsumer", "public static class Consumer {}")
-            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+            .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));
         TestCompilation.AssertNoErrors(compilation);
         using var consumerImage = new MemoryStream();
         var consumerEmit = compilation.Emit(consumerImage);

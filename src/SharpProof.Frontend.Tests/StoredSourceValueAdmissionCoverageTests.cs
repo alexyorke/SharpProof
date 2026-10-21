@@ -20,7 +20,7 @@ public sealed class StoredSourceValueAdmissionCoverageTests
         var setup = array ? "var storage = new int[1];" : "var storage = new Cell();";
         var access = array ? "storage[0]" : "storage.Value";
         var assignment = compound ? " += " : " = ";
-        var additional = "public sealed class Cell { public int Value; }";
+        const string additional = "public sealed class Cell { public int Value; }";
         var prefix = "int Target(int value) { " + setup + access + assignment;
         var suffix = "; return " + access + "; }";
         using var subject = TypedProgramSubject.Create(prefix + "Helper(ref value)" + suffix +
@@ -47,7 +47,7 @@ public sealed class StoredSourceValueAdmissionCoverageTests
         Assert.That(value, Is.SameAs(invocation));
         Assert.That(target.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(target, array ? Is.InstanceOf<IArrayElementReferenceOperation>() : Is.InstanceOf<IFieldReferenceOperation>());
-        var session = new TotalSourceCallSession(subject.Compilation, null, null, default) { OpaqueCalls = true };
+        var session = new TotalSourceCallSession(subject.Compilation, null, null, default, opaqueCalls: true);
         var lowering = new RoslynTotalProgramLowerer(subject.Context, default, session).Lower(subject.Graph);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
@@ -56,7 +56,7 @@ public sealed class StoredSourceValueAdmissionCoverageTests
         Assert.That(session.IsActive(invocation.TargetMethod), Is.False);
         using var control = TypedProgramSubject.Create(prefix + "value + 1" + suffix, additional);
         Assert.That(control.Invoke([5]), Is.EqualTo(6));
-        var controlSession = new TotalSourceCallSession(control.Compilation, null, null, default) { OpaqueCalls = true };
+        var controlSession = new TotalSourceCallSession(control.Compilation, null, null, default, opaqueCalls: true);
         var exact = new RoslynTotalProgramLowerer(control.Context, default, controlSession).Lower(control.Graph);
         Assert.That(exact.IsExact, Is.True);
         Assert.That(exact.ConstructionLimitExceeded, Is.False);

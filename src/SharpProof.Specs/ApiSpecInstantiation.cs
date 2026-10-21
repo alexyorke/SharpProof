@@ -48,10 +48,10 @@ internal static partial class ApiSpecInstantiator
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         substitutions = ArgumentNullGuard.NotNull(
             substitutions, nameof(substitutions));
-        substitutions = substitutions.ToImmutableDictionary();
+        var capturedSubstitutions = substitutions.ToImmutableDictionary();
 
         var variables = template.VariablesById;
-        foreach (var substitution in substitutions)
+        foreach (var substitution in capturedSubstitutions)
         {
             if (!variables.TryGetValue(substitution.Key, out var variable))
             {
@@ -78,7 +78,7 @@ internal static partial class ApiSpecInstantiator
                     "The substitution term type does not match the spec variable type.");
             }
         }
-        var instantiation = new Instantiation(factory, substitutions,
+        var instantiation = new Instantiation(factory, capturedSubstitutions,
             template.VariablesBySlot, template.ValidatedTerms);
         IrTerm? normalCompletionCondition = null;
         if (template.Facets.Throws.NormalCompletion is { } declaredCompletion)
@@ -143,14 +143,14 @@ internal static partial class ApiSpecInstantiator
 
     private sealed partial class Instantiation(
         IrFactory factory,
-        IReadOnlyDictionary<SpecVarId, IrTerm> substitutions,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
+        ImmutableDictionary<SpecVarId, IrTerm> substitutions,
+        ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        private IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> _guarded_validatedTerms = validatedTerms ?? throw new System.ArgumentNullException(nameof(validatedTerms));
-        private IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> _guarded_variables = variables ?? throw new System.ArgumentNullException(nameof(variables));
-        private IReadOnlyDictionary<SpecVarId, IrTerm> _guarded_substitutions = substitutions ?? throw new System.ArgumentNullException(nameof(substitutions));
-        private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
+        private readonly ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> _guarded_validatedTerms = validatedTerms ?? throw new System.ArgumentNullException(nameof(validatedTerms));
+        private readonly ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> _guarded_variables = variables ?? throw new System.ArgumentNullException(nameof(variables));
+        private readonly ImmutableDictionary<SpecVarId, IrTerm> _guarded_substitutions = substitutions ?? throw new System.ArgumentNullException(nameof(substitutions));
+        private readonly IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         internal TermResult Term(SpecTermDeclaration term)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));

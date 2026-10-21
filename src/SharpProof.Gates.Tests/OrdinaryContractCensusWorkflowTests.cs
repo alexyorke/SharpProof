@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -26,12 +27,12 @@ public sealed class OrdinaryContractCensusWorkflowTests
             """, "OrdinaryDuplicateContractEnrollment", includeExternalEffectsFixture: false);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
-        var original = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
-        var repeated = CorpusGate.MatchNativeContractCalls(compilation, [body, body], TestContext.CurrentContext.CancellationToken);
+        var original = CorpusGate.MatchNativeContractCalls(compilation, ImmutableArray.Create(body), TestContext.CurrentContext.CancellationToken);
+        var repeated = CorpusGate.MatchNativeContractCalls(compilation, ImmutableArray.Create(body, body), TestContext.CurrentContext.CancellationToken);
         var obligation = body.CallPreconditions.Single();
         var marker = (SharpProof.Ir.IrAssignInstruction)body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == obligation.Instruction));
@@ -47,7 +48,7 @@ public sealed class OrdinaryContractCensusWorkflowTests
             Assert.That(original.Failures, Is.Empty);
             Assert.That(repeated.Expected, Is.EqualTo(1));
             Assert.That(repeated.Matched, Is.EqualTo(1));
-            Assert.That(repeated.Failures, Is.EqualTo(new[] { "DuplicateNativeObligation:" + sourceKey }));
+            Assert.That(repeated.Failures, Is.EqualTo(ImmutableArray.Create("DuplicateNativeObligation:" + sourceKey)));
         }
     }
 
@@ -73,7 +74,7 @@ public sealed class OrdinaryContractCensusWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
 
         var census = CorpusGate.CensusContractCalls(compilation);
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, ImmutableArray<CompilerTotalCallablePreparation>.Empty, TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -83,10 +84,10 @@ public sealed class OrdinaryContractCensusWorkflowTests
             Assert.That(census.Complete, Is.True);
             Assert.That(census.Unpublished, Is.True);
             Assert.That(census.ManifestUnchanged, Is.True);
-            Assert.That(census.Failures, Is.EqualTo(new[] { expectedFailure }));
+            Assert.That(census.Failures, Is.EqualTo(ImmutableArray.Create(expectedFailure)));
             Assert.That(coverage.Expected, Is.Zero);
             Assert.That(coverage.Matched, Is.Zero);
-            Assert.That(coverage.Failures, Is.EqualTo(new[] { "RequiresBindingFailed:" + expectedFailure }));
+            Assert.That(coverage.Failures, Is.EqualTo(ImmutableArray.Create("RequiresBindingFailed:" + expectedFailure)));
         }
     }
 }

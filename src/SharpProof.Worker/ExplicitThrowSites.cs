@@ -8,7 +8,7 @@ internal static class ExplicitThrowSites
     private const string Prefix = "explicit-throw:";
     private const string ExactPrefix = Prefix + "exact:";
 
-    internal static string[] Types(IrFactory factory, OperationId site)
+    internal static ImmutableArray<string> Types(IrFactory factory, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(factory);

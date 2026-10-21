@@ -37,7 +37,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
         var expectedZulu = await ObserveVersionAsync("ZuluTarget", allocate: false);
         var actualZulu = await ObserveVersionAsync("ZuluTarget", allocate: changeVersions);
         var actualAlpha = await ObserveVersionAsync("AlphaTarget", allocate: changeVersions);
-        var expected = new[] { expectedZulu, expectedAlpha }.ToImmutableDictionary(
+        var expected = ImmutableArray.Create(expectedZulu, expectedAlpha).ToImmutableDictionary(
             static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId), StringComparer.Ordinal);
 
         var failures = CorpusObservationComparison.CompareConcurrent(expected, [actualZulu, actualAlpha]);

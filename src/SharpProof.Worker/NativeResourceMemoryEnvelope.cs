@@ -155,14 +155,13 @@ internal static class NativeResourceMemoryEnvelope
         root = ArgumentNullGuard.NotNull(root, nameof(root));
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         references = ArgumentNullGuard.NotNull(references, nameof(references));
-        var pending = new Stack<IrTerm>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IrTerm>.Empty.Push(root);
+        while (!pending.IsEmpty)
         {
             cancellation.ThrowIfCancellationRequested();
             if (--remaining < 0)
             { return false; }
-            var term = pending.Pop();
+            pending = pending.Pop(out var term);
             switch (term)
             {
                 case IrVariableTerm variable when Scalar(factory, variable.Type) || Reference(factory, variable.Type) && references.Contains(variable.Variable):
@@ -182,7 +181,7 @@ internal static class NativeResourceMemoryEnvelope
                 default:
                     return false;
             }
-            IrTraversal.PushChildren(term, pending);
+            pending = IrTraversal.PushChildren(term, pending);
         }
         return true;
     }

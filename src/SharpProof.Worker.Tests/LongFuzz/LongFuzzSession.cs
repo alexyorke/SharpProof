@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -32,8 +33,8 @@ internal sealed class LongFuzzSession
     private static readonly object s_sync = new();
     private static DateTime? s_runDeadline;
 
-    private readonly Dictionary<string, int> _counts = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, int> _hitKinds = new(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, int>.Builder _counts = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, int>.Builder _hitKinds = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
     private readonly Stopwatch _elapsed = Stopwatch.StartNew();
     private readonly DateTime _deadline;
     private int _cases;
@@ -74,6 +75,7 @@ internal sealed class LongFuzzSession
     internal string Output { get; }
     internal int Cases => _cases;
     internal int Hits => _hitKinds.Values.Sum();
+    internal ImmutableDictionary<string, int> Counts => _counts.ToImmutable();
 
     internal IEnumerable<int> Seeds()
     {
@@ -157,8 +159,8 @@ internal sealed class LongFuzzSession
     {
         var stats = new LongFuzzStats(
             Harness, SeedStart, _lastSeed, _cases, Hits, Math.Round(_elapsed.Elapsed.TotalMinutes, 2),
-            new SortedDictionary<string, int>(_hitKinds, StringComparer.Ordinal),
-            new SortedDictionary<string, int>(_counts, StringComparer.Ordinal));
+            _hitKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            _counts.ToImmutableSortedDictionary(StringComparer.Ordinal));
         lock (s_sync)
         {
             File.WriteAllText(Path.Combine(Output, "stats-" + Harness + ".json"), JsonSerializer.Serialize(stats) + "\n");
@@ -264,9 +266,9 @@ internal sealed record LongFuzzHitRecord(
 
 internal sealed record LongFuzzStats(
     string Harness, int SeedStart, int LastSeed, int Cases, int Hits, double ElapsedMinutes,
-    SortedDictionary<string, int> HitKinds, SortedDictionary<string, int> Counts)
+    ImmutableSortedDictionary<string, int> HitKinds, ImmutableSortedDictionary<string, int> Counts)
 {
     public string Harness { get; init; } = Harness ?? throw new System.ArgumentNullException(nameof(Harness));
-    public SortedDictionary<string, int> HitKinds { get; init; } = HitKinds ?? throw new System.ArgumentNullException(nameof(HitKinds));
-    public SortedDictionary<string, int> Counts { get; init; } = Counts ?? throw new System.ArgumentNullException(nameof(Counts));
+    public ImmutableSortedDictionary<string, int> HitKinds { get; init; } = HitKinds ?? throw new System.ArgumentNullException(nameof(HitKinds));
+    public ImmutableSortedDictionary<string, int> Counts { get; init; } = Counts ?? throw new System.ArgumentNullException(nameof(Counts));
 }

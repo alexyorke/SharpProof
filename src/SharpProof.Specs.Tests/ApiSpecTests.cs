@@ -54,7 +54,7 @@ public sealed class ApiSpecTests
         {
             Assert.Throws<ArgumentNullException>(() => ApiSpecTable.Create(null!));
             Assert.Throws<ArgumentException>(() =>
-                ApiSpecTable.Create(Array.Empty<ApiSpecDeclaration>()));
+                ApiSpecTable.Create(ImmutableArray<ApiSpecDeclaration>.Empty));
             Assert.Throws<ArgumentException>(() =>
                 ApiSpecTable.Create([declaration, null!]));
             var duplicateError = Assert.Throws<ArgumentException>(() =>
@@ -91,7 +91,7 @@ public sealed class ApiSpecTests
         var annotations = output.GetCustomAttributes(inherit: false)
             .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.GetType().FullName ==
                 "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(annotations, Has.Length.EqualTo(1));
         var annotation = annotations[0];
@@ -386,7 +386,7 @@ public sealed class ApiSpecTests
     [Test]
     public void DefaultBclCatalogApprovesOnlyObservedFrameworkIdentities()
     {
-        var expected = new[] {
+        var expected = ImmutableArray.Create(
             "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
             "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreRuntime",
             "System.Collections|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
@@ -408,7 +408,7 @@ public sealed class ApiSpecTests
             "mscorlib|b77a5c561934e089|NetStandardReferencePack",
             "netstandard|cc7b13ffcd2ddd51|MicrosoftNetCoreReferencePack",
             "netstandard|cc7b13ffcd2ddd51|NetStandardReferencePack"
-        };
+        );
 
         foreach (var template in ApiSpecTable.Default.Templates.Where(
                      static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Target.WitnessIdentifier.StartsWith(
@@ -484,11 +484,7 @@ public sealed class ApiSpecTests
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters.Single()] = factory.Variable(parameter),
-                [template.Result!.Value] = factory.Variable(result)
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters.Single(), factory.Variable(parameter)).SetItem(template.Result!.Value, factory.Variable(result)));
 
         Assert.That(
             instantiated.Status,
@@ -656,7 +652,7 @@ public sealed class ApiSpecTests
                         "System.Diagnostics.ConditionalAttribute"))
                     .SelectMany(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ConstructorArguments))
                     .Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
-                Is.EquivalentTo(new object[] { Contract.ConditionalSymbol }));
+                Is.EquivalentTo(ImmutableArray.Create<object>(Contract.ConditionalSymbol)));
         }
     }
 
@@ -683,8 +679,8 @@ public sealed class ApiSpecTests
     [Test]
     public void SharpProofPackageSpecsRejectPublicKeyMismatch()
     {
-        var publicKey = typeof(object).Assembly.GetName().GetPublicKey();
-        Assert.That(publicKey, Is.Not.Null.And.Not.Empty);
+        var publicKey = typeof(object).Assembly.GetName().GetPublicKey()!.ToImmutableArray();
+        Assert.That(publicKey, Is.Not.Empty);
         AssertSharpProofPackageSpecRejected(
             () => CreateSharpProofPackageReference(
                 CreateContractSource(
@@ -1050,7 +1046,7 @@ public sealed class ApiSpecTests
                 constructor.Parameters.Length == 1 &&
                 constructor.Parameters[0].Type.SpecialType ==
                     SpecialType.System_String))
-            .ToArray();
+            .ToImmutableArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 1 &&
@@ -1059,7 +1055,7 @@ public sealed class ApiSpecTests
         var standard = supported
             .Where(static constructor =>
                 constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName == "Exception"))
-            .ToArray();
+            .ToImmutableArray();
         var invalidOperationParameterless =
             invalidOperation.InstanceConstructors.Single(
                 static constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.IsEmpty));
@@ -1171,13 +1167,13 @@ public sealed class ApiSpecTests
     [Test]
     public void SeedFacetsRetainDocumentedAndObservedEvidence()
     {
-        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (new[] {
+        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (ImmutableArray.Create(
             row.Facets.Effects.Evidence,
             row.Facets.Allocation.Evidence,
             row.Facets.Throws.Evidence,
             row.Facets.Nullness.Evidence,
             row.Facets.Cardinality.Evidence
-        })).Concat(ApiSpecTable.Default.Templates
+        ))).Concat(ApiSpecTable.Default.Templates
             .Where(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination != null))
             .Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination!.Evidence)))
         .Concat(ApiSpecTable.Default.Templates.SelectMany(
@@ -1202,11 +1198,7 @@ public sealed class ApiSpecTests
         return ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Receiver!.Value] = factory.Variable(receiver),
-                [template.Result!.Value] = factory.Variable(result)
-            });
+            ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Receiver!.Value, factory.Variable(receiver)).SetItem(template.Result!.Value, factory.Variable(result)));
     }
 
     private static ApiSpecDeclaration Declaration(
@@ -1542,11 +1534,10 @@ public sealed class ApiSpecTests
                 ".nuget",
                 "packages");
         }
-        var candidates = new[]
-            {
+        var candidates = ImmutableArray.Create(
                 packRoot,
                 Path.Combine(packageRoot, "microsoft.netcore.app.ref")
-            }
+            )
             .Where(Directory.Exists)
             .SelectMany(Directory.EnumerateDirectories)
             .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new
@@ -1592,7 +1583,7 @@ public sealed class ApiSpecTests
                 emit.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
-        return MetadataReference.CreateFromImage(stream.ToArray());
+        return MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
     }
 
     private static MetadataReference CoreReference

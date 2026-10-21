@@ -10,7 +10,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ConditionalMetadataSymbolReaderTests
 {
-    private static readonly string[] ExpectedSymbols = ["existing", "FIRST", "SECOND", "FIRST"];
+    private static readonly ImmutableArray<string> ExpectedSymbols = ["existing", "FIRST", "SECOND", "FIRST"];
 
     [Test]
     public void CompiledConditionalAttributesAppendSymbolsInMetadataOrder()
@@ -28,7 +28,7 @@ public sealed class ConditionalMetadataSymbolReaderTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        using var metadata = ModuleMetadata.CreateFromImage(image.ToArray());
+        using var metadata = ModuleMetadata.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
         var reader = metadata.GetMetadataReader();
         Assert.That(reader.MetadataKind, Is.EqualTo(MetadataKind.Ecma335));
         var handle = reader.MethodDefinitions.Single(candidate =>
@@ -94,9 +94,9 @@ public sealed class ConditionalMetadataSymbolReaderTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures",
             "Windows.Media.Capture.CameraCaptureUIContract.winmd");
-        var bytes = File.ReadAllBytes(path);
+        var bytes = File.ReadAllBytes(path).ToImmutableArray();
         Assert.That(bytes, Has.Length.EqualTo(3072));
-        Assert.That(Convert.ToHexString(SHA256.HashData(bytes)),
+        Assert.That(Convert.ToHexString(SHA256.HashData(bytes.AsSpan())),
             Is.EqualTo("5F9EE2BFF39D954EDFDB88E985B7F6F42CBB6DB98D6D2EFE05DB9035B66856FB"));
         return ModuleMetadata.CreateFromImage(bytes);
     }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using System.Globalization;
 using System.Numerics;
@@ -11,10 +12,11 @@ internal sealed class IrTypedIntegerTests
     public void TypedInterningIncludesWidthAndSignAndKeepsLegacySeparate()
     {
         var factory = new IrFactory();
-        var types = new HashSet<IrTypeId> { factory.IntegerType };
-        foreach (var width in new[] { 8, 16, 32, 64 })
+        var types = ImmutableHashSet.CreateBuilder<IrTypeId>();
+        types.Add(factory.IntegerType);
+        foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
-            foreach (var isSigned in new[] { false, true })
+            foreach (var isSigned in ImmutableArray.Create(false, true))
             {
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 Assert.That(factory.GetOrCreateIntegerType(width, isSigned), Is.EqualTo(type));
@@ -67,11 +69,8 @@ internal sealed class IrTypedIntegerTests
         var variable = factory.CreateVariable("sequence", sequenceType);
         var result = new IrInterpreter(factory).Evaluate(
             factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateSequenceValue(sequenceType,
-                    [factory.CreateIntegerValue(type, ushort.MaxValue)])
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateSequenceValue(sequenceType,
+                    [factory.CreateIntegerValue(type, ushort.MaxValue)])));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Type, Is.EqualTo(type));
         Assert.That(result.Value.IntegerBits, Is.EqualTo(ushort.MaxValue));
@@ -96,10 +95,7 @@ internal sealed class IrTypedIntegerTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var variable = factory.CreateVariable("boxed", factory.ObjectType);
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateReferenceValue(factory.ObjectType, boxed)
-        };
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateReferenceValue(factory.ObjectType, boxed));
         var result = new IrInterpreter(factory).Evaluate(factory.Cast(type, factory.Variable(variable)), values);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Type, Is.EqualTo(type));
@@ -117,11 +113,7 @@ internal sealed class IrTypedIntegerTests
         var type = factory.GetOrCreateIntegerType(8, isSigned);
         var left = factory.CreateVariable("left", type);
         var right = factory.CreateVariable("right", type);
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [left] = factory.CreateIntegerValueFromBits(type, 128),
-            [right] = factory.CreateIntegerValueFromBits(type, 127)
-        };
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValueFromBits(type, 128)).SetItem(right, factory.CreateIntegerValueFromBits(type, 127));
         var runtime = new IrInterpreter(factory).Evaluate(factory.Binary(operation,
             factory.Variable(left), factory.Variable(right)), values);
         var folded = (IrBooleanTerm)factory.Binary(operation, factory.IntegerBits(type, 128), factory.IntegerBits(type, 127));
@@ -138,7 +130,7 @@ internal sealed class IrTypedIntegerTests
         var type = factory.GetOrCreateIntegerType(8, true);
         var variable = factory.CreateVariable("value", type);
         var result = new IrInterpreter(factory).Evaluate(factory.Unary(IrUnaryOperator.Negate, factory.Variable(variable)),
-            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateIntegerValueFromBits(type, bits) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValueFromBits(type, bits)));
         var folded = (IrIntegerTerm)factory.Unary(IrUnaryOperator.Negate, factory.IntegerBits(type, bits));
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Type, Is.EqualTo(type));

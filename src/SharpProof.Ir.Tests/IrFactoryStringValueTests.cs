@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -10,7 +11,7 @@ public sealed class IrFactoryStringValueTests
     public void CreateStringValueRejectsIllFormedUtf16LikeStringTerms()
     {
         var factory = new IrFactory();
-        foreach (var surrogate in new[] { '\uD800', '\uDC00' })
+        foreach (var surrogate in ImmutableArray.Create('\uD800', '\uDC00'))
         {
             var value = new string(surrogate, 1);
             var valueError = Assert.Throws<ArgumentException>(
@@ -60,12 +61,9 @@ public sealed class IrFactoryStringValueTests
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             interpreter.Evaluate(
                 cast,
-                new Dictionary<IrVarId, IrValue>
-                {
-                    [source] = factory.CreateReferenceValue(
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(source, factory.CreateReferenceValue(
                         factory.ObjectType,
-                        malformed)
-                })));
+                        malformed)))));
 
         using (Assert.EnterMultipleScope())
         {

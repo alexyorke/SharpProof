@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -19,7 +20,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         var bodySource = "var result=value;" + string.Concat(Enumerable.Repeat("result+=1;", statementCount)) + "return result;";
         var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes;" +
             "public static class Subject { [DoesNotThrow] public static int Root(int value) {" + bodySource + "} }";
-        var compilation = TestCompilation.Create("OwnedScalarConstructionBoundary", ("scalar-boundary.cs", source));
+        var compilation = TestCompilation.CreateExact("OwnedScalarConstructionBoundary", [("scalar-boundary.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -44,7 +45,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(method.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
         Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
-        var statements = declaration.Body!.Statements.OfType<ExpressionStatementSyntax>().ToArray();
+        var statements = declaration.Body!.Statements.OfType<ExpressionStatementSyntax>().ToImmutableArray();
         Assert.That(statements, Has.Length.EqualTo(statementCount));
         foreach (var statement in statements)
         {
@@ -83,7 +84,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
             var factory = total.Program.Factory;
             var entry = total.Parameters.Single().Entry;
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1)));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
             Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(statementCount + 1)));
@@ -94,6 +95,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
             Assert.That(total, Is.Null);
         }
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

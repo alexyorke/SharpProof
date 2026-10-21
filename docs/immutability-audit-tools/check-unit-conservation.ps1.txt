@@ -1,0 +1,69 @@
+Historical source snapshot. Remove this documentation header line to restore the exact source payload.
+param([string]$OutputRoot,[string]$RepositoryRoot,[string]$Mode)
+$ErrorActionPreference='Stop'
+$encoding=[Text.UTF8Encoding]::new($false)
+$universe=@(Get-Content (Join-Path $OutputRoot 'source-universe.txt'))
+if(@($universe|Group-Object|Where-Object Count -gt 1).Count){throw 'Duplicate universe paths'}
+$known=@{}
+foreach($row in Import-Csv (Join-Path $RepositoryRoot 'docs/immutability-const-units.tsv') -Delimiter ([char]9)){$known.Add($row.Path,$row.ConstReviewStatus)}
+$compiled=@{}
+$contexts=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$instances=0
+foreach($report in Get-ChildItem $OutputRoot -Filter '*.tsv'){
+    $rows=@(Import-Csv $report.FullName -Delimiter ([char]9))
+    $unitRows=@($rows|Where-Object Kind -eq 'Unit')
+    $pathReport=[IO.Path]::ChangeExtension($report.FullName,'.paths.txt')
+    if(-not (Test-Path $pathReport)){throw 'Missing normalized compiler paths'}
+    $tracked=@(Import-Csv $pathReport -Delimiter ([char]9)|Where-Object Tracked -eq 'True'|ForEach-Object ResolvedPath)
+    if(Compare-Object @($tracked|Sort-Object) @($unitRows.Path|Sort-Object)){throw 'Compiler path/unit mismatch'}
+    foreach($row in $unitRows) {
+        if($row.Path -notin $universe){throw 'Unexpected compiled unit'}
+        if(-not $compiled.ContainsKey($row.Path)){$compiled.Add($row.Path,[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal))}
+        $null=$compiled[$row.Path].Add($row.ContextSha256)
+        $null=$contexts.Add($row.ContextSha256)
+        $hash=(Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $row.Path) -Algorithm SHA256).Hash.ToLowerInvariant()
+        if($hash -cne $row.SourceSha256){throw "Compiler source drift $($row.Path)"}
+        $instances++
+    }
+}
+$semanticUnits=@{}
+$observations=0
+foreach($report in Get-ChildItem (Join-Path $OutputRoot 'residual') -Filter '*.tsv'){
+    $rows=@(Import-Csv $report.FullName -Delimiter ([char]9))
+    foreach($row in $rows){
+        if(-not $contexts.Contains($row.ContextSha256)){throw 'Semantic report lacks matching actual compilation'}
+        $observations++
+        if($row.Kind -eq 'Unit'){
+            if($row.Shape -ne 'CompiledSyntax'){throw "Parse errors $($row.Path)"}
+            $key=$row.ContextSha256+'|'+$row.Path
+            if($semanticUnits.ContainsKey($key)){throw 'Duplicate semantic unit'}
+            $semanticUnits.Add($key,$row)
+        }
+    }
+}
+foreach($path in $compiled.Keys){foreach($context in $compiled[$path]){if(-not $semanticUnits.ContainsKey($context+'|'+$path)){throw 'Missing zero-candidate semantic unit'}}}
+$manifest=[Collections.Generic.List[string]]::new()
+$manifest.Add('Path'+[char]9+'SourceSha256'+[char]9+'CompilerContextCount'+[char]9+'Status'+[char]9+'Contexts')
+$unexpected=[Collections.Generic.List[string]]::new()
+$absent=0
+foreach($path in $universe|Sort-Object -CaseSensitive){
+    $hash=(Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $path) -Algorithm SHA256).Hash.ToLowerInvariant()
+    $count=0;$contextList=''
+    if($compiled.ContainsKey($path)){
+        $count=$compiled[$path].Count
+        $contextList=($compiled[$path]|Sort-Object) -join ','
+        $status='ActualCompilerCensus'
+    } else {
+        $absent++
+        if($Mode -in @('benchmark','linked-benchmark')){$status='OutsideSelectedPilot'}
+        elseif($known[$path] -eq 'CompilerRuntimeSubjectPreserved'){$status='AbsentCompilerContext: explicit physical compiler/runtime subject'}
+        elseif($known[$path] -eq 'DynamicHelperManuallyReviewed'){$status='AbsentCompilerContext: dynamic helper; manual review retained, fresh semantic context required for automatic claims'}
+        else{$status='UnexpectedMissingCompilerContext';$unexpected.Add($path)}
+    }
+    $manifest.Add((@($path,$hash,$count,$status,$contextList) -join [char]9))
+}
+[IO.File]::WriteAllText((Join-Path $OutputRoot 'residual-unit-manifest.txt'),($manifest -join [char]10)+[char]10,$encoding)
+[IO.File]::WriteAllText((Join-Path $OutputRoot 'unexpected-missing-paths.txt'),($unexpected -join [char]10),$encoding)
+if($unexpected.Count){throw "Unexpected missing compiler paths: $($unexpected.Count)"}
+Write-Output "Conserved $($universe.Count) paths: $($compiled.Count) compiled, $absent explicit absent; $instances compiled-unit instances; $($contexts.Count) contexts; $observations semantic observations."
+& (Join-Path $PSScriptRoot 'check-type-reference-authority.ps1') -OutputRoot $OutputRoot

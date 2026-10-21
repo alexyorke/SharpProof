@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -80,6 +81,7 @@ internal sealed class NativeOpaqueCallTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
@@ -174,7 +176,7 @@ internal sealed class NativeOpaqueCallTests
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
-            foreach (var result in new[] { allocations, purity })
+            foreach (var result in ImmutableArray.Create(allocations, purity))
             {
                 if (proven)
                 { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
@@ -204,7 +206,7 @@ internal sealed class NativeOpaqueCallTests
     [TestCase(false, null)]
     public async Task CatchAllHandlesDispatchedAndConstrainedCalls(bool guarded, Type? outcome)
     {
-        var body = "var entry = _collection.Find(item.Key); return entry.Value.Equals(item.Value);";
+        const string body = "var entry = _collection.Find(item.Key); return entry.Value.Equals(item.Value);";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
             using System.Collections.Generic;
             using SharpProof.Attributes;
@@ -235,10 +237,11 @@ internal sealed class NativeOpaqueCallTests
     private static async Task<WorkerClaimOutcome> PostconditionAsync(CompilerCallablePreparation preparation)
     {
         System.ArgumentNullException.ThrowIfNull(preparation);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
-        return results.Count == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
+        return results.Length == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
     }
 
     private static CompilerCallablePreparation Prepare(string method)

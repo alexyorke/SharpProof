@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -17,7 +18,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
         var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, TestContext.CurrentContext.CancellationToken);
         var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, otherActual })
+        foreach (var response in ImmutableArray.Create(actual, otherActual))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
@@ -93,7 +94,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
         var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, TestContext.CurrentContext.CancellationToken);
         var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, otherActual })
+        foreach (var response in ImmutableArray.Create(actual, otherActual))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
@@ -119,7 +120,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         Assert.That(profile.MaximumExpressionDepth, Is.EqualTo(64));
         var profileRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(other.Request))
             ?? throw new AssertionException("The actual owned request did not deserialize.");
-        profileRequest.Budgets = profile;
+        { profileRequest = profileRequest with { Budgets = profile }; }
         var profileValidation = WorkerProtocolJson.Validate(profileRequest);
         Assert.That(profileValidation.IsValid, Is.True, string.Join(", ", profileValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(profileRequest);
@@ -155,7 +156,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         System.ArgumentNullException.ThrowIfNull(typeName);
         var source = "using SharpProof.Attributes; public static class " + typeName +
             " { public static int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; } }";
-        var compilation = TestCompilation.Create(assemblyName, ("Subject.cs", source));
+        var compilation = TestCompilation.CreateExact(assemblyName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -163,6 +164,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         Assert.That(project.Request.Budgets.QueryRlimit, Is.EqualTo(3_000_000));
         Assert.That(project.Request.Budgets.MethodRlimit, Is.EqualTo(20_000_000));
         Assert.That(project.Request.Budgets.MaximumExpressionDepth, Is.EqualTo(64));

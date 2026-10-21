@@ -1,24 +1,28 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$SharpProofPackageIds = @(
-    'SharpProof',
-    'SharpProof.Attributes',
-    'SharpProof.Verifier'
-) | Sort-Object
+New-Variable -Scope Script -Name SharpProofPackageIds -Option ReadOnly -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string](
+        [string[]](@(
+                'SharpProof',
+                'SharpProof.Attributes',
+                'SharpProof.Verifier'
+            ) | Sort-Object)))
 
 # The SharpProof entrypoint is a metadata-only facade; all executable payloads
 # and their portable PDBs live in Attributes and Verifier.
-$SharpProofSymbolPackageIds = @(
-    'SharpProof.Attributes',
-    'SharpProof.Verifier'
-) | Sort-Object
+New-Variable -Scope Script -Name SharpProofSymbolPackageIds -Option ReadOnly -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]](@(
+                'SharpProof.Attributes',
+                'SharpProof.Verifier'
+            ) | Sort-Object)))
 
-$script:SharpProofPackagePushOrder = @(
-    'SharpProof.Attributes',
-    'SharpProof.Verifier',
-    'SharpProof'
-)
+New-Variable -Scope Script -Name SharpProofPackagePushOrder -Option ReadOnly -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'SharpProof.Attributes',
+            'SharpProof.Verifier',
+            'SharpProof'
+        )))
 
 function Get-SharpProofNuspecMetadata {
     param(
@@ -28,10 +32,10 @@ function Get-SharpProofNuspecMetadata {
 
     $archive = [IO.Compression.ZipFile]::OpenRead($Path)
     try {
-        $entries = @($archive.Entries | Where-Object {
-                $_.FullName.EndsWith(
-                    '.nuspec', [StringComparison]::OrdinalIgnoreCase)
-            })
+        $entries = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($archive.Entries | Where-Object {
+                    $_.FullName.EndsWith(
+                        '.nuspec', [StringComparison]::OrdinalIgnoreCase)
+                }))
         if ($entries.Count -ne 1) {
             throw "Package '$Path' must contain exactly one nuspec."
         }
@@ -75,8 +79,8 @@ function Get-SharpProofPackageIdentity {
         $metadata.OwnerDocument.NameTable)
     $namespaces.AddNamespace(
         'n', [string]$metadata.OwnerDocument.DocumentElement.NamespaceURI)
-    $ids = @($metadata.SelectNodes('n:id', $namespaces))
-    $versions = @($metadata.SelectNodes('n:version', $namespaces))
+    $ids = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($metadata.SelectNodes('n:id', $namespaces)))
+    $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($metadata.SelectNodes('n:version', $namespaces)))
     if ($RequireSingleIdentity -and
         ($ids.Count -ne 1 -or $versions.Count -ne 1)) {
         throw "Package '$Path' has incomplete identity metadata."
@@ -103,18 +107,18 @@ function Get-SharpProofPackageIdentity {
         }
     }
 
-    return [pscustomobject][ordered]@{
-        Id               = $id.InnerText
-        Version          = $version.InnerText
-        Path             = $Path
-        RepositoryUrl    = $repositoryUrl
-        RepositoryCommit = if ($null -eq $repositoryCommit) {
-            $null
-        }
-        else {
-            $repositoryCommit.ToLowerInvariant()
-        }
-    }
+    return ([ordered]@{
+            Id               = $id.InnerText
+            Version          = $version.InnerText
+            Path             = $Path
+            RepositoryUrl    = $repositoryUrl
+            RepositoryCommit = if ($null -eq $repositoryCommit) {
+                $null
+            }
+            else {
+                $repositoryCommit.ToLowerInvariant()
+            }
+        }).AsReadOnly()
 }
 
 function Get-SharpProofPackageIdentitySet {
@@ -126,23 +130,23 @@ function Get-SharpProofPackageIdentitySet {
         [switch]$RequireRepository
     )
 
-    $identities = @(
-        $Files | ForEach-Object {
-            [pscustomobject][ordered]@{
-                File     = $_
-                Identity = Get-SharpProofPackageIdentity `
-                    -Path $_.FullName `
-                    -RequireRepository:$RequireRepository
-            }
-        }
-    )
-    foreach ($extension in @('.nupkg', '.snupkg')) {
-        $actualIds = @(
-            $identities |
-                Where-Object { $_.File.Extension -eq $extension } |
-                ForEach-Object { $_.Identity.Id } |
-                Sort-Object
-        )
+    $identityBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($file in $Files) {
+        $identityBuilder.Add(([ordered]@{
+                    File     = $file
+                    Identity = Get-SharpProofPackageIdentity `
+                        -Path $file.FullName `
+                        -RequireRepository:$RequireRepository
+                }).AsReadOnly())
+    }
+    $identities = $identityBuilder.ToImmutable()
+    foreach ($extension in [Collections.Immutable.ImmutableArray]::Create[string]('.nupkg', '.snupkg')) {
+        $actualIds = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                $identities |
+                    Where-Object { $_.File.Extension -eq $extension } |
+                    ForEach-Object { $_.Identity.Id } |
+                    Sort-Object
+            ))
         $expectedIds = if ($extension -eq '.snupkg') { $SharpProofSymbolPackageIds } else { $SharpProofPackageIds }
         if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
             throw (
@@ -151,27 +155,27 @@ function Get-SharpProofPackageIdentitySet {
         }
     }
 
-    $versions = @(
-        $identities |
-            ForEach-Object { $_.Identity.Version } |
-            Sort-Object -Unique
-    )
+    $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+            $identities |
+                ForEach-Object { $_.Identity.Version } |
+                Sort-Object -Unique
+        ))
     if ($versions.Count -ne 1) {
         throw (
             'SharpProof package and symbol package versions must match; ' +
             "found '$($versions -join ', ')'.")
     }
 
-    return [pscustomobject][ordered]@{
-        Identities        = $identities
-        Version           = [string]$versions[0]
-        RepositoryCommits = @(
-            $identities |
-                ForEach-Object { $_.Identity.RepositoryCommit } |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                Sort-Object -Unique
-        )
-    }
+    return ([ordered]@{
+            Identities        = $identities
+            Version           = [string]$versions[0]
+            RepositoryCommits = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                    $identities |
+                        ForEach-Object { $_.Identity.RepositoryCommit } |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                        Sort-Object -Unique
+                ))
+        }).AsReadOnly()
 }
 
 Export-ModuleMember -Function @(

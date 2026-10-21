@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -28,7 +29,7 @@ public sealed class ConditionalElisionReceiverMutationTests
             """);
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-        var inputs = new string?[] { null, "word", "" };
+        var inputs = ImmutableArray.Create<string?>(null, "word", "");
         foreach (var input in inputs)
         { Assert.That(subject.Invoke([input!]), Is.EqualTo(10)); }
         var mutation = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
@@ -45,7 +46,7 @@ public sealed class ConditionalElisionReceiverMutationTests
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter] = value });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, value));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(10)));
             Assert.That(replay.ConsumedApproximation, Is.False);

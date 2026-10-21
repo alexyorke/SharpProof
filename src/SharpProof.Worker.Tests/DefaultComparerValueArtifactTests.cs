@@ -27,29 +27,36 @@ internal sealed class DefaultComparerValueArtifactTests
                 }
             }
             """);
-        var graph = artifact.Callables.Single().Total!.Graph;
-        var index = Array.FindIndex(graph.Members, candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-            candidate.Name.StartsWith(IrOpaqueCallSite.DefaultComparerValuePrefix, StringComparison.Ordinal));
+        var callable = artifact.Callables.Single();
+        var total = callable.Total!;
+        var graph = total.Graph;
+        var index = graph.Members.IndexOf(graph.Members.FirstOrDefault(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+            candidate.Name.StartsWith(IrOpaqueCallSite.DefaultComparerValuePrefix, StringComparison.Ordinal))!);
         Assert.That(index, Is.GreaterThanOrEqualTo(0));
-        var member = graph.Members[index];
+        var members = graph.Members.ToBuilder();
+        var terms = graph.Terms.ToBuilder();
+        var member = members[index];
         switch (scenario)
         {
             case "ordinary":
-                member.Name = "ordinary";
+                members[index] = member with { Name = "ordinary" };
                 break;
             case "unknown-kind":
-                member.Name = IrOpaqueCallSite.DefaultComparerValuePrefix + "System_Boolean";
+                members[index] = member with { Name = IrOpaqueCallSite.DefaultComparerValuePrefix + "System_Boolean" };
                 break;
             case "instance":
-                member.IsStatic = false;
+                members[index] = member with { IsStatic = false };
                 break;
             case "parameter":
-                member.ParameterTypes = [member.ReturnType];
+                members[index] = member with { ParameterTypes = [member.ReturnType] };
                 break;
             case "impure":
-                graph.Terms.Single(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Kind == IrTermKind.Opaque && term.A == index).C = 1;
+                var opaque = graph.Terms.Single(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Kind == IrTermKind.Opaque && term.A == index);
+                terms[graph.Terms.IndexOf(opaque)] = opaque with { C = 1 };
                 break;
         }
+        graph = graph with { Members = members.ToImmutable(), Terms = terms.ToImmutable() };
+        artifact = artifact with { Callables = artifact.Callables.ReplaceAt(0, callable with { Total = total with { Graph = graph } }) };
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (scenario == "valid")
         {

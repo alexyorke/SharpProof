@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -11,11 +12,83 @@ namespace SharpProof.Gates.Test;
 public sealed class DictionaryAnalyzerConfigurationContractTests
 {
     [Test]
+    public void ExplicitComparerProviderKeepsGlobalValuesOutOfFileOptions()
+    {
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        builder.Add("CaseKey", "captured");
+        IReadOnlyDictionary<string, string> values = builder.ToImmutable();
+        var provider = new DictionaryAnalyzerConfigOptionsProvider(values, StringComparer.OrdinalIgnoreCase);
+        var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
+        var additional = new ConfigurationAdditionalText();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(provider.GlobalOptions.TryGetValue("casekey", out var captured), Is.True);
+            Assert.That(captured, Is.EqualTo("captured"));
+            Assert.That(provider.GetOptions(tree), Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
+            Assert.That(provider.GetOptions(additional), Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
+        }
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void ExplicitComparerSnapshotsAnOpaqueReadOnlyDictionary(bool ignoreCase, bool opaqueInput)
+    {
+        var comparer = ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var producer = new Dictionary<string, string>(comparer) { ["CaseKey"] = "captured" };
+        IReadOnlyDictionary<string, string> opaque =
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(producer);
+        var options = opaqueInput
+            ? new DictionaryAnalyzerConfigOptions(opaque, comparer)
+            : new DictionaryAnalyzerConfigOptions(producer);
+        var provider = opaqueInput
+            ? new DictionaryAnalyzerConfigOptionsProvider(opaque, comparer)
+            : new DictionaryAnalyzerConfigOptionsProvider(producer);
+        producer["CaseKey"] = "changed";
+        producer["added"] = "later";
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(options.TryGetValue("CaseKey", out var captured), Is.True);
+            Assert.That(captured, Is.EqualTo("captured"));
+            Assert.That(options.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
+            Assert.That(options.TryGetValue("added", out _), Is.False);
+            Assert.That(provider.GlobalOptions.TryGetValue("CaseKey", out var global), Is.True);
+            Assert.That(global, Is.EqualTo("captured"));
+            Assert.That(provider.GlobalOptions.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
+            Assert.That(provider.GlobalOptions.TryGetValue("added", out _), Is.False);
+            Assert.That(provider.GetOptions(CSharpSyntaxTree.ParseText("class C { }")),
+                Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
+        }
+    }
+
+    [Test]
+    public void DefaultTupleOptionsRejectBeforeCapturingEntries()
+    {
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = new DictionaryAnalyzerConfigOptions(
+                default(ImmutableArray<(string Key, string Value)>));
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("values"));
+    }
+
+    [Test]
+    public void TupleOptionsRejectIdenticalCaseInsensitiveDuplicates()
+    {
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new DictionaryAnalyzerConfigOptions([("key", "value"), ("KEY", "value")]);
+        }));
+    }
+
+    [Test]
     public void TupleOptionsParseMixedCaseKeysAndValuesAndReportMissingKeys()
     {
-        var options = new DictionaryAnalyzerConfigOptions(
+        var options = new DictionaryAnalyzerConfigOptions([
             ("SHARPPROOF_PROFILE", " StRiCt "),
-            ("SharpProof_Features", " EfFeCtS "));
+            ("SharpProof_Features", " EfFeCtS ")]);
         var provider = new DictionaryAnalyzerConfigOptionsProvider(options);
         var configuration = CompilerConfiguration.FromOptions(provider);
 
@@ -35,11 +108,10 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
     [Test]
     public void DictionaryProviderKeepsGlobalConfigurationOutOfFileOptions()
     {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["build_property.SharpProofProfile"] = "strict",
-            ["build_property.SharpProofFeatures"] = "contracts"
-        };
+        var valueBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        valueBuilder.Add("build_property.SharpProofProfile", "strict");
+        valueBuilder.Add("build_property.SharpProofFeatures", "contracts");
+        var values = valueBuilder.ToImmutable();
         var provider = new DictionaryAnalyzerConfigOptionsProvider(values);
         var configuration = CompilerConfiguration.FromOptions(provider);
         var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
@@ -68,9 +140,9 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
     [TestCase(false)]
     public void FileOptionSharingPreservesGlobalIdentityAndConfiguration(bool globalForFiles)
     {
-        var options = new DictionaryAnalyzerConfigOptions(
+        var options = new DictionaryAnalyzerConfigOptions([
             ("sharpproof_profile", "strict"),
-            ("sharpproof_features", "effects"));
+            ("sharpproof_features", "effects")]);
         var provider = new DictionaryAnalyzerConfigOptionsProvider(options, globalForFiles);
         var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
         var additional = new ConfigurationAdditionalText();

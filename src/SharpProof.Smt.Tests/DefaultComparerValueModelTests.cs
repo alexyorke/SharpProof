@@ -91,7 +91,7 @@ internal sealed class DefaultComparerValueModelTests
         var outcome = await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         if (scenario == "observed")
         {
-            Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : outcome.GetType().Name);
             Assert.That(((RefutedOutcome)outcome).Model.Assignments[variable].Reference, Is.SameAs(instance));
         }
         else

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
@@ -28,7 +29,7 @@ internal sealed partial class WorkerTests
             var aliasRequest = Path.Combine(aliasDirectory, "request.json");
             var publishedResult = Path.Combine(project.DirectoryPath, "published-result.json");
             var publishedManifest = Path.Combine(project.DirectoryPath, "published-manifest.json");
-            var originalManifest = await File.ReadAllBytesAsync(sourceRequest.CompilerManifest.Path);
+            var originalManifest = (await File.ReadAllBytesAsync(sourceRequest.CompilerManifest.Path)).ToImmutableArray();
             Assert.That(Path.GetFullPath(aliasRequest), Is.Not.EqualTo(Path.GetFullPath(privateRequest)));
             Assert.That(PublicationLease.CanonicalMember(aliasRequest), Is.EqualTo(PublicationLease.CanonicalMember(privateRequest)));
             var originalError = Console.Error;
@@ -62,9 +63,9 @@ internal sealed partial class WorkerTests
             Assert.That(await File.ReadAllBytesAsync(sourceRequest.CompilerManifest.Path), Is.EqualTo(originalManifest));
             Assert.That(File.Exists(publishedResult), Is.False);
             Assert.That(File.Exists(publishedManifest), Is.False);
-            var requestBytes = await File.ReadAllBytesAsync(privateRequest);
+            var requestBytes = (await File.ReadAllBytesAsync(privateRequest)).ToImmutableArray();
             Assert.That(await File.ReadAllBytesAsync(aliasRequest), Is.EqualTo(requestBytes));
-            var request = WorkerProtocolJson.DeserializeRequest(System.Text.Encoding.UTF8.GetString(requestBytes))
+            var request = WorkerProtocolJson.DeserializeRequest(System.Text.Encoding.UTF8.GetString(requestBytes.AsSpan()))
                 ?? throw new AssertionException("The private request was not preserved.");
             Assert.That(request.CompilerManifest.Path, Is.EqualTo(sourceRequest.CompilerManifest.Path));
             Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(sourceRequest.CompilerManifest.Sha256));

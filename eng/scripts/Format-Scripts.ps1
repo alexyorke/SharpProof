@@ -38,11 +38,15 @@ finally { $process.Dispose() }
 # Arcade requires this pinned upstream tree to remain byte-for-byte intact.
 # Check provenance before excluding vendor code from repository style rules.
 $arcadeManifest = Get-Content (Join-Path $configurationRoot 'eng/arcade-source.json') -Raw | ConvertFrom-Json
-$arcadeFiles = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
-foreach ($file in $arcadeManifest.commonFiles) { $arcadeFiles.Add([string]$file.path, [string]$file.sha256) }
+$arcadeFileBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
+foreach ($file in $arcadeManifest.commonFiles) {
+    if ($arcadeFileBuilder.ContainsKey([string]$file.path)) { throw [ArgumentException]::new('An item with the same key has already been added. Key: ' + $file.path) }
+    $arcadeFileBuilder.Add([string]$file.path, [string]$file.sha256)
+}
+$arcadeFiles = $arcadeFileBuilder.ToImmutable()
 
-$powershellPaths = [Collections.Generic.List[string]]::new()
-$shellPaths = [Collections.Generic.List[string]]::new()
+$powershellPathBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$shellPathBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 foreach ($relative in $tracked.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)) {
     if ($relative.StartsWith('eng/common/', [StringComparison]::Ordinal)) {
         if (-not $arcadeFiles.ContainsKey($relative)) { throw "Unpinned Arcade bootstrap file: $relative" }
@@ -51,11 +55,11 @@ foreach ($relative in $tracked.Split([char]0, [StringSplitOptions]::RemoveEmptyE
         continue
     }
     if ([IO.Path]::GetExtension($relative) -in @('.ps1', '.psm1', '.psd1')) {
-        $powershellPaths.Add($relative)
+        $powershellPathBuilder.Add($relative)
         continue
     }
     if ([IO.Path]::GetExtension($relative) -in @('.sh', '.bash')) {
-        $shellPaths.Add($relative)
+        $shellPathBuilder.Add($relative)
         continue
     }
     # Include shell scripts with no extension (or an unusual one) by shebang.
@@ -64,16 +68,18 @@ foreach ($relative in $tracked.Split([char]0, [StringSplitOptions]::RemoveEmptyE
         $prefix = [byte[]]::new(256)
         $length = $stream.Read($prefix, 0, $prefix.Length)
         if ([Text.Encoding]::ASCII.GetString($prefix, 0, $length) -match '^#![^\r\n]*\b(bash|sh|dash|ksh)\b') {
-            $shellPaths.Add($relative)
+            $shellPathBuilder.Add($relative)
         }
     }
     finally { $stream.Dispose() }
 }
 
+$powershellPaths = $powershellPathBuilder.ToImmutable()
+$shellPaths = $shellPathBuilder.ToImmutable()
 $encoding = [Text.UTF8Encoding]::new($false, $true)
 $formatSettings = Join-Path $configurationRoot 'eng/PowerShellFormatting.psd1'
 $lintSettings = Join-Path $configurationRoot 'eng/PSScriptAnalyzerSettings.psd1'
-$failures = [Collections.Generic.List[string]]::new()
+$failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 $changed = 0
 
 function Format-PowerShellSource {
@@ -86,7 +92,7 @@ function Format-PowerShellSource {
     if ($formatErrors.Count -gt 0) { throw 'PowerShell formatting produced invalid syntax.' }
     # PSScriptAnalyzer can leave spaces after closing braces. Remove them
     # without trimming data inside strings or here-strings.
-    $literals = @($formatTokens | Where-Object { $_.Kind -in @('StringLiteral', 'StringExpandable', 'HereStringLiteral', 'HereStringExpandable') })
+    $literals = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($formatTokens | Where-Object { $_.Kind -in @('StringLiteral', 'StringExpandable', 'HereStringLiteral', 'HereStringExpandable') }))
     $trailingWhitespace = [regex]::Matches($formatted, '(?m)[ \t]+$')
     $builder = [Text.StringBuilder]::new($formatted)
     for ($index = $trailingWhitespace.Count - 1; $index -ge 0; $index--) {
@@ -110,28 +116,30 @@ try {
         [void][Management.Automation.Language.Parser]::ParseInput($inputText, [ref]$parseTokens, [ref]$parseErrors)
         if ($parseErrors.Count -gt 0) {
             foreach ($parseError in $parseErrors) {
-                $failures.Add("${relative}:$($parseError.Extent.StartLineNumber): PowerShell parse error: $($parseError.Message)")
+                $failureBuilder.Add("${relative}:$($parseError.Extent.StartLineNumber): PowerShell parse error: $($parseError.Message)")
             }
             continue
         }
         $formatted = Format-PowerShellSource -Source $inputText
         if ($original -cne $formatted) {
-            if ($VerifyNoChanges) { $failures.Add("Formatting differs: $relative") }
+            if ($VerifyNoChanges) { $failureBuilder.Add("Formatting differs: $relative") }
             else { [IO.File]::WriteAllText($path, $formatted, $encoding); $changed++ }
         }
         foreach ($finding in @(Invoke-ScriptAnalyzer -Path $path -Settings $lintSettings)) {
-            $failures.Add("${relative}:$($finding.Line): $($finding.RuleName): $($finding.Message)")
+            $failureBuilder.Add("${relative}:$($finding.Line): $($finding.RuleName): $($finding.Message)")
         }
     }
     if ($shellPaths.Count -gt 0) {
-        & shellcheck --format=gcc -- @shellPaths
-        if ($LASTEXITCODE -ne 0) { $failures.Add('ShellCheck failed.') }
+        $shellArguments = [string[]]@($shellPaths)
+        & shellcheck --format=gcc -- @shellArguments
+        if ($LASTEXITCODE -ne 0) { $failureBuilder.Add('ShellCheck failed.') }
         $shellFormatMode = if ($VerifyNoChanges) { '-d' } else { '-w' }
-        & shfmt -i 2 -ci -sr $shellFormatMode -- @shellPaths
-        if ($LASTEXITCODE -ne 0) { $failures.Add('Shell formatting failed.') }
+        & shfmt -i 2 -ci -sr $shellFormatMode -- @shellArguments
+        if ($LASTEXITCODE -ne 0) { $failureBuilder.Add('Shell formatting failed.') }
     }
 }
 finally { Pop-Location }
+$failures = $failureBuilder.ToImmutable()
 Write-Host "Checked $($powershellPaths.Count) PowerShell files and $($shellPaths.Count) shell scripts; formatted $changed PowerShell files."
 if ($failures.Count -gt 0) {
     $failures | Select-Object -First 60 | ForEach-Object { Write-Host $_ }

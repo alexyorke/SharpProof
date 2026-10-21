@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -39,7 +40,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         if (!valid)
         {
             Assert.That(File.ReadAllText(result), Is.EqualTo("prior result"));
-            Assert.That(engine.Errors, Has.Count.EqualTo(1));
+            Assert.That(engine.Errors, Has.Length.EqualTo(1));
         }
     }
 
@@ -49,7 +50,7 @@ public sealed class CompilerCaptureFreshnessControlTests
     {
         System.ArgumentNullException.ThrowIfNull(disabledProperty);
         using var consumer = new Consumer(PureSource);
-        var build = await consumer.BuildAsync((disabledProperty, "false"));
+        var build = await consumer.BuildAsync([(disabledProperty, "false")]);
         Assert.That(build.Code, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SP0049"));
         Assert.That(File.Exists(consumer.ResultPath), Is.False);
@@ -87,7 +88,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         Assert.That(File.ReadAllText(result), Is.EqualTo("prior result"));
         Assert.That(File.ReadAllText(companion), Is.EqualTo("preserved companion"));
         Assert.That(File.ReadAllText(worker), Is.EqualTo("preserved worker"));
-        Assert.That(engine.Errors, Has.Count.EqualTo(1));
+        Assert.That(engine.Errors, Has.Length.EqualTo(1));
     }
 
     [TestCase("RunAnalyzers")]
@@ -96,11 +97,11 @@ public sealed class CompilerCaptureFreshnessControlTests
     {
         System.ArgumentNullException.ThrowIfNull(disabledProperty);
         using var consumer = new Consumer(PureSource);
-        var first = await consumer.BuildAsync();
+        var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         Assert.That((await consumer.ResultAsync()).ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         await File.WriteAllTextAsync(consumer.SourcePath, ImpureSource);
-        var rejected = await consumer.BuildAsync((disabledProperty, "false"));
+        var rejected = await consumer.BuildAsync([(disabledProperty, "false")]);
         Assert.That(rejected.Code, Is.Not.Zero, rejected.Output);
         Assert.That(rejected.Output, Does.Contain("fresh final compiler manifest"));
         Assert.That(File.Exists(consumer.ResultPath), Is.False);
@@ -108,7 +109,7 @@ public sealed class CompilerCaptureFreshnessControlTests
 
         // Source and the emitted intermediate assembly remain unchanged here.
         // The missing capture must force compilation and collection to resume.
-        var recovered = await consumer.BuildAsync();
+        var recovered = await consumer.BuildAsync([]);
         Assert.That(recovered.Code, Is.Not.Zero, recovered.Output);
         Assert.That(File.Exists(consumer.StagingPath), Is.True);
         Assert.That((await consumer.ResultAsync()).ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -118,19 +119,19 @@ public sealed class CompilerCaptureFreshnessControlTests
     public async Task UnchangedBuildReusesCaptureAndChangedEnabledBuildCollectsAgain()
     {
         using var consumer = new Consumer(PureSource);
-        var first = await consumer.BuildAsync();
+        var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         var firstCompletion = await File.ReadAllTextAsync(consumer.CompletionPath);
-        var firstCapture = await File.ReadAllBytesAsync(consumer.StagingPath);
+        var firstCapture = (await File.ReadAllBytesAsync(consumer.StagingPath)).ToImmutableArray();
 
-        var unchanged = await consumer.BuildAsync();
+        var unchanged = await consumer.BuildAsync([]);
         Assert.That(unchanged.Code, Is.Zero, unchanged.Output);
         Assert.That(await File.ReadAllTextAsync(consumer.CompletionPath), Is.EqualTo(firstCompletion));
         Assert.That(await File.ReadAllBytesAsync(consumer.StagingPath), Is.EqualTo(firstCapture));
         Assert.That((await consumer.ResultAsync()).Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
 
         await File.WriteAllTextAsync(consumer.SourcePath, PureSource.Replace("=> 0", "=> 1", StringComparison.Ordinal));
-        var changed = await consumer.BuildAsync();
+        var changed = await consumer.BuildAsync([]);
         Assert.That(changed.Code, Is.Zero, changed.Output);
         Assert.That(await File.ReadAllTextAsync(consumer.CompletionPath), Is.Not.EqualTo(firstCompletion));
         Assert.That((await consumer.ResultAsync()).ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -143,11 +144,11 @@ public sealed class CompilerCaptureFreshnessControlTests
         System.ArgumentNullException.ThrowIfNull(fileName);
         System.ArgumentNullException.ThrowIfNull(property);
         using var consumer = new Consumer(PureSource);
-        var first = await consumer.BuildAsync();
+        var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         var sidecar = Path.Combine(Path.GetDirectoryName(consumer.ResultPath)!, fileName);
-        var original = await File.ReadAllBytesAsync(sidecar);
-        var rejected = await consumer.BuildAsync((property, sidecar));
+        var original = (await File.ReadAllBytesAsync(sidecar)).ToImmutableArray();
+        var rejected = await consumer.BuildAsync([(property, sidecar)]);
         Assert.That(rejected.Code, Is.Not.Zero, rejected.Output);
         Assert.That(rejected.Output, Does.Contain("compiler-owned outputs"));
         Assert.That(await File.ReadAllBytesAsync(sidecar), Is.EqualTo(original));
@@ -165,7 +166,7 @@ public sealed class CompilerCaptureFreshnessControlTests
             </Project>
             """, StringComparison.Ordinal);
         await File.WriteAllTextAsync(consumer.ProjectPath, project);
-        (string Name, string Value)[] properties =
+        ImmutableArray<(string Name, string Value)> properties =
         [
             ("_SharpProofInvocationId", "0123456789abcdef0123456789abcdef"),
             ("_SharpProofCompilerCaptureNonce", "0123456789abcdef0123456789abcdef"),
@@ -188,7 +189,7 @@ public sealed class CompilerCaptureFreshnessControlTests
     public async Task RemovedCollectorCannotReusePriorCapture()
     {
         using var consumer = new Consumer(PureSource);
-        var first = await consumer.BuildAsync();
+        var first = await consumer.BuildAsync([]);
         Assert.That(first.Code, Is.Zero, first.Output);
         var project = await File.ReadAllTextAsync(consumer.ProjectPath);
         project = project.Replace("</Project>", """
@@ -199,7 +200,7 @@ public sealed class CompilerCaptureFreshnessControlTests
             """, StringComparison.Ordinal);
         await File.WriteAllTextAsync(consumer.ProjectPath, project);
         await File.WriteAllTextAsync(consumer.SourcePath, ImpureSource);
-        var rejected = await consumer.BuildAsync();
+        var rejected = await consumer.BuildAsync([]);
         Assert.That(rejected.Code, Is.Not.Zero, rejected.Output);
         Assert.That(rejected.Output, Does.Contain("fresh final compiler manifest"));
         Assert.That(File.Exists(consumer.ResultPath), Is.False);
@@ -231,10 +232,16 @@ public sealed class CompilerCaptureFreshnessControlTests
             return (string)_type.GetProperty(name, Members)!.GetValue(_project)!;
         }
 
-        internal async Task<(int Code, string Output)> BuildAsync(params (string Name, string Value)[] properties)
+        internal async Task<(int Code, string Output)> BuildAsync(ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
-            (string Name, string Value)[] configured = [("SharpProofRunAnalyzersForPackageTests", "true"), .. properties];
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
+            var configuredBuilder = ImmutableArray.CreateBuilder<(string Name, string Value)>();
+            configuredBuilder.Add(("SharpProofRunAnalyzersForPackageTests", "true"));
+            configuredBuilder.AddRange(properties);
+            var configured = configuredBuilder.ToImmutable();
             var task = (Task)_type.GetMethod("BuildAsync", Members)!.Invoke(_project, [true, configured])!;
             await task;
             var result = task.GetType().GetProperty("Result")!.GetValue(task)!;

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -39,11 +40,7 @@ public sealed class Wave9CompoundNullInstantiationAuditTests
         var referenceType = nominal
             ? factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Widget")
             : factory.ObjectType;
-        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>
-        {
-            [template.Parameters[0]] = factory.Variable(factory.CreateVariable("flag", factory.BooleanType)),
-            [template.Parameters[1]] = factory.Variable(factory.CreateVariable("reference", referenceType))
-        });
+        var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty.SetItem(template.Parameters[0], factory.Variable(factory.CreateVariable("flag", factory.BooleanType))).SetItem(template.Parameters[1], factory.Variable(factory.CreateVariable("reference", referenceType))));
         TestContext.Out.WriteLine($"shape={shape}; nominal={nominal}; completion={normalCompletion}; status={result.Status}; failure={result.Failure?.Kind}; detail={result.Failure?.Detail}");
         Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
         var instantiated = normalCompletion ? result.NormalCompletionCondition : result.Postconditions.Single();

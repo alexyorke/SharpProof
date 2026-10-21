@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -35,15 +36,15 @@ public sealed class TypedRegionProgramLoweringTests
         Assert.That(expected is Type type ? actual?.GetType() : actual, Is.EqualTo(expected));
         if (name == "catch-all")
         {
-            var regions = new Stack<Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegion>();
-            regions.Push(subject.Graph.Root);
-            while (regions.Count != 0)
+            var regions = ImmutableStack<Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegion>.Empty;
+            regions = regions.Push(subject.Graph.Root);
+            while (!regions.IsEmpty)
             {
-                var region = regions.Pop();
+                regions = regions.Pop(out var region);
                 if (region.Kind == Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegionKind.Catch)
                 { Assert.That(region.ExceptionType!.SpecialType, Is.EqualTo(Microsoft.CodeAnalysis.SpecialType.System_Object)); }
                 foreach (var child in region.NestedRegions)
-                { regions.Push(child); }
+                { regions = regions.Push(child); }
             }
         }
         var lowered = subject.Lower();
@@ -165,24 +166,24 @@ public sealed class TypedRegionProgramLoweringTests
     public void SynthesizedLockLocalPreservesAllocatedReceiverAndSynchronizationSites()
     {
         using var subject = TypedProgramSubject.Create("void Target() { lock (new object()) { } }");
-        var pending = new Stack<Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegion>();
-        pending.Push(subject.Graph.Root);
+        var pending = ImmutableStack<Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowRegion>.Empty;
+        pending = pending.Push(subject.Graph.Root);
         var unnamed = false;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
+            pending = pending.Pop(out var region);
             foreach (var local in region.Locals)
             {
                 TestContext.Out.WriteLine($"lock CFG local: name='{local.Name}' implicit={local.IsImplicitlyDeclared} type={local.Type}");
                 unnamed |= string.IsNullOrEmpty(local.Name);
             }
             foreach (var child in region.NestedRegions)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         Assert.That(unnamed, Is.True);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         Assert.That(instructions.OfType<IrLockInstruction>().Count(), Is.EqualTo(2));
     }

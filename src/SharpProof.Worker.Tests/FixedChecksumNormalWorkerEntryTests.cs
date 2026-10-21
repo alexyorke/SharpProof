@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -582,9 +583,9 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             ?? throw new AssertionException("The container artifact export root was not provided.");
         var output = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "fixed-checksum-normal-entry");
         Directory.CreateDirectory(output);
-        var evidence = new Dictionary<string, object?>
+        var evidence = new OrderedEvidenceBuilder
         {
-            ["sourceSha256"] = Hash(Encoding.UTF8.GetBytes(Source)),
+            ["sourceSha256"] = Hash(Encoding.UTF8.GetBytes(Source).ToImmutableArray()),
             ["completed"] = false,
             ["actualNativeQueryCounts"] = "NOT_EXPOSED by the normal worker API",
             ["actualConsumedResourceUnits"] = "NOT_EXPOSED by the normal worker API",
@@ -593,7 +594,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
         };
         try
         {
-            Assert.That(Hash(Encoding.UTF8.GetBytes(Source)), Is.EqualTo("07E0484D84169ACBE275EBE37E512C3B3BB6BB080D8B251E47735C938698C414"));
+            Assert.That(Hash(Encoding.UTF8.GetBytes(Source).ToImmutableArray()), Is.EqualTo("07E0484D84169ACBE275EBE37E512C3B3BB6BB080D8B251E47735C938698C414"));
             // The same-head strict component retains all20 real CLR+IR controls.
             // Do not repeat its48 construction probes before this normal invocation.
             var budgets = new WorkerBudgets();
@@ -605,7 +606,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(budgets.MaxParallelism, Is.EqualTo(4));
             using var project = WorkerTests.TestProject.Create(Source);
             Assert.That(await File.ReadAllTextAsync(project.SourcePaths.Single(), TestContext.CurrentContext.CancellationToken), Is.EqualTo(Source));
-            var controlCompilation = TestCompilation.Create("FixedChecksumNativeEntryOptions", ("Subject.cs", Source));
+            var controlCompilation = TestCompilation.CreateExact("FixedChecksumNativeEntryOptions", [("Subject.cs", Source)]);
             var parseOptions = (CSharpParseOptions)controlCompilation.SyntaxTrees.Single().Options;
             var compilationOptions = (CSharpCompilationOptions)controlCompilation.Options;
             var ownedCompilation = project.CreateCompilation(parseOptions, compilationOptions);
@@ -613,8 +614,8 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             using var image = new MemoryStream();
             var emitted = ownedCompilation.Emit(image);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            evidence["ownedImageSha256"] = Hash(image.ToArray());
-            await File.WriteAllBytesAsync(Path.Combine(output, "owned-image.dll"), image.ToArray());
+            evidence["ownedImageSha256"] = Hash(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))));
+            await File.WriteAllBytesAsync(Path.Combine(output, "owned-image.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
             await File.WriteAllTextAsync(Path.Combine(output, "source.cs"), Source, new UTF8Encoding(false));
             evidence["compilationEnvironment"] = "Owned TestProject filtered references and temp document paths, not the original full-TPA artifact identity";
             var request = project.CreateRequest(cacheEnabled: false, parseOptions: parseOptions,
@@ -624,10 +625,10 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             var requestValidation = WorkerProtocolJson.Validate(request);
             Assert.That(requestValidation.IsValid, Is.True, string.Join(", ", requestValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             await File.WriteAllTextAsync(Path.Combine(output, "request.json"), WorkerProtocolJson.SerializeRequest(request), new UTF8Encoding(false));
-            var artifactBytes = await File.ReadAllBytesAsync(request.CompilerManifest.Path, TestContext.CurrentContext.CancellationToken);
+            var artifactBytes = (await File.ReadAllBytesAsync(request.CompilerManifest.Path, TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
             Assert.That(WorkerProtocolJson.ComputeSha256(artifactBytes), Is.EqualTo(request.CompilerManifest.Sha256));
             evidence["ownedArtifactSha256"] = Hash(artifactBytes);
-            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-artifact.json"), artifactBytes);
+            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-artifact.json"), artifactBytes.AsMemory());
             var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
             Assert.That(snapshot.Callables, Has.Length.EqualTo(1));
             var target = snapshot.Callables.Single();
@@ -652,7 +653,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             var responseJson = WorkerProtocolJson.SerializeCanonicalResponse(response);
             await File.WriteAllTextAsync(Path.Combine(output, "response.json"), responseJson, new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
             evidence["actualResponse"] = response;
-            evidence["responseSha256"] = Hash(Encoding.UTF8.GetBytes(responseJson));
+            evidence["responseSha256"] = Hash(Encoding.UTF8.GetBytes(responseJson).ToImmutableArray());
             var validation = WorkerProtocolJson.Validate(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest);
             evidence["validationErrors"] = validation.Errors;
             Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
@@ -704,13 +705,14 @@ public sealed class FixedChecksumNormalWorkerEntryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(evidence) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
+                evidence.ToJson() + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        return Convert.ToHexString(SHA256.HashData(bytes));
+        if (bytes.IsDefault)
+        { throw new ArgumentNullException(nameof(bytes)); }
+        return Convert.ToHexString(SHA256.HashData(bytes.AsSpan()));
     }
 }

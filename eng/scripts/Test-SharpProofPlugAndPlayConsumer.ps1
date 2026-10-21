@@ -30,8 +30,8 @@ if ($actualFamily -cne $OsFamily -or $actualHost -cne $Architecture -or $actualP
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
-$identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -In @('.nupkg', '.snupkg')))
+$identities = Get-SharpProofPackageIdentitySet -Files ([object[]]@($files)) -RequireRepository
 $version = [string]$identities.Version
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $expectedCommit = (& git -C $repository rev-parse HEAD).Trim()
@@ -64,7 +64,8 @@ $encoding = [Text.UTF8Encoding]::new($false)
 
 function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory = $consumer) {
     $commandFile = $dotnet
-    $commandArguments = @($Arguments)
+    $commandArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments))
     if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
         $commandFile = $MSBuildPath
         $verb = $Arguments[0]
@@ -72,30 +73,33 @@ function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory 
             # Execute the already-built application, not the modern worker CLR.
             $commandFile = Join-Path $WorkingDirectory "bin/Release/$TargetFramework/Application.exe"
             if (-not (Test-Path -LiteralPath $commandFile -PathType Leaf)) { throw 'The downstream executable is missing.' }
-            $commandArguments = @()
+            $commandArgumentBuilder.Clear()
         }
         elseif ($verb -ceq 'query-host') {
-            $commandArguments = @($Arguments[1], '-nologo', '-verbosity:quiet',
-                '-getProperty:MSBuildRuntimeType,MSBuildVersion,NETCoreSdkVersion,_SharpProofVerifierHostSupported')
+            $commandArgumentBuilder.Clear()
+            [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments[1], '-nologo', '-verbosity:quiet',
+                    '-getProperty:MSBuildRuntimeType,MSBuildVersion,NETCoreSdkVersion,_SharpProofVerifierHostSupported'))
         }
         else {
             if ($verb -cnotin @('restore', 'build', 'pack', 'clean')) { throw "Unexpected Visual Studio command: $verb" }
             $target = if ($verb -ceq 'build' -and $Arguments -ccontains '-t:Rebuild') { 'Rebuild' } else { $verb }
-            $commandArguments = @($Arguments[1], "-t:$target", '-nologo')
+            $commandArgumentBuilder.Clear()
+            [void]$commandArgumentBuilder.AddRange([object[]]@($Arguments[1], "-t:$target", '-nologo'))
             for ($index = 2; $index -lt $Arguments.Count; $index++) {
                 $argument = $Arguments[$index]
                 switch -CaseSensitive ($argument) {
-                    '-c' { $commandArguments += '-p:Configuration=' + $Arguments[++$index] }
-                    '-o' { $commandArguments += '-p:PackageOutputPath=' + $Arguments[++$index] }
-                    '--configfile' { $commandArguments += '-p:RestoreConfigFile=' + (Join-Path $WorkingDirectory $Arguments[++$index]) }
+                    '-c' { [void]$commandArgumentBuilder.Add('-p:Configuration=' + $Arguments[++$index]) }
+                    '-o' { [void]$commandArgumentBuilder.Add('-p:PackageOutputPath=' + $Arguments[++$index]) }
+                    '--configfile' { [void]$commandArgumentBuilder.Add('-p:RestoreConfigFile=' + (Join-Path $WorkingDirectory $Arguments[++$index])) }
                     '--nologo' { }
                     '--no-restore' { }
                     '-t:Rebuild' { }
-                    default { $commandArguments += $argument }
+                    default { [void]$commandArgumentBuilder.Add($argument) }
                 }
             }
         }
     }
+    $commandArguments = $commandArgumentBuilder.ToImmutable()
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $commandFile
     $start.WorkingDirectory = $WorkingDirectory
@@ -125,7 +129,7 @@ function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory 
         }
         $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         Write-Host (($output -split '\r?\n' | Select-Object -Last 100) -join "`n")
-        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
+        return ([ordered]@{ ExitCode = $process.ExitCode; Output = $output }).AsReadOnly()
     }
     finally { $process.Dispose() }
 }
@@ -157,8 +161,8 @@ function Assert-ConsumerEvidence([string]$Outcome) {
     $request = Get-Content -LiteralPath $requestPath -Raw | ConvertFrom-Json
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $compiler = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    $claims = @($result.claimResults)
-    $manifestClaims = @($result.manifest.claims)
+    $claims = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.claimResults)))
+    $manifestClaims = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.manifest.claims)))
     if ($result.runStatus -cne 'Complete' -or $result.failureReason -cne 'None' -or
         $claims.Count -ne 1 -or $manifestClaims.Count -ne 1 -or
         $claims[0].outcome -cne $Outcome -or $claims[0].vacuity -cne 'None' -or
@@ -179,10 +183,10 @@ function Assert-ConsumerEvidence([string]$Outcome) {
     }
     if ($result.manifest.hash -cne $compiler.manifest.hash) { throw 'Published response claim-manifest hash differs from the compiler manifest.' }
     if ($result.inputHash -notmatch '^[0-9a-f]{64}$') { throw 'Published response input hash is malformed.' }
-    $callables = @($result.callableResults)
+    $callables = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($result.callableResults)))
     if ($callables.Count -ne 1 -or $callables[0].coverage -cne 'Complete') { throw 'The selected callable was not completely verified.' }
     if ($Outcome -ceq 'Refuted') {
-        $model = @($claims[0].model)
+        $model = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@($claims[0].model)))
         if ($model.Count -ne 1 -or $model[0].variable -cne 'parameter:0' -or $model[0].kind -cne 'Integer') { throw 'The refutation has no exact identity-input counterexample.' }
         # Returning zero violates Identity for every nonzero Int64 input.
         $counterexample = [long]0
@@ -231,17 +235,19 @@ try {
         }
         Write-Host "Qualified Full MSBuild $($hostProperties.MSBuildVersion), SDK $($hostProperties.NETCoreSdkVersion)."
     }
-    $buildArguments = @('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
-    $passing = Invoke-ConsumerCommand $buildArguments
+    $buildArguments = [Collections.Immutable.ImmutableArray]::Create[string]('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
+    $passing = Invoke-ConsumerCommand ([string[]]@($buildArguments))
     if ($passing.ExitCode -ne 0) { throw 'Fresh default consumer did not build and prove its contract.' }
     $passingHash = Assert-ConsumerEvidence 'Proven'
     if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
-        $incremental = Invoke-ConsumerCommand $buildArguments
+        $incremental = Invoke-ConsumerCommand ([string[]]@($buildArguments))
         if ($incremental.ExitCode -ne 0) { throw 'The unchanged Visual Studio consumer did not retain a valid proof.' }
         $null = Assert-ConsumerEvidence 'Proven'
     }
     Write-ConsumerSource '0'
-    $failing = Invoke-ConsumerCommand ($buildArguments + @('-t:Rebuild'))
+    $failingArgumentBuilder = $buildArguments.ToBuilder()
+    $failingArgumentBuilder.Add('-t:Rebuild')
+    $failing = Invoke-ConsumerCommand ([string[]]@($failingArgumentBuilder.ToImmutable()))
     if ($failing.ExitCode -eq 0 -or $failing.Output -notmatch '\bSP0051\b') { throw 'False contract did not fail with the refuted-contract diagnostic SP0051.' }
     $failingHash = Assert-ConsumerEvidence 'Refuted'
     if ($passingHash -ceq $failingHash) { throw 'Modified source reused stale proof evidence.' }
@@ -302,8 +308,8 @@ public static class Program
     if (-not (Test-Path -LiteralPath (Join-Path $applicationOutput 'SharpProof.Attributes.dll') -PathType Leaf)) {
         throw 'The downstream application did not receive the attribute runtime assembly.'
     }
-    $nativeFiles = @(Get-ChildItem -LiteralPath $applicationOutput -Recurse -File |
-            Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })
+    $nativeFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]](@(Get-ChildItem -LiteralPath $applicationOutput -Recurse -File |
+                    Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })))
     if ($nativeFiles.Count -ne 0) { throw 'Verifier native build-tool payloads leaked into application runtime output.' }
     $run = Invoke-ConsumerCommand -WorkingDirectory $downstream -Arguments @(
         'run', '--project', 'Application.csproj', '-c', 'Release', '--no-build', '--no-restore')

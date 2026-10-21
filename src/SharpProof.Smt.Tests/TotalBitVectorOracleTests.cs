@@ -24,14 +24,18 @@ public sealed class TotalBitVectorOracleTests
         var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         using var context = new Context();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        foreach (var left in new[] { 0UL, 1UL, mask, 1UL << (width - 1), 0xAAAAAAAAAAAAAAAAUL & mask })
+        foreach (var left in ImmutableArray.Create(0UL, 1UL, mask, 1UL << (width - 1), 0xAAAAAAAAAAAAAAAAUL & mask))
         {
-            foreach (var right in new[] { 0UL, 1UL, mask, 0x5555555555555555UL & mask })
+            foreach (var right in ImmutableArray.Create(0UL, 1UL, mask, 0x5555555555555555UL & mask))
             {
                 using var first = context.MkBV(left, (uint)width);
                 using var second = context.MkBV(right, (uint)width);
-                foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd,
-                    IrBinaryOperator.BitwiseOr, IrBinaryOperator.BitwiseXor })
+                foreach (var operation in ImmutableArray.Create(
+                    IrBinaryOperator.Divide,
+                    IrBinaryOperator.Remainder,
+                    IrBinaryOperator.BitwiseAnd,
+                    IrBinaryOperator.BitwiseOr,
+                    IrBinaryOperator.BitwiseXor))
                 {
                     using var expression = (operation, isSigned) switch
                     {
@@ -55,13 +59,11 @@ public sealed class TotalBitVectorOracleTests
                     Assert.That(actual.Status, Is.EqualTo(IrEvaluationStatus.Value));
                     Assert.That(actual.Value!.IntegerBits, Is.EqualTo(expected), $"{width}/{isSigned}: {left} {operation} {right}");
                     Assert.That(folded.Bits, Is.EqualTo(expected));
-                    var assumptions = new[]
-                    {
+                    var assumptions = ImmutableArray.Create(
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.IntegerBits(type, left)),
                             new LoweredJustification(factory.CreateOperation())),
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(y), factory.IntegerBits(type, right)),
-                            new LoweredJustification(factory.CreateOperation()))
-                    };
+                            new LoweredJustification(factory.CreateOperation())));
                     var query = new VerificationQuery(factory, assumptions,
                         new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.AndAlso,
                             factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
@@ -90,12 +92,12 @@ public sealed class TotalBitVectorOracleTests
         var y = factory.CreateVariable("y", type);
         var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        foreach (var left in new[] { 0UL, 1UL, mask, 1UL << (width - 1), 0xAAAAAAAAAAAAAAAAUL & mask, 0x0123456789ABCDEFUL & mask })
+        foreach (var left in ImmutableArray.Create(0UL, 1UL, mask, 1UL << (width - 1), 0xAAAAAAAAAAAAAAAAUL & mask, 0x0123456789ABCDEFUL & mask))
         {
-            foreach (var count in new[] { 0, 1, 7, 31, 32, 33, 63, 64, 65, -1, -32, -33, int.MinValue, int.MaxValue })
+            foreach (var count in ImmutableArray.Create(0, 1, 7, 31, 32, 33, 63, 64, 65, -1, -32, -33, int.MinValue, int.MaxValue))
             {
                 var right = unchecked((ulong)(long)count) & mask;
-                foreach (var operation in new[] { IrBinaryOperator.ShiftLeft, IrBinaryOperator.ShiftRight })
+                foreach (var operation in ImmutableArray.Create(IrBinaryOperator.ShiftLeft, IrBinaryOperator.ShiftRight))
                 {
                     var left32 = unchecked((uint)left);
                     var expected = (width, isSigned, operation == IrBinaryOperator.ShiftLeft) switch
@@ -119,13 +121,11 @@ public sealed class TotalBitVectorOracleTests
                     Assert.That(actual.Status, Is.EqualTo(IrEvaluationStatus.Value));
                     Assert.That(actual.Value!.IntegerBits, Is.EqualTo(expected), $"{width}/{isSigned}: {left} {operation} {count}");
                     Assert.That(folded.Bits, Is.EqualTo(expected));
-                    var assumptions = new[]
-                    {
+                    var assumptions = ImmutableArray.Create(
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.IntegerBits(type, left)),
                             new LoweredJustification(factory.CreateOperation())),
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(y), factory.IntegerBits(type, right)),
-                            new LoweredJustification(factory.CreateOperation()))
-                    };
+                            new LoweredJustification(factory.CreateOperation())));
                     var query = new VerificationQuery(factory, assumptions,
                         new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
                             ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
