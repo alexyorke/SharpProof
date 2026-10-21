@@ -97,6 +97,26 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Intermediate fault observation controls
+
+The pinned-runtime fault-recording matrix now covers both recording orders,
+with and without observation between records. The actual holder transitions
+from unhandled to handled after observation and back to unhandled after the
+second record; final cleanup marks it handled again. Both dispatch identities
+and capacity-two growth remain intact. Allocation measurements use separate
+intervals around each record, excluding reflection and observation work; their
+sum remains within the independently calculated 736-byte fixed-carrier envelope.
+All 167 Specs cases passed with zero build warnings/errors on .NET 8.0.32 x64.
+Evidence: `artifacts/resource-task-observed-holder-runtime.log`.
+Full formatting, quality/API and documentation checks passed. Evidence:
+`artifacts/resource-task-observed-holder-format.log`,
+`artifacts/resource-task-observed-holder-lint.log` and
+`artifacts/resource-task-observed-holder-docs.log`.
+
+This validates the re-registration path used by the conditional notification
+component. It does not reproduce automatic finalization frequency or establish
+a complete root fault-byte bound; phase F remains open.
+
 ### CI-sharding integration
 
 After `e17baf9e8` was published, the MR reported a new master conflict. The

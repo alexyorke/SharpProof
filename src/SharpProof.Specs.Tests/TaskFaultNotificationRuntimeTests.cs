@@ -32,9 +32,11 @@ internal sealed class TaskFaultNotificationRuntimeTests
         Assert.That(allocated, Is.Positive.And.LessThanOrEqualTo((long)upper * repetitions));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void TwoFaultRecordingSitesRetainBothDispatchesWithinTheFixedCarrierEnvelope(bool schedulerFirst)
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void TwoFaultRecordingSitesRetainBothDispatchesWithinTheFixedCarrierEnvelope(bool schedulerFirst, bool observeBetween)
     {
         AssertPinnedRuntime();
         var record = CreateFaultRecorder();
@@ -46,15 +48,28 @@ internal sealed class TaskFaultNotificationRuntimeTests
         {
             var warm = new Task(static () => { });
             record(warm, first);
+            if (observeBetween)
+            { _ = ReadFaultsAndMarkHandled(warm); }
             record(warm, second);
             _ = ReadFaultsAndMarkHandled(warm);
         }
         var task = new Task(static () => { });
         var before = GC.GetAllocatedBytesForCurrentThread();
         record(task, first);
-        record(task, second);
         var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(ReadHolderHandled(task), Is.False);
+        if (observeBetween)
+        {
+            _ = ReadFaultsAndMarkHandled(task);
+            Assert.That(ReadHolderHandled(task), Is.True);
+        }
+        // Reflection/observation work stays outside both measured intervals.
+        before = GC.GetAllocatedBytesForCurrentThread();
+        record(task, second);
+        bytes += GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(ReadHolderHandled(task), Is.False);
         var faults = ReadFaultsAndMarkHandled(task);
+        Assert.That(ReadHolderHandled(task), Is.True);
         Assert.That(faults, Has.Count.EqualTo(2));
         Assert.That(faults.Capacity, Is.EqualTo(2));
         Assert.That(faults[0].SourceException, Is.SameAs(first));
@@ -80,14 +95,28 @@ internal sealed class TaskFaultNotificationRuntimeTests
         return method.CreateDelegate<Action<Task, Exception>>();
     }
 
-    private static List<ExceptionDispatchInfo> ReadFaultsAndMarkHandled(Task task)
+    private static object FaultHolder(Task task)
     {
         ArgumentNullException.ThrowIfNull(task);
         const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
         var contingentField = typeof(Task).GetField("m_contingentProperties", instance)!;
         var contingent = contingentField.GetValue(task)!;
         var holderField = contingent.GetType().GetField("m_exceptionsHolder", instance)!;
-        var holder = holderField.GetValue(contingent)!;
+        return holderField.GetValue(contingent)!;
+    }
+
+    private static bool ReadHolderHandled(Task task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        var holder = FaultHolder(task);
+        return (bool)holder.GetType().GetField("m_isHandled", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holder)!;
+    }
+
+    private static List<ExceptionDispatchInfo> ReadFaultsAndMarkHandled(Task task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+        var holder = FaultHolder(task);
         _ = holder.GetType().GetMethod("MarkAsHandled", instance)!.Invoke(holder, [false]);
         return (List<ExceptionDispatchInfo>)holder.GetType().GetField("m_faultExceptions", instance)!.GetValue(holder)!;
     }
