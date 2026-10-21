@@ -804,6 +804,7 @@
           "src/SharpProof.Worker/NativeTaskStorageVerifier.cs",
           "src/SharpProof.Worker/NativeTaskFaultCarrierStorageVerifier.cs",
           "src/SharpProof.Worker/NativeTaskFaultNotificationStorageVerifier.cs",
+          "src/SharpProof.Worker/NativeTaskIrFaultOriginVerifier.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ObjectStorage.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
           "src/SharpProof.Ir/AnalysisDefaults.cs",

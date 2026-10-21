@@ -77,6 +77,10 @@ jobs:
   canonical-package:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    env:
+      # Match the constrained coverage envelope and leave room for runner services.
+      SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
+      SHARPPROOF_TMPFS_SIZE: 4g
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,9 +103,35 @@ jobs:
       - name: Run the PR package phase
         if: ${{ !cancelled() }}
         run: >-
-          docker compose run --rm tooling package-tests
+          docker compose run
+          --name "${COMPOSE_PROJECT_NAME}-canonical-package"
+          tooling package-tests
           -Configuration Release -Fast
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Record package container termination
+        if: always()
+        run: |
+          task_container="${COMPOSE_PROJECT_NAME}-canonical-package"
+          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
+          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
+          mkdir -p "$state_dir"
+          if docker inspect --format \
+            '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
+            "$task_container" > "${state_dir}/canonical-package.json"; then
+            cat "${state_dir}/canonical-package.json"
+          else
+            printf '{"available":false}\n' > "${state_dir}/canonical-package.json"
+          fi
+
+      - name: Upload package container termination
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-package-container-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sharpproof-container-state/*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload package phase and repository gate evidence
         if: always()

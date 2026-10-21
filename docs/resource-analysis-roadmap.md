@@ -97,6 +97,58 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Owned-IR primitive fault candidates
+
+`NativeTaskIrFaultOriginVerifier` derives conservative primitive fault families
+from source-owned callback IR after the existing source-cost/ownership check.
+It handles typed throws, arithmetic, array length/indexing and cast candidates,
+and records the presence of IR allocation sites separately. The set and flag
+are discarded together on unclassified throws/exits, approximations, unsupported
+control assumptions, ownership failures or the shared traversal budget. The
+new production file is registered in the acceptance contract's trusted paths.
+
+All 92 projection/profile cases passed with zero build warnings/errors. Primitive
+arithmetic, null and indexing failures are independently executed by the IR
+interpreter. Total IR can return typed defaults for unguarded unboxing; the
+profile retains conservative candidates without inferring an actual throw.
+The source lowerer's unsupported array downcast remains explicitly unclassified.
+Controls also cover every typed throw family, later-child rejection, shared
+budgets, control transfers and cancellation. Evidence:
+`artifacts/resource-task-ir-fault-origins-tests-3.log`.
+Evaluated layout passed: 2850 source files, 59 projects, 151 pinned common files.
+Evidence: `artifacts/resource-task-ir-fault-origins-layout.log`.
+Full C# formatting passed:
+`artifacts/resource-task-ir-fault-origins-format.log`.
+
+This is an IR candidate profile, not complete CLR fault coverage or a runtime
+byte bound. Empty candidates do not prove exception-free execution. Allocator
+failure, initialization, runtime helpers, payloads, exception escape boundaries
+and trace growth/copy costs still require separate checked models before root
+composition. Runtime array-limit approximations deliberately remain Unknown.
+
+### Canonical package isolation and termination evidence
+
+On `12c8a8516`, the canonical package runner reported shutdown after its first
+134-case shard passed. The aggregate `build-and-test` check then rejected that
+failed prerequisite; other canonical prerequisites passed. This repeats the
+shutdown symptom seen on `0cc594782`, but still does not establish OOM as its
+cause. The job inherited Compose's 40 GiB memory and 8 GiB scratch defaults.
+[GitHub's public Linux runner specifications](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job)
+provide 16 GB RAM. The package job now uses the same 12 GiB memory / 4 GiB
+scratch envelope already used for coverage, keeps its CPU/filter/parallelism,
+and retains its named container until Docker exit/OOM/error state is captured
+and uploaded. This corrects the isolation configuration and adds evidence;
+exact-head hosted CI is still needed to qualify it.
+
+The complete canonical package command passed locally in that 12 GiB / 4 GiB
+envelope: 492 tests passed, one existing skip, across 14 isolated shards with
+parallelism four, in 642.7 seconds. Evidence:
+`artifacts/resource-canonical-package-constrained.log` and
+`artifacts/timings/package-tests-release-fast.json`.
+Full quality/API and documentation checks also passed. Evidence:
+`artifacts/resource-ir-origins-package-isolation-lint-final.log` and
+`artifacts/resource-ir-origins-package-isolation-docs-final.log`.
+
 ### Intermediate fault observation controls
 
 The pinned-runtime fault-recording matrix now covers both recording orders,
@@ -280,10 +332,18 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `12c8a8516` passed all six coverage shards in run 39532409230.
+The complete merge-commit report (65e4b165ad64b0340d2a5275be40c13045d326c7)
+measured 6095/6292 changed trusted lines (96.87%, 197 uncovered), below the
+unchanged 100% floor. This is the latest complete numeric measurement; the
+report is retained at
+`artifacts/resource-12c8-coverage-evidence/coverage/SharpProof.coverage.json`.
+The observed-holder controls and owned-IR profiler are newer than this report.
+
 Published `ff069b5e4` passed all four coverage shards in run 39527309371.
 The complete merge-commit report (9afe98ad12cf941d29eb12a4edbc7e21d4a645de)
 measured 6069/6273 changed trusted lines (96.75%, 204 uncovered), below the
-unchanged 100% floor. This is the latest complete numeric measurement; the
+unchanged 100% floor. This is an earlier complete numeric measurement; the
 report is retained at
 `artifacts/resource-ff069b-coverage-evidence/coverage/SharpProof.coverage.json`.
 All non-coverage workflows also passed on that published head, including

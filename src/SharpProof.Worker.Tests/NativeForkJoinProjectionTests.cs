@@ -9,7 +9,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeForkJoinProjectionTests
+internal sealed class NativeForkJoinProjectionTests
 {
     [TestCase("", 7, 0L)]
     [TestCase("for(int i=0;i<count;i++){var a=new int[2];}", 7, 320L)]
@@ -436,6 +436,262 @@ public sealed class NativeForkJoinProjectionTests
         Assert.That(storage.RetainedUpper, Is.Null);
         Assert.That(storage.UnknownReason, Is.EqualTo(reason));
     }
+    [Test]
+    public void EmptyIrFaultProfileDoesNotClaimCompleteRuntimeFaultCoverage()
+    {
+        var projection = Lower("");
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.HasOrigins, Is.True, check.UnknownReason);
+        Assert.That(check.ExceptionKinds, Is.Empty);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(NativeTaskIrFaultOriginVerifier.Model, Is.EqualTo("task-join-owned-ir-fault-origins-v1"));
+    }
+
+    [TestCase("int value=7/count;", 0, IrExceptionKind.DivideByZero)]
+    [TestCase("int value=7%count;", 0, IrExceptionKind.DivideByZero)]
+    [TestCase("checked {int value=count+1;}", int.MaxValue, IrExceptionKind.Overflow)]
+    [TestCase("int[] array=null;int value=array.Length;", 0, IrExceptionKind.NullReference)]
+    [TestCase("int[] array=null;int value=array[count];", 0, IrExceptionKind.NullReference)]
+    [TestCase("int[] array=new int[1];int value=array[count];", 2, IrExceptionKind.IndexOutOfRange)]
+    public void PrimitiveIrFaultProfilesContainIndependentlyExecutedFaults(string body, int input, IrExceptionKind expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var projection = Lower(body);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.HasOrigins, Is.True, check.UnknownReason);
+        Assert.That(check.ExceptionKinds, Does.Contain(expected));
+        var child = projection.Children[0].Owner;
+        var factory = child.Program.Factory;
+        var values = ImmutableDictionary<IrVarId, IrValue>.Empty.Add(child.Parameters[0].Entry, factory.CreateIntegerValue(input));
+        var execution = new IrProgramInterpreter(factory).Execute(child.Program, values, 1000,
+            new IrProgramReplayOptions(static _ => null), cancellation);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(execution.Exception!.Kind, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ConstantArraySitesKeepAllocationFailureSeparateFromIrExceptionKinds()
+    {
+        var projection = Lower("var array=new int[1];");
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.HasOrigins, Is.True, check.UnknownReason);
+        Assert.That(check.HasIrAllocations, Is.True);
+        Assert.That(check.ExceptionKinds, Does.Contain(IrExceptionKind.Overflow));
+    }
+
+    [TestCase(IrExceptionKind.DivideByZero, true)]
+    [TestCase(IrExceptionKind.Overflow, true)]
+    [TestCase(IrExceptionKind.NullReference, true)]
+    [TestCase(IrExceptionKind.IndexOutOfRange, true)]
+    [TestCase(IrExceptionKind.InvalidCast, true)]
+    [TestCase(IrExceptionKind.Argument, true)]
+    [TestCase(IrExceptionKind.ArgumentOutOfRange, true)]
+    [TestCase(IrExceptionKind.Unknown, false)]
+    [TestCase(IrExceptionKind.Explicit, false)]
+    public void TypedIrThrowsRequireAClassifiedFamily(IrExceptionKind kind, bool classified)
+    {
+        if (!Enum.IsDefined(kind))
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        var projection = Lower("");
+        var child = projection.Children[1];
+        var factory = child.Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        builder.Throw(entry, factory.CreateOperation(), kind, exit);
+        builder.ExceptionalExit(exit, factory.CreateOperation());
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1,
+            child with { Owner = child.Owner with { Program = builder.Build() }, Cost = ResourceProgram.Zero })
+        };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation).HasSourceCosts, Is.True);
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.HasOrigins, Is.EqualTo(classified), check.UnknownReason);
+        if (classified)
+        { Assert.That(check.ExceptionKinds, Is.EquivalentTo(new[] { kind })); }
+        else
+        {
+            Assert.That(check.ExceptionKinds, Is.Null);
+            Assert.That(check.HasIrAllocations, Is.False);
+            Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsUnclassifiedThrow"));
+        }
+    }
+
+    [Test]
+    public void LaterUnclassifiedFaultsDiscardEarlierAllocationAndFamilyFacts()
+    {
+        var projection = Lower("var array=new int[1];");
+        var child = projection.Children[1];
+        var factory = child.Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.Unknown, exit);
+        builder.ExceptionalExit(exit, factory.CreateOperation());
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1,
+            child with { Owner = child.Owner with { Program = builder.Build() }, Cost = ResourceProgram.Zero })
+        };
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.HasOrigins, Is.False);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsUnclassifiedThrow"));
+    }
+
+    [Test]
+    public void RuntimeArrayLimitApproximationsAreNotReclassifiedAsKnownFaults()
+    {
+        var projection = Lower("var array=new int[count];");
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.HasOrigins, Is.False);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsApproximationUnsupported"));
+    }
+
+    [Test]
+    public void IrFaultClassificationHasASharedTermBudgetAcrossChildren()
+    {
+        var projection = Lower("");
+        var child = projection.Children[0];
+        var factory = child.Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        IrTerm term = factory.Binary(IrBinaryOperator.Divide, factory.Variable(child.Owner.Parameters[0].Entry), factory.Integer(1));
+        for (var depth = 0; depth < 7; depth++)
+        { term = factory.Binary(IrBinaryOperator.Add, term, term); }
+        builder.Assign(entry, factory.CreateOperation(), factory.CreateVariable("value", factory.IntegerType), term);
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        var children = Enumerable.Range(0, 16).Select(index => child with
+        { Owner = child.Owner with { CallableId = "root:fork-child:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), Program = program } }).ToImmutableArray();
+        projection = projection with { Children = children };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation).HasSourceCosts, Is.True);
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsBudgetExceeded"));
+    }
+
+    [TestCase("entry-exit")]
+    [TestCase("bypass-exit")]
+    [TestCase("assume")]
+    [TestCase("assert")]
+    public void IrFaultOriginsRejectUnclassifiedControlTransfers(string shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        var projection = Lower("");
+        var factory = projection.Children[1].Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        switch (shape)
+        {
+            case "entry-exit":
+                builder.ExceptionalExit(entry, factory.CreateOperation());
+                break;
+            case "bypass-exit":
+                var exit = builder.CreateBlock();
+                builder.Goto(entry, factory.CreateOperation(), exit);
+                builder.ExceptionalExit(exit, factory.CreateOperation());
+                break;
+            case "assume":
+                builder.Assume(entry, factory.CreateOperation(), factory.Boolean(false));
+                builder.Return(entry, factory.CreateOperation());
+                break;
+            case "assert":
+                builder.Assert(entry, factory.CreateOperation(), factory.Boolean(false));
+                builder.Return(entry, factory.CreateOperation());
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(shape));
+        }
+        projection = WithFaultOriginProgram(projection, builder.Build());
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation).HasSourceCosts, Is.True);
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo(shape.EndsWith("exit", StringComparison.Ordinal)
+            ? "TaskIrFaultOriginsUnclassifiedExit" : "TaskIrFaultOriginsControlUnsupported"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OwnedIrUnboxingKeepsFaultCandidatesDespiteTypedDefaults(bool boolean)
+    {
+        var projection = Lower("");
+        var factory = projection.Children[1].Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var owner = factory.CreateVariable("boxed", factory.ObjectType);
+        var targetType = boolean ? factory.BooleanType : factory.IntegerType;
+        var target = factory.CreateVariable("value", targetType);
+        builder.Assign(entry, factory.CreateOperation(), owner, factory.Null(factory.ObjectType));
+        builder.Assign(entry, factory.CreateOperation(), target, factory.Cast(targetType, factory.Variable(owner)));
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        projection = WithFaultOriginProgram(projection, program);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.HasOrigins, Is.True, check.UnknownReason);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.ExceptionKinds, Is.EquivalentTo(new[] { IrExceptionKind.NullReference, IrExceptionKind.InvalidCast }));
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000,
+            new IrProgramReplayOptions(static _ => null), cancellation);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        if (boolean)
+        { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.False); }
+        else
+        { Assert.That(execution.GetCurrentValue(target)!.Integer, Is.Zero); }
+    }
+
+    [Test]
+    public void UnsupportedSourceDowncastsRemainOutsideTheOwnedProjection()
+    {
+        const string source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) " +
+            "{object value=(object)new int[1];byte[] other=(byte[])value;}}";
+        var result = LowerSourceResult(source);
+        Assert.That(result.Projection, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinChildLoweringIncomplete"));
+    }
+
+    private static CompilerForkJoinProjection WithFaultOriginProgram(CompilerForkJoinProjection projection, IrProgram program)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        ArgumentNullException.ThrowIfNull(program);
+        var child = projection.Children[1];
+        var replaced = child with { Owner = child.Owner with { Program = program }, Cost = ResourceProgram.Zero };
+        return projection with { Children = projection.Children.SetItem(1, replaced) };
+    }
+
+    [Test]
+    public void IrFaultClassificationRejectsUnownedChildrenAndHonorsCancellation()
+    {
+        var projection = Lower("");
+        var root = Root(projection);
+        var child = projection.Children[1];
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1,
+            child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } })
+        };
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, root, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action cancel = () => { _ = NativeTaskIrFaultOriginVerifier.Check(projection, root, cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(cancel);
+    }
+
     private static CompilerTotalEntryPreparation Root(CompilerForkJoinProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
@@ -456,14 +712,20 @@ public sealed class NativeForkJoinProjectionTests
     private static CompilerForkJoinProjection LowerSource(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        var result = LowerSourceResult(source);
+        Assert.That(result.UnknownReason, Is.Null);
+        return result.Projection!;
+    }
+
+    private static CompilerForkJoinProjectionResult LowerSourceResult(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("ForkJoinProjection", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root");
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
-        var result = CompilerForkJoinResourceLowering.Lower(method, compilation, "root", TestContext.CurrentContext.CancellationToken);
-        Assert.That(result.UnknownReason, Is.Null);
-        return result.Projection!;
+        return CompilerForkJoinResourceLowering.Lower(method, compilation, "root", TestContext.CurrentContext.CancellationToken);
     }
 }
