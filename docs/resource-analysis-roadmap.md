@@ -97,6 +97,24 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Owned-IR fault-profile coverage boundaries
+
+The next three controls exercise object/array reference casts and exhaustion
+between instructions after term traversal. Upcasts must add no type-fault
+candidate, downcasts retain a conservative candidate even for a null execution,
+and exhausted classification must discard all facts. The initial build caught
+a test assertion using a nonexistent value property and a missing lambda
+argument guard; both test-source errors were corrected. The next run exposed
+constant folding of literal-null casts and a callback-factory mismatch in the
+test setup. The final controls use variable operands and each callback's own
+factory. All 95 projection/profile cases passed with zero build errors.
+Evidence: `artifacts/resource-fault-profile-coverage-boundaries-3.log`.
+Full formatting passed before the final test-setup corrections; the final
+private-workspace whitespace pass copied zero changes. Evidence:
+`artifacts/resource-fault-profile-boundary-format.log` and
+`artifacts/resource-fault-profile-boundary-apply-format.log`. Final documentation
+checks passed in `artifacts/resource-fault-profile-boundary-docs-final.log`.
+
 ### Shared normal-domain proof budgets
 
 New worker controls spend the shared budget across clauses, resource regions,
@@ -133,6 +151,10 @@ quality/API, formatting and documentation checks also passed. Evidence:
 local package baseline was 642.7 seconds at four CPUs, 12 GiB memory, 4 GiB
 scratch and parallelism four, with 492 passed and one existing skip.
 One local timing comparison does not establish a general performance gain.
+Canonical package CI then passed on published `5dadd9e3b`, run 39540486893,
+job 119027232479. Evidence: `artifacts/resource-5dadd-package-job.log` and
+`artifacts/resource-5dadd-package-container/canonical-package.json`.
+Docker recorded exit code zero and `oomKilled: false`.
 
 ### Loop rejection coverage follow-up
 

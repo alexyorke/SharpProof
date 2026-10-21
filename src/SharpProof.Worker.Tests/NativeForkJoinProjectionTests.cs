@@ -662,6 +662,68 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinChildLoweringIncomplete"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OwnedReferenceCastsRetainTypeFaultCandidates(bool upcast)
+    {
+        var projection = Lower("");
+        var factory = projection.Children[1].Owner.Program.Factory;
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var targetType = upcast ? factory.ObjectType : array;
+        var operandType = upcast ? array : factory.ObjectType;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var result = factory.CreateVariable("cast", targetType);
+        var operand = factory.CreateVariable("operand", operandType);
+        builder.Assign(entry, factory.CreateOperation(), operand, factory.Null(operandType));
+        builder.Assign(entry, factory.CreateOperation(), result,
+            factory.Cast(targetType, factory.Variable(operand)));
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        projection = WithFaultOriginProgram(projection, program);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.HasOrigins, Is.True, check.UnknownReason);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.ExceptionKinds, upcast ? Is.Empty : Is.EquivalentTo(new[] { IrExceptionKind.InvalidCast }));
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000,
+            new IrProgramReplayOptions(static _ => null), cancellation);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.GetCurrentValue(result)!.Kind, Is.EqualTo(IrValueKind.Null));
+    }
+
+    [Test]
+    public void SharedFaultBudgetAlsoRejectsAnInstructionAfterTermTraversal()
+    {
+        var projection = Lower("");
+        projection = projection with
+        {
+            Children = projection.Children.Select(child =>
+            {
+                ArgumentNullException.ThrowIfNull(child);
+                var factory = child.Owner.Program.Factory;
+                var builder = new IrProgramBuilder(factory);
+                var entry = builder.CreateBlock();
+                var body = builder.CreateBlock();
+                var exit = builder.CreateBlock();
+                builder.Goto(entry, factory.CreateOperation(), body);
+                var value = factory.CreateVariable("value", factory.IntegerType);
+                for (var index = 0; index < 1023; index++)
+                { builder.Assign(body, factory.CreateOperation(), value, factory.Integer(index)); }
+                builder.Goto(body, factory.CreateOperation(), exit);
+                builder.Return(exit, factory.CreateOperation());
+                return child with { Owner = child.Owner with { Program = builder.Build() }, Cost = ResourceProgram.Zero };
+            }).ToImmutableArray()
+        };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var source = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(source.HasSourceCosts, Is.True, source.UnknownReason);
+        var check = NativeTaskIrFaultOriginVerifier.Check(projection, Root(projection), cancellation);
+        Assert.That(check.ExceptionKinds, Is.Null);
+        Assert.That(check.HasIrAllocations, Is.False);
+        Assert.That(check.UnknownReason, Is.EqualTo("TaskIrFaultOriginsBudgetExceeded"));
+    }
+
     private static CompilerForkJoinProjection WithFaultOriginProgram(CompilerForkJoinProjection projection, IrProgram program)
     {
         ArgumentNullException.ThrowIfNull(projection);
