@@ -17,7 +17,8 @@ try {
     foreach ($name in @('psscriptAnalyzer', 'shellcheck', 'shfmt')) {
         $tool = $tools.$name
         $download = Join-Path $temporaryRoot $name
-        Invoke-WebRequest -Uri $tool.url -OutFile $download
+        # Tool hosts can return transient gateway errors during image builds.
+        Invoke-WebRequest -Uri $tool.url -OutFile $download -MaximumRetryCount 3 -RetryIntervalSec 5
         if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ine $tool.sha256) {
             throw "Downloaded $name does not match its pinned SHA256."
         }
