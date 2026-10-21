@@ -381,6 +381,61 @@ public sealed class NativeForkJoinProjectionTests
         Assert.Throws<OperationCanceledException>(decode);
     }
 
+    [TestCase("empty", "ForkJoinInputOwnershipInvalid")]
+    [TestCase("control", "ForkJoinInputOwnershipInvalid")]
+    [TestCase("oversized", "ForkJoinSourceCostBudgetExceeded")]
+    public void InvalidRootDisplayNamesCannotPublishPartialChildBounds(string shape, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        ArgumentNullException.ThrowIfNull(reason);
+        var projection = Lower("var a=new int[count];");
+        var root = Root(projection);
+        var name = shape switch
+        {
+            "empty" => string.Empty,
+            "control" => "n\n",
+            "oversized" => new string('n', ResourceExpression.MaximumTextLength + 1),
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        projection = projection with { RootParameterNames = [name] };
+        AssertNoPartialCosts(projection, root, reason);
+    }
+
+    [Test]
+    public void CombinedInstructionBudgetIncludesTheLaterChildBeforeStorageComposition()
+    {
+        var projection = Lower("var a=new int[count];");
+        var root = Root(projection);
+        var child = projection.Children[1];
+        var factory = child.Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        for (var index = 0; index < ResourceExpression.MaximumNodes; index++)
+        { builder.Assign(entry, factory.CreateOperation(), child.Owner.Parameters[0].Current, factory.Integer(index)); }
+        builder.Return(entry, factory.CreateOperation());
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1, child with { Owner = child.Owner with { Program = builder.Build() } })
+        };
+        AssertNoPartialCosts(projection, root, "ForkJoinSourceCostBudgetExceeded");
+    }
+
+    private static void AssertNoPartialCosts(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(reason);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var source = NativeForkJoinSourceCostVerifier.Check(projection, root, cancellation);
+        Assert.That(source.HasSourceCosts, Is.False);
+        Assert.That(source.Upper, Is.Null);
+        Assert.That(source.UnknownReason, Is.EqualTo(reason));
+        var storage = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, root, Layout(), cancellation);
+        Assert.That(storage.CumulativeUpper, Is.Null);
+        Assert.That(storage.PeakAuxiliaryUpper, Is.Null);
+        Assert.That(storage.RetainedUpper, Is.Null);
+        Assert.That(storage.UnknownReason, Is.EqualTo(reason));
+    }
     private static CompilerTotalEntryPreparation Root(CompilerForkJoinProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);

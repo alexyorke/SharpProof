@@ -143,4 +143,37 @@ public sealed class ResourceMemoryFieldFactTests
         var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, token);
         Assert.That(replay.Complete(execution, Layout, token).Bounds, Is.EqualTo(result.Bounds));
     }
+    [TestCase(32)]
+    [TestCase(33)]
+    public void ScalarTraversalBudgetAdmitsItsBoundaryAndRejectsDeeperTerms(int depth)
+    {
+        if (depth is not (32 or 33))
+        { throw new ArgumentOutOfRangeException(nameof(depth)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var input = factory.CreateVariable("input", factory.IntegerType);
+        builder.Assign(entry, factory.CreateOperation(), input, factory.Integer(0));
+        IrTerm value = factory.Variable(input);
+        var wide = factory.GetOrCreateIntegerType(64, true);
+        for (var index = 0; index < depth; index++)
+        { value = factory.Cast(index % 2 == 0 ? wide : factory.IntegerType, value); }
+        builder.Return(entry, factory.CreateOperation(), value);
+        var program = builder.Build();
+        var token = TestContext.CurrentContext.CancellationToken;
+        var result = ResourceMemoryProgram.Evaluate(program, Layout, token);
+        if (depth == 33)
+        {
+            Assert.That(result.Verified, Is.False);
+            Assert.That(result.Bounds, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("MemoryScalarEffectUnsupported"));
+            return;
+        }
+        Assert.That(result.Verified, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds, Is.EqualTo(new ResourceMemoryBounds(0, 0, 0, 0, 0, 0)));
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, token);
+        Assert.That(replay.Complete(execution, Layout, token).Bounds, Is.EqualTo(result.Bounds));
+    }
 }

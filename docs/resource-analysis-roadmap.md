@@ -96,9 +96,42 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+### Fault notification lifecycle review
+
+The pinned `TaskExceptionHolder.cs` cache still matches SHA-256
+`bc4dda204de133879e4e334b37f74fc6c57690c05a179ae4648fbfa653a38604`
+(blob `4d9a68fdca4f11df2a493f8695dc3ea82f38544f`). Its finalizer constructs the
+notification at lines 54-70, while `MarkAsUnhandled` can re-register an observed
+holder for finalization at lines 213-224. The finalizer itself does not mark the
+holder handled. Therefore a per-construction bound alone is insufficient to
+multiply by an assumed one-notification-per-holder count. The admitted root
+still needs a lifecycle proof excluding later exception additions and external
+re-registration/resurrection effects. Pinned `Task.cs` documents the ordinary
+fault-publication ordering at lines 1813-1827 and reserves promise completion
+before recording exceptions at lines 3377-3393; those facts are inputs to that
+proof, rather than an existing notification-frequency certificate. No new
+cumulative runtime-byte verdict is published from this review.
+### Analysis-budget boundary controls
+
+Two additional scalar-traversal controls admit depth 32 with independent replay
+and reject depth 33 with `MemoryScalarEffectUnsupported` and no partial bounds.
+The complete memory group passed 196 cases with zero build warnings/errors in
+the canonical Linux amd64 container. Evidence:
+`artifacts/resource-memory-traversal-budget-controls.log`.
+
+Four additional fork/join controls reject empty/control-character input names,
+oversized input names, and a later child exceeding the combined instruction
+budget. Each checks both source costs and child storage, retaining no partial
+cumulative, peak or retained bounds. All 64 projection/composition/transport
+cases passed with zero build warnings/errors. Evidence:
+`artifacts/resource-fork-join-budget-controls.log`.
+Canonical formatting and documentation checks passed as recorded in
+`artifacts/resource-fork-join-budget-format.log` and
+`artifacts/resource-fork-join-budget-docs-final.log`.
+
 ### Memory ownership rejection controls
 
-The memory group now contains 194 passing cases in the canonical Linux amd64
+At checkpoint `0cc594782`, the memory group passed 194 cases in the canonical Linux amd64
 container. Six additional controls allocate owned storage before presenting a
 borrowed or null field receiver, a borrowed child, an unsupported scalar field
 expression, a directly returned borrowed reference, or a read of an uninitialized
@@ -114,13 +147,14 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 `artifacts/resource-memory-ownership-docs-final.log`.
 
 ### Current coverage qualification
+
 Published `96dcfa4ee` passed all four coverage shards in run 39522192698,
 including the repaired package preparation. The complete merge-commit report
 (92a24329ec1e45fad2e364651d8c30853c0f465f) measured 6052/6273 changed trusted
 lines (96.48%, 221 uncovered), below the unchanged 100% floor. This supersedes
 the complete numerical measurements below. The report is retained at
 `artifacts/resource-96dc-coverage-evidence/coverage/SharpProof.coverage.json`.
-The twelve additional local memory controls above are newer than this report
+The additional local memory and fork/join controls above are newer than this report
 and require their own exact-head qualification. The roadmap and draft MR remain
 incomplete while the fault-byte proof, coverage floor and final audit are open.
 
