@@ -891,7 +891,7 @@ try {
         if ($coverageEnabled) {
             # Consumer workspaces use distinct compiler pipes. Do not leave one
             # idle server per workspace alive for the entire instrumented shard.
-            $environment['UseSharedCompilation'] = 'false'
+            $environmentBuilder.Add('UseSharedCompilation', 'false')
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
                 -SourceDirectory (Join-Path $repositoryRoot (
                     'artifacts/bin/SharpProof.Package.IntegrationTests/' + $Configuration +

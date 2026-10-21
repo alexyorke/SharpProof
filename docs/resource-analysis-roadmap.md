@@ -343,6 +343,47 @@ resource-task-source-runtime filename prefixes. No public resource enum changed.
 Cumulative root task bytes remain Unknown pending the separate runtime prefix
 model below. No feature-completion or coverage improvement is claimed yet.
 
+### Coverage preparation repair
+
+At integration head `5f9a25598`, all three semantic coverage shards passed in
+run 39520008544, but the package shard failed before starting its tests. The
+container exited 1 with `oomKilled=false`. The merged callback still wrote
+`UseSharedCompilation` through the retired mutable environment map, causing
+"Cannot index into a null array." The fix adds the same `false` value to the
+immutable environment builder, retaining the compiler-server mitigation.
+
+A permanent child-process regression extracts and executes the actual package
+preparation callback in four coverage/exclusivity modes. It checks the package
+source, compiler-server setting, isolated coverage output, collector routing and
+direct test-host binding. Both this probe and the existing coverage-evidence
+regressions passed. Script formatting passed for 89 PowerShell and 19 shell
+files. The complete local Release package coverage shard passed 492 cases with
+one existing skip across 14 isolated shards at parallelism four. Total package
+phase time was 527.369 seconds. It retained the same four CPUs, 12 GiB memory
+and 4 GiB scratch limits as CI; no concurrency, deadline, instrumentation or
+coverage floor was relaxed. Normalization completed successfully for 28 reports.
+New exact-head CI must qualify the committed repair; no newer aggregate
+coverage percentage is claimed.
+Evidence uses the `resource-package-environment` and
+`resource-coverage-environment-package` artifact prefixes.
+
+### Fault-origin review
+
+The existing normal-domain checker explicitly assumes ideal allocation success
+and a nonnegative counter domain. It is not a certificate that real task faults
+can only use preallocated exceptions. The pinned
+[task scheduling implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs#L1699)
+constructs a new `TaskSchedulerException` when queueing throws, records it, finishes
+the task, marks ordinary starts handled, and throws that wrapper. Internal task
+creation reaches this shared scheduling path. Proving normal callback source
+alone therefore does not account for launch-failure wrapper storage and traces.
+
+The reviewed Task.cs blob is `0ab2d859c0b96f818ed1b56c5f55fcd3dae43e91`,
+SHA-256 `5967259aff81a295fc2280e6400ed76b14d29f2687882c55d5297aabd281af70`;
+source and provenance are cached under `artifacts/resource-runtime-fault-review/`.
+This rejects an unproved shortcut, not an implementation of the full remaining
+fault-cost model. Root cumulative task bytes remain Unknown.
+
 ### Master integration
 
 Integrated reviewed master `015c1db92` after its immutable-model migration caused
