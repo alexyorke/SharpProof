@@ -15,6 +15,53 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Release, true)]
+    public void AsyncRootBoundaryComesFromTheSameEmittedModule(OptimizationLevel optimization, bool captureCarriersFirst)
+    {
+        var (compilation, method, _, _) = Compile(true, optimization);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var before = captureCarriersFirst ? collector.Capture(method, "root", cancellation).Shapes : null;
+        var capture = collector.CaptureExceptionBoundary(method, "root", cancellation);
+        Assert.That(capture.Boundary, Is.Not.Null, capture.UnknownReason);
+        var boundary = capture.Boundary!;
+        var shapes = before ?? collector.Capture(method, "root", cancellation).Shapes!;
+        Assert.That(boundary.RootCallableId, Is.EqualTo("root"));
+        Assert.That(boundary.ModuleSha256, Is.EqualTo(shapes.ModuleSha256));
+        Assert.That(boundary.StateMachineMetadataName, Is.EqualTo(shapes.StateMachine!.MetadataName));
+        Assert.That(boundary.MethodToken >> 24, Is.EqualTo(6));
+        Assert.That(boundary.TryOffset, Is.GreaterThanOrEqualTo(0));
+        Assert.That(boundary.TryLength, Is.GreaterThan(0));
+        Assert.That(collector.CaptureExceptionBoundary(method, "root", cancellation).Boundary, Is.EqualTo(boundary));
+    }
+
+    [Test]
+    public void SynchronousTaskRootsCannotClaimALocalAsyncCatchBoundary()
+    {
+        var (compilation, method, _, _) = Compile(false, OptimizationLevel.Release);
+        var capture = new CompilerTaskCarrierCollector(compilation).CaptureExceptionBoundary(method, "root",
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Boundary, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskRootExceptionBoundaryAsyncRequired"));
+    }
+
+    [Test]
+    public void ExceptionBoundaryCaptureRejectsUnsupportedRootsAndHonorsCancellation()
+    {
+        var (compilation, method, _, _) = Compile(true, OptimizationLevel.Release);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var capture = collector.CaptureExceptionBoundary(method, " ", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Boundary, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierRootUnsupported"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action canceled = () => { _ = collector.CaptureExceptionBoundary(method, "root", cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(canceled);
+    }
+
     [TestCase(0, 224L, 0)]
     [TestCase(1, 272L, 1)]
     [TestCase(2, 224L, 4)]

@@ -109,6 +109,43 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Emitted async-root exception boundaries
+
+`CaptureExceptionBoundary` inspects the actual emitted async state-machine
+`MoveNext` method, using the same module image/hash as carrier capture. Admission
+requires one framework Exception catch, protected Task.Run/WhenAll/GetResult
+sites and allocations, and one handler call that records the fault in the
+framework async builder. Synchronous roots, unsupported emission/body shapes,
+incomplete call sites and unverified handlers return Unknown without a boundary
+record. The cached emitted image is retained under the existing 16 MiB bound.
+
+The IL reader has a separate metadata-operand entry point; scalar provider
+admission keeps its existing operand policy. New lexical controls check metadata
+tokens and floating-point operand bits without treating byte arrays as CLR
+program evidence. Emission controls cover Debug/Release, capture order/module
+reuse, synchronous-root rejection and cancellation. All 121 carrier/parser cases
+passed with zero build errors after strengthening awaiter framework identity and
+rejecting indirect calls. Evidence:
+`artifacts/resource-emitted-task-boundary-tests-2.log`.
+Full quality/API and documentation checks passed. Evidence:
+`artifacts/resource-emitted-task-boundary-lint.log` and
+`artifacts/resource-emitted-task-boundary-docs-checkpoint.log`.
+Full formatting passed before the final awaiter-identity tightening; its final
+private-workspace whitespace check copied zero changes. Evidence:
+`artifacts/resource-emitted-task-boundary-format.log` and
+`artifacts/resource-emitted-task-boundary-apply-format-final.log`. Final
+documentation checks also passed:
+`artifacts/resource-emitted-task-boundary-docs-final.log`.
+This is compiler-side source-boundary evidence. It is not yet transported or
+composed into a native CLR-frame/trace-byte proof, and it does not cover failures
+in runtime helpers outside the source catch.
+
+Published `6ef27aa7b` completed all six coverage shards in run 39549217069.
+Its complete report measured 6233/6422 changed trusted lines (97.06%, 189
+uncovered), failing the unchanged 100% floor. Task-only dispatch-copy changes
+have no uncovered changed lines in that report. Evidence:
+`artifacts/resource-6ef27-coverage-evidence/coverage/SharpProof.coverage.json`.
+
 ### Execution-context wrapper dispatch counts
 
 The fault-carrier checker now keeps context-wrapper captures/restores separate
@@ -586,10 +623,18 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `6ef27aa7b` passed all six coverage shards in run 39549217069. Its
+complete merge-commit report (b0355107616598e00ef7b99beabbcfd73e62317b) measured
+6233/6422 changed trusted lines (97.06%, 189 uncovered), failing the unchanged
+100% floor. This is the latest complete numeric measurement:
+`artifacts/resource-6ef27-coverage-evidence/coverage/SharpProof.coverage.json`.
+Task-only dispatch-copy work has no uncovered changed lines. The context-wrapper
+and emitted-boundary work is newer and needs its own qualification.
+
 Published `cfa23e7cb` passed all six coverage shards in run 39545675178. Its
 complete merge-commit report (8c25b7674f9933c7d27ca4bb0f91b6d08befb5e8) measured
 6201/6388 changed trusted lines (97.07%, 187 uncovered), failing the unchanged
-100% floor. This is the latest complete numeric measurement:
+100% floor. This earlier complete numeric measurement is retained at
 `artifacts/resource-cfa23-coverage-evidence/coverage/SharpProof.coverage.json`.
 The fixed source-exception instance verifier has no uncovered changed lines in
 that report. Source-activation and task-dispatch-copy work is newer and requires

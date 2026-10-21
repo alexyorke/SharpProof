@@ -1,6 +1,21 @@
 using System.IO;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 
 namespace SharpProof.CompilerArtifact;
+
+// Source-owned emitted boundary evidence only, not a CLR frame or byte bound.
+internal sealed record CompilerTaskRootExceptionBoundary(string RootCallableId, string ModuleSha256,
+    string StateMachineMetadataName, int MethodToken, int TryOffset, int TryLength)
+{
+    public string RootCallableId { get; init; } = ArgumentNullGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string ModuleSha256 { get; init; } = ArgumentNullGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
+    public string StateMachineMetadataName { get; init; } = ArgumentNullGuard.NotNull(StateMachineMetadataName, nameof(StateMachineMetadataName));
+}
+
+internal sealed record CompilerTaskRootExceptionBoundaryCapture(CompilerTaskRootExceptionBoundary? Boundary, string? UnknownReason);
 
 // Import private generated fields from a real emission. This metadata is source
 // evidence; it supplies neither a physical layout nor an allocation verdict.
@@ -12,9 +27,117 @@ internal sealed class CompilerTaskCarrierCollector
     private IAssemblySymbol? _assembly;
     private string? _moduleHash;
     private string? _emissionFailure;
+    private byte[]? _image;
 
     internal CompilerTaskCarrierCollector(CSharpCompilation compilation)
     { _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation)); }
+
+    internal CompilerTaskRootExceptionBoundaryCapture CaptureExceptionBoundary(IMethodSymbol method, string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var capture = Capture(method, callableId, cancellation);
+        if (capture.Shapes is not { } shapes)
+        { return new(null, capture.UnknownReason); }
+        if (shapes.StateMachine is not { } machine)
+        { return new(null, "TaskRootExceptionBoundaryAsyncRequired"); }
+        var state = _assembly!.GetTypeByMetadataName(machine.MetadataName);
+        var entries = state?.GetMembers("MoveNext").OfType<IMethodSymbol>().Where(static candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Parameters.IsEmpty && candidate.Arity == 0).ToArray();
+        if (entries is not { Length: 1 })
+        { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
+        try
+        {
+            using var stream = new MemoryStream(_image!, false);
+            using var pe = new PEReader(stream);
+            var metadata = pe.GetMetadataReader();
+            var handle = MetadataTokens.EntityHandle(entries[0].MetadataToken);
+            if (handle.Kind != HandleKind.MethodDefinition)
+            { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
+            var body = pe.GetMethodBody(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).RelativeVirtualAddress);
+            if (body.ExceptionRegions.Length != 1 || body.ExceptionRegions[0].Kind != ExceptionRegionKind.Catch)
+            { return new(null, "TaskRootExceptionBoundaryHandlerUnsupported"); }
+            var region = body.ExceptionRegions[0];
+            var framework = _compilation.GetTypeByMetadataName("System.Exception")?.ContainingAssembly.Identity;
+            if (framework is null || !FrameworkType(metadata, region.CatchType, "System", "Exception", framework))
+            { return new(null, "TaskRootExceptionBoundaryCatchUnsupported"); }
+            var code = body.GetILBytes();
+            if (code is null || code.Length > 4096)
+            { return new(null, "TaskRootExceptionBoundaryBodyUnsupported"); }
+            var cursor = 0;
+            var runs = 0;
+            var joins = 0;
+            var awaits = 0;
+            var records = 0;
+            while (cursor < code.Length)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
+                { return new(null, "TaskRootExceptionBoundaryBodyUnsupported"); }
+                var inside = instruction.Offset >= region.TryOffset && instruction.Offset < region.TryOffset + region.TryLength;
+                if (instruction.RawCode == "Calli")
+                { return new(null, "TaskRootExceptionBoundaryCallUnsupported"); }
+                if (instruction.RawCode is "Newobj" or "Newarr" or "Throw" or "Rethrow" && !inside)
+                { return new(null, "TaskRootExceptionBoundarySourceEscape"); }
+                if (instruction.RawCode is not ("Call" or "Callvirt"))
+                { continue; }
+                var called = MetadataTokens.EntityHandle(checked((int)instruction.Operand));
+                if (called.Kind == HandleKind.MethodSpecification)
+                { called = metadata.GetMethodSpecification((MethodSpecificationHandle)called).Method; }
+                if (called.Kind != HandleKind.MemberReference)
+                { return new(null, "TaskRootExceptionBoundaryCallUnsupported"); }
+                var member = metadata.GetMemberReference((MemberReferenceHandle)called);
+                var name = metadata.GetString(member.Name);
+                var taskCall = name is "Run" or "WhenAll" && FrameworkType(metadata, member.Parent, "System.Threading.Tasks", "Task", framework);
+                var awaitCall = name == "GetResult" && FrameworkAwaiter(metadata, member.Parent, framework);
+                if ((taskCall || awaitCall) && !inside)
+                { return new(null, "TaskRootExceptionBoundarySourceEscape"); }
+                if (taskCall)
+                { if (name == "Run") { runs++; } else { joins++; } }
+                if (awaitCall)
+                { awaits++; }
+                if (name == "SetException" && instruction.Offset >= region.HandlerOffset &&
+                    instruction.Offset < region.HandlerOffset + region.HandlerLength &&
+                    FrameworkType(metadata, member.Parent, "System.Runtime.CompilerServices", "AsyncTaskMethodBuilder", framework))
+                { records++; }
+            }
+            var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+            if (runs != plan.Children.Length || joins != 1 || awaits != 1 || records != 1)
+            { return new(null, "TaskRootExceptionBoundaryCallsIncomplete"); }
+            return new(new(callableId, shapes.ModuleSha256, machine.MetadataName, entries[0].MetadataToken, region.TryOffset, region.TryLength), null);
+        }
+        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
+        { return new(null, "TaskRootExceptionBoundaryEmissionInvalid"); }
+    }
+
+    private static bool FrameworkType(MetadataReader metadata, EntityHandle handle, string space, string name, AssemblyIdentity framework)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        space = ArgumentNullGuard.NotNull(space, nameof(space));
+        name = ArgumentNullGuard.NotNull(name, nameof(name));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        if (handle.Kind != HandleKind.TypeReference)
+        { return false; }
+        var type = metadata.GetTypeReference((TypeReferenceHandle)handle);
+        if (metadata.GetString(type.Namespace) != space || metadata.GetString(type.Name) != name || type.ResolutionScope.Kind != HandleKind.AssemblyReference)
+        { return false; }
+        var assembly = metadata.GetAssemblyReference((AssemblyReferenceHandle)type.ResolutionScope);
+        return metadata.GetString(assembly.Name) == framework.Name && assembly.Version == framework.Version &&
+            (assembly.Flags & AssemblyFlags.PublicKey) == 0 && metadata.GetBlobContent(assembly.PublicKeyOrToken).SequenceEqual(framework.PublicKeyToken) &&
+            (assembly.Culture.IsNil ? "" : metadata.GetString(assembly.Culture)) == framework.CultureName;
+    }
+
+    private static bool FrameworkAwaiter(MetadataReader metadata, EntityHandle handle, AssemblyIdentity framework)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        if (handle.Kind != HandleKind.TypeReference)
+        { return false; }
+        var type = metadata.GetTypeReference((TypeReferenceHandle)handle);
+        return metadata.GetString(type.Name) == "ConfiguredTaskAwaiter" && metadata.GetString(type.Namespace).Length == 0 &&
+            FrameworkType(metadata, type.ResolutionScope, "System.Runtime.CompilerServices", "ConfiguredTaskAwaitable", framework);
+    }
 
     internal CompilerTaskCarrierCapture Capture(IMethodSymbol method, string callableId, CancellationToken cancellation)
     {
@@ -117,6 +240,7 @@ internal sealed class CompilerTaskCarrierCollector
         if (stream.Length > MaximumImageBytes)
         { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
         var image = stream.ToArray();
+        _image = image;
         var reference = MetadataReference.CreateFromImage(image);
         var inspection = CSharpCompilation.Create("SharpProof.TaskCarrierInspection", references: _compilation.References.Append(reference),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithMetadataImportOptions(MetadataImportOptions.All));

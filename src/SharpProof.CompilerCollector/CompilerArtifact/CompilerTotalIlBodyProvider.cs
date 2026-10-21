@@ -257,8 +257,17 @@ internal static class CompilerScalarIlDecoder
                 CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, ["System", "Runtime", "InteropServices"])));
     }
 
-    internal static unsafe bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,
+    internal static bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,
         out CompilerIlToken instruction)
+    { return TryReadInstructionCore(code, ref offset, out instruction, false); }
+
+    // Raw metadata inspection does not widen scalar provider admission.
+    internal static bool TryReadMetadataInstruction(ReadOnlySpan<byte> code, ref int offset,
+        out CompilerIlToken instruction)
+    { return TryReadInstructionCore(code, ref offset, out instruction, true); }
+
+    private static unsafe bool TryReadInstructionCore(ReadOnlySpan<byte> code, ref int offset,
+        out CompilerIlToken instruction, bool metadataOperands)
     {
         instruction = default;
         fixed (byte* start = code)
@@ -294,6 +303,17 @@ internal static class CompilerScalarIlDecoder
                         operand = reader.ReadInt32();
                         break;
                     case OperandType.InlineI8:
+                        operand = reader.ReadInt64();
+                        break;
+                    case OperandType.InlineField when metadataOperands:
+                    case OperandType.InlineType when metadataOperands:
+                    case OperandType.InlineTok when metadataOperands:
+                    case OperandType.InlineSig when metadataOperands:
+                    case OperandType.InlineString when metadataOperands:
+                    case OperandType.ShortInlineR when metadataOperands:
+                        operand = reader.ReadInt32();
+                        break;
+                    case OperandType.InlineR when metadataOperands:
                         operand = reader.ReadInt64();
                         break;
                     default:
