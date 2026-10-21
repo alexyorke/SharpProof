@@ -63,36 +63,24 @@ internal static class ResourceMemoryProgram
         instructions = ArgumentNullGuard.NotNull(instructions, nameof(instructions));
         layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
         var unreadCopies = new HashSet<int>();
-        var liveCopies = new Dictionary<IrVarId, int>();
+        var liveCopies = new HashSet<IrVarId>();
+        var lastUse = new Dictionary<IrVarId, int>();
         for (var index = instructions.Count - 1; index >= 0; index--)
         {
             cancellation.ThrowIfCancellationRequested();
-            if (instructions[index] is IrAssignInstruction { Value: IrVariableTerm } copy)
-            {
-                if (!liveCopies.Remove(copy.Target))
-                { unreadCopies.Add(index); continue; }
-            }
+            var unreadCopy = instructions[index] is IrAssignInstruction { Value: IrVariableTerm } copy &&
+                !liveCopies.Remove(copy.Target);
+            if (unreadCopy)
+            { unreadCopies.Add(index); }
             var readCount = 0;
             foreach (var term in IrInstructionFacts.ReadTerms(instructions[index]))
             {
                 cancellation.ThrowIfCancellationRequested();
                 if (++readCount > ResourceMemoryTrace.MaximumEvents)
                 { return Unknown("MemoryProgramBudgetExceeded"); }
-                if (!ReadVariables(term, factory, liveCopies, index, 0))
-                { return Unknown("MemoryScalarEffectUnsupported"); }
-            }
-        }
-        var lastUse = new Dictionary<IrVarId, int>();
-        for (var index = 0; index < instructions.Count; index++)
-        {
-            cancellation.ThrowIfCancellationRequested();
-            var readCount = 0;
-            foreach (var term in IrInstructionFacts.ReadTerms(instructions[index]))
-            {
-                cancellation.ThrowIfCancellationRequested();
-                if (++readCount > ResourceMemoryTrace.MaximumEvents)
-                { return Unknown("MemoryProgramBudgetExceeded"); }
-                if (!ReadVariables(term, factory, lastUse, index, 0))
+                // An unread copy still contributes to the conservative last-use
+                // envelope, but cannot make another copy transitively observed.
+                if (!ReadVariables(term, factory, liveCopies, lastUse, index, 0, !unreadCopy))
                 { return Unknown("MemoryScalarEffectUnsupported"); }
             }
         }
@@ -315,23 +303,31 @@ internal static class ResourceMemoryProgram
         return Unknown("MemoryControlFlowUnsupported");
     }
 
-    private static bool ReadVariables(IrTerm term, IrFactory factory, Dictionary<IrVarId, int> lastUse, int index, int depth)
+    private static bool ReadVariables(IrTerm term, IrFactory factory, HashSet<IrVarId> liveCopies,
+        Dictionary<IrVarId, int> lastUse, int index, int depth, bool observeCopies)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        liveCopies = ArgumentNullGuard.NotNull(liveCopies, nameof(liveCopies));
         lastUse = ArgumentNullGuard.NotNull(lastUse, nameof(lastUse));
         if (depth > 32)
         { return false; }
         if (term is IrVariableTerm variable)
-        { lastUse[variable.Variable] = index; return true; }
+        {
+            if (!lastUse.ContainsKey(variable.Variable))
+            { lastUse.Add(variable.Variable, index); }
+            if (observeCopies)
+            { liveCopies.Add(variable.Variable); }
+            return true;
+        }
         if (term is IrCastTerm cast)
-        { return ReadVariables(cast.Operand, factory, lastUse, index, depth + 1); }
+        { return ReadVariables(cast.Operand, factory, liveCopies, lastUse, index, depth + 1, observeCopies); }
         if (term is IrUnaryTerm unary)
-        { return ReadVariables(unary.Operand, factory, lastUse, index, depth + 1); }
+        { return ReadVariables(unary.Operand, factory, liveCopies, lastUse, index, depth + 1, observeCopies); }
         if (term is IrBinaryTerm binary)
-        { return ReadVariables(binary.Left, factory, lastUse, index, depth + 1) && ReadVariables(binary.Right, factory, lastUse, index, depth + 1); }
+        { return ReadVariables(binary.Left, factory, liveCopies, lastUse, index, depth + 1, observeCopies) && ReadVariables(binary.Right, factory, liveCopies, lastUse, index, depth + 1, observeCopies); }
         if (term is IrOpaqueTerm { Receiver: { } owner, Arguments.IsEmpty: true } && IrFieldSites.IsFieldRead(factory, term))
-        { return ReadVariables(owner, factory, lastUse, index, depth + 1); }
+        { return ReadVariables(owner, factory, liveCopies, lastUse, index, depth + 1, observeCopies); }
         if (term is IrStringTerm text && factory.GetString(text.Value).Length == 0)
         { return true; }
         return term is IrIntegerTerm or IrBooleanTerm or IrNullTerm;

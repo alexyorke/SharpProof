@@ -97,6 +97,30 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Consolidated memory read validation
+
+Memory extraction now validates reads once in reverse instruction order. The
+first recorded use is each variable's greatest read index. A separate live-copy
+set preserves the existing rule for unobserved copy chains: their reads retain
+the conservative last-use envelope without making prior copies observed. This
+replaces two traversals of the same immutable terms and removes the second
+pass's unreachable read/depth rejection; the 1024-read and depth-32 budgets are
+unchanged. Numeric bounds and model identities are unchanged.
+
+The complete memory group passed 205 cases with zero build warnings/errors.
+New controls cover initializer reads plus their extent, scalar casts used both
+in returns and assigned snapshots, nested Boolean guards, and nested owned
+field reads. Supported results agree with independent replay. For deeper terms,
+the replay checker also returns its explicit depth rejection; interpreter return
+values and heap identities independently verify the actual array/graph outcome.
+Evidence: `artifacts/resource-memory-single-pass-controls-4.log`.
+All 716 selected native resource-contract and fork/join worker tests passed
+with zero build warnings/errors. The full quality/API and documentation gates
+also passed. Evidence: `artifacts/resource-memory-single-pass-worker.log`,
+`artifacts/resource-memory-single-pass-lint.log` and
+`artifacts/resource-memory-single-pass-docs.log`.
+Full formatting passed: `artifacts/resource-memory-single-pass-format.log`.
+
 ### Memory-envelope ownership and budget controls
 
 Seven additional controls reject exhausted instruction, definition, expression
