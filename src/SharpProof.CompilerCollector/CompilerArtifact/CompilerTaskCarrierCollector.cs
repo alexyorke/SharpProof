@@ -45,15 +45,40 @@ internal sealed class CompilerTaskCarrierCollector
             if (handle.Kind != HandleKind.MethodDefinition)
             { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
             var body = pe.GetMethodBody(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).RelativeVirtualAddress);
-            if (body.ExceptionRegions.Length != 1 || body.ExceptionRegions[0].Kind != ExceptionRegionKind.Catch)
-            { return new(null, "TaskRootExceptionBoundaryHandlerUnsupported"); }
-            var region = body.ExceptionRegions[0];
             var framework = _compilation.GetTypeByMetadataName("System.Exception")?.ContainingAssembly.Identity;
-            if (framework is null || !FrameworkType(metadata, region.CatchType, "System", "Exception", framework))
+            if (framework is null)
             { return new(null, "TaskRootExceptionBoundaryCatchUnsupported"); }
+            var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+            if (ValidateExceptionBoundary(metadata, body, framework, plan.Children.Length, cancellation) is { } failure)
+            { return new(null, failure); }
+            var region = body.ExceptionRegions[0];
+            return new(new(callableId, shapes.ModuleSha256, machine.MetadataName, entries[0].MetadataToken, region.TryOffset, region.TryLength), null);
+        }
+        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
+        { return new(null, "TaskRootExceptionBoundaryEmissionInvalid"); }
+    }
+
+    // Body facts only. The caller separately binds the emitted module, owning
+    // state-machine method and callable before constructing a boundary record.
+    internal static string? ValidateExceptionBoundary(MetadataReader metadata, MethodBodyBlock body,
+        AssemblyIdentity framework, int children, CancellationToken cancellation)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        cancellation.ThrowIfCancellationRequested();
+        if (children is < 2 or > 16)
+        { return "TaskRootExceptionBoundaryCallsIncomplete"; }
+        try
+        {
+            if (body.ExceptionRegions.Length != 1 || body.ExceptionRegions[0].Kind != ExceptionRegionKind.Catch)
+            { return "TaskRootExceptionBoundaryHandlerUnsupported"; }
+            var region = body.ExceptionRegions[0];
+            if (!FrameworkType(metadata, region.CatchType, "System", "Exception", framework))
+            { return "TaskRootExceptionBoundaryCatchUnsupported"; }
             var code = body.GetILBytes();
             if (code is null || code.Length > 4096)
-            { return new(null, "TaskRootExceptionBoundaryBodyUnsupported"); }
+            { return "TaskRootExceptionBoundaryBodyUnsupported"; }
             var cursor = 0;
             var runs = 0;
             var joins = 0;
@@ -63,25 +88,25 @@ internal sealed class CompilerTaskCarrierCollector
             {
                 cancellation.ThrowIfCancellationRequested();
                 if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
-                { return new(null, "TaskRootExceptionBoundaryBodyUnsupported"); }
+                { return "TaskRootExceptionBoundaryBodyUnsupported"; }
                 var inside = instruction.Offset >= region.TryOffset && instruction.Offset < region.TryOffset + region.TryLength;
                 if (instruction.RawCode == "Calli")
-                { return new(null, "TaskRootExceptionBoundaryCallUnsupported"); }
+                { return "TaskRootExceptionBoundaryCallUnsupported"; }
                 if (instruction.RawCode is "Newobj" or "Newarr" or "Throw" or "Rethrow" && !inside)
-                { return new(null, "TaskRootExceptionBoundarySourceEscape"); }
+                { return "TaskRootExceptionBoundarySourceEscape"; }
                 if (instruction.RawCode is not ("Call" or "Callvirt"))
                 { continue; }
                 var called = MetadataTokens.EntityHandle(checked((int)instruction.Operand));
                 if (called.Kind == HandleKind.MethodSpecification)
                 { called = metadata.GetMethodSpecification((MethodSpecificationHandle)called).Method; }
                 if (called.Kind != HandleKind.MemberReference)
-                { return new(null, "TaskRootExceptionBoundaryCallUnsupported"); }
+                { return "TaskRootExceptionBoundaryCallUnsupported"; }
                 var member = metadata.GetMemberReference((MemberReferenceHandle)called);
                 var name = metadata.GetString(member.Name);
                 var taskCall = name is "Run" or "WhenAll" && FrameworkType(metadata, member.Parent, "System.Threading.Tasks", "Task", framework);
                 var awaitCall = name == "GetResult" && FrameworkAwaiter(metadata, member.Parent, framework);
                 if ((taskCall || awaitCall) && !inside)
-                { return new(null, "TaskRootExceptionBoundarySourceEscape"); }
+                { return "TaskRootExceptionBoundarySourceEscape"; }
                 if (taskCall)
                 { if (name == "Run") { runs++; } else { joins++; } }
                 if (awaitCall)
@@ -91,13 +116,12 @@ internal sealed class CompilerTaskCarrierCollector
                     FrameworkType(metadata, member.Parent, "System.Runtime.CompilerServices", "AsyncTaskMethodBuilder", framework))
                 { records++; }
             }
-            var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
-            if (runs != plan.Children.Length || joins != 1 || awaits != 1 || records != 1)
-            { return new(null, "TaskRootExceptionBoundaryCallsIncomplete"); }
-            return new(new(callableId, shapes.ModuleSha256, machine.MetadataName, entries[0].MetadataToken, region.TryOffset, region.TryLength), null);
+            if (runs != children || joins != 1 || awaits != 1 || records != 1)
+            { return "TaskRootExceptionBoundaryCallsIncomplete"; }
+            return null;
         }
         catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
-        { return new(null, "TaskRootExceptionBoundaryEmissionInvalid"); }
+        { return "TaskRootExceptionBoundaryEmissionInvalid"; }
     }
 
     private static bool FrameworkType(MetadataReader metadata, EntityHandle handle, string space, string name, AssemblyIdentity framework)

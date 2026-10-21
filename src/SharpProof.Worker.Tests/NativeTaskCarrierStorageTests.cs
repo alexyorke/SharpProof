@@ -15,6 +15,104 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(CustomException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
+    [TestCase("public static void Probe() {try {Helper();} catch(Exception) {}}", false, "TaskRootExceptionBoundaryCallUnsupported")]
+    [TestCase("public static unsafe void Probe(delegate* unmanaged<void> p) {try {p();} catch(Exception) {}}", false, "TaskRootExceptionBoundaryCallUnsupported")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {} new object();}", false, "TaskRootExceptionBoundarySourceEscape")]
+    [TestCase("public static void Probe(Exception e) {try {int.Parse(\"0\");} catch(Exception) {} throw e;}", false, "TaskRootExceptionBoundarySourceEscape")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {} Task.WhenAll(Array.Empty<Task>());}", false, "TaskRootExceptionBoundarySourceEscape")]
+    [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {}}", false, "TaskRootExceptionBoundaryCallsIncomplete")]
+    [TestCase("public static async Task<int> Probe() => await Task.FromResult(1).ConfigureAwait(false);", true, "TaskRootExceptionBoundaryCallsIncomplete")]
+    [TestCase("public static void Probe(int n) {try {switch(n) {case 0: n=7;break;case 1:n=8;break;case 2:n=9;break;case 3:n=10;break;case 4:n=11;break;default:n=12;break;}} catch(Exception) {}}", false, "TaskRootExceptionBoundaryBodyUnsupported")]
+    public void EmittedBodyValidatorRejectsUnsupportedBoundaries(string declaration, bool asyncBody, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(expected);
+        Assert.That(ValidateProbeBody(declaration, asyncBody), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void EmittedBodyValidatorRejectsOversizedBodiesAndMalformedCallTokens()
+    {
+        var statements = string.Concat(Enumerable.Range(0, 1500).Select(index =>
+            "n += " + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + ";"));
+        Assert.That(ValidateProbeBody("public static void Probe(int n) {try {" + statements + "} catch(Exception) {}}", false),
+            Is.EqualTo("TaskRootExceptionBoundaryBodyUnsupported"));
+        Assert.That(ValidateProbeBody("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {}}", false, corruptCall: true),
+            Is.EqualTo("TaskRootExceptionBoundaryEmissionInvalid"));
+    }
+
+    [TestCase(1)]
+    [TestCase(17)]
+    public void EmittedBodyValidatorChecksJoinBudgets(int children)
+    {
+        Assert.That(ValidateProbeBody("public static void Probe() {}", false, children), Is.EqualTo("TaskRootExceptionBoundaryCallsIncomplete"));
+    }
+
+    [Test]
+    public void EmittedBodyValidatorHonorsCancellation()
+    {
+        Action check = () => { _ = ValidateProbeBody("public static void Probe() {}", false, cancel: true); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        var source = "using System; using System.Threading.Tasks; public static class C {" + declaration +
+            " static void Helper() {} } public sealed class CustomException : Exception {}";
+        var initial = TestCompilation.Create("BoundaryBodyControl", [("Subject.cs", source)], allowUnsafe: true);
+        var compilation = initial.WithOptions(initial.Options.WithAllowUnsafe(true).WithOptimizationLevel(OptimizationLevel.Debug));
+        TestCompilation.AssertNoErrors(compilation);
+        using var emitted = new MemoryStream();
+        var emission = compilation.Emit(emitted, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(emission.Success, Is.True);
+        var bytes = emitted.ToArray();
+        if (corruptCall)
+        { CorruptProbeCall(bytes); }
+        using var stream = new MemoryStream(bytes, false);
+        using var image = new PEReader(stream);
+        var metadata = image.GetMetadataReader();
+        var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
+            .Single(value => metadata.GetString(value.Name) == (asyncBody ? "MoveNext" : "Probe"));
+        var body = image.GetMethodBody(method.RelativeVirtualAddress);
+        using var cancellation = new CancellationTokenSource();
+        if (cancel)
+        { cancellation.Cancel(); }
+        return CompilerTaskCarrierCollector.ValidateExceptionBoundary(metadata, body,
+            compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity, children,
+            cancel ? cancellation.Token : TestContext.CurrentContext.CancellationToken);
+    }
+
+    private static void CorruptProbeCall(byte[] bytes)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        using var stream = new MemoryStream(bytes, false);
+        using var image = new PEReader(stream);
+        var metadata = image.GetMetadataReader();
+        var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
+            .Single(value => metadata.GetString(value.Name) == "Probe");
+        var section = image.PEHeaders.SectionHeaders.Single(value => method.RelativeVirtualAddress >= value.VirtualAddress &&
+            method.RelativeVirtualAddress < value.VirtualAddress + value.SizeOfRawData);
+        var offset = section.PointerToRawData + method.RelativeVirtualAddress - section.VirtualAddress;
+        Assert.That(bytes[offset] & 3, Is.EqualTo(3), "This fixture requires a fat method header.");
+        var headerBytes = (bytes[offset + 1] >> 4) * 4;
+        var code = image.GetMethodBody(method.RelativeVirtualAddress).GetILBytes()!;
+        var cursor = 0;
+        while (CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
+        {
+            if (instruction.RawCode is "Call" or "Callvirt")
+            {
+                System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(offset + headerBytes + instruction.Offset + 1, 4), -1);
+                return;
+            }
+        }
+        Assert.Fail("The emitted fixture must contain a call operand to corrupt.");
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void BoundaryOwnershipReusesCarrierAndLayoutAdmission(bool incompatibleLayout)

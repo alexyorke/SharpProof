@@ -109,6 +109,46 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Direct emitted-boundary rejection controls
+
+The emitted-body checks now have a shared internal validator. Capture still
+binds the real emitted image, state-machine method and callable before creating
+a boundary record; the validator returns only a rejection reason or success for
+body facts. It does not establish module ownership, independent IL validity,
+physical frame counts or a root byte bound. Join counts outside the native
+domain of two through sixteen children return Unknown.
+
+New controls compile real method bodies and check rejection of missing/finally
+handlers, wrong framework catches, local method-definition calls, indirect
+calls, unprotected allocations/throws/joins, incomplete joins, generic awaiter
+shapes, dense switch instructions and oversized bodies. A separate control
+corrupts an emitted call token to exercise malformed metadata handling. Existing
+Debug/Release emission and artifact workflow tests continue through the shared
+production validator. Cancellation is checked directly. The first targeted run
+passed 163 of 164 cases; the indirect-call fixture was rejected during initial
+test compilation because its unsafe option was applied after the helper's
+diagnostic check. Fixture creation now passes the option directly and the
+targeted set then passed all 164 cases with zero build warnings or errors:
+`artifacts/resource-boundary-body-tests-final.log`. All 652 broader resource-contract
+workflow cases passed with zero build warnings or errors:
+`artifacts/resource-boundary-body-workflows.log`. Full quality/API, documentation and canonical
+private formatting checks passed:
+`artifacts/resource-boundary-body-lint.log`,
+`artifacts/resource-boundary-body-docs.log` and
+`artifacts/resource-boundary-body-format.log` (zero changes).
+No coverage improvement is claimed before a complete report.
+
+Published `2b78ed310` completed all six coverage shards in run 39562323764.
+Its aggregate for merge `38e48ccefe79434328f27ab1f15970271c62e5ed` measured
+6441/6645 changed trusted lines (96.93%, 204 uncovered), failing the unchanged
+100% floor. This supersedes the 96.91% report below. The malformed block
+inventory rejection and fresh source-fault tracker additions have no uncovered
+changed lines; the previously uncovered missing-block rejection is now covered.
+Evidence: `artifacts/resource-2b78-coverage-evidence/coverage/SharpProof.coverage.json`.
+The direct body-validator work is local and is not measured by that report.
+Published `2b78ed310` also passed complete canonical CI (run 39562323885) and
+package-consumer qualification (run 39562324011).
+
 ### Memory control-flow inventory rejection
 
 The last complete changed-TCB report left the malformed-control-flow rejection
