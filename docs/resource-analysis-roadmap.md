@@ -109,6 +109,24 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Refreshing the available Ubuntu tooling pin
+
+The canonical Dockerfile now pins xz-utils to the available Ubuntu revision
+`5.6.1+really5.4.5-1ubuntu0.4`. Published coverage aggregation had failed because
+the former `...ubuntu0.3` revision was no longer in the signed noble package
+indexes. A canonical-container probe fetched the current indexes into temporary
+APT state and found revision 0.4 in noble-updates and noble-security:
+`artifacts/resource-xz-package-probe-final.log`.
+
+The canonical tooling image rebuilt successfully and its install log confirms
+revision 0.4: `artifacts/resource-xz-tooling-build.log`. The tooling doctor and
+contract checks passed: `artifacts/resource-xz-tooling-doctor.log` and
+`artifacts/resource-xz-tooling-contract.log`. Full quality/API and documentation
+checks passed: `artifacts/resource-xz-tooling-lint.log` and
+`artifacts/resource-xz-tooling-docs.log`. Qualification of the next published
+head remains pending. This repairs the
+image-preparation failure; coverage still needs to reach the unchanged 100% floor.
+
 ### Emitted callback forwarding activations
 
 A collector-only fact now checks generated callback forwarding bodies against
@@ -149,6 +167,8 @@ A canonical-container probe using temporary APT state found
 `artifacts/resource-xz-package-probe-final.log`. Repair and qualification of the
 pin remain pending. The last complete coverage report remains 96.93% with 204
 gaps; this failed aggregation does not supersede it.
+Published `e3a21d9a7` passed complete canonical CI (run 39565332413) and
+package-consumer qualification (run 39565332532).
 
 ### Direct emitted-boundary rejection controls
 

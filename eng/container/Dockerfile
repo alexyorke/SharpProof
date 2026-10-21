@@ -77,7 +77,7 @@ RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
 
 COPY eng/container/Install-ScriptTools.ps1 /opt/sharpproof/Install-ScriptTools.ps1
 RUN apt-get update -qq \
-    && apt-get install -y --no-install-recommends xz-utils=5.6.1+really5.4.5-1ubuntu0.3 \
+    && apt-get install -y --no-install-recommends xz-utils=5.6.1+really5.4.5-1ubuntu0.4 \
     && rm -rf /var/lib/apt/lists/*
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Install-ScriptTools.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json
