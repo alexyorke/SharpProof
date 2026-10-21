@@ -240,7 +240,7 @@ param(
     [string]$SemanticCohort = 'All',
 
     # CI runs the Remaining cohort's Worker remainder shards and its other
-    # tasks on separate runners; the cohort gate requires both parts.
+    # tasks on separate runners; the cohort gate requires every part.
     [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerB', 'Projects')]
     [string]$TaskGroup = 'All',
 
