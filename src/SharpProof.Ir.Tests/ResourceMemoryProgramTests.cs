@@ -7,6 +7,71 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ForeignBlockInventoryReturnsUnknown(bool mismatchedProgramScope)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
+        var owned = builder.Build();
+        var other = new IrProgramBuilder(factory);
+        var foreignEntry = other.CreateBlock();
+        other.Return(foreignEntry, factory.CreateOperation());
+        var foreign = other.Build();
+        var malformed = new IrProgram(factory, mismatchedProgramScope ? foreign.Scope : owned.Scope,
+            owned.Entry, [owned.GetBlock(entry), foreign.GetBlock(foreignEntry)]);
+        var check = ResourceMemoryProgram.Evaluate(malformed, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.False);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MalformedMemoryControlFlow"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void InvalidBlockInventoryReturnsUnknownWithoutThrowing(bool nullBlock)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
+        var owned = builder.Build();
+        var block = owned.GetBlock(entry);
+        var malformed = new IrProgram(factory, owned.Scope, owned.Entry, [block, nullBlock ? null! : block]);
+        var check = ResourceMemoryProgram.Evaluate(malformed, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.False);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MalformedMemoryControlFlow"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MissingOwnedBlocksDiscardPreviouslyCountedStorage(bool missingEntry)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        builder.Goto(entry, factory.CreateOperation(), exit);
+        builder.Return(exit, factory.CreateOperation(), factory.Variable(root));
+        var owned = builder.Build();
+        // The IR container accepts a subset of blocks. The memory evaluator
+        // must independently check both entry and successor ownership.
+        var malformed = new IrProgram(factory, owned.Scope, owned.Entry,
+            [owned.GetBlock(missingEntry ? exit : entry)]);
+        var check = ResourceMemoryProgram.Evaluate(malformed, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.False);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MalformedMemoryControlFlow"));
+    }
+
     [Test]
     public void OwnedCopyChainsPreservePeakStorageThroughTheirLastRead()
     {

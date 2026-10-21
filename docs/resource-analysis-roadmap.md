@@ -109,6 +109,47 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Memory control-flow inventory rejection
+
+The last complete changed-TCB report left the malformed-control-flow rejection
+in ResourceMemoryProgram uncovered. New controls construct an IR container with
+an omitted entry or successor block through its existing constructor. They
+verify Unknown and no partial storage result, including a missing successor
+after an allocation has already been traversed. All 211 resource-memory cases
+and all 859 IR cases passed with zero build warnings or errors:
+`artifacts/resource-memory-block-inventory-fixed-final.log` and
+`artifacts/resource-memory-block-inventory-ir-all.log`.
+Full quality/API, documentation and private-workspace formatting checks passed:
+`artifacts/resource-memory-block-inventory-lint.log`,
+`artifacts/resource-memory-block-inventory-docs.log` and
+`artifacts/resource-memory-block-inventory-format.log` (zero formatted changes).
+All 652 affected compiler/native worker cases passed with zero build warnings
+or errors: `artifacts/resource-memory-block-inventory-worker.log`.
+The audit also reproduced exceptions for duplicate/null block
+inventories and a verified result for foreign-scope inventories. Evaluation now
+checks entry scope, block scope, duplicates and null blocks before traversal,
+returning MalformedMemoryControlFlow with no partial bound. Reproduction:
+`artifacts/resource-memory-block-inventory-repro-all.log`. The first fix used
+Dictionary.TryAdd, which is unavailable to this netstandard target; it now uses
+the compatible ContainsKey/Add operations on its private dictionary.
+No overall coverage improvement is claimed until a complete
+coverage report measures the updated head.
+
+Two candidate field-store probes were rejected by the IR builder before reaching
+memory analysis. Those probes were removed; they do not establish coverage of
+the later memory guard.
+
+The published coverage campaign for `f7aa2bb6c` completed all six shards in run
+39558045780. The aggregate for merge `25fc402e077d7c8a562604e0cd299280f5d930b0`
+measured 6430/6635 changed trusted lines (96.91%, 205 uncovered), failing the
+unchanged 100% floor. The raw/resolver buffer catalog, carrier transport decoder
+and native carrier verifier additions have no uncovered changed lines in that
+report. Evidence: `artifacts/resource-f7aa-coverage-evidence/coverage/SharpProof.coverage.json`.
+It supersedes the older complete 97.06% report below. The tracker-entry and
+inventory changes still need qualification on their next published head.
+Published `f7aa2bb6c` also passed complete canonical CI (run 39558045979) and
+package-consumer qualification (run 39558045983).
+
 ### Fresh source-fault tracker entry counters
 
 The native source-exception check now exposes the resolver entry-counter bound

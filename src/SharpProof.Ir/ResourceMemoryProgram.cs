@@ -17,7 +17,16 @@ internal static class ResourceMemoryProgram
         { return Unknown("MemoryProgramRequiresTotalSemantics"); }
         if (program.Blocks.Length > ResourceMemoryTrace.MaximumEvents / 4)
         { return Unknown("MemoryProgramBudgetExceeded"); }
-        var blocks = program.Blocks.ToDictionary(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Id);
+        if (program.Entry.Scope != program.Scope)
+        { return Unknown("MalformedMemoryControlFlow"); }
+        var blocks = new Dictionary<IrBlockId, IrBasicBlock>(program.Blocks.Length);
+        foreach (var block in program.Blocks)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (block is null || block.Id.Scope != program.Scope || blocks.ContainsKey(block.Id))
+            { return Unknown("MalformedMemoryControlFlow"); }
+            blocks.Add(block.Id, block);
+        }
         var constants = new Dictionary<IrVarId, IrTerm>();
         var references = new Dictionary<IrVarId, int>();
         var referenceFields = new Dictionary<(int Receiver, IrMemberId Field), int>();
