@@ -6,6 +6,8 @@ for language in 8 9 13; do
   cp global.json "$fixture/global.json"
   constants=""
   if [ "$language" != 8 ]; then constants=FUNCTION_POINTERS; fi
+  default_signature='T1? DefaultValue<T1, T2>(bool flag, T1 value, T2 tag)'
+  if [ "$language" = 8 ]; then default_signature='T1 DefaultValue<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct'; fi
   package_reference=""
   if [ "$#" -eq 3 ]; then
     package_reference="<ItemGroup><PackageReference Include=\"SharpProof.HmInference\" Version=\"$3\" PrivateAssets=\"all\" /></ItemGroup>"
@@ -136,8 +138,8 @@ EOF
     'global::System.Func<T1>? CoalesceDelegate<T1, T2>(global::System.Func<T1>? value, T2 tag)' \
     '(T1 text, T2 number)? CoalescePair<T1, T2, T3>((T1 text, T2 number)? value, T3 tag)' \
     'T1? CoalesceChain<T1, T2>(T1? value, T1? fallback, T2 tag) where T1 : class' \
-    'int CoalesceScalarDefault<T1>(int? value, T1 tag)' \
-    'int? CoalesceAssignScalarDefault<T1>(int? value, T1 tag)' \
+    'T1 CoalesceScalarDefault<T1, T2>(T1? value, T2 tag) where T1 : struct' \
+    'T1? CoalesceAssignScalarDefault<T1, T2>(T1? value, T2 tag) where T1 : struct' \
     'object? CoalesceTyped<T1>(object? value, T1 tag)' \
     'global::System.Threading.Tasks.Task<T1?> CoalesceAwaitReference<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : class' \
     'global::System.Threading.Tasks.Task<T1?> CoalesceAwaitValue<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : struct' \
@@ -169,7 +171,7 @@ EOF
     '(T1 left, T2 right)? Pair<T1, T2, T3>(bool flag, (T1 left, T2 right) value, T3 tag)' \
     'T1? Switch<T1, T2>(int key, T1 value, T2 tag) where T1 : class' \
     'object? Typed<T1>(bool flag, object value, T1 tag)' \
-    'int DefaultValue<T1>(bool flag, int value, T1 tag)' \
+    "$default_signature" \
     'global::System.Threading.Tasks.Task<T1?> AsyncReference<T1, T2>(bool flag, global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : class' \
     'global::System.Threading.Tasks.Task<T1?> AsyncValue<T1, T2>(bool flag, global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : struct' \
     'global::System.Threading.Tasks.ValueTask<T1?> ValueReference<T1, T2>(bool flag, global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : class' \

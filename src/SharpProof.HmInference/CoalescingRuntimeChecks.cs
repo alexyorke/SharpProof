@@ -235,7 +235,7 @@ internal static class CoalescingRuntimeChecks
             || symbol.GetMembers("ConvertedReference").OfType<IMethodSymbol>().Single().TypeParameters.Length != 2
             || !symbol.GetMembers("ConvertedBoxing").OfType<IMethodSymbol>().Single().TypeParameters[0].HasValueTypeConstraint
             || symbol.GetMembers("Array").OfType<IMethodSymbol>().Single().TypeParameters[0].HasReferenceTypeConstraint
-            || symbol.GetMembers("AssignScalarDefault").OfType<IMethodSymbol>().Single().Parameters[0].Type is not INamedTypeSymbol { TypeArguments: [{ SpecialType: SpecialType.System_Int32 }] }
+            || symbol.GetMembers("AssignScalarDefault").OfType<IMethodSymbol>().Single().Parameters[0].Type is not INamedTypeSymbol { TypeArguments: [ITypeParameterSymbol { HasValueTypeConstraint: true }] }
             || symbol.GetMembers("Typed").OfType<IMethodSymbol>().Single().Parameters[0].Type.SpecialType != SpecialType.System_Object)
         { throw new InvalidOperationException("Coalescing Fix All lost null constraints or scalar/typed endpoints."); }
         Program.Log.Info("PASS CoalescingFixAllConstraintsAndDefaultEndpoints");

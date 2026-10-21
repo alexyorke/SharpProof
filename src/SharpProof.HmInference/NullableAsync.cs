@@ -149,6 +149,8 @@ public static partial class Inference
             }
             if (converted is not null && NullReturnHole(expression, converted) is { } hole)
             { return hole; }
+            if (converted is not null && ScalarDefaultValue(expression, converted) is { } defaultValue)
+            { return BindDeclaredReturn(expression, defaultValue, converted); }
             var joined = expression;
             while (joined is ParenthesizedExpressionSyntax parenthesized)
             { joined = parenthesized.Expression; }
@@ -217,6 +219,106 @@ public static partial class Inference
             { BindConvertedArgument(info.Type, converted, value, targetShape, false); }
             conversionTargets.Add((targetShape, converted));
             return BindDeclaredReturn(expression, targetShape, converted);
+        }
+        private readonly HashSet<HmType> defaultValueAnnotations = [];
+
+        private HmType? ScalarDefaultValue(ExpressionSyntax expression, ITypeSymbol target)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (!target.IsValueType || target is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+                || IsFixedDeclaredReturn(expression))
+            { return null; }
+            var literal = expression;
+            var suppressed = false;
+            while (true)
+            {
+                if (literal is ParenthesizedExpressionSyntax parentheses)
+                { literal = parentheses.Expression; }
+                else if (literal is PostfixUnaryExpressionSyntax suppression && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { suppressed = true; literal = suppression.Operand; }
+                else
+                { break; }
+            }
+            if (!literal.IsKind(SyntaxKind.DefaultLiteralExpression)
+                || !SymbolEqualityComparer.Default.Equals(model.GetTypeInfo(literal, cancellationToken).ConvertedType, target))
+            { return null; }
+            var shape = CSharpTypes.Erase(target);
+            var position = expression.SpanStart;
+            if (currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration)
+            { position = declaration.ReturnType.SpanStart; }
+            var valueDomain = model.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: < LanguageVersion.CSharp9 }
+                && (model.GetNullableContext(position) & NullableContext.AnnotationsEnabled) != 0;
+            return suppressed ? shape : DefaultValueAnnotation(shape, valueDomain);
+        }
+
+        private HmType DefaultValueAnnotation(HmType shape, bool valueDomain)
+        {
+            if (shape is null)
+            { throw new ArgumentNullException(nameof(shape)); }
+            shape = shape.Root;
+            if (shape.Name == "Tuple")
+            {
+                return shape.WithArguments(shape.Arguments.Select(argument =>
+                { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } return DefaultValueAnnotation(argument, valueDomain); }).ToArray());
+            }
+            if (!shape.IsVariable)
+            { return shape; }
+            if (valueDomain)
+            { RequireKeyword(shape, "struct"); return shape; }
+            var annotated = new HmType(CSharpTypes.NullableParameter, shape);
+            defaultValueAnnotations.Add(annotated);
+            return annotated;
+        }
+
+        private bool HasDefaultValueAnnotation(HmType shape)
+        {
+            if (shape is null)
+            { throw new ArgumentNullException(nameof(shape)); }
+            if (defaultValueAnnotations.Count == 0)
+            { return false; }
+            shape = shape.Root;
+            return defaultValueAnnotations.Contains(shape) || shape.Arguments.Any(HasDefaultValueAnnotation);
+        }
+
+        private HmType MergeDefaultValues(HmType first, HmType second)
+        {
+            if (first is null)
+            { throw new ArgumentNullException(nameof(first)); }
+            if (second is null)
+            { throw new ArgumentNullException(nameof(second)); }
+            if (!HasDefaultValueAnnotation(first) && !HasDefaultValueAnnotation(second))
+            { HmType.Unify(first, second); return first; }
+            first = first.Root;
+            second = second.Root;
+            var annotated = first.Name == CSharpTypes.NullableParameter || second.Name == CSharpTypes.NullableParameter;
+            if (first.Name == CSharpTypes.NullableParameter)
+            { first = first.Arguments[0].Root; }
+            if (second.Name == CSharpTypes.NullableParameter)
+            { second = second.Arguments[0].Root; }
+            HmType merged;
+            if (!first.IsVariable && !second.IsVariable && first.Name == second.Name && first.NestedTypeName == second.NestedTypeName
+                && first.Arguments.Length == second.Arguments.Length && (first.CSharpSymbol is null || second.CSharpSymbol is null
+                || CSharpTypes.ConstructorIdentity(first.CSharpSymbol) == CSharpTypes.ConstructorIdentity(second.CSharpSymbol)))
+            {
+                merged = first.WithArguments(first.Arguments.Select((argument, index) =>
+                {
+                    if (argument is null)
+                    { throw new ArgumentNullException(nameof(argument)); }
+                    if (index < 0)
+                    { throw new ArgumentOutOfRangeException(nameof(index)); }
+                    return MergeDefaultValues(argument, second.Arguments[index]);
+                }).ToArray());
+            }
+            else
+            { HmType.Unify(first, second); merged = first.Root; }
+            if (!annotated)
+            { return merged; }
+            var result = new HmType(CSharpTypes.NullableParameter, merged);
+            defaultValueAnnotations.Add(result);
+            return result;
         }
         private HmType? NullReturnHole(ExpressionSyntax expression, ITypeSymbol converted)
         {
@@ -362,6 +464,23 @@ public static partial class Inference
             var info = model.GetTypeInfo(expression, cancellationToken);
             target ??= info.Type ?? info.ConvertedType ?? throw new InferenceException("Unresolved expression join.");
             var result = fixedResult ? CSharpTypes.Rigid(target) : HmType.Variable();
+            if (fixedResult && info.Type is { IsValueType: true } natural && !SymbolEqualityComparer.Default.Equals(natural, target)
+                && expression.DescendantNodesAndSelf(node =>
+                    { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax); })
+                    .OfType<LiteralExpressionSyntax>().Any(literal =>
+                    {
+                        if (literal is null)
+                        { throw new ArgumentNullException(nameof(literal)); }
+                        var type = model.GetTypeInfo(literal, cancellationToken).ConvertedType;
+                        return literal.IsKind(SyntaxKind.DefaultLiteralExpression) && type is { IsValueType: true }
+                            && type is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+                    }))
+            {
+                var inferred = JoinedExpression(expression, natural, false);
+                BindConvertedArgument(natural, target, inferred, result);
+                conversionTargets.Add((result, target));
+                return result;
+            }
             HmType Arm(ExpressionSyntax value)
             {
                 if (value is null)
@@ -374,7 +493,7 @@ public static partial class Inference
                 if (fixedResult)
                 { BindFixedConversion(inferred, result, target, false); }
                 else
-                { HmType.Unify(result, inferred); }
+                { result = MergeDefaultValues(result, inferred); }
                 return inferred;
             }
             if (expression is ConditionalExpressionSyntax conditional)
@@ -707,7 +826,7 @@ public static partial class Inference
             { source = source.WithNullableAnnotation(NullableAnnotation.NotAnnotated); }
             var result = CSharpTypes.Erase(resultType);
             BindConvertedArgument(source, resultType, selected, result);
-            BindConvertedArgument(fallback, resultType, Expression(rightSyntax), result);
+            BindConvertedArgument(fallback, resultType, ScalarDefaultValue(rightSyntax, resultType) ?? Expression(rightSyntax), result);
             conversionTargets.Add((result, resultType));
             return result;
         }

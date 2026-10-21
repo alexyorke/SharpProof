@@ -50,3 +50,5 @@ The README describes today's supported subset; it is not the completion spec.
 The pure HM core's rank-1 restriction and C# local monomorphism are properties of
 their respective type systems, not omissions that can be removed by making locals
 unsoundly polymorphic. An ML parser/interpreter is not required for a C# analyzer.
+
+Scalar default return joins, callbacks, iterators and async payloads now have signature and executed Fix All coverage across reference, struct and nullable-value arguments, including zero/null behavior, explicit struct constructors, selected awaits, faults and cancellation. C# 8/9/13 CLI and package fixtures cover their language-dependent signatures. General default assignment flow into an already inferred local remains a separate coverage gap; these checks do not establish universal C# support.

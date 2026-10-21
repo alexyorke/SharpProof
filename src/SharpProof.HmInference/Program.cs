@@ -357,6 +357,8 @@ internal static class Program
         passed += await ArrayConstructionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PartialMethodChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PartialContractChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += DefaultValueChecks.Run(cancellationToken);
+        passed += await DefaultValueRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += NullJoinChecks.Run(cancellationToken);
         passed += ConvertedCoalescingChecks.Run(cancellationToken);
         passed += ReturnConversionChecks.Run(cancellationToken);

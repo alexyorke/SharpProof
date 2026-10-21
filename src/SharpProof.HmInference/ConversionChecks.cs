@@ -60,7 +60,7 @@ internal static class ConversionChecks
     {
         (string Name, string Source, string Status, string? Signature)[] tests =
         [
-            ("NullableResourceFlowState", "static int M(IEnumerable<int> values,bool ignored) { using var e=values.GetEnumerator();return e.MoveNext()?e.Current:default; }", "Suggestion", "int M<T1>(global::System.Collections.Generic.IEnumerable<int> values, T1 ignored)"),
+            ("NullableResourceFlowState", "static int M(IEnumerable<int> values,bool ignored) { using var e=values.GetEnumerator();return e.MoveNext()?e.Current:default; }", "Suggestion", "T1? M<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, T2 ignored)"),
             ("ValueTypeBoxingConstraint", "static ValueType M(int value)=>ConversionApi.BoxValueType(value);", "Suggestion", "global::System.ValueType M<T1>(T1 value) where T1 : struct"),
             ("EnumBoxingConstraint", "static Enum M(DayOfWeek value)=>ConversionApi.BoxEnum(value);", "Suggestion", "global::System.Enum M<T1>(T1 value) where T1 : global::System.Enum"),
             ("ArrayInvariantInterfaceConversion", "static object M(string[] values)=>ConversionApi.ObjectList(values);", "Suggestion", "object M<T1>(T1[] values) where T1 : class"),

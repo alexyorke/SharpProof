@@ -123,6 +123,11 @@ public static partial class Inference
                 && SymbolEqualityComparer.Default.Equals(source, nullable.TypeArguments[0]) && destination.Name == CSharpTypes.NullableValue)
             { HmType.Unify(inferred, destination.Arguments[0]); return; }
             var classified = ((CSharpCompilation)model.Compilation).ClassifyConversion(source, target);
+            if (!classified.IsUserDefined && classified.IsImplicit && (classified.IsReference || classified.IsBoxing)
+                && source.IsValueType && source is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+                && target.IsReferenceType && target.NullableAnnotation == NullableAnnotation.NotAnnotated
+                && inferred.Root.Name == CSharpTypes.NullableParameter && value.IsVariable)
+            { RequireKeyword(value, "struct"); }
             if (allowUserDefined && classified.IsUserDefined && TryUserConversion(source, target, inferred, expected, classified.MethodSymbol))
             { return; }
             if (!classified.IsUserDefined && classified.IsImplicit && (classified.IsReference || classified.IsBoxing))

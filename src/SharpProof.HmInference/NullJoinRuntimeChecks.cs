@@ -157,7 +157,7 @@ internal static class NullJoinRuntimeChecks
             || symbol.GetMembers("Array").OfType<IMethodSymbol>().Single().TypeParameters[0].HasReferenceTypeConstraint
             || symbol.GetMembers("CallerTarget").OfType<IMethodSymbol>().Single().Parameters[1].Type.SpecialType != SpecialType.System_Object
             || symbol.GetMembers("Typed").OfType<IMethodSymbol>().Single().Parameters[1].Type.SpecialType != SpecialType.System_Object
-            || symbol.GetMembers("DefaultValue").OfType<IMethodSymbol>().Single().Parameters[1].Type.SpecialType != SpecialType.System_Int32)
+            || symbol.GetMembers("DefaultValue").OfType<IMethodSymbol>().Single().Parameters[1].Type is not ITypeParameterSymbol { HasValueTypeConstraint: false })
         { throw new InvalidOperationException("Null join Fix All lost constraints or fixed/caller endpoints."); }
         Program.Log.Info("PASS NullJoinFixAllConstraintsAndOriginalCallerTypedDefaultEndpoints");
         var beforeContext = new System.Runtime.Loader.AssemblyLoadContext("BeforeNullJoins", isCollectible: true);

@@ -275,39 +275,37 @@ public static partial class Inference
             var constraintPosition = method.ConstraintClauses.Count == 0 ? method.ParameterList.Span.End : method.ConstraintClauses[method.ConstraintClauses.Count - 1].Span.End;
             var nullableAnnotations = (model.GetNullableContext(constraintPosition) & NullableContext.AnnotationsEnabled) != 0;
             var nullableConstraints = BuildConstraints(variables, nullableAnnotations);
-            var parameterNames = parameters.Select((t, i) =>
+            string RenderParameterType(HmType type, int index)
             {
-                if (t is null)
-                {
-                    throw new global::System.ArgumentNullException(nameof(t));
-                }
-
-                if (i < 0)
-                {
-                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
-                }
-
-                return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables,
-                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
-            }).ToArray();
-            var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
-                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
-            TypeSyntax returnSyntax = returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName);
-            returnSyntax = method.ReturnType is RefTypeSyntax refReturn ? refReturn.WithType(returnSyntax.WithTriviaFrom(refReturn.Type)) : returnSyntax.WithTriviaFrom(method.ReturnType);
-            var candidate = method.WithReturnType(returnSyntax).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                if (index < 0)
+                { throw new ArgumentOutOfRangeException(nameof(index)); }
+                return CSharpTypes.Render(type, symbol.Parameters[index].Type, variables,
+                    (model.GetNullableContext(method.Parameters()[index].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
+            }
+            string[] parameterNames = [];
+            var returnName = "";
+            TypeSyntax RenderReturnSyntax()
             {
-                if (p is null)
+                returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
+                    (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End, preserveDeclaredAnnotations: true, cancellationToken: cancellationToken);
+                TypeSyntax syntax = returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName);
+                return method.ReturnType is RefTypeSyntax refReturn ? refReturn.WithType(syntax.WithTriviaFrom(refReturn.Type)) : syntax.WithTriviaFrom(method.ReturnType);
+            }
+            ParameterListSyntax RenderParameters()
+            {
+                parameterNames = parameters.Select(RenderParameterType).ToArray();
+                return method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((parameter, index) =>
                 {
-                    throw new global::System.ArgumentNullException(nameof(p));
-                }
-
-                if (i < 0)
-                {
-                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
-                }
-
-                return p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]).WithTriviaFrom(p.Type!));
-            }))));
+                    if (parameter is null)
+                    { throw new ArgumentNullException(nameof(parameter)); }
+                    if (index < 0)
+                    { throw new ArgumentOutOfRangeException(nameof(index)); }
+                    return parameter.WithType(SyntaxFactory.ParseTypeName(parameterNames[index]).WithTriviaFrom(parameter.Type!));
+                })));
+            }
+            var candidate = method.WithReturnType(RenderReturnSyntax()).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(RenderParameters());
             candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints));
             // Recheck the original compilation with just this signature changed. This catches
             // explicit local types, conversions, name collisions and broken call sites.
@@ -348,7 +346,9 @@ public static partial class Inference
                 var layoutMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
                 if (InferBuilderLayoutConstraints(changedCompilation, layoutMethod, variables))
                 {
-                    candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(BuildConstraints(variables, nullableAnnotations)));
+                    nullableConstraints = BuildConstraints(variables, nullableAnnotations);
+                    candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints))
+                        .WithReturnType(RenderReturnSyntax()).WithParameterList(RenderParameters());
                     changed = CandidateTree();
                     changedCompilation = ReplaceCandidate(changed);
                 }
@@ -764,7 +764,7 @@ public static partial class Inference
                         if (yielded.Expression is null)
                         { flow = new(null, false); }
                         else
-                        { HmType.Unify(iteratorElement, Returned(yielded.Expression, iteratorDeclaredElement)); }
+                        { iteratorElement = MergeDefaultValues(iteratorElement, Returned(yielded.Expression, iteratorDeclaredElement)); }
                         break;
                     case BreakStatementSyntax:
                         flow = new(null, false, Breaks: true);
@@ -855,19 +855,14 @@ public static partial class Inference
             });
         }
 
-        private static HmType? MergeReturns(HmType? first, HmType? second)
+        private HmType? MergeReturns(HmType? first, HmType? second)
         {
             if (first is null)
             {
                 return second;
             }
 
-            if (second is not null)
-            {
-                HmType.Unify(first, second);
-            }
-
-            return first;
+            return second is null ? first : MergeDefaultValues(first, second);
         }
 
         private void Declare(VariableDeclarationSyntax declaration)
@@ -1543,6 +1538,8 @@ public static partial class Inference
 
             inferred = inferred.Root;
             declared = declared.Root;
+            if (inferred.Name == CSharpTypes.NullableParameter)
+            { PreserveResultOnly(inferred.Arguments[0], declared.Name == CSharpTypes.NullableParameter ? declared.Arguments[0] : declared, inferable); return; }
             if (inferred.IsVariable && !inferable.Contains(inferred))
             {
                 HmType.Unify(inferred, declared);
