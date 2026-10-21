@@ -92,7 +92,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate)
+    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate | package-partition-gate)
       return 0
       ;;
     *)
@@ -223,6 +223,11 @@ case "${command_name}" in
       cp -a "${repo_root}/artifacts/coverage" "${task_root}/artifacts/"
     fi
     ;;
+  package-partition-gate)
+    if [[ -d "${repo_root}/artifacts/package-partitions" ]]; then
+      cp -a "${repo_root}/artifacts/package-partitions" "${task_root}/artifacts/"
+    fi
+    ;;
   canonical-cohort-gate)
     if [[ -d "${repo_root}/artifacts/canonical-cohorts" ]]; then
       cp -a "${repo_root}/artifacts/canonical-cohorts" "${task_root}/artifacts/"
@@ -254,6 +259,9 @@ set -e
 # Aggregate gates consume downloaded evidence owned by the runner. Export only
 # their new results, preserving the authenticated inputs and their ownership.
 case "${command_name}" in
+  package-partition-gate)
+    result_paths=()
+    ;;
   canonical-cohort-gate)
     result_paths=(canonical-cohorts/canonical-cohort-validation.json)
     ;;

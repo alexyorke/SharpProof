@@ -74,9 +74,18 @@ jobs:
           mode: report
           name: ${{ github.job }}-${{ matrix.part }}
 
-  canonical-package:
+  canonical-package-partition:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [0, 1, 2, 3]
+    outputs:
+      partition-0-attempt: ${{ steps.partition-identity.outputs.partition-0-attempt }}
+      partition-1-attempt: ${{ steps.partition-identity.outputs.partition-1-attempt }}
+      partition-2-attempt: ${{ steps.partition-identity.outputs.partition-2-attempt }}
+      partition-3-attempt: ${{ steps.partition-identity.outputs.partition-3-attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,6 +100,7 @@ jobs:
       # that pr runs before its build. They read only sources, so they run
       # here, off canonical-main's critical path.
       - name: Run the PR repository gates
+        if: matrix.partition == 0
         run: docker compose run --rm tooling repository-gates -Configuration Release
 
       # The package phase of pr, with the same Release configuration and
@@ -99,27 +109,74 @@ jobs:
       - name: Run the PR package phase
         if: ${{ !cancelled() }}
         run: >-
-          docker compose run --rm tooling package-tests
+          docker compose run --rm -e GITHUB_RUN_ID tooling package-tests
           -Configuration Release -Fast
+          -PackagePartitionCount 4 -PackagePartition ${{ matrix.partition }}
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
       - name: Upload package phase and repository gate evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-package-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-package-${{ matrix.partition }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
+            artifacts/package-partitions
             artifacts/timings
             artifacts/layout-audit
             artifacts/public-api-governance
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
+
+      - name: Record successful package artifact attempt
+        id: partition-identity
+        env:
+          SHARPPROOF_PARTITION: ${{ matrix.partition }}
+        run: echo "partition-${SHARPPROOF_PARTITION}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
         with:
           mode: report
+
+  canonical-package:
+    if: always() && github.event_name != 'schedule'
+    needs: canonical-package-partition
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every successful package partition
+        env:
+          PARTITION_RESULT: ${{ needs.canonical-package-partition.result }}
+        run: test "$PARTITION_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Download package partition 0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-package-0-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-0-attempt }}
+          path: artifacts
+      - name: Download package partition 1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-package-1-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-1-attempt }}
+          path: artifacts
+      - name: Download package partition 2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-package-2-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-2-attempt }}
+          path: artifacts
+      - name: Download package partition 3
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-package-3-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-3-attempt }}
+          path: artifacts
+      - name: Reconcile package discovery and executed identities
+        run: docker compose run --rm -e GITHUB_RUN_ID tooling package-partition-gate
 
   canonical-gates:
     if: github.event_name != 'schedule'
@@ -170,12 +227,35 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Apply SharpProof to every tracked project
-        run: docker compose run --rm tooling self-apply -Configuration Release
+      - name: Apply SharpProof to every tracked source project
+        run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Sources
 
-      # The API inventory runs here rather than on its own runner: it adds
-      # about two minutes to a job well inside the canonical-main critical
-      # path, and saves a runner slot and a tooling image build per run.
+  self-application-samples:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Apply SharpProof through package-backed samples
+        run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Samples
+
+  api-coverage:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
       - name: Check pinned .NET API inventory and support evidence
         if: ${{ !cancelled() }}
         run: >-
@@ -226,11 +306,26 @@ jobs:
         with:
           mode: report
 
+  # Formatting and independent-path reproduction remain required and run in parallel.
   # Independent-path package reproduction rebuilds and packs the solution
   # twice and needs no other job's output. It runs here, beside the canonical
   # jobs, rather than in the package job that every consumer job waits for.
-  # Repository formatting shares this runner and its tooling image. Release
-  # qualification requires this workflow's exact-commit success on master.
+  # Release qualification requires this workflow's exact-commit success on master.
+  formatting:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Require C#, PowerShell, and shell linting and formatting
+        run: docker compose run --rm tooling format-check
+
+
   package-reproducibility:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -243,9 +338,6 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-
-      - name: Require C#, PowerShell, and shell linting and formatting
-        run: docker compose run --rm tooling format-check
 
       - name: Require full independent-path managed payload reproducibility
         id: package-reproducibility
@@ -288,7 +380,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-package, canonical-gates, self-application, package-reproducibility, repository-quality]
+    needs: [canonical-main, canonical-package, canonical-gates, self-application, self-application-samples, api-coverage, formatting, package-reproducibility, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -296,10 +388,17 @@ jobs:
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
           SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
+          SHARPPROOF_SAMPLES_RESULT: ${{ needs.self-application-samples.result }}
+          SHARPPROOF_API_RESULT: ${{ needs.api-coverage.result }}
+          SHARPPROOF_FORMATTING_RESULT: ${{ needs.formatting.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
           SHARPPROOF_REPRODUCIBILITY_RESULT: ${{ needs.package-reproducibility.result }}
           SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
         run: |
+          if [[ "$SHARPPROOF_SAMPLES_RESULT" != success || "$SHARPPROOF_API_RESULT" != success || "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
+            echo "Samples, API coverage, or formatting did not succeed." >&2
+            exit 1
+          fi
           if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
             echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
             exit 1

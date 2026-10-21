@@ -51,3 +51,5 @@ catch {
     if ($_.Exception.Message -cne 'Fixture discovery returned only 1 test methods.') { throw }
 }
 Write-Host 'Package discovery regressions passed: class ownership, parameter cases, cardinality, and minimum counts.'
+
+& (Join-Path $PSScriptRoot 'Test-SharpProofPackagePartitions.ps1')

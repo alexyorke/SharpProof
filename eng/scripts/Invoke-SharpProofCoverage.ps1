@@ -16,7 +16,7 @@ param(
     # every other project, plus the package tests. Shard runs leave the
     # coverage gate to a separate job.
     [Parameter()]
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all'
 )
 
@@ -153,7 +153,7 @@ if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     $broadFilter = "($broadFilter)&($TestFilter)"
 }
 if ([string]::IsNullOrWhiteSpace($TestFilter)) {
-    if ($CoveragePhase -ne 'package') {
+    if ($CoveragePhase -notmatch '^package(?:-[0-3])?$') {
         $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
         $coverageTaskGroup = switch ($CoveragePhase) {
             'semantic-gates-corpus' { 'GatesCorpus' }
@@ -179,14 +179,16 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
         }
     }
 
-    if ($CoveragePhase -in @('all', 'package')) {
+    if ($CoveragePhase -eq 'all' -or $CoveragePhase -match '^package(?:-[0-3])?$') {
         $packageResults = Join-Path $resolvedResultsDirectory 'package'
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
             -Configuration Release `
             -NoBuild `
             -TimeoutSeconds $TimeoutSeconds `
             -CoverageSettings $managedSettings `
-            -CoverageResultsDirectory $packageResults
+            -CoverageResultsDirectory $packageResults `
+            -PackagePartitionCount $(if ($CoveragePhase -match '^package-[0-3]$') { 4 } else { 1 }) `
+            -PackagePartition $(if ($CoveragePhase -match '^package-([0-3])$') { [int]$Matches[1] } else { 0 })
         if ($LASTEXITCODE -ne 0) {
             throw (
                 'Sharded package coverage failed with exit code ' +
