@@ -275,6 +275,7 @@ function Invoke-SharpProofSolutionBuild(
 }
 
 function Invoke-SharpProofCoverageAuthorityBuild {
+    param([string[]]$AdditionalProjects = @())
     # The gate recomputes every production PDB and source identity. Its build
     # need not also compile the test projects already exercised by the shards
     # and the required PR gate. Derive this complete set from the same inventory
@@ -291,7 +292,7 @@ function Invoke-SharpProofCoverageAuthorityBuild {
                 OutputPath     = $selectionPath
             }).AsReadOnly()
         $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
-        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($selection.projects | ForEach-Object { [string]$_.projectPath }))
+        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@((@($selection.projects | ForEach-Object { [string]$_.projectPath }) + $AdditionalProjects | Sort-Object -CaseSensitive -Unique)))
         if ($projects.Length -eq 0) { throw 'Coverage build project selection is empty.' }
         ([ordered]@{ solution = ([ordered]@{
                     path = 'SharpProof.slnx'; projects = $projects
@@ -677,17 +678,23 @@ switch ($Command) {
     'coverage-shard' {
         # One runner collects one part of the default coverage run. The
         # coverage-gate job merges every shard and enforces the thresholds.
-        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects')) {
+        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects', 'semantic-worker-b')) {
             throw ('coverage-shard requires -CoveragePhase ' + ($coverageShardNames -join ', ') + '.')
         }
         # Identical sources in different private container workspaces must
         # produce the same MVID/PDB identity even outside GitHub Actions.
         # Analyzers do not change those binaries and the canonical PR build
         # already enforces them, so shards and the gate skip them.
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
-            -AdditionalBuildArguments @(
-            '-p:ContinuousIntegrationBuild=true',
-            '-p:RunAnalyzersDuringBuild=false')
+        if ($CoveragePhase -in $coverageShardNames) {
+            $testProjects = Get-SharpProofCoverageBuildProjects -RepositoryRoot $repositoryRoot -Phase $CoveragePhase
+            Invoke-SharpProofCoverageAuthorityBuild -AdditionalProjects ([string[]]@($testProjects))
+        }
+        else {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
+                -AdditionalBuildArguments @(
+                '-p:ContinuousIntegrationBuild=true',
+                '-p:RunAnalyzersDuringBuild=false')
+        }
         $coverageShardArguments = ([ordered]@{
                 ResultsDirectory = (Join-Path $repositoryRoot (
                         'artifacts/coverage/' + $CoveragePhase))

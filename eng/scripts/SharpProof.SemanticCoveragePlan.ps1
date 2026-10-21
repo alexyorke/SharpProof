@@ -30,6 +30,46 @@ function Get-SharpProofSemanticCoverageTasks {
         }).AsReadOnly()
 }
 
+# Each collector needs the complete production build plus only its own test
+# projects. Canonical PR builds still compile the full solution with analyzers.
+function Get-SharpProofCoverageBuildProjects {
+    param([string]$RepositoryRoot, [string]$Phase)
+    $plan = Get-SharpProofSemanticCoverageTasks -RepositoryRoot $RepositoryRoot
+    $projects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    if ($Phase -cmatch '^package-[0-3]$') {
+        [void]$projects.Add('src/SharpProof.Package.IntegrationTests/SharpProof.Package.IntegrationTests.csproj')
+    }
+    elseif ($plan.Contains($Phase)) {
+        $semanticProjects = (Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw | ConvertFrom-Json).solution.projects
+        foreach ($task in $plan[$Phase]) {
+            if ($task.StartsWith('semantic-', [StringComparison]::Ordinal)) {
+                $projectMatches = @($semanticProjects | Where-Object { ('semantic-' + [IO.Path]::GetFileNameWithoutExtension(([string]$_).Replace('\', '/')).ToLowerInvariant()) -ceq $task })
+                if ($projectMatches.Count -ne 1) { throw "Coverage task has no unique project: '$task'." }
+                [void]$projects.Add(([string]$projectMatches[0]).Replace('\', '/'))
+            }
+            elseif ($task.StartsWith('worker-', [StringComparison]::Ordinal)) {
+                [void]$projects.Add('src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
+            }
+            elseif ($task.StartsWith('gates-', [StringComparison]::Ordinal)) {
+                [void]$projects.Add('src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj')
+            }
+            elseif ($task -ceq 'architecture') {
+                [void]$projects.Add('src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj')
+            }
+            else { throw "Coverage build has an unknown task: '$task'." }
+        }
+        if ($Phase -ceq 'semantic-extras') {
+            [void]$projects.Add('src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj')
+            [void]$projects.Add('src/SharpProof.Fuzz.Tests/SharpProof.Fuzz.Tests.csproj')
+        }
+    }
+    else { throw "Coverage build has an unknown phase: '$Phase'." }
+    foreach ($project in $projects) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RepositoryRoot $project) -PathType Leaf)) { throw "Coverage test project is absent: '$project'." }
+    }
+    return , [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($projects.ToImmutable() | Sort-Object -CaseSensitive))
+}
+
 function Assert-SharpProofSemanticCoveragePartitions {
     param([string]$Root, [string]$RepositoryRoot)
     . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')

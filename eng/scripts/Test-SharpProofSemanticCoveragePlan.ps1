@@ -28,6 +28,20 @@ function Write-CorpusReceipt([string]$Part, [string[]]$Names) {
     [IO.File]::WriteAllText((Join-Path $root 'cases.trx'), $text)
 }
 try {
+    $buildProjects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    $shards = Get-SharpProofSemanticCoverageShards
+    foreach ($phase in $shards) {
+        $selectedProjects = Get-SharpProofCoverageBuildProjects -RepositoryRoot $repositoryRoot -Phase $phase
+        foreach ($project in $selectedProjects) { [void]$buildProjects.Add($project) }
+    }
+    $semanticProjects = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw | ConvertFrom-Json).solution.projects
+    $expectedProjects = @($semanticProjects | ForEach-Object { ([string]$_).Replace('\', '/') }) + @(
+        'src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj',
+        'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj',
+        'src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj',
+        'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj',
+        'src/SharpProof.Package.IntegrationTests/SharpProof.Package.IntegrationTests.csproj')
+    if ((@($buildProjects.ToImmutable() | Sort-Object -CaseSensitive) -join "`n") -cne (@($expectedProjects | Sort-Object -CaseSensitive -Unique) -join "`n")) { throw 'Coverage builds do not retain the complete test project union.' }
     # Explicit post-authentication unit state: manifests are tested separately.
     $plan = Get-SharpProofSemanticCoverageTasks -RepositoryRoot $repositoryRoot
     if ((Get-SharpProofSemanticCoverageShards).Count -ne 13 -or $plan.Count -ne 9) { throw 'Semantic coverage plan lost a shard.' }

@@ -455,7 +455,10 @@ foreach ($report in $reports) {
                     $report.FullName).Replace('\', '/')
                 bytes = [int64]$report.Length
             }).AsReadOnly())
-    [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
+    # Parse the authenticated report directly; avoid constructing and recoding
+    # a second full XML string before XmlDocument performs the same validation.
+    $document = [Xml.XmlDocument]::new()
+    $document.Load($report.FullName)
     $authorityNodes = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
             $document.SelectNodes('/coverage/sharpProofAuthority')))
     if ($authorityNodes.Length -ne 1) {
