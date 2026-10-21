@@ -595,7 +595,7 @@ foreach ($report in $reports) {
 }
 
 $coverageMergeTimer.Stop()
-Write-Host ('Coverage phase: name=validation-class-records elapsedMilliseconds={0} validated={1} reused={2}' -f $coverageMergeTimer.ElapsedMilliseconds, $validatedClassCount, $reusedClassRecords)
+Write-Verbose ('Coverage phase: name=validation-class-records elapsedMilliseconds={0} validated={1} reused={2}' -f $coverageMergeTimer.ElapsedMilliseconds, $validatedClassCount, $reusedClassRecords)
 
 $frozenHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($entry in $lineHits.GetEnumerator()) {
