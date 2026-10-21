@@ -22,9 +22,9 @@ env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
-# Twelve shards retain the complete selection: split corpus workflows, isolate
-# Analyzer and the Attributes/Fuzz console tail, retain both Worker halves,
-# and run all remaining projects plus four package method partitions.
+# Fifteen shards retain the complete selection: split corpus workflows and
+# Worker A4 fixtures, isolate Analyzer and the Attributes/Fuzz console tail,
+# and run every other project plus four package method partitions.
 # The required coverage gate authenticates every artifact, verifies the complete
 # task/case partition, and preserves independent authority, MAX merging, floors,
 # and changed-TCB enforcement.
@@ -40,9 +40,11 @@ jobs:
       semantic-gates-shards-attempt: ${{ steps.shard-identity.outputs.semantic-gates-shards-attempt }}
       semantic-gates-shards-artifact-id: ${{ steps.shard-identity.outputs.semantic-gates-shards-artifact-id }}
       semantic-worker-a-1-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-1-attempt }}
-      semantic-worker-a-4-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-4-attempt }}
+      semantic-worker-a-4a-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-4a-attempt }}
+      semantic-worker-a-4b-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-4b-attempt }}
       semantic-worker-a-1-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-1-artifact-id }}
-      semantic-worker-a-4-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-4-artifact-id }}
+      semantic-worker-a-4a-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-4a-artifact-id }}
+      semantic-worker-a-4b-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-4b-artifact-id }}
       semantic-worker-b-2-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-2-attempt }}
       semantic-worker-b-2-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-b-2-artifact-id }}
       semantic-worker-b-3-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-3-attempt }}
@@ -69,7 +71,8 @@ jobs:
           - semantic-gates-corpus-b
           - semantic-gates-shards
           - semantic-worker-a-1
-          - semantic-worker-a-4
+          - semantic-worker-a-4a
+          - semantic-worker-a-4b
           - semantic-worker-b-2
           - semantic-worker-b-3
           - semantic-analyzer
@@ -190,11 +193,11 @@ jobs:
           outputs = json.loads(os.environ['SHARPPROOF_SHARD_OUTPUTS'])
           attempts = {key.removesuffix('-attempt'): value for key, value in outputs.items() if key.endswith('-attempt')}
           artifacts = {key.removesuffix('-artifact-id'): value for key, value in outputs.items() if key.endswith('-artifact-id')}
-          if len(attempts) != 14 or artifacts.keys() != attempts.keys():
+          if len(attempts) != 15 or artifacts.keys() != attempts.keys():
               raise SystemExit('Every coverage shard must supply its producer attempt and immutable artifact ID.')
           if any(not str(value).isdigit() or int(value) < 1 for value in [*attempts.values(), *artifacts.values()]):
               raise SystemExit('Coverage producer identities must be positive integers.')
-          if len(set(artifacts.values())) != 14:
+          if len(set(artifacts.values())) != 15:
               raise SystemExit('Coverage shards must have distinct immutable artifact IDs.')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write('artifact-ids=' + ','.join(artifacts.values()) + '\n')

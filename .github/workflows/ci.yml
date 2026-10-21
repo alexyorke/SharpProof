@@ -195,9 +195,18 @@ jobs:
 
   canonical-gates:
     outputs:
-      attempt: ${{ steps.cohort-identity.outputs.attempt }}
+      corpus-attempt: ${{ steps.cohort-identity.outputs.corpus-attempt }}
+      shards-attempt: ${{ steps.cohort-identity.outputs.shards-attempt }}
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: corpus
+            task-group: GatesCorpus
+          - part: shards
+            task-group: GatesShards
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -210,30 +219,33 @@ jobs:
 
       # -Fast skips analyzers in this build only; canonical-main's full
       # solution build, required through build-and-test, enforces them.
-      - name: Run the complete canonical Gates cohort
+      - name: Run the ${{ matrix.part }} part of the canonical Gates cohort
         run: >-
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
-          -Configuration Release -Fast -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
+          -Configuration Release -Fast -SemanticCohort Gates -TaskGroup ${{ matrix.task-group }} -TestResultsDirectory artifacts/canonical-gates
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
       - name: Upload Gates cohort and timing evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-gates-${{ matrix.part }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts
           if-no-files-found: error
           retention-days: 14
 
       - name: Record successful Gates artifact attempt
         id: cohort-identity
-        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+        env:
+          SHARPPROOF_PART: ${{ matrix.part }}
+        run: echo "${SHARPPROOF_PART}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
         with:
           mode: report
+          name: ${{ github.job }}-${{ matrix.part }}
 
   self-application:
     needs: repository-quality
@@ -473,18 +485,24 @@ jobs:
           name: canonical-main-projects-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.projects-attempt }}
           path: artifacts/canonical-cohorts/remaining-projects-evidence
 
-      - name: Download Gates cohort evidence
+      - name: Download Gates corpus part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-gates-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.attempt }}
-          path: artifacts/canonical-cohorts/gates-evidence
+          name: canonical-gates-corpus-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.corpus-attempt }}
+          path: artifacts/canonical-cohorts/gates-corpus-evidence
 
-      # The three Remaining parts hold disjoint task directories. Each keeps its
-      # receipt as canonical-cohort.<part>.json, and the gate merges them.
+      - name: Download Gates shards part evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-gates-shards-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.shards-attempt }}
+          path: artifacts/canonical-cohorts/gates-shards-evidence
+
+      # Each cohort part holds disjoint task directories and its own receipt.
+      # Reconcile all three Remaining parts and both Gates parts.
       - name: Reconcile actual discovery and TRX identities
         env:
           SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS: >-
-            {"Remaining":{"canonical-cohort.worker-a.json":"${{ needs.canonical-main.outputs.worker-a-attempt }}","canonical-cohort.worker-b.json":"${{ needs.canonical-main.outputs.worker-b-attempt }}","canonical-cohort.projects.json":"${{ needs.canonical-main.outputs.projects-attempt }}"},"Gates":{"canonical-cohort.json":"${{ needs.canonical-gates.outputs.attempt }}"}}
+            {"Remaining":{"canonical-cohort.worker-a.json":"${{ needs.canonical-main.outputs.worker-a-attempt }}","canonical-cohort.worker-b.json":"${{ needs.canonical-main.outputs.worker-b-attempt }}","canonical-cohort.projects.json":"${{ needs.canonical-main.outputs.projects-attempt }}"},"Gates":{"canonical-cohort.corpus.json":"${{ needs.canonical-gates.outputs.corpus-attempt }}","canonical-cohort.shards.json":"${{ needs.canonical-gates.outputs.shards-attempt }}"}}
         run: |
           set -euo pipefail
           remaining=artifacts/canonical-cohorts/remaining
@@ -500,7 +518,19 @@ jobs:
               mv "${task}" "${remaining}/"
             done
           done
-          mv artifacts/canonical-cohorts/gates-evidence/canonical-gates artifacts/canonical-cohorts/gates
+          gates=artifacts/canonical-cohorts/gates
+          mkdir -p "${gates}"
+          for part in corpus shards; do
+            source="artifacts/canonical-cohorts/gates-${part}-evidence/canonical-gates"
+            mv "${source}/canonical-cohort.json" "${gates}/canonical-cohort.${part}.json"
+            for task in "${source}"/*/; do
+              if [[ -e "${gates}/$(basename "${task}")" ]]; then
+                echo "Multiple Gates parts ran task $(basename "${task}")." >&2
+                exit 1
+              fi
+              mv "${task}" "${gates}/"
+            done
+          done
           "${SHARPPROOF_PWSH}" -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCanonicalCohortGate.ps1
 
       - name: Upload combined canonical cohort evidence
