@@ -63,4 +63,84 @@ public sealed class ResourceMemoryFieldFactTests
         var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, TestContext.CurrentContext.CancellationToken);
         Assert.That(replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken).Bounds, Is.EqualTo(result.Bounds));
     }
+    [TestCase("borrowed-receiver")]
+    [TestCase("null-receiver")]
+    [TestCase("borrowed-child")]
+    [TestCase("scalar-expression")]
+    public void UnsupportedFieldStoresDiscardPreviouslyCountedAllocations(string shape)
+    {
+        if (shape is not ("borrowed-receiver" or "null-receiver" or "borrowed-child" or "scalar-expression"))
+        { throw new ArgumentOutOfRangeException(nameof(shape)); }
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        var borrowed = factory.CreateVariable("borrowed", factory.ObjectType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        var scalar = shape == "scalar-expression";
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            IrFieldSites.Prefix + "value", scalar ? factory.IntegerType : factory.ObjectType, false);
+        IrTerm receiver = shape == "borrowed-receiver" ? factory.Variable(borrowed) :
+            shape == "null-receiver" ? factory.Null(factory.ObjectType) : factory.Variable(root);
+        IrTerm value = scalar ? factory.Binary(IrBinaryOperator.Add,
+            factory.Variable(factory.CreateVariable("input", factory.IntegerType)), factory.Integer(1)) :
+            shape == "borrowed-child" ? factory.Variable(borrowed) : factory.Null(factory.ObjectType);
+        builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, value);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
+        var result = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Verified, Is.False);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("MemoryFieldStoreUnsupported"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ReturningBorrowedStorageDiscardsPreviouslyCountedAllocations(bool fieldRead)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        var borrowed = factory.CreateVariable("borrowed", factory.ObjectType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            IrFieldSites.Prefix + "uninitialized", factory.ObjectType, false);
+        builder.Return(entry, factory.CreateOperation(), fieldRead ?
+            factory.PureOpaque(field, factory.Variable(root)) : factory.Variable(borrowed));
+        var result = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Verified, Is.False);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("UnownedMemoryOutput"));
+    }
+    [TestCase(true, -128, true)]
+    [TestCase(true, 127, true)]
+    [TestCase(true, 128, false)]
+    [TestCase(false, 0, true)]
+    [TestCase(false, 255, true)]
+    [TestCase(false, 256, false)]
+    public void NarrowScalarCastsRequireRepresentableConstants(bool isSigned, int value, bool representable)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var input = factory.CreateVariable("input", factory.IntegerType);
+        builder.Assign(entry, factory.CreateOperation(), input, factory.Integer(value));
+        builder.Return(entry, factory.CreateOperation(),
+            factory.Cast(factory.GetOrCreateIntegerType(8, isSigned), factory.Variable(input)));
+        var program = builder.Build();
+        var token = TestContext.CurrentContext.CancellationToken;
+        var result = ResourceMemoryProgram.Evaluate(program, Layout, token);
+        if (!representable)
+        {
+            Assert.That(result.Bounds, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("MemoryScalarEffectUnsupported"));
+            return;
+        }
+        Assert.That(result.Verified, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds, Is.EqualTo(new ResourceMemoryBounds(0, 0, 0, 0, 0, 0)));
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, token);
+        Assert.That(replay.Complete(execution, Layout, token).Bounds, Is.EqualTo(result.Bounds));
+    }
 }

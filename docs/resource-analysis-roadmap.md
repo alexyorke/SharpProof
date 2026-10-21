@@ -96,13 +96,38 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+### Memory ownership rejection controls
+
+The memory group now contains 194 passing cases in the canonical Linux amd64
+container. Six additional controls allocate owned storage before presenting a
+borrowed or null field receiver, a borrowed child, an unsupported scalar field
+expression, a directly returned borrowed reference, or a read of an uninitialized
+reference field. Each returns its explicit Unknown reason and no partial memory
+bounds. These controls exercise rejection after otherwise countable allocations;
+they do not extend the admitted memory model or close the task fault-byte item.
+Six additional signed/unsigned narrowing-cast controls compare representable
+constant values with independent replay and require Unknown for out-of-range
+values. The final build reported zero warnings and zero errors.
+Evidence: `artifacts/resource-memory-ownership-boundaries-final.log`.
+The final canonical formatting and documentation checks also passed; their logs
+are `artifacts/resource-memory-ownership-format-final.log` and
+`artifacts/resource-memory-ownership-docs-final.log`.
 
 ### Current coverage qualification
+Published `96dcfa4ee` passed all four coverage shards in run 39522192698,
+including the repaired package preparation. The complete merge-commit report
+(92a24329ec1e45fad2e364651d8c30853c0f465f) measured 6052/6273 changed trusted
+lines (96.48%, 221 uncovered), below the unchanged 100% floor. This supersedes
+the complete numerical measurements below. The report is retained at
+`artifacts/resource-96dc-coverage-evidence/coverage/SharpProof.coverage.json`.
+The twelve additional local memory controls above are newer than this report
+and require their own exact-head qualification. The roadmap and draft MR remain
+incomplete while the fault-byte proof, coverage floor and final audit are open.
 
 Published `c1cab0c1e` passed all four coverage shards in run 39504679149.
 The complete merge-commit report (cd7093d7bf7187a8cfc5bc3970629e7c6c1f2946)
 measured 6016/6246 changed trusted lines (96.32%, 230 uncovered lines), below
-the unchanged 100% floor. This is the latest complete measurement, including
+the unchanged 100% floor. This earlier complete measurement includes
 the notification component and replay controls. The report is at
 `artifacts/resource-c1cab-coverage-evidence/coverage/SharpProof.coverage.json`
 and the aggregate failure log is `artifacts/resource-c1cab-coverage-failed.log`.
