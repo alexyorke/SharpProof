@@ -1028,10 +1028,7 @@ public static partial class Inference
                 case LiteralExpressionSyntax literal when !literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression):
                     return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).Type!);
                 case ConditionalExpressionSyntax conditional:
-                    BooleanCondition(conditional.Condition);
-                    var yes = Expression(conditional.WhenTrue);
-                    HmType.Unify(yes, Expression(conditional.WhenFalse));
-                    return yes;
+                    return JoinedExpression(conditional);
                 case TupleExpressionSyntax tuple:
                     return new("Tuple", tuple.Arguments.Select(a =>
                     {
@@ -1148,21 +1145,7 @@ public static partial class Inference
                 case CheckedExpressionSyntax checkedExpression:
                     return Expression(checkedExpression.Expression);
                 case SwitchExpressionSyntax switched:
-                    Expression(switched.GoverningExpression);
-                    var switchedResult = HmType.Variable();
-                    foreach (var arm in switched.Arms)
-                    {
-                        Pattern(arm.Pattern, Expression(switched.GoverningExpression));
-
-                        if (arm.WhenClause is not null)
-                        {
-                            BooleanCondition(arm.WhenClause.Condition);
-                        }
-
-                        HmType.Unify(switchedResult, Expression(arm.Expression));
-                    }
-
-                    return switchedResult;
+                    return JoinedExpression(switched);
                 default:
                     throw new InferenceException($"Unsupported expression: {expression.Kind()}.");
             }

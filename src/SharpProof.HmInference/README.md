@@ -139,7 +139,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Conditionals, return branches and guard returns | Unify results |
 | Declaration, recursive, positional and list patterns | Bind pattern variables; infer structural member/element types and retain implicit protocol selections |
 | Legacy type tests and safe casts | Infer the operand; retain the tested type and reference/nullable cast target, including awaited operands |
-| Pattern switches and switch expressions | Bind section/arm variables and guards; unify results and preserve constant conversion domains |
+| Pattern switches and switch expressions | Bind section/arm variables and guards; join converted results, retain numeric/user conversion endpoints and nullable lifting; fixed local result types permit independent captures |
 | Self-recursive methods | Solve monomorphic recursive references |
 | Resolved method and generic calls | Import signatures; instantiate generic parameters per call |
 | Named/reordered arguments and omitted optional defaults | Bind by Roslyn parameter identity rather than source position |

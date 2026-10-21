@@ -32,6 +32,7 @@ bash src/SharpProof.HmInference/verify-partials.sh "$output" | tee /workspace/Sh
 bash src/SharpProof.HmInference/verify-callerconstraints.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/caller-constraint-checks.txt
 bash src/SharpProof.HmInference/verify-nullablecallers.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-caller-checks.txt
 bash src/SharpProof.HmInference/verify-nullablegroups.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-group-checks.txt
+bash src/SharpProof.HmInference/verify-joins.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/expression-join-checks.txt
 bash src/SharpProof.HmInference/verify-localreturns.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/local-return-checks.txt
 bash src/SharpProof.HmInference/verify-performance.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/performance-checks.txt
 bash src/SharpProof.HmInference/verify-builder-layout.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/builder-layout-checks.txt

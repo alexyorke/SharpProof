@@ -147,6 +147,12 @@ public static partial class Inference
                     }
                 }
             }
+            var joined = expression;
+            while (joined is ParenthesizedExpressionSyntax parenthesized)
+            { joined = parenthesized.Expression; }
+            if (converted is not null && joined is ConditionalExpressionSyntax or SwitchExpressionSyntax
+                && IsFixedLocalReturn(expression) && model.GetOperation(joined, cancellationToken) is not IConditionalOperation { IsRef: true })
+            { return JoinedExpression(joined, converted, true); }
             if (expression is TupleExpressionSyntax tupleExpression && converted is INamedTypeSymbol { IsTupleType: true } targetTuple)
             {
                 var items = new List<HmType>();
@@ -187,29 +193,7 @@ public static partial class Inference
                     { inferred = inferred.Arguments[0].Root; }
                     return inferred;
                 }
-                SyntaxNode slot = expression;
-                while (true)
-                {
-                    if (slot.Parent is ParenthesizedExpressionSyntax parentheses)
-                    { slot = parentheses; }
-                    else if (slot.Parent is ArgumentSyntax { Parent: TupleExpressionSyntax tuple })
-                    { slot = tuple; }
-                    else
-                    { break; }
-                }
-                var declaration = slot.Parent switch
-                {
-                    ArrowExpressionClauseSyntax { Parent: LocalFunctionStatementSyntax local } => local,
-                    ReturnStatementSyntax or YieldStatementSyntax => slot.Ancestors().FirstOrDefault(owner =>
-                    {
-                        if (owner is null)
-                        { throw new ArgumentNullException(nameof(owner)); }
-                        return owner is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or MethodDeclarationSyntax;
-                    }) as LocalFunctionStatementSyntax,
-                    _ => null
-                };
-                if (declaration is not null && (iteratorReturn is null || slot.Parent is YieldStatementSyntax)
-                    && model.GetDeclaredSymbol(declaration, cancellationToken) is { RefKind: RefKind.None })
+                if (IsFixedLocalReturn(expression))
                 {
                     var fixedReturn = CSharpTypes.Rigid(converted);
                     BindDeclaredLocalReturn(inferred, fixedReturn, converted, false);
@@ -233,6 +217,149 @@ public static partial class Inference
             // boundary instead of narrowing the API to the expression's type.
             Anchor(expression);
             return CSharpTypes.Rigid(converted);
+        }
+
+        private bool IsFixedLocalReturn(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            SyntaxNode slot = expression;
+            while (true)
+            {
+                if (slot.Parent is ParenthesizedExpressionSyntax parentheses)
+                { slot = parentheses; }
+                else if (slot.Parent is ArgumentSyntax { Parent: TupleExpressionSyntax tuple })
+                { slot = tuple; }
+                else
+                { break; }
+            }
+            var declaration = slot.Parent switch
+            {
+                ArrowExpressionClauseSyntax { Parent: LocalFunctionStatementSyntax local } => local,
+                ReturnStatementSyntax or YieldStatementSyntax => slot.Ancestors().FirstOrDefault(owner =>
+                {
+                    if (owner is null)
+                    { throw new ArgumentNullException(nameof(owner)); }
+                    return owner is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or MethodDeclarationSyntax;
+                }) as LocalFunctionStatementSyntax,
+                _ => null
+            };
+            return declaration is not null && (iteratorReturn is null || slot.Parent is YieldStatementSyntax)
+                && model.GetDeclaredSymbol(declaration, cancellationToken) is { RefKind: RefKind.None };
+        }
+
+        private HmType JoinedExpression(ExpressionSyntax expression, ITypeSymbol? target = null, bool fixedResult = false)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            var info = model.GetTypeInfo(expression, cancellationToken);
+            target ??= info.Type ?? info.ConvertedType ?? throw new InferenceException("Unresolved expression join.");
+            var result = fixedResult ? CSharpTypes.Rigid(target) : HmType.Variable();
+            HmType Arm(ExpressionSyntax value)
+            {
+                if (value is null)
+                { throw new ArgumentNullException(nameof(value)); }
+                var unwrapped = value;
+                while (unwrapped is ParenthesizedExpressionSyntax parentheses)
+                { unwrapped = parentheses.Expression; }
+                var inferred = fixedResult && unwrapped is ConditionalExpressionSyntax or SwitchExpressionSyntax
+                    ? JoinedExpression(unwrapped, target, true) : Returned(value, target);
+                if (fixedResult)
+                { BindDeclaredLocalReturn(inferred, result, target, false); }
+                else
+                { HmType.Unify(result, inferred); }
+                return inferred;
+            }
+            if (expression is ConditionalExpressionSyntax conditional)
+            {
+                BooleanCondition(conditional.Condition);
+                if (model.GetOperation(conditional, cancellationToken) is IConditionalOperation { IsRef: true })
+                {
+                    var referent = Expression(conditional.WhenTrue);
+                    HmType.Unify(referent, Expression(conditional.WhenFalse));
+                    return referent;
+                }
+                var first = Arm(conditional.WhenTrue);
+                var second = Arm(conditional.WhenFalse);
+                // Earlier conditionals need a native operand conversion; the declared
+                // local result cannot supply their type through target typing.
+                if (fixedResult && model.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: < LanguageVersion.CSharp9 })
+                {
+                    var firstType = model.GetTypeInfo(conditional.WhenTrue, cancellationToken).Type;
+                    var secondType = model.GetTypeInfo(conditional.WhenFalse, cancellationToken).Type;
+                    var firstMatches = SymbolEqualityComparer.Default.Equals(firstType, target);
+                    var secondMatches = SymbolEqualityComparer.Default.Equals(secondType, target);
+                    if (firstMatches && secondMatches)
+                    { RelateNaturalJoin(first, second, target, false); }
+                    else if (firstMatches && secondType is not null)
+                    { BindConvertedArgument(secondType, target, CSharpTypes.Rigid(secondType), first, false); }
+                    else if (secondMatches && firstType is not null)
+                    { BindConvertedArgument(firstType, target, CSharpTypes.Rigid(firstType), second, false); }
+                }
+            }
+            else if (expression is SwitchExpressionSyntax switched)
+            {
+                var governing = Expression(switched.GoverningExpression);
+                foreach (var arm in switched.Arms)
+                {
+                    Pattern(arm.Pattern, governing);
+                    if (arm.WhenClause is not null)
+                    { BooleanCondition(arm.WhenClause.Condition); }
+                    Arm(arm.Expression);
+                }
+            }
+            else
+            { throw new InferenceException("Unsupported expression join."); }
+            return result;
+        }
+
+        private void RelateNaturalJoin(HmType first, HmType second, ITypeSymbol declared, bool referenceOnly)
+        {
+            if (first is null)
+            { throw new ArgumentNullException(nameof(first)); }
+            if (second is null)
+            { throw new ArgumentNullException(nameof(second)); }
+            if (declared is null)
+            { throw new ArgumentNullException(nameof(declared)); }
+            first = ConversionCore(first);
+            second = ConversionCore(second);
+            if (!first.IsVariable && second.IsVariable)
+            { (first, second) = (second, first); }
+            if (first.IsVariable)
+            {
+                conversionBounds.Add((first, second, declared, declared, referenceOnly));
+                return;
+            }
+            if (first.Name == second.Name && first.Arguments.Length == second.Arguments.Length)
+            {
+                if (declared is IArrayTypeSymbol array && first.Arguments.Length == 1)
+                {
+                    RelateNaturalJoin(first.Arguments[0], second.Arguments[0], array.ElementType, true);
+                    return;
+                }
+                if (declared is INamedTypeSymbol { IsTupleType: true } tuple && !referenceOnly)
+                {
+                    for (var i = 0; i < tuple.TupleElements.Length; i++)
+                    { RelateNaturalJoin(first.Arguments[i], second.Arguments[i], tuple.TupleElements[i].Type, false); }
+                    return;
+                }
+                if (declared is INamedTypeSymbol { IsGenericType: true, IsTupleType: false } named)
+                {
+                    if (first.NestedTypeName is not null)
+                    { HmType.Unify(first.Arguments[0], second.Arguments[0]); }
+                    var left = CSharpTypes.OwnArguments(first);
+                    var right = CSharpTypes.OwnArguments(second);
+                    for (var i = 0; i < left.Length; i++)
+                    {
+                        if (named.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
+                        { RelateNaturalJoin(left[i], right[i], named.TypeArguments[i], true); }
+                        else
+                        { HmType.Unify(left[i], right[i]); }
+                    }
+                    return;
+                }
+            }
+            HmType.Unify(first, second);
         }
 
         private HmType Awaited(AwaitExpressionSyntax expression)
