@@ -309,6 +309,8 @@ ranges, nested object identity and completed/suspended nested awaits with new
 type arguments. Direct pointer/function-pointer types and stack allocation remain
 open.
 
+Fixed declared value storage accepts representable conversions from generalized inputs without changing its declared type. This includes fields, properties, indexers, explicit locals, object initializers and typed deconstruction. Nullable annotations come from the bound storage contract; numeric/boxing endpoints, explicit ref storage and inferred-local assignments retain their required types.
+
 Pattern variables participate in inference through `is` expressions, switch labels,
 guards and switch-expression arms. Var captures share the input monotype; property
 and positional patterns propagate generic container/tuple arguments, including

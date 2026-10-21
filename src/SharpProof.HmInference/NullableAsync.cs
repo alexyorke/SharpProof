@@ -196,7 +196,7 @@ public static partial class Inference
                 if (IsFixedLocalReturn(expression))
                 {
                     var fixedReturn = CSharpTypes.Rigid(converted);
-                    BindDeclaredLocalReturn(inferred, fixedReturn, converted, false);
+                    BindFixedConversion(inferred, fixedReturn, converted, false);
                     return fixedReturn;
                 }
                 return inferred;
@@ -265,7 +265,7 @@ public static partial class Inference
                 var inferred = fixedResult && unwrapped is ConditionalExpressionSyntax or SwitchExpressionSyntax
                     ? JoinedExpression(unwrapped, target, true) : Returned(value, target);
                 if (fixedResult)
-                { BindDeclaredLocalReturn(inferred, result, target, false); }
+                { BindFixedConversion(inferred, result, target, false); }
                 else
                 { HmType.Unify(result, inferred); }
                 return inferred;

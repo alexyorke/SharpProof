@@ -889,8 +889,11 @@ public static partial class Inference
                 }
                 else
                 {
-                    // Retain the explicit local type and its conversion from the initializer.
-                    Anchor(variable.Initializer.Value);
+                    // Explicit value locals keep their declared storage type.
+                    if (declaration.Type is RefTypeSyntax)
+                    { Anchor(variable.Initializer.Value is RefExpressionSyntax referent ? referent.Expression : variable.Initializer.Value); }
+                    else
+                    { FixedStorageValue(variable.Initializer.Value, symbol.Type); }
                     environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
                 }
             }
@@ -968,6 +971,9 @@ public static partial class Inference
 
                         if (model.GetOperation(assignment.Left, cancellationToken) is IDiscardOperation)
                         { return Expression(assignment.Right); }
+                        if (assignment.Right is not RefExpressionSyntax && AssignmentTarget(assignment.Left).FreeVariables().Count == 0
+                            && StorageType(assignment.Left) is { } fixedTarget)
+                        { return FixedStorageValue(assignment.Right, fixedTarget); }
                         return AssignValue(assignment.Left, Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
                             ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
@@ -1232,7 +1238,10 @@ public static partial class Inference
                     }
                     else
                     {
-                        Anchor(assignment.Right);
+                        if (StorageType(assignment.Left) is { } fixedMember)
+                        { FixedStorageValue(assignment.Right, fixedMember); }
+                        else
+                        { Anchor(assignment.Right); }
                     }
                 }
                 else
@@ -1272,7 +1281,15 @@ public static partial class Inference
             }
 
             var target = AssignmentTarget(targetSyntax);
-            var targetType = model.GetTypeInfo(targetSyntax, cancellationToken).Type!;
+            var targetType = StorageType(targetSyntax);
+            if (sourceType is not null && SymbolEqualityComparer.Default.Equals(targetType, sourceType)
+                && sourceType is not IDynamicTypeSymbol && targetType is not IDynamicTypeSymbol
+                && !IsDynamicIdentityBoundary(sourceType, targetType) && target.FreeVariables().Count == 0
+                && targetSyntax.Parent is not AssignmentExpressionSyntax { Right: RefExpressionSyntax })
+            {
+                BindFixedConversion(value, target, targetType, false);
+                return target;
+            }
             if (sourceType is not null && !SymbolEqualityComparer.Default.Equals(targetType, sourceType))
             {
                 // Assignment conversions are not HM equality. Keep both original
@@ -1294,6 +1311,46 @@ public static partial class Inference
             }
 
             return target;
+        }
+
+        private ITypeSymbol StorageType(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            // Lvalue TypeInfo can lose declared nullable annotations in deconstruction.
+            // Use the bound storage contract before consulting expression flow types.
+            return model.GetOperation(expression, cancellationToken) switch
+            {
+                IFieldReferenceOperation field => field.Field.Type,
+                IPropertyReferenceOperation property => property.Property.Type,
+                ILocalReferenceOperation local => local.Local.Type,
+                IParameterReferenceOperation parameter => parameter.Parameter.Type,
+                IArrayElementReferenceOperation { ArrayReference.Type: IArrayTypeSymbol array } => array.ElementType,
+                _ => model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Unresolved storage type.")
+            };
+        }
+
+        private HmType FixedStorageValue(ExpressionSyntax expression, ITypeSymbol declared)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (declared is null)
+            { throw new ArgumentNullException(nameof(declared)); }
+            var expected = CSharpTypes.Rigid(declared);
+            var source = model.GetTypeInfo(expression, cancellationToken).Type;
+            if (source is not null && (source is IDynamicTypeSymbol || declared is IDynamicTypeSymbol || IsDynamicIdentityBoundary(source, declared)))
+            {
+                Anchor(expression);
+                return expected;
+            }
+            var joined = expression;
+            while (joined is ParenthesizedExpressionSyntax parentheses)
+            { joined = parentheses.Expression; }
+            var inferred = joined is ConditionalExpressionSyntax or SwitchExpressionSyntax
+                && model.GetOperation(joined, cancellationToken) is not IConditionalOperation { IsRef: true }
+                ? JoinedExpression(joined, declared, true) : Returned(expression, declared);
+            BindFixedConversion(inferred, expected, declared, false);
+            return expected;
         }
 
         private HmType Increment(ExpressionSyntax expression, ExpressionSyntax operand)
@@ -1338,7 +1395,8 @@ public static partial class Inference
                     if (!declaration.Type.IsVar)
                     {
                         var declaredType = model.GetTypeInfo(declaration.Type, cancellationToken).Type!;
-                        if (!SymbolEqualityComparer.IncludeNullability.Equals(original, declaredType))
+                        if (!SymbolEqualityComparer.Default.Equals(original, declaredType)
+                            || original is IDynamicTypeSymbol || declaredType is IDynamicTypeSymbol || IsDynamicIdentityBoundary(original, declaredType))
                         {
                             // Explicit deconstruction conversions keep separate source and local types.
                             HmType.Unify(value, CSharpTypes.Rigid(original));
@@ -1346,7 +1404,10 @@ public static partial class Inference
                             original = declaredType;
                         }
                         else
-                        { HmType.Unify(value, CSharpTypes.Rigid(declaredType)); }
+                        {
+                            BindFixedConversion(value, CSharpTypes.Rigid(declaredType), declaredType, false);
+                            value = CSharpTypes.Rigid(declaredType);
+                        }
                     }
 
                     return BindDesignation(declaration.Designation, value, original, info);

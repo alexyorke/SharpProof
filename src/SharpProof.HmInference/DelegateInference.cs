@@ -60,7 +60,7 @@ public static partial class Inference
                 {
                     var declared = nested.asyncReturn is { Arity: 1 } task ? task.TypeArguments[0] : symbol.ReturnType;
                     var fixedReturn = CSharpTypes.Rigid(declared);
-                    nested.BindDeclaredLocalReturn(result, fixedReturn, declared, false);
+                    nested.BindFixedConversion(result, fixedReturn, declared, false);
                     result = fixedReturn;
                 }
                 result = nested.iteratorReturn is not null ? nested.WrapIteratorResult() : nested.WrapAsyncResult(result);
@@ -74,7 +74,7 @@ public static partial class Inference
             conversionBounds.AddRange(nested.conversionBounds);
             needsBuilderEmission |= nested.needsBuilderEmission;
         }
-        private void BindDeclaredLocalReturn(HmType inferred, HmType expected, ITypeSymbol declared, bool referenceOnly)
+        private void BindFixedConversion(HmType inferred, HmType expected, ITypeSymbol declared, bool referenceOnly)
         {
             if (inferred is null)
             { throw new ArgumentNullException(nameof(inferred)); }
@@ -111,13 +111,13 @@ public static partial class Inference
             {
                 if (declared is IArrayTypeSymbol array && inferred.Arguments.Length == 1)
                 {
-                    BindDeclaredLocalReturn(inferred.Arguments[0], expected.Arguments[0], array.ElementType, true);
+                    BindFixedConversion(inferred.Arguments[0], expected.Arguments[0], array.ElementType, true);
                     return;
                 }
                 if (declared is INamedTypeSymbol { IsTupleType: true } tuple && !referenceOnly)
                 {
                     for (var i = 0; i < tuple.TupleElements.Length; i++)
-                    { BindDeclaredLocalReturn(inferred.Arguments[i], expected.Arguments[i], tuple.TupleElements[i].Type, false); }
+                    { BindFixedConversion(inferred.Arguments[i], expected.Arguments[i], tuple.TupleElements[i].Type, false); }
                     return;
                 }
                 if (declared is INamedTypeSymbol { IsGenericType: true, IsTupleType: false } constructed)
@@ -129,7 +129,7 @@ public static partial class Inference
                     for (var i = 0; i < values.Length; i++)
                     {
                         if (constructed.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
-                        { BindDeclaredLocalReturn(values[i], targets[i], constructed.TypeArguments[i], true); }
+                        { BindFixedConversion(values[i], targets[i], constructed.TypeArguments[i], true); }
                         else
                         { HmType.Unify(values[i], targets[i]); }
                     }
