@@ -171,8 +171,8 @@ public static partial class Inference
             {
                 var inferred = Interpolation(expression).Root;
                 if (converted.IsReferenceType && converted.NullableAnnotation == NullableAnnotation.Annotated && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
-                { return new(CSharpTypes.NullableReference, inferred); }
-                return inferred;
+                { inferred = new(CSharpTypes.NullableReference, inferred); }
+                return BindDeclaredReturn(expression, inferred, converted);
             }
             if (info.Type is IDynamicTypeSymbol || converted is IDynamicTypeSymbol)
             {
@@ -188,26 +188,19 @@ public static partial class Inference
                 var inferred = Expression(expression).Root;
                 if (info.Type.IsReferenceType && converted.NullableAnnotation == NullableAnnotation.Annotated && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
                 {
-                    return new(CSharpTypes.NullableReference, inferred);
+                    inferred = new(CSharpTypes.NullableReference, inferred);
                 }
-                if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated && inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+                else if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated && inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
                 {
                     while (inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
                     { inferred = inferred.Arguments[0].Root; }
-                    return inferred;
                 }
-                if (IsFixedDeclaredReturn(expression))
-                {
-                    var fixedReturn = CSharpTypes.Rigid(converted);
-                    BindFixedConversion(inferred, fixedReturn, converted, false);
-                    return fixedReturn;
-                }
-                return inferred;
+                return BindDeclaredReturn(expression, inferred, converted);
             }
             if (converted is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
                 && SymbolEqualityComparer.Default.Equals(info.Type, nullable.TypeArguments[0]))
             {
-                return new(CSharpTypes.NullableValue, Expression(expression));
+                return BindDeclaredReturn(expression, new(CSharpTypes.NullableValue, Expression(expression)), converted);
             }
             var returnConversion = model.ClassifyConversion(expression, converted);
             if (returnConversion.IsUserDefined)
@@ -220,6 +213,21 @@ public static partial class Inference
             // boundary instead of narrowing the API to the expression's type.
             Anchor(expression);
             return CSharpTypes.Rigid(converted);
+        }
+
+        private HmType BindDeclaredReturn(ExpressionSyntax expression, HmType inferred, ITypeSymbol converted)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (inferred is null)
+            { throw new ArgumentNullException(nameof(inferred)); }
+            if (converted is null)
+            { throw new ArgumentNullException(nameof(converted)); }
+            if (!IsFixedDeclaredReturn(expression))
+            { return inferred; }
+            var fixedReturn = CSharpTypes.Rigid(converted);
+            BindFixedConversion(inferred, fixedReturn, converted, false);
+            return fixedReturn;
         }
 
         private bool IsFixedDeclaredReturn(ExpressionSyntax expression)

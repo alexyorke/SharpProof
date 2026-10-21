@@ -309,6 +309,8 @@ ranges, nested object identity and completed/suspended nested awaits with new
 type arguments. Direct pointer/function-pointer types and stack allocation remain
 open.
 
+Fixed nullable return contracts bind each adjusted return or yield before merging flow. This keeps captured domains independent across nullable branches, tuple results and local iterators, including value and nullable-value captures.
+
 Fixed delegate contexts infer conversions inside lambda/anonymous-method returns without changing the delegate signature. This admits value captures boxed into object results, including nested and async callbacks; expression-tree shape and ref-return invariance remain protected.
 
 Fixed call parameters also accept representable conversions from generalized inputs, including constructors, delegate calls, explicit generic instantiations, params and array elements. Reference and omitted readonly arguments retain their original storage contracts.
