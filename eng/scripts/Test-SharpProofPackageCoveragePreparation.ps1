@@ -47,12 +47,11 @@ foreach ($coverageEnabled in @($false, $true)) {
         $callback = $expression.ScriptBlock.GetScriptBlock().GetNewClosure()
         $invocation = & $callback ([pscustomobject]@{ Name = 'fixture'; Filter = 'Name=Fixture'; Exclusive = $exclusive })
         if ($invocation.Environment['SHARPPROOF_PACKAGE_SOURCE'] -ne $fixture['feed']) { throw 'Package source was lost.' }
+        if ($invocation.Environment['UseSharedCompilation'] -cne 'false') { throw 'Package consumers may retain compiler servers.' }
         if (($invocation.Arguments -contains '--fixture-coverage') -ne $coverageEnabled) { throw 'Coverage collector routing changed.' }
         if ($coverageEnabled) {
-            if ($invocation.Environment['UseSharedCompilation'] -cne 'false') { throw 'Instrumented consumers may retain compiler servers.' }
             if ($invocation.Arguments[0] -cne 'test' -or @($invocation.Arguments | Where-Object { $_ -like '-p:OutDir=*fixture/Release/net10.0/' }).Count -ne 1) { throw 'Coverage output isolation was lost.' }
         }
-        elseif ($invocation.Environment.ContainsKey('UseSharedCompilation')) { throw 'Non-coverage compilation settings changed.' }
         if (-not $coverageEnabled -and -not $exclusive) {
             if ($invocation.Arguments[0] -cne 'vstest' -or $invocation.Environment['DOTNET_HOST_PATH'] -ne $fixture['resolvedDotnetHost']) { throw 'Direct test host binding changed.' }
         }

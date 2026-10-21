@@ -97,6 +97,43 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Shared normal-domain proof budgets
+
+New worker controls spend the shared budget across clauses, resource regions,
+instruction discovery and return-term checking. A separate Boolean snapshot
+chain checks both sides of the resolution-depth boundary: losing the constant
+must retain the unproved exceptional edge, even though independent execution
+returns normally. All 34 normal-domain cases passed with zero build errors.
+Evidence: `artifacts/resource-normal-domain-shared-budget.log`.
+
+### Package compiler lifetime and observed container OOM
+
+Canonical CI for `01a00a77f` captured Docker state `oomKilled: true`, exit code
+one, for the failed package job. The BuildTask test host crashed after reporting
+one passed test; the first 134-case package layout shard had passed. Evidence:
+`artifacts/resource-01a00-package-container/canonical-package.json` and
+`artifacts/resource-01a00-package-job.log`. This establishes an OOM event for
+this container, unlike the earlier shutdown logs; it does not identify the
+allocation that exhausted the container.
+
+Package consumer preparation now disables persistent compiler servers for
+ordinary runs as well as coverage runs. Temporary consumer workspaces use
+distinct compiler pipes, so retaining servers across the campaign can accumulate
+idle processes. This is a source-based retention diagnosis; the full constrained
+package run must qualify the fix. All four actual preparation callback modes
+passed, together with coverage-evidence regressions. Evidence:
+`artifacts/resource-package-compiler-lifetime-regressions.log`.
+The complete constrained package run passed all 492 tests with one existing skip
+across 14 shards, including all 95 BuildTask tests, in 541.1 seconds. Full
+quality/API, formatting and documentation checks also passed. Evidence:
+`artifacts/resource-package-compiler-lifetime-full.log`,
+`artifacts/resource-package-compiler-lifetime-lint.log`,
+`artifacts/resource-package-lifetime-budget-format.log` and
+`artifacts/resource-package-lifetime-budget-docs.log`. The comparable previous
+local package baseline was 642.7 seconds at four CPUs, 12 GiB memory, 4 GiB
+scratch and parallelism four, with 492 passed and one existing skip.
+One local timing comparison does not establish a general performance gain.
+
 ### Loop rejection coverage follow-up
 
 The coverage follow-up adds five valid-source rejection controls: a dynamic
@@ -345,13 +382,21 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `01a00a77f` passed all six coverage shards in run 39537817090.
+Its complete merge-commit report (6a6e5d3a480ce4d98b27f90d4be3a7ccbf796e69)
+measured 6159/6360 changed trusted lines (96.84%, 201 uncovered), below the
+unchanged 100% floor. This is the latest complete numeric measurement:
+`artifacts/resource-01a00-coverage-evidence/coverage/SharpProof.coverage.json`.
+Four uncovered lines belong to the new owned-IR profiler. The local loop and
+shared-budget controls and compiler-lifetime repair are newer than this report.
+
 Published `12c8a8516` passed all six coverage shards in run 39532409230.
 The complete merge-commit report (65e4b165ad64b0340d2a5275be40c13045d326c7)
 measured 6095/6292 changed trusted lines (96.87%, 197 uncovered), below the
-unchanged 100% floor. This is the latest complete numeric measurement; the
+unchanged 100% floor. This earlier
 report is retained at
 `artifacts/resource-12c8-coverage-evidence/coverage/SharpProof.coverage.json`.
-The observed-holder controls and owned-IR profiler are newer than this report.
+The observed-holder controls and owned-IR profiler were newer than this report.
 
 Published `ff069b5e4` passed all four coverage shards in run 39527309371.
 The complete merge-commit report (9afe98ad12cf941d29eb12a4edbc7e21d4a645de)

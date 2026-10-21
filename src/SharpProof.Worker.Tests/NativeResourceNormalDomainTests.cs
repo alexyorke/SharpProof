@@ -171,6 +171,51 @@ internal sealed class NativeResourceNormalDomainTests
             new IrProgramReplayOptions(static _ => null), TestContext.CurrentContext.CancellationToken);
         Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(7));
     }
+    [TestCase(4096, "ResourceNormalDomainBudgetExceeded")]
+    [TestCase(4094, "ResourceNormalDomainBudgetExceeded")]
+    [TestCase(4092, "ResourceNormalDomainTermUnsupported")]
+    public void OneSharedBudgetCoversClausesRegionsInstructionsAndReturnTerms(int clauses, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        builder.Return(builder.CreateBlock(), factory.CreateOperation(), factory.Integer(7));
+        var clause = new CompilerTotalClause(CompilerContractKind.Requires, factory.Boolean(true), factory.Boolean(true),
+            factory.CreateOperation(), null, null);
+        var owner = new CompilerTotalCallablePreparation("owner", builder.Build(), [], null,
+            Enumerable.Repeat(clause, clauses).ToImmutableArray());
+        Assert.That(NativeResourceNormalDomain.Check(ResourceProgram.Zero, owner,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(expected));
+    }
+
+    [TestCase(29, true)]
+    [TestCase(32, false)]
+    public void BooleanSnapshotDepthCannotDiscardAnUnprovedExceptionalEdge(int aliases, bool admitted)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var current = factory.CreateVariable("condition", factory.BooleanType);
+        builder.Assign(entry, factory.CreateOperation(), current, factory.Boolean(true));
+        for (var index = 0; index < aliases; index++)
+        {
+            var next = factory.CreateVariable("snapshot", factory.BooleanType);
+            builder.Assign(entry, factory.CreateOperation(), next, factory.Variable(current));
+            current = next;
+        }
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(current), yes, no);
+        builder.Return(yes, factory.CreateOperation());
+        builder.Assume(no, factory.CreateOperation(), factory.Boolean(false));
+        builder.Return(no, factory.CreateOperation());
+        var program = builder.Build();
+        Assert.That(Check(program), admitted ? Is.Null : Is.EqualTo("ResourceNormalDomainInstructionUnsupported:Assume"));
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000,
+            new IrProgramReplayOptions(static _ => null), TestContext.CurrentContext.CancellationToken);
+        Assert.That(execution.ReturnValue, Is.Null);
+    }
+
     private static string? Check(IrProgram program)
     {
         ArgumentNullException.ThrowIfNull(program);
