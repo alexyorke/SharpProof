@@ -30,7 +30,7 @@ param(
     # and its complete complement. Analyzer, ProjectsRest, and Extras partition
     # the original Projects group; the isolated collectors run in Extras.
     # Legacy groups and All preserve the existing local task selections.
-    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
+    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
     [string]$TaskGroup = 'All'
 )
 
@@ -506,9 +506,11 @@ if ($TaskGroup -ne 'All') {
                     'Worker' { $taskName -cin $workerTaskNames }
                     'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
                     'WorkerB' { $taskName -cin $workerBTaskNames }
+                    'WorkerB2' { $taskName -ceq 'worker-remainder-2' }
+                    'WorkerB3' { $taskName -ceq 'worker-remainder-3' }
                     'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }
-                    'Analyzer' { $taskName -ceq 'semantic-sharpproof.analyzer.tests' }
-                    'ProjectsRest' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin @('architecture', 'semantic-sharpproof.analyzer.tests') }
+                    'Analyzer' { $taskName -cin @('semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
+                    'ProjectsRest' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin @('architecture', 'semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
                     'Extras' { $taskName -ceq 'architecture' }
                 }
             }))

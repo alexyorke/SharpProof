@@ -30,7 +30,7 @@ function Write-CorpusReceipt([string]$Part, [string[]]$Names) {
 try {
     # Explicit post-authentication unit state: manifests are tested separately.
     $plan = Get-SharpProofSemanticCoverageTasks -RepositoryRoot $repositoryRoot
-    if ((Get-SharpProofSemanticCoverageShards).Count -ne 12 -or $plan.Count -ne 8) { throw 'Semantic coverage plan lost a shard.' }
+    if ((Get-SharpProofSemanticCoverageShards).Count -ne 13 -or $plan.Count -ne 9) { throw 'Semantic coverage plan lost a shard.' }
     foreach ($phase in $plan.Keys) {
         $root = Join-Path $fixture "$phase/semantic"
         [IO.Directory]::CreateDirectory($root) | Out-Null

@@ -37,7 +37,8 @@ jobs:
       semantic-gates-corpus-b-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-b-attempt }}
       semantic-gates-shards-attempt: ${{ steps.shard-identity.outputs.semantic-gates-shards-attempt }}
       semantic-worker-a-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-attempt }}
-      semantic-worker-b-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-attempt }}
+      semantic-worker-b-2-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-2-attempt }}
+      semantic-worker-b-3-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-3-attempt }}
       semantic-analyzer-attempt: ${{ steps.shard-identity.outputs.semantic-analyzer-attempt }}
       semantic-projects-rest-attempt: ${{ steps.shard-identity.outputs.semantic-projects-rest-attempt }}
       semantic-extras-attempt: ${{ steps.shard-identity.outputs.semantic-extras-attempt }}
@@ -53,7 +54,8 @@ jobs:
           - semantic-gates-corpus-b
           - semantic-gates-shards
           - semantic-worker-a
-          - semantic-worker-b
+          - semantic-worker-b-2
+          - semantic-worker-b-3
           - semantic-analyzer
           - semantic-projects-rest
           - semantic-extras
@@ -178,10 +180,16 @@ jobs:
           name: coverage-shard-semantic-worker-a-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-a-attempt }}
           path: artifacts
 
-      - name: Download semantic-worker-b coverage shard
+      - name: Download semantic-worker-b-2 coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: coverage-shard-semantic-worker-b-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-b-attempt }}
+          name: coverage-shard-semantic-worker-b-2-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-b-2-attempt }}
+          path: artifacts
+
+      - name: Download semantic-worker-b-3 coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-worker-b-3-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-b-3-attempt }}
           path: artifacts
 
       - name: Download semantic-analyzer coverage shard

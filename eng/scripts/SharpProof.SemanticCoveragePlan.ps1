@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 function Get-SharpProofSemanticCoverageShards {
     return , [Collections.Immutable.ImmutableArray]::Create[string](
         'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards',
-        'semantic-worker-a', 'semantic-worker-b', 'semantic-analyzer',
+        'semantic-worker-a', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer',
         'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')
 }
 
@@ -13,7 +13,7 @@ function Get-SharpProofSemanticCoverageTasks {
     $remaining = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($project in $projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension(([string]$project).Replace('\', '/')).ToLowerInvariant()
-        if ($name -in @('sharpproof.gates.tests', 'sharpproof.architecture.tests', 'sharpproof.attributes.tests', 'sharpproof.analyzer.tests')) { continue }
+        if ($name -in @('sharpproof.gates.tests', 'sharpproof.architecture.tests', 'sharpproof.attributes.tests', 'sharpproof.analyzer.tests', 'sharpproof.fuzz.tests')) { continue }
         $remaining.Add('semantic-' + $name)
     }
     $remaining.AddRange([string[]]@('worker-core', 'worker-claim-manifest', 'worker-compiler-manifest'))
@@ -22,8 +22,9 @@ function Get-SharpProofSemanticCoverageTasks {
             'semantic-gates-corpus-b' = @('gates-corpus')
             'semantic-gates-shards'   = @('gates-remainder-1', 'gates-remainder-2', 'gates-remainder-3')
             'semantic-worker-a'       = @('worker-remainder-1', 'worker-remainder-4', 'worker-fixed-checksum')
-            'semantic-worker-b'       = @('worker-remainder-2', 'worker-remainder-3')
-            'semantic-analyzer'       = @('semantic-sharpproof.analyzer.tests')
+            'semantic-worker-b-2'     = @('worker-remainder-2')
+            'semantic-worker-b-3'     = @('worker-remainder-3')
+            'semantic-analyzer'       = @('semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests')
             'semantic-projects-rest'  = $remaining.ToImmutable()
             'semantic-extras'         = @('architecture')
         }).AsReadOnly()

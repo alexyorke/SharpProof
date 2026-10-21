@@ -86,10 +86,9 @@ jobs:
           mode: report
           name: ${{ github.job }}-${{ matrix.part }}
 
-  # Keep the initial runner wave for semantic tests and coverage. These shorter
-  # independent phases become ready after quality and remain required by the gate.
+  # Package partitions start alongside quality: their aggregation otherwise
+  # extends required-check completion after the longer semantic cohorts finish.
   canonical-package-partition:
-    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
