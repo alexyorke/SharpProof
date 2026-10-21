@@ -109,6 +109,42 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Closed resolver-array prefixes
+
+A separate private component now bounds resolver `object[]` storage for a closed
+trace collection. It requires proved upper bounds on attempted appended frames
+`F`, resolver capture/restore copies `D`, and every participating StackTraceInfo's
+entry `m_cDynamicMethodItems` counter `K`. The last input is explicit because
+ClearStackTrace preserves the counter. It is not inferred from logical source
+activations, native frame-buffer capacity or a surviving trace.
+
+Pinned SaveStackTrace either retains the counter or doubles a dynamic batch for
+a replacement. For extensions it recounts the whole stored trace, adds the new
+dynamic batch and can double that sum. Both counts are at most `F`, bounding
+every resolver-array capacity by `max(K, 4 * F)`. Each nonempty save allocates at
+most one resolver array, including abandoned allocations, and each dispatch copy
+allocates at most one more. The cumulative upper bound is therefore
+`(F + D) * (24 + 8 * max(K, 4 * F))` under the pinned x64 layout. BigInteger
+arithmetic prevents overflow. Invalid budgets and incompatible layouts return
+Unknown with no bound or model identity; cancellation propagates.
+
+The first 51 targeted trace tests passed, including dynamic-method traces with
+actual resolver arrays and repeated dispatch restores:
+`artifacts/resource-resolver-prefix-tests.log`. New controls preserve a large
+entry counter even with few frames, exercise negative budgets and arithmetic
+beyond Int64, and check measured trace allocations against both buffer
+components. All 215 tests in the complete Specs project passed with zero build
+warnings or errors: `artifacts/resource-resolver-prefix-specs.log`. Full
+quality/API and documentation checks passed:
+`artifacts/resource-resolver-prefix-lint.log` and
+`artifacts/resource-resolver-prefix-docs.log`. The canonical private formatter
+copied zero source changes: `artifacts/resource-resolver-prefix-format.log`.
+
+This changes no root verdict or response identity. The runtime must still prove
+the frame/copy/counter budgets and account for referenced resolver and loader
+objects, initialization, helper failures, payloads and root composition. The
+cumulative runtime-byte checklist remains open.
+
 ### Closed raw-trace buffer prefixes
 
 A private component now bounds cumulative raw `byte[]` trace storage for a

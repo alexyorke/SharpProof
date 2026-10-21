@@ -11,6 +11,115 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, 0, 30, 0L)]
+    [TestCase(1, 0, 30, 264L)]
+    [TestCase(2, 3, 30, 1320L)]
+    [TestCase(10, 4, 30, 4816L)]
+    [TestCase(1, 2, 1024, 24648L)]
+    public void ResolverPrefixBoundsPreserveScratchCapacityAndCountCopies(int frames, int copies, int capacity, long expected)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, copies, capacity,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.CumulativeUpper!.Constant, Is.EqualTo(new BigInteger(expected)));
+        Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.ResolverTraceBufferModel));
+    }
+
+    [TestCase(-1, 0, 30)]
+    [TestCase(0, -1, 30)]
+    [TestCase(0, 0, -1)]
+    public void InvalidResolverBudgetsNeverPublishABound(int frames, int copies, int capacity)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, copies, capacity,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("InvalidResolverTracePrefixBudget"));
+    }
+
+    [Test]
+    public void ResolverBudgetsRequirePinnedLayoutAndPropagateCancellation()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8);
+        var result = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(1, 1, 30, layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.CumulativeUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(1, 1, 30, layout, cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [Test]
+    public void ResolverPrefixArithmeticDoesNotOverflowInt64()
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(int.MaxValue, int.MaxValue, int.MaxValue,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        var frames = new BigInteger(int.MaxValue);
+        Assert.That(result.CumulativeUpper!.Constant, Is.EqualTo(2 * frames * (24 + 32 * frames)));
+        Assert.That(result.CumulativeUpper.Constant, Is.GreaterThan(new BigInteger(long.MaxValue)));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(8)]
+    public void DynamicThrowAndDispatchAllocationsFitClosedBufferBudgets(int restores)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var method = new DynamicMethod("ThrowResolverTraceControl", typeof(void), [typeof(InvalidOperationException)],
+            typeof(ExceptionStackTraceRuntimeTests).Module, true);
+        var generator = method.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Throw);
+        var thrower = method.CreateDelegate<Action<InvalidOperationException>>();
+        for (var index = 0; index < 64; index++)
+        {
+            var warm = new InvalidOperationException("resolver-trace-control");
+            CaptureDynamicTrace(thrower, warm);
+            ConsumeRestoredDispatch(ExceptionDispatchInfo.Capture(warm));
+        }
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var resolverField = typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var exception = new InvalidOperationException("resolver-trace-control");
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        CaptureDynamicTrace(thrower, exception);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        var resolvers = (object[])resolverField.GetValue(exception)!;
+        Assert.That(resolvers.Length, Is.EqualTo(30), "The fresh runtime scratch seed is part of this control's premise.");
+        for (var index = 0; index < restores; index++)
+        {
+            var dispatch = ExceptionDispatchInfo.Capture(exception);
+            before = GC.GetAllocatedBytesForCurrentThread();
+            ConsumeRestoredDispatch(dispatch);
+            allocated += GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+        var trace = (byte[])traceField.GetValue(exception)!;
+        // The trace only extends in this control. Its final count bounds all
+        // appended frames. Although capture preparation is outside measured
+        // intervals, budget both capture and restore copies for the whole prefix.
+        var frames = checked((int)BitConverter.ToUInt64(trace, 0));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var raw = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 2 * restores, layout, cancellation);
+        var resolver = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, 2 * restores, 30, layout, cancellation);
+        Assert.That(((object[])resolverField.GetValue(exception)!).Length, Is.LessThanOrEqualTo(Math.Max(30, 4 * frames)));
+        Assert.That(new BigInteger(allocated), Is.LessThanOrEqualTo(raw.CumulativeUpper!.Constant!.Value + resolver.CumulativeUpper!.Constant!.Value));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static void CaptureDynamicTrace(Action<InvalidOperationException> thrower, InvalidOperationException exception)
+    {
+        ArgumentNullException.ThrowIfNull(thrower);
+        ArgumentNullException.ThrowIfNull(exception);
+        try
+        { thrower(exception); }
+        catch (InvalidOperationException)
+        { }
+    }
+
     [TestCase(0, 0, 0L)]
     [TestCase(1, 0, 240L)]
     [TestCase(2, 3, 1288L)]

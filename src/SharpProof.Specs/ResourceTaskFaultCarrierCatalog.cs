@@ -9,12 +9,18 @@ internal sealed record ResourceRawTraceBufferCheck(ResourceExpression? Cumulativ
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.RawTraceBufferModel;
 }
 
+internal sealed record ResourceResolverTraceBufferCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.ResolverTraceBufferModel;
+}
+
 // Fixed .NET 8.0.32 fault bookkeeping and a separately scoped raw-trace prefix
 // component. Neither component establishes a root allocation verdict.
 internal static class ResourceTaskFaultCarrierCatalog
 {
     internal const string Model = "task-join-fixed-fault-carriers-v2";
     internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
+    internal const string ResolverTraceBufferModel = "closed-exception-resolver-buffers-v1";
     internal const string RawTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp";
     internal const string SaveTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp";
 
@@ -47,6 +53,35 @@ internal static class ResourceTaskFaultCarrierCatalog
         var maximumArrays = 2 * frames + rawCopies;
         return new(ResourceExpression.Literal(maximumArrays * maximumArrayBytes), null);
     }
+    // The same closed-collection premise as raw traces, plus an independently
+    // proved entry bound on every participating StackTraceInfo's
+    // m_cDynamicMethodItems value. ClearStackTrace preserves that counter;
+    // it cannot be inferred from the surviving trace size. Referenced resolver
+    // and loader objects are not included.
+    internal static ResourceResolverTraceBufferCheck BoundResolverTraceBuffers(int appendedFrames, int resolverCopies,
+        int initialResolverCapacity, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        if (appendedFrames < 0 || resolverCopies < 0 || initialResolverCapacity < 0)
+        { return new(null, "InvalidResolverTracePrefixBudget"); }
+        var compatible = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Reference,
+            ResourceExpression.Zero), layout, cancellation);
+        if (!compatible.Verified)
+        { return new(null, compatible.UnknownReason); }
+        // A replacement saves at most twice its batch's dynamic count, or the
+        // existing scratch capacity. An extension recounts the whole stored
+        // trace (<= F) and adds the new dynamic batch once more (<= F), then can
+        // double that sum. Restoring an old resolver array preserves capacity.
+        // Thus no capacity exceeds max(entryCapacity, 4 * totalFrames).
+        // Each nonempty save allocates at most one resolver array, even when
+        // abandoned; capture/restore each contributes at most one extra copy.
+        var frames = new BigInteger(appendedFrames);
+        var maximumElements = BigInteger.Max(initialResolverCapacity, 4 * frames);
+        var maximumArrayBytes = 24 + 8 * maximumElements;
+        return new(ResourceExpression.Literal((frames + resolverCopies) * maximumArrayBytes), null);
+    }
+
     // One queue attempt and one at-most-once callback can each record a fault.
     internal const int MaximumChildFaultRecords = 2;
     internal const int MaximumJoinedDispatches = 16 * MaximumChildFaultRecords;
