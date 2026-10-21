@@ -16,7 +16,7 @@ param(
     # every other project, plus the package tests. Shard runs leave the
     # coverage gate to a separate job.
     [Parameter()]
-    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all'
 )
 
@@ -156,8 +156,10 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
     if ($CoveragePhase -ne 'package') {
         $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
         $coverageTaskGroup = switch ($CoveragePhase) {
-            'semantic-gates' { 'Gates' }
-            'semantic-worker' { 'Worker' }
+            'semantic-gates-corpus' { 'GatesCorpus' }
+            'semantic-gates-shards' { 'GatesShards' }
+            'semantic-worker-a' { 'WorkerA' }
+            'semantic-worker-b' { 'WorkerB' }
             'semantic-projects' { 'Projects' }
             default { 'All' }
         }
@@ -168,7 +170,7 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
             -TestFilter $broadFilter `
             -CoverageSettings $managedSettings `
             -CoverageResultsDirectory $semanticResults `
-            -CoverageTaskGroup $coverageTaskGroup `
+            -TaskGroup $coverageTaskGroup `
             -AttributesCollectedSeparately
         if ($LASTEXITCODE -ne 0) {
             throw (

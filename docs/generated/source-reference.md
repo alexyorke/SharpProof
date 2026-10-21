@@ -318,6 +318,11 @@ param(
     [ValidateSet('All', 'Remaining', 'Gates')]
     [string]$SemanticCohort = 'All',
 
+    # CI runs the Remaining cohort's Worker remainder shards and its other
+    # tasks on separate runners; the cohort gate requires both parts.
+    [ValidateSet('All', 'Worker', 'Projects')]
+    [string]$TaskGroup = 'All',
+
     [string]$TestResultsDirectory = '',
 
     # CI runs the package phase of pr in a separate parallel job.
@@ -326,7 +331,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,

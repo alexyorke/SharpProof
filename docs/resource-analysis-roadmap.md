@@ -97,6 +97,24 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### CI-sharding integration
+
+After `e17baf9e8` was published, the MR reported a new master conflict. The
+integration includes master `b96f69ee8` (CI task/shard splitting, nine files)
+and resolves the single coverage-workflow conflict by retaining all six new
+shard names together with the branch's per-shard environment and named-container
+termination evidence. CPU/memory/scratch limits and the 100% changed-TCB floor
+are unchanged. No production C# files changed in this master update. The prior
+four-shard evidence remains a historical measurement; the integrated head needs
+its own six-shard qualification.
+The integrated sources passed the Release repository gates (including evaluated
+layout and documentation), full quality/API checks, and coverage-evidence
+regressions including the four-mode actual package preparation callback.
+Evidence: `artifacts/resource-master-b96-repository-gates.log`,
+`artifacts/resource-master-b96-lint.log` and
+`artifacts/resource-master-b96-coverage-regressions-2.log`.
+Full formatting passed: `artifacts/resource-master-b96-format.log`.
+
 ### Dual fault-recording paths and notification prefixes
 
 The pinned `Task.cs` cache still matches SHA-256

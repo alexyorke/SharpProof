@@ -256,6 +256,50 @@ function Save-SharpProofCanonicalCohort {
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort.json') -Encoding utf8NoBOM
 }
 
+# CI may run one cohort as several parts on separate runners. Each part's
+# receipt sits beside the merged task directories as canonical-cohort.<part>.json.
+# The parts must share their run, source, and selection; their task, discovery,
+# and case lists merge into one receipt that the checks below treat as whole.
+function Read-SharpProofCanonicalReceipt {
+    param([string]$CohortRoot)
+
+    $receipts = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $CohortRoot -File -Filter 'canonical-cohort*.json' |
+                Sort-Object Name | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json }))
+    if ($receipts.Length -eq 0) { throw 'Canonical cohort has no receipt.' }
+    if ($receipts.Length -eq 1) { return $receipts[0] }
+    $first = $receipts[0]
+    foreach ($part in $receipts) {
+        foreach ($name in @('schemaVersion', 'commit', 'tree', 'runId', 'runAttempt', 'cohort', 'configuration', 'filter')) {
+            if ([string]$part.$name -cne [string]$first.$name) {
+                throw 'Canonical cohort parts differ in their run, source, or selection.'
+            }
+        }
+        if ((@($part.projects) -join "`n") -cne (@($first.projects) -join "`n")) {
+            throw 'Canonical cohort parts differ in their run, source, or selection.'
+        }
+    }
+    $discovered = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($part in $receipts) { $discovered.AddRange([string[]]@($part.discovered)) }
+    $discovered.Sort([StringComparer]::Ordinal)
+    return ([ordered]@{
+            schemaVersion   = $first.schemaVersion
+            commit          = $first.commit
+            tree            = $first.tree
+            runId           = $first.runId
+            runAttempt      = $first.runAttempt
+            cohort          = $first.cohort
+            configuration   = $first.configuration
+            filter          = $first.filter
+            projects        = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($first.projects))
+            expectedTasks   = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($receipts | ForEach-Object { $_.expectedTasks } | Sort-Object))
+            completedTasks  = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($receipts | ForEach-Object { $_.completedTasks } | Sort-Object))
+            completed       = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($receipts | ForEach-Object { $_.completed }))
+            discovered      = $discovered.ToImmutable()
+            discoveredCases = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($receipts | ForEach-Object { $_.discoveredCases }))
+            cases           = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($receipts | ForEach-Object { $_.cases }))
+        }).AsReadOnly()
+}
+
 function Assert-SharpProofCanonicalCohorts {
     param([string]$Root, [string]$RepositoryRoot)
 
@@ -272,7 +316,7 @@ function Assert-SharpProofCanonicalCohorts {
     $summary = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($cohort in @('Remaining', 'Gates')) {
         $cohortRoot = Join-Path $Root $cohort.ToLowerInvariant()
-        $receipt = Get-Content -LiteralPath (Join-Path $cohortRoot 'canonical-cohort.json') -Raw | ConvertFrom-Json
+        $receipt = Read-SharpProofCanonicalReceipt -CohortRoot $cohortRoot
         $expectedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($projects | Where-Object {
                     if ($cohort -eq 'Gates') { $_ -ceq $gatesProject }
                     else { $_ -cne $gatesProject }
