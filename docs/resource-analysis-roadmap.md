@@ -109,8 +109,8 @@ with no numeric component or required model identity. Its model is
 The reviewed inherited Exception slots bound an instance by 136 bytes. The
 ArgumentException `_paramName` slot raises this to 144; ArgumentOutOfRangeException
 also has `_actualValue`, raising it to 152. The pinned runtime source cache and
-blob/SHA-256 provenance for all seven families and their fieldless SystemException
-and ArithmeticException bases are recorded in
+blob/SHA-256 provenance for all seven families and their SystemException
+and ArithmeticException bases, which add no instance fields, are recorded in
 `artifacts/resource-runtime-fault-review/primitive-exception-sources.json`.
 The checker conservatively uses the largest candidate for every callback and
 permits at most one escaping ordinary source exception per at-most-once callback
