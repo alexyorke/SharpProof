@@ -252,7 +252,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,

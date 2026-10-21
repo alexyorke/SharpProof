@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 function Get-SharpProofSemanticCoverageShards {
     return , [Collections.Immutable.ImmutableArray]::Create[string](
         'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards',
-        'semantic-worker-a', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer',
+        'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer',
         'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')
 }
 
@@ -21,7 +21,8 @@ function Get-SharpProofSemanticCoverageTasks {
             'semantic-gates-corpus-a' = @('gates-corpus')
             'semantic-gates-corpus-b' = @('gates-corpus')
             'semantic-gates-shards'   = @('gates-remainder-1', 'gates-remainder-2', 'gates-remainder-3')
-            'semantic-worker-a'       = @('worker-remainder-1', 'worker-remainder-4', 'worker-fixed-checksum')
+            'semantic-worker-a-1'     = @('worker-remainder-1', 'worker-fixed-checksum')
+            'semantic-worker-a-4'     = @('worker-remainder-4')
             'semantic-worker-b-2'     = @('worker-remainder-2')
             'semantic-worker-b-3'     = @('worker-remainder-3')
             'semantic-analyzer'       = @('semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests')

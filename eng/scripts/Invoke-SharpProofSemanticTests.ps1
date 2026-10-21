@@ -30,7 +30,7 @@ param(
     # and its complete complement. Analyzer, ProjectsRest, and Extras partition
     # the original Projects group; the isolated collectors run in Extras.
     # Legacy groups and All preserve the existing local task selections.
-    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
+    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
     [string]$TaskGroup = 'All'
 )
 
@@ -506,6 +506,8 @@ if ($TaskGroup -ne 'All') {
                     'Worker' { $taskName -cin $workerTaskNames }
                     'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
                     'WorkerB' { $taskName -cin $workerBTaskNames }
+                    'WorkerA1' { $taskName -cin @('worker-remainder-1', 'worker-fixed-checksum') }
+                    'WorkerA4' { $taskName -ceq 'worker-remainder-4' }
                     'WorkerB2' { $taskName -ceq 'worker-remainder-2' }
                     'WorkerB3' { $taskName -ceq 'worker-remainder-3' }
                     'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }

@@ -35,7 +35,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
@@ -678,7 +678,7 @@ switch ($Command) {
     'coverage-shard' {
         # One runner collects one part of the default coverage run. The
         # coverage-gate job merges every shard and enforces the thresholds.
-        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects', 'semantic-worker-b')) {
+        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects', 'semantic-worker-a', 'semantic-worker-b')) {
             throw ('coverage-shard requires -CoveragePhase ' + ($coverageShardNames -join ', ') + '.')
         }
         # Identical sources in different private container workspaces must

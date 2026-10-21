@@ -448,6 +448,7 @@ $reusedClassRecords = 0
 $validatedClassCount = 0
 $coverageMergeTimer = [Diagnostics.Stopwatch]::StartNew()
 $reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$sourcePathCaches = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($report in $reports) {
     $reportFiles.Add(([ordered]@{
                 path  = [IO.Path]::GetRelativePath(
@@ -478,11 +479,15 @@ foreach ($report in $reports) {
             $document.SelectNodes('/coverage/sources/source') |
                 ForEach-Object { [string]$_.InnerText }
         ))
-    # Classes in one report repeatedly name the same source documents. Scope
-    # this cache to that report's fixed source roots; each distinct filename
-    # still passes the full physical-path and repository-boundary validation.
-    $sourcePathCache = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string](
-        [StringComparer]::Ordinal)
+    # The private source snapshot is immutable during validation. Reuse path
+    # resolution only for the same ordered source-root array and filename;
+    # different roots still receive independent physical-boundary validation.
+    $sourceRootsKey = ConvertTo-Json -InputObject ([string[]]@($sourceRoots)) -Compress
+    [object]$sourcePathCache = $null
+    if (-not $sourcePathCaches.TryGetValue($sourceRootsKey, [ref]$sourcePathCache)) {
+        $sourcePathCache = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
+        $sourcePathCaches.Add($sourceRootsKey, $sourcePathCache)
+    }
     $classes = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($document.SelectNodes('//class')))
     if ($classes.Length -eq 0) {
         throw "Coverage report has no classes: $($report.FullName)"

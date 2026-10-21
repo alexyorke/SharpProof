@@ -51,6 +51,7 @@ function Invoke-MergeFixture {
     $validatedClassRecords = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::Ordinal)
     $reusedClassRecords = 0; $validatedClassCount = 0
     $reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $sourcePathCaches = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
     . ([scriptblock]::Create($loops[0].Extent.Text))
     return [pscustomobject]@{ reused = $reusedClassRecords; validated = $validatedClassCount; hits = $lineHits }
 }
@@ -76,9 +77,17 @@ try {
         $message = if ($bad.Contains("number='999'")) { 'outside the authenticated PDB universe' } else { 'malformed sequence point' }
         Assert-MergeFailure @($first, $report) $message
     }
+    $rooted = Write-Report 'rooted' 'ProductionA' "<line number='10' hits='1' />"
+    $rootedText = [IO.File]::ReadAllText($rooted.FullName).Replace("filename='src/Subject.cs'", "filename='Subject.cs'").Replace("<source>$fixture</source>", "<source>$(Join-Path $fixture 'src')</source>")
+    [IO.File]::WriteAllText($rooted.FullName, $rootedText)
+    $rootedResult = Invoke-MergeFixture -Reports @($rooted)
+    if ($rootedResult.hits['ProductionA:src/Subject.cs'][10] -ne 1) { throw 'Source-root fixture did not exercise source-root resolution.' }
+    $differentRoots = Write-Report 'different-roots' 'ProductionA' "<line number='10' hits='1' />"
+    [IO.File]::WriteAllText($differentRoots.FullName, $rootedText.Replace((Join-Path $fixture 'src'), (Join-Path $fixture 'missing')))
+    Assert-MergeFailure @($rooted, $differentRoots) 'Source document is foreign or missing'
     $empty = Write-Report 'empty' 'ProductionA' ''
     Assert-MergeFailure @($first, $empty) 'no production sequence points'
-    Write-Host 'Coverage class reuse regressions passed: identical records, module isolation, MAX and zero hits, overlapping credits, authority mismatch, malformed records, and out-of-range zero hits.'
+    Write-Host 'Coverage class reuse regressions passed: identical records, module isolation, MAX and zero hits, overlapping credits, authority mismatch, malformed records, out-of-range zero hits, and isolation between distinct source roots.'
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($fixture)

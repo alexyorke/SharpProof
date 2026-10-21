@@ -16,7 +16,7 @@ param(
     # every other project, plus the package tests. Shard runs leave the
     # coverage gate to a separate job.
     [Parameter()]
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-a-1', 'semantic-worker-a-4', 'semantic-worker-b', 'semantic-worker-b-2', 'semantic-worker-b-3', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3', 'package')]
     [string]$CoveragePhase = 'all'
 )
 
@@ -161,6 +161,8 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
             'semantic-gates-corpus-b' { 'GatesCorpusB' }
             'semantic-gates-shards' { 'GatesShards' }
             'semantic-worker-a' { 'WorkerA' }
+            'semantic-worker-a-1' { 'WorkerA1' }
+            'semantic-worker-a-4' { 'WorkerA4' }
             'semantic-worker-b' { 'WorkerB' }
             'semantic-worker-b-2' { 'WorkerB2' }
             'semantic-worker-b-3' { 'WorkerB3' }

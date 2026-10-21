@@ -30,6 +30,9 @@ function Write-CorpusReceipt([string]$Part, [string[]]$Names) {
 try {
     $buildProjects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     $shards = Get-SharpProofSemanticCoverageShards
+    $workflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github/workflows/coverage.yml') -Raw
+    $matrix = @([regex]::Matches($workflow, '(?m)^          - ((?:semantic-|package-)[^\r\n]+)') | ForEach-Object { $_.Groups[1].Value })
+    if ((@($matrix | Sort-Object -CaseSensitive) -join "`n") -cne (@($shards | Sort-Object -CaseSensitive) -join "`n")) { throw 'Coverage workflow matrix differs from the complete semantic coverage plan.' }
     foreach ($phase in $shards) {
         $selectedProjects = Get-SharpProofCoverageBuildProjects -RepositoryRoot $repositoryRoot -Phase $phase
         foreach ($project in $selectedProjects) { [void]$buildProjects.Add($project) }
@@ -44,7 +47,7 @@ try {
     if ((@($buildProjects.ToImmutable() | Sort-Object -CaseSensitive) -join "`n") -cne (@($expectedProjects | Sort-Object -CaseSensitive -Unique) -join "`n")) { throw 'Coverage builds do not retain the complete test project union.' }
     # Explicit post-authentication unit state: manifests are tested separately.
     $plan = Get-SharpProofSemanticCoverageTasks -RepositoryRoot $repositoryRoot
-    if ((Get-SharpProofSemanticCoverageShards).Count -ne 13 -or $plan.Count -ne 9) { throw 'Semantic coverage plan lost a shard.' }
+    if ((Get-SharpProofSemanticCoverageShards).Count -ne 14 -or $plan.Count -ne 10) { throw 'Semantic coverage plan lost a shard.' }
     foreach ($phase in $plan.Keys) {
         $root = Join-Path $fixture "$phase/semantic"
         [IO.Directory]::CreateDirectory($root) | Out-Null

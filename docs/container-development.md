@@ -74,8 +74,8 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `corpus` | Canonical corpus and support-ratchet checks |
 | `corpus-update` | Intentional corpus observation update |
 | `coverage` | Release coverage and acceptance checks; requires a comparison ref |
-| `coverage-shard` | Collect one Release phase from the thirteen-part [semantic coverage plan](../eng/scripts/SharpProof.SemanticCoveragePlan.ps1) |
-| `coverage-gate` | Validate and merge all thirteen downloaded coverage shards; requires a comparison ref |
+| `coverage-shard` | Collect one Release phase from the fourteen-part [semantic coverage plan](../eng/scripts/SharpProof.SemanticCoveragePlan.ps1) |
+| `coverage-gate` | Validate and merge all fourteen downloaded coverage shards; requires a comparison ref |
 | `dependency-audit` | Locked restore and dependency vulnerability audit |
 | `security` | Dependency audit and full Release build with banned-API enforcement |
 | `fuzz-nightly` | Clean exact-commit fuzz campaign |
@@ -123,7 +123,7 @@ The comparison ref must already be available in the checkout's Git metadata. The
 
 Coverage shards derive their test build projects from the same task plan and add every evaluated production project. Canonical PR jobs still build the full solution with analyzers. The merge streams XML directly into XmlDocument rather than first copying each whole report into a PowerShell string. Source/module authority, range and hit validation, all overlapping credits, direct zero-hit evidence, and MAX merging are unchanged. Exact immutable artifact IDs allow concurrent downloads while retaining successful producer attempts.
 
-CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) collects thirteen independent phases: two corpus parts, Gates remainder tasks, three Worker parts, Analyzer with the semantic Fuzz campaign, remaining project tasks, isolated architecture/Attributes/Fuzz checks, and four package partitions. Every phase retains source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence, verifies complete task and corpus-case partitions, and independently rebuilds production authority before enforcing coverage. Corpus parts reserve every worker slot. Proof budgets, timeouts, module ownership, MAX merging, coverage floors, and changed-TCB enforcement are unchanged.
+CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) collects fourteen independent phases: two corpus parts, Gates remainder tasks, four Worker parts, Analyzer with the semantic Fuzz campaign, remaining project tasks, isolated architecture/Attributes/Fuzz checks, and four package partitions. Every phase retains source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence, verifies complete task and corpus-case partitions, and independently rebuilds production authority before enforcing coverage. Corpus parts reserve every worker slot. Proof budgets, timeouts, module ownership, MAX merging, coverage floors, and changed-TCB enforcement are unchanged.
 
 Coverage validation caches coverage credits for each production assembly, source, and line from that assembly's matching PDB ranges within one run. It preserves every overlapping sequence-point start and keeps lines that are permitted without granting coverage credit. The cache is rebuilt from independently authenticated current binaries and PDBs on each invocation. Project totals include every document owned by the project's evaluated `Compile` items and authenticated module, including linked sources outside its directory. Aggregate totals sum assembly/source/start obligations, so source compiled into two production assemblies contributes separately for each assembly. Repeated reports use maximum hits within the same assembly; another production or test assembly cannot supply its coverage.
 
