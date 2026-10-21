@@ -147,6 +147,8 @@ public static partial class Inference
                     }
                 }
             }
+            if (converted is not null && NullReturnHole(expression, converted) is { } hole)
+            { return hole; }
             var joined = expression;
             while (joined is ParenthesizedExpressionSyntax parenthesized)
             { joined = parenthesized.Expression; }
@@ -213,6 +215,74 @@ public static partial class Inference
             // boundary instead of narrowing the API to the expression's type.
             Anchor(expression);
             return CSharpTypes.Rigid(converted);
+        }
+
+        private HmType? NullReturnHole(ExpressionSyntax expression, ITypeSymbol converted)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (converted is null)
+            { throw new ArgumentNullException(nameof(converted)); }
+            var literal = expression;
+            while (true)
+            {
+                if (literal is ParenthesizedExpressionSyntax parentheses)
+                { literal = parentheses.Expression; }
+                else if (literal is PostfixUnaryExpressionSyntax suppressed && suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { literal = suppressed.Operand; }
+                else
+                { break; }
+            }
+            if (!literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression))
+            { return null; }
+            if (!converted.IsReferenceType && converted is not (IPointerTypeSymbol or IFunctionPointerTypeSymbol)
+                && converted is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            { return null; }
+            ExpressionSyntax site = expression;
+            while (true)
+            {
+                if (site.Parent is ParenthesizedExpressionSyntax parentheses)
+                { site = parentheses; }
+                else if (site.Parent is PostfixUnaryExpressionSyntax suppressed && suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { site = suppressed; }
+                else if (site.Parent is ArgumentSyntax { Parent: TupleExpressionSyntax tuple })
+                { site = tuple; }
+                else if (site.Parent is ConditionalExpressionSyntax conditional && (conditional.WhenTrue == site || conditional.WhenFalse == site))
+                { site = conditional; }
+                else if (site.Parent is SwitchExpressionArmSyntax { Parent: SwitchExpressionSyntax switched })
+                { site = switched; }
+                else
+                { break; }
+            }
+            if (IsFixedDeclaredReturn(site))
+            { return null; }
+            SyntaxNode? owner = site.Parent switch
+            {
+                ArrowExpressionClauseSyntax arrow => arrow.Parent,
+                AnonymousFunctionExpressionSyntax anonymous => anonymous,
+                ReturnStatementSyntax or YieldStatementSyntax => site.Ancestors().FirstOrDefault(node =>
+                {
+                    if (node is null)
+                    { throw new ArgumentNullException(nameof(node)); }
+                    return node is MethodDeclarationSyntax or LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
+                }),
+                _ => null
+            };
+            var referenceKind = owner switch
+            {
+                MethodDeclarationSyntax method => model.GetDeclaredSymbol(method, cancellationToken)?.RefKind,
+                AnonymousFunctionExpressionSyntax anonymous when model.GetOperation(anonymous, cancellationToken) is IAnonymousFunctionOperation operation => operation.Symbol.RefKind,
+                _ => null
+            };
+            if (referenceKind != RefKind.None)
+            { return null; }
+            var inferred = CSharpTypes.Erase(converted);
+            var core = ConversionCore(inferred);
+            if (converted.IsReferenceType && core.IsVariable)
+            { RequireKeyword(core, "class"); }
+            else if (core.Name == CSharpTypes.NullableValue && core.Arguments[0].Root.IsVariable)
+            { RequireKeyword(core.Arguments[0], "struct"); }
+            return inferred;
         }
 
         private HmType BindDeclaredReturn(ExpressionSyntax expression, HmType inferred, ITypeSymbol converted)

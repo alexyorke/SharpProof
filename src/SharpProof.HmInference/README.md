@@ -309,6 +309,8 @@ ranges, nested object identity and completed/suspended nested awaits with new
 type arguments. Direct pointer/function-pointer types and stack allocation remain
 open.
 
+Ordinary return joins infer null-compatible reference/value constraints and preserve structural input/result relationships. Untyped null-like defaults can participate; explicit casts and non-nullable value defaults keep their declared endpoints.
+
 Fixed nullable return contracts bind each adjusted return or yield before merging flow. This keeps captured domains independent across nullable branches, tuple results and local iterators, including value and nullable-value captures.
 
 Fixed delegate contexts infer conversions inside lambda/anonymous-method returns without changing the delegate signature. This admits value captures boxed into object results, including nested and async callbacks; expression-tree shape and ref-return invariance remain protected.

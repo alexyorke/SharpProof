@@ -1137,6 +1137,9 @@ public static partial class Inference
                 case MemberAccessExpressionSyntax member:
                     return Member(member);
                 case CastExpressionSyntax cast:
+                    if (IsUntypedNull(cast.Expression) && model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: null, Conversion.Exists: true }
+                        && model.GetTypeInfo(cast.Type, cancellationToken).Type is { } nullCastType)
+                    { return CSharpTypes.Rigid(nullCastType); }
                     if (model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: not null } userCast)
                     {
                         var targetType = model.GetTypeInfo(cast.Type, cancellationToken).Type!;
