@@ -29,6 +29,10 @@ jobs:
   # solution with analyzers; build-and-test reconciles all three receipts.
   canonical-main:
     name: canonical-main (${{ matrix.part }})
+    outputs:
+      worker-a-attempt: ${{ steps.cohort-identity.outputs.worker-a-attempt }}
+      worker-b-attempt: ${{ steps.cohort-identity.outputs.worker-b-attempt }}
+      projects-attempt: ${{ steps.cohort-identity.outputs.projects-attempt }}
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
@@ -68,6 +72,12 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Record successful cohort artifact attempt
+        id: cohort-identity
+        env:
+          SHARPPROOF_PART: ${{ matrix.part }}
+        run: echo "${SHARPPROOF_PART}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -184,6 +194,8 @@ jobs:
         run: docker compose run --rm -e GITHUB_RUN_ID tooling package-partition-gate
 
   canonical-gates:
+    outputs:
+      attempt: ${{ steps.cohort-identity.outputs.attempt }}
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -212,6 +224,10 @@ jobs:
           path: artifacts
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record successful Gates artifact attempt
+        id: cohort-identity
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -443,30 +459,33 @@ jobs:
       - name: Download non-Gates cohort Worker A part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-main-worker-a-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-main-worker-a-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.worker-a-attempt }}
           path: artifacts/canonical-cohorts/remaining-worker-a-evidence
 
       - name: Download non-Gates cohort Worker B part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-main-worker-b-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-main-worker-b-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.worker-b-attempt }}
           path: artifacts/canonical-cohorts/remaining-worker-b-evidence
 
       - name: Download non-Gates cohort Projects part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-main-projects-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-main-projects-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.projects-attempt }}
           path: artifacts/canonical-cohorts/remaining-projects-evidence
 
       - name: Download Gates cohort evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-gates-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.attempt }}
           path: artifacts/canonical-cohorts/gates-evidence
 
       # The three Remaining parts hold disjoint task directories. Each keeps its
       # receipt as canonical-cohort.<part>.json, and the gate merges them.
       - name: Reconcile actual discovery and TRX identities
+        env:
+          SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS: >-
+            {"Remaining":{"canonical-cohort.worker-a.json":"${{ needs.canonical-main.outputs.worker-a-attempt }}","canonical-cohort.worker-b.json":"${{ needs.canonical-main.outputs.worker-b-attempt }}","canonical-cohort.projects.json":"${{ needs.canonical-main.outputs.projects-attempt }}"},"Gates":{"canonical-cohort.json":"${{ needs.canonical-gates.outputs.attempt }}"}}
         run: |
           set -euo pipefail
           remaining=artifacts/canonical-cohorts/remaining

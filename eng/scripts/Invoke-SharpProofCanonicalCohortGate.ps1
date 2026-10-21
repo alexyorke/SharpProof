@@ -12,6 +12,13 @@ $ErrorActionPreference = 'Stop'
 # runs the same script.
 & (Join-Path $PSScriptRoot 'Test-SharpProofCanonicalEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
+$artifactAttempts = if ([string]::IsNullOrWhiteSpace($env:SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS)) {
+    $null
+}
+else {
+    ConvertFrom-Json -InputObject $env:SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS -AsHashtable
+}
 Assert-SharpProofCanonicalCohorts `
     -Root (Join-Path $RepositoryRoot 'artifacts/canonical-cohorts') `
-    -RepositoryRoot $RepositoryRoot
+    -RepositoryRoot $RepositoryRoot `
+    -ArtifactAttempts $artifactAttempts

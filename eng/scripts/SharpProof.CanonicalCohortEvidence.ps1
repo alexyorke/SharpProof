@@ -261,7 +261,22 @@ function Save-SharpProofCanonicalCohort {
 # The parts must share their run, source, and selection; their task, discovery,
 # and case lists merge into one receipt that the checks below treat as whole.
 function Read-SharpProofCanonicalReceipt {
-    param([string]$CohortRoot)
+    param([string]$CohortRoot, [Collections.IDictionary]$ExpectedAttempts, [string]$CurrentAttempt = $env:GITHUB_RUN_ATTEMPT)
+
+    if ($null -ne $ExpectedAttempts) {
+        $files = @(Get-ChildItem -LiteralPath $CohortRoot -File -Filter 'canonical-cohort*.json')
+        if ($CurrentAttempt -notmatch '^[1-9]\d*$' -or $ExpectedAttempts.Count -ne $files.Count) {
+            throw 'Canonical artifact attempts do not identify every receipt.'
+        }
+        foreach ($file in $files) {
+            $part = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+            $attempt = [string]$ExpectedAttempts[$file.Name]
+            if (-not $ExpectedAttempts.Contains($file.Name) -or $attempt -notmatch '^[1-9]\d*$' -or
+                [long]$attempt -gt [long]$CurrentAttempt -or [string]$part.runAttempt -cne $attempt) {
+                throw 'Canonical receipt differs from its successful producer attempt.'
+            }
+        }
+    }
 
     $receipts = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $CohortRoot -File -Filter 'canonical-cohort*.json' |
                 Sort-Object Name | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json }))
@@ -270,7 +285,7 @@ function Read-SharpProofCanonicalReceipt {
     $first = $receipts[0]
     foreach ($part in $receipts) {
         foreach ($name in @('schemaVersion', 'commit', 'tree', 'runId', 'runAttempt', 'cohort', 'configuration', 'filter')) {
-            if ([string]$part.$name -cne [string]$first.$name) {
+            if (($name -cne 'runAttempt' -or $null -eq $ExpectedAttempts) -and [string]$part.$name -cne [string]$first.$name) {
                 throw 'Canonical cohort parts differ in their run, source, or selection.'
             }
         }
@@ -301,7 +316,7 @@ function Read-SharpProofCanonicalReceipt {
 }
 
 function Assert-SharpProofCanonicalCohorts {
-    param([string]$Root, [string]$RepositoryRoot)
+    param([string]$Root, [string]$RepositoryRoot, [Collections.IDictionary]$ArtifactAttempts)
 
     $canonicalFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
     $projects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@((Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw |
@@ -316,7 +331,14 @@ function Assert-SharpProofCanonicalCohorts {
     $summary = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($cohort in @('Remaining', 'Gates')) {
         $cohortRoot = Join-Path $Root $cohort.ToLowerInvariant()
-        $receipt = Read-SharpProofCanonicalReceipt -CohortRoot $cohortRoot
+        $expectedAttempts = $null
+        if ($null -ne $ArtifactAttempts) {
+            if ($ArtifactAttempts.Count -ne 2 -or -not $ArtifactAttempts.Contains($cohort)) {
+                throw 'Canonical artifact attempts do not identify both cohorts.'
+            }
+            $expectedAttempts = $ArtifactAttempts[$cohort]
+        }
+        $receipt = Read-SharpProofCanonicalReceipt -CohortRoot $cohortRoot -ExpectedAttempts $expectedAttempts
         $expectedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($projects | Where-Object {
                     if ($cohort -eq 'Gates') { $_ -ceq $gatesProject }
                     else { $_ -cne $gatesProject }
@@ -325,7 +347,7 @@ function Assert-SharpProofCanonicalCohorts {
             $receipt.commit -cne $commit -or $receipt.tree -cne $tree -or
             $receipt.commit -cne $env:GITHUB_SHA -or
             $receipt.runId -cne $env:GITHUB_RUN_ID -or
-            $receipt.runAttempt -cne $env:GITHUB_RUN_ATTEMPT -or
+            ($null -eq $expectedAttempts -and $receipt.runAttempt -cne $env:GITHUB_RUN_ATTEMPT) -or
             $receipt.configuration -cne 'Release' -or $receipt.filter -cne $canonicalFilter -or
             (@($receipt.projects) -join "`n") -cne ($expectedProjects -join "`n")) {
             throw 'Canonical cohort does not match this attempt and the complete project partition.'
@@ -408,7 +430,7 @@ function Assert-SharpProofCanonicalCohorts {
                 }).AsReadOnly())
     }
     ([ordered]@{ schemaVersion = 1; commit = $commit; tree = $tree; runId = $env:GITHUB_RUN_ID;
-        runAttempt = $env:GITHUB_RUN_ATTEMPT; cases = $allIds.Count; cohorts = $summary.ToImmutable()
+        runAttempt = $env:GITHUB_RUN_ATTEMPT; artifactAttempts = $ArtifactAttempts; cases = $allIds.Count; cohorts = $summary.ToImmutable()
     }).AsReadOnly() |
         ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort-validation.json') -Encoding utf8NoBOM

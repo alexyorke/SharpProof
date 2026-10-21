@@ -79,6 +79,21 @@ try {
     }
     $partPath = Join-Path $partsRoot 'canonical-cohort.worker-b.json'
     $validPart = Get-Content -LiteralPath $partPath -Raw
+    $attempts = [ordered]@{
+        'canonical-cohort.projects.json' = '1'
+        'canonical-cohort.worker-a.json' = '1'
+        'canonical-cohort.worker-b.json' = '2'
+    }
+    $validPart.Replace('"runAttempt": "1"', '"runAttempt": "2"') | Set-Content -LiteralPath $partPath
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot } 'Canonical cohort parts differ in their run, source, or selection.'
+    $retained = Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2'
+    if ($retained.discovered.Count -ne 3) { throw 'Retained successful attempts lost canonical evidence.' }
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '1' } 'Canonical receipt differs from its successful producer attempt.'
+    $attempts['canonical-cohort.worker-b.json'] = '1'
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2' } 'Canonical receipt differs from its successful producer attempt.'
+    $attempts.Remove('canonical-cohort.projects.json')
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2' } 'Canonical artifact attempts do not identify every receipt.'
+    $validPart | Set-Content -LiteralPath $partPath
     $validPart.Replace('"commit": "commit"', '"commit": "other"') | Set-Content -LiteralPath $partPath
     Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot } 'Canonical cohort parts differ in their run, source, or selection.'
     Write-Host 'Canonical evidence regressions passed: deterministic ordering, encoded collisions, name multiplicity, missing definitions and duplicate execution/discovery identities.'
