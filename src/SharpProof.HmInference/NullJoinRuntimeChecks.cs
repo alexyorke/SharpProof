@@ -18,6 +18,14 @@ internal static class NullJoinRuntimeChecks
             using System.Threading.Tasks;
             public static class NullProbe{
                 public static object? Stored;
+                public static object? RecursiveReference(int depth,object value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveReference(depth-1,value,tag);}
+                public static int? RecursiveValue(int depth,int value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveValue(depth-1,value,tag);}
+                public static object[]? RecursiveArray(int depth,object[] value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveArray(depth-1,value,tag);}
+                public static (object? text,int number) RecursivePair(int depth,object value,int number,int tag){if(depth==0)return(null,number);if(depth==1)return(value,number);return RecursivePair(depth-1,value,number,tag);}
+                public static async Task<object?> RecursiveTaskReference(int depth,Task<object> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveTaskReference(depth-1,value,tag);}
+                public static async Task<int?> RecursiveTaskValue(int depth,Task<int> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveTaskValue(depth-1,value,tag);}
+                public static async ValueTask<object?> RecursiveValueReference(int depth,ValueTask<object> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveValueReference(depth-1,value,tag);}
+                public static async ValueTask<int?> RecursiveValueStruct(int depth,ValueTask<int> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveValueStruct(depth-1,value,tag);}
                 public static object? Reference(bool flag,object value,int tag){if(flag)return value;return null;}
                 public static int? Value(bool flag,int value,int tag){if(flag)return value;return null;}
                 public static object[]? Array(bool flag,object[] value,int tag)=>flag?value:null;
@@ -46,6 +54,15 @@ internal static class NullJoinRuntimeChecks
                         ||!ReferenceEquals(NullProbe.Delegate(true,factory,0),factory)||NullProbe.Delegate(false,factory,0)!=null)return false;
                     var pair=NullProbe.Pair(true,(marker,7),0);
                     if(!pair.HasValue||!ReferenceEquals(pair.Value.left,marker)||pair.Value.right!=7||NullProbe.Pair(false,(marker,7),0)!=null)return false;
+                    foreach(var depth in new[]{0,1,4}){
+                        var recursivePair=NullProbe.RecursivePair(depth,marker,7,0);
+                        if(depth==0?(NullProbe.RecursiveReference(depth,marker,0)!=null||NullProbe.RecursiveValue(depth,7,0)!=null
+                            ||NullProbe.RecursiveArray(depth,array,0)!=null||recursivePair.text!=null)
+                            :(!ReferenceEquals(NullProbe.RecursiveReference(depth,marker,0),marker)||NullProbe.RecursiveValue(depth,7,0)!=7
+                            ||!ReferenceEquals(NullProbe.RecursiveArray(depth,array,0),array)||!ReferenceEquals(recursivePair.text,marker)))return false;
+                        if(recursivePair.number!=7||await NullProbe.RecursiveTaskValue(depth,Task.FromResult(7),0).WaitAsync(cancellationToken)!=(depth==0?(int?)null:7)
+                            ||await NullProbe.RecursiveValueStruct(depth,new ValueTask<int>(7),0).AsTask().WaitAsync(cancellationToken)!=(depth==0?(int?)null:7))return false;
+                    }
                     var boxed=NullProbe.BoxedCaller(42);if(!ReferenceEquals(boxed,NullProbe.Stored))return false;
                     if(NullProbe.Typed(false,marker,0)!=null||NullProbe.DefaultValue(false,7,0)!=0||!Native())return false;
                     using var canceled=new CancellationTokenSource();canceled.Cancel();
@@ -54,9 +71,11 @@ internal static class NullJoinRuntimeChecks
                         var failure=new InvalidOperationException("root-null-await");bool selected=outcome!="Unselected";
                         var first=NullProbe.AsyncReference(selected,gate.Task,0);
                         var second=NullProbe.ValueReference(selected,new ValueTask<object>(gate.Task),0).AsTask();
-                        if(first.IsCompleted==selected||second.IsCompleted==selected)return false;
+                        var recursiveFirst=NullProbe.RecursiveTaskReference(selected?4:0,gate.Task,0);
+                        var recursiveSecond=NullProbe.RecursiveValueReference(selected?4:0,new ValueTask<object>(gate.Task),0).AsTask();
+                        if(first.IsCompleted==selected||second.IsCompleted==selected||recursiveFirst.IsCompleted==selected||recursiveSecond.IsCompleted==selected)return false;
                         if(outcome=="Success")gate.SetResult(marker);else if(outcome=="Fault")gate.SetException(failure);else if(outcome=="Cancel")gate.SetCanceled(canceled.Token);
-                        foreach(var pending in new[]{first,second}){
+                        foreach(var pending in new[]{first,second,recursiveFirst,recursiveSecond}){
                             try{var value=await pending.WaitAsync(cancellationToken);if(outcome=="Success"?!ReferenceEquals(value,marker):outcome!="Unselected"||value!=null)return false;}
                             catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
                             catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
@@ -100,6 +119,17 @@ internal static class NullJoinRuntimeChecks
                         ||await NullProbe.ValueReference(false,new ValueTask<string>(payload),tag).AsTask().WaitAsync(cancellationToken)!=null
                         ||await NullProbe.ValueStruct(true,new ValueTask<decimal>(23m),tag).AsTask().WaitAsync(cancellationToken)!=23m
                         ||await NullProbe.ValueStruct(false,new ValueTask<decimal>(23m),tag).AsTask().WaitAsync(cancellationToken)!=null)return false;
+                    foreach(var depth in new[]{0,1,4}){
+                        var recursivePair=NullProbe.RecursivePair(depth,payload,23m,tag);
+                        if(depth==0?(NullProbe.RecursiveReference(depth,payload,tag)!=null||NullProbe.RecursiveValue(depth,23m,tag)!=null
+                            ||NullProbe.RecursiveArray(depth,array,tag)!=null||recursivePair.text!=null)
+                            :(!ReferenceEquals(NullProbe.RecursiveReference(depth,payload,tag),payload)||NullProbe.RecursiveValue(depth,23m,tag)!=23m
+                            ||!ReferenceEquals(NullProbe.RecursiveArray(depth,array,tag),array)||!ReferenceEquals(recursivePair.text,payload)))return false;
+                        if(recursivePair.number!=23m||await NullProbe.RecursiveTaskReference(depth,Task.FromResult(payload),tag).WaitAsync(cancellationToken)!=(depth==0?null:payload)
+                            ||await NullProbe.RecursiveValueReference(depth,new ValueTask<string>(payload),tag).AsTask().WaitAsync(cancellationToken)!=(depth==0?null:payload)
+                            ||await NullProbe.RecursiveTaskValue(depth,Task.FromResult(23m),tag).WaitAsync(cancellationToken)!=(depth==0?(decimal?)null:23m)
+                            ||await NullProbe.RecursiveValueStruct(depth,new ValueTask<decimal>(23m),tag).AsTask().WaitAsync(cancellationToken)!=(depth==0?(decimal?)null:23m))return false;
+                    }
                     return Native(tag);
                 }
                 static string Echo(string value)=>value;
@@ -152,13 +182,13 @@ internal static class NullJoinRuntimeChecks
                 if (!await pending.WaitAsync(cancellationToken).ConfigureAwait(false))
                 { throw new InvalidOperationException("Null join changed original identities, values, native callbacks or async effects."); }
             }
-            Program.Log.Info("PASS NullJoinOriginalIdentityBoxingValuesPointersCallbacksSuspensionFaultAndCancellation");
+            Program.Log.Info("PASS NullJoinOriginalIdentityBoxingValuesRecursionPointersCallbacksSuspensionFaultAndCancellation");
             var newer = changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText(newSource, cancellationToken: cancellationToken)).WithAssemblyName("NewNullJoins");
             var newAssembly = Load(newer, afterContext);
             var newPending = (Task<bool>)newAssembly.GetType("NewRunner")!.GetMethod("Run")!.Invoke(null, [cancellationToken])!;
             if (!await newPending.WaitAsync(cancellationToken).ConfigureAwait(false))
             { throw new InvalidOperationException("Null join lost new generic null/value domains."); }
-            Program.Log.Info("PASS NullJoinNewReferenceStructContainersTupleNativeAndAsyncDomains");
+            Program.Log.Info("PASS NullJoinNewReferenceStructContainersTupleRecursiveNativeAndAsyncDomains");
             var invalid = changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText("class Bad{void Check(){_=NullProbe.Reference<int,int>(true,1,0);_=NullProbe.Value<string,int>(true,\"x\",0);}}", cancellationToken: cancellationToken));
             if (invalid.GetDiagnostics(cancellationToken).Count(diagnostic =>
                 { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Id is "CS0452" or "CS0453"; }) != 2)

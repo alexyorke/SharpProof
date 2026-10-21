@@ -154,7 +154,9 @@ public static partial class Inference
             for (var i = 0; i < parameters.Length; i++)
             { ImportConstructedConstraints(symbol.Parameters[i].Type, parameters[i]); }
             currentMethod = symbol;
-            var recursiveReturn = HmType.Variable();
+            // Seed the declared structure so recursive nullable results do not acquire
+            // an extra nullable wrapper while the body is still being inferred.
+            var recursiveReturn = CSharpTypes.Erase(symbol.ReturnType);
             currentFunction = HmType.Function(parameters, recursiveReturn);
             for (var i = 0; i < parameters.Length; i++)
             {

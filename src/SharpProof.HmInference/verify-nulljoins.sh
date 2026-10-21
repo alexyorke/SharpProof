@@ -21,6 +21,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 public static class NullJoinConsumer{
+                public static object? RecursiveReference(int depth,object value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveReference(depth-1,value,tag);}
+                public static int? RecursiveValue(int depth,int value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveValue(depth-1,value,tag);}
+                public static object[]? RecursiveArray(int depth,object[] value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveArray(depth-1,value,tag);}
+                public static (object? text,int number) RecursivePair(int depth,object value,int number,int tag){if(depth==0)return(null,number);if(depth==1)return(value,number);return RecursivePair(depth-1,value,number,tag);}
+                public static async Task<object?> RecursiveTaskReference(int depth,Task<object> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveTaskReference(depth-1,value,tag);}
+                public static async Task<int?> RecursiveTaskValue(int depth,Task<int> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveTaskValue(depth-1,value,tag);}
+                public static async ValueTask<object?> RecursiveValueReference(int depth,ValueTask<object> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveValueReference(depth-1,value,tag);}
+                public static async ValueTask<int?> RecursiveValueStruct(int depth,ValueTask<int> value,int tag){if(depth==0)return null;if(depth==1)return await value;return await RecursiveValueStruct(depth-1,value,tag);}
     public static object? Reference(bool flag,object value,int tag){if(flag)return value;return null;}
     public static int? Value(bool flag,int value,int tag){if(flag)return value;return null;}
     public static object[]? Array(bool flag,object[] value,int tag)=>flag?value:null;
@@ -70,6 +78,14 @@ EOF
   fi
   cp "$log" "$destination"
   for expected in \
+    'T1? RecursiveReference<T1, T2>(int depth, T1 value, T2 tag) where T1 : class' \
+    'T1? RecursiveValue<T1, T2>(int depth, T1 value, T2 tag) where T1 : struct' \
+    'T1[]? RecursiveArray<T1, T2>(int depth, T1[] value, T2 tag)' \
+    '(T1? text, T2 number) RecursivePair<T1, T2, T3>(int depth, T1 value, T2 number, T3 tag) where T1 : class' \
+    'global::System.Threading.Tasks.Task<T1?> RecursiveTaskReference<T1, T2>(int depth, global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : class' \
+    'global::System.Threading.Tasks.Task<T1?> RecursiveTaskValue<T1, T2>(int depth, global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : struct' \
+    'global::System.Threading.Tasks.ValueTask<T1?> RecursiveValueReference<T1, T2>(int depth, global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : class' \
+    'global::System.Threading.Tasks.ValueTask<T1?> RecursiveValueStruct<T1, T2>(int depth, global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : struct' \
     'T1? Reference<T1, T2>(bool flag, T1 value, T2 tag) where T1 : class' \
     'T1? Value<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct' \
     'T1[]? Array<T1, T2>(bool flag, T1[] value, T2 tag)' \
