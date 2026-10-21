@@ -457,6 +457,10 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(result.TaskTraceRestoreCountUpper, Is.EqualTo(configured ? 1 : 0));
         Assert.That(result.TaskDispatchArrayCopiesUpper, Is.EqualTo(4 * count + (configured ? 4 : 0)));
         Assert.That(result.RequiredTraceCopyModel, Is.EqualTo(NativeTaskFaultCarrierStorageVerifier.TraceCopyModel));
+        Assert.That(result.ContextTraceCaptureCountUpper, Is.EqualTo(count + (configured ? 1 : 0)));
+        Assert.That(result.ContextTraceRestoreCountUpper, Is.EqualTo(count + (configured ? 1 : 0)));
+        Assert.That(result.CombinedDispatchArrayCopiesUpper, Is.EqualTo(8 * count + (configured ? 8 : 0)));
+        Assert.That(result.RequiredCombinedTraceCopyModel, Is.EqualTo(NativeTaskFaultCarrierStorageVerifier.CombinedTraceCopyModel));
     }
 
     [TestCase(2, false, 1136L)]
@@ -519,6 +523,10 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(result.TaskTraceRestoreCountUpper, Is.Null);
         Assert.That(result.TaskDispatchArrayCopiesUpper, Is.Null);
         Assert.That(result.RequiredTraceCopyModel, Is.Null);
+        Assert.That(result.ContextTraceCaptureCountUpper, Is.Null);
+        Assert.That(result.ContextTraceRestoreCountUpper, Is.Null);
+        Assert.That(result.CombinedDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(result.RequiredCombinedTraceCopyModel, Is.Null);
     }
 
     [Test]
@@ -530,6 +538,8 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(incompatible.BookkeepingUpper, Is.Null);
         Assert.That(incompatible.TaskDispatchArrayCopiesUpper, Is.Null);
         Assert.That(incompatible.RequiredTraceCopyModel, Is.Null);
+        Assert.That(incompatible.CombinedDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(incompatible.RequiredCombinedTraceCopyModel, Is.Null);
         Assert.That(incompatible.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
         var child = projection.Children[1];
         projection = projection with { Children = [projection.Children[0], child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } }] };
@@ -537,6 +547,8 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(unowned.BookkeepingUpper, Is.Null);
         Assert.That(unowned.TaskDispatchArrayCopiesUpper, Is.Null);
         Assert.That(unowned.RequiredTraceCopyModel, Is.Null);
+        Assert.That(unowned.CombinedDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(unowned.RequiredCombinedTraceCopyModel, Is.Null);
         Assert.That(unowned.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
     }
 

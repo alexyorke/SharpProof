@@ -4,9 +4,15 @@ internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? Bookkeepi
 {
     internal int? TaskTraceCaptureCountUpper { get; init; }
     internal int? TaskTraceRestoreCountUpper { get; init; }
+    internal int? ContextTraceCaptureCountUpper { get; init; }
+    internal int? ContextTraceRestoreCountUpper { get; init; }
     internal int? TaskDispatchArrayCopiesUpper => TaskTraceCaptureCountUpper is { } captures && TaskTraceRestoreCountUpper is { } restores
         ? 2 * (captures + restores) : null;
     internal string? RequiredTraceCopyModel => TaskDispatchArrayCopiesUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.TraceCopyModel;
+    internal int? CombinedDispatchArrayCopiesUpper => TaskDispatchArrayCopiesUpper is { } taskCopies &&
+        ContextTraceCaptureCountUpper is { } captures && ContextTraceRestoreCountUpper is { } restores
+        ? taskCopies + 2 * (captures + restores) : null;
+    internal string? RequiredCombinedTraceCopyModel => CombinedDispatchArrayCopiesUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.CombinedTraceCopyModel;
 }
 
 // Conditional fixed carrier/list allocation prefixes, not a total task-byte
@@ -15,6 +21,7 @@ internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? Bookkeepi
 internal static class NativeTaskFaultCarrierStorageVerifier
 {
     internal const string TraceCopyModel = "task-join-task-dispatch-copy-counts-v1";
+    internal const string CombinedTraceCopyModel = "task-join-context-dispatch-copy-counts-v1";
     internal static NativeTaskFaultCarrierCheck Check(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
         ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
     {
@@ -55,12 +62,18 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         // WhenAll forwards existing dispatches. A configured root restores the
         // first fault once and records it once in its own async box. Each capture
         // or restore copies at most one trace byte array and one resolver array.
-        // Trace growth, affinity copies, execution-context dispatches and other
-        // runtime/helper work remain separate obligations, not counted here.
+        // Trace growth, affinity copies and other runtime/helper work remain
+        // separate obligations. Context-wrapper operations are counted separately
+        // below; externally induced context-change callback work is not included.
         return new(total, null)
         {
             TaskTraceCaptureCountUpper = count * faultsPerChild + (projection.ConfiguredAwait ? 1 : 0),
-            TaskTraceRestoreCountUpper = projection.ConfiguredAwait ? 1 : 0
+            TaskTraceRestoreCountUpper = projection.ConfiguredAwait ? 1 : 0,
+            // Each child enters at most one RunInternal/RunFromThreadPoolDispatchLoop
+            // wrapper. A configured root can resume its single await once through
+            // the async box's corresponding wrapper. Each catches/rethrows once.
+            ContextTraceCaptureCountUpper = count + (projection.ConfiguredAwait ? 1 : 0),
+            ContextTraceRestoreCountUpper = count + (projection.ConfiguredAwait ? 1 : 0)
         };
 
         ResourceExpression ObjectBytes(ImmutableArray<ResourceStorageKind> fields)

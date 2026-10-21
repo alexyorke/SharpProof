@@ -109,6 +109,42 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Execution-context wrapper dispatch counts
+
+The fault-carrier checker now keeps context-wrapper captures/restores separate
+from the existing task-only model and supplies a combined operation count under
+`task-join-context-dispatch-copy-counts-v1`. Each child can enter one context
+wrapper; a configured root can resume its single await through one async-box
+wrapper. Each wrapper can capture and rethrow one exception, so each context
+operation is bounded by `children + 1` for configured roots or `children`
+otherwise. Combined task/context dispatch copies are bounded by
+`8 * children + 8` arrays for configured roots, or `8 * children` otherwise.
+Failure results expose neither combined counts nor a combined model identity.
+
+This still counts operations, not bytes. External context-change callback work,
+trace growth/affinity copies, helper failures and initialization remain separate
+obligations. The pinned Task, ExecutionContext and async-box implementation
+sources establish the wrapper sites and capture/rethrow paths. Runtime controls
+exercise normal/faulting public and thread-pool wrapper paths, checking captured
+flow values, restored flow state and exception identity. All 190 Specs cases
+and 96 native carrier cases passed with zero build errors. Evidence:
+`artifacts/resource-context-dispatch-copy-runtime.log` and
+`artifacts/resource-context-dispatch-copy-worker.log`.
+The pinned async entry implementation calls the initial `MoveNext` directly,
+restoring context in a finally block without an extra capture/rethrow wrapper.
+Its source identity is recorded in
+`artifacts/resource-runtime-fault-review/async-entry-context-source.json`.
+Full formatting, quality/API and documentation checks passed. Evidence:
+`artifacts/resource-context-dispatch-copy-format.log`,
+`artifacts/resource-context-dispatch-copy-lint.log` and
+`artifacts/resource-context-dispatch-copy-docs.log`.
+
+Canonical CI passed completely on published `cfa23e7cb`, including package
+reproducibility, in run 39545675384. Its complete coverage report remains below
+the unchanged 100% floor at 97.07%. The verified source-activation and task-only
+copy-count commits were published together at `6ef27aa7b`; that head needs its
+own exact-commit CI and coverage qualification.
+
 ### Task-owned dispatch-copy operations
 
 The fixed fault-carrier check now derives task-owned dispatch-operation counts

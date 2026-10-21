@@ -9,6 +9,58 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task ContextWrappersRestoreFlowStateAndPreserveFaultIdentity(bool threadPool, bool faulting)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        var slot = new AsyncLocal<int>();
+        var exception = new InvalidOperationException("context-copy-control");
+        var observed = 0;
+        ContextCallback callback = _ =>
+        {
+            observed = slot.Value;
+            slot.Value = 11;
+            if (faulting)
+            { throw exception; }
+        };
+        slot.Value = 7;
+        var context = ExecutionContext.Capture()!;
+        slot.Value = 9;
+        InvalidOperationException? error = null;
+        int restored;
+        if (threadPool)
+        {
+            var completion = new TaskCompletionSource<(InvalidOperationException? Error, int Restored)>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var method = typeof(ExecutionContext).GetMethod("RunFromThreadPoolDispatchLoop", BindingFlags.Static | BindingFlags.NonPublic)!;
+            var run = method.CreateDelegate<Action<Thread, ExecutionContext, ContextCallback, object>>();
+            ThreadPool.UnsafeQueueUserWorkItem(_ =>
+            {
+                InvalidOperationException? failure = null;
+                try
+                { run(Thread.CurrentThread, context, callback, new object()); }
+                catch (InvalidOperationException caught)
+                { failure = caught; }
+                completion.SetResult((failure, slot.Value));
+            }, null);
+            (error, restored) = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.CurrentContext.CancellationToken);
+        }
+        else
+        {
+            try
+            { ExecutionContext.Run(context, callback, null); }
+            catch (InvalidOperationException caught)
+            { error = caught; }
+            restored = slot.Value;
+        }
+        Assert.That(observed, Is.EqualTo(7));
+        Assert.That(restored, Is.EqualTo(threadPool ? 0 : 9));
+        Assert.That(slot.Value, Is.EqualTo(9));
+        Assert.That(error, faulting ? Is.SameAs(exception) : Is.Null);
+    }
+
     [TestCase(0, false)]
     [TestCase(3, false)]
     [TestCase(15, false)]
