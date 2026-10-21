@@ -14,6 +14,33 @@ internal static class NativeTaskCarrierStorageVerifier
     internal const string Model = WorkerResourceModels.TaskCompilerCarrierModel;
     internal const int MaximumCallbacks = 64;
 
+    // This binds a collector fact to its source carriers. It does not establish
+    // a physical CLR frame count or a bound on runtime exception allocations.
+    internal static string? CheckExceptionBoundary(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var carriers = Check(shapes, projection, root, layout, cancellation);
+        if (carriers.UnknownReason is { } reason)
+        { return reason; }
+        var capture = shapes.RootExceptionBoundary;
+        if (capture is null)
+        { return "TaskRootExceptionBoundaryUnavailable"; }
+        if (capture.Boundary is not { } boundary)
+        {
+            return !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskRootExceptionBoundaryInvalid";
+        }
+        if (capture.UnknownReason is not null || !projection.ConfiguredAwait || shapes.StateMachine is null ||
+            boundary.RootCallableId != root.CallableId || boundary.ModuleSha256 != shapes.ModuleSha256 ||
+            boundary.StateMachineMetadataName != shapes.StateMachine.MetadataName ||
+            boundary.MethodToken >> 24 != 6 || (boundary.MethodToken & 0x00ffffff) == 0 ||
+            boundary.TryOffset < 0 || boundary.TryOffset >= 4096 || boundary.TryLength <= 0 ||
+            boundary.TryLength > 4096 - boundary.TryOffset)
+        { return "TaskRootExceptionBoundaryInvalid"; }
+        return null;
+    }
+
     internal static NativeTaskCarrierStorageCheck Check(CompilerTaskCarrierShapes shapes,
         CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
         ResourceRuntimeLayoutContext layout, CancellationToken cancellation)

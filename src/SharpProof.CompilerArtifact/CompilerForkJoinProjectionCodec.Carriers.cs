@@ -36,6 +36,8 @@ internal static partial class CompilerForkJoinProjectionCodec
             { writer.WriteNullValue(); }
             else
             { WriteCarrierType(writer, shapes.StateMachine, cancellation); }
+            writer.WritePropertyName("boundary");
+            WriteBoundary(writer, shapes.RootExceptionBoundary, cancellation);
             writer.WriteEndObject();
         }
         writer.WriteEndObject();
@@ -74,7 +76,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Carrier Unknown reason is too long.");
             return new(null, reason);
         }
-        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state"]);
+        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary"]);
         Require(Text(shapes.GetProperty("root")) == owner, "Carrier root is unowned.");
         var module = Text(shapes.GetProperty("module"));
         Require(WorkerProtocolJson.IsSha256(module), "Carrier module hash is invalid.");
@@ -97,7 +99,63 @@ internal static partial class CompilerForkJoinProjectionCodec
         var encodedState = shapes.GetProperty("state");
         Require((encodedState.ValueKind != JsonValueKind.Null) == configured, "Carrier state-machine kind is inconsistent.");
         var state = configured ? ReadCarrierType(encodedState, ref remaining, cancellation) : null;
-        return new(new(owner, module, compiler, callbacks, frames.MoveToImmutable(), state), null);
+        return new(new(owner, module, compiler, callbacks, frames.MoveToImmutable(), state)
+        { RootExceptionBoundary = ReadBoundary(shapes.GetProperty("boundary"), owner, module, state, cancellation) }, null);
+    }
+
+    private static void WriteBoundary(Utf8JsonWriter writer, CompilerTaskRootExceptionBoundaryCapture? capture, CancellationToken cancellation)
+    {
+        writer = ArgumentNullGuard.NotNull(writer, nameof(writer));
+        cancellation.ThrowIfCancellationRequested();
+        if (capture is null)
+        { writer.WriteNullValue(); return; }
+        Require((capture.Boundary is null) != (capture.UnknownReason is null), "Boundary evidence requires a value or Unknown reason.");
+        writer.WriteStartObject();
+        writer.WriteString("unknown", capture.UnknownReason);
+        writer.WritePropertyName("value");
+        if (capture.Boundary is not { } boundary)
+        { writer.WriteNullValue(); }
+        else
+        {
+            writer.WriteStartObject();
+            writer.WriteString("root", boundary.RootCallableId);
+            writer.WriteString("module", boundary.ModuleSha256);
+            writer.WriteString("state", boundary.StateMachineMetadataName);
+            writer.WriteNumber("method", boundary.MethodToken);
+            writer.WriteNumber("offset", boundary.TryOffset);
+            writer.WriteNumber("length", boundary.TryLength);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndObject();
+    }
+
+    private static CompilerTaskRootExceptionBoundaryCapture? ReadBoundary(JsonElement value, string owner, string module,
+        CompilerTaskCarrierType? state, CancellationToken cancellation)
+    {
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        module = ArgumentNullGuard.NotNull(module, nameof(module));
+        cancellation.ThrowIfCancellationRequested();
+        if (value.ValueKind == JsonValueKind.Null)
+        { return null; }
+        Properties(value, ["unknown", "value"]);
+        var unknown = value.GetProperty("unknown");
+        var encoded = value.GetProperty("value");
+        Require((unknown.ValueKind == JsonValueKind.Null) != (encoded.ValueKind == JsonValueKind.Null), "Boundary evidence requires a value or Unknown reason.");
+        if (encoded.ValueKind == JsonValueKind.Null)
+        {
+            var reason = Text(unknown);
+            Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Boundary Unknown reason is invalid.");
+            return new(null, reason);
+        }
+        Properties(encoded, ["root", "module", "state", "method", "offset", "length"]);
+        Require(Text(encoded.GetProperty("root")) == owner && Text(encoded.GetProperty("module")) == module &&
+            state is not null && Text(encoded.GetProperty("state")) == state.MetadataName, "Boundary source identity is unowned.");
+        var method = Integer(encoded.GetProperty("method"));
+        var offset = Integer(encoded.GetProperty("offset"));
+        var length = Integer(encoded.GetProperty("length"));
+        Require(method >> 24 == 6 && (method & 0x00ffffff) != 0, "Boundary method token is invalid.");
+        Require(offset >= 0 && offset < 4096 && length > 0 && length <= 4096 - offset, "Boundary range is invalid.");
+        return new(new(owner, module, state!.MetadataName, method, offset, length), null);
     }
 
     private static CompilerTaskCarrierType ReadCarrierType(JsonElement value, ref int remaining, CancellationToken cancellation)

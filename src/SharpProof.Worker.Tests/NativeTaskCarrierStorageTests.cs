@@ -15,6 +15,138 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void BoundaryOwnershipReusesCarrierAndLayoutAdmission(bool incompatibleLayout)
+    {
+        var (shapes, projection, root) = Fixture(2);
+        if (!incompatibleLayout)
+        { shapes = shapes with { RootCallableId = "foreign" }; }
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var reason = NativeTaskCarrierStorageVerifier.CheckExceptionBoundary(shapes, projection, root,
+            incompatibleLayout ? new("CoreCLR", "8.0.32", "arm64", 8) : Layout(), cancellation);
+        Assert.That(reason, Is.EqualTo(incompatibleLayout ? "IncompatibleResourceRuntimeLayout" : "TaskCompilerCarrierOwnershipUnproved"));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action check = () => { _ = NativeTaskCarrierStorageVerifier.CheckExceptionBoundary(shapes, projection, root, Layout(), canceled.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [TestCase(OptimizationLevel.Debug)]
+    [TestCase(OptimizationLevel.Release)]
+    public void EmittedBoundarySurvivesTransportAndNativeOwnershipChecks(OptimizationLevel optimization)
+    {
+        var (compilation, method, projection, root) = Compile(true, optimization);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var capture = collector.Capture(method, "root", cancellation);
+        projection = projection with
+        {
+            Carriers = capture with
+            {
+                Shapes = capture.Shapes! with
+                { RootExceptionBoundary = collector.CaptureExceptionBoundary(method, "root", cancellation) }
+            }
+        };
+        var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+        Assert.That(decoded.Carriers!.Shapes!.RootExceptionBoundary, Is.EqualTo(projection.Carriers.Shapes!.RootExceptionBoundary));
+        Assert.That(NativeTaskCarrierStorageVerifier.CheckExceptionBoundary(decoded.Carriers.Shapes, decoded, root, Layout(), cancellation), Is.Null);
+    }
+
+    [TestCase("root")]
+    [TestCase("module")]
+    [TestCase("state")]
+    [TestCase("token")]
+    [TestCase("empty-token")]
+    [TestCase("offset")]
+    [TestCase("length")]
+    [TestCase("overflow")]
+    [TestCase("both")]
+    public void BoundaryTransportAndNativeChecksRejectUnownedEvidence(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, root) = Fixture(2);
+        var boundary = new CompilerTaskRootExceptionBoundary("root", shapes.ModuleSha256, shapes.StateMachine!.MetadataName, 0x06000001, 0, 100);
+        boundary = mutation switch
+        {
+            "root" => boundary with { RootCallableId = "foreign" },
+            "module" => boundary with { ModuleSha256 = new string('b', 64) },
+            "state" => boundary with { StateMachineMetadataName = "foreign" },
+            "token" => boundary with { MethodToken = 0x02000001 },
+            "empty-token" => boundary with { MethodToken = 0x06000000 },
+            "offset" => boundary with { TryOffset = -1 },
+            "length" => boundary with { TryLength = 0 },
+            "overflow" => boundary with { TryOffset = int.MaxValue, TryLength = int.MaxValue },
+            "both" => boundary,
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+        };
+        shapes = shapes with { RootExceptionBoundary = new(boundary, mutation == "both" ? "Unsupported" : null) };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeTaskCarrierStorageVerifier.CheckExceptionBoundary(shapes, projection, root, Layout(), cancellation), Is.EqualTo("TaskRootExceptionBoundaryInvalid"));
+        Action encode = () => { _ = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation); };
+        Assert.Throws<InvalidDataException>(encode);
+    }
+
+    [TestCase(null, "TaskRootExceptionBoundaryUnavailable")]
+    [TestCase("UnsupportedBoundary", "UnsupportedBoundary")]
+    [TestCase("", "TaskRootExceptionBoundaryInvalid")]
+    public void MissingOrUnknownBoundariesNeverBecomeSuccess(string? reason, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var (shapes, projection, root) = Fixture(2);
+        shapes = shapes with { RootExceptionBoundary = reason is null ? null : new(null, reason) };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeTaskCarrierStorageVerifier.CheckExceptionBoundary(shapes, projection, root, Layout(), cancellation), Is.EqualTo(expected));
+        if (reason is null || reason.Length != 0)
+        {
+            var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+            Assert.That(decoded.Carriers!.Shapes!.RootExceptionBoundary, Is.EqualTo(shapes.RootExceptionBoundary));
+        }
+    }
+
+    [TestCase("missing")]
+    [TestCase("extra")]
+    [TestCase("kind")]
+    [TestCase("neither")]
+    [TestCase("long-reason")]
+    [TestCase("old-version")]
+    public void BoundaryDecoderRejectsMalformedAndOldTransport(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, root) = Fixture(2);
+        shapes = shapes with { RootExceptionBoundary = new(null, "UnsupportedBoundary") };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var json = JsonNode.Parse(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation))!.AsObject();
+        var evidence = json["carriers"]!["shapes"]!.AsObject();
+        var boundary = evidence["boundary"]!.AsObject();
+        switch (mutation)
+        {
+            case "missing":
+                evidence.Remove("boundary");
+                break;
+            case "extra":
+                boundary["extra"] = true;
+                break;
+            case "kind":
+                evidence["boundary"] = true;
+                break;
+            case "neither":
+                boundary["unknown"] = null;
+                break;
+            case "long-reason":
+                boundary["unknown"] = new string('x', 513);
+                break;
+            case "old-version":
+                json["version"] = CompilerForkJoinProjectionCodec.Version - 1;
+                break;
+        }
+        Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), root, cancellation); };
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
     [TestCase(OptimizationLevel.Debug, false)]
     [TestCase(OptimizationLevel.Debug, true)]
     [TestCase(OptimizationLevel.Release, false)]

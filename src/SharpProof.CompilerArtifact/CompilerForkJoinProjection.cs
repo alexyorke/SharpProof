@@ -48,6 +48,7 @@ internal sealed record CompilerTaskCarrierType(string MetadataName, bool IsValue
 internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string ModuleSha256, string CompilerIdentity,
     int MatchedCallbacks, ImmutableArray<CompilerTaskCarrierType> CallbackFrames, CompilerTaskCarrierType? StateMachine)
 {
+    internal CompilerTaskRootExceptionBoundaryCapture? RootExceptionBoundary { get; init; }
     public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
     public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
     public string CompilerIdentity { get; init; } = RepositoryParameterGuard.NotNull(CompilerIdentity, nameof(CompilerIdentity));
@@ -55,3 +56,14 @@ internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string M
         ? throw new ArgumentException("Callback frames must be initialized.", nameof(CallbackFrames)) : CallbackFrames;
 }
 internal sealed record CompilerTaskCarrierCapture(CompilerTaskCarrierShapes? Shapes, string? UnknownReason);
+
+// Source-owned emitted boundary evidence only, not a CLR frame or byte bound.
+internal sealed record CompilerTaskRootExceptionBoundary(string RootCallableId, string ModuleSha256,
+    string StateMachineMetadataName, int MethodToken, int TryOffset, int TryLength)
+{
+    public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
+    public string StateMachineMetadataName { get; init; } = RepositoryParameterGuard.NotNull(StateMachineMetadataName, nameof(StateMachineMetadataName));
+}
+
+internal sealed record CompilerTaskRootExceptionBoundaryCapture(CompilerTaskRootExceptionBoundary? Boundary, string? UnknownReason);

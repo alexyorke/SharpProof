@@ -109,6 +109,51 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Transporting async-root boundary evidence
+
+The nested fork/join projection is now version 4 and the response cache is
+version 56. Carrier records transport the emitted root boundary or its explicit
+Unknown reason. The decoder checks exact properties, bounded ranges, method
+tokens and root/module/state identities. The native carrier verifier separately
+checks ownership against admitted source costs and the selected runtime layout.
+Missing or inconsistent evidence cannot become a successful boundary check.
+
+Controls cover Debug/Release emission round trips, altered identities, malformed
+ranges and payloads, old versions, absent evidence and Unknown preservation. An
+artifact workflow control also checks that storage metrics carry the boundary
+capture while loop-only metrics do not request it. All 276 focused carrier,
+IL-parser, protocol and artifact-selection tests passed with zero build warnings
+or errors. Evidence: `artifacts/resource-boundary-transport-tests-final.log`.
+Documentation and full quality/API checks passed:
+`artifacts/resource-boundary-transport-docs.log` and
+`artifacts/resource-boundary-transport-lint.log`. Full formatting and container
+contract checks passed: `artifacts/resource-boundary-transport-format-final.log`
+and `artifacts/resource-boundary-transport-contract.log`. The first test build identified two
+test-code analyzer errors, which were corrected before the passing run; a
+formatting check also identified added switch statements, now corrected.
+The first broader run passed 754 of 755 cases. Its duplicate-property fixture
+still searched for projection version 3, so it did not mutate version 4 JSON.
+The fixture now uses the owning version constant and checks that its target
+property exists. All 879 affected resource-contract, projection, cache and carrier
+workflow cases passed with zero build warnings or errors after this fix:
+`artifacts/resource-boundary-transport-workflows-final.log`. All 124 final carrier
+cases also passed separately: `artifacts/resource-boundary-transport-admission-tests.log`.
+Additional boundary controls check incompatible layouts, unowned carriers and
+cancellation. The final private-workspace formatting pass copied zero changes:
+`artifacts/resource-boundary-transport-format-last.log`.
+
+This is a collector-owned source fact, not independent IL replay or a physical
+CLR-frame certificate. Runtime helper failures, cumulative trace growth and
+copies, payloads, initialization and composition into root cumulative bytes
+remain open. The full roadmap and unchanged coverage floor still apply.
+
+Published `ab254500c` passed package-consumer CI (run 39551817889), including
+Linux, macOS, Windows and CLI consumers, and complete canonical CI (run
+39551817943). Coverage run 39551817887 passed five
+shards but the package campaign exceeded its existing 1200-second limit. That
+run has no complete aggregate; it does not replace the last complete 97.06%
+report below. Evidence: `artifacts/resource-ab254-coverage-failure.log`.
+
 ### Emitted async-root exception boundaries
 
 `CaptureExceptionBoundary` inspects the actual emitted async state-machine
@@ -136,8 +181,9 @@ private-workspace whitespace check copied zero changes. Evidence:
 `artifacts/resource-emitted-task-boundary-apply-format-final.log`. Final
 documentation checks also passed:
 `artifacts/resource-emitted-task-boundary-docs-final.log`.
-This is compiler-side source-boundary evidence. It is not yet transported or
-composed into a native CLR-frame/trace-byte proof, and it does not cover failures
+This checkpoint established compiler-side source-boundary evidence. The newer
+checkpoint transports it, but does not compose a native CLR-frame/trace-byte
+proof. It does not cover failures
 in runtime helpers outside the source catch.
 
 Published `6ef27aa7b` completed all six coverage shards in run 39549217069.

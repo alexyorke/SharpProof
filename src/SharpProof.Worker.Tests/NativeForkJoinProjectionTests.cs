@@ -406,7 +406,11 @@ internal sealed class NativeForkJoinProjectionTests
         }
         var json = node.ToJsonString();
         if (mutation == "duplicate")
-        { json = json.Replace("\"version\":3", "\"version\":3,\"version\":3", StringComparison.Ordinal); }
+        {
+            var property = "\"version\":" + CompilerForkJoinProjectionCodec.Version.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Assert.That(json, Does.Contain(property));
+            json = json.Replace(property, property + "," + property, StringComparison.Ordinal);
+        }
         else if (mutation == "duplicate-body")
         { json = json.Replace("\"effectsCompleteAtEntry\":true", "\"effectsCompleteAtEntry\":true,\"effectsCompleteAtEntry\":true", StringComparison.Ordinal); }
         Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(json), root, cancellation); };

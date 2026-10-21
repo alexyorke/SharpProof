@@ -6,17 +6,6 @@ using System.Reflection.PortableExecutable;
 
 namespace SharpProof.CompilerArtifact;
 
-// Source-owned emitted boundary evidence only, not a CLR frame or byte bound.
-internal sealed record CompilerTaskRootExceptionBoundary(string RootCallableId, string ModuleSha256,
-    string StateMachineMetadataName, int MethodToken, int TryOffset, int TryLength)
-{
-    public string RootCallableId { get; init; } = ArgumentNullGuard.NotNull(RootCallableId, nameof(RootCallableId));
-    public string ModuleSha256 { get; init; } = ArgumentNullGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
-    public string StateMachineMetadataName { get; init; } = ArgumentNullGuard.NotNull(StateMachineMetadataName, nameof(StateMachineMetadataName));
-}
-
-internal sealed record CompilerTaskRootExceptionBoundaryCapture(CompilerTaskRootExceptionBoundary? Boundary, string? UnknownReason);
-
 // Import private generated fields from a real emission. This metadata is source
 // evidence; it supplies neither a physical layout nor an allocation verdict.
 internal sealed class CompilerTaskCarrierCollector

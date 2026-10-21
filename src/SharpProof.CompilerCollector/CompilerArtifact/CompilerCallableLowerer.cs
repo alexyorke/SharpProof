@@ -79,7 +79,18 @@ internal sealed class CompilerCallableLowerer
         }
         if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
-        { forkJoin = forkJoin with { Carriers = _taskCarriers.Capture(target.Method, target.Entry.CallableId, cancellationToken) }; }
+        {
+            var carriers = _taskCarriers.Capture(target.Method, target.Entry.CallableId, cancellationToken);
+            if (carriers.Shapes is { } shapes)
+            {
+                carriers = carriers with
+                {
+                    Shapes = shapes with
+                    { RootExceptionBoundary = _taskCarriers.CaptureExceptionBoundary(target.Method, target.Entry.CallableId, cancellationToken) }
+                };
+            }
+            forkJoin = forkJoin with { Carriers = carriers };
+        }
         if (forkJoin is { ConfiguredAwait: true })
         { reason = WorkerClaimReason.None; }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };
