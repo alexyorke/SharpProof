@@ -146,7 +146,7 @@ function Save-SharpProofCoverageShardManifest {
     param([string]$Root, [string]$Phase)
 
     $files = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $Root -Recurse -File |
-                Where-Object { $_.Name -in @('package-partition.json', 'discovery.dump') -or $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
+                Where-Object { $_.Name -in @('package-partition.json', 'discovery.dump', 'discovered-tests.txt') -or $_.Name -like '*.discovery.dump' -or $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
                     $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
                 Sort-Object FullName | ForEach-Object {
                     ([ordered]@{
@@ -174,7 +174,7 @@ function Assert-SharpProofCoverageShardManifest {
         throw "Coverage shard '$Phase' has an invalid completion manifest."
     }
     $actual = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Get-ChildItem -LiteralPath $Root -Recurse -File |
-                Where-Object { $_.Name -in @('package-partition.json', 'discovery.dump') -or $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
+                Where-Object { $_.Name -in @('package-partition.json', 'discovery.dump', 'discovered-tests.txt') -or $_.Name -like '*.discovery.dump' -or $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
                     $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
                 ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object))
     $recorded = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object))
@@ -183,7 +183,7 @@ function Assert-SharpProofCoverageShardManifest {
         @($recorded | Where-Object { Test-SharpProofCoverageReportName -Path $_ }).Count -eq 0 -or
         @($recorded | Where-Object { $_ -like '*/coverage-cohort.json' }).Count -ne 1 -or
         @($recorded | Where-Object { $_ -eq 'coverage-authority.json' }).Count -ne 1 -or
-        ($Phase -eq 'semantic-projects' -and $recorded -cnotcontains 'coverage-cohort.json')) {
+        ($Phase -in @('semantic-projects', 'semantic-extras') -and $recorded -cnotcontains 'coverage-cohort.json')) {
         throw "Coverage shard '$Phase' evidence file set differs from its completion manifest."
     }
     foreach ($file in $manifest.files) {

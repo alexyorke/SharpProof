@@ -35,7 +35,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package-0', 'package-1', 'package-2', 'package-3')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
@@ -97,8 +97,8 @@ if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
 # CI collects each coverage shard on its own runner; the gate requires all.
-$coverageShardNames = [Collections.Immutable.ImmutableArray]::Create[string](
-    'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package-0', 'package-1', 'package-2', 'package-3')
+. (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
+$coverageShardNames = Get-SharpProofSemanticCoverageShards
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
     throw '-CoveragePhase is supported only for coverage-shard.'
@@ -123,7 +123,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
     -not $NoBuild -and -not $Fast) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -677,7 +677,7 @@ switch ($Command) {
     'coverage-shard' {
         # One runner collects one part of the default coverage run. The
         # coverage-gate job merges every shard and enforces the thresholds.
-        if ($CoveragePhase -notin $coverageShardNames) {
+        if ($CoveragePhase -notin $coverageShardNames -and $CoveragePhase -notin @('semantic-gates-corpus', 'semantic-projects')) {
             throw ('coverage-shard requires -CoveragePhase ' + ($coverageShardNames -join ', ') + '.')
         }
         # Identical sources in different private container workspaces must
@@ -766,6 +766,7 @@ switch ($Command) {
                 ($shardModules -join ','))
             $authorityFileBuilder.Add($shardAuthorityPath)
         }
+        Assert-SharpProofSemanticCoveragePartitions -Root $coverageRoot -RepositoryRoot $repositoryRoot
         . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
         Assert-SharpProofPackagePartitions -Roots @(0..3 | ForEach-Object { Join-Path $coverageRoot "package-$_/package/partition-evidence" }) -Commit ((& git rev-parse HEAD).Trim()) -Filter ''
         $authorityKeys = $authorityKeyBuilder.ToImmutable()

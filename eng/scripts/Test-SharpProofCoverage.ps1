@@ -440,6 +440,13 @@ function Resolve-CoverageSourcePath {
         -DocumentPath $FileName -SourceRoots ([string[]]@($SourceRoots))
 }
 
+# Reuse an identical class only after its module/source and every line have
+# passed this validation. MAX merging is idempotent, including zero hits and
+# overlapping PDB credits. Any changed record must take the full validation path.
+$validatedClassRecords = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::Ordinal)
+$reusedClassRecords = 0
+$validatedClassCount = 0
+$coverageMergeTimer = [Diagnostics.Stopwatch]::StartNew()
 $reportFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($report in $reports) {
     $reportFiles.Add(([ordered]@{
@@ -485,14 +492,15 @@ foreach ($report in $reports) {
             -not $package.HasAttribute('name')) {
             throw "Coverage report class has no package identity: $($report.FullName)"
         }
-        if (-not $expectedAssemblyNames.Contains([string]$package.name)) {
+        $packageName = $package.GetAttribute('name')
+        if (-not $expectedAssemblyNames.Contains($packageName)) {
             continue
         }
         $hasProductionPackage = $true
         if (-not $class.HasAttribute('filename')) {
             throw "Coverage report class has no source filename: $($report.FullName)"
         }
-        $reportedFileName = ([string]$class.filename).Replace('\', '/')
+        $reportedFileName = $class.GetAttribute('filename').Replace('\', '/')
         if ($reportedFileName.Contains('/obj/', [StringComparison]::Ordinal) -or
             $reportedFileName.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
@@ -512,31 +520,38 @@ foreach ($report in $reports) {
             $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
-        $sourceKey = [string]$package.name + ':' + $relativePath
+        $sourceKey = $packageName + ':' + $relativePath
         if (-not $expectedLineHits.ContainsKey($sourceKey)) {
             throw (
                 "Coverage report source is outside the authenticated source " +
                 "universe: '$sourceKey'.")
         }
+        $classRecordKey = $sourceKey + ':' + [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($class.OuterXml)))
+        $cachedLineCount = 0
+        if ($validatedClassRecords.TryGetValue($classRecordKey, [ref]$cachedLineCount)) {
+            $reportLineCount += $cachedLineCount
+            $reusedClassRecords++
+            continue
+        }
+        $validatedClassCount++
         $fileHits = $lineHits[$sourceKey]
         $fileCredits = $permittedLineCredits[$sourceKey]
         $fileReportedHits = $reportedLineHits[$sourceKey]
         $lines = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($class.SelectNodes('.//line')))
         if ($lines.Length -gt 0) {
-            [void]$reportedModuleDocuments.Add(([string]$package.name + ':' + $relativePath))
+            [void]$reportedModuleDocuments.Add($sourceKey)
         }
         foreach ($line in $lines) {
             $number = 0
             $hits = 0
-            if (-not $line.HasAttribute('number') -or
-                -not $line.HasAttribute('hits') -or
-                -not [int]::TryParse(
-                    [string]$line.number,
+            if (-not [int]::TryParse(
+                    $line.GetAttribute('number'),
                     [Globalization.NumberStyles]::Integer,
                     [Globalization.CultureInfo]::InvariantCulture,
                     [ref]$number) -or
                 -not [int]::TryParse(
-                    [string]$line.hits,
+                    $line.GetAttribute('hits'),
                     [Globalization.NumberStyles]::Integer,
                     [Globalization.CultureInfo]::InvariantCulture,
                     [ref]$hits) -or
@@ -561,18 +576,26 @@ foreach ($report in $reports) {
                 $hits -gt $fileReportedHits[$number]) {
                 $fileReportedHits[$number] = $hits
             }
-            foreach ($credit in $credits) {
-                if ($hits -gt $fileHits[$credit]) {
-                    $fileHits[$credit] = $hits
+            # Zero records still receive full source/PDB validation and remain
+            # direct evidence. They cannot increase any nonnegative MAX value.
+            if ($hits -gt 0) {
+                foreach ($credit in $credits) {
+                    if ($hits -gt $fileHits[$credit]) {
+                        $fileHits[$credit] = $hits
+                    }
                 }
             }
             $reportLineCount++
         }
+        $validatedClassRecords.Add($classRecordKey, $lines.Length)
     }
     if ($hasProductionPackage -and $reportLineCount -eq 0) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
 }
+
+$coverageMergeTimer.Stop()
+Write-Host ('Coverage phase: name=validation-class-records elapsedMilliseconds={0} validated={1} reused={2}' -f $coverageMergeTimer.ElapsedMilliseconds, $validatedClassCount, $reusedClassRecords)
 
 $frozenHits = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::Ordinal)
 foreach ($entry in $lineHits.GetEnumerator()) {

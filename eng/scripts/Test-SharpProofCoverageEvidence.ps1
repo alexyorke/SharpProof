@@ -150,3 +150,7 @@ finally {
     [IO.Directory]::Delete($temporary, $true)
 }
 Write-Host 'Coverage evidence regressions passed: isolated project roots, collector collisions, missing attachments, and exact architecture-only receipts.'
+
+& (Join-Path $PSScriptRoot 'Test-SharpProofSemanticCoveragePlan.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-SharpProofCoverageMergeRecords.ps1')

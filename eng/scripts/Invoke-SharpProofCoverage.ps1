@@ -16,7 +16,7 @@ param(
     # every other project, plus the package tests. Shard runs leave the
     # coverage gate to a separate job.
     [Parameter()]
-    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package', 'package-0', 'package-1', 'package-2', 'package-3')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-projects', 'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-analyzer', 'semantic-projects-rest', 'semantic-extras', 'package-0', 'package-1', 'package-2', 'package-3', 'package')]
     [string]$CoveragePhase = 'all'
 )
 
@@ -157,10 +157,15 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
         $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
         $coverageTaskGroup = switch ($CoveragePhase) {
             'semantic-gates-corpus' { 'GatesCorpus' }
+            'semantic-gates-corpus-a' { 'GatesCorpusA' }
+            'semantic-gates-corpus-b' { 'GatesCorpusB' }
             'semantic-gates-shards' { 'GatesShards' }
             'semantic-worker-a' { 'WorkerA' }
             'semantic-worker-b' { 'WorkerB' }
             'semantic-projects' { 'Projects' }
+            'semantic-analyzer' { 'Analyzer' }
+            'semantic-projects-rest' { 'ProjectsRest' }
+            'semantic-extras' { 'Extras' }
             default { 'All' }
         }
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
@@ -219,7 +224,7 @@ else {
 $coverageAttributesTimer = [Diagnostics.Stopwatch]::StartNew()
 try {
     # The isolated run belongs to the semantic projects shard (or to 'all').
-    if ($CoveragePhase -in @('all', 'semantic-projects')) {
+    if ($CoveragePhase -in @('all', 'semantic-projects', 'semantic-extras')) {
         $attributesSettings = New-CoverageSettings `
             -Name 'attributes' `
             -ModulePath '.*SharpProof\.Attributes\.dll$'
@@ -256,7 +261,7 @@ finally {
 # already-built binaries.
 # Merged reports keep maximum hits, so one shard collecting this run is
 # enough; it belongs to the semantic projects shard (or to 'all').
-if ($CoveragePhase -in @('all', 'semantic-projects')) {
+if ($CoveragePhase -in @('all', 'semantic-projects', 'semantic-extras')) {
     $fuzzConsoleSettings = New-CoverageSettings `
         -Name 'fuzz-console-cancellation' `
         -ModulePath '.*SharpProof\.Fuzz\.dll$'
@@ -303,6 +308,16 @@ if ($CoveragePhase -in @('all', 'semantic-projects')) {
             -Encoding utf8NoBOM
         Remove-SharpProofOwnedDirectory -Directory $fuzzConsoleOutputRoot
     }
+}
+
+if ($CoveragePhase -in @('all', 'semantic-projects', 'semantic-extras')) {
+    Save-SharpProofCoverageCohort -Root $resolvedResultsDirectory `
+        -Expected @(
+        [pscustomobject]@{ Name = 'attributes'; Target = Join-Path $repositoryRoot 'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj' },
+        [pscustomobject]@{ Name = 'fuzz-console-cancellation'; Target = Join-Path $repositoryRoot 'src/SharpProof.Fuzz.Tests/SharpProof.Fuzz.Tests.csproj' }) `
+        -Completed @(
+        [pscustomobject]@{ Test = [pscustomobject]@{ Name = 'attributes' }; ExitCode = 0 },
+        [pscustomobject]@{ Test = [pscustomobject]@{ Name = 'fuzz-console-cancellation' }; ExitCode = 0 })
 }
 
 # The container entrypoint builds each task in a disposable clone while the

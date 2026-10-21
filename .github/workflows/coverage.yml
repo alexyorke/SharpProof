@@ -22,26 +22,25 @@ env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
-# Nine shards run on separate runners: "semantic-gates-corpus" (the Gates corpus
-# task), "semantic-gates-shards" (the Gates remainder shards),
-# "semantic-worker-a" and "semantic-worker-b" (two halves of the Worker
-# remainder shards), "semantic-projects" (every other semantic task plus the
-# isolated Attributes and Fuzz console runs), and four SHA-256 method partitions of the package tests.
-# Each uploads its own normalized Cobertura reports, coverage-authority.json,
-# and timing profile. The coverage-gate job downloads all nine, fails closed if
-# their authority evidence differs, merges the reports with the same max-hits
-# union as before, and enforces the unchanged floors, aggregate minimum, and
-# changed-TCB check.
+# Twelve shards retain the complete selection: split corpus workflows, isolate
+# Analyzer and the Attributes/Fuzz console tail, retain both Worker halves,
+# and run all remaining projects plus four package method partitions.
+# The required coverage gate authenticates every artifact, verifies the complete
+# task/case partition, and preserves independent authority, MAX merging, floors,
+# and changed-TCB enforcement.
 jobs:
   coverage-shard:
     name: coverage shard (${{ matrix.shard }})
     runs-on: ubuntu-latest
     outputs:
-      semantic-gates-corpus-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-attempt }}
+      semantic-gates-corpus-a-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-a-attempt }}
+      semantic-gates-corpus-b-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-b-attempt }}
       semantic-gates-shards-attempt: ${{ steps.shard-identity.outputs.semantic-gates-shards-attempt }}
       semantic-worker-a-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-attempt }}
       semantic-worker-b-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-attempt }}
-      semantic-projects-attempt: ${{ steps.shard-identity.outputs.semantic-projects-attempt }}
+      semantic-analyzer-attempt: ${{ steps.shard-identity.outputs.semantic-analyzer-attempt }}
+      semantic-projects-rest-attempt: ${{ steps.shard-identity.outputs.semantic-projects-rest-attempt }}
+      semantic-extras-attempt: ${{ steps.shard-identity.outputs.semantic-extras-attempt }}
       package-0-attempt: ${{ steps.shard-identity.outputs.package-0-attempt }}
       package-1-attempt: ${{ steps.shard-identity.outputs.package-1-attempt }}
       package-2-attempt: ${{ steps.shard-identity.outputs.package-2-attempt }}
@@ -50,11 +49,14 @@ jobs:
       fail-fast: false
       matrix:
         shard:
-          - semantic-gates-corpus
+          - semantic-gates-corpus-a
+          - semantic-gates-corpus-b
           - semantic-gates-shards
           - semantic-worker-a
           - semantic-worker-b
-          - semantic-projects
+          - semantic-analyzer
+          - semantic-projects-rest
+          - semantic-extras
           - package-0
           - package-1
           - package-2
@@ -152,10 +154,16 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Download semantic-gates-corpus coverage shard
+      - name: Download semantic-gates-corpus-a coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: coverage-shard-semantic-gates-corpus-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-gates-corpus-attempt }}
+          name: coverage-shard-semantic-gates-corpus-a-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-gates-corpus-a-attempt }}
+          path: artifacts
+
+      - name: Download semantic-gates-corpus-b coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-gates-corpus-b-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-gates-corpus-b-attempt }}
           path: artifacts
 
       - name: Download semantic-gates-shards coverage shard
@@ -176,31 +184,43 @@ jobs:
           name: coverage-shard-semantic-worker-b-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-b-attempt }}
           path: artifacts
 
-      - name: Download semantic-projects coverage shard
+      - name: Download semantic-analyzer coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: coverage-shard-semantic-projects-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-projects-attempt }}
+          name: coverage-shard-semantic-analyzer-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-analyzer-attempt }}
           path: artifacts
 
-      - name: Download package coverage partition 0
+      - name: Download semantic-projects-rest coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-projects-rest-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-projects-rest-attempt }}
+          path: artifacts
+
+      - name: Download semantic-extras coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-extras-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-extras-attempt }}
+          path: artifacts
+
+      - name: Download package-0 coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-shard-package-0-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-0-attempt }}
           path: artifacts
 
-      - name: Download package coverage partition 1
+      - name: Download package-1 coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-shard-package-1-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-1-attempt }}
           path: artifacts
 
-      - name: Download package coverage partition 2
+      - name: Download package-2 coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-shard-package-2-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-2-attempt }}
           path: artifacts
 
-      - name: Download package coverage partition 3
+      - name: Download package-3 coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-shard-package-3-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-3-attempt }}

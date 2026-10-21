@@ -127,7 +127,7 @@ function Assert-SharpProofHistoricalCaseAliases {
 }
 
 function Read-SharpProofCanonicalDiscovery {
-    param([string]$Root)
+    param([string]$Root, [string[]]$ExcludedCategories = @('Performance', 'Coverage', 'Corpus'))
 
     $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $ids = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
@@ -145,7 +145,7 @@ function Read-SharpProofCanonicalDiscovery {
             if (-not $selectedNames.Contains($name)) { continue }
             $categories = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') |
                         ForEach-Object { [string]$_.value }))
-            if (@($categories | Where-Object { $_ -in @('Performance', 'Coverage', 'Corpus') }).Count) { continue }
+            if (@($categories | Where-Object { $_ -in $ExcludedCategories }).Count) { continue }
             $id = [string]$test.id
             if ([string]::IsNullOrWhiteSpace($id) -or -not $ids.Add($assembly + '|' + $id)) {
                 throw 'Actual NUnit discovery has an absent or duplicated per-case identity.'
