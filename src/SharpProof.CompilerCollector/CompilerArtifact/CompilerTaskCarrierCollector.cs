@@ -6,6 +6,18 @@ using System.Reflection.PortableExecutable;
 
 namespace SharpProof.CompilerArtifact;
 
+internal sealed record CompilerTaskCallbackForwarder(int MethodToken, int ChildMethodToken);
+internal sealed record CompilerTaskCallbackActivation(string RootCallableId, string ModuleSha256,
+    ImmutableArray<CompilerTaskCallbackForwarder> Forwarders)
+{
+    public string RootCallableId { get; init; } = ArgumentNullGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string ModuleSha256 { get; init; } = ArgumentNullGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
+    public ImmutableArray<CompilerTaskCallbackForwarder> Forwarders { get; init; } = Forwarders.IsDefault
+        ? throw new ArgumentException("Forwarders must be initialized.", nameof(Forwarders)) : Forwarders;
+    internal int WrapperActivationsUpper => Forwarders.IsEmpty ? 0 : 1;
+}
+internal sealed record CompilerTaskCallbackActivationCapture(CompilerTaskCallbackActivation? Activations, string? UnknownReason);
+
 // Import private generated fields from a real emission. This metadata is source
 // evidence; it supplies neither a physical layout nor an allocation verdict.
 internal sealed class CompilerTaskCarrierCollector
@@ -20,6 +32,136 @@ internal sealed class CompilerTaskCarrierCollector
 
     internal CompilerTaskCarrierCollector(CSharpCompilation compilation)
     { _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation)); }
+
+    internal CompilerTaskCallbackActivationCapture CaptureCallbackActivations(IMethodSymbol method, string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var capture = Capture(method, callableId, cancellation);
+        if (capture.Shapes is not { } shapes)
+        { return new(null, capture.UnknownReason); }
+        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+        var targets = ImmutableHashSet.CreateBuilder<int>();
+        foreach (var invocation in plan.Children)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var child = invocation.TargetMethod;
+            var imported = _assembly!.GetTypeByMetadataName(MetadataName(child.ContainingType));
+            var candidates = imported?.GetMembers(child.MetadataName).OfType<IMethodSymbol>().Where(candidate =>
+                candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.IsStatic && candidate.ReturnsVoid &&
+                candidate.Arity == 0 && candidate.Parameters.Length == child.Parameters.Length && candidate.Parameters.All(static parameter =>
+                    parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind == RefKind.None &&
+                    parameter.Type.SpecialType == SpecialType.System_Int32)).ToArray();
+            if (candidates is not { Length: 1 })
+            { return new(null, "TaskCallbackSourceTargetUnavailable"); }
+            targets.Add(candidates[0].MetadataToken);
+        }
+        var forwarders = ImmutableArray.CreateBuilder<CompilerTaskCallbackForwarder>();
+        var pending = new Stack<INamedTypeSymbol>();
+        pending.Push(_assembly!.GetTypeByMetadataName(MetadataName(method.ContainingType))!);
+        try
+        {
+            using var stream = new MemoryStream(_image!, false);
+            using var image = new PEReader(stream);
+            var metadata = image.GetMetadataReader();
+            while (pending.Count != 0)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var current = pending.Pop();
+                foreach (var nested in current.GetTypeMembers())
+                { pending.Push(nested); }
+                foreach (var callback in current.GetMembers().OfType<IMethodSymbol>())
+                {
+                    if (!callback.MetadataName.StartsWith("<" + method.MetadataName + ">b__", StringComparison.Ordinal))
+                    { continue; }
+                    var handle = (MethodDefinitionHandle)MetadataTokens.EntityHandle(callback.MetadataToken);
+                    var body = image.GetMethodBody(metadata.GetMethodDefinition(handle).RelativeVirtualAddress);
+                    var check = ValidateCallbackForwarder(body, targets.ToImmutable(), cancellation);
+                    if (check.Target is not { } target)
+                    { return new(null, check.UnknownReason); }
+                    forwarders.Add(new(callback.MetadataToken, target));
+                }
+            }
+            // Capture already bounded the same immutable metadata traversal.
+            if (forwarders.Count != shapes.MatchedCallbacks)
+            { return new(null, "TaskCallbackForwarderCoverageIncomplete"); }
+            return new(new(callableId, shapes.ModuleSha256, forwarders.ToImmutable()), null);
+        }
+        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
+        { return new(null, "TaskCallbackForwarderEmissionInvalid"); }
+    }
+
+    // Counts compiler-owned wrapper activations only. CLR helpers, source-child
+    // activations and exception trace frame enumeration are separate obligations.
+    internal static (int? Target, string? UnknownReason) ValidateCallbackForwarder(MethodBodyBlock body,
+        ImmutableHashSet<int> targets, CancellationToken cancellation)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        targets = ArgumentNullGuard.NotNull(targets, nameof(targets));
+        cancellation.ThrowIfCancellationRequested();
+        if (targets.Count is < 1 or > ResourceForkJoinPlan.MaximumChildren ||
+            targets.Any(static token => token >> 24 != 6 || (token & 0x00ffffff) == 0))
+        { return (null, "TaskCallbackForwarderTargetUnavailable"); }
+        var code = body.GetILBytes();
+        if (!body.ExceptionRegions.IsEmpty || code is null || code.Length > 4096)
+        { return (null, "TaskCallbackForwarderBodyUnsupported"); }
+        int? target = null;
+        var cursor = 0;
+        while (cursor < code.Length)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
+            { return (null, "TaskCallbackForwarderBodyUnsupported"); }
+            switch (instruction.RawCode)
+            {
+                case "Call":
+                    var called = checked((int)instruction.Operand);
+                    if (target is not null || !targets.Contains(called))
+                    { return (null, "TaskCallbackForwarderCallUnsupported"); }
+                    target = called;
+                    break;
+                case "Ret":
+                    return cursor == code.Length && target is not null ? (target, null) : (null, "TaskCallbackForwarderBodyUnsupported");
+                case "Br":
+                case "Br_s":
+                    if (instruction.TargetByteOffset <= instruction.Offset || instruction.TargetByteOffset >= code.Length)
+                    { return (null, "TaskCallbackForwarderBodyUnsupported"); }
+                    break;
+                case "Nop":
+                case "Ldarg_0":
+                case "Ldfld":
+                case "Ldc_i4":
+                case "Ldc_i4_s":
+                case "Ldc_i4_m1":
+                case "Ldc_i4_0":
+                case "Ldc_i4_1":
+                case "Ldc_i4_2":
+                case "Ldc_i4_3":
+                case "Ldc_i4_4":
+                case "Ldc_i4_5":
+                case "Ldc_i4_6":
+                case "Ldc_i4_7":
+                case "Ldc_i4_8":
+                case "Ldloc":
+                case "Ldloc_s":
+                case "Ldloc_0":
+                case "Ldloc_1":
+                case "Ldloc_2":
+                case "Ldloc_3":
+                case "Stloc":
+                case "Stloc_s":
+                case "Stloc_0":
+                case "Stloc_1":
+                case "Stloc_2":
+                case "Stloc_3":
+                    break;
+                default:
+                    return (null, "TaskCallbackForwarderBodyUnsupported");
+            }
+        }
+        return (null, "TaskCallbackForwarderBodyUnsupported");
+    }
 
     internal CompilerTaskRootExceptionBoundaryCapture CaptureExceptionBoundary(IMethodSymbol method, string callableId, CancellationToken cancellation)
     {

@@ -15,6 +15,126 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, true)]
+    public void CallbackWrapperActivationComesFromTheSameEmittedModule(OptimizationLevel optimization, bool configured)
+    {
+        var (compilation, method, _, _) = Compile(configured, optimization);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var capture = collector.CaptureCallbackActivations(method, "root", cancellation);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Activations, Is.Not.Null);
+        var activations = capture.Activations!;
+        Assert.That(activations.RootCallableId, Is.EqualTo("root"));
+        Assert.That(activations.ModuleSha256, Is.EqualTo(collector.Capture(method, "root", cancellation).Shapes!.ModuleSha256));
+        Assert.That(activations.Forwarders, Has.Length.EqualTo(2));
+        Assert.That(activations.WrapperActivationsUpper, Is.EqualTo(1));
+        foreach (var forwarder in activations.Forwarders)
+        {
+            Assert.That(forwarder.MethodToken >> 24, Is.EqualTo(6));
+            Assert.That(forwarder.ChildMethodToken >> 24, Is.EqualTo(6));
+            Assert.That(forwarder.MethodToken, Is.Not.EqualTo(forwarder.ChildMethodToken));
+        }
+        var repeated = collector.CaptureCallbackActivations(method, "root", cancellation).Activations!;
+        Assert.That(repeated.ModuleSha256, Is.EqualTo(activations.ModuleSha256));
+        Assert.That(repeated.Forwarders.ToArray(), Is.EqualTo(activations.Forwarders.ToArray()));
+    }
+
+    [Test]
+    public void CallbackActivationCaptureRejectsUnsupportedRootsAndHonorsCancellation()
+    {
+        var (compilation, method, _, _) = Compile(false, OptimizationLevel.Release);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var capture = collector.CaptureCallbackActivations(method, " ", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.Activations, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskCarrierRootUnsupported"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () => { _ = collector.CaptureCallbackActivations(method, "root", cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [TestCase(-1)]
+    [TestCase(0)]
+    [TestCase(7)]
+    [TestCase(8)]
+    [TestCase(9)]
+    [TestCase(128)]
+    [TestCase(int.MinValue)]
+    [TestCase(int.MaxValue)]
+    public void ConstantOnlyCallbacksHaveOneWrapperActivation(int value)
+    {
+        var literal = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var source = "using System.Threading.Tasks; public static class C {public static Task Root() => " +
+            "Task.WhenAll(Task.Run(()=>Child(" + literal + ")),Task.Run(()=>Child(" + literal + "))); static void Child(int n) {} }";
+        var compilation = TestCompilation.Create("ConstantCallback", [("Subject.cs", source)]);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var capture = new CompilerTaskCarrierCollector(compilation).CaptureCallbackActivations(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Activations!.WrapperActivationsUpper, Is.EqualTo(1));
+        Assert.That(capture.Activations.Forwarders, Has.Length.EqualTo(2));
+    }
+
+    [TestCase(OptimizationLevel.Debug)]
+    [TestCase(OptimizationLevel.Release)]
+    public void NamedArgumentCallbacksKeepTheirOwnedForwardTarget(OptimizationLevel optimization)
+    {
+        const string source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Child(right:3,left:n)),Task.Run(()=>Child(right:n,left:-128))); static void Child(int left,int right) {} }";
+        var initial = TestCompilation.Create("NamedCallback", [("Subject.cs", source)]);
+        var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var capture = new CompilerTaskCarrierCollector(compilation).CaptureCallbackActivations(method, "root", TestContext.CurrentContext.CancellationToken);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Activations!.Forwarders, Has.Length.EqualTo(2));
+        Assert.That(capture.Activations.WrapperActivationsUpper, Is.EqualTo(1));
+    }
+
+    [TestCase("public static void Probe() {Child(3);}", null)]
+    [TestCase("public static void Probe() {}", "TaskCallbackForwarderBodyUnsupported")]
+    [TestCase("public static void Probe() {Child(3);Child(4);}", "TaskCallbackForwarderCallUnsupported")]
+    [TestCase("public static void Probe() {Console.WriteLine();}", "TaskCallbackForwarderCallUnsupported")]
+    [TestCase("public static void Probe() {try {Child(3);} catch(Exception) {}}", "TaskCallbackForwarderBodyUnsupported")]
+    [TestCase("public static void Probe() {new object();Child(3);}", "TaskCallbackForwarderBodyUnsupported")]
+    [TestCase("public static void Probe() {again: Child(3);goto again;}", "TaskCallbackForwarderBodyUnsupported")]
+    public void CallbackBodyValidationRequiresOneOwnedForwardCall(string declaration, string? expected)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        var result = ValidateForwarderProbe(declaration);
+        Assert.That(result.UnknownReason, Is.EqualTo(expected));
+        Assert.That(result.Target.HasValue, Is.EqualTo(expected is null));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CallbackBodyValidationRejectsUnavailableTargetSets(bool invalidToken)
+    {
+        var result = ValidateForwarderProbe("public static void Probe() {Child(3);}", invalidToken ? 2 : 1);
+        Assert.That(result.Target, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskCallbackForwarderTargetUnavailable"));
+    }
+
+    private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        var compilation = TestCompilation.Create("ForwarderBodyControl", [("Subject.cs",
+            "using System; public static class C {" + declaration + " static void Child(int n) {} }")]);
+        using var stream = new MemoryStream();
+        Assert.That(compilation.Emit(stream, cancellationToken: TestContext.CurrentContext.CancellationToken).Success, Is.True);
+        stream.Position = 0;
+        using var image = new PEReader(stream);
+        var metadata = image.GetMetadataReader();
+        var probe = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition).Single(value => metadata.GetString(value.Name) == "Probe");
+        var child = metadata.MethodDefinitions.Single(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name) == "Child");
+        var targets = targetMutation == 1 ? ImmutableHashSet<int>.Empty :
+            ImmutableHashSet.Create(targetMutation == 2 ? 0x0a000001 : System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(child));
+        return CompilerTaskCarrierCollector.ValidateCallbackForwarder(image.GetMethodBody(probe.RelativeVirtualAddress), targets,
+            TestContext.CurrentContext.CancellationToken);
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]

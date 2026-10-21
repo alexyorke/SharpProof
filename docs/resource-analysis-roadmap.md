@@ -109,6 +109,47 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Emitted callback forwarding activations
+
+A collector-only fact now checks generated callback forwarding bodies against
+the emitted method tokens of the root plan's owned source children. Admission
+requires no handlers, no backward branches, one owned direct call and a final
+return. Only argument/constant/field/local loads and stores, no-ops and forward
+branches are admitted around that call. Calls to other targets, multiple calls,
+allocations, handlers and unsupported bodies return Unknown without an activation
+record. The fact retains root/module identity and every checked wrapper/child
+method-token pair from the same cached emission.
+
+The upper bound is one wrapper activation per entered forwarding call, excluding
+its callee. Source-child activations, indirect reentry, runtime helpers and trace
+frame enumeration remain separate obligations. The fact is not transported or
+consumed by native root composition yet and changes no public verdict or cache
+identity. It does not complete the CLR/helper-frame bridge.
+
+Controls cover Debug/Release and synchronous/configured roots, repeated capture
+with the same module identity, constant operands, named argument order, target
+ownership, unsupported bodies and cancellation. The first build caught a
+constant instance-property style error; the bound now derives zero/one from the
+forwarder set. IL opcode names were aligned with the decoder's ECMA names before
+the corrected targeted run. All 180 targeted carrier/parser cases passed with
+zero build warnings or errors: `artifacts/resource-callback-activation-tests-final.log`.
+Full quality/API and documentation checks passed:
+`artifacts/resource-callback-activation-lint.log` and
+`artifacts/resource-callback-activation-docs.log`. Canonical private formatting
+copied zero changes: `artifacts/resource-callback-activation-format-final.log`.
+All 754 broader resource-contract and projection cases passed with zero build
+warnings or errors: `artifacts/resource-callback-activation-workflows.log`.
+
+Published `e3a21d9a7` completed all six coverage shards in run 39565332287, but
+aggregation failed while rebuilding the package-preparation image: the pinned
+xz-utils `5.6.1+really5.4.5-1ubuntu0.3` was absent from the current Ubuntu indexes.
+No aggregate report was produced. Evidence: `artifacts/resource-e3a21-coverage-failure.log`.
+A canonical-container probe using temporary APT state found
+`5.6.1+really5.4.5-1ubuntu0.4` in noble-updates and noble-security:
+`artifacts/resource-xz-package-probe-final.log`. Repair and qualification of the
+pin remain pending. The last complete coverage report remains 96.93% with 204
+gaps; this failed aggregation does not supersede it.
+
 ### Direct emitted-boundary rejection controls
 
 The emitted-body checks now have a shared internal validator. Capture still
