@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -24,7 +24,7 @@ param(
 
     # CI runs the Remaining cohort's Worker remainder shards and its other
     # tasks on separate runners; the cohort gate requires both parts.
-    [ValidateSet('All', 'Worker', 'Projects')]
+    [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerB', 'Projects')]
     [string]$TaskGroup = 'All',
 
     [string]$TestResultsDirectory = '',
@@ -123,7 +123,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility') -and
     -not $NoBuild -and -not $Fast) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -695,6 +695,11 @@ switch ($Command) {
             }).AsReadOnly()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `
             'Coverage shard collection failed.' $coverageShardArguments
+    }
+    'package-reproducibility' {
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproduciblePackages.ps1' `
+            'Independent-path package reproduction failed.' `
+        ([ordered]@{ Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility' }).AsReadOnly()
     }
     'package-partition-gate' {
         . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')

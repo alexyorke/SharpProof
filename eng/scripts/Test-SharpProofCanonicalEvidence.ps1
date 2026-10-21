@@ -63,6 +63,24 @@ try {
         Assert-CanonicalFailure { Read-SharpProofCanonicalDiscovery -Root $fixture } 'Actual NUnit discovery has an absent or duplicated per-case identity.'
     }
     finally { [IO.File]::WriteAllText($dumpPath, $validDump) }
+    $partsRoot = Join-Path $fixture 'parts'
+    [IO.Directory]::CreateDirectory($partsRoot) | Out-Null
+    foreach ($partName in @('worker-a', 'worker-b', 'projects')) {
+        ([ordered]@{
+            schemaVersion = 1; commit = 'commit'; tree = 'tree'; runId = 'run'; runAttempt = '1'
+            cohort = 'Remaining'; configuration = 'Release'; filter = 'filter'; projects = @('project')
+            expectedTasks = @($partName); completedTasks = @($partName); completed = @()
+            discovered = @($partName); discoveredCases = @(); cases = @()
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partsRoot "canonical-cohort.$partName.json") -Encoding utf8NoBOM
+    }
+    $merged = Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot
+    if (($merged.expectedTasks -join ',') -cne 'projects,worker-a,worker-b' -or $merged.discovered.Count -ne 3) {
+        throw 'Three-part canonical receipt merging lost a Worker half or the Projects cohort.'
+    }
+    $partPath = Join-Path $partsRoot 'canonical-cohort.worker-b.json'
+    $validPart = Get-Content -LiteralPath $partPath -Raw
+    $validPart.Replace('"commit": "commit"', '"commit": "other"') | Set-Content -LiteralPath $partPath
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot } 'Canonical cohort parts differ in their run, source, or selection.'
     Write-Host 'Canonical evidence regressions passed: deterministic ordering, encoded collisions, name multiplicity, missing definitions and duplicate execution/discovery identities.'
 }
 finally {

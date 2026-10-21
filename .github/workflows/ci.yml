@@ -23,10 +23,10 @@ jobs:
   repository-quality:
     uses: ./.github/workflows/quality.yml
 
-  # The Remaining cohort saturates a four-CPU runner, so it runs as two parts on
-  # separate runners: "worker" (the Worker remainder shards) and "projects"
-  # (every other Remaining task). Each part builds the full solution with
-  # analyzers. build-and-test merges both parts' receipts and evidence.
+  # The Remaining cohort saturates a four-CPU runner, so it runs as three parts on
+  # separate runners: "worker-a" and "worker-b" reuse the coverage halves;
+  # "projects" runs every other Remaining task. Every part builds the full
+  # solution with analyzers; build-and-test reconciles all three receipts.
   canonical-main:
     name: canonical-main (${{ matrix.part }})
     if: github.event_name != 'schedule'
@@ -35,8 +35,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - part: worker
-            task-group: Worker
+          - part: worker-a
+            task-group: WorkerA
+          - part: worker-b
+            task-group: WorkerB
           - part: projects
             task-group: Projects
     steps:
@@ -343,9 +345,7 @@ jobs:
         id: package-reproducibility
         if: ${{ !cancelled() }}
         run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReproduciblePackages.ps1
-          -Scope Full -OutputDirectory artifacts/reproducibility'
+          docker compose run --rm tooling package-reproducibility -Configuration Release
 
       - name: Summarize managed payload and raw ZIP comparisons separately
         if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
@@ -432,11 +432,17 @@ jobs:
             "PowerShell $(jq -r .powershell.version eng/container/toolchain.json)"
           echo "SHARPPROOF_PWSH=${root}/pwsh" >> "${GITHUB_ENV}"
 
-      - name: Download non-Gates cohort Worker part evidence
+      - name: Download non-Gates cohort Worker A part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-main-worker-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/canonical-cohorts/remaining-worker-evidence
+          name: canonical-main-worker-a-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/remaining-worker-a-evidence
+
+      - name: Download non-Gates cohort Worker B part evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-main-worker-b-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/remaining-worker-b-evidence
 
       - name: Download non-Gates cohort Projects part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -450,19 +456,19 @@ jobs:
           name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/canonical-cohorts/gates-evidence
 
-      # The two Remaining parts hold disjoint task directories. Each keeps its
+      # The three Remaining parts hold disjoint task directories. Each keeps its
       # receipt as canonical-cohort.<part>.json, and the gate merges them.
       - name: Reconcile actual discovery and TRX identities
         run: |
           set -euo pipefail
           remaining=artifacts/canonical-cohorts/remaining
           mkdir -p "${remaining}"
-          for part in worker projects; do
+          for part in worker-a worker-b projects; do
             source="artifacts/canonical-cohorts/remaining-${part}-evidence/canonical-remaining"
             mv "${source}/canonical-cohort.json" "${remaining}/canonical-cohort.${part}.json"
             for task in "${source}"/*/; do
               if [[ -e "${remaining}/$(basename "${task}")" ]]; then
-                echo "Both Remaining parts ran task $(basename "${task}")." >&2
+                echo "Multiple Remaining parts ran task $(basename "${task}")." >&2
                 exit 1
               fi
               mv "${task}" "${remaining}/"

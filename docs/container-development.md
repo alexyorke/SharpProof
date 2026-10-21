@@ -66,6 +66,7 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `pr` | Release `pr-gates` profile |
 | `pr-gates` | `repository-gates`, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
 | `repository-gates` | Source-only `pr-gates` checks: documentation, container contract, repository layout, package and release regressions, public API governance |
+| `package-reproducibility` | Run Full independent-path reproduction in a clean private workspace and export the report |
 | `self-apply` | Apply packaged analysis to the source project set and samples |
 | `samples` | Package-backed sample matrix; packs a feed if none is supplied |
 | `pack` | Clean exact-commit package graph build and validation |
@@ -94,7 +95,7 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates`, `-TaskGroup All|Worker|Projects`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` and `-SkipRepositoryGates` are supported only by `pr` and `pr-gates`, for CI runs that execute the package phase or the repository gates in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. `self-apply -SelfApplicationPhase All|Sources|Samples` defaults to `All`. `package-tests -PackagePartitionCount 4 -PackagePartition 0..3` runs one method partition; the default count of one retains a complete local run. `package-partition-gate` reconciles all four retained partitions. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates`, `-TaskGroup All|Worker|WorkerA|WorkerB|Projects`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` and `-SkipRepositoryGates` are supported only by `pr` and `pr-gates`, for CI runs that execute the package phase or the repository gates in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. `self-apply -SelfApplicationPhase All|Sources|Samples` defaults to `All`. `package-tests -PackagePartitionCount 4 -PackagePartition 0..3` runs one method partition; the default count of one retains a complete local run. `package-partition-gate` reconciles all four retained partitions. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
 
 After packing clean source, test the exported package bytes:
 

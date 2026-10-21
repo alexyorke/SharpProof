@@ -29,8 +29,8 @@ param(
     # CI spreads the semantic tasks across runners. Coverage uses GatesCorpus
     # (the Gates corpus task), GatesShards (the Gates remainder shards),
     # WorkerA and WorkerB (two halves of the Worker remainder shards), and
-    # Projects (every other task). The canonical Remaining cohort uses Worker
-    # (every Worker remainder shard) and Projects. All keeps the single-runner
+    # Projects (every other task). The canonical Remaining cohort also supports
+    # WorkerA and WorkerB, or Worker for both halves. All keeps the single-runner
     # task set.
     [ValidateSet('All', 'GatesCorpus', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'Projects')]
     [string]$TaskGroup = 'All'
@@ -108,8 +108,8 @@ if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
     throw 'Separate Attributes collection requires coverage collection.'
 }
 if ($TaskGroup -ne 'All' -and -not $coverageEnabled -and
-    ($SemanticCohort -ne 'Remaining' -or $TaskGroup -notin @('Worker', 'Projects'))) {
-    throw 'Without coverage, task groups select only Worker or Projects of the Remaining cohort.'
+    ($SemanticCohort -ne 'Remaining' -or $TaskGroup -notin @('Worker', 'WorkerA', 'WorkerB', 'Projects'))) {
+    throw 'Without coverage, task groups select only Worker, WorkerA, WorkerB, or Projects of the Remaining cohort.'
 }
 if ($coverageEnabled -and $TaskGroup -eq 'Worker') {
     throw 'Coverage selects the Worker remainder shards as WorkerA and WorkerB.'
