@@ -223,20 +223,7 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(expression)); }
             if (converted is null)
             { throw new ArgumentNullException(nameof(converted)); }
-            var literal = expression;
-            while (true)
-            {
-                if (literal is ParenthesizedExpressionSyntax parentheses)
-                { literal = parentheses.Expression; }
-                else if (literal is PostfixUnaryExpressionSyntax suppressed && suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-                { literal = suppressed.Operand; }
-                else
-                { break; }
-            }
-            if (!literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression))
-            { return null; }
-            if (!converted.IsReferenceType && converted is not (IPointerTypeSymbol or IFunctionPointerTypeSymbol)
-                && converted is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            if (!IsNullLiteralConversion(expression, converted))
             { return null; }
             ExpressionSyntax site = expression;
             while (true)
@@ -276,6 +263,37 @@ public static partial class Inference
             };
             if (referenceKind != RefKind.None)
             { return null; }
+            return NullLiteralShape(converted);
+        }
+
+        private static bool IsNullLiteralConversion(ExpressionSyntax expression, ITypeSymbol converted)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (converted is null)
+            { throw new ArgumentNullException(nameof(converted)); }
+            var literal = expression;
+            while (true)
+            {
+                if (literal is ParenthesizedExpressionSyntax parentheses)
+                { literal = parentheses.Expression; }
+                else if (literal is PostfixUnaryExpressionSyntax suppressed && suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { literal = suppressed.Operand; }
+                else
+                { break; }
+            }
+            if (!literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression))
+            { return false; }
+            if (!converted.IsReferenceType && converted is not (IPointerTypeSymbol or IFunctionPointerTypeSymbol)
+                && converted is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            { return false; }
+            return true;
+        }
+
+        private HmType NullLiteralShape(ITypeSymbol converted)
+        {
+            if (converted is null)
+            { throw new ArgumentNullException(nameof(converted)); }
             var inferred = CSharpTypes.Erase(converted);
             var core = ConversionCore(inferred);
             if (converted.IsReferenceType && core.IsVariable)
@@ -600,6 +618,13 @@ public static partial class Inference
                 throw new InferenceException("Unresolved coalescing expression.");
             }
             var left = Expression(expression.Left).Root;
+            var resultType = model.GetTypeInfo(expression, cancellationToken).Type ?? operation.Type;
+            if (resultType is not null && IsNullLiteralConversion(expression.Right, resultType))
+            {
+                var result = NullLiteralShape(resultType);
+                HmType.Unify(ConversionCore(left), ConversionCore(result));
+                return result;
+            }
             while (left.Name == CSharpTypes.NullableParameter && left.Arguments[0].Root.Name is CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter)
             { left = left.Arguments[0].Root; }
             if (!operation.ValueConversion.IsIdentity || left.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue or CSharpTypes.NullableParameter))
@@ -628,6 +653,12 @@ public static partial class Inference
             var targetType = model.GetTypeInfo(expression.Left, cancellationToken).Type!;
             var sourceType = model.GetTypeInfo(expression.Right, cancellationToken).Type;
             var resultType = model.GetTypeInfo(expression, cancellationToken).Type!;
+            if (IsNullLiteralConversion(expression.Right, resultType))
+            {
+                var result = NullLiteralShape(resultType);
+                HmType.Unify(ConversionCore(target), ConversionCore(result));
+                return result;
+            }
             var underlying = targetType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
                 ? nullable.TypeArguments[0] : targetType;
             if (target.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue) || sourceType is null

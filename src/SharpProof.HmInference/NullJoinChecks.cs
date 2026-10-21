@@ -9,6 +9,37 @@ internal static class NullJoinChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("CoalesceNullReference", "static object? M(object? value,int tag)=>value??null;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceDefaultReference", "static object? M(object? value,int tag)=>value??default;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceNullValue", "static int? M(int? value,int tag)=>value??null;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
+            ("CoalesceAssignNullReference", "static object? M(object? value,int tag)=>value??=null;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceAssignDefaultReference", "static object? M(object? value,int tag)=>value??=default;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceAssignNullValue", "static int? M(int? value,int tag)=>value??=null;", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
+            ("CoalesceAssignScalarDefaultRetainsEndpoint", "static int? M(int? value,int tag)=>value??=default;", "int? M<T1>(int? value, T1 tag)"),
+            ("CoalesceScalarDefaultRetainsEndpoint", "static int M(int? value,int tag)=>value??default;", "int M<T1>(int? value, T1 tag)"),
+            ("CoalesceTypedDefaultRetainsEndpoint", "static object? M(object? value,int tag)=>value??default(object);", "object? M<T1>(object? value, T1 tag)"),
+            ("CoalesceTypedNullRetainsEndpoint", "static object? M(object? value,int tag)=>value??(object?)null;", "object? M<T1>(object? value, T1 tag)"),
+            ("CoalesceNullArray", "static object[]? M(object[]? value,int tag)=>value??null;", "T1[]? M<T1, T2>(T1[]? value, T2 tag)"),
+            ("CoalesceDefaultList", "static List<int>? M(List<int>? value,int tag)=>value??default;", "global::System.Collections.Generic.List<T1>? M<T1, T2>(global::System.Collections.Generic.List<T1>? value, T2 tag)"),
+            ("CoalesceNullDelegate", "static Func<object>? M(Func<object>? value,int tag)=>value??null;", "global::System.Func<T1>? M<T1, T2>(global::System.Func<T1>? value, T2 tag)"),
+            ("CoalesceNullNullableTuple", "static (object text,int number)? M((object text,int number)? value,int tag)=>value??null;", "(T1 text, T2 number)? M<T1, T2, T3>((T1 text, T2 number)? value, T3 tag)"),
+            ("CoalesceNullTupleComponent", "static (object? text,int number) M(object? value,int number,int tag)=>(value??null,number);", "(T1? text, T2 number) M<T1, T2, T3>(T1? value, T2 number, T3 tag) where T1 : class"),
+            ("CoalesceNullAwaitReference", "static async Task<object?> M(Task<object?> value,int tag)=>(await value)??null;", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : class"),
+            ("CoalesceNullAwaitValue", "static async ValueTask<int?> M(ValueTask<int?> value,int tag)=>(await value)??null;", "global::System.Threading.Tasks.ValueTask<T1?> M<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 tag) where T1 : struct"),
+            ("CoalesceNullChain", "static object? M(object? value,object? fallback,int tag)=>value??fallback??null;", "T1? M<T1, T2>(T1? value, T1? fallback, T2 tag) where T1 : class"),
+            ("CoalesceNullNonNullableReference", "static object? M(object value,int tag)=>value??null;", "T1? M<T1, T2>(T1 value, T2 tag) where T1 : class"),
+            ("CoalesceSuppressedNullReference", "static object? M(object? value,int tag)=>value??(null!);", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceAssignNullArray", "static object[]? M(object[]? value,int tag)=>value??=null;", "T1[]? M<T1, T2>(T1[]? value, T2 tag)"),
+            ("CoalesceAssignDefaultList", "static List<int>? M(List<int>? value,int tag)=>value??=default;", "global::System.Collections.Generic.List<T1>? M<T1, T2>(global::System.Collections.Generic.List<T1>? value, T2 tag)"),
+            ("CoalesceAssignNullTuple", "static (object text,int number)? M((object text,int number)? value,int tag)=>value??=null;", "(T1 text, T2 number)? M<T1, T2, T3>((T1 text, T2 number)? value, T3 tag)"),
+            ("CoalesceAsyncAssignReference", "static async Task<object?> M(object? value,int tag){await Task.Yield();return value??=null;}", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceAsyncAssignValue", "static async ValueTask<int?> M(int? value,int tag){await Task.Yield();return value??=null;}", "global::System.Threading.Tasks.ValueTask<T1?> M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
+            ("CoalesceNullTaskValue", "static async Task<int?> M(Task<int?> value,int tag)=>(await value)??null;", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : struct"),
+            ("CoalesceNullValueTaskReference", "static async ValueTask<object?> M(ValueTask<object?> value,int tag)=>(await value)??null;", "global::System.Threading.Tasks.ValueTask<T1?> M<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 tag) where T1 : class"),
+            ("CoalesceAssignNullReferenceFlow", "static object? M(object? value,int tag){value??=null;return value;}", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceAssignNullValueFlow", "static int? M(int? value,int tag){value??=null;return value;}", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
+            ("CoalesceNullFixedLocalReturn", "static object? M(object? value,int tag){object? Local()=>value??null;return Local();}", "object? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("CoalesceNullFixedLambdaReturn", "static object? M(object? value,int tag){Func<object?> callback=()=>value??null;return callback();}", "object? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
             ("RecursiveNullReferenceReturns", "static object? M(int depth,object value,int tag){if(depth==0)return null;if(depth==1)return value;return M(depth-1,value,tag);}", "T1? M<T1, T2>(int depth, T1 value, T2 tag) where T1 : class"),
             ("RecursiveNullValueReturns", "static int? M(int depth,int value,int tag){if(depth==0)return null;if(depth==1)return value;return M(depth-1,value,tag);}", "T1? M<T1, T2>(int depth, T1 value, T2 tag) where T1 : struct"),
             ("RecursiveNullArrayReturns", "static object[]? M(int depth,object[] value,int tag){if(depth==0)return null;if(depth==1)return value;return M(depth-1,value,tag);}", "T1[]? M<T1, T2>(int depth, T1[] value, T2 tag)"),
@@ -47,6 +78,7 @@ internal static class NullJoinChecks
             ("RootNullPointer", "static unsafe int* M(bool flag,int* value,int tag){if(flag)return value;return null;}", "T1* M<T1, T2>(bool flag, T1* value, T2 tag) where T1 : unmanaged"),
             ("RootNullFunctionPointer", "static unsafe delegate*<int,int> M(bool flag,delegate*<int,int> value,int tag){if(flag)return value;return null;}", "delegate*<T1, T2> M<T1, T2, T3>(bool flag, delegate*<T1, T2> value, T3 tag)")
         ];
+        var failures = new List<string>();
         foreach (var test in tests)
         {
             var tree = CSharpSyntaxTree.ParseText("#nullable enable\nusing System;using System.Collections.Generic;using System.Threading.Tasks;class Cases{" + test.Source + "}", cancellationToken: cancellationToken);
@@ -58,9 +90,11 @@ internal static class NullJoinChecks
             var result = Program.Results(compilation, cancellationToken).Single(candidate =>
             { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == "M"; });
             if (result.Signature != test.Signature || result.Status != "Suggestion")
-            { throw new InvalidOperationException(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
+            { failures.Add(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); continue; }
             Program.Log.Info("PASS " + test.Name);
         }
+        if (failures.Count != 0)
+        { throw new InvalidOperationException(string.Join("\n", failures)); }
         return tests.Length;
     }
 }

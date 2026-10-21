@@ -21,6 +21,25 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 public static class NullJoinConsumer{
+public static object? CoalesceReference(object? value,int tag)=>value??null;
+public static object? CoalesceReferenceDefault(object? value,int tag)=>value??default;
+public static int? CoalesceValue(int? value,int tag)=>value??null;
+public static object? CoalesceAssignReference(object? value,int tag)=>value??=null;
+public static int? CoalesceAssignValue(int? value,int tag)=>value??=null;
+public static object[]? CoalesceArray(object[]? value,int tag)=>value??null;
+public static List<int>? CoalesceList(List<int>? value,int tag)=>value??=default;
+public static Func<object>? CoalesceDelegate(Func<object>? value,int tag)=>value??null;
+public static (object text,int number)? CoalescePair((object text,int number)? value,int tag)=>value??=null;
+public static object? CoalesceChain(object? value,object? fallback,int tag)=>value??fallback??null;
+public static int CoalesceScalarDefault(int? value,int tag)=>value??default;
+public static int? CoalesceAssignScalarDefault(int? value,int tag)=>value??=default;
+public static object? CoalesceTyped(object? value,int tag)=>value??(object?)null;
+public static async Task<object?> CoalesceAwaitReference(Task<object?> value,int tag)=>(await value)??null;
+public static async Task<int?> CoalesceAwaitValue(Task<int?> value,int tag)=>(await value)??null;
+public static async ValueTask<object?> CoalesceAwaitValueReference(ValueTask<object?> value,int tag)=>(await value)??null;
+public static async ValueTask<int?> CoalesceAwaitValueStruct(ValueTask<int?> value,int tag)=>(await value)??null;
+public static async Task<object?> CoalesceAsyncAssignReference(object? value,int tag){await Task.Yield();return value??=null;}
+public static async ValueTask<int?> CoalesceAsyncAssignValue(int? value,int tag){await Task.Yield();return value??=null;}
                 public static object? RecursiveReference(int depth,object value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveReference(depth-1,value,tag);}
                 public static int? RecursiveValue(int depth,int value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveValue(depth-1,value,tag);}
                 public static object[]? RecursiveArray(int depth,object[] value,int tag){if(depth==0)return null;if(depth==1)return value;return RecursiveArray(depth-1,value,tag);}
@@ -86,6 +105,25 @@ EOF
     'global::System.Threading.Tasks.Task<T1?> RecursiveTaskValue<T1, T2>(int depth, global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : struct' \
     'global::System.Threading.Tasks.ValueTask<T1?> RecursiveValueReference<T1, T2>(int depth, global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : class' \
     'global::System.Threading.Tasks.ValueTask<T1?> RecursiveValueStruct<T1, T2>(int depth, global::System.Threading.Tasks.ValueTask<T1> value, T2 tag) where T1 : struct' \
+    'T1? CoalesceReference<T1, T2>(T1? value, T2 tag) where T1 : class' \
+    'T1? CoalesceReferenceDefault<T1, T2>(T1? value, T2 tag) where T1 : class' \
+    'T1? CoalesceValue<T1, T2>(T1? value, T2 tag) where T1 : struct' \
+    'T1? CoalesceAssignReference<T1, T2>(T1? value, T2 tag) where T1 : class' \
+    'T1? CoalesceAssignValue<T1, T2>(T1? value, T2 tag) where T1 : struct' \
+    'T1[]? CoalesceArray<T1, T2>(T1[]? value, T2 tag)' \
+    'global::System.Collections.Generic.List<T1>? CoalesceList<T1, T2>(global::System.Collections.Generic.List<T1>? value, T2 tag)' \
+    'global::System.Func<T1>? CoalesceDelegate<T1, T2>(global::System.Func<T1>? value, T2 tag)' \
+    '(T1 text, T2 number)? CoalescePair<T1, T2, T3>((T1 text, T2 number)? value, T3 tag)' \
+    'T1? CoalesceChain<T1, T2>(T1? value, T1? fallback, T2 tag) where T1 : class' \
+    'int CoalesceScalarDefault<T1>(int? value, T1 tag)' \
+    'int? CoalesceAssignScalarDefault<T1>(int? value, T1 tag)' \
+    'object? CoalesceTyped<T1>(object? value, T1 tag)' \
+    'global::System.Threading.Tasks.Task<T1?> CoalesceAwaitReference<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : class' \
+    'global::System.Threading.Tasks.Task<T1?> CoalesceAwaitValue<T1, T2>(global::System.Threading.Tasks.Task<T1?> value, T2 tag) where T1 : struct' \
+    'global::System.Threading.Tasks.ValueTask<T1?> CoalesceAwaitValueReference<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 tag) where T1 : class' \
+    'global::System.Threading.Tasks.ValueTask<T1?> CoalesceAwaitValueStruct<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?> value, T2 tag) where T1 : struct' \
+    'global::System.Threading.Tasks.Task<T1?> CoalesceAsyncAssignReference<T1, T2>(T1? value, T2 tag) where T1 : class' \
+    'global::System.Threading.Tasks.ValueTask<T1?> CoalesceAsyncAssignValue<T1, T2>(T1? value, T2 tag) where T1 : struct' \
     'T1? Reference<T1, T2>(bool flag, T1 value, T2 tag) where T1 : class' \
     'T1? Value<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct' \
     'T1[]? Array<T1, T2>(bool flag, T1[] value, T2 tag)' \
