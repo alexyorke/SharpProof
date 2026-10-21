@@ -120,6 +120,63 @@ internal sealed class ExceptionStackTraceRuntimeTests
         { }
     }
 
+    [Test]
+    public void NestedFreshFaultDoesNotInheritTheAmbientResolverCounter()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var method = new DynamicMethod("FreshResolverSeedControl", typeof(void), [typeof(InvalidOperationException)],
+            typeof(ExceptionStackTraceRuntimeTests).Module, true);
+        var generator = method.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Throw);
+        var freshThrower = method.CreateDelegate<Action<InvalidOperationException>>();
+        var keepAlive = typeof(GC).GetMethod(nameof(GC.KeepAlive), [typeof(object)])!;
+        for (var index = 0; index < 40; index++)
+        {
+            var next = new DynamicMethod("AmbientResolverSeedControl", typeof(void), [typeof(InvalidOperationException)],
+                typeof(ExceptionStackTraceRuntimeTests).Module, true);
+            generator = next.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Call, method);
+            // Work after the call prevents tail calls without boxing or allocating.
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Call, keepAlive);
+            generator.Emit(OpCodes.Ret);
+            method = next;
+        }
+        var ambientThrower = method.CreateDelegate<Action<InvalidOperationException>>();
+        var ambient = new InvalidOperationException("ambient-resolver-control");
+        CaptureDynamicTrace(ambientThrower, ambient);
+        var resolverField = typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.That(((object[])resolverField.GetValue(ambient)!).Length,
+            Is.GreaterThan(ResourceTaskFaultCarrierCatalog.FreshTrackerResolverCapacityUpper));
+        var dispatch = ExceptionDispatchInfo.Capture(ambient);
+        var fresh = new InvalidOperationException("fresh-resolver-control");
+        long allocated = 0;
+        try
+        { dispatch.Throw(); }
+        catch (InvalidOperationException)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            CaptureDynamicTrace(freshThrower, fresh);
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+        var seed = ResourceTaskFaultCarrierCatalog.FreshTrackerResolverCapacityUpper;
+        Assert.That(seed, Is.EqualTo(30));
+        Assert.That(((object[])resolverField.GetValue(fresh)!).Length, Is.EqualTo(seed));
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var trace = (byte[])traceField.GetValue(fresh)!;
+        var frames = checked((int)BitConverter.ToUInt64(trace, 0));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var raw = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 0, layout, cancellation);
+        var resolver = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, 0, seed, layout, cancellation);
+        Assert.That(allocated, Is.GreaterThan(0));
+        Assert.That(new BigInteger(allocated), Is.LessThanOrEqualTo(raw.CumulativeUpper!.Constant!.Value + resolver.CumulativeUpper!.Constant!.Value));
+    }
+
     [TestCase(0, 0, 0L)]
     [TestCase(1, 0, 240L)]
     [TestCase(2, 3, 1288L)]

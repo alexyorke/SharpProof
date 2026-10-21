@@ -14,13 +14,20 @@ internal sealed record ResourceResolverTraceBufferCheck(ResourceExpression? Cumu
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.ResolverTraceBufferModel;
 }
 
-// Fixed .NET 8.0.32 fault bookkeeping and a separately scoped raw-trace prefix
-// component. Neither component establishes a root allocation verdict.
+// Fixed .NET 8.0.32 fault bookkeeping and separately scoped trace components.
+// None of these components establishes a root allocation verdict.
 internal static class ResourceTaskFaultCarrierCatalog
 {
     internal const string Model = "task-join-fixed-fault-carriers-v2";
     internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
     internal const string ResolverTraceBufferModel = "closed-exception-resolver-buffers-v1";
+    internal const string FreshSourceTrackerModel = "closed-source-fault-tracker-seed-v1";
+    // Both ExceptionTracker constructors call StackTraceInfo.Init (counter zero).
+    // AllocateStackTrace seeds 30 in retail builds, 2 in debug builds, or zero
+    // on failure. Continuing saves are accounted by the resolver prefix bound.
+    internal const int FreshTrackerResolverCapacityUpper = 30;
+    internal const string TrackerEntrySource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/exceptionhandling.h";
+    internal const string TrackerDispatchSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/exceptionhandling.cpp";
     internal const string RawTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp";
     internal const string SaveTraceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/excep.cpp";
 

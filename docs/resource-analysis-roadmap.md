@@ -109,6 +109,46 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Fresh source-fault tracker entry counters
+
+The native source-exception check now exposes the resolver entry-counter bound
+for its admitted fresh ordinary source faults under an explicit closed-runtime
+tracker model. A nonempty source-fault candidate set has upper seed 30; an empty
+set has seed zero. Failed source ownership, handling and layout checks expose
+neither the seed nor its model. This fact excludes scheduler/helper faults and
+imported exception traces and does not supply a physical frame budget.
+
+The pinned tracker dispatch creates an ExceptionTracker for new, nested and
+rethrown dispatches using its constructor, including the emergency allocation
+path. Both constructors call StackTraceInfo.Init, resetting the counter to zero.
+The initial native frame-buffer allocation seeds the resolver counter with 30
+in retail builds, 2 in debug builds, or zero on allocation failure. Continuing
+saves and restored arrays remain covered by the separate resolver prefix model;
+30 is an entry seed rather than a bound on later counter values.
+
+The additional source is pinned `exceptionhandling.h`, blob
+`d8eb19e6ef208a9c9303fe24a85dd0a031461110`, SHA-256
+`ad5f915202c6a006fe1bb57bf3538dfaa3b602909cf7b1a51d12f00ddd9779cd`.
+The reviewed `exceptionhandling.cpp` SHA-256 is
+`dcc92f01ddc25607057ed773148478a675c84894affdc7d0b2534047a02ad843`.
+Both are from runtime commit `b9a49e4a6d3a444a3685e318c74a7892d01873f7`.
+
+Native controls check supported exception families, an empty source profile,
+unsupported handling and incompatible layouts. A runtime control creates an
+ambient dynamic trace with more than 30 resolver slots, restores and catches it,
+then throws a fresh dynamic exception inside that handler. It checks the fresh
+array seed and measures only its raw/resolver allocation interval. All 216 Specs
+tests passed with zero build warnings or errors:
+`artifacts/resource-source-tracker-seed-specs.log`. Full quality/API and
+documentation checks passed: `artifacts/resource-source-tracker-seed-lint.log`
+and `artifacts/resource-source-tracker-seed-docs.log`. The canonical private
+formatter copied zero changes: `artifacts/resource-source-tracker-seed-format.log`.
+The native test build identified a missing Specs namespace import in the new
+assertions; it was fixed and all 102 native projection cases passed with zero
+build warnings or errors: `artifacts/resource-source-tracker-seed-worker-final.log`.
+Frame-budget derivation, remaining runtime fault origins and
+complete cumulative root bytes are still open.
+
 ### Closed resolver-array prefixes
 
 A separate private component now bounds resolver `object[]` storage for a closed

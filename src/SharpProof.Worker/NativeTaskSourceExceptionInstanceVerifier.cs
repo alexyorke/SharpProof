@@ -3,6 +3,11 @@ namespace SharpProof.Worker;
 internal sealed record NativeTaskSourceExceptionInstanceCheck(ResourceExpression? SourceInstanceUpper, string? UnknownReason)
 {
     internal string? RequiredRuntimeModel => SourceInstanceUpper is null ? null : NativeTaskSourceExceptionInstanceVerifier.Model;
+    // Fresh ordinary source faults only, under the closed runtime model. This
+    // says nothing about scheduler/helper faults or imported exception traces.
+    internal int? InitialResolverCapacityUpper => SourceInstanceUpper is null ? null :
+        SourceInstanceUpper.Constant == System.Numerics.BigInteger.Zero ? 0 : ResourceTaskFaultCarrierCatalog.FreshTrackerResolverCapacityUpper;
+    internal string? RequiredTrackerModel => InitialResolverCapacityUpper is null ? null : ResourceTaskFaultCarrierCatalog.FreshSourceTrackerModel;
 }
 
 // Fixed ordinary source-exception instances only. Messages and their initialization,

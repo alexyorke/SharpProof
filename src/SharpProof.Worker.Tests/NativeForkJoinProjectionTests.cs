@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Specs;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -567,11 +568,15 @@ internal sealed class NativeForkJoinProjectionTests
             var upper = kind == IrExceptionKind.ArgumentOutOfRange ? 304 : kind == IrExceptionKind.Argument ? 288 : 272;
             Assert.That(instances.SourceInstanceUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(upper)));
             Assert.That(instances.RequiredRuntimeModel, Is.EqualTo(NativeTaskSourceExceptionInstanceVerifier.Model));
+            Assert.That(instances.InitialResolverCapacityUpper, Is.EqualTo(30));
+            Assert.That(instances.RequiredTrackerModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.FreshSourceTrackerModel));
         }
         else
         {
             Assert.That(instances.SourceInstanceUpper, Is.Null);
             Assert.That(instances.RequiredRuntimeModel, Is.Null);
+            Assert.That(instances.InitialResolverCapacityUpper, Is.Null);
+            Assert.That(instances.RequiredTrackerModel, Is.Null);
         }
         if (classified)
         { Assert.That(check.ExceptionKinds, Is.EquivalentTo(new[] { kind })); }
@@ -795,6 +800,8 @@ internal sealed class NativeForkJoinProjectionTests
             TestContext.CurrentContext.CancellationToken);
         Assert.That(check.SourceInstanceUpper!.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
         Assert.That(check.RequiredRuntimeModel, Is.EqualTo(NativeTaskSourceExceptionInstanceVerifier.Model));
+        Assert.That(check.InitialResolverCapacityUpper, Is.Zero);
+        Assert.That(check.RequiredTrackerModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.FreshSourceTrackerModel));
     }
 
     [Test]
@@ -813,6 +820,8 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(check.SourceInstanceUpper, Is.Null);
         Assert.That(check.RequiredRuntimeModel, Is.Null);
         Assert.That(check.UnknownReason, Is.EqualTo("TaskSourceExceptionHandlingUnsupported"));
+        Assert.That(check.InitialResolverCapacityUpper, Is.Null);
+        Assert.That(check.RequiredTrackerModel, Is.Null);
     }
 
     [Test]
@@ -825,6 +834,8 @@ internal sealed class NativeForkJoinProjectionTests
         Assert.That(check.SourceInstanceUpper, Is.Null);
         Assert.That(check.RequiredRuntimeModel, Is.Null);
         Assert.That(check.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        Assert.That(check.InitialResolverCapacityUpper, Is.Null);
+        Assert.That(check.RequiredTrackerModel, Is.Null);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Action canceled = () =>
