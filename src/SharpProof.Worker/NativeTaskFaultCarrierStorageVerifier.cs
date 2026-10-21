@@ -1,12 +1,20 @@
 namespace SharpProof.Worker;
 
-internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? BookkeepingUpper, string? UnknownReason);
+internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? BookkeepingUpper, string? UnknownReason)
+{
+    internal int? TaskTraceCaptureCountUpper { get; init; }
+    internal int? TaskTraceRestoreCountUpper { get; init; }
+    internal int? TaskDispatchArrayCopiesUpper => TaskTraceCaptureCountUpper is { } captures && TaskTraceRestoreCountUpper is { } restores
+        ? 2 * (captures + restores) : null;
+    internal string? RequiredTraceCopyModel => TaskDispatchArrayCopiesUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.TraceCopyModel;
+}
 
 // Conditional fixed carrier/list allocation prefixes, not a total task-byte
 // contract verdict. Exception payload and trace allocation must be composed
 // separately before any root cumulative byte proof can be published.
 internal static class NativeTaskFaultCarrierStorageVerifier
 {
+    internal const string TraceCopyModel = "task-join-task-dispatch-copy-counts-v1";
     internal static NativeTaskFaultCarrierCheck Check(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
         ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
     {
@@ -43,7 +51,17 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         total = ResourceExpression.Add(total, ResourceExpression.Multiply(joinList, ResourceExpression.Literal(count)));
         if (projection.ConfiguredAwait)
         { total = ResourceExpression.Add(total, ResourceExpression.Add(fixedRecord, ListBytes(1))); }
-        return new(total, null);
+        // Each task-owned AddException site can capture one dispatch state.
+        // WhenAll forwards existing dispatches. A configured root restores the
+        // first fault once and records it once in its own async box. Each capture
+        // or restore copies at most one trace byte array and one resolver array.
+        // Trace growth, affinity copies, execution-context dispatches and other
+        // runtime/helper work remain separate obligations, not counted here.
+        return new(total, null)
+        {
+            TaskTraceCaptureCountUpper = count * faultsPerChild + (projection.ConfiguredAwait ? 1 : 0),
+            TaskTraceRestoreCountUpper = projection.ConfiguredAwait ? 1 : 0
+        };
 
         ResourceExpression ObjectBytes(ImmutableArray<ResourceStorageKind> fields)
         {

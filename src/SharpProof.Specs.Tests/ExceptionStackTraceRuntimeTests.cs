@@ -1,5 +1,7 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using NUnit.Framework;
 
 namespace SharpProof.Specs.Test;
@@ -7,6 +9,77 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, false)]
+    [TestCase(3, false)]
+    [TestCase(15, false)]
+    [TestCase(0, true)]
+    [TestCase(3, true)]
+    [TestCase(15, true)]
+    public void DispatchCaptureAndRestoreCopyOnlyTheirReviewedTracePayloads(int depth, bool restoring)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var exception = CaptureInsideBoundary(depth);
+        var trace = (byte[])typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(exception)!;
+        var resolvers = (object[]?)typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(exception);
+        var payload = ArrayBytes(trace.Length, 1) + (resolvers is null ? 0 : ArrayBytes(resolvers.Length, 8));
+        var dispatch = ExceptionDispatchInfo.Capture(exception);
+        var restore = CreateDispatchRestorer();
+        for (var index = 0; index < 64; index++)
+        {
+            if (restoring)
+            { restore(dispatch); ConsumeRestoredDispatch(dispatch); }
+            else
+            { GC.KeepAlive(ExceptionDispatchInfo.Capture(exception)); }
+        }
+        var bytes = 0L;
+        for (var index = 0; index < 128; index++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            if (restoring)
+            { restore(dispatch); }
+            else
+            { GC.KeepAlive(ExceptionDispatchInfo.Capture(exception)); }
+            bytes += GC.GetAllocatedBytesForCurrentThread() - before;
+            // Restore marks a pending foreign raise. Consume it outside the
+            // measured interval; this throw has separate trace-growth costs.
+            if (restoring)
+            { ConsumeRestoredDispatch(dispatch); }
+        }
+        Assert.That(bytes, Is.GreaterThan(0));
+        // Capture also constructs the fixed dispatch object; restore does not.
+        Assert.That(bytes, Is.LessThanOrEqualTo(128 * (payload + (restoring ? 0 : 64))));
+
+        static long ArrayBytes(int length, int elementBytes)
+        { return (24L + (long)length * elementBytes + 7) & ~7L; }
+    }
+
+    private static Action<ExceptionDispatchInfo> CreateDispatchRestorer()
+    {
+        var state = typeof(ExceptionDispatchInfo).GetField("_dispatchState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var target = typeof(Exception).GetMethod("RestoreDispatchState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var method = new DynamicMethod("RestoreExceptionDispatch", typeof(void), [typeof(ExceptionDispatchInfo)],
+            typeof(ExceptionStackTraceRuntimeTests).Module, true);
+        var generator = method.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Callvirt, typeof(ExceptionDispatchInfo).GetProperty(nameof(ExceptionDispatchInfo.SourceException))!.GetMethod!);
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldflda, state);
+        generator.Emit(OpCodes.Call, target);
+        generator.Emit(OpCodes.Ret);
+        return method.CreateDelegate<Action<ExceptionDispatchInfo>>();
+    }
+
+    private static void ConsumeRestoredDispatch(ExceptionDispatchInfo dispatch)
+    {
+        ArgumentNullException.ThrowIfNull(dispatch);
+        try
+        { dispatch.Throw(); }
+        catch (InvalidOperationException)
+        { }
+    }
+
     [TestCase(0, 0)]
     [TestCase(8, 0)]
     [TestCase(32, 0)]

@@ -453,6 +453,10 @@ public sealed class NativeTaskCarrierStorageTests
         var result = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.UnknownReason, Is.Null);
         Assert.That(result.BookkeepingUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(result.TaskTraceCaptureCountUpper, Is.EqualTo(2 * count + (configured ? 1 : 0)));
+        Assert.That(result.TaskTraceRestoreCountUpper, Is.EqualTo(configured ? 1 : 0));
+        Assert.That(result.TaskDispatchArrayCopiesUpper, Is.EqualTo(4 * count + (configured ? 4 : 0)));
+        Assert.That(result.RequiredTraceCopyModel, Is.EqualTo(NativeTaskFaultCarrierStorageVerifier.TraceCopyModel));
     }
 
     [TestCase(2, false, 1136L)]
@@ -511,6 +515,10 @@ public sealed class NativeTaskCarrierStorageTests
         var result = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.BookkeepingUpper, Is.Null);
         Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinRootOwnershipInvalid"));
+        Assert.That(result.TaskTraceCaptureCountUpper, Is.Null);
+        Assert.That(result.TaskTraceRestoreCountUpper, Is.Null);
+        Assert.That(result.TaskDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(result.RequiredTraceCopyModel, Is.Null);
     }
 
     [Test]
@@ -520,11 +528,15 @@ public sealed class NativeTaskCarrierStorageTests
         var incompatible = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, new("CoreCLR", "8.0.32", "x86", 4),
             TestContext.CurrentContext.CancellationToken);
         Assert.That(incompatible.BookkeepingUpper, Is.Null);
+        Assert.That(incompatible.TaskDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(incompatible.RequiredTraceCopyModel, Is.Null);
         Assert.That(incompatible.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
         var child = projection.Children[1];
         projection = projection with { Children = [projection.Children[0], child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } }] };
         var unowned = NativeTaskFaultCarrierStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(unowned.BookkeepingUpper, Is.Null);
+        Assert.That(unowned.TaskDispatchArrayCopiesUpper, Is.Null);
+        Assert.That(unowned.RequiredTraceCopyModel, Is.Null);
         Assert.That(unowned.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
     }
 

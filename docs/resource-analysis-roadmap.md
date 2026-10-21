@@ -109,6 +109,42 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Task-owned dispatch-copy operations
+
+The fixed fault-carrier check now derives task-owned dispatch-operation counts
+under `task-join-task-dispatch-copy-counts-v1`. The two fault-recording sites per
+child give at most `2 * children` captures; a configured async root adds one
+capture and one restore. Each capture/restore copies at most one trace byte array
+and one resolver array, giving at most `4 * children + 4` copied arrays for a
+configured root, or `4 * children` otherwise. Rejected ownership/layout/counts
+retain no copy counts or model identity. Existing bookkeeping byte bounds and
+their model remain unchanged.
+
+These are operation counts, not a trace-byte bound. Save/growth retries,
+thread-affinity copies, execution-context dispatches and runtime/helper work
+remain separate obligations. Pinned TaskAwaiter and async-builder sources and
+blob/SHA-256 provenance are cached in
+`artifacts/resource-runtime-fault-review/task-dispatch-copy-sources.json`;
+the existing holder/Task/CoreCLR source evidence supplies the remaining paths.
+The pinned ExecutionContext source explicitly captures and rethrows callback
+failures in both `RunInternal` and `RunFromThreadPoolDispatchLoop`. Those
+additional operations must be included by root composition; the task-only
+counts cannot stand in for them. Helper-frame source provenance is cached in
+`artifacts/resource-runtime-fault-review/runtime-helper-frame-sources.json`.
+
+Six independent runtime controls isolate capture or restore from the following
+throw, measuring only the reviewed dispatch object and trace/resolver payload
+copies. Reflection, preparation, warmup and cleanup throws stay outside allocation
+intervals. All 186 Specs cases passed on .NET 8.0.32 x64. Evidence:
+`artifacts/resource-task-dispatch-copy-runtime.log`. All 96 native carrier cases
+passed with zero build errors, including rejection, layout and cancellation
+controls: `artifacts/resource-task-dispatch-copy-worker.log`.
+Full formatting and quality/API checks passed. Evidence:
+`artifacts/resource-task-dispatch-copy-format.log` and
+`artifacts/resource-task-dispatch-copy-lint.log`.
+Final documentation checks passed in
+`artifacts/resource-task-dispatch-copy-docs-final.log`.
+
 ### Source activations and trace catch boundaries
 
 Six pinned-runtime controls distinguish a catch inside an owned call chain from
@@ -514,10 +550,19 @@ are `artifacts/resource-memory-ownership-format-final.log` and
 
 ### Current coverage qualification
 
+Published `cfa23e7cb` passed all six coverage shards in run 39545675178. Its
+complete merge-commit report (8c25b7674f9933c7d27ca4bb0f91b6d08befb5e8) measured
+6201/6388 changed trusted lines (97.07%, 187 uncovered), failing the unchanged
+100% floor. This is the latest complete numeric measurement:
+`artifacts/resource-cfa23-coverage-evidence/coverage/SharpProof.coverage.json`.
+The fixed source-exception instance verifier has no uncovered changed lines in
+that report. Source-activation and task-dispatch-copy work is newer and requires
+its own qualification.
+
 Published `5dadd9e3b` passed all six coverage shards in run 39540486904, attempt
 two. Its complete merge-commit report (0a3d1d8123995ac9a62da95b9f739f00468735af)
 measured 6168/6360 changed trusted lines (96.98%, 192 uncovered), below the
-unchanged 100% floor. This is the latest complete numeric measurement:
+unchanged 100% floor. This earlier complete numeric measurement is retained at
 `artifacts/resource-5dadd-coverage-evidence/coverage/SharpProof.coverage.json`.
 The profiler boundary controls, construction-order controls and source-exception
 instance component are newer than this report.
