@@ -84,6 +84,18 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] Cancellation, exceptional completion, shared-state and repeated-entry controls
   for the admitted task model; unsupported execution shapes remain Unknown.
 
+The cumulative-byte item remains open until all of these obligations are joined:
+
+- [x] Private fixed task carriers, fault records and notification components.
+- [x] Source-owned primitive fault candidates and fixed source-exception instances.
+- [x] Private compiler-owned source activation bounds.
+- [ ] Checked CLR/helper-frame bridge.
+- [ ] Checked exception escape/catch boundaries for every admitted root path.
+- [ ] Cumulative trace growth, retry, thread-affinity copy and dispatch-copy costs.
+- [ ] Referenced payloads, messages, scheduler faults and initialization costs.
+- [ ] Root composition with bound runtime premises, evidence identities and
+  consumer-level proof/Unknown controls. Private components do not satisfy this.
+
 ## Delivery and verification
 
 - [x] Preserve the original dirty checkout using an isolated branch/worktree.
@@ -96,6 +108,40 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+### Source activations and trace catch boundaries
+
+Six pinned-runtime controls distinguish a catch inside an owned call chain from
+an exception escaping through ambient callers. With inlining and tail-call
+elision disabled for the controls, the closed trace has `throwDepth + 2` frames,
+independent of ambient depths zero, eight and 32. The escaping trace has
+`ambientDepth + throwDepth + 3` frames. All 180 Specs cases passed on .NET 8.0.32
+x64. Evidence: `artifacts/resource-trace-catch-boundary-specs-2.log`.
+These observations are controls for the required compiler/runtime bridge, not a
+universal proof or a caller-supplied frame cap.
+
+`CheckSourceActivations` reuses source ownership checking and the native source
+stack kernel, substitutes the checked callback argument mappings, and takes the
+maximum callback source depth. Missing activation structure or unsupported
+ownership returns Unknown with no partial depth/model. Its source-side model is
+explicitly separate from physical CLR frames and trace-byte costs. All 102
+projection/source-activation cases passed with zero build errors on the final
+source, including argument substitution:
+`artifacts/resource-owned-source-activation-worker-2.log`. The initial build
+caught formatting diagnostics in a test record update; formatting was corrected.
+Full quality/API checks passed in
+`artifacts/resource-owned-source-activation-lint-final.log`.
+Full formatting and final documentation checks passed. Evidence:
+`artifacts/resource-owned-source-activation-format.log` and
+`artifacts/resource-owned-source-activation-docs-final.log`.
+
+Coverage for published `104e2e69b` failed before worker-a tests because the
+container registry returned HTTP 503. Evidence:
+`artifacts/resource-104-worker-a-failed.log`. The failed jobs in run 39543577096
+were retried against the same head. Attempt two failed before tests when the
+script-tool download received a Web Application Firewall response. Evidence:
+`artifacts/resource-104-coverage-attempt2-failed.log`. No complete measurement is
+claimed for that head; the tool source and integrity checks were not changed.
 
 ### Fixed source-exception instance storage
 

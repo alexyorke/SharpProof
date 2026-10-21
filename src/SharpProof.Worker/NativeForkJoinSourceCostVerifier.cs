@@ -14,9 +14,55 @@ internal sealed record NativeForkJoinSourceCostCheck(NativeResourceCost? Upper, 
 internal sealed record NativeForkJoinChildStorageCheck(ResourceExpression? CumulativeUpper,
     ResourceExpression? PeakAuxiliaryUpper, ResourceExpression? RetainedUpper, string? UnknownReason);
 
+// Logical source activations per callback, not physical CLR frames or a trace
+// allocation bound. Runtime/helper frames require a separate checked bridge.
+internal sealed record NativeForkJoinSourceActivationCheck(ResourceExpression? Upper, string? UnknownReason)
+{
+    internal string? RequiredSourceModel => Upper is null ? null : NativeResourceStackVerifier.ModelId;
+}
+
 internal static class NativeForkJoinSourceCostVerifier
 {
     internal const string ChildStorageModel = "fork-join-isolated-child-storage-v1";
+
+    internal static NativeForkJoinSourceActivationCheck CheckSourceActivations(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        cancellation.ThrowIfCancellationRequested();
+        var source = Check(projection, root, cancellation);
+        if (!source.HasSourceCosts)
+        { return new(null, source.UnknownReason); }
+        var maximum = ResourceExpression.Zero;
+        var remaining = ResourceExpression.MaximumNodes;
+        try
+        {
+            foreach (var child in projection.Children)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                // Source ownership and its complete resource program were checked
+                // above. Derive the rank/frame bound, then substitute the checked
+                // formal-to-root mapping rather than accepting a supplied cap.
+                var stack = NativeResourceStackVerifier.Derive(child.Cost, cancellation);
+                if (stack.Bounds is not { } bounds)
+                { return new(null, stack.UnknownReason ?? "ForkJoinSourceActivationUnproved"); }
+                var arguments = new ResourceExpression[child.Arguments.Length];
+                foreach (var argument in child.Arguments)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    arguments[argument.ParameterOrdinal] = argument.RootParameterOrdinal is { } ordinal
+                        ? ResourceExpression.InputSize(new ResourceInput(ordinal, ResourceInputKind.NonNegativeScalar,
+                            projection.RootParameterNames[ordinal], int.MaxValue))
+                        : ResourceExpression.Literal(BigInteger.Max(0, argument.Constant!.Value));
+                }
+                maximum = ResourceExpression.Max(maximum, Substitute(bounds.Depth, arguments, ref remaining, cancellation));
+            }
+            return new(maximum, null);
+        }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "ForkJoinSourceActivationBudgetExceeded"); }
+    }
 
     internal static NativeForkJoinChildStorageCheck CheckChildStorage(CompilerForkJoinProjection projection,
         CompilerTotalEntryPreparation root, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)

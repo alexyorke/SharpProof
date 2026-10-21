@@ -7,6 +7,66 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0, 0)]
+    [TestCase(8, 0)]
+    [TestCase(32, 0)]
+    [TestCase(0, 3)]
+    [TestCase(8, 3)]
+    [TestCase(32, 3)]
+    public void CatchBoundarySeparatesOwnedTraceFramesFromAmbientCallers(int ambientDepth, int throwDepth)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var closed = (byte[])traceField.GetValue(CallClosedBoundary(ambientDepth, throwDepth))!;
+        var escaped = (byte[])traceField.GetValue(CaptureOutsideBoundary(ambientDepth, throwDepth))!;
+        Assert.That(BitConverter.ToUInt64(closed, 0), Is.EqualTo((ulong)throwDepth + 2));
+        Assert.That(BitConverter.ToUInt64(escaped, 0), Is.EqualTo((ulong)(ambientDepth + throwDepth) + 3));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static InvalidOperationException CallClosedBoundary(int ambientDepth, int throwDepth)
+    {
+        if (ambientDepth is < 0 or > 32)
+        { throw new ArgumentOutOfRangeException(nameof(ambientDepth)); }
+        var result = ambientDepth == 0 ? CaptureInsideBoundary(throwDepth) : CallClosedBoundary(ambientDepth - 1, throwDepth);
+        GC.KeepAlive(ambientDepth);
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static InvalidOperationException CaptureInsideBoundary(int throwDepth)
+    {
+        try
+        { ThrowAtDepth(throwDepth); }
+        catch (InvalidOperationException exception)
+        { return exception; }
+        throw new InvalidOperationException("The trace control must throw.");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static InvalidOperationException CaptureOutsideBoundary(int ambientDepth, int throwDepth)
+    {
+        try
+        { EscapeThroughAmbient(ambientDepth, throwDepth); }
+        catch (InvalidOperationException exception)
+        { return exception; }
+        throw new InvalidOperationException("The trace control must throw.");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static void EscapeThroughAmbient(int ambientDepth, int throwDepth)
+    {
+        if (ambientDepth is < 0 or > 32)
+        { throw new ArgumentOutOfRangeException(nameof(ambientDepth)); }
+        if (ambientDepth == 0)
+        { ThrowAtDepth(throwDepth); }
+        else
+        { EscapeThroughAmbient(ambientDepth - 1, throwDepth); }
+        GC.KeepAlive(ambientDepth);
+    }
+
     [TestCase(0, 136)]
     [TestCase(1, 136)]
     [TestCase(2, 136)]

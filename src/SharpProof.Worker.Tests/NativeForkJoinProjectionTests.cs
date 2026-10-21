@@ -11,6 +11,53 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class NativeForkJoinProjectionTests
 {
+    [TestCase(false, 1)]
+    [TestCase(true, 3)]
+    public void SourceActivationBoundsComeFromOwnedCallPrograms(bool nested, int expected)
+    {
+        var projection = nested ? LowerSource("using System.Threading.Tasks; public static class C {public static Task Root(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) { Middle(count); } " +
+            "static void Middle(int value) { Leaf(value); } static void Leaf(int value) { }}") : Lower("");
+        var check = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, Root(projection),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Upper, Is.Not.Null, check.UnknownReason);
+        Assert.That(check.Upper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+        Assert.That(check.RequiredSourceModel, Is.EqualTo(NativeResourceStackVerifier.ModelId));
+    }
+
+    [Test]
+    public void MissingActivationStructureDoesNotInventFramesOrInvalidateIndependentSourceCosts()
+    {
+        var projection = Lower("");
+        projection = projection with { Children = projection.Children.SetItem(1, projection.Children[1] with { Cost = ResourceProgram.Zero }) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), cancellation).HasSourceCosts, Is.True);
+        var check = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, Root(projection), cancellation);
+        Assert.That(check.Upper, Is.Null);
+        Assert.That(check.RequiredSourceModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("ResourceStackRootActivationMissing"));
+    }
+
+    [Test]
+    public void ActivationBoundsRejectUnownedLaterCallbacksAndHonorCancellation()
+    {
+        var projection = Lower("");
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1, projection.Children[1] with
+            { Owner = projection.Children[1].Owner with { EffectsCompleteAtEntry = false } })
+        };
+        var root = Root(projection);
+        var check = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, root, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Upper, Is.Null);
+        Assert.That(check.RequiredSourceModel, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinChildOwnershipInvalid"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action canceled = () => { _ = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, root, cancellation.Token); };
+        Assert.Throws<OperationCanceledException>(canceled);
+    }
+
     [TestCase("", 7, 0L)]
     [TestCase("for(int i=0;i<count;i++){var a=new int[2];}", 7, 320L)]
     [TestCase("for(int i=0;i<count;i++){var a=new int[2];}", -5, 96L)]
