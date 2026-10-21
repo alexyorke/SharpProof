@@ -109,6 +109,28 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Native contract rejection controls
+
+Additional native contract controls exercise a sealed declaration marked
+UnsupportedContract and a missing root activation for both source depth and
+source stack bytes. A zero-cost resource program cannot substitute for a missing
+activation certificate. Both direct checking and asynchronous replay keep the
+result Unknown without a numeric bound or witness. These controls change no
+production semantics. All 655 resource-contract workflow cases passed with zero
+build warnings or errors: `artifacts/resource-contract-rejections-tests-final.log`.
+Full quality/API passed on retry after an external Debian license link refused
+the first connection: `artifacts/resource-contract-rejections-lint-retry.log`.
+Documentation checks passed and private formatting copied zero changes:
+`artifacts/resource-contract-rejections-docs.log` and
+`artifacts/resource-contract-rejections-format.log`.
+
+Published `bbe9896a7` contains callback transport/native composition and symbolic
+trace-buffer composition. Its documentation and security workflows passed; five
+coverage shards passed, with package coverage and complete canonical/package
+qualification still running at this checkpoint. The additional rejection tests
+remain local while that published run completes, preserving its exact-head
+evidence. They have not yet been measured by hosted coverage.
+
 ### Symbolic trace-buffer composition
 
 The private trace catalog now composes its raw and resolver array bounds using

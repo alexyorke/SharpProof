@@ -200,6 +200,7 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("invalid-claim", "UnsupportedResourceContract")]
     [TestCase("missing-program", "ResourceProgramUnavailable")]
     [TestCase("metadata", "ResourceMetadataAssumptionsNotBound")]
+    [TestCase("unsupported-contract", "UnsupportedResourceContract")]
     [TestCase("malformed-bound", "MalformedResourceEvidence")]
     public void IncompleteNativeEvidenceAlwaysReturnsUnknownWithoutNumericBounds(string scenario, string expected)
     {
@@ -227,6 +228,11 @@ internal sealed partial class NativeResourceContractTests
             case "metadata":
                 preparation = preparation with { ResourceProgram = ResourceProgram.MetadataBoundary };
                 break;
+            case "unsupported-contract":
+                claim = claim with { Reason = WorkerClaimReason.UnsupportedContract, Certainty = WorkerEffectEvidenceCertainty.Unavailable };
+                CompilerEffectClaimArtifactCodec.Seal(claim);
+                preparation = preparation with { EffectClaims = [claim] };
+                break;
             default:
                 claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = claim.Constraint.ResourceUpperBound! with { UpperBound = System.Text.Encoding.UTF8.GetBytes("{}") } } };
                 CompilerEffectClaimArtifactCodec.Seal(claim);
@@ -238,6 +244,27 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
         Assert.That(result.ResourceBound.UnknownReason, Is.EqualTo(expected));
         Assert.That(result.EffectWitness, Is.Null);
+    }
+
+    [TestCase("SourceActivationDepth")]
+    [TestCase("SourceStackBytes")]
+    public async Task MissingActivationCannotBecomeAZeroStackProofOrReplayRefutation(string metric)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var preparation = Prepare(Source($"[ResourceUpperBound(ResourceMetric.{metric}, 0)]", ""));
+        preparation = preparation with { ResourceProgram = ResourceProgram.Zero };
+        var claim = preparation.EffectClaims.Single();
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var result = NativeResourceContractVerifier.Verify(preparation, claim, cancellation);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceStackRootActivationMissing"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+        var replay = await NativeResourceContractVerifier.VerifyAsync(preparation, claim, new WorkerBudgets(), cancellation);
+        Assert.That(replay.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(replay.ResourceBound!.UnknownReason, Is.EqualTo(result.ResourceBound.UnknownReason));
+        Assert.That(replay.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(replay.EffectWitness, Is.Null);
     }
 
     [Test]
