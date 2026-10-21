@@ -104,6 +104,11 @@ public sealed partial class ResourceBoundsTests
     [TestCase("int remaining=n; int other=1; while (remaining>0) { other--; }", "UnprovedLoopProgress")]
     [TestCase("for (int i=0; i<n; --i) {}", "UnprovedLoopProgress")]
     [TestCase("for (int i=0; i<n; i+=m) {}", "UnsupportedLoop")]
+    [TestCase("int i=3; while(i>n) { i--; }", "UnsupportedLoopBound")]
+    [TestCase("int i=3; while(i> -1) { i--; }", "UnsupportedLoopBound")]
+    [TestCase("int i=0; while(i<5) { i=i+1; }", "UnprovedLoopProgress")]
+    [TestCase("int other=0; for(int i=0;i<5;other++) {}", "UnsupportedLoop")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) { } else right--; }", "UnprovedLoopProgress")]
     public void UnprovedGeneralizedLoopShapesAbstain(string body, string reason)
     {
         ArgumentNullException.ThrowIfNull(body);

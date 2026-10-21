@@ -97,6 +97,19 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## Current checkpoint
 
+### Loop rejection coverage follow-up
+
+The coverage follow-up adds five valid-source rejection controls: a dynamic
+descending bound, a negative descending bound, assignment-style progress,
+updates to a different counter, and an empty first phase body. Each requires
+an explicit Unknown reason and no partial bounds. All 50 rejection cases passed
+with zero build errors. Evidence:
+`artifacts/resource-loop-unsupported-boundaries-2.log`. Documentation checks
+passed in `artifacts/resource-loop-boundary-docs.log`.
+Two attempted oversized mixed-width compound assignments were rejected by the
+C# compiler before analysis and were removed. Those attempts do not qualify
+the corresponding defensive analyzer branches as covered.
+
 ### Owned-IR primitive fault candidates
 
 `NativeTaskIrFaultOriginVerifier` derives conservative primitive fault families
