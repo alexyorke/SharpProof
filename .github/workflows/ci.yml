@@ -23,9 +23,22 @@ jobs:
   repository-quality:
     uses: ./.github/workflows/quality.yml
 
+  # The Remaining cohort saturates a four-CPU runner, so it runs as two parts on
+  # separate runners: "worker" (the Worker remainder shards) and "projects"
+  # (every other Remaining task). Each part builds the full solution with
+  # analyzers. build-and-test merges both parts' receipts and evidence.
   canonical-main:
+    name: canonical-main (${{ matrix.part }})
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: worker
+            task-group: Worker
+          - part: projects
+            task-group: Projects
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,17 +51,18 @@ jobs:
 
       # This job is the critical path, so the package phase and the
       # source-only repository gates run in canonical-package, in parallel.
-      - name: Run the single-build non-Gates semantic PR phases
+      - name: Run the ${{ matrix.part }} part of the non-Gates semantic PR phases
         run: >-
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
-          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining
+          -SemanticCohort Remaining -TaskGroup ${{ matrix.task-group }}
+          -TestResultsDirectory artifacts/canonical-remaining
           -SkipPackageTests -SkipRepositoryGates
 
       - name: Upload container gate evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-main-${{ matrix.part }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
@@ -58,6 +72,7 @@ jobs:
         uses: ./.github/actions/runner-telemetry
         with:
           mode: report
+          name: ${{ github.job }}-${{ matrix.part }}
 
   canonical-package:
     if: github.event_name != 'schedule'
@@ -318,11 +333,17 @@ jobs:
             "PowerShell $(jq -r .powershell.version eng/container/toolchain.json)"
           echo "SHARPPROOF_PWSH=${root}/pwsh" >> "${GITHUB_ENV}"
 
-      - name: Download non-Gates cohort evidence
+      - name: Download non-Gates cohort Worker part evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/canonical-cohorts/remaining-evidence
+          name: canonical-main-worker-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/remaining-worker-evidence
+
+      - name: Download non-Gates cohort Projects part evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-main-projects-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/remaining-projects-evidence
 
       - name: Download Gates cohort evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -330,9 +351,24 @@ jobs:
           name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/canonical-cohorts/gates-evidence
 
+      # The two Remaining parts hold disjoint task directories. Each keeps its
+      # receipt as canonical-cohort.<part>.json, and the gate merges them.
       - name: Reconcile actual discovery and TRX identities
         run: |
-          mv artifacts/canonical-cohorts/remaining-evidence/canonical-remaining artifacts/canonical-cohorts/remaining
+          set -euo pipefail
+          remaining=artifacts/canonical-cohorts/remaining
+          mkdir -p "${remaining}"
+          for part in worker projects; do
+            source="artifacts/canonical-cohorts/remaining-${part}-evidence/canonical-remaining"
+            mv "${source}/canonical-cohort.json" "${remaining}/canonical-cohort.${part}.json"
+            for task in "${source}"/*/; do
+              if [[ -e "${remaining}/$(basename "${task}")" ]]; then
+                echo "Both Remaining parts ran task $(basename "${task}")." >&2
+                exit 1
+              fi
+              mv "${task}" "${remaining}/"
+            done
+          done
           mv artifacts/canonical-cohorts/gates-evidence/canonical-gates artifacts/canonical-cohorts/gates
           "${SHARPPROOF_PWSH}" -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCanonicalCohortGate.ps1
 

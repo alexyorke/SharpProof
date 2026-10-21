@@ -16,6 +16,11 @@ param(
     [ValidateSet('All', 'Remaining', 'Gates')]
     [string]$SemanticCohort = 'All',
 
+    # CI runs the Remaining cohort's Worker remainder shards and its other
+    # tasks on separate runners; the cohort gate requires both parts.
+    [ValidateSet('All', 'Worker', 'Projects')]
+    [string]$TaskGroup = 'All',
+
     [string]$TestResultsDirectory = '',
 
     # CI runs the package phase of pr in a separate parallel job.
@@ -24,7 +29,7 @@ param(
     # CI runs the source-only repository gates of pr in a separate parallel job.
     [switch]$SkipRepositoryGates,
 
-    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
+    [ValidateSet('all', 'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
@@ -71,6 +76,7 @@ if ($Fast -and $Command -notin $reusableTestCommands) {
     throw '-Fast is supported only for non-qualifying test commands.'
 }
 if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
+        $PSBoundParameters.ContainsKey('TaskGroup') -or
         $PSBoundParameters.ContainsKey('TestResultsDirectory')) -and
     $Command -notin @('pr', 'pr-gates', 'semantic-tests')) {
     throw 'Canonical cohort options are supported only for pr, pr-gates, and semantic-tests.'
@@ -85,7 +91,8 @@ if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
 # CI collects each coverage shard on its own runner; the gate requires all.
-$coverageShardNames = [Collections.Immutable.ImmutableArray]::Create[string]('semantic-gates', 'semantic-worker', 'semantic-projects', 'package')
+$coverageShardNames = [Collections.Immutable.ImmutableArray]::Create[string](
+    'semantic-gates-corpus', 'semantic-gates-shards', 'semantic-worker-a', 'semantic-worker-b', 'semantic-projects', 'package')
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
     throw '-CoveragePhase is supported only for coverage-shard.'
@@ -366,7 +373,8 @@ switch ($Command) {
     }
     'pr' {
         & $PSCommandPath -Command 'pr-gates' -Configuration 'Release' `
-            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory `
+            -SemanticCohort $SemanticCohort -TaskGroup $TaskGroup `
+            -TestResultsDirectory $TestResultsDirectory `
             -SkipPackageTests:$SkipPackageTests -SkipRepositoryGates:$SkipRepositoryGates
     }
     'nightly' {
@@ -483,6 +491,7 @@ switch ($Command) {
                 }).AsReadOnly()).ToImmutable()
         $semanticTestArgumentBuilder = $prTestArguments.ToBuilder()
         $semanticTestArgumentBuilder['SemanticCohort'] = $SemanticCohort
+        $semanticTestArgumentBuilder['TaskGroup'] = $TaskGroup
         $semanticTestArgumentBuilder['TestResultsDirectory'] = $TestResultsDirectory
         $semanticTestArguments = $semanticTestArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofSemanticTests.ps1' `
@@ -545,6 +554,7 @@ switch ($Command) {
     'semantic-tests' {
         $semanticArgumentBuilder = (New-TestInvocationArguments).ToBuilder()
         $semanticArgumentBuilder['SemanticCohort'] = $SemanticCohort
+        $semanticArgumentBuilder['TaskGroup'] = $TaskGroup
         $semanticArgumentBuilder['TestResultsDirectory'] = $TestResultsDirectory
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $semanticArgumentBuilder['TestFilter'] = $TestFilter

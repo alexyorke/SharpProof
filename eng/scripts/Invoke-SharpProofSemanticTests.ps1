@@ -26,12 +26,14 @@ param(
 
     [switch]$AttributesCollectedSeparately,
 
-    # Coverage CI spreads the semantic coverage tasks across runners. Gates
-    # holds the Gates corpus task and shards, the Worker remainder shards
-    # dominate the rest, and Projects holds every other task. All keeps the
-    # single-runner task set.
-    [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
-    [string]$CoverageTaskGroup = 'All'
+    # CI spreads the semantic tasks across runners. Coverage uses GatesCorpus
+    # (the Gates corpus task), GatesShards (the Gates remainder shards),
+    # WorkerA and WorkerB (two halves of the Worker remainder shards), and
+    # Projects (every other task). The canonical Remaining cohort uses Worker
+    # (every Worker remainder shard) and Projects. All keeps the single-runner
+    # task set.
+    [ValidateSet('All', 'GatesCorpus', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'Projects')]
+    [string]$TaskGroup = 'All'
 )
 
 Set-StrictMode -Version Latest
@@ -105,8 +107,12 @@ $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
     throw 'Separate Attributes collection requires coverage collection.'
 }
-if ($CoverageTaskGroup -ne 'All' -and -not $coverageEnabled) {
-    throw 'Coverage task groups require coverage collection.'
+if ($TaskGroup -ne 'All' -and -not $coverageEnabled -and
+    ($SemanticCohort -ne 'Remaining' -or $TaskGroup -notin @('Worker', 'Projects'))) {
+    throw 'Without coverage, task groups select only Worker or Projects of the Remaining cohort.'
+}
+if ($coverageEnabled -and $TaskGroup -eq 'Worker') {
+    throw 'Coverage selects the Worker remainder shards as WorkerA and WorkerB.'
 }
 if ($coverageEnabled) {
     # Gates runs as its own task set below; its corpus verifier task reserves
@@ -187,7 +193,7 @@ $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 $timingStem = 'semantic-tests-' + $Configuration.ToLowerInvariant()
 $timingSuffix =
 $(if ($ArchitectureOnly) { '-architecture-only' } else { '' }) +
-$(if ($CoverageTaskGroup -ne 'All') { '-' + $CoverageTaskGroup.ToLowerInvariant() } else { '' }) +
+$(if ($TaskGroup -ne 'All') { '-' + $TaskGroup.ToLowerInvariant() } else { '' }) +
 $(if ($coverageEnabled) { '-coverage' } else { '' })
 $canonicalTimingOutput = Join-Path $timingDirectory (
     $timingStem + $timingSuffix + '.json')
@@ -475,28 +481,31 @@ if ($architectureShardingEnabled) {
                 DefaultEstimatedMilliseconds = 10000L
             }).AsReadOnly())
 }
-if ($CoverageTaskGroup -ne 'All') {
-    $gatesTaskNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
-    $gatesTaskNameBuilder.Add('gates-corpus')
-    foreach ($gatesTaskName in $gatesRemainderTaskNames) { $gatesTaskNameBuilder.Add($gatesTaskName) }
-    $gatesTaskNames = $gatesTaskNameBuilder.ToImmutable()
+if ($TaskGroup -ne 'All') {
     $workerTaskNameBuilder = $workerRemainderTaskNames.ToBuilder()
     $workerTaskNameBuilder.Add('worker-fixed-checksum')
     $workerTaskNames = $workerTaskNameBuilder.ToImmutable()
+    # WorkerB takes two measured-balanced remainder shards; WorkerA takes every
+    # other Worker task, so a new remainder shard still runs exactly once.
+    $workerBTaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
+        'worker-remainder-2', 'worker-remainder-3')
     # Capture the name first: inside switch, $_ is the switch value.
     $taskSnapshot = $taskBuilder.ToImmutable()
     $selectedTasks = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($taskSnapshot | Where-Object {
                 $taskName = [string]$_.Name
-                switch ($CoverageTaskGroup) {
-                    'Gates' { $taskName -cin $gatesTaskNames }
+                switch ($TaskGroup) {
+                    'GatesCorpus' { $taskName -ceq 'gates-corpus' }
+                    'GatesShards' { $taskName -cin $gatesRemainderTaskNames }
                     'Worker' { $taskName -cin $workerTaskNames }
-                    'Projects' { $taskName -cnotin $gatesTaskNames -and $taskName -cnotin $workerTaskNames }
+                    'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
+                    'WorkerB' { $taskName -cin $workerBTaskNames }
+                    'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }
                 }
             }))
     $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($selectedTask in $selectedTasks) { $taskBuilder.Add($selectedTask) }
     if ($taskBuilder.Count -eq 0) {
-        throw "Coverage task group '$CoverageTaskGroup' selected no tasks."
+        throw "Task group '$TaskGroup' selected no tasks."
     }
 }
 $estimatedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
@@ -715,7 +724,7 @@ finally {
             fast                     = [bool]$Fast
             architectureOnly         = [bool]$ArchitectureOnly
             semanticCohort           = $SemanticCohort
-            coverageTaskGroup        = $CoverageTaskGroup
+            taskGroup                = $TaskGroup
             parallelism              = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
             tasks                    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($timingSnapshot | Sort-Object { $_.name }))
