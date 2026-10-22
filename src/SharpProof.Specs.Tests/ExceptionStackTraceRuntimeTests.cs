@@ -11,6 +11,73 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(16)]
+    public void BestOomMaterializationBoundsOneInstancePerConversion(int conversions)
+    {
+        var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(ResourceExpression.Literal(conversions),
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.CumulativeUpper!.Constant, Is.EqualTo(new BigInteger(136) * conversions));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.BestOomInstanceModel));
+    }
+
+    [Test]
+    public void BestOomMaterializationPreservesSymbolicConversionCounts()
+    {
+        var conversions = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "conversions", int.MaxValue));
+        var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(conversions,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(new BigInteger(952)));
+    }
+
+    [Test]
+    public void BestOomMaterializationNeverPublishesPartialBoundsOnLayoutOrBudgetFailure()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var conversions = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "conversions", int.MaxValue));
+        for (var depth = conversions.Depth; depth < ResourceExpression.MaximumDepth; depth++)
+        { conversions = ResourceExpression.Add(conversions, ResourceExpression.One); }
+        var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(conversions, layout, cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("BestOomInstanceBudgetExceeded"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(ResourceExpression.Zero,
+            new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action operation = () => { _ = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(ResourceExpression.One, layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(operation);
+    }
+
+    [Test]
+    public void UninitializedOomInstanceAllocationFitsTheReviewedShapeWithoutMessageConstruction()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        Assert.That(typeof(OutOfMemoryException).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Empty);
+        Assert.That(typeof(SystemException).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Empty);
+        for (var warmup = 0; warmup < 64; warmup++)
+        { GC.KeepAlive(RuntimeHelpers.GetUninitializedObject(typeof(OutOfMemoryException))); }
+        var message = typeof(Exception).GetField("_message", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        for (var iteration = 0; iteration < 128; iteration++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var instance = RuntimeHelpers.GetUninitializedObject(typeof(OutOfMemoryException));
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(allocated, Is.GreaterThan(0).And.LessThanOrEqualTo(136));
+            Assert.That(message.GetValue(instance), Is.Null);
+            GC.KeepAlive(instance);
+        }
+    }
     [TestCase(ResourcePrimitiveHCallKind.DivideByZero)]
     [TestCase(ResourcePrimitiveHCallKind.Overflow)]
     [TestCase(ResourcePrimitiveHCallKind.NullReference)]

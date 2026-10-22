@@ -11,6 +11,40 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase("ordinal", "ResourceLowerInputMismatch")]
+    [TestCase("kind", "ResourceLowerInputMismatch")]
+    [TestCase("name", "ResourceLowerInputMismatch")]
+    [TestCase("multiple", "AsymptoticMultipleInputs")]
+    public void LowerProjectionCannotPublishTightnessForAnUnmatchedInput(string corruption, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        ArgumentNullException.ThrowIfNull(reason);
+        var owned = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var foreign = ResourceExpression.InputSize(new ResourceInput(corruption is "ordinal" or "multiple" ? 1 : 0,
+            corruption == "kind" ? ResourceInputKind.ArrayLength : ResourceInputKind.NonNegativeScalar,
+            corruption is "name" or "multiple" ? "other" : "n", int.MaxValue));
+        var lower = corruption == "multiple" ? ResourceExpression.Add(owned, foreign) : foreign;
+        var upper = new WorkerResourceAsymptoticEvidence
+        {
+            UpperBound = "O(n)",
+            PolynomialDegree = 1,
+            LogarithmicDegree = 0,
+            IsZero = false,
+            InputOrdinal = 0,
+            InputKind = nameof(ResourceInputKind.NonNegativeScalar),
+            InputName = "n"
+        };
+        var method = typeof(NativeResourceContractVerifier).GetMethod("LowerEvidence",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        var result = (WorkerResourceLowerAsymptoticEvidence)method!.Invoke(null,
+            [upper, lower, null, TestContext.CurrentContext.CancellationToken])!;
+        Assert.That(result.UnknownReason, Is.EqualTo(reason));
+        Assert.That(result.InferredBound, Is.Null);
+        Assert.That(result.LowerBound, Is.Null);
+        Assert.That(result.TightBound, Is.Null);
+        Assert.That(result.Growth, Is.Null);
+    }
     private static string Source(string attributes, string body)
     {
         ArgumentNullException.ThrowIfNull(attributes);

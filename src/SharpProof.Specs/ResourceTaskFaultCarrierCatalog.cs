@@ -11,6 +11,10 @@ internal sealed record ResourcePrimitiveHCallFrameCheck(int? DirectFramesUpper, 
     internal string? RequiredRuntimeModel => DirectFramesUpper is null ? null : ResourceTaskFaultCarrierCatalog.PrimitiveHCallFrameModel;
 }
 
+internal sealed record ResourceBestOomInstanceCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.BestOomInstanceModel;
+}
 internal sealed record ResourceRawTraceBufferCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
 {
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.RawTraceBufferModel;
@@ -60,6 +64,30 @@ internal static class ResourceTaskFaultCarrierCatalog
         // JIT_ThrowDivZero, JIT_Overflow, JIT_ThrowNullRef, JIT_RngChkFail,
         // and the JIT_NewArr1 worker are HCIMPL entries in the pinned source.
         return new(0, null);
+    }
+    internal const string BestOomInstanceModel = "coreclr8-best-oom-instance-storage-v1";
+    internal const string BestOomInstanceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp";
+
+    // Instance storage only for GetBestOutOfMemoryException conversions. The
+    // caller must independently bound every conversion attempt. GetBestException
+    // attempts AllocateObject once, sets two scalar fields, and falls back to
+    // the preallocated exception on failure; it does not call a managed ctor.
+    // Trace buffers, notifications, initialization and dimension-error message
+    // exceptions remain separate components. This has no root proof authority.
+    internal static ResourceBestOomInstanceCheck BoundBestOomInstances(ResourceExpression conversions,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        conversions = ArgumentNullGuard.NotNull(conversions, nameof(conversions));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var instance = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultNotificationCatalog.ExceptionFields),
+            layout, cancellation);
+        if (instance.Bounds is not { } bytes)
+        { return new(null, instance.UnknownReason); }
+        try
+        { return new(ResourceExpression.Multiply(bytes.Upper, conversions), null); }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "BestOomInstanceBudgetExceeded"); }
     }
     internal const string FreshSourceTrackerModel = "closed-source-fault-tracker-seed-v1";
     // Both ExceptionTracker constructors call StackTraceInfo.Init (counter zero).

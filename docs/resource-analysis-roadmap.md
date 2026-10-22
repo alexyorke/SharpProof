@@ -109,6 +109,88 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Best-effort OOM materialization instance storage
+
+A new private component bounds fixed instance storage for an independently
+bounded count of `GetBestOutOfMemoryException` conversions. On the pinned
+CoreCLR 8.0.32 x64 layout, its result is 136 bytes times that count, with model
+`coreclr8-best-oom-instance-storage-v1`. Unsupported layouts and expression
+budget exhaustion return Unknown without a partial bound or model identity;
+cancellation propagates. The component does not infer conversion counts or
+publish a root task allocation verdict.
+
+Pinned [`CLRException::GetBestException`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp#L522)
+attempts `AllocateObject` once, writes HResult/XCode, and catches failures by
+returning the preallocated OOM object. It does not invoke the managed exception
+constructor. `SystemException` and `OutOfMemoryException` add no instance fields
+to the reviewed Exception layout. This bounds that explicit candidate instance
+only: allocator notifications, other helper allocations, traces, initialization,
+and the distinct dimension-error message constructor remain separate costs.
+The caller must establish the already activated runtime types and conversion
+prefix before composing this with other runtime components.
+
+The cached native throw implementation (`src/coreclr/utilcode/ex.cpp`) and
+managed OOM type were fetched at the pinned revision and registered with blob
+identity, byte count and SHA-256 in the ignored research manifest. The native
+`ThrowOutOfMemory` path uses the preallocated native OOM exception; subsequent
+managed materialization remains a separate operation. An uninitialized-object
+allocation control checks the field shape and instance size without invoking
+the managed message constructor. Its warmed measurements validate only that
+shape, not conversion counts or cold initialization costs.
+
+The completed report for `d74b98de9` (coverage run 39822545703, merge
+`97b34b2e740653e0328dbcd240f3e4459b26ede1`) passed all fifteen shards but
+failed the unchanged 100% floor: 6852/7007 changed trusted lines, 97.79%,
+155 gaps. It newly covers claim-digest rejection and task-declaration decoder
+rejection. Evidence is retained at
+`artifacts/resource-d74b98-coverage-evidence/coverage/SharpProof.coverage.json`.
+This report predates the substitution, lower-growth and OOM component changes.
+
+The first allocation control measured 128 bytes and rejected an equality
+assertion against the conservative 136-byte model. The corrected control
+requires a positive allocation no greater than the declared upper bound;
+no model constant was weakened. The first fixture run passed all other 82
+cases (`artifacts/resource-best-oom-instance-tests.log`). All 247 Specs cases
+then passed with zero build warnings or errors on the corrected final source
+(`artifacts/resource-best-oom-instance-specs-tests.log`). An initial quality
+gate identified a prose spelling issue, corrected without a dictionary exception.
+
+Final quality/API checks passed
+(`artifacts/resource-best-oom-instance-lint-final.log`), as did documentation
+checks (`artifacts/resource-best-oom-instance-docs-final.log`). The final
+canonical private formatter copied zero source changes
+(`artifacts/resource-best-oom-instance-format-verified.log`). The private
+component does not change a root verdict, protocol, runtime assumption binding
+or response cache identity. Runtime-byte root composition remains open.
+
+### Lower-growth input isolation and allocation-failure path review
+
+Four additional native projection controls reject lower-growth evidence with
+a different input ordinal, kind or display name, or with multiple inputs.
+Rejection must leave the inferred lower expression, Omega bound, Theta bound
+and nested growth absent. These controls exercise projection's separate
+validation after callers have supplied their independently owned formulas.
+They do not establish a new source lower bound or runtime-byte proof.
+
+Pinned [`AllocateSzArray`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/gchelpers.cpp#L370)
+checks `MaxArrayLength` and delegates storage to `Alloc`. A dimension-limit
+failure calls `ThrowOutOfMemoryDimensionsExceeded`; on the admitted x64 path
+that helper constructs an `EEMessageException` with the dimension resource ID.
+A null GC allocation result in `Alloc` calls `ThrowOutOfMemory`. These remain
+runtime/helper failure obligations beyond the seven-family ordinary source
+exception-instance component. In particular, a source array length fitting
+Int32 does not remove runtime dimension/allocation failure paths. The cached
+source's recorded blob identity, byte count and SHA-256 were verified before
+this review. Constructor/resource-message costs and trace handling are still
+required before root cumulative-byte composition.
+
+All 686 native resource-contract cases passed, with zero build warnings or
+errors (`artifacts/resource-lower-projection-guards-tests.log`), including the
+four lower-growth rejection controls. Their initial quality/API and docs
+checks passed (`artifacts/resource-lower-projection-guards-lint.log` and
+`artifacts/resource-lower-projection-guards-docs.log`). Final checks include
+the subsequently added OOM component as a separate production change.
+
 ### Independent source-cost substitution guards
 
 Four additional native fork/join controls exercise substitution's own scalar
