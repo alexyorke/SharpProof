@@ -166,12 +166,33 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.EffectWitness.Location.Line, Is.GreaterThan(0));
         Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
     }
+    [TestCase("var later=new long[3]; var after=new int[50];")]
+    [TestCase("var later=new string('x',20);")]
+    [TestCase("var later=new object();")]
+    public async Task LaterAllocationsCannotReplaceTheEarliestExactByteViolation(string suffix)
+    {
+        ArgumentNullException.ThrowIfNull(suffix);
+        var source = Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes,31)]", "var first=new byte[1]; " + suffix);
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("32"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("31"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        var location = result.EffectWitness!.Location;
+        Assert.That(source.Substring(location.Start, location.Length), Does.Contain("new byte[1]"));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+    }
+
     [TestCase("Contract.Requires(n==0); if(n>0) { var a=new int[3]; }")]
     [TestCase("int zero=0; int bad=n/zero; var a=new int[3];")]
     [TestCase("int value=System.Math.Max(n,0); var a=new int[3];")]
     [TestCase("var a=new float[3];")]
     [TestCase("var a=new double[3];")]
     [TestCase("var a=new float[3]; var b=new int[3];")]
+    [TestCase("var a=new object[1];")]
+    [TestCase("var a=new object[1]; var b=new byte[1];")]
     public async Task ByteRefutationsCannotCrossInfeasibleExceptionalOrOpaquePrefixes(string body)
     {
         ArgumentNullException.ThrowIfNull(body);

@@ -109,6 +109,62 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Byte-prefix controls, cache acceptance repair and coverage evidence
+
+New native consumer controls check that later array, string and object
+allocations cannot replace the first exact byte violation. Each has a 31-byte
+contract and a first `byte[1]` allocation costing 32 bytes in the declared
+layout. The observed lower bound must remain 32, and the witness source span
+must identify that first allocation rather than a later one. Additional
+reference-array prefixes require Unknown with no numerical witness, including
+when a later primitive array would otherwise exceed the declared bound.
+These controls exercise supported replay behavior and its unsupported-storage
+boundary; they add no allocation proof authority or new runtime assumptions.
+
+Hosted coverage for `baa0e3373` exposed a missed compatibility source:
+`AcceptanceContractMatchesWorkerDefaults` failed in semantic-projects job
+120047721464 because `eng/acceptance/contract.json` still declared cache 58
+while the worker already used 59. The original failure is retained in
+`artifacts/resource-baa-coverage-projects-failure.log`. The acceptance contract
+and living compatibility documentation now agree on cache 59. Historical
+roadmap entries retain their original versions. The focused defaults/protocol
+check passed all 131 tests with zero build warnings or errors
+(`artifacts/resource-cache59-acceptance-alignment-tests.log`). Canonical CI's
+projects job 120046640665 independently failed the same original mismatch,
+with no additional failed test in its retained log
+(`artifacts/resource-baa-canonical-projects-failure.log`). No hosted retry
+is used to bypass this reproducible mismatch. The repair requires qualification
+on the next pushed head.
+
+The latest retained aggregate evidence is now the completed predecessor
+`7d9b7327e` coverage run 39839935291. All fifteen coverage shards succeeded.
+The aggregate coverage job 120046064666 failed its unchanged 100 percent floor;
+the enclosing workflow was subsequently marked cancelled. The retained report
+contains 74 input reports and measures 6935 of 7086 changed trusted lines
+(97.87 percent), leaving 151 uncovered lines. Its authority identifies 26
+modules and 38692 sequence points. The report's merge commit
+`41d06f26759258be5adb58b0a8402a3a430ba9c0` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and branch head
+`7d9b7327ed5ced63671c4785b9d7d154a57bb70d`. The evidence is retained in
+`artifacts/resource-7d9b-coverage-evidence/coverage/SharpProof.coverage.json`.
+No complete qualification is inferred from the workflow's cancelled status.
+This replaces the older report as the working coverage baseline, and does not
+qualify later commits or prove that the new controls close specific lines.
+
+All 691 native resource-contract tests passed with zero build warnings or
+errors (`artifacts/resource-byte-replay-prefix-guards-tests.log`), including
+the five new controls. Full quality/API checks and documentation checks passed
+(`artifacts/resource-byte-replay-prefix-guards-lint.log` and
+`artifacts/resource-byte-replay-prefix-guards-docs.log`). The canonical formatter
+copied zero source changes (`artifacts/resource-byte-replay-prefix-guards-format.log`).
+
+The remaining cumulative runtime-byte obligations are unchanged. The runtime
+model must account for unowned caller frames and cold initialization; the
+choice between explicit reported assumptions and derivation from a closed
+entrypoint is pending user input. No dependent model or proof is introduced
+while that choice is pending. Independent coverage and verification work
+continues. The root runtime-byte result remains Unknown.
+
 ### Exception-boundary call roles
 
 The compiler boundary validator now rejects unclassified method calls outside
