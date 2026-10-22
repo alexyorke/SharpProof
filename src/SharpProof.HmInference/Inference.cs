@@ -198,7 +198,10 @@ public static partial class Inference
             result = iteratorReturn is not null ? WrapIteratorResult() : WrapAsyncResult(result);
             if (symbol.PartialDefinitionPart is { } resultDefinition)
             { ImportPartialContract(result, symbol.ReturnType, resultDefinition.ReturnType, symbol); }
-            HmType.Unify(recursiveReturn, result);
+            if (HasDefaultValueAnnotation(result))
+            { _ = MergeDefaultValues(recursiveReturn, result); }
+            else
+            { HmType.Unify(recursiveReturn, result); }
             var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
             {
                 if (p is null)
@@ -965,6 +968,9 @@ public static partial class Inference
                 case SizeOfExpressionSyntax:
                     return new("int");
                 case RefExpressionSyntax reference:
+                    if (StorageExpression(reference.Expression) is InvocationExpressionSyntax referenceCall
+                        && model.GetOperation(referenceCall, cancellationToken) is IInvocationOperation { TargetMethod.RefKind: not RefKind.None })
+                    { return MethodCall(referenceCall, forStorage: true); }
                     return Expression(reference.Expression);
                 case RangeExpressionSyntax range:
                     if (range.LeftOperand is not null)
@@ -1303,7 +1309,7 @@ public static partial class Inference
                 && model.GetOperation(pointerInvocation, cancellationToken) is IFunctionPointerInvocationOperation { Target.Type: IFunctionPointerTypeSymbol { Signature.ReturnsByRef: true } })
             { return Expression(pointerInvocation); }
             if (target is InvocationExpressionSyntax invocation && model.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true })
-            { return Expression(invocation); }
+            { return MethodCall(invocation, forStorage: true); }
             if (target is PrefixUnaryExpressionSyntax pointerTarget && pointerTarget.IsKind(SyntaxKind.PointerIndirectionExpression))
             { return Expression(target); }
             if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax and not MemberAccessExpressionSyntax)
@@ -1760,7 +1766,7 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);
         }
 
-        private HmType MethodCall(InvocationExpressionSyntax invocation)
+        private HmType MethodCall(InvocationExpressionSyntax invocation, bool forStorage = false)
         {
             if (model.GetOperation(invocation, cancellationToken) is IFunctionPointerInvocationOperation pointerCall)
             {
@@ -1783,13 +1789,13 @@ public static partial class Inference
                 var receiverValue = operation.Instance is IConditionalAccessInstanceOperation ? ConditionalReceiver().Value : Expression(receiver);
                 var signature = DelegateSignature(called.ContainingType, receiverValue);
                 BindArguments(operation, signature.Inputs);
-                return signature.Output;
+                return ApplyReturnNullability(called, signature.Output, forStorage);
             }
             if (SameMethodDefinition(called, currentMethod) && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod!.ContainingType)
                 && Enumerable.SequenceEqual<ITypeSymbol>(called.TypeArguments, currentMethod.TypeParameters, SymbolEqualityComparer.Default))
             {
                 BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray());
-                return currentFunction.Arguments[currentFunction.Arguments.Length - 1];
+                return ApplyReturnNullability(called, currentFunction.Arguments[currentFunction.Arguments.Length - 1], forStorage);
             }
 
             ExpressionSyntax? instanceReceiver = null;
@@ -1822,7 +1828,7 @@ public static partial class Inference
             }).ToArray());
             foreach (var parameter in definition.TypeParameters)
             { ImportConstraints(parameter, variables[parameter], variables, called.TypeArguments[parameter.Ordinal]); }
-            return CSharpTypes.Rigid(definition.ReturnType, variables);
+            return ApplyReturnNullability(called, CSharpTypes.Rigid(definition.ReturnType, variables), forStorage);
         }
 
         private void BindArguments(IInvocationOperation operation, HmType[] parameters)

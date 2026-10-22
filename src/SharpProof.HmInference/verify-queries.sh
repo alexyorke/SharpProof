@@ -23,6 +23,15 @@ public static class QueryConsumer{
   public static IEnumerable<(int left,int right)> SwitchMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear switch{true=>(default,default),false=>(pair.first[0],pair.second[0])};
   public static async ValueTask<IEnumerable<(int left,int right)>> ConditionalMixedAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values,bool clear)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear?(default,default):(pair.first[0],pair.second[0]);
   public static (int left,int right) ConditionalArrayStores(int[] first,int[] second,bool clear){(first[0],second[0])=clear?(default,default):(first[0],second[0]);return(first[0],second[0]);}
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull]static T ContractMaybe<T>(T value)=>value;
+  [return:System.Diagnostics.CodeAnalysis.NotNull]static T? ContractRequired<T>(T? value)where T:class=>value!;
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T ContractAction<T>(T value);
+  public static string? ContractReference(string value,bool tag)=>ContractMaybe(value);
+  public static int ContractValue(int value,bool tag)=>ContractMaybe(value);
+  public static int[]? ContractArray(int[] value,bool tag)=>ContractMaybe(value);
+  public static async Task<int> ContractAsync(Task<int> value,bool tag)=>ContractMaybe(await value);
+  public static int ContractDelegate(ContractAction<int> action,int value,bool tag)=>action(value);
+  public static string ContractRequire(string? value,bool tag)=>ContractRequired(value);
   static Func<T> Capture<T>(Func<T> read)=>read;
   public static Func<int> TupleCapture(int value,bool other){var read=Capture(()=>value);(value,other)=(default,default);return read;}
   public static (Func<int> read,Action clear) TupleDeferred(int value,bool other){var read=Capture(()=>value);Action clear=()=>{(value,other)=(default,default);};return(read,clear);}
@@ -128,7 +137,13 @@ EOF
     printf 'Query operator rebinding was suggested (C# %s)\n' "$language"
     exit 1
   fi
+  grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
+  grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag) where T1 : class' "$log"
+    grep -Fq 'T1 ContractValue<T1, T2>(T1 value, T2 tag) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> ContractAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : struct' "$log"
+    grep -Fq 'T1 ContractDelegate<T1, T2>(global::QueryConsumer.ContractAction<T1> action, T1 value, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)> ConditionalMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)> values, bool clear) where T1 : struct where T2 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)> SwitchMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)> values, bool clear) where T1 : struct where T2 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)>> ConditionalMixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)>> values, bool clear) where T1 : struct where T2 : struct' "$log"
@@ -145,6 +160,10 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag)' "$log"
+    grep -Fq 'T1? ContractValue<T1, T2>(T1 value, T2 tag)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> ContractAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
+    grep -Fq 'T1? ContractDelegate<T1, T2>(global::QueryConsumer.ContractAction<T1> action, T1 value, T2 tag)' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)> ConditionalMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, bool clear) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)> SwitchMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, bool clear) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)>> ConditionalMixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)>> values, bool clear) where T1 : struct' "$log"

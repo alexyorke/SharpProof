@@ -13,8 +13,9 @@ internal static class QueryRuntimeChecks
         const string source = """
             #nullable enable
             using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+            [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T QueryMaybeAction<T>(T value,bool keep);
             public static class QueryTrace{
-                public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls,CaptureCalls;
+                public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls,CaptureCalls,ContractCalls;public static Exception ContractFailure=new InvalidOperationException("contract-null");
                 public static int Index(){IndexCalls++;return 0;}
                 public static bool Accept<T>(T value){Value+="where;";return true;}
                 public static T Touch<T>(T value){Value+="touch;";if(Failure!=null)throw Failure;return value;}
@@ -28,6 +29,15 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T ContractMaybe<T>(T value,bool keep){Interlocked.Increment(ref QueryTrace.ContractCalls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return keep?value:default;}
+                [return:System.Diagnostics.CodeAnalysis.NotNull]static T? ContractRequired<T>(T? value){Interlocked.Increment(ref QueryTrace.ContractCalls);if(value is null)throw QueryTrace.ContractFailure;return value;}
+                public static int ContractValue(int value,bool keep)=>ContractMaybe(value,keep);
+                public static int[]? ContractArray(int[] value,bool keep)=>ContractMaybe(value,keep);
+                public static (int value,bool sibling) ContractTuple(int value,bool sibling,bool keep)=>(ContractMaybe(value,keep),sibling);
+                public static int ContractDelegate(QueryMaybeAction<int> action,int value,bool keep)=>action(value,keep);
+                public static string ContractRequire(string? value)=>ContractRequired(value);
+                public static async Task<int> ContractAsync(Task<int> value,bool keep)=>ContractMaybe(await value,keep);
+                public static async ValueTask<int> ContractValueAsync(ValueTask<int> value,bool keep)=>ContractMaybe(await value,keep);
                 static ref T BranchBorrow<T>(ref T value){QueryTrace.Value+="left;";QueryTrace.RefCalls++;return ref value;}
                 static ref T BranchArrayBorrow<T>(T[] value){QueryTrace.Value+="right;";QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
                 static T BranchKeep<T>(T value){QueryTrace.Value+="keep;";if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return value;}
@@ -175,7 +185,32 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> ReturnContracts(CancellationToken cancellationToken){
+                    QueryMaybeAction<int> action=QueryProbe.ContractMaybe;int[] array={7};
+                    foreach(var keep in new[]{true,false}){
+                        if(QueryProbe.ContractValue(7,keep)!=(keep?7:0)||QueryProbe.ContractDelegate(action,7,keep)!=(keep?7:0)||QueryProbe.ContractTuple(7,true,keep)!=(keep?7:0,true)
+                            ||!ReferenceEquals(QueryProbe.ContractArray(array,keep),keep?array:null))return false;
+                    }
+                    if(QueryProbe.ContractRequire("value")!="value")return false;string? absent=null;try{_=QueryProbe.ContractRequire(absent);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();var failure=new InvalidOperationException("contract-call");
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        QueryTrace.ContractCalls=0;QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{
+                            var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);var task=QueryProbe.ContractAsync(gate.Task,false);var valueTask=QueryProbe.ContractValueAsync(new ValueTask<int>(gate.Task),false).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.ContractCalls!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(7);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=0)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(QueryTrace.ContractCalls!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(!await ReturnContracts(cancellationToken))return false;
                     if(!await BranchStores(cancellationToken))return false;
                     if(!await TupleCaptures(cancellationToken))return false;
                     if(QueryProbe.Grouped(7)!=0)return false;
@@ -295,7 +330,24 @@ internal static class QueryRuntimeChecks
                         var result=query.Single();if(result.left!=0m||result.right!=null||asyncLeft[0]!=0m||asyncRight[0]!=null||QueryTrace.RefCalls!=++executed*2)return false;}
                     return true;
                 }
+                static async Task<bool> ReturnContracts(string text,CancellationToken cancellationToken){
+                    QueryMaybeAction<string> action=QueryProbe.ContractMaybe;var uri=new Uri("https://example.invalid/return-contract");string[] array={text};
+                    foreach(var keep in new[]{true,false}){
+                        if(!ReferenceEquals(QueryProbe.ContractValue(text,keep),keep?text:null)||!ReferenceEquals(QueryProbe.ContractDelegate(action,text,keep),keep?text:null)
+                            ||!ReferenceEquals(QueryProbe.ContractArray(array,keep),keep?array:null))return false;
+                        var pair=QueryProbe.ContractTuple(text,uri,keep);if(!ReferenceEquals(pair.value,keep?text:null)||!ReferenceEquals(pair.sibling,uri))return false;
+                    }
+                    if(QueryProbe.ContractValue((decimal?)23m,false)!=null)return false;
+                    var initial=new QueryStoreValue();QueryStoreValue.Calls=0;var stored=QueryProbe.ContractValue(initial,false);if(stored.Value!=0||stored.Text!=null||QueryStoreValue.Calls!=0)return false;
+                    if(!ReferenceEquals(QueryProbe.ContractRequire(uri),uri))return false;try{_=QueryProbe.ContractRequire<Uri>(null);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var gate=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.ContractCalls=0;
+                    var task=QueryProbe.ContractAsync(gate.Task,false);var valueTask=QueryProbe.ContractValueAsync(new ValueTask<string>(gate.Task),false).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.ContractCalls!=0)return false;gate.SetResult(text);
+                    foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(result!=null)return false;}
+                    return QueryTrace.ContractCalls==2;
+                }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(!await ReturnContracts(text,cancellationToken))return false;
                     if(!await BranchStores(text,cancellationToken))return false;
                     if(!await TupleCaptures(text,cancellationToken))return false;
                     if(QueryProbe.Grouped(text)!=null||QueryProbe.Grouped<decimal?>(23m)!=null)return false;

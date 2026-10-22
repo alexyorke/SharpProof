@@ -9,6 +9,58 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private HmType ApplyReturnNullability(IMethodSymbol called, HmType value, bool forStorage)
+        {
+            if (called is null)
+            { throw new ArgumentNullException(nameof(called)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (forStorage || called.ReturnsVoid)
+            { return value; }
+            var maybeNull = false;
+            var notNull = false;
+            foreach (var attribute in called.GetReturnTypeAttributes())
+            {
+                var name = attribute.AttributeClass?.ToDisplayString();
+                maybeNull |= name == "System.Diagnostics.CodeAnalysis.MaybeNullAttribute";
+                notNull |= name == "System.Diagnostics.CodeAnalysis.NotNullAttribute";
+            }
+            if (notNull)
+            { return ConversionCore(value); }
+            if (!maybeNull)
+            { return value; }
+            value = value.Root;
+            if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && called.ReturnType.IsValueType && called.ReturnType is not ITypeParameterSymbol)
+            { return value; }
+            if (value.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+            { defaultValueAnnotations.Add(value); return value; }
+            if (value.IsVariable || value.CSharpSymbol is ITypeParameterSymbol)
+            {
+                var position = currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration
+                    ? declaration.ReturnType.SpanStart : 0;
+                var legacy = model.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: < LanguageVersion.CSharp9 }
+                    && (model.GetNullableContext(position) & NullableContext.AnnotationsEnabled) != 0;
+                if (!value.IsVariable && value.CSharpSymbol is ITypeParameterSymbol existing)
+                {
+                    if (existing.HasValueTypeConstraint || existing.HasUnmanagedTypeConstraint || legacy && !existing.HasReferenceTypeConstraint)
+                    { return value; }
+                    var annotated = new HmType(CSharpTypes.NullableParameter, value);
+                    defaultValueAnnotations.Add(annotated);
+                    return annotated;
+                }
+                if (legacy && called.ReturnType.IsReferenceType)
+                { RequireKeyword(value, "class"); }
+                return DefaultValueAnnotation(value, legacy && !called.ReturnType.IsReferenceType);
+            }
+            if (called.ReturnType.IsReferenceType)
+            {
+                var nullable = new HmType(CSharpTypes.NullableReference, value);
+                defaultValueAnnotations.Add(nullable);
+                return nullable;
+            }
+            return value;
+        }
+
         private INamedTypeSymbol? asyncReturn;
 
         private readonly Stack<(ITypeSymbol Type, HmType Value)> conditionalReceivers = new();

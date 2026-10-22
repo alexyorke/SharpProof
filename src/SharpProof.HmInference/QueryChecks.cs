@@ -10,6 +10,28 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("ImportedMaybeNullExistingGeneric", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)=>Maybe(value);", "T? M<T, T1>(T value, T1 tag)"),
+            ("ImportedMaybeNullExistingReference", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)where T:class=>Maybe(value);", "T? M<T, T1>(T value, T1 tag) where T : class"),
+            ("ImportedMaybeNullExistingStruct", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)where T:struct=>Maybe(value);", "T M<T, T1>(T value, T1 tag) where T : struct"),
+            ("ImportedMaybeNullRecursiveArray", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T[] Maybe<T>(T[] value)=>value;static int[] M(int[] value,bool flag)=>flag?Maybe(value):M(value,true);", "T1[]? M<T1>(T1[] value, bool flag)"),
+            ("ImportedMaybeNullRecursiveAsync", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static async Task<int> M(Task<int> value,bool flag)=>flag?Maybe(await value):await M(value,true);", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<T1> value, bool flag)"),
+            ("ImportedMaybeNullReference", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static string? M(string value,bool tag)=>Maybe(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ImportedNotNullNullableInput", "[return:System.Diagnostics.CodeAnalysis.NotNull]static T? Require<T>(T? value)=>value!;static string M(string? value,bool tag)=>Require(value);", "T1 M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("ImportedMaybeNullRefAlias", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static ref T Borrow<T>(ref T value)=>ref value;static int M(int[] value,bool tag){ref var alias=ref Borrow(ref value[0]);alias=default;return value[0];}", "T1? M<T1, T2>(T1?[] value, T2 tag)"),
+            ("ImportedMaybeNullReadonlyRead", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static ref readonly T Borrow<T>(in T value)=>ref value;static int M(in int value,bool tag)=>Borrow(in value);", "T1? M<T1, T2>(in T1 value, T2 tag)"),
+            ("ImportedNotNullReturn", "[return:System.Diagnostics.CodeAnalysis.NotNull]static T? Require<T>(T? value)=>value!;static int M(int value,bool tag)=>Require(value);", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ImportedNotNullArray", "[return:System.Diagnostics.CodeAnalysis.NotNull]static T[]? Require<T>(T[]? value)=>value!;static int[] M(int[]? value,bool tag)=>Require(value);", "T1[] M<T1, T2>(T1[]? value, T2 tag)"),
+            ("ImportedMaybeNullArray", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T[] Maybe<T>(T[] value)=>value;static int[] M(int[] value,bool tag)=>Maybe(value);", "T1[]? M<T1, T2>(T1[] value, T2 tag)"),
+            ("ImportedMaybeNullNullableValue", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static int? M(int? value,bool tag)=>Maybe(value);", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
+            ("ImportedMaybeNullTupleValue", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static (int left,bool right) M((int left,bool right) value,string tag)=>Maybe(value);", "(T1 left, T2 right) M<T1, T2, T3>((T1 left, T2 right) value, T3 tag)"),
+            ("ImportedMaybeNullSuppression", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static int M(int value,bool tag)=>Maybe(value)!;", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ImportedMaybeNullRefStore", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static ref T Borrow<T>(ref T value)=>ref value;static int M(int[] value,bool tag){Borrow(ref value[0])=default;return value[0];}", "T1? M<T1, T2>(T1?[] value, T2 tag)"),
+            ("ImportedMaybeNullInstance", "class Box<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read()=>default;}static int M(Box<int> value,bool tag)=>value.Read();", "T1? M<T1, T2>(global::Cases.Box<T1> value, T2 tag)"),
+            ("ImportedMaybeNullTupleSibling", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static (int left,bool right) M(int value,bool other,string tag)=>(Maybe(value),other);", "(T1? left, T2 right) M<T1, T2, T3>(T1 value, T2 other, T3 tag)"),
+            ("ImportedMaybeNullReturn", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static int M(int value,bool tag)=>Maybe(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ImportedMaybeNullDefault", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>default;static int M(int value,bool tag)=>Maybe(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ImportedMaybeNullAsync", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Maybe<T>(T value)=>value;static async Task<int> M(Task<int> value,bool tag)=>Maybe(await value);", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)"),
+            ("ImportedMaybeNullDelegate", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]delegate T Maybe<T>(T value);static int M(Maybe<int> action,int value,bool tag)=>action(value);", "T1? M<T1, T2>(global::Cases.Maybe<T1> action, T1 value, T2 tag)"),
             ("QueryNestedConditionalMixedRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static ref T ArrayBorrow<T>(T[] value)=>ref value[0];static IEnumerable<(int left,(int mid,bool right) rest)> M(IEnumerable<(int[] first,int[] second,bool[] third)> values,bool flag,string tag)=>from pair in values select (Borrow(ref pair.first[0]),(ArrayBorrow(pair.second),ArrayBorrow(pair.third)))=flag?(default,(default,default)):(pair.first[0],(pair.second[0],pair.third[0]));", "global::System.Collections.Generic.IEnumerable<(T1 left, (T2? mid, T3? right) rest)> M<T1, T2, T3, T4>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second, T3?[] third)> values, bool flag, T4 tag) where T1 : struct"),
             ("QueryReversedConditionalMixedRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static ref T ArrayBorrow<T>(T[] value)=>ref value[0];static IEnumerable<(int left,int right)> M(IEnumerable<(int[] first,int[] second)> values,bool flag,string tag)=>from pair in values select (ArrayBorrow(pair.second),Borrow(ref pair.first[0]))=flag?(default,default):(pair.second[0],pair.first[0]);", "global::System.Collections.Generic.IEnumerable<(T2? left, T1 right)> M<T1, T2, T3>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, bool flag, T3 tag) where T1 : struct"),
             ("ValueAsyncConditionalMixedRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static ref T ArrayBorrow<T>(T[] value)=>ref value[0];static async ValueTask<IEnumerable<(int left,int right)>> M(ValueTask<IEnumerable<(int[] first,int[] second)>> values,bool flag,string tag)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=flag?(default,default):(pair.first[0],pair.second[0]);", "global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)>> M<T1, T2, T3>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)>> values, bool flag, T3 tag) where T1 : struct"),
@@ -107,6 +129,58 @@ internal static class QueryChecks
         }
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
+        var providerTree = CSharpSyntaxTree.ParseText("""
+            #nullable enable
+            public static class ReturnContractProvider{
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T Maybe<T>(T value)=>value;
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T[] ArrayMaybe<T>(T[] value)=>value;
+                [return:System.Diagnostics.CodeAnalysis.NotNull]public static T? Require<T>(T? value)=>value!;
+            }
+            [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T MaybeContract<T>(T value);
+            public sealed class ReturnContractBox<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read()=>default;}
+            namespace Other{[System.AttributeUsage(System.AttributeTargets.ReturnValue)]public sealed class MaybeNullAttribute:System.Attribute{}}
+            """, cancellationToken: cancellationToken);
+        using var providerImage = new MemoryStream();
+        var emittedProvider = Program.Compile([providerTree]).WithAssemblyName("ReturnContractMetadata").Emit(providerImage, cancellationToken: cancellationToken);
+        if (!emittedProvider.Success)
+        { throw new InvalidOperationException("Return-contract provider: " + string.Join("; ", emittedProvider.Diagnostics)); }
+        var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
+        (string Name, string Source, string Signature)[] metadataTests =
+        [
+            ("MetadataMaybeNull", "static int M(int value,bool tag)=>ReturnContractProvider.Maybe(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("MetadataMaybeNullArray", "static int[] M(int[] value,bool tag)=>ReturnContractProvider.ArrayMaybe(value);", "T1[]? M<T1, T2>(T1[] value, T2 tag)"),
+            ("MetadataNotNull", "static string M(string? value,bool tag)=>ReturnContractProvider.Require(value);", "T1 M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("MetadataMaybeNullDelegate", "static int M(MaybeContract<int> action,int value,bool tag)=>action(value);", "T1? M<T1, T2>(global::MaybeContract<T1> action, T1 value, T2 tag)"),
+            ("MetadataMaybeNullOwner", "static int M(ReturnContractBox<int> value,bool tag)=>value.Read();", "T1? M<T1, T2>(global::ReturnContractBox<T1> value, T2 tag)"),
+            ("MetadataUnrelatedAttribute", "[return:Other.MaybeNull]static T Identity<T>(T value)=>value;static int M(int value,bool tag)=>Identity(value);", "T1 M<T1, T2>(T1 value, T2 tag)")
+        ];
+        foreach (var test in metadataTests)
+        {
+            var consumerTree = CSharpSyntaxTree.ParseText("#nullable enable\nclass Consumer{" + test.Source + "}", cancellationToken: cancellationToken);
+            var consumer = Program.Compile([consumerTree]).AddReferences(providerReference);
+            var result = Program.Results(consumer, cancellationToken).Single(item =>
+            { ArgumentNullException.ThrowIfNull(item); return item.Method == "M"; });
+            if (result.Status != "Suggestion" || result.Signature != test.Signature)
+            { throw new InvalidOperationException(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
+            Program.Log.Info("PASS " + test.Name);
+        }
+        foreach (var language in new[] { LanguageVersion.CSharp8, LanguageVersion.CSharp9, LanguageVersion.CSharp13 })
+        {
+            var tree = CSharpSyntaxTree.ParseText("#nullable enable\nclass LegacyContract{[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)=>Maybe(value);}", new CSharpParseOptions(language), cancellationToken: cancellationToken);
+            var compilation = Program.Compile([tree]);
+            var result = Program.Results(compilation, cancellationToken).Single(item =>
+            { ArgumentNullException.ThrowIfNull(item); return item.Method == "M"; });
+            var expected = (language == LanguageVersion.CSharp8 ? "T" : "T?") + " M<T, T1>(T value, T1 tag)";
+            if (result.Status != "Suggestion" || result.Signature != expected)
+            { throw new InvalidOperationException("Existing generic return contract " + language + ": " + result.Status + ": " + (result.Signature ?? result.Message)); }
+            Program.Log.Info("PASS ExistingGenericReturnContract" + language);
+        }
+        var nullCallerTree = CSharpSyntaxTree.ParseText("#nullable enable\nclass NullContractCaller{[return:System.Diagnostics.CodeAnalysis.NotNull]static T? Require<T>(T? value)where T:class=>value!;static string M(string? value)=>Require(value);static string Caller()=>M(null);}", cancellationToken: cancellationToken);
+        var nullCaller = Program.Compile([nullCallerTree]);
+        if (Program.Results(nullCaller, cancellationToken).Any(result =>
+            { ArgumentNullException.ThrowIfNull(result); return result.Method == "M" && result.Status == "Suggestion"; }))
+        { throw new InvalidOperationException("A null-literal caller lost its inferred generic argument."); }
+        Program.Log.Info("PASS ReturnContractRetainsUntypedNullCaller");
         const string bindingSource = """
             using System;using System.Linq;using System.Collections.Generic;
             public sealed class Seq<T>{public IEnumerable<T> Values;public Seq(IEnumerable<T> values){Values=values;}}
@@ -164,7 +238,7 @@ internal static class QueryChecks
                 policyChecks++;
             }
         }
-        return tests.Length + 3 + policyChecks;
+        return tests.Length + metadataTests.Length + 7 + policyChecks;
     }
     private sealed class RefStoreWarningOptions : SyntaxTreeOptionsProvider
     {

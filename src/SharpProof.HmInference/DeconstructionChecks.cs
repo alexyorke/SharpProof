@@ -41,8 +41,8 @@ internal static class DeconstructionChecks
             ("ExistingNullableDelegate", "static System.Func<T?> M<T>(T? value,int ignored)=>()=>value;", "Suggestion", "global::System.Func<T?> M<T, T1>(T? value, T1 ignored)"),
             ("ExistingNullableField", "static T? M<T>(Box<T> box,int ignored)=>box.Value; } class Box<T>{public T Value=default!;} class Tail {", "Suggestion", "T? M<T, T1>(global::Box<T> box, T1 ignored)"),
             ("ConstraintDeconstructShadowing", "static int M(Pair pair) {var(value,flag)=pair;return value;} } interface IDeconstruct {void Deconstruct(out int value,out bool flag);} class Pair:IDeconstruct {void IDeconstruct.Deconstruct(out int value,out bool flag){value=2;flag=true;}} static class Extensions {public static void Deconstruct<T>(this T pair,out int value,out bool flag) where T:IDeconstruct {value=1;flag=true;} } class Tail {", "Rejected", null),
-            ("NewWarningStillRejected", "static int M(int x)=>Id(x); [return:System.Diagnostics.CodeAnalysis.MaybeNull] static T Id<T>(T x)=>x;", "Rejected", null),
-            ("NewWarningSeparateSiteRejected", "static int M(int x) {string? note=null;string Local()=>note;return Id(x);} [return:System.Diagnostics.CodeAnalysis.MaybeNull] static T Id<T>(T x)=>x;", "Rejected", null),
+            ("MaybeNullReturnFlow", "static int M(int x)=>Id(x); [return:System.Diagnostics.CodeAnalysis.MaybeNull] static T Id<T>(T x)=>x;", "Suggestion", "T1? M<T1>(T1 x)"),
+            ("MaybeNullReturnFlowKeepsExistingWarning", "static int M(int x) {string? note=null;string Local()=>note;return Id(x);} [return:System.Diagnostics.CodeAnalysis.MaybeNull] static T Id<T>(T x)=>x;", "Suggestion", "T1? M<T1>(T1 x)"),
             ("NestedTupleResult", "static (int,(int,bool)) M((int,System.Collections.Generic.KeyValuePair<int,bool>) pair,int x,int y,bool z)=>(x,(y,z))=pair;", "Suggestion", "(T1, (T2, T3)) M<T1, T2, T3>((T1, global::System.Collections.Generic.KeyValuePair<T2, T3>) pair, T1 x, T2 y, T3 z)")
         ];
         var failures = new List<string>();

@@ -795,5 +795,16 @@ Task and ValueTask checks cover stores after suspension, earlier value copies,
 reference and nullable-value domains, deferred query execution, faults and
 cancellation. C# 8/9/13 CLI and packaged consumers verify these signatures.
 
+Calls and delegate invocations honor `MaybeNull` and `NotNull` return contracts,
+including contracts imported from emitted metadata. Nullable results preserve
+independent inputs and tuple siblings; arrays, existing generic parameters and
+Task/ValueTask results retain their structural relationships. Physical nullable
+value types stay intact. Ref-return reads use the contract, while ref aliases
+and writes retain the storage type. Applied fixes verify default/null results,
+identity, explicit struct constructors, suspension, faults and cancellation.
+C# 8 uses representable class/struct bounds for newly inferred nullable results;
+existing unconstrained generic return types retain their declared form there.
+Conditional, parameter and member flow contracts still need further work.
+
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).
