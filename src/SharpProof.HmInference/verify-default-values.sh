@@ -19,7 +19,16 @@ EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class IndirectConsumerCell<T>{public T Value;public IndirectConsumerCell(T value){Value=value;}public ref T Slot=>ref Value;public ref T this[int index]=>ref Value;}
+public sealed class OwnerConsumerPair<T,U>{public T Row;public U Flag;public OwnerConsumerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){row=Row;flag=Flag;}}
 public static class DefaultConsumer{
+    public static int OwnerArray(int[][] value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerEnumerable(IEnumerable<int[]> value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerList(List<int[]> value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerNested(IEnumerable<IEnumerable<int[]>> value){foreach(var batch in value)foreach(var row in batch){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerTuple((int[] row,bool flag) value){var(row,_)=value;ref var alias=ref row[0];alias=default;return alias;}
+    public static int OwnerCustom(OwnerConsumerPair<int[],bool> value){var(row,_)=value;ref var alias=ref row[0];alias=default;return alias;}
+    public static int OwnerForeachTuple(IEnumerable<(int[] row,bool flag)> value){foreach(var(row,_)in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerRef(Span<int[]> value){foreach(ref var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
     static ref T Borrow<T>(ref T value)=>ref value;
     public static int IndirectArray(int[] value){ref var alias=ref value[0];alias=default;return alias;}
     public static int IndirectMatrix(int[,] value){ref var alias=ref value[0,0];alias=default;return alias;}
@@ -40,6 +49,9 @@ public static class DefaultConsumer{
     public static (int left,int right) AliasConditional(bool flag,int first,int second){var left=first;var right=second;ref var alias=ref(flag?ref left:ref right);alias=default;return(left,right);}
     public static int AliasConditionalStore(bool flag,int value){ref var alias=ref value;alias=flag?value:default;return value;}
 #if MODERN_ALIASES
+    public static async Task<int> OwnerAsync(IAsyncEnumerable<int[]> value){await foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static async Task<int> OwnerAwaitTuple(IAsyncEnumerable<(int[] row,bool flag)> value){await foreach(var(row,_)in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OwnerMixed(int[] first,int[] second){var row=first;(row,var other)=(second,first);ref var alias=ref other[0];alias=default;return row[0];}
     public static Func<int> AliasCapture(int value){var result=value;var read=()=>result;ref var alias=ref result;alias=default;return read;}
     public static async Task<int> AliasAsync(Task<int> value){var result=await value;ref var alias=ref result;alias=default;return result;}
 #endif
@@ -98,6 +110,14 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element OwnerArray<T1>(${element}[][] value)$suffix" \
+    "$element OwnerEnumerable<T1>(global::System.Collections.Generic.IEnumerable<${element}[]> value)$suffix" \
+    "$element OwnerList<T1>(global::System.Collections.Generic.List<${element}[]> value)$suffix" \
+    "$element OwnerNested<T1>(global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.IEnumerable<${element}[]>> value)$suffix" \
+    "$element OwnerTuple<T1, T2>((${element}[] row, T2 flag) value)$suffix" \
+    "$element OwnerCustom<T1, T2>(global::OwnerConsumerPair<${element}[], T2> value)$suffix" \
+    "$element OwnerForeachTuple<T1, T2>(global::System.Collections.Generic.IEnumerable<(${element}[] row, T2 flag)> value)$suffix" \
+    "$element OwnerRef<T1>(global::System.Span<${element}[]> value)$suffix" \
     "$element IndirectArray<T1>(${element}[] value)$suffix" \
     "$element IndirectMatrix<T1>(${element}[,] value)$suffix" \
     "$element IndirectJagged<T1>(${element}[][] value)$suffix" \
@@ -140,6 +160,9 @@ EOF
     fi
   done
   if [ "$language" = 13 ]; then
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> OwnerAsync<T1>(global::System.Collections.Generic.IAsyncEnumerable<T1?[]> value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> OwnerAwaitTuple<T1, T2>(global::System.Collections.Generic.IAsyncEnumerable<(T1?[] row, T2 flag)> value)' "$log"
+    grep -Fq 'T1? OwnerMixed<T1>(T1?[] first, T1?[] second)' "$log"
     grep -Fq 'global::System.Func<T1?> AliasCapture<T1>(T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> AliasAsync<T1>(global::System.Threading.Tasks.Task<T1> value)' "$log"
   fi

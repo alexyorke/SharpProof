@@ -267,6 +267,19 @@ public static partial class Inference
             for (var i = 0; i < parameters.Length; i++)
             { probe.environment.Add(currentMethod.Parameters[i], probeParameters[i]); }
             var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            var boundDeconstructions = new HashSet<int>();
+            void BindDeconstructed(AssignmentExpressionSyntax assignment)
+            {
+                if (assignment is null)
+                { throw new ArgumentNullException(nameof(assignment)); }
+                if (!boundDeconstructions.Add(assignment.SpanStart))
+                { return; }
+                BindLocals(assignment.Right);
+                BindLocals(assignment.Left);
+                var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type ?? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType
+                    ?? throw new InferenceException("Storage deconstruction has no type.");
+                probe.BindDeconstruction(assignment.Left, probe.Expression(assignment.Right), original, AssignmentDeconstructionBinding(model, assignment));
+            }
             void BindLocals(SyntaxNode syntax)
             {
                 if (syntax is null)
@@ -277,19 +290,43 @@ public static partial class Inference
                     { continue; }
                     if (!resolving.Add(local))
                     { throw new InferenceException("Cyclic storage initializer."); }
-                    var variable = local.DeclaringSyntaxReferences.Select(reference =>
-                        { if (reference is null) { throw new ArgumentNullException(nameof(reference)); } return reference.GetSyntax(cancellationToken); }).OfType<VariableDeclaratorSyntax>().FirstOrDefault();
-                    if (variable?.Initializer is null || variable.Parent is not VariableDeclarationSyntax localDeclaration)
+                    var site = local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)
+                        ?? throw new InferenceException("Storage owner has no declaration.");
+                    var loop = site.AncestorsAndSelf().OfType<CommonForEachStatementSyntax>().FirstOrDefault(candidate =>
+                    {
+                        if (candidate is null)
+                        { throw new ArgumentNullException(nameof(candidate)); }
+                        return candidate is ForEachStatementSyntax simple && SymbolEqualityComparer.Default.Equals(model.GetDeclaredSymbol(simple, cancellationToken), local)
+                            || candidate is ForEachVariableStatementSyntax deconstructed && deconstructed.Variable.Span.Contains(site.Span);
+                    });
+                    var deconstruction = site.AncestorsAndSelf().OfType<AssignmentExpressionSyntax>().FirstOrDefault(candidate =>
+                    {
+                        if (candidate is null)
+                        { throw new ArgumentNullException(nameof(candidate)); }
+                        return candidate.Left is DeclarationExpressionSyntax or TupleExpressionSyntax && candidate.Left.Span.Contains(site.Span);
+                    });
+                    if (loop is not null)
+                    { BindLocals(loop.Expression); probe.BindIteration(loop); }
+                    else if (deconstruction is not null)
+                    { BindDeconstructed(deconstruction); }
+                    else if (site is VariableDeclaratorSyntax { Initializer: not null, Parent: VariableDeclarationSyntax localDeclaration } variable)
+                    {
+                        BindLocals(variable.Initializer.Value);
+                        var inferred = localDeclaration.Type is RefTypeSyntax referenceType ? referenceType.Type.IsVar : localDeclaration.Type.IsVar;
+                        probe.environment.Add(local, inferred ? probe.Expression(variable.Initializer.Value) : CSharpTypes.Rigid(local.Type));
+                    }
+                    else
                     { throw new InferenceException("Storage owner has no initializer."); }
-                    BindLocals(variable.Initializer.Value);
-                    var inferred = localDeclaration.Type is RefTypeSyntax referenceType ? referenceType.Type.IsVar : localDeclaration.Type.IsVar;
-                    probe.environment.Add(local, inferred ? probe.Expression(variable.Initializer.Value) : CSharpTypes.Rigid(local.Type));
                     resolving.Remove(local);
                     // Receiver copies can be reassigned to another input container.
                     foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                     {
-                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) || assignment.Right is RefExpressionSyntax
-                            || !SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol, local)
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) || assignment.Right is RefExpressionSyntax)
+                        { continue; }
+                        if (assignment.Left is TupleExpressionSyntax && assignment.Left.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(target =>
+                            { if (target is null) { throw new ArgumentNullException(nameof(target)); } return SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(target, cancellationToken).Symbol, local); }))
+                        { BindDeconstructed(assignment); continue; }
+                        if (!SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol, local)
                             || model.GetTypeInfo(assignment.Right, cancellationToken).Type is not { IsReferenceType: true })
                         { continue; }
                         BindLocals(assignment.Right);

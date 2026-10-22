@@ -19,7 +19,38 @@ internal static class DefaultValueRuntimeChecks
                 public ref T this[int index]{get{Reads++;return ref Value;}}
             }
             public sealed class IndirectPair<T,U>{public T Left;public U Right;public IndirectPair(T left,U right){Left=left;Right=right;}}
+            public sealed class OwnerPair<T,U>{public T Row;public U Flag;public int Calls;public OwnerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){Calls++;row=Row;flag=Flag;}}
+            public sealed class OwnerRows<T>:IEnumerable<T[]>,IEnumerator<T[]>{
+                public T[] Row;public T Restore;public bool RestoreOnDispose;public bool HasRow=true;public Exception? MoveError,DisposeError;
+                public int Gets,Moves,Disposals;bool moved;
+                public OwnerRows(T[] row,T restore){Row=row;Restore=restore;}
+                public IEnumerator<T[]> GetEnumerator(){Gets++;return this;}
+                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
+                public T[] Current=>Row;object System.Collections.IEnumerator.Current=>Current;
+                public bool MoveNext(){Moves++;if(MoveError!=null)throw MoveError;if(!HasRow||moved)return false;moved=true;return true;}
+                public void Reset()=>throw new NotSupportedException();
+                public void Dispose(){Disposals++;if(RestoreOnDispose)Row[0]=Restore;if(DisposeError!=null)throw DisposeError;}
+            }
+            public sealed class OwnerAsyncRows<T>:IAsyncEnumerable<T[]>,IAsyncEnumerator<T[]>{
+                public T[] Row;public T Restore;public int Gets,Moves,Disposals;public CancellationToken Token;public Exception? DisposeError;
+                public TaskCompletionSource<bool> MoveGate=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public TaskCompletionSource<bool> DisposeGate=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public TaskCompletionSource<bool> Disposing=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                public OwnerAsyncRows(T[] row,T restore){Row=row;Restore=restore;}
+                public IAsyncEnumerator<T[]> GetAsyncEnumerator(CancellationToken cancellationToken=default){Gets++;Token=cancellationToken;return this;}
+                public T[] Current=>Row;
+                public ValueTask<bool> MoveNextAsync(){Moves++;return new ValueTask<bool>(MoveGate.Task);}
+                public async ValueTask DisposeAsync(){Disposals++;Disposing.SetResult(true);await DisposeGate.Task;Row[0]=Restore;if(DisposeError!=null)throw DisposeError;}
+            }
             public static class DefaultProbe{
+                public static int OwnerEnumerable(IEnumerable<int[]> value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+                public static int OwnerTuple((int[] row,int flag) value){var(row,_)=value;ref var alias=ref row[0];alias=default;return alias;}
+                public static int OwnerCustom(OwnerPair<int[],int> value){var(row,_)=value;ref var alias=ref row[0];alias=default;return alias;}
+                public static int OwnerForeachCustom(IEnumerable<OwnerPair<int[],int>> value){foreach(var(row,_)in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+                public static int OwnerMixed(int[] first,int[] second){var row=first;(row,var other)=(second,first);ref var alias=ref other[0];alias=default;return row[0];}
+                public static int OwnerForeachTuple(IEnumerable<(int[] row,int flag)> value){foreach(var(row,_)in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+                public static int OwnerRef(Span<int[]> value){foreach(ref var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
+                public static async Task<int> OwnerAsync(IAsyncEnumerable<int[]> value,CancellationToken cancellationToken){await foreach(var row in value.WithCancellation(cancellationToken)){ref var alias=ref row[0];alias=default;return alias;}return default;}
                 public static int IndirectSibling(IndirectPair<int,int> pair){ref var alias=ref pair.Left;alias=default;return pair.Right;}
                 public static long IndirectWidening(long[] value,int fill){value[0]=fill;var copy=value[0];ref var alias=ref value[0];alias=default;return copy;}
                 public static int? IndirectLift(int?[] value,int fill){value[0]=fill;ref var alias=ref value[0];alias=default;return alias;}
@@ -77,6 +108,7 @@ internal static class DefaultValueRuntimeChecks
             public static class OriginalDefaultRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     if(!Indirect())return false;
+                    if(!await Owners(cancellationToken))return false;
                     foreach(bool flag in new[]{false,true}){
                         int expected=flag?7:0;
                         if(DefaultProbe.Assigned(!flag,7)!=expected||await DefaultProbe.AssignedAsync(!flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected)return false;
@@ -143,6 +175,38 @@ internal static class DefaultValueRuntimeChecks
                         ||DefaultProbe.IndirectIndexer(indexer)!=0||indexer.Value!=0||indexer.Reads!=1||DefaultProbe.IndirectTuple((7,9))!=0)return false;
                     int[] first={7},second={9};return DefaultProbe.IndirectRebind(first,second)==0&&first[0]==7&&second[0]==0;
                 }
+                static async Task<bool> Owners(CancellationToken cancellationToken){
+                    var rows=new OwnerRows<int>(new[]{7},99){RestoreOnDispose=true};
+                    if(DefaultProbe.OwnerEnumerable(rows)!=0||rows.Row[0]!=99||rows.Gets!=1||rows.Moves!=1||rows.Disposals!=1)return false;
+                    var empty=new OwnerRows<int>(new[]{7},99){HasRow=false};if(DefaultProbe.OwnerEnumerable(empty)!=0||empty.Disposals!=1)return false;
+                    var failure=new InvalidOperationException("owner-move");var failed=new OwnerRows<int>(new[]{7},99){MoveError=failure};
+                    try{_=DefaultProbe.OwnerEnumerable(failed);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){}
+                    if(failed.Row[0]!=7||failed.Disposals!=1)return false;
+                    var disposal=new OwnerRows<int>(new[]{7},99){DisposeError=failure};
+                    try{_=DefaultProbe.OwnerEnumerable(disposal);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){}
+                    if(disposal.Row[0]!=0||disposal.Disposals!=1)return false;
+                    int[] tupleRow={7},customRow={7},foreachRow={7},spanRow={7};var pair=new OwnerPair<int[],int>(customRow,1);
+                    int[] first={7},second={9};var loopPair=new OwnerPair<int[],int>(new[]{7},1);
+                    if(DefaultProbe.OwnerMixed(first,second)!=9||first[0]!=0||second[0]!=9
+                        ||DefaultProbe.OwnerForeachCustom(new[]{loopPair})!=0||loopPair.Row[0]!=0||loopPair.Calls!=1)return false;
+                    if(DefaultProbe.OwnerTuple((tupleRow,1))!=0||tupleRow[0]!=0||DefaultProbe.OwnerCustom(pair)!=0||customRow[0]!=0||pair.Calls!=1
+                        ||DefaultProbe.OwnerForeachTuple(new[]{(foreachRow,1)})!=0||foreachRow[0]!=0||DefaultProbe.OwnerRef(new[]{spanRow}.AsSpan())!=0||spanRow[0]!=0)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Empty","Fault","Cancel","DisposeFault","DisposeCancel"}){
+                        var source=new OwnerAsyncRows<int>(new[]{7},99);var pending=DefaultProbe.OwnerAsync(source,cancellationToken);
+                        if(outcome=="DisposeFault")source.DisposeError=failure;
+                        if(pending.IsCompleted)return false;
+                        if(outcome=="Fault")source.MoveGate.SetException(failure);else if(outcome=="Cancel")source.MoveGate.SetCanceled(canceled.Token);else source.MoveGate.SetResult(outcome is "Value" or "DisposeFault" or "DisposeCancel");
+                        await source.Disposing.Task.WaitAsync(cancellationToken);
+                        if(pending.IsCompleted||source.Gets!=1||source.Moves!=1||source.Disposals!=1||source.Token!=cancellationToken||source.Row[0]!=(outcome is "Value" or "DisposeFault" or "DisposeCancel"?0:7))return false;
+                        if(outcome=="DisposeCancel")source.DisposeGate.SetCanceled(canceled.Token);else source.DisposeGate.SetResult(true);
+                        try{if(await pending.WaitAsync(cancellationToken)!=0||outcome is "Fault" or "Cancel" or "DisposeFault" or "DisposeCancel")return false;}
+                        catch(InvalidOperationException error)when(outcome is "Fault" or "DisposeFault"&&ReferenceEquals(error,failure)){}
+                        catch(OperationCanceledException error)when(outcome is "Cancel" or "DisposeCancel"&&error.CancellationToken==canceled.Token){}
+                        if(source.Row[0]!=(outcome=="DisposeCancel"?0:99))return false;
+                    }
+                    return true;
+                }
             }
             """;
         const string newSource = """
@@ -153,6 +217,7 @@ internal static class DefaultValueRuntimeChecks
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     string text=new string('x',2);
                     if(!Indirect(text))return false;
+                    if(!await Owners(text,cancellationToken))return false;
                     string other=new string('y',2);string? slot=text;decimal? number=23m;
                     if(DefaultProbe.Alias(text)!=null||DefaultProbe.AliasLocal(text)!=null||DefaultProbe.AliasChain(text)!=null||DefaultProbe.AliasReset(text)!=null
                         ||!ReferenceEquals(DefaultProbe.AliasCopy(text),text)||DefaultProbe.AliasCopy(text).Length!=text.Length||DefaultProbe.AliasCapture(text)()!=null||DefaultProbe.AliasRef(ref slot)!=null||slot!=null
@@ -204,6 +269,21 @@ internal static class DefaultValueRuntimeChecks
                     numbers[0]=23m;if(DefaultProbe.IndirectLift(numbers,23m)!=null||numbers[0]!=null)return false;
                     var numberCell=new IndirectCell<decimal?>(23m);if(DefaultProbe.IndirectProperty(numberCell)!=null||numberCell.Value!=null)return false;
                     string?[] first={text},second={text};return DefaultProbe.IndirectRebind(first,second)==null&&ReferenceEquals(first[0],text)&&second[0]==null;
+                }
+                static async Task<bool> Owners(string text,CancellationToken cancellationToken){
+                    string other=new string('z',2);var rows=new OwnerRows<string?>(new[]{(string?)text},other){RestoreOnDispose=true};
+                    if(DefaultProbe.OwnerEnumerable(rows)!=null||!ReferenceEquals(rows.Row[0],other)||rows.Gets!=1||rows.Moves!=1||rows.Disposals!=1)return false;
+                    string?[] tupleRow={text},customRow={text},foreachRow={text},spanRow={text};var pair=new OwnerPair<string?[],Uri>(customRow,new Uri("https://example.invalid/owner"));
+                    string?[] first={text},second={other};var loopPair=new OwnerPair<string?[],string>(new[]{(string?)text},other);
+                    if(!ReferenceEquals(DefaultProbe.OwnerMixed(first,second),other)||first[0]!=null||!ReferenceEquals(second[0],other)
+                        ||DefaultProbe.OwnerForeachCustom(new[]{loopPair})!=null||loopPair.Row[0]!=null||loopPair.Calls!=1)return false;
+                    if(DefaultProbe.OwnerTuple((tupleRow,other))!=null||tupleRow[0]!=null||DefaultProbe.OwnerCustom(pair)!=null||customRow[0]!=null||pair.Calls!=1
+                        ||DefaultProbe.OwnerForeachTuple(new[]{(foreachRow,other)})!=null||foreachRow[0]!=null||DefaultProbe.OwnerRef(new[]{spanRow}.AsSpan())!=null||spanRow[0]!=null)return false;
+                    var source=new OwnerAsyncRows<string?>(new[]{(string?)text},other);var pending=DefaultProbe.OwnerAsync(source,cancellationToken);
+                    if(pending.IsCompleted)return false;source.MoveGate.SetResult(true);await source.Disposing.Task.WaitAsync(cancellationToken);
+                    if(pending.IsCompleted||source.Row[0]!=null||source.Disposals!=1||source.Token!=cancellationToken)return false;
+                    source.DisposeGate.SetResult(true);if(await pending.WaitAsync(cancellationToken)!=null||!ReferenceEquals(source.Row[0],other))return false;
+                    decimal?[] numberRow={23m};var numbers=new OwnerRows<decimal?>(numberRow,99m);return DefaultProbe.OwnerEnumerable(numbers)==null&&numberRow[0]==null&&numbers.Disposals==1;
                 }
             }
             """;

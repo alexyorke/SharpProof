@@ -157,26 +157,30 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(loop)); }
             return Scoped(() =>
             {
-                var info = model.GetForEachStatementInfo(loop);
-                var element = EnumerationElement(loop, info);
-                if (loop is ForEachStatementSyntax simple)
-                {
-                    var iteration = element;
-                    var iterationSyntax = simple.Type is RefTypeSyntax referenceType ? referenceType.Type : simple.Type;
-                    if (!iterationSyntax.IsVar)
-                    {
-                        HmType.Unify(element, CSharpTypes.Rigid(info.ElementType!));
-                        iteration = CSharpTypes.Rigid(model.GetTypeInfo(iterationSyntax, cancellationToken).Type!);
-                    }
-                    environment.Add(model.GetDeclaredSymbol(simple, cancellationToken)!, iteration);
-                }
-                else if (loop is ForEachVariableStatementSyntax deconstructed)
-                {
-                    BindDeconstruction(deconstructed.Variable, element, info.ElementType!, model.GetDeconstructionInfo(deconstructed));
-
-                }
+                BindIteration(loop);
                 return LoopFlow(Branch(loop.Statement));
             });
+        }
+
+        private void BindIteration(CommonForEachStatementSyntax loop)
+        {
+            if (loop is null)
+            { throw new ArgumentNullException(nameof(loop)); }
+            var info = model.GetForEachStatementInfo(loop);
+            var element = EnumerationElement(loop, info);
+            if (loop is ForEachStatementSyntax simple)
+            {
+                var iteration = element;
+                var iterationSyntax = simple.Type is RefTypeSyntax referenceType ? referenceType.Type : simple.Type;
+                if (!iterationSyntax.IsVar)
+                {
+                    HmType.Unify(element, CSharpTypes.Rigid(info.ElementType!));
+                    iteration = CSharpTypes.Rigid(model.GetTypeInfo(iterationSyntax, cancellationToken).Type!);
+                }
+                environment.Add(model.GetDeclaredSymbol(simple, cancellationToken)!, iteration);
+            }
+            else if (loop is ForEachVariableStatementSyntax deconstructed)
+            { BindDeconstruction(deconstructed.Variable, element, info.ElementType!, model.GetDeconstructionInfo(deconstructed)); }
         }
 
         private bool PreservesForEachBindings(SyntaxNode before, SyntaxNode after, SemanticModel beforeModel, SemanticModel changedModel, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)
