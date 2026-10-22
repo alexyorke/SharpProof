@@ -9,6 +9,24 @@ internal static class DefaultValueChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("DefaultAssignedLocal", "static int M(int value,int tag){var result=value;result=default;return result;}", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("DefaultAssignedBranch", "static int M(bool flag,int value,int tag){var result=value;if(flag)result=default;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag)"),
+            ("DefaultAssignedParameter", "static int M(int value,int tag){value=default;return value;}", "T1? M<T1, T2>(T1? value, T2 tag)"),
+            ("DefaultAssignedCopy", "static int M(int value,int tag){var result=value;var copy=result;result=default;return copy;}", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("DefaultAssignedReplacement", "static int M(bool flag,int value,int other,int tag){var result=value;if(flag)result=default;else result=other;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T1 other, T2 tag)"),
+            ("DefaultAssignedCallback", "static Func<int> M(int value,int tag){var result=value;Func<int> read=()=>result;result=default;return read;}", "global::System.Func<int> M<T1>(int value, T1 tag)"),
+            ("DefaultAssignedNaturalCallback", "static int M(int value,int tag){var result=value;var read=()=>result;result=default;return read();}", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("DefaultAssignedLocalFunction", "static int M(int value,int tag){var result=value;int Read()=>result;result=default;return Read();}", "int M<T1>(int value, T1 tag)"),
+            ("DefaultAssignedLocalReset", "static int M(int value,int tag){var result=value;void Reset(){result=default;}Reset();return result;}", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("DefaultAssignedLambdaReset", "static int M(int value,int tag){var result=value;Action reset=()=>{result=default;};reset();return result;}", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("DefaultAssignedMixedCapture", "static int M(bool flag,int value,int tag){var result=value;void Reset(){result=default;}if(flag)Reset();else result=default!;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag)"),
+            ("DefaultAssignedAsync", "static async Task<int> M(bool flag,Task<int> value,int tag){var result=await value;if(flag)result=default;return result;}", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(bool flag, global::System.Threading.Tasks.Task<T1> value, T2 tag)"),
+            ("DefaultAssignedLoop", "static int M(bool flag,int value,int tag){var result=value;while(flag){result=default;break;}return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag)"),
+            ("DefaultAssignedTuple", "static (int left,int right) M((int left,int right) value,int tag){var result=value;result=default;return result;}", "(T1? left, T2? right) M<T1, T2, T3>((T1 left, T2 right) value, T3 tag)"),
+            ("DefaultAssignedArray", "static int M(int[] values,int tag){values[0]=default;return values[0];}", "T1? M<T1, T2>(T1?[] values, T2 tag)"),
+            ("DefaultAssignedList", "static int M(List<int> values,int tag){values[0]=default;return values[0];}", "T1? M<T1, T2>(global::System.Collections.Generic.List<T1?> values, T2 tag)"),
+            ("DefaultAssignedTypedControl", "static int M(int value,int tag){int result=value;result=default;return result;}", "int M<T1>(int value, T1 tag)"),
+            ("DefaultAssignedRefControl", "static int M(int value,int tag){ref var result=ref value;result=default;return result;}", "T1 M<T1, T2>(T1 value, T2 tag) where T1 : struct"),
             ("DefaultInferredLocal", "static int M(bool flag,int value,int tag){var result=flag?value:default;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag)"),
             ("DefaultUnusedCallback", "static int M(bool flag,int value,int tag){var read=()=>flag?value:default;_=read();return value;}", "T1 M<T1, T2>(bool flag, T1 value, T2 tag)"),
             ("DefaultCatch", "static int M(bool flag,int value,int tag){try{if(flag)throw new InvalidOperationException();return value;}catch(InvalidOperationException){return default;}}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag)"),
@@ -66,15 +84,19 @@ internal static class DefaultValueChecks
             {
                 if (nullable && version == LanguageVersion.CSharp7_3)
                 { continue; }
-                var tree = CSharpSyntaxTree.ParseText((nullable ? "#nullable enable\n" : "") + "class Cases{static int M(bool flag,int value,int tag)=>flag?value:default;}", new CSharpParseOptions(version), cancellationToken: cancellationToken);
-                var result = Program.Results(Program.Compile([tree]), cancellationToken).Single();
-                var signature = !nullable ? "T1 M<T1, T2>(bool flag, T1 value, T2 tag)"
-                    : version < LanguageVersion.CSharp9 ? "T1 M<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct" : "T1? M<T1, T2>(bool flag, T1 value, T2 tag)";
-                if (result.Status != "Suggestion" || result.Signature != signature)
-                { failures.Add("Default version " + version + " nullable=" + nullable + ": expected " + signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
-                else
-                { Program.Log.Info("PASS DefaultValue" + version + "Nullable" + nullable); }
-                versionChecks++;
+                foreach (var assigned in new[] { false, true })
+                {
+                    var body = assigned ? "static int M(bool flag,int value,int tag){var result=value;if(flag)result=default;return result;}" : "static int M(bool flag,int value,int tag)=>flag?value:default;";
+                    var tree = CSharpSyntaxTree.ParseText((nullable ? "#nullable enable\n" : "") + "class Cases{" + body + "}", new CSharpParseOptions(version), cancellationToken: cancellationToken);
+                    var result = Program.Results(Program.Compile([tree]), cancellationToken).Single();
+                    var signature = !nullable ? "T1 M<T1, T2>(bool flag, T1 value, T2 tag)"
+                        : version < LanguageVersion.CSharp9 ? "T1 M<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct" : "T1? M<T1, T2>(bool flag, T1 value, T2 tag)";
+                    if (result.Status != "Suggestion" || result.Signature != signature)
+                    { failures.Add("Default version " + version + " nullable=" + nullable + ": expected " + signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
+                    else
+                    { Program.Log.Info("PASS DefaultValue" + version + "Nullable" + nullable + "Assigned" + assigned); }
+                    versionChecks++;
+                }
             }
         }
         foreach (var (name, body) in new[]

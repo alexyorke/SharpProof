@@ -154,6 +154,13 @@ public static partial class Inference
             for (var i = 0; i < parameters.Length; i++)
             { ImportConstructedConstraints(symbol.Parameters[i].Type, parameters[i]); }
             currentMethod = symbol;
+            // A parameter declaration also owns mutable storage; its annotation
+            // must admit default writes before rendering the public signature.
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                if (symbol.Parameters[i].RefKind == RefKind.None)
+                { parameters[i] = DefaultStoredValue(symbol.Parameters[i], parameters[i]); }
+            }
             // Seed the declared structure so recursive nullable results do not acquire
             // an extra nullable wrapper while the body is still being inferred.
             var recursiveReturn = CSharpTypes.Erase(symbol.ReturnType);
@@ -971,7 +978,7 @@ public static partial class Inference
                         if (assignment.Right is not RefExpressionSyntax && AssignmentTarget(assignment.Left).FreeVariables().Count == 0
                             && StorageType(assignment.Left) is { } fixedTarget)
                         { return FixedContextValue(assignment.Right, fixedTarget); }
-                        return AssignValue(assignment.Left, Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
+                        return AssignValue(assignment.Left, ScalarDefaultValue(assignment.Right, StorageType(assignment.Left)) ?? Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
                             ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 
@@ -1004,7 +1011,7 @@ public static partial class Inference
                     var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
                     if (symbol is not null && environment.TryGetValue(symbol, out var type))
                     {
-                        return type;
+                        return CapturedDefaultValue(identifier, symbol, type);
                     }
 
                     // Captured constructor parameters retain their instance storage type.
@@ -1290,6 +1297,17 @@ public static partial class Inference
 
             var target = AssignmentTarget(targetSyntax);
             var targetType = StorageType(targetSyntax);
+            if (targetSyntax is IdentifierNameSyntax && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is { } storage
+                && storage is ILocalSymbol or IParameterSymbol
+                && (HasDefaultValueAnnotation(target) || HasDefaultValueAnnotation(value)))
+            {
+                var merged = MergeDefaultValues(target, value);
+                if (storage is ILocalSymbol { RefKind: not RefKind.None } or IParameterSymbol { RefKind: not RefKind.None })
+                { RequireKeyword(ConversionCore(merged), "struct"); HmType.Unify(target, ConversionCore(merged)); return target; }
+                environment[storage] = merged;
+                defaultAssignedStorages.Add(storage);
+                return merged;
+            }
             if (sourceType is not null && SymbolEqualityComparer.Default.Equals(targetType, sourceType)
                 && sourceType is not IDynamicTypeSymbol && targetType is not IDynamicTypeSymbol
                 && !IsDynamicIdentityBoundary(sourceType, targetType) && target.FreeVariables().Count == 0

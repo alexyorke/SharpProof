@@ -70,6 +70,12 @@ public static partial class Inference
             { return; }
             foreach (var entry in copies)
             { HmType.Unify(entry.Key, entry.Value); }
+            defaultValueAnnotations.UnionWith(nested.defaultValueAnnotations);
+            foreach (var storage in nested.defaultAssignedStorages)
+            {
+                if (environment.TryGetValue(storage, out var previous) && nested.environment.TryGetValue(storage, out var written))
+                { environment[storage] = MergeDefaultValues(previous, written); defaultAssignedStorages.Add(storage); }
+            }
             inferredConstraints.AddRange(nested.inferredConstraints);
             conversionTargets.AddRange(nested.conversionTargets);
             conversionBounds.AddRange(nested.conversionBounds);

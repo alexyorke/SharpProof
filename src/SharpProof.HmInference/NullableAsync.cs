@@ -221,6 +221,61 @@ public static partial class Inference
             return BindDeclaredReturn(expression, targetShape, converted);
         }
         private readonly HashSet<HmType> defaultValueAnnotations = [];
+        private readonly HashSet<ISymbol> defaultAssignedStorages = new(SymbolEqualityComparer.Default);
+        private Dictionary<ISymbol, List<ExpressionSyntax>>? defaultStores;
+
+        private HmType CapturedDefaultValue(IdentifierNameSyntax identifier, ISymbol symbol, HmType type)
+        {
+            if (identifier is null)
+            { throw new ArgumentNullException(nameof(identifier)); }
+            if (symbol is null)
+            { throw new ArgumentNullException(nameof(symbol)); }
+            if (type is null)
+            { throw new ArgumentNullException(nameof(type)); }
+            if (symbol is not (ILocalSymbol or IParameterSymbol)
+                || defaultStores is not null && !defaultStores.ContainsKey(symbol))
+            { return type; }
+            // Captured writes may run after their body was analyzed. Join their
+            // lifetime even when compiler flow still assumes the earlier value.
+            return DefaultStoredValue(symbol, type, SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, model.GetEnclosingSymbol(identifier.SpanStart, cancellationToken)));
+        }
+
+        private HmType DefaultStoredValue(ISymbol symbol, HmType type, bool onlyCapturedWrites = false)
+        {
+            if (symbol is null)
+            { throw new ArgumentNullException(nameof(symbol)); }
+            if (type is null)
+            { throw new ArgumentNullException(nameof(type)); }
+            if (defaultStores is null)
+            {
+                defaultStores = new(SymbolEqualityComparer.Default);
+                if (currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is { } declaration)
+                {
+                    foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Left is IdentifierNameSyntax
+                            && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } assigned
+                            && assigned is ILocalSymbol or IParameterSymbol
+                            && ScalarDefaultValue(assignment.Right, StorageType(assignment.Left)) is not null)
+                        {
+                            if (!defaultStores.TryGetValue(assigned, out var stores))
+                            { stores = []; defaultStores.Add(assigned, stores); }
+                            stores.Add(assignment.Right);
+                        }
+                    }
+                }
+            }
+            var storageType = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, _ => null };
+            if (storageType is null || !defaultStores.TryGetValue(symbol, out var literals))
+            { return type; }
+            foreach (var literal in literals)
+            {
+                if ((!onlyCapturedWrites || !SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, model.GetEnclosingSymbol(literal.SpanStart, cancellationToken)))
+                    && ScalarDefaultValue(literal, storageType) is { } value)
+                { type = MergeDefaultValues(type, value); }
+            }
+            return type;
+        }
 
         private HmType? ScalarDefaultValue(ExpressionSyntax expression, ITypeSymbol target)
         {

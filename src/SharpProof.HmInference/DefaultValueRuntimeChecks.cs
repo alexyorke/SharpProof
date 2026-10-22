@@ -14,6 +14,16 @@ internal static class DefaultValueRuntimeChecks
             #nullable enable
             using System;using System.Collections.Generic;using System.Linq;using System.Threading;using System.Threading.Tasks;
             public static class DefaultProbe{
+                public static int Assigned(bool flag,int value){var result=value;if(flag)result=default;return result;}
+                public static int Parameter(int value){value=default;return value;}
+                public static int Reset(int value){var result=value;void Clear(){result=default;}Clear();return result;}
+                public static int LambdaReset(int value){var result=value;Action clear=()=>{result=default;};clear();return result;}
+                public static int ArrayStore(int[] values){values[0]=default;return values[0];}
+                public static int ListStore(List<int> values){values[0]=default;return values[0];}
+                public static int Copy(int value){var result=value;var copy=result;result=default;return copy;}
+                public static Func<int> Captured(int value){var result=value;var read=()=>result;result=default;return read;}
+                public static int Alias(int value){ref var result=ref value;result=default;return result;}
+                public static async Task<int> AssignedAsync(bool flag,Task<int> value){var result=await value;if(flag)result=default;return result;}
                 public static int First(IEnumerable<int> values){using var e=values.GetEnumerator();return e.MoveNext()?e.Current:default;}
                 public static int Choose(bool flag,int value)=>flag?value:default;
                 public static int Branch(bool flag,int value){if(flag)return value;return default;}
@@ -32,11 +42,15 @@ internal static class DefaultValueRuntimeChecks
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     foreach(bool flag in new[]{false,true}){
                         int expected=flag?7:0;
+                        if(DefaultProbe.Assigned(!flag,7)!=expected||await DefaultProbe.AssignedAsync(!flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected)return false;
                         if(DefaultProbe.Choose(flag,7)!=expected||DefaultProbe.Branch(flag,7)!=expected||DefaultProbe.Callback(flag,7)()!=expected
                             ||DefaultProbe.Tuple(flag,(7,8))!=(flag?(7,8):(0,0))||DefaultProbe.Box(flag,7) is not int boxed||boxed!=expected)return false;
                         if(await DefaultProbe.Async(flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected
                             ||await DefaultProbe.ValueAsync(flag,new ValueTask<int>(7)).AsTask().WaitAsync(cancellationToken)!=expected)return false;
                     }
+                    if(DefaultProbe.Copy(7)!=7||DefaultProbe.Parameter(7)!=0||DefaultProbe.Captured(7)()!=0||DefaultProbe.Alias(7)!=0)return false;
+                    int[] stored={7};var list=new List<int>{7};
+                    if(DefaultProbe.Reset(7)!=0||DefaultProbe.LambdaReset(7)!=0||DefaultProbe.ArrayStore(stored)!=0||stored[0]!=0||DefaultProbe.ListStore(list)!=0||list[0]!=0)return false;
                     if(DefaultProbe.First(Array.Empty<int>())!=0||DefaultProbe.First(new[]{7})!=7||!DefaultProbe.Iterator(7).SequenceEqual(new[]{7,0})||DefaultProbe.Coalesce((int?)null)!=0
                         ||DefaultProbe.Assign((int?)null) is not { } assigned||assigned!=0)return false;
                     var items=new List<int>();await foreach(var item in DefaultProbe.AsyncIterator(7).WithCancellation(cancellationToken))items.Add(item);
@@ -46,6 +60,8 @@ internal static class DefaultValueRuntimeChecks
                         var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
                         var pending=DefaultProbe.Async(true,gate.Task);
                         var valuePending=DefaultProbe.ValueAsync(true,new ValueTask<int>(gate.Task)).AsTask();
+                        var assignedPending=DefaultProbe.AssignedAsync(true,gate.Task);
+                        if(assignedPending.IsCompleted)return false;
                         if(pending.IsCompleted||valuePending.IsCompleted||!DefaultProbe.Async(false,gate.Task).IsCompletedSuccessfully
                             ||!DefaultProbe.ValueAsync(false,new ValueTask<int>(gate.Task)).IsCompletedSuccessfully)return false;
                         var failure=new InvalidOperationException("default-await");
@@ -55,6 +71,9 @@ internal static class DefaultValueRuntimeChecks
                             catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
                             catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
                         }
+                        try{if(await assignedPending.WaitAsync(cancellationToken)!=0||outcome!="Value")return false;}
+                        catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                        catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
                     }
                     return true;
                 }
@@ -67,13 +86,19 @@ internal static class DefaultValueRuntimeChecks
             public static class NewDefaultRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     string text=new string('x',2);
+                    string?[] stored={text};var list=new List<string?>{text};
+                    if(DefaultProbe.Reset(text)!=null||DefaultProbe.LambdaReset(text)!=null||DefaultProbe.ArrayStore(stored)!=null||stored[0]!=null||DefaultProbe.ListStore(list)!=null||list[0]!=null)return false;
+                    if(DefaultProbe.Assigned(true,text)!=null||!ReferenceEquals(DefaultProbe.Assigned(false,text),text)
+                        ||DefaultProbe.Parameter(text)!=null||!ReferenceEquals(DefaultProbe.Copy(text),text)||DefaultProbe.Captured(text)()!=null
+                        ||DefaultProbe.Assigned(true,(decimal?)23m)!=null||DefaultProbe.Assigned(true,23m)!=0m||DefaultProbe.Alias(23m)!=0m
+                        ||await DefaultProbe.AssignedAsync(true,Task.FromResult(text)).WaitAsync(cancellationToken)!=null)return false;
                     if(DefaultProbe.First(Array.Empty<string>())!=null||!ReferenceEquals(DefaultProbe.First(new[]{text}),text)||!ReferenceEquals(DefaultProbe.Choose(true,text),text)||DefaultProbe.Choose(false,text)!=null
                         ||DefaultProbe.Branch(false,text)!=null||DefaultProbe.Callback(false,text)()!=null
                         ||!DefaultProbe.Iterator(text).SequenceEqual(new string?[]{text,null}))return false;
                     if(DefaultProbe.Choose(false,23m)!=0m||DefaultProbe.Choose(true,23m)!=23m
                         ||DefaultProbe.Choose(false,(decimal?)23m)!=null||DefaultProbe.Choose(true,(decimal?)23m)!=23m)return false;
                     var original=new ConstructorProbe();ConstructorProbe.Calls=0;
-                    if(DefaultProbe.Choose(false,original).Value!=0||ConstructorProbe.Calls!=0)return false;
+                    if(DefaultProbe.Choose(false,original).Value!=0||DefaultProbe.Assigned(true,original).Value!=0||DefaultProbe.Alias(original).Value!=0||ConstructorProbe.Calls!=0)return false;
                     if(DefaultProbe.Tuple(false,(text,23m))!=(null,0m)||DefaultProbe.Tuple(true,(text,23m))!=(text,23m))return false;
                     if(DefaultProbe.Coalesce((decimal?)null)!=0m||DefaultProbe.Assign((decimal?)null) is not { } zero||zero!=0m
                         ||DefaultProbe.Box(false,23m) is not decimal boxed||boxed!=0m)return false;

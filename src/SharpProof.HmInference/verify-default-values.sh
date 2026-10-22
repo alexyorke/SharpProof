@@ -17,6 +17,12 @@ EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Collections.Generic;using System.Threading.Tasks;
 public static class DefaultConsumer{
+    public static int Assigned(bool flag,int value){var result=value;if(flag)result=default;return result;}
+    public static int Parameter(int value){value=default;return value;}
+    public static int Reset(int value){var result=value;void Clear(){result=default;}Clear();return result;}
+    public static int ArrayStore(int[] values){values[0]=default;return values[0];}
+    public static int ListStore(List<int> values){values[0]=default;return values[0];}
+    public static async Task<int> AssignedAsync(bool flag,Task<int> value){var result=await value;if(flag)result=default;return result;}
     public static int Choose(bool flag,int value)=>flag?value:default;
     public static int Branch(bool flag,int value){if(flag)return value;return default;}
     public static Func<int> Callback(bool flag,int value)=>()=>flag?value:default;
@@ -66,6 +72,12 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element Assigned<T1>(bool flag, T1 value)$suffix" \
+    "$element Parameter<T1>($element value)$suffix" \
+    "$element Reset<T1>(T1 value)$suffix" \
+    "$element ArrayStore<T1>(${element}[] values)$suffix" \
+    "$element ListStore<T1>(global::System.Collections.Generic.List<$element> values)$suffix" \
+    "global::System.Threading.Tasks.Task<$element> AssignedAsync<T1>(bool flag, global::System.Threading.Tasks.Task<T1> value)$suffix" \
     "$element Choose<T1>(bool flag, T1 value)$suffix" \
     "$element Branch<T1>(bool flag, T1 value)$suffix" \
     "global::System.Func<$element> Callback<T1>(bool flag, T1 value)$suffix" \
