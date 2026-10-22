@@ -109,6 +109,49 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Boolean case meaning and metadata provenance
+
+Additional compiler-to-native controls exercise Boolean negation, explicit
+Boolean conversion, literal conditions and a separate Boolean input without a
+declared distribution. They compare both case bounds and the rounded weighted
+bound against independently executed allocation counts. The separate flag
+retains the maximum branch cost in both modeled cases; no distribution is
+invented for it. A companion control requires dependencies from both reviewed
+`Math.Min`/`Math.Max` branches to remain in the native proof evidence and be
+marked as used.
+
+All 663 native resource-contract cases passed on the final source with zero
+build warnings or errors (`artifacts/resource-boolean-branches-tests-verified.log`).
+The earlier metadata assertion failed `CA1861`; a shared readonly witness array
+resolved that test-only finding. Full quality/API checks passed
+(`artifacts/resource-boolean-branches-lint-final.log`), and the final canonical
+private formatter copied zero source changes
+(`artifacts/resource-boolean-branches-format-final.log`).
+
+Published `0fb889b1b` passed complete canonical CI (39798309137) and completed
+all fifteen coverage shards in run 39798308654.
+Aggregation measured 6809/7007 changed trusted lines (97.17%, 198 gaps), failing
+the unchanged 100% minimum. Compared with `2ddc058d8`, coverage closed the
+external-write lifetime rejection, child-isolation rejection and child-cost
+ceiling-division substitution lines. The complete report for merge
+`80e1a6835a241c1cf38c5806a1f5e02ff1dd2a1a` is retained at
+`artifacts/resource-0fb889-coverage-evidence/coverage/SharpProof.coverage.json`.
+This report predates the current Boolean controls and does not qualify them.
+
+The exception-message audit reached
+[`EEException::CreateThrowable`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp#L1002).
+It allocates the exception, invokes its default constructor, and can then
+allocate a replacement managed message string when `GetThrowableMessage`
+supplies specialized text. The existing fixed-instance component covers
+neither the constructor's resource initialization nor that replacement string.
+Both remain explicit obligations before root byte composition. The source's
+immutable blob identity, byte count and SHA-256 are retained in the ignored
+research manifest. No runtime-byte admission changed.
+
+The retry of package run 39792643381 (attempt 2) passed for published
+`2ddc058d8`, resolving its archive TLS timeout. This predecessor consumer pass
+does not qualify the subsequent head or close the coverage requirement.
+
 ### Lifetime replay rejects external writes after allocation
 
 Four execution controls allocate and return an owned primitive array, with a

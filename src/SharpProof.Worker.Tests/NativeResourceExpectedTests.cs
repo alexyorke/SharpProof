@@ -9,6 +9,75 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    private static readonly string[] BooleanCaseMetadataWitnesses = ["bcl.math.min.int32-int32", "bcl.math.max.int32-int32"];
+
+    [Test]
+    public async Task BooleanCasesPreserveMetadataDependenciesFromBothBranches()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedElements,0)] public static void Target(int n," +
+            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {int value=System.Math.Max(n,0);} " +
+            "else {int value=System.Math.Min(n,0);}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var dependencies = result.ResourceBound!.MetadataAssumptions;
+        Assert.That(dependencies.Select(static dependency => dependency is null ? throw new ArgumentNullException(nameof(dependency)) :
+            dependency.WitnessIdentifier), Is.EquivalentTo(BooleanCaseMetadataWitnesses));
+        foreach (var dependency in dependencies)
+        {
+            Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                assumption.Id == dependency.AssumptionId).Used, Is.True);
+        }
+    }
+
+    [TestCase("!selected", 7, 2, 6)]
+    [TestCase("(bool)selected", 2, 7, 4)]
+    [TestCase("true", 7, 7, 7)]
+    [TestCase("false", 2, 2, 2)]
+    [TestCase("other", 7, 7, 7)]
+    public async Task BooleanInputModelsPreserveBranchMeaningWithoutModelingOtherFlags(string condition,
+        int falseUpper, int trueUpper, int expectedUpper)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedElements,7)] public static void Target(" +
+            "[ResourceBooleanInput(1,3)] bool selected,bool other) {if(" + condition +
+            ") {var a=new int[7];} else {var b=new int[2];}} }";
+        var target = Read(CreateArtifact(source));
+        var token = TestContext.CurrentContext.CancellationToken;
+        var check = NativeResourceExpectedVerifier.Verify(target.ResourceProgram!, ResourceCostMetric.AllocatedElements,
+            target.Entry.CallableId, target.Total!, null, token);
+        Assert.That(check.UnknownReason, Is.Null, target.ResourceUnknownReason);
+        Assert.That(check.FalseUpper!.Constant, Is.EqualTo(new BigInteger(falseUpper)));
+        Assert.That(check.TrueUpper!.Constant, Is.EqualTo(new BigInteger(trueUpper)));
+        Assert.That(check.ExpectedUpper!.Constant, Is.EqualTo(new BigInteger(expectedUpper)));
+        foreach (var other in new[] { false, true })
+        {
+            var observedWeighted = 3 * Execute(false, other) + Execute(true, other);
+            Assert.That(new BigInteger(expectedUpper * 4), Is.GreaterThanOrEqualTo(new BigInteger(observedWeighted)));
+        }
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), token)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.Expected!.UnknownReason, Is.Null);
+        Assert.That(result.ResourceBound.Expected.UpperBound, Is.EqualTo(check.ExpectedUpper.ToDisplayString()));
+
+        int Execute(bool selected, bool other)
+        {
+            var takeLarge = condition switch
+            {
+                "!selected" => !selected,
+                "(bool)selected" => selected,
+                "true" => true,
+                "false" => false,
+                "other" => other,
+                _ => throw new ArgumentOutOfRangeException(nameof(condition))
+            };
+            return takeLarge ? new int[7].Length : new int[2].Length;
+        }
+    }
+
     [TestCase("n>=0")]
     [TestCase("selected")]
     public async Task InputRestrictionsDoNotSilentlyConditionTheDeclaredDistribution(string restriction)
