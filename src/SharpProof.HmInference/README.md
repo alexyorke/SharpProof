@@ -779,5 +779,12 @@ other newly introduced warnings still reject candidates. Exact signatures and
 IDE runtime checks cover nullable reference/value inputs, array identity, tuple
 siblings, generic caller wrappers and async suspension, faults and cancellation.
 
+Parenthesized assignment targets and tuple deconstruction stores preserve nullable
+storage paths, including ref-return targets and contextually typed `default`
+elements. Compiler warnings refine the affected tuple element independently.
+Task and ValueTask checks cover stores after suspension, earlier value copies,
+reference and nullable-value domains, deferred query execution, faults and
+cancellation. C# 8/9/13 CLI and packaged consumers verify these signatures.
+
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

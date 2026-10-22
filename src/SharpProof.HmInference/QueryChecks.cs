@@ -10,6 +10,19 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("GroupedAsyncLocal", "static async Task<(int copy,int stored)> M(Task<int> value,bool tag){var result=await value;var copy=result;((result))=default;return(copy,result);}", "global::System.Threading.Tasks.Task<(T1 copy, T1? stored)> M<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)"),
+            ("GroupedValueAsyncArray", "static async ValueTask<int> M(ValueTask<int[]> value,bool tag){var result=await value;((result[0]))=default;return result[0];}", "global::System.Threading.Tasks.ValueTask<T1?> M<T1, T2>(global::System.Threading.Tasks.ValueTask<T1?[]> value, T2 tag)"),
+            ("AsyncDeconstructRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static async Task<(int left,bool right)> M(Task<int[]> first,bool[] second,string tag){var result=await first;(Borrow(ref result[0]),Borrow(ref second[0]))=(default,default);return(result[0],second[0]);}", "global::System.Threading.Tasks.Task<(T1? left, T2? right)> M<T1, T2, T3>(global::System.Threading.Tasks.Task<T1?[]> first, T2?[] second, T3 tag)"),
+            ("AsyncQueryMixedStores", "static ref T Borrow<T>(ref T value)=>ref value;static ref T ArrayBorrow<T>(T[] value)=>ref value[0];static async Task<IEnumerable<(int left,int right)>> M(Task<IEnumerable<(int[] first,int[] second)>> values,bool tag)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=(default,default);", "global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)>> M<T1, T2, T3>(global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)>> values, T3 tag) where T1 : struct"),
+            ("GroupedParameterStore", "static int M(int value,bool tag){(value)=default;return value;}", "T1? M<T1, T2>(T1? value, T2 tag)"),
+            ("GroupedLocalCopyStore", "static (int copy,int stored) M(int value,bool tag){var result=value;var copy=result;((result))=default;return(copy,result);}", "(T1 copy, T1? stored) M<T1, T2>(T1 value, T2 tag)"),
+            ("GroupedAliasStore", "static int M(int value,bool tag){ref var alias=ref value;(alias)=default;return value;}", "T1? M<T1, T2>(T1? value, T2 tag)"),
+            ("GroupedArrayStore", "static int M(int[] value,bool tag){((value[0]))=default;return value[0];}", "T1? M<T1, T2>(T1?[] value, T2 tag)"),
+            ("GroupedQueryRefStore", "static ref T Borrow<T>(ref T value)=>ref value;static IEnumerable<int> M(IEnumerable<int[]> values,bool tag)=>from row in values select (Borrow(ref row[0]))=default;", "global::System.Collections.Generic.IEnumerable<T1> M<T1, T2>(global::System.Collections.Generic.IEnumerable<T1[]> values, T2 tag) where T1 : struct"),
+            ("DeconstructArrayStores", "static (int left,bool right) M(int[] first,bool[] second,int tag){(first[0],second[0])=(default,default);return(first[0],second[0]);}", "(T1? left, T2? right) M<T1, T2, T3>(T1?[] first, T2?[] second, T3 tag)"),
+            ("DeconstructRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static (int left,bool right) M(int[] first,bool[] second,int tag){(Borrow(ref first[0]),Borrow(ref second[0]))=(default,default);return(first[0],second[0]);}", "(T1? left, T2? right) M<T1, T2, T3>(T1?[] first, T2?[] second, T3 tag)"),
+            ("QueryDeconstructRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static IEnumerable<(int left,int right)> M(IEnumerable<int[]> values,bool tag)=>from row in values select (Borrow(ref row[0]),Borrow(ref row[1]))=(default,default);", "global::System.Collections.Generic.IEnumerable<(T1 left, T1 right)> M<T1, T2>(global::System.Collections.Generic.IEnumerable<T1[]> values, T2 tag) where T1 : struct"),
+            ("QueryMixedRefStores", "static ref T Borrow<T>(ref T value)=>ref value;static ref T ArrayBorrow<T>(T[] value)=>ref value[0];static IEnumerable<(int left,int right)> M(IEnumerable<(int[] first,int[] second)> values,bool tag)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=(default,default);", "global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)> M<T1, T2, T3>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, T3 tag) where T1 : struct"),
             ("QueryRefDependentStore", "static ref T Borrow<T>(ref T value)=>ref value;static U Needs<T,U>(T first,U second)where U:T=>second;static IEnumerable<int> M(IEnumerable<int[]> values,int other,bool tag)=>from row in values select Needs(Borrow(ref row[0])=default,other);", "global::System.Collections.Generic.IEnumerable<T1> M<T1, T2>(global::System.Collections.Generic.IEnumerable<T1[]> values, T1 other, T2 tag) where T1 : struct"),
             ("RefCallCapturedLocalQuery", "static ref T Borrow<T>(ref T value)=>ref value;static void M(IEnumerable<int[]> values,bool tag){void Work(){foreach(var item in(from row in values select Borrow(ref row[0])=default)){}}Work();}", "void M<T1, T2>(global::System.Collections.Generic.IEnumerable<T1[]> values, T2 tag) where T1 : struct"),
             ("RefCallCapturedLocalFunction", "static ref T Borrow<T>(ref T value)=>ref value;static int M(int[] value,bool tag){void Clear(){Borrow(ref value[0])=default;}Clear();return value[0];}", "T1? M<T1, T2>(T1?[] value, T2 tag)"),
@@ -97,29 +110,32 @@ internal static class QueryChecks
             Program.Log.Info("PASS QueryMalformed " + invalid);
         }
         var policyChecks = 0;
-        foreach (var policy in new[] { "Legacy", "Disabled", "Annotations", "Pragma", "Specific", "Tree", "Promoted" })
+        foreach (var deconstruct in new[] { false, true })
         {
-            var context = policy switch { "Legacy" => "", "Disabled" => "#nullable disable\n", "Annotations" => "#nullable enable annotations\n#nullable disable warnings\n", "Pragma" => "#nullable enable\n#pragma warning disable CS8601\n", _ => "#nullable enable\n" };
-            var policyTree = CSharpSyntaxTree.ParseText(context + "using System.Linq;using System.Collections.Generic;class Policy{static ref T Borrow<T>(ref T value)=>ref value;static IEnumerable<int> M(IEnumerable<int[]> values,bool tag)=>from row in values select Borrow(ref row[0])=default;}",
-                new CSharpParseOptions(policy == "Legacy" ? LanguageVersion.CSharp7_3 : LanguageVersion.CSharp13), cancellationToken: cancellationToken);
-            var policyCompilation = Program.Compile([policyTree]);
-            var options = policyCompilation.Options.WithNullableContextOptions(policy == "Legacy" ? NullableContextOptions.Disable : NullableContextOptions.Enable);
-            if (policy is "Specific" or "Promoted")
-            { options = options.WithGeneralDiagnosticOption(ReportDiagnostic.Error); }
-            if (policy == "Specific")
-            { options = options.WithSpecificDiagnosticOptions(options.SpecificDiagnosticOptions.SetItem("CS8601", ReportDiagnostic.Suppress)); }
-            if (policy == "Tree")
-            { options = options.WithSyntaxTreeOptionsProvider(new RefStoreWarningOptions(policyTree)); }
-            policyCompilation = policyCompilation.WithOptions(options);
-            var policyMethod = policyTree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
-            { ArgumentNullException.ThrowIfNull(method); return method.Identifier.ValueText == "M"; });
-            var policyResult = Inference.Analyze(policyMethod, policyCompilation.GetSemanticModel(policyTree), cancellationToken);
-            var element = policy is "Legacy" or "Disabled" or "Promoted" ? "T1" : "T1?";
-            var expected = "global::System.Collections.Generic.IEnumerable<" + element + "> M<T1, T2>(global::System.Collections.Generic.IEnumerable<" + element + "[]> values, T2 tag)" + (policy == "Promoted" ? " where T1 : struct" : "");
-            if (policyResult.Status != "Suggestion" || policyResult.Signature != expected)
-            { throw new InvalidOperationException("Ref-store policy " + policy + ": expected " + expected + "; got " + policyResult.Status + ": " + (policyResult.Signature ?? policyResult.Message)); }
-            Program.Log.Info("PASS RefStoreWarningPolicy" + policy);
-            policyChecks++;
+            foreach (var policy in new[] { "Legacy", "Disabled", "Annotations", "Pragma", "Specific", "Tree", "Promoted" })
+            {
+                var context = policy switch { "Legacy" => "", "Disabled" => "#nullable disable\n", "Annotations" => "#nullable enable annotations\n#nullable disable warnings\n", "Pragma" => "#nullable enable\n#pragma warning disable CS8600, CS8601\n", _ => "#nullable enable\n" };
+                var policyTree = CSharpSyntaxTree.ParseText(context + "using System.Linq;using System.Collections.Generic;class Policy{static ref T Borrow<T>(ref T value)=>ref value;static IEnumerable<" + (deconstruct ? "(int,int)" : "int") + "> M(IEnumerable<int[]> values,bool tag)=>from row in values select " + (deconstruct ? "(Borrow(ref row[0]),Borrow(ref row[1]))=(default,default)" : "Borrow(ref row[0])=default") + ";}",
+                    new CSharpParseOptions(policy == "Legacy" ? LanguageVersion.CSharp7_3 : LanguageVersion.CSharp13), cancellationToken: cancellationToken);
+                var policyCompilation = Program.Compile([policyTree]);
+                var options = policyCompilation.Options.WithNullableContextOptions(policy == "Legacy" ? NullableContextOptions.Disable : NullableContextOptions.Enable);
+                if (policy is "Specific" or "Promoted")
+                { options = options.WithGeneralDiagnosticOption(ReportDiagnostic.Error); }
+                if (policy == "Specific")
+                { options = options.WithSpecificDiagnosticOptions(options.SpecificDiagnosticOptions.SetItem("CS8601", ReportDiagnostic.Suppress).SetItem("CS8600", ReportDiagnostic.Suppress)); }
+                if (policy == "Tree")
+                { options = options.WithSyntaxTreeOptionsProvider(new RefStoreWarningOptions(policyTree)); }
+                policyCompilation = policyCompilation.WithOptions(options);
+                var policyMethod = policyTree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+                { ArgumentNullException.ThrowIfNull(method); return method.Identifier.ValueText == "M"; });
+                var policyResult = Inference.Analyze(policyMethod, policyCompilation.GetSemanticModel(policyTree), cancellationToken);
+                var element = policy is "Legacy" or "Disabled" or "Promoted" ? "T1" : "T1?";
+                var expected = "global::System.Collections.Generic.IEnumerable<" + (deconstruct ? "(" + element + ", " + element + ")" : element) + "> M<T1, T2>(global::System.Collections.Generic.IEnumerable<" + element + "[]> values, T2 tag)" + (policy == "Promoted" ? " where T1 : struct" : "");
+                if (policyResult.Status != "Suggestion" || policyResult.Signature != expected)
+                { throw new InvalidOperationException("Ref-store policy " + policy + ": expected " + expected + "; got " + policyResult.Status + ": " + (policyResult.Signature ?? policyResult.Message)); }
+                Program.Log.Info("PASS " + (deconstruct ? "Tuple" : "") + "RefStoreWarningPolicy" + policy);
+                policyChecks++;
+            }
         }
         return tests.Length + 3 + policyChecks;
     }
@@ -135,7 +151,7 @@ internal static class QueryChecks
             ArgumentNullException.ThrowIfNull(tree);
             ArgumentNullException.ThrowIfNull(diagnosticId);
             severity = ReportDiagnostic.Suppress;
-            return ReferenceEquals(tree, original) && diagnosticId == "CS8601";
+            return ReferenceEquals(tree, original) && diagnosticId is "CS8600" or "CS8601";
         }
         public override bool TryGetGlobalDiagnosticValue(string diagnosticId, CancellationToken cancellationToken, out ReportDiagnostic severity)
         { ArgumentNullException.ThrowIfNull(diagnosticId); severity = ReportDiagnostic.Default; return false; }

@@ -227,7 +227,7 @@ public static partial class Inference
         private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
         private readonly HashSet<ISymbol> preparedIndirectAliases = new(SymbolEqualityComparer.Default);
         private Dictionary<ISymbol, HmType>? storageLambdaInputs;
-        private readonly List<(HmType Shape, AssignmentExpressionSyntax Store)> refReturnDefaultDomains = [];
+        private readonly List<(HmType Shape, ExpressionSyntax Store)> refReturnDefaultDomains = [];
 
         private bool ConstrainRefReturnDefaults(Compilation changed, MethodDeclarationSyntax original, MethodDeclarationSyntax replacement)
         {
@@ -246,7 +246,7 @@ public static partial class Inference
             foreach (var diagnostic in changed.GetDiagnostics(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (diagnostic.Id != "CS8601" || diagnostic.IsSuppressed || diagnostic.Severity is not (DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+                if (diagnostic.Id is not ("CS8600" or "CS8601") || diagnostic.IsSuppressed || diagnostic.Severity is not (DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
                     || diagnostic.Location.SourceTree != replacement.SyntaxTree)
                 { continue; }
                 var position = diagnostic.Location.SourceSpan;
@@ -279,10 +279,10 @@ public static partial class Inference
             {
                 if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                 { continue; }
-                if (assignment.Right is RefExpressionSyntax reference && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol alias
+                if (assignment.Right is RefExpressionSyntax reference && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol is ILocalSymbol alias
                     && ReferenceStorageOwners(alias).Count == 0 && defaultStores is not null && defaultStores.TryGetValue(alias, out var literals))
                 { foreach (var literal in literals) { candidates.Add((reference.Expression, literal, alias.Type, alias)); } }
-                else if (assignment.Left is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
+                else if (StorageExpression(assignment.Left) is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
                 {
                     var type = StorageType(assignment.Left);
                     foreach (var literal in StoredAlternatives(assignment.Right))
@@ -372,9 +372,8 @@ public static partial class Inference
                 { return; }
                 BindLocals(assignment.Right);
                 BindLocals(assignment.Left);
-                var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type ?? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType
-                    ?? throw new InferenceException("Storage deconstruction has no type.");
-                probe.BindDeconstruction(assignment.Left, probe.Expression(assignment.Right), original, AssignmentDeconstructionBinding(model, assignment));
+                var original = probe.DeconstructionSourceType(assignment);
+                probe.BindDeconstruction(assignment.Left, probe.DeconstructionValue(assignment.Right, original), original, AssignmentDeconstructionBinding(model, assignment));
             }
             void BindLocals(SyntaxNode syntax)
             {
@@ -432,7 +431,7 @@ public static partial class Inference
                         if (assignment.Left is TupleExpressionSyntax && assignment.Left.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(target =>
                             { if (target is null) { throw new ArgumentNullException(nameof(target)); } return SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(target, cancellationToken).Symbol, local); }))
                         { BindDeconstructed(assignment); continue; }
-                        if (!SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol, local)
+                        if (!SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol, local)
                             || model.GetTypeInfo(assignment.Right, cancellationToken).Type is not { IsReferenceType: true })
                         { continue; }
                         BindLocals(assignment.Right);
@@ -590,7 +589,7 @@ public static partial class Inference
                     foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                     {
                         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Right is RefExpressionSyntax reference
-                            && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
+                            && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
                         { Add(alias, reference); }
                     }
                 }
@@ -665,8 +664,8 @@ public static partial class Inference
                 {
                     foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                     {
-                        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Left is IdentifierNameSyntax
-                            && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } assigned
+                        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && StorageExpression(assignment.Left) is IdentifierNameSyntax
+                            && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol is { } assigned
                             && assigned is ILocalSymbol or IParameterSymbol)
                         {
                             foreach (var literal in StoredAlternatives(assignment.Right))

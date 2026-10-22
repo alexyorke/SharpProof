@@ -997,12 +997,10 @@ public static partial class Inference
                 case AssignmentExpressionSyntax assignment:
                     if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                     {
-                        if (assignment.Left is TupleExpressionSyntax or DeclarationExpressionSyntax)
+                        if (StorageExpression(assignment.Left) is TupleExpressionSyntax or DeclarationExpressionSyntax)
                         {
-                            var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type;
-                            if (original is null)
-                            { throw new InferenceException("Unresolved deconstruction source."); }
-                            return BindDeconstruction(assignment.Left, Expression(assignment.Right), original, AssignmentDeconstructionBinding(model, assignment));
+                            var original = DeconstructionSourceType(assignment);
+                            return BindDeconstruction(assignment.Left, DeconstructionValue(assignment.Right, original), original, AssignmentDeconstructionBinding(model, assignment));
                         }
 
                         if (model.GetOperation(assignment.Left, cancellationToken) is IDiscardOperation)
@@ -1300,6 +1298,7 @@ public static partial class Inference
 
         private HmType AssignmentTarget(ExpressionSyntax target)
         {
+            target = StorageExpression(target);
             if (target is InvocationExpressionSyntax pointerInvocation
                 && model.GetOperation(pointerInvocation, cancellationToken) is IFunctionPointerInvocationOperation { Target.Type: IFunctionPointerTypeSymbol { Signature.ReturnsByRef: true } })
             { return Expression(pointerInvocation); }
@@ -1327,6 +1326,9 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(value));
             }
 
+            var store = targetSyntax.Ancestors().OfType<AssignmentExpressionSyntax>().FirstOrDefault(assignment =>
+            { if (assignment is null) { throw new ArgumentNullException(nameof(assignment)); } return assignment.Left.Span.Contains(targetSyntax.Span); });
+            targetSyntax = StorageExpression(targetSyntax);
             var target = AssignmentTarget(targetSyntax);
             var targetType = StorageType(targetSyntax);
             if (value.Root.Name == CSharpTypes.NullableParameter && HasDefaultValueAnnotation(value)
@@ -1334,13 +1336,13 @@ public static partial class Inference
                 && model.GetOperation(referenceCall, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true } referenceOperation
                 && referenceOperation.TargetMethod.OriginalDefinition.ReturnType is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } returnParameter
                 && returnParameter.NullableAnnotation != NullableAnnotation.Annotated
-                && targetSyntax.Parent is AssignmentExpressionSyntax store)
+                && store is not null)
             {
                 // Let effective compiler diagnostics decide whether the inferred
                 // ref contract needs a value-domain restriction.
-                refReturnDefaultDomains.Add((target, store));
+                refReturnDefaultDomains.Add((target, StoreValueLocation(targetSyntax, store)));
             }
-            if (targetSyntax.Parent is AssignmentExpressionSyntax { Right: RefExpressionSyntax }
+            if (store is { Right: RefExpressionSyntax }
                 && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
             {
                 HmType.Unify(ConversionCore(target), ConversionCore(value));
@@ -1489,6 +1491,7 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(value));
             }
 
+            target = StorageExpression(target);
             switch (target)
             {
                 case DeclarationExpressionSyntax declaration:
@@ -1519,7 +1522,7 @@ public static partial class Inference
                     return new("Tuple", assigned);
                 case IdentifierNameSyntax identifier when model.GetOperation(identifier, cancellationToken) is IDiscardOperation:
                     return value;
-                case IdentifierNameSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax:
+                case IdentifierNameSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or InvocationExpressionSyntax:
                     return AssignValue(target, value, original);
                 default:
                     throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");

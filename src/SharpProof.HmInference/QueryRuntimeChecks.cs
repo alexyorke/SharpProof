@@ -28,6 +28,10 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static int Grouped(int value){(value)=default;return value;}
+                public static async Task<(int copy,int stored)> GroupedAsync(Task<int> value){var result=await value;var copy=result;((result))=default;return(copy,result);}
+                public static async Task<(int left,int right)> TupleAsync(Task<int[]> first,int[] second){var result=await first;(Borrow(ref result[QueryTrace.Index()]),ArrayBorrow(second))=(default,default);return(result[0],second[0]);}
+                public static async ValueTask<IEnumerable<(int left,int right)>> MixedAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values)=>from pair in await values select (Borrow(ref pair.first[QueryTrace.Index()]),ArrayBorrow(pair.second))=(default,default);
                 public static IEnumerable<int> ArrayRefStore(IEnumerable<int[]> values)=>from row in values select ArrayBorrow(row)=default;
                 public static void RefLocalQuery(IEnumerable<int[]> values){void Clear(){foreach(var item in(from row in values select Borrow(ref row[QueryTrace.Index()])=default)){}}Clear();}
                 public static int RefLocal(int[] values){void Clear(){Borrow(ref values[QueryTrace.Index()])=default;}Clear();return values[0];}
@@ -106,6 +110,24 @@ internal static class QueryRuntimeChecks
                     return true;
                 }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(QueryProbe.Grouped(7)!=0)return false;
+                    using(var cancel=new CancellationTokenSource()){
+                        cancel.Cancel();var failure=new InvalidOperationException("tuple-await");
+                        foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                            int[] first={7},second={9};QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                            var gate=new TaskCompletionSource<int[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                            var task=QueryProbe.TupleAsync(gate.Task,second);
+                            if(task.IsCompleted||QueryTrace.RefCalls!=0||first[0]!=7||second[0]!=9)return false;
+                            if(outcome=="Value")gate.SetResult(first);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(cancel.Token);
+                            try{var result=await task.WaitAsync(cancellationToken);if(outcome!="Value"||result!=(0,0)||first[0]!=0||second[0]!=0||QueryTrace.RefCalls!=2||QueryTrace.IndexCalls!=2)return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==cancel.Token){}
+                            if(outcome!="Value"&&(QueryTrace.RefCalls!=0||first[0]!=7||second[0]!=9))return false;
+                        }
+                    }
+                    var grouped=await QueryProbe.GroupedAsync(Task.FromResult(7));if(grouped!=(7,0))return false;
+                    int[] mixedLeft={7},mixedRight={9};var mixed=await QueryProbe.MixedAsync(new ValueTask<IEnumerable<(int[],int[])>>(new[]{(mixedLeft,mixedRight)}));
+                    if(mixedLeft[0]!=7||mixedRight[0]!=9||mixed.Single()!=(0,0)||mixedLeft[0]!=0||mixedRight[0]!=0)return false;
                     int[] row={7};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
                     QueryTrace.OnDispose=()=>row[0]=99;
                     try{var query=QueryProbe.RefStore(QueryTrace.Source(new[]{row}));if(row[0]!=7||QueryTrace.RefCalls!=0||QueryTrace.Value!="")return false;
@@ -169,6 +191,22 @@ internal static class QueryRuntimeChecks
                     return true;
                 }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(QueryProbe.Grouped(text)!=null||QueryProbe.Grouped<decimal?>(23m)!=null)return false;
+                    var gateCopy=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var copyTask=QueryProbe.GroupedAsync(gateCopy.Task);
+                    if(copyTask.IsCompleted)return false;gateCopy.SetResult(text);var grouped=await copyTask.WaitAsync(cancellationToken);
+                    if(!ReferenceEquals(grouped.copy,text)||grouped.stored!=null)return false;
+                    string?[] tupleLeft={text};decimal?[] tupleRight={23m};var tupleGate=new TaskCompletionSource<string?[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    QueryTrace.RefCalls=QueryTrace.IndexCalls=0;var tupleTask=QueryProbe.TupleAsync(tupleGate.Task,tupleRight);
+                    if(tupleTask.IsCompleted||QueryTrace.RefCalls!=0)return false;tupleGate.SetResult(tupleLeft);var tuple=await tupleTask.WaitAsync(cancellationToken);
+                    if(tuple.left!=null||tuple.right!=null||tupleLeft[0]!=null||tupleRight[0]!=null||QueryTrace.RefCalls!=2||QueryTrace.IndexCalls!=2)return false;
+                    decimal[] mixedLeft={23m};string?[] mixedRight={text};QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                    var mixedGate=new TaskCompletionSource<IEnumerable<(decimal[],string?[])>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var mixedTask=QueryProbe.MixedAsync(new ValueTask<IEnumerable<(decimal[],string?[])>>(mixedGate.Task)).AsTask();
+                    if(mixedTask.IsCompleted||QueryTrace.RefCalls!=0)return false;mixedGate.SetResult(new[]{(mixedLeft,mixedRight)});
+                    var mixed=await mixedTask.WaitAsync(cancellationToken);if(QueryTrace.RefCalls!=0||mixedLeft[0]!=23m||!ReferenceEquals(mixedRight[0],text))return false;
+                    var mixedValue=mixed.Single();if(mixedValue.left!=0m||mixedValue.right!=null||mixedLeft[0]!=0m||mixedRight[0]!=null||QueryTrace.RefCalls!=2||QueryTrace.IndexCalls!=2)return false;
+                    decimal?[] optionalMixed={23m};mixedLeft[0]=23m;var optionalQuery=await QueryProbe.MixedAsync(new ValueTask<IEnumerable<(decimal[],decimal?[])>>(new[]{(mixedLeft,optionalMixed)}));
+                    var optionalValue=optionalQuery.Single();if(optionalValue.left!=0m||optionalValue.right!=null||optionalMixed[0]!=null)return false;
                     decimal[] number={23m};if(QueryProbe.RefStore(new[]{number}).Single()!=0m||number[0]!=0m)return false;
                     var original=new QueryStoreValue();QueryStoreValue.Calls=0;var row=new[]{original};var copied=QueryProbe.RefCopy(new[]{row}).Single();
                     if(copied.copy.Value!=99||copied.copy.Text!="ctor"||copied.stored.Value!=0||copied.stored.Text!=null||row[0].Value!=0||row[0].Text!=null||QueryStoreValue.Calls!=0)return false;

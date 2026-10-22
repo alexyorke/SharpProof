@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.HmInference;
 
@@ -8,6 +9,64 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private static ExpressionSyntax StorageExpression(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            while (expression is ParenthesizedExpressionSyntax parentheses)
+            { expression = parentheses.Expression; }
+            return expression;
+        }
+
+        private static ExpressionSyntax StoreValueLocation(ExpressionSyntax target, AssignmentExpressionSyntax assignment)
+        {
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (assignment is null)
+            { throw new ArgumentNullException(nameof(assignment)); }
+            var path = new Stack<int>();
+            foreach (var node in target.AncestorsAndSelf())
+            {
+                if (node == assignment.Left)
+                { break; }
+                if (node is ArgumentSyntax argument && argument.Parent is TupleExpressionSyntax tuple)
+                { path.Push(tuple.Arguments.IndexOf(argument)); }
+            }
+            var value = assignment.Right;
+            foreach (var index in path)
+            {
+                if (StorageExpression(value) is not TupleExpressionSyntax tuple || index >= tuple.Arguments.Count)
+                { return assignment.Right; }
+                value = tuple.Arguments[index].Expression;
+            }
+            return value;
+        }
+        private ITypeSymbol DeconstructionSourceType(AssignmentExpressionSyntax assignment)
+        {
+            if (assignment is null)
+            { throw new ArgumentNullException(nameof(assignment)); }
+            var info = model.GetTypeInfo(assignment.Right, cancellationToken);
+            return info.Type ?? info.ConvertedType ?? (model.GetOperation(assignment, cancellationToken) as IDeconstructionAssignmentOperation)?.Value.Type
+                ?? throw new InferenceException("Unresolved deconstruction source.");
+        }
+
+        private HmType DeconstructionValue(ExpressionSyntax expression, ITypeSymbol original)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            var unwrapped = StorageExpression(expression);
+            if (unwrapped is TupleExpressionSyntax tuple && original is INamedTypeSymbol { IsTupleType: true } type && tuple.Arguments.Count == type.TupleElements.Length)
+            {
+                var values = new HmType[tuple.Arguments.Count];
+                for (var i = 0; i < values.Length; i++)
+                { values[i] = DeconstructionValue(tuple.Arguments[i].Expression, type.TupleElements[i].Type); }
+                return new("Tuple", values);
+            }
+            return StoredLiteralValue(expression, original) ?? Returned(expression, original);
+        }
+
         private static HmType? ProjectDeconstructionReceiver(ITypeSymbol original, HmType value, INamedTypeSymbol target)
         {
             if (original is null)

@@ -19,6 +19,9 @@ public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)
 public static class QueryConsumer{
   static ref T Borrow<T>(ref T value)=>ref value;
   static ref T ArrayBorrow<T>(T[] value)=>ref value[0];
+  public static async Task<(int copy,int stored)> GroupedAsync(Task<int> value){var result=await value;var copy=result;((result))=default;return(copy,result);}
+  public static async Task<(int left,int right)> TupleAsync(Task<int[]> first,int[] second){var result=await first;(Borrow(ref result[0]),ArrayBorrow(second))=(default,default);return(result[0],second[0]);}
+  public static async ValueTask<IEnumerable<(int left,int right)>> MixedAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=(default,default);
   public static IEnumerable<int> ArrayRefStore(IEnumerable<int[]> values)=>from row in values select ArrayBorrow(row)=default;
   public static IEnumerable<int> RefStore(IEnumerable<int[]> values)=>from row in values select Borrow(ref row[0])=default;
   public static IEnumerable<string> RefSibling(IEnumerable<(int[] row,string tag)> values)=>from pair in values select(Borrow(ref pair.row[0])=default,pair.tag).Item2;
@@ -118,12 +121,18 @@ EOF
     exit 1
   fi
   if [ "$language" = 8 ]; then
+    grep -Fq 'global::System.Threading.Tasks.Task<(T1 copy, T1 stored)> GroupedAsync<T1>(global::System.Threading.Tasks.Task<T1> value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<(T1 left, T2 right)> TupleAsync<T1, T2>(global::System.Threading.Tasks.Task<T1[]> first, T2[] second) where T1 : struct where T2 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)>> MixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)>> values) where T1 : struct where T2 : struct' "$log"
     grep -Fq 'T1 RefBlock<T1>(T1[] values) where T1 : struct' "$log"
     grep -Fq 'T1 RefParameter<T1>(ref T1 value) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> ArrayRefStore<T1>(global::System.Collections.Generic.IEnumerable<T1[]> values) where T1 : struct' "$log"
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'global::System.Threading.Tasks.Task<(T1 copy, T1? stored)> GroupedAsync<T1>(global::System.Threading.Tasks.Task<T1> value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<(T1? left, T2? right)> TupleAsync<T1, T2>(global::System.Threading.Tasks.Task<T1?[]> first, T2?[] second)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)>> MixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)>> values) where T1 : struct' "$log"
     grep -Fq 'T1? RefBlock<T1>(T1?[] values)' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> RefStoreSuppressed<T1>(global::System.Collections.Generic.IEnumerable<T1?[]> values)' "$log"
     grep -Fq 'T1? RefParameter<T1>(ref T1? value)' "$log"
