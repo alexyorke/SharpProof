@@ -12,6 +12,43 @@ namespace SharpProof.Specs.Test;
 internal sealed class ExceptionStackTraceRuntimeTests
 {
     [Test]
+    public void CapturingAFreshSchedulerWrapperDoesNotCopyItsTracedInnerException()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var inner = new InvalidOperationException("scheduler-capture-inner");
+        CaptureRawTrace(2, inner);
+        var trace = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var dynamicMethods = typeof(Exception).GetField("_dynamicMethods", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.That(trace.GetValue(inner), Is.Not.Null);
+        var wrapper = new TaskSchedulerException("scheduler-capture-wrapper", inner);
+        Assert.That(trace.GetValue(wrapper), Is.Null);
+        Assert.That(dynamicMethods.GetValue(wrapper), Is.Null);
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var dispatchShape = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultCarrierCatalog.DispatchFields),
+            layout, TestContext.CurrentContext.CancellationToken);
+        var stateField = typeof(ExceptionDispatchInfo).GetField("_dispatchState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var rawField = stateField.FieldType.GetField("StackTrace", BindingFlags.Instance | BindingFlags.Public)!;
+        var dynamicField = stateField.FieldType.GetField("DynamicMethods", BindingFlags.Instance | BindingFlags.Public)!;
+        for (var warmup = 0; warmup < 64; warmup++)
+        { GC.KeepAlive(ExceptionDispatchInfo.Capture(wrapper)); }
+        for (var iteration = 0; iteration < 128; iteration++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var dispatch = ExceptionDispatchInfo.Capture(wrapper);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(new BigInteger(allocated), Is.GreaterThan(0).And.LessThanOrEqualTo(dispatchShape.Bounds!.Upper.Constant!.Value));
+            Assert.That(ReferenceEquals(dispatch.SourceException, wrapper), Is.True);
+            var state = stateField.GetValue(dispatch)!;
+            Assert.That(rawField.GetValue(state), Is.Null);
+            Assert.That(dynamicField.GetValue(state), Is.Null);
+            Assert.That(ReferenceEquals(wrapper.InnerException, inner), Is.True);
+            GC.KeepAlive(dispatch);
+        }
+    }
+
+    [Test]
     public void WarmSchedulerWrapperAllocationsFitTheReviewedInstanceShapeWithoutCopyingTheInnerPayload()
     {
         Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));

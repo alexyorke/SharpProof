@@ -8,10 +8,11 @@ internal sealed record NativeTaskSchedulerExceptionInstanceCheck(ResourceExpress
 internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? BookkeepingUpper, string? UnknownReason)
 {
     internal int? TaskTraceCaptureCountUpper { get; init; }
+    internal int? TaskNonEmptyTraceCaptureCountUpper { get; init; }
     internal int? TaskTraceRestoreCountUpper { get; init; }
     internal int? ContextTraceCaptureCountUpper { get; init; }
     internal int? ContextTraceRestoreCountUpper { get; init; }
-    internal int? TaskDispatchArrayCopiesUpper => TaskTraceCaptureCountUpper is { } captures && TaskTraceRestoreCountUpper is { } restores
+    internal int? TaskDispatchArrayCopiesUpper => TaskNonEmptyTraceCaptureCountUpper is { } captures && TaskTraceRestoreCountUpper is { } restores
         ? 2 * (captures + restores) : null;
     internal string? RequiredTraceCopyModel => TaskDispatchArrayCopiesUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.TraceCopyModel;
     internal int? CombinedDispatchArrayCopiesUpper => TaskDispatchArrayCopiesUpper is { } taskCopies &&
@@ -51,8 +52,8 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         return new(ResourceExpression.Multiply(bytes.Upper, ResourceExpression.Literal(projection.Children.Length)), null);
     }
 
-    internal const string TraceCopyModel = "task-join-task-dispatch-copy-counts-v1";
-    internal const string CombinedTraceCopyModel = "task-join-context-dispatch-copy-counts-v1";
+    internal const string TraceCopyModel = "task-join-task-dispatch-copy-counts-v2";
+    internal const string CombinedTraceCopyModel = "task-join-context-dispatch-copy-counts-v2";
     internal static NativeTaskFaultCarrierCheck Check(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
         ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
     {
@@ -91,14 +92,18 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         { total = ResourceExpression.Add(total, ResourceExpression.Add(fixedRecord, ListBytes(1))); }
         // Each task-owned AddException site can capture one dispatch state.
         // WhenAll forwards existing dispatches. A configured root restores the
-        // first fault once and records it once in its own async box. Each capture
-        // or restore copies at most one trace byte array and one resolver array.
+        // first fault once and records it once in its own async box. Queue wrappers
+        // are captured before their first throw: their own trace fields are null,
+        // and capture never copies the inner exception's arrays. Keep those dispatch
+        // instances, but exclude their captures from possible trace-array copies.
+        // Other captures/restores copy at most one raw and one resolver array.
         // Trace growth, affinity copies and other runtime/helper work remain
         // separate obligations. Context-wrapper operations are counted separately
         // below; externally induced context-change callback work is not included.
         return new(total, null)
         {
             TaskTraceCaptureCountUpper = count * faultsPerChild + (projection.ConfiguredAwait ? 1 : 0),
+            TaskNonEmptyTraceCaptureCountUpper = count + (projection.ConfiguredAwait ? 1 : 0),
             TaskTraceRestoreCountUpper = projection.ConfiguredAwait ? 1 : 0,
             // Each child enters at most one RunInternal/RunFromThreadPoolDispatchLoop
             // wrapper. A configured root can resume its single await once through

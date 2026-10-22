@@ -109,6 +109,55 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Scheduler captures before the first throw
+
+The private dispatch-copy model now distinguishes all dispatch captures from
+captures that can copy trace arrays. Each queue-failure wrapper is captured by
+`AddException` before its first throw. Its own trace and resolver fields are
+empty, even when its inner exception already has a trace. Those captures still
+allocate dispatch objects, so the fixed bookkeeping and total capture counts
+are unchanged.
+
+Pinned [`Task.ScheduleAndStart`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs#L1699)
+records the fresh wrapper before throwing it.
+[`CaptureDispatchState`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Exception.CoreCLR.cs#L251)
+passes the outer exception to the native
+[`GetStackTracesDeepCopy`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/comutilnative.cpp#L80)
+routine. That routine copies only the outer object's nonempty trace fields;
+it does not traverse the inner exception.
+
+For `n` children and `c = 1` for a configured root (otherwise zero), total
+task captures remain `2n + c`, while potentially nonempty captures are at most
+`n + c`. The task raw/resolver copy-array bound is now `2n + 4c`; adding the
+existing execution-context capture/restore allowances gives `6n + 8c`.
+The private identities advance to `task-join-task-dispatch-copy-counts-v2`
+and `task-join-context-dispatch-copy-counts-v2`. Invalid ownership and layouts
+return no partial count or model identity. No public protocol or cache identity
+changes because these private models are not bound to root evidence.
+
+The independent pinned-runtime control captures a fresh wrapper around an
+already traced inner exception. Across 128 measured captures after warmup,
+allocation fits the dispatch-object shape alone, both captured trace fields
+remain null, and inner identity is retained. This control and source review
+establish the excluded copy operation; they do not prove cold initialization,
+trace growth, repeated unwind passes, helper frames or cumulative root bytes.
+Those obligations remain open and the root result remains Unknown.
+
+All 270 Specs tests and all 271 native carrier tests passed, with zero build
+warnings or errors (`artifacts/resource-scheduler-prethrow-copies-specs-tests.log`
+and `artifacts/resource-scheduler-prethrow-copies-native-tests.log`). Full
+quality/API checks and documentation checks passed
+(`artifacts/resource-scheduler-prethrow-copies-lint.log` and
+`artifacts/resource-scheduler-prethrow-copies-docs.log`).
+The canonical formatter copied zero source changes
+(`artifacts/resource-scheduler-prethrow-copies-format.log`).
+
+For committed predecessor `66ac122f9`, security (39837731067) and documentation
+(39837731053) passed. Its canonical CI (39837731374) is queued; coverage
+(39837731257) and package consumers (39837731382) remain active. Superseded
+`2a1feeea8` CI, coverage and package runs were cancelled, not passed. These
+hosted results do not qualify the uncommitted refinement.
+
 ### Scheduler queue-failure wrapper instances
 
 A new private native component bounds explicit `TaskSchedulerException`
