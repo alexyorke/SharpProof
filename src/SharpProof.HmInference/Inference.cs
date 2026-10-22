@@ -513,6 +513,8 @@ public static partial class Inference
                 { return new(symbol.Name, "Rejected", "Generalization changes a selected field, property or indexer."); }
                 if (!PreservesPatternBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes an implicit pattern member."); }
+                if (!PreservesQueryBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes a query operator or its default arguments."); }
                 if (!PreservesDeconstructionBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes a deconstruction binding or conversion."); }
                 var originalCreations = beforeRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
@@ -924,6 +926,8 @@ public static partial class Inference
         private HmType Expression(ExpressionSyntax expression)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (queryReferences is not null && queryReferences.TryGetValue(expression, out var queryReference))
+            { return queryReference; }
             if (expression is IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax
                 && model.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol group
                 && model.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate } target)
@@ -932,6 +936,8 @@ public static partial class Inference
             { return dynamicExpression; }
             switch (expression)
             {
+                case QueryExpressionSyntax query:
+                    return Query(query);
                 case PrefixUnaryExpressionSyntax pointerRead when pointerRead.IsKind(SyntaxKind.PointerIndirectionExpression):
                     return PointerElement(pointerRead.Operand);
                 case PrefixUnaryExpressionSyntax address when address.IsKind(SyntaxKind.AddressOfExpression):

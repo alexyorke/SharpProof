@@ -5,6 +5,17 @@ inference core, a C# generic-signature adapter, a Roslyn analyzer (`HM0001`),
 a CLI, an IDE code-fix package, samples, and executable regression checks. It is separate from the
 production analyzer and main solution.
 
+LINQ query syntax follows Roslyn's selected call tree, including `let`, additional
+`from` clauses, ordering, joins/group joins, grouping and continuations. Generated
+selectors share inferred element graphs through transparent carriers. `IQueryable`
+quotes and custom query patterns retain their selected operators; supplied queries
+are checked again after signature edits. Typed `from` casts and numeric endpoints
+stay fixed, while nullable/default joins, coalescing and awaited sources retain
+their structural relationships. Applied Fix All checks cover deferred enumeration,
+early disposal, traces, reference identity, provider expression trees, independent
+key/value domains, suspension, faults and cancellation. Bundled examples are in
+`Samples/Queries.cs.txt`; CLI and package fixtures cover C# 8, 9 and 13.
+
 ## Run
 
 From the repository root, use the host wrapper to run verification in the

@@ -1,0 +1,19 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+public static class QuerySamples
+{
+    public static IEnumerable<int> Map(IEnumerable<int> values) => from value in values select value;
+    public static IEnumerable<(int left, string right)> Pairs(IEnumerable<int> left, IEnumerable<string> right) =>
+        from x in left from y in right select (x, y);
+    public static IEnumerable<IGrouping<int, string>> Groups(IEnumerable<(int key, string value)> values) =>
+        from item in values group item.value by item.key;
+    public static IQueryable<int> Quoted(IQueryable<int> values) => from value in values select value;
+    public static async Task<IEnumerable<int>> Awaited(Task<IEnumerable<int>> values) =>
+        from value in await values select value;
+    public static IEnumerable<int> Defaulted(IEnumerable<int> values, bool keep) =>
+        from value in values select keep ? value : default;
+    public static IEnumerable<int> Numeric(IEnumerable<int> values, int tag) => from value in values where value > 0 select value;
+}

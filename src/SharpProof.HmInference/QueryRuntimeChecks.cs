@@ -1,0 +1,164 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.HmInference.CodeFixes;
+
+namespace SharpProof.HmInference;
+
+internal static class QueryRuntimeChecks
+{
+    public static async Task<int> Run(CancellationToken cancellationToken)
+    {
+        const string source = """
+            #nullable enable
+            using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+            public static class QueryTrace{
+                public static string Value="";public static Exception? Failure;
+                public static bool Accept<T>(T value){Value+="where;";return true;}
+                public static T Touch<T>(T value){Value+="touch;";if(Failure!=null)throw Failure;return value;}
+                public static IEnumerable<T> Source<T>(IEnumerable<T> values){Value+="open;";try{foreach(var value in values)yield return value;}finally{Value+="dispose;";}}
+            }
+            public sealed class QueryBox<T>{
+                public IEnumerable<T> Values;public QueryBox(IEnumerable<T> values){Values=values;}
+                public QueryBox<U> Select<U>(Func<T,U> selector){QueryTrace.Value+="select;";return new QueryBox<U>(Values.Select(selector));}
+            }
+            public static class QueryProbe{
+                public static IEnumerable<int> DefaultJoin(IEnumerable<int> values,bool flag)=>from x in values select flag?x:default;
+                public static IEnumerable<string?> NullJoin(IEnumerable<string> values,bool flag)=>from x in values select flag?x:null;
+                public static IEnumerable<int> Coalesce(IEnumerable<int?> values,int fallback)=>from x in values select x??fallback;
+                public static IEnumerable<int> Lazy(IEnumerable<int> values)=>from x in values where QueryTrace.Accept(x) let pair=(QueryTrace.Touch(x),x) select pair.Item1;
+                public static IEnumerable<(int left,string right)> Many(IEnumerable<int> values,IEnumerable<string> other)=>from x in values from y in other select(x,y);
+                public static IEnumerable<int> Order(IEnumerable<int> values)=>from x in values orderby x descending,x select x;
+                public static IEnumerable<int> Continue(IEnumerable<int> values)=>from x in values select(x,x) into pair select pair.Item2;
+                public static IEnumerable<(string left,bool right)> Join(IEnumerable<(int key,string value)> left,IEnumerable<(int key,bool value)> right)=>from l in left join r in right on l.key equals r.key select(l.value,r.value);
+                public static IEnumerable<IEnumerable<int>> GroupJoin(IEnumerable<int> left,IEnumerable<int> right)=>from l in left join r in right on l equals r into grouped select grouped;
+                public static IEnumerable<IGrouping<int,string>> Group(IEnumerable<(int key,string value)> values)=>from x in values group x.value by x.key;
+                public static IEnumerable<int> Typed(IEnumerable<object> values)=>from int x in values select x;
+                public static IEnumerable<int> Numeric(IEnumerable<int> values)=>from x in values where x>0 select x;
+                public static IQueryable<int> Quoted(IQueryable<int> values)=>from x in values where QueryTrace.Accept(x) select x;
+                public static IQueryable<int> QuotedDefault(IQueryable<int> values,bool flag)=>from x in values select flag?x:default;
+                public static QueryBox<int> Custom(QueryBox<int> values)=>from x in values select QueryTrace.Touch(x);
+                public static async Task<IEnumerable<int>> Async(Task<IEnumerable<int>> values)=>from x in await values select QueryTrace.Touch(x);
+                public static async ValueTask<IEnumerable<int>> ValueAsync(ValueTask<IEnumerable<int>> values)=>from x in await values select QueryTrace.Touch(x);
+            }
+            public static class OriginalQueryRunner{
+                public static async Task<bool> Run(CancellationToken cancellationToken){
+                    if(!QueryProbe.DefaultJoin(new[]{7},true).SequenceEqual(new[]{7})||!QueryProbe.DefaultJoin(new[]{7},false).SequenceEqual(new[]{0})
+                        ||!QueryProbe.NullJoin(new[]{"value"},true).SequenceEqual(new[]{"value"})||QueryProbe.NullJoin(new[]{"value"},false).Single()!=null
+                        ||!QueryProbe.Coalesce(new int?[]{null,7},9).SequenceEqual(new[]{9,7}))return false;
+                    QueryTrace.Value="";var lazy=QueryProbe.Lazy(QueryTrace.Source(new[]{7,9}));
+                    if(QueryTrace.Value!=""||lazy.Take(1).Single()!=7||QueryTrace.Value!="open;where;touch;dispose;")return false;
+                    if(!QueryProbe.Many(new[]{1,2},new[]{"a","b"}).SequenceEqual(new[]{(1,"a"),(1,"b"),(2,"a"),(2,"b")})
+                        ||!QueryProbe.Order(new[]{1,3,2}).SequenceEqual(new[]{3,2,1})||!QueryProbe.Continue(new[]{7,9}).SequenceEqual(new[]{7,9}))return false;
+                    var joined=QueryProbe.Join(new[]{(1,"left")},new[]{(1,true),(2,false)}).ToArray();
+                    if(joined.Length!=1||joined[0]!=("left",true))return false;
+                    var groups=QueryProbe.GroupJoin(new[]{1,2},new[]{1,1,3}).ToArray();if(groups.Length!=2||!groups[0].SequenceEqual(new[]{1,1})||groups[1].Any())return false;
+                    var grouped=QueryProbe.Group(new[]{(1,"a"),(1,"b"),(2,"c")}).ToArray();if(grouped.Length!=2||grouped[0].Key!=1||!grouped[0].SequenceEqual(new[]{"a","b"}))return false;
+                    using(var items=QueryProbe.Typed(new object[]{7,"bad"}).GetEnumerator()){
+                        if(!items.MoveNext()||items.Current!=7)return false;try{items.MoveNext();return false;}catch(InvalidCastException){}
+                    }
+                    if(!QueryProbe.Numeric(new[]{-1,0,1}).SequenceEqual(new[]{1}))return false;
+                    QueryTrace.Value="";var quoted=QueryProbe.Quoted(new[]{7,9}.AsQueryable());
+                    if(QueryTrace.Value!=""||quoted.Expression is not MethodCallExpression call||call.Method.DeclaringType!=typeof(Queryable)
+                        ||call.Method.GetGenericArguments()[0]!=typeof(int)||!quoted.SequenceEqual(new[]{7,9})||QueryTrace.Value!="where;where;")return false;
+                    QueryTrace.Value="";var custom=QueryProbe.Custom(new QueryBox<int>(new[]{7,9}));
+                    var defaults=QueryProbe.QuotedDefault(new[]{7}.AsQueryable(),false);
+                    var selector=(LambdaExpression)((UnaryExpression)((MethodCallExpression)defaults.Expression).Arguments[1]).Operand;
+                    if(((ConditionalExpression)selector.Body).IfFalse is not ConstantExpression constant||constant.Type!=typeof(int)||!Equals(constant.Value,0)||defaults.Single()!=0)return false;
+                    if(QueryTrace.Value!="select;"||!custom.Values.SequenceEqual(new[]{7,9})||QueryTrace.Value!="select;touch;touch;")return false;
+                    var failure=new InvalidOperationException("query-selector");QueryTrace.Value="";QueryTrace.Failure=failure;var failed=QueryProbe.Lazy(new[]{7});
+                    try{if(QueryTrace.Value!="")return false;_=failed.ToArray();return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){}
+                    finally{QueryTrace.Failure=null;}
+                    if(QueryTrace.Value!="where;touch;")return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        QueryTrace.Value="";var gate=new TaskCompletionSource<IEnumerable<int>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=QueryProbe.Async(gate.Task);var valueTask=QueryProbe.ValueAsync(new ValueTask<IEnumerable<int>>(gate.Task)).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.Value!="")return false;
+                        if(outcome=="Value")gate.SetResult(new[]{7,9});else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        foreach(var pending in new[]{task,valueTask}){
+                            try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||QueryTrace.Value!=""||!result.SequenceEqual(new[]{7,9})||QueryTrace.Value!="touch;touch;")return false;QueryTrace.Value="";}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                    }
+                    return true;
+                }
+            }
+            """;
+        const string newSource = """
+            #nullable enable
+            using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+            public static class NewQueryRunner{
+                public static async Task<bool> Run(CancellationToken cancellationToken){
+                    string text=new string('x',2);var uri=new Uri("https://example.invalid/query");
+                    if(!ReferenceEquals(QueryProbe.DefaultJoin(new[]{text},true).Single(),text)||QueryProbe.DefaultJoin(new[]{text},false).Single()!=null
+                        ||QueryProbe.DefaultJoin(new decimal?[]{23m},false).Single()!=null||!ReferenceEquals(QueryProbe.NullJoin(new[]{uri},true).Single(),uri)
+                        ||QueryProbe.NullJoin(new[]{uri},false).Single()!=null||!QueryProbe.Coalesce(new decimal?[]{null,23m},99m).SequenceEqual(new[]{99m,23m}))return false;
+                    QueryTrace.Value="";var lazy=QueryProbe.Lazy(QueryTrace.Source(new string?[]{text,null}));
+                    if(QueryTrace.Value!=""||!ReferenceEquals(lazy.Take(1).Single(),text)||QueryTrace.Value!="open;where;touch;dispose;")return false;
+                    QueryTrace.Value="";if(!QueryProbe.Lazy(new string?[]{text,null}).SequenceEqual(new string?[]{text,null})||QueryTrace.Value!="where;touch;where;touch;")return false;
+                    var pairs=QueryProbe.Many(new[]{text},new[]{uri}).ToArray();if(pairs.Length!=1||!ReferenceEquals(pairs[0].left,text)||!ReferenceEquals(pairs[0].right,uri))return false;
+                    if(!QueryProbe.Order(new[]{"a","c","b"}).SequenceEqual(new[]{"c","b","a"})||!ReferenceEquals(QueryProbe.Continue(new[]{uri}).Single(),uri))return false;
+                    var joined=QueryProbe.Join(new[]{("key",uri)},new[]{("key",23m)}).ToArray();if(joined.Length!=1||!ReferenceEquals(joined[0].left,uri)||joined[0].right!=23m)return false;
+                    var groups=QueryProbe.GroupJoin(new[]{"a","b"},new[]{"a","a","c"}).ToArray();if(groups.Length!=2||!groups[0].SequenceEqual(new[]{"a","a"})||groups[1].Any())return false;
+                    var grouped=QueryProbe.Group(new[]{("key",uri)}).Single();if(grouped.Key!="key"||!ReferenceEquals(grouped.Single(),uri))return false;
+                    QueryTrace.Value="";var quoted=QueryProbe.Quoted(new string?[]{text,null}.AsQueryable());
+                    if(QueryTrace.Value!=""||quoted.Expression is not MethodCallExpression call||call.Method.GetGenericArguments()[0]!=typeof(string)
+                        ||!quoted.SequenceEqual(new string?[]{text,null})||QueryTrace.Value!="where;where;")return false;
+                    QueryTrace.Value="";var custom=QueryProbe.Custom(new QueryBox<Uri>(new[]{uri}));if(QueryTrace.Value!="select;"||!ReferenceEquals(custom.Values.Single(),uri)||QueryTrace.Value!="select;touch;")return false;
+                    var defaults=QueryProbe.QuotedDefault(new[]{text}.AsQueryable(),false);
+                    var selector=(LambdaExpression)((UnaryExpression)((MethodCallExpression)defaults.Expression).Arguments[1]).Operand;
+                    if(((ConditionalExpression)selector.Body).IfFalse is not ConstantExpression constant||constant.Type!=typeof(string)||constant.Value!=null||defaults.Single()!=null)return false;
+                    QueryTrace.Value="";var gate=new TaskCompletionSource<IEnumerable<string?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var task=QueryProbe.Async(gate.Task);var valueTask=QueryProbe.ValueAsync(new ValueTask<IEnumerable<string?>>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.Value!="")return false;gate.SetResult(new string?[]{text,null});
+                    foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(QueryTrace.Value!=""||!result.SequenceEqual(new string?[]{text,null})||QueryTrace.Value!="touch;touch;")return false;QueryTrace.Value="";}
+                    return true;
+                }
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "Queries", "Queries", LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, generalDiagnosticOption: ReportDiagnostic.Error),
+            metadataReferences: Program.Compile([]).References));
+        var document = project.AddDocument("Queries.cs", source);
+        var original = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var provider = new HmSignatureCodeFixProvider();
+        var context = new FixAllContext(document, provider, FixAllScope.Project, "HM.GeneralizeSignature", provider.FixableDiagnosticIds, new CodeFixChecks.DiagnosticSource(), cancellationToken);
+        var action = (await provider.GetFixAllProvider().GetFixAsync(context).ConfigureAwait(false))!;
+        var solution = (await action.GetOperationsAsync(cancellationToken).ConfigureAwait(false)).OfType<ApplyChangesOperation>().Single().ChangedSolution;
+        var changed = (await solution.GetDocument(document.Id)!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var loadContext = new System.Runtime.Loader.AssemblyLoadContext("QueryInference", isCollectible: true);
+        try
+        {
+            async Task Execute(Compilation compilation, string runner)
+            {
+                ArgumentNullException.ThrowIfNull(compilation);
+                ArgumentException.ThrowIfNullOrEmpty(runner);
+                using var image = new MemoryStream();
+                var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+                if (!emitted.Success)
+                { throw new InvalidOperationException("Query emission: " + string.Join("\n", emitted.Diagnostics)); }
+                image.Position = 0;
+                var assembly = loadContext.LoadFromStream(image);
+                var pending = (Task<bool>)assembly.GetType(runner)!.GetMethod("Run")!.Invoke(null, [cancellationToken])!;
+                if (!await pending.WaitAsync(cancellationToken).ConfigureAwait(false))
+                { throw new InvalidOperationException("Query runtime effects: " + runner); }
+            }
+            await Execute(original.WithAssemblyName("BeforeQueries"), "OriginalQueryRunner").ConfigureAwait(false);
+            await Execute(changed.WithAssemblyName("AfterQueries"), "OriginalQueryRunner").ConfigureAwait(false);
+            Program.Log.Info("PASS QueryOriginalLazinessDisposalOperatorsGroupsTreesAndAwaitEffects");
+            await Execute(changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText(newSource, cancellationToken: cancellationToken)).WithAssemblyName("NewQueries"), "NewQueryRunner").ConfigureAwait(false);
+            Program.Log.Info("PASS QueryNewReferenceNullableAndIndependentDomains");
+            var invalid = changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText("using System.Collections.Generic;class Bad{void Check(){_=QueryProbe.Numeric(new[]{\"bad\"});IEnumerable<string> values=QueryProbe.Typed(new[]{1});}}", cancellationToken: cancellationToken));
+            if (invalid.GetDiagnostics(cancellationToken).Count(diagnostic =>
+                { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; }) != 2)
+            { throw new InvalidOperationException("Query numeric or typed-from boundaries changed."); }
+            Program.Log.Info("PASS QueryRetainsNumericAndExplicitCastDomains");
+        }
+        finally { loadContext.Unload(); }
+        return 3;
+    }
+}

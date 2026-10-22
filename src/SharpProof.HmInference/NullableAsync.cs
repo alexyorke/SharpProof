@@ -836,6 +836,7 @@ public static partial class Inference
             {
                 MethodDeclarationSyntax method => model.GetDeclaredSymbol(method, cancellationToken)?.RefKind,
                 AnonymousFunctionExpressionSyntax anonymous when model.GetOperation(anonymous, cancellationToken) is IAnonymousFunctionOperation operation => operation.Symbol.RefKind,
+                null when site.Parent is SelectOrGroupClauseSyntax or QueryClauseSyntax or OrderingSyntax => querySelectorReturn?.RefKind,
                 _ => null
             };
             if (referenceKind != RefKind.None)

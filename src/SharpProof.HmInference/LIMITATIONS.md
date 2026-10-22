@@ -7,6 +7,7 @@ The README describes today's supported subset; it is not the completion spec.
 
 | Requirement | Current evidence / remaining work |
 | --- | --- |
+| LINQ query syntax | Implemented: compiler-selected query calls and generated selectors, transparent carriers, let/multiple-from/order/join/group-join/group/continuation clauses, custom query patterns, IQueryable quotes and awaited sources. Nullable/default selector joins and coalescing retain structural relationships; explicit casts and numeric endpoints stay fixed. Supplied query operators and omitted defaults are rechecked, including a regression that rejects a newly applicable overload. Applied Fix All execution compares lazy enumeration, early disposal, traces, identities, independent key/value domains, provider expressions, nullable/new domains, suspension, exact faults and cancellation. C# 8/9/13 CLI and fresh-package consumers verify signatures. Other selector expressions follow the remaining C# inference gaps. |
 | Portable IDE analyzer | Implemented: netstandard2.0 analyzer, packaged-consumer load test; interactive IDE acceptance remains open |
 | IDE code fix | Verified: MEF discovery and application/trivia/stale-input/cancellation tests |
 | Safe Fix All | Implemented: sequential document/project/solution provider; conflict regression checks |

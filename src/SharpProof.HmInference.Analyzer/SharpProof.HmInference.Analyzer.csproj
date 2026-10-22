@@ -33,6 +33,7 @@
     <Compile Include="../SharpProof.HmInference/Patterns.cs" Link="Patterns.cs" />
     <Compile Include="../SharpProof.HmInference/ArgumentConversions.cs" Link="ArgumentConversions.cs" />
     <Compile Include="../SharpProof.HmInference/DelegateInference.cs" Link="DelegateInference.cs" />
+    <Compile Include="../SharpProof.HmInference/QueryInference.cs" Link="QueryInference.cs" />
     <Compile Include="../SharpProof.HmInference/Enumeration.cs" Link="Enumeration.cs" />
     <Compile Include="../SharpProof.HmInference/Deconstruction.cs" Link="Deconstruction.cs" />
     <Compile Include="../SharpProof.HmInference/StructuredFlow.cs" Link="StructuredFlow.cs" />
