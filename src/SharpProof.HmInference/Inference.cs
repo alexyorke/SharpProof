@@ -978,7 +978,7 @@ public static partial class Inference
                         if (assignment.Right is not RefExpressionSyntax && AssignmentTarget(assignment.Left).FreeVariables().Count == 0
                             && StorageType(assignment.Left) is { } fixedTarget)
                         { return FixedContextValue(assignment.Right, fixedTarget); }
-                        return AssignValue(assignment.Left, ScalarDefaultValue(assignment.Right, StorageType(assignment.Left)) ?? Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
+                        return AssignValue(assignment.Left, StoredLiteralValue(assignment.Right, StorageType(assignment.Left)) ?? Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
                             ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 
@@ -1303,7 +1303,13 @@ public static partial class Inference
             {
                 var merged = MergeDefaultValues(target, value);
                 if (storage is ILocalSymbol { RefKind: not RefKind.None } or IParameterSymbol { RefKind: not RefKind.None })
-                { RequireKeyword(ConversionCore(merged), "struct"); HmType.Unify(target, ConversionCore(merged)); return target; }
+                {
+                    if (merged.Root.Name == CSharpTypes.NullableParameter)
+                    { RequireKeyword(ConversionCore(merged), "struct"); HmType.Unify(target, ConversionCore(merged)); }
+                    else
+                    { HmType.Unify(target, merged); }
+                    return target;
+                }
                 environment[storage] = merged;
                 defaultAssignedStorages.Add(storage);
                 return merged;

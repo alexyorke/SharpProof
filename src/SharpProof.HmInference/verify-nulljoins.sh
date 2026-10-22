@@ -6,6 +6,7 @@ for language in 8 9 13; do
   cp global.json "$fixture/global.json"
   constants=""
   if [ "$language" != 8 ]; then constants=FUNCTION_POINTERS; fi
+  if [ "$language" = 13 ]; then constants="$constants;NATURAL_DELEGATES"; fi
   default_signature='T1? DefaultValue<T1, T2>(bool flag, T1 value, T2 tag)'
   if [ "$language" = 8 ]; then default_signature='T1 DefaultValue<T1, T2>(bool flag, T1 value, T2 tag) where T1 : struct'; fi
   package_reference=""
@@ -28,6 +29,24 @@ public readonly struct ConvertedBox<T>{
     public static implicit operator ConvertedBox<T>(T value){Conversions++;return new ConvertedBox<T>(value);}
 }
 public static class NullJoinConsumer{
+public static object? StoreReference(bool clear,object value){var result=value;if(clear)result=null;return result;}
+public static int? StoreValue(bool clear,int? value){var result=value;if(clear)result=default;return result;}
+public static object? StoreParameter(object? value){value=null;return value;}
+public static object StoreCopy(object value){var result=value;var copy=result;result=null;return copy;}
+public static object? StoreCapture(object value){var result=value;void Clear(){result=null;}Clear();return result;}
+public static object? StoreArray(object?[] values){values[0]=null;return values[0];}
+public static int? StoreList(List<int?> values){values[0]=null;return values[0];}
+public static object? StoreRef(ref object? value){value=null;return value;}
+public static int? StoreValueRef(ref int? value){value=null;return value;}
+public static unsafe int* StorePointer(int* value){var result=value;result=null;return result;}
+public static int[]? StoreArrayRoot(int[] value){var result=value;result=null;return result;}
+public static List<int>? StoreListRoot(List<int> value){var result=value;result=null;return result;}
+public static (object left,int right)? StoreTupleRoot((object left,int right)? value){var result=value;result=default;return result;}
+public static async Task<object?> StoreAwait(bool clear,Task<object> value){var result=await value;if(clear)result=null;return result;}
+public static async ValueTask<int?> StoreAwaitValue(bool clear,ValueTask<int?> value){var result=await value;if(clear)result=null;return result;}
+#if NATURAL_DELEGATES
+public static Func<object?> StoreCallback(object value){var result=value;var read=()=>result;result=null;return read;}
+#endif
 public static object ConvertedReference(object? value,string fallback)=>value??fallback;
 public static object ConvertedSelection(string? value,object fallback)=>value??fallback;
 public static object ConvertedBoxing(int? value,object fallback)=>value??fallback;
@@ -86,6 +105,7 @@ public static async ValueTask<int?> CoalesceAsyncAssignValue(int? value,int tag)
     public static async ValueTask<int?> ValueStruct(bool flag,ValueTask<int> value,int tag){if(flag)return await value;return null;}
     public static unsafe int* Pointer(bool flag,int* value,int tag){if(flag)return value;return null;}
 #if FUNCTION_POINTERS
+    public static unsafe delegate*<int,int> StoreFunctionPointer(delegate*<int,int> value){var result=value;result=null;return result;}
     public static unsafe delegate*<int,int> FunctionPointer(bool flag,delegate*<int,int> value,int tag){if(flag)return value;return null;}
 #endif
 }
@@ -120,6 +140,21 @@ EOF
   fi
   cp "$log" "$destination"
   for expected in \
+    'T1? StoreReference<T1>(bool clear, T1 value) where T1 : class' \
+    'T1? StoreValue<T1>(bool clear, T1? value) where T1 : struct' \
+    'T1? StoreParameter<T1>(T1? value) where T1 : class' \
+    'T1 StoreCopy<T1>(T1 value) where T1 : class' \
+    'T1? StoreCapture<T1>(T1 value) where T1 : class' \
+    'T1? StoreArray<T1>(T1?[] values) where T1 : class' \
+    'T1? StoreList<T1>(global::System.Collections.Generic.List<T1?> values) where T1 : struct' \
+    'T1? StoreRef<T1>(ref T1? value) where T1 : class' \
+    'T1? StoreValueRef<T1>(ref T1? value) where T1 : struct' \
+    'T1* StorePointer<T1>(T1* value) where T1 : unmanaged' \
+    'T1[]? StoreArrayRoot<T1>(T1[] value)' \
+    'global::System.Collections.Generic.List<T1>? StoreListRoot<T1>(global::System.Collections.Generic.List<T1> value)' \
+    '(T1 left, T2 right)? StoreTupleRoot<T1, T2>((T1 left, T2 right)? value)' \
+    'global::System.Threading.Tasks.Task<T1?> StoreAwait<T1>(bool clear, global::System.Threading.Tasks.Task<T1> value) where T1 : class' \
+    'global::System.Threading.Tasks.ValueTask<T1?> StoreAwaitValue<T1>(bool clear, global::System.Threading.Tasks.ValueTask<T1?> value) where T1 : struct' \
     'T1? RecursiveReference<T1, T2>(int depth, T1 value, T2 tag) where T1 : class' \
     'T1? RecursiveValue<T1, T2>(int depth, T1 value, T2 tag) where T1 : struct' \
     'T1[]? RecursiveArray<T1, T2>(int depth, T1[] value, T2 tag)' \
@@ -184,7 +219,11 @@ EOF
     fi
   done
   if [ "$language" != 8 ]; then
+    grep -Fq 'delegate*<T1, T2> StoreFunctionPointer<T1, T2>(delegate*<T1, T2> value)' "$log"
     grep -Fq 'delegate*<T1, T2> FunctionPointer<T1, T2, T3>(bool flag, delegate*<T1, T2> value, T3 tag)' "$log"
+  fi
+  if [ "$language" = 13 ]; then
+    grep -Fq 'global::System.Func<T1?> StoreCallback<T1>(T1 value) where T1 : class' "$log"
   fi
   if [ "$#" -eq 1 ]; then printf 'PASS CliNullJoinInferenceCSharp%s\n' "$language"; fi
 done

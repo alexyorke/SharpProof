@@ -194,7 +194,8 @@ public static partial class Inference
                 {
                     inferred = new(CSharpTypes.NullableReference, inferred);
                 }
-                else if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated && inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+                else if (info.Type.IsReferenceType && converted.NullableAnnotation != NullableAnnotation.Annotated
+                    && inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter && !HasDefaultValueAnnotation(inferred))
                 {
                     while (inferred.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
                     { inferred = inferred.Arguments[0].Root; }
@@ -256,7 +257,7 @@ public static partial class Inference
                         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Left is IdentifierNameSyntax
                             && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } assigned
                             && assigned is ILocalSymbol or IParameterSymbol
-                            && ScalarDefaultValue(assignment.Right, StorageType(assignment.Left)) is not null)
+                            && StoredLiteralValue(assignment.Right, StorageType(assignment.Left)) is not null)
                         {
                             if (!defaultStores.TryGetValue(assigned, out var stores))
                             { stores = []; defaultStores.Add(assigned, stores); }
@@ -271,10 +272,37 @@ public static partial class Inference
             foreach (var literal in literals)
             {
                 if ((!onlyCapturedWrites || !SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, model.GetEnclosingSymbol(literal.SpanStart, cancellationToken)))
-                    && ScalarDefaultValue(literal, storageType) is { } value)
+                    && StoredLiteralValue(literal, storageType) is { } value)
                 { type = MergeDefaultValues(type, value); }
             }
             return type;
+        }
+
+        private HmType? StoredLiteralValue(ExpressionSyntax expression, ITypeSymbol target)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (ScalarDefaultValue(expression, target) is { } scalar)
+            { return scalar; }
+            if (!IsNullLiteralConversion(expression, target))
+            { return null; }
+            var literal = expression;
+            var suppressed = false;
+            while (true)
+            {
+                if (literal is ParenthesizedExpressionSyntax parentheses)
+                { literal = parentheses.Expression; }
+                else if (literal is PostfixUnaryExpressionSyntax suppression && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { suppressed = true; literal = suppression.Operand; }
+                else
+                { break; }
+            }
+            var shape = NullLiteralShape(target.IsReferenceType
+                ? target.WithNullableAnnotation(suppressed ? NullableAnnotation.NotAnnotated : NullableAnnotation.Annotated) : target);
+            defaultValueAnnotations.Add(shape);
+            return shape;
         }
 
         private HmType? ScalarDefaultValue(ExpressionSyntax expression, ITypeSymbol target)
@@ -348,6 +376,11 @@ public static partial class Inference
             { HmType.Unify(first, second); return first; }
             first = first.Root;
             second = second.Root;
+            var reference = first.Name == CSharpTypes.NullableReference || second.Name == CSharpTypes.NullableReference;
+            if (first.Name == CSharpTypes.NullableReference)
+            { first = first.Arguments[0].Root; }
+            if (second.Name == CSharpTypes.NullableReference)
+            { second = second.Arguments[0].Root; }
             var annotated = first.Name == CSharpTypes.NullableParameter || second.Name == CSharpTypes.NullableParameter;
             if (first.Name == CSharpTypes.NullableParameter)
             { first = first.Arguments[0].Root; }
@@ -369,9 +402,9 @@ public static partial class Inference
             }
             else
             { HmType.Unify(first, second); merged = first.Root; }
-            if (!annotated)
+            if (!annotated && !reference)
             { return merged; }
-            var result = new HmType(CSharpTypes.NullableParameter, merged);
+            var result = new HmType(reference ? CSharpTypes.NullableReference : CSharpTypes.NullableParameter, merged);
             defaultValueAnnotations.Add(result);
             return result;
         }
