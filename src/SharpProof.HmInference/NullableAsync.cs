@@ -93,8 +93,20 @@ public static partial class Inference
         }
 
         private readonly HashSet<int> forwardedDisallowNull = [];
+        private readonly Dictionary<TextSpan, HmType> disallowNullArguments = [];
+        private readonly HashSet<HmType> constrainedDisallowNull = [];
 
-        private bool ForwardDisallowNullInputs(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate)
+        private void RecordDisallowNullArgument(IArgumentOperation argument, HmType value)
+        {
+            if (argument is null)
+            { throw new ArgumentNullException(nameof(argument)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (argument.Parameter is { RefKind: not RefKind.Out } parameter && HasDisallowNull(parameter))
+            { disallowNullArguments[argument.Syntax.Span] = value; }
+        }
+
+        private bool RefineDisallowNullInputs(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate)
         {
             if (compilation is null)
             { throw new ArgumentNullException(nameof(compilation)); }
@@ -125,12 +137,21 @@ public static partial class Inference
                     { throw new ArgumentNullException(nameof(diagnostic)); }
                     return after[i].Span.Contains(diagnostic.Location.SourceSpan);
                 }) || model.GetOperation(before[i], cancellationToken) is not IArgumentOperation { Parameter: { } target }
-                    || target.RefKind == RefKind.Out || !HasDisallowNull(target)
-                    || StorageExpression(before[i].Expression) is not IdentifierNameSyntax identifier
-                    || model.GetSymbolInfo(identifier, cancellationToken).Symbol is not IParameterSymbol source
-                    || !SymbolEqualityComparer.Default.Equals(source.ContainingSymbol, currentMethod) || HasDisallowNull(source))
+                    || target.RefKind == RefKind.Out || !HasDisallowNull(target))
                 { continue; }
-                changed |= forwardedDisallowNull.Add(source.Ordinal);
+                if (StorageExpression(before[i].Expression) is IdentifierNameSyntax identifier
+                    && model.GetSymbolInfo(identifier, cancellationToken).Symbol is IParameterSymbol source
+                    && SymbolEqualityComparer.Default.Equals(source.ContainingSymbol, currentMethod))
+                {
+                    if (!HasDisallowNull(source))
+                    { changed |= forwardedDisallowNull.Add(source.Ordinal); }
+                }
+                else if (disallowNullArguments.TryGetValue(before[i].Span, out var actual)
+                    && actual.Root.IsVariable && constrainedDisallowNull.Add(actual.Root))
+                {
+                    RequireKeyword(actual.Root, "notnull");
+                    changed = true;
+                }
             }
             return changed;
         }

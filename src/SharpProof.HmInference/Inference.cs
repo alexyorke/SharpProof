@@ -378,10 +378,12 @@ public static partial class Inference
                 changed = CandidateTree();
                 changedCompilation = ReplaceCandidate(changed);
             }
-            while (ForwardDisallowNullInputs(changedCompilation, method,
+            while (RefineDisallowNullInputs(changedCompilation, method,
                 changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single()))
             {
-                candidate = candidate.WithParameterList(RenderParameters());
+                NormalizeConstraints();
+                nullableConstraints = BuildConstraints(variables, nullableAnnotations);
+                candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints)).WithParameterList(RenderParameters());
                 changed = CandidateTree();
                 changedCompilation = ReplaceCandidate(changed);
             }
@@ -1927,6 +1929,7 @@ public static partial class Inference
                 else
                 {
                     var actual = BindNullableArgument(argument.Value, ApplyInputNullability(parameter, expected));
+                    RecordDisallowNullArgument(argument, actual);
                     if (argumentValues is not null)
                     { argumentValues[parameter.Ordinal] = actual; }
                 }
@@ -1956,6 +1959,7 @@ public static partial class Inference
             // Storage passed by reference is invariant. Omitted readonly arguments
             // continue through ordinary conversion binding, including temporaries.
             var actual = BoundExpression(argument.Value, forStorage: true);
+            RecordDisallowNullArgument(argument, actual);
             var storage = parameter.RefKind is not (RefKind.Ref or RefKind.Out)
                 ? ApplyInputNullability(parameter, expected) : OutputStorageType(parameter, expected);
             var input = storage.Root;

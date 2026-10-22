@@ -71,6 +71,11 @@ internal static class QueryRuntimeChecks
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
                 public static T RequireInput<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value){Interlocked.Increment(ref RequiredTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(value is null)throw QueryTrace.ContractFailure;return value;}
                 static void RequireReadonly<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value){Interlocked.Increment(ref RequiredTrace.Calls);if(value is null)throw QueryTrace.ContractFailure;}
+                public static int RequiredPair((int value,bool tag) pair)=>RequireInput(pair.value);
+                public static int RequiredArray(int[] values)=>RequireInput(values[0]);
+                public static int RequiredMember(ReadonlyCell<int> cell)=>RequireInput(cell.Value);
+                public static async Task<int> RequiredPairTask(Task<(int value,bool tag)> input){var pair=await input;return RequireInput(pair.value);}
+                public static async ValueTask<int> RequiredArrayValueTask(ValueTask<int[]> input){var values=await input;return RequireInput(values[0]);}
                 public static int RequiredValue(int value)=>RequireInput(value);
                 public static int RequiredNamed(int value)=>RequireInput(value:value);
                 public static int RequiredDelegate(RequiredAction<int> require,int value)=>require(value);
@@ -367,7 +372,25 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> ProjectedContracts(CancellationToken cancellationToken){
+                    RequiredTrace.Calls=0;if(QueryProbe.RequiredPair((7,true))!=7||QueryProbe.RequiredArray(new[]{7})!=7||QueryProbe.RequiredMember(new ReadonlyCell<int>(7))!=7||RequiredTrace.Calls!=3)return false;
+                    var failure=new InvalidOperationException("projected input");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        RequiredTrace.Calls=0;var gate=new TaskCompletionSource<(int value,bool tag)>(TaskCreationOptions.RunContinuationsAsynchronously);var arrayGate=new TaskCompletionSource<int[]>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.RequiredPairTask(gate.Task);var valueTask=QueryProbe.RequiredArrayValueTask(new ValueTask<int[]>(arrayGate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted||RequiredTrace.Calls!=0)return false;
+                            if(outcome is "Value" or "HelperFault"){gate.SetResult((7,true));arrayGate.SetResult(new[]{7});}else if(outcome=="Fault"){gate.SetException(failure);arrayGate.SetException(failure);}else{gate.SetCanceled(canceled.Token);arrayGate.SetCanceled(canceled.Token);}
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{if(await pending.WaitAsync(cancellationToken)!=7||outcome!="Value")return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(RequiredTrace.Calls!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> RequiredContracts(CancellationToken cancellationToken){
+                    if(!await ProjectedContracts(cancellationToken))return false;
                     RequiredTrace.Calls=0;var value=17;if(QueryProbe.RequiredValue(7)!=7||QueryProbe.RequiredNamed(11)!=11||QueryProbe.RequiredDelegate(QueryProbe.RequireInput,13)!=13||QueryProbe.RequiredReadonly(in value)!=17||value!=17||PartialInputProbe.RequiredPartial(19)!=19||RequiredTrace.Calls!=5)return false;
                     var failure=new InvalidOperationException("required input");using var canceled=new CancellationTokenSource();canceled.Cancel();
                     foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
@@ -708,7 +731,16 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> ProjectedContracts(string text,CancellationToken cancellationToken){
+                    RequiredTrace.Calls=0;Uri? unrelated=null;var values=new[]{text};var cell=new ReadonlyCell<string>(text);
+                    if(!ReferenceEquals(QueryProbe.RequiredPair((text,unrelated)),text)||!ReferenceEquals(QueryProbe.RequiredArray(values),text)||!ReferenceEquals(QueryProbe.RequiredMember(cell),text)||RequiredTrace.Calls!=3||!ReferenceEquals(values[0],text)||!ReferenceEquals(cell.Value,text))return false;
+                    var gate=new TaskCompletionSource<(string value,Uri? tag)>(TaskCreationOptions.RunContinuationsAsynchronously);var arrayGate=new TaskCompletionSource<string[]>(TaskCreationOptions.RunContinuationsAsynchronously);RequiredTrace.Calls=0;
+                    var task=QueryProbe.RequiredPairTask(gate.Task);var valueTask=QueryProbe.RequiredArrayValueTask(new ValueTask<string[]>(arrayGate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted||RequiredTrace.Calls!=0)return false;gate.SetResult((text,unrelated));arrayGate.SetResult(values);
+                    if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||!ReferenceEquals(await valueTask.WaitAsync(cancellationToken),text)||RequiredTrace.Calls!=2)return false;
+                    return true;
+                }
                 static async Task<bool> RequiredContracts(string text,CancellationToken cancellationToken){
+                    if(!await ProjectedContracts(text,cancellationToken))return false;
                     RequiredTrace.Calls=0;var uri=new Uri("https://example.invalid/required-input");decimal? number=23m;
                     if(!ReferenceEquals(QueryProbe.RequiredValue(text),text)||QueryProbe.RequiredNamed(number)!=23m||!ReferenceEquals(QueryProbe.RequiredDelegate(QueryProbe.RequireInput,uri),uri)||QueryProbe.RequiredReadonly(in number)!=23m||number!=23m||PartialInputProbe.RequiredPartial(number)!=23m||RequiredTrace.Calls!=5)return false;
                     try{_=QueryProbe.RequiredValue<string>(null!);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}

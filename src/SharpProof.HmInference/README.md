@@ -902,8 +902,13 @@ Task/ValueTask wrappers have regression coverage. Partial implementations emit t
 contract once while both declarations retain matching generic types. Applied fixes
 verify reference identity, nullable-value inputs, exact helper faults, suspension,
 cancellation and reflected metadata. CLI/package consumers cover C# 8/9/13 and
-C# 9/13 non-void partial declarations. Projected input contracts and stronger
-relational wrapper forwarding still need work.
+C# 9/13 non-void partial declarations. Projected tuple fields, array elements,
+member reads, delegate/readonly arguments and Task/ValueTask payloads infer
+`notnull` only on the component that needs it. Unrelated tuple components stay
+unconstrained. Effective compiler diagnostics drive these bounds; guarded and
+suppressed calls avoid unnecessary restrictions. Source/metadata helpers, applied
+IDE fixes and C# 8/9/13 CLI/package consumers cover these cases. Stronger
+relational wrapper forwarding and optional projected storage still need work.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
