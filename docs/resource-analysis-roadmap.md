@@ -109,6 +109,35 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Object initializer lifetime boundaries and measured coverage
+
+Additional native lifetime controls exercise field initialization, constructor
+assignment and the final object initializer in their C# execution order. They
+also cover an initializer value returned by a direct source call. Each admitted
+case checks both the exact finite memory bound and a one-byte-lower refutation.
+Ordinary property, indexer and valid nested-member initializers have positive
+controls. Separate raw constructions inside field initializers exercise the
+property/indexer rejection boundary; a null nested-member target also requires
+Unknown. Rejections retain no partial inferred/observed bound or metadata
+evidence, despite an earlier array allocation in the same method.
+
+All 674 native resource-contract cases passed on the corrected final source,
+with zero build warnings or errors (`artifacts/resource-object-initializer-tests-final.log`).
+Full quality/API checks passed (`artifacts/resource-object-initializer-lint-final.log`),
+as did documentation checks (`artifacts/resource-object-initializer-docs-final.log`).
+The canonical private formatter copied zero source changes
+(`artifacts/resource-object-initializer-format-final.log`). No production
+admission rule or cost model changed.
+
+Published `836d0d13b` passed complete canonical CI (39801977550), package consumers (39801975090), and completed
+all fifteen coverage shards in run 39801975063.
+Aggregation measured 6816/7007 changed trusted lines (97.27%, 191 gaps), failing
+the unchanged 100% minimum. Seven previous gaps closed in Boolean case handling
+and metadata-assumption merging. The complete report for merge
+`980bdf220c89ff46eb8527630c61e8c046b4e38b` is retained at
+`artifacts/resource-836d-coverage-evidence/coverage/SharpProof.coverage.json`.
+This report predates the local warmed-message and initializer controls.
+
 ### Default exception messages and resource initialization
 
 The pinned runtime controls now exercise all seven reviewed ordinary exception

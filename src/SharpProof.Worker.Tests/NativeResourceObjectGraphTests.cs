@@ -6,6 +6,25 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase("public class Inner { public int Count {get;set;} } public class Node { public Inner Child=new Inner {Count=3}; }", "var root=new Node(); return new int[root.Child.Count];")]
+    [TestCase("public class Node { public int Count; public Node Child; }", "var root=new Node {Child={Count=3}}; return new int[root.Count];")]
+    [TestCase("public class Inner { public int this[int i] {get=>i;set{}} } public class Node { public Inner Child=new Inner {[0]=3}; }", "var root=new Node(); return new int[1];")]
+    public async Task UnsupportedObjectInitializersCannotPublishPartialLifetimeBounds(string declaration, string body)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using SharpProof.Attributes; " + declaration + " public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static int[] Target() {var earlier=new int[1];" + body + "} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
     [TestCase("return new System.Action(Work);", 0, 64)]
     [TestCase("return new System.Func<int>(Read);", 0, 64)]
     [TestCase("object first=new System.Action(Work); object second=new System.Action(Work); if(first==second) return null; return second;", 64, 64)]
@@ -107,6 +126,14 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("public class Node { public bool Flag; }", "var root=new Node(); root.Flag=true; if(root.Flag==false) return new int[3]; return new int[1];", 24, 32)]
     [TestCase("public class Node { public ulong Count; }", "var root=new Node(); root.Count=ulong.MaxValue; if(root.Count>0) return new int[1]; return new int[3];", 24, 32)]
     [TestCase("public class Node { public int[] Child { get; } }", "var root=new Node(); return root.Child;", 24, 0)]
+    [TestCase("public class Node { public int Count; }", "var root=new Node {Count=3}; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count=1; public Node() {Count=2;} }", "var root=new Node {Count=3}; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count=1; public Node(int value) {Count=value;} }", "var root=new Node(2) {Count=3}; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count; public static int Seed() => 3; }", "var root=new Node {Count=Node.Seed()}; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count {get;set;} }", "var root=new Node {Count=3}; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int this[int i] {get=>i;set{}} }", "var root=new Node {[0]=3}; return new int[1];", 24, 32)]
+    [TestCase("public class Inner { public int Count; } public class Node { public Inner Child=new Inner {Count=3}; }", "var root=new Node(); return new int[root.Child.Count];", 48, 40)]
+    [TestCase("public class Inner { public int Count; } public class Node { public Inner Child=new Inner(); }", "var root=new Node {Child={Count=3}}; return new int[root.Child.Count];", 48, 40)]
     public async Task CompilerFieldDefaultsAndScalarStoresDetermineFiniteMemory(string declaration, string body, int auxiliary, int retained)
     {
         ArgumentNullException.ThrowIfNull(declaration);
