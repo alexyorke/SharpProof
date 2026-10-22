@@ -97,10 +97,13 @@ public static partial class Inference
         return result;
     }
 
-    private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken)
+    private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
+        Dictionary<int, NullableFlowState>? parameterReadFlow = null, List<Dictionary<int, NullableFlowState>>? readFlowHistory = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<int, NullableFlowState> parameterReadFlow = parameterReadFlow ?? [];
+        private readonly List<Dictionary<int, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -372,6 +375,10 @@ public static partial class Inference
                 changed = CandidateTree();
                 changedCompilation = ReplaceCandidate(changed);
             }
+            var postconditionMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
+            if (RefineParameterPostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
+            { return refinedPostconditions; }
+
             if (needsBuilderEmission)
             {
                 var previousPins = pins.Count;
@@ -1048,7 +1055,7 @@ public static partial class Inference
                     var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
                     if (symbol is not null && environment.TryGetValue(symbol, out var type))
                     {
-                        return CapturedDefaultValue(identifier, symbol, type);
+                        return ApplyParameterReadFlow(identifier, symbol, CapturedDefaultValue(identifier, symbol, type), forStorage);
                     }
 
                     // Captured constructor parameters retain their instance storage type.
@@ -1938,10 +1945,10 @@ public static partial class Inference
             }
             // Storage passed by reference is invariant. Omitted readonly arguments
             // continue through ordinary conversion binding, including temporaries.
-            HmType.Unify(expected, BoundExpression(argument.Value));
+            HmType.Unify(expected, BoundExpression(argument.Value, forStorage: true));
             return true;
         }
-        private HmType BoundExpression(IOperation value)
+        private HmType BoundExpression(IOperation value, bool forStorage = false)
         {
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
@@ -1950,7 +1957,7 @@ public static partial class Inference
             { operand = conversion.Operand; }
             if (operand is IConditionalAccessInstanceOperation)
             { return ConditionalReceiver().Value; }
-            return value.Syntax is ExpressionSyntax expression ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");
+            return value.Syntax is ExpressionSyntax expression ? Expression(expression, forStorage) : throw new InferenceException("Unsupported synthesized argument.");
         }
     }
 

@@ -59,6 +59,121 @@ public static partial class Inference
             return ApplyMaybeNullContract(returnType, value);
         }
 
+        private HmType ApplyParameterReadFlow(IdentifierNameSyntax syntax, ISymbol symbol, HmType value, bool forStorage)
+        {
+            if (syntax is null)
+            { throw new ArgumentNullException(nameof(syntax)); }
+            if (symbol is null)
+            { throw new ArgumentNullException(nameof(symbol)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (forStorage || !parameterReadFlow.TryGetValue(syntax.SpanStart, out var state))
+            { return value; }
+            var type = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, _ => null };
+            return state == NullableFlowState.NotNull ? ConversionCore(value)
+                : state == NullableFlowState.MaybeNull && type is not null ? ApplyMaybeNullContract(type, value) : value;
+        }
+
+        private MethodResult? RefineParameterPostconditions(Compilation compilation, MethodDeclarationSyntax original,
+            MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
+            var body = (SyntaxNode?)original.Body ?? original.ExpressionBody;
+            var changedBody = (SyntaxNode?)candidate.Body ?? candidate.ExpressionBody;
+            if (body is null || changedBody is null)
+            { return null; }
+            var targets = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            foreach (var syntax in body.DescendantNodesAndSelf().OfType<ArgumentSyntax>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (model.GetOperation(syntax, cancellationToken) is not IArgumentOperation { Parameter: { } parameter } argument
+                    || !parameter.GetAttributes().Any(attribute =>
+                    {
+                        if (attribute is null)
+                        { throw new ArgumentNullException(nameof(attribute)); }
+                        return attribute.AttributeClass?.ToDisplayString() is
+                            "System.Diagnostics.CodeAnalysis.MaybeNullAttribute" or "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute"
+                            or "System.Diagnostics.CodeAnalysis.NotNullAttribute" or "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute";
+                    }))
+                { continue; }
+                var operand = argument.Value;
+                while (operand is IConversionOperation or IDeclarationExpressionOperation)
+                { operand = operand is IConversionOperation conversion ? conversion.Operand : ((IDeclarationExpressionOperation)operand).Expression; }
+                if (operand is ILocalReferenceOperation local)
+                { targets.Add(local.Local); }
+                else if (operand is IParameterReferenceOperation input)
+                { targets.Add(input.Parameter); }
+            }
+            if (targets.Count == 0)
+            { return null; }
+            var before = body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().ToArray();
+            var after = changedBody.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().ToArray();
+            if (before.Length != after.Length)
+            { throw new InferenceException("Cannot correlate parameter-postcondition reads."); }
+            var candidateModel = compilation.GetSemanticModel(candidate.SyntaxTree);
+            var next = new Dictionary<int, NullableFlowState>();
+            for (var i = 0; i < before.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (before[i].Identifier.ValueText != after[i].Identifier.ValueText)
+                { throw new InferenceException("Cannot correlate parameter-postcondition reads."); }
+                if (model.GetSymbolInfo(before[i], cancellationToken).Symbol is not { } symbol || !targets.Contains(symbol))
+                { continue; }
+                var info = candidateModel.GetTypeInfo(after[i], cancellationToken);
+                var state = info.Nullability.FlowState;
+                // Unconstrained T can be MaybeNull within its unannotated domain.
+                // Only an annotated read introduces optionality beyond that domain.
+                if (state == NullableFlowState.MaybeNull && info.Nullability.Annotation == NullableAnnotation.NotAnnotated)
+                { state = NullableFlowState.NotNull; }
+                // Roslyn can expose the pre-flow annotation of a direct conditional
+                // operand even when its joined expression retains unannotated T.
+                SyntaxNode branch = after[i];
+                while (branch.Parent is ParenthesizedExpressionSyntax parentheses)
+                { branch = parentheses; }
+                if (branch.Parent is ConditionalExpressionSyntax conditional && conditional.Condition != branch)
+                {
+                    var joined = candidateModel.GetTypeInfo(conditional, cancellationToken);
+                    if (joined.Nullability.Annotation == NullableAnnotation.NotAnnotated
+                        && SymbolEqualityComparer.Default.Equals(info.Type, joined.Type))
+                    { state = NullableFlowState.NotNull; }
+                }
+                // A representability bound added for C# 8 must not erase the flow
+                // evidence that required that bound in the preceding pass.
+                if (state == NullableFlowState.NotNull && parameterReadFlow.TryGetValue(before[i].SpanStart, out var previous)
+                    && previous == NullableFlowState.MaybeNull && (info.Type?.IsValueType == true
+                        || info.Type is ITypeParameterSymbol { HasValueTypeConstraint: true }))
+                { state = previous; }
+                if (state != NullableFlowState.None)
+                { next[before[i].SpanStart] = state; }
+            }
+            static bool SameFlow(Dictionary<int, NullableFlowState> left, Dictionary<int, NullableFlowState> right)
+            {
+                if (left is null)
+                { throw new ArgumentNullException(nameof(left)); }
+                if (right is null)
+                { throw new ArgumentNullException(nameof(right)); }
+                return left.Count == right.Count && left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
+            }
+            if (SameFlow(parameterReadFlow, next))
+            { return null; }
+            if (readFlowHistory.Any(previous =>
+            {
+                if (previous is null)
+                { throw new ArgumentNullException(nameof(previous)); }
+                return SameFlow(previous, next);
+            }))
+            { return new(original.Identifier.ValueText, "Rejected", "Parameter-postcondition flow refinement does not converge."); }
+            readFlowHistory.Add(parameterReadFlow);
+            return new Session(model, cancellationToken, next, readFlowHistory).Analyze(original, pins);
+        }
+
         private static HmType ApplyInputNullability(IParameterSymbol parameter, HmType value)
         {
             if (parameter is null)

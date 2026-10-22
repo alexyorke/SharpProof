@@ -10,6 +10,21 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("MaybeNullWhenConditional", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell,int fallback)=>cell.Try(out var value)?value:fallback;", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 fallback)"),
+            ("MaybeNullWhenFalseRead", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell,int fallback){if(!cell.Try(out var value))return value;return fallback;}", "T1? M<T1>(global::Cases.Cell<T1> cell, T1 fallback)"),
+            ("MaybeNullWhenReassigned", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell,int fallback){cell.Try(out var value);value=fallback;return value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 fallback)"),
+            ("NotNullWhenInput", "static bool Check<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)]T? value)=>value is not null;static string M(string? value,string fallback)=>Check(value)?value:fallback;", "T1 M<T1>(T1? value, T1 fallback) where T1 : class"),
+            ("NotNullWhenFalseInput", "static bool Check<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(false)]T? value)=>value is null;static string M(string? value,string fallback){if(!Check(value))return value;return fallback;}", "T1 M<T1>(T1? value, T1 fallback) where T1 : class"),
+            ("NotNullWhenOutside", "static bool Check<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)]T? value)=>value is not null;static string? M(string? value){Check(value);return value;}", "T1? M<T1>(T1? value) where T1 : class"),
+            ("MaybeNullWhenDelegate", "class Cell<T>{}delegate bool Try<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);static int M(Try<int> action,Cell<int> cell){action(cell,out var value);return value;}", "T1? M<T1>(global::Cases.Try<T1> action, global::Cases.Cell<T1> cell)"),
+            ("MaybeNullOutRead", "class Cell<T>{public void Read([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;}static int M(Cell<int> cell){cell.Read(out var value);return value;}", "T1? M<T1>(global::Cases.Cell<T1> cell)"),
+            ("MaybeNullWhenIgnored", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell){cell.Try(out var value);return value;}", "T1? M<T1>(global::Cases.Cell<T1> cell)"),
+            ("MaybeNullWhenSuccess", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell,int fallback){if(cell.Try(out var value))return value;return fallback;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 fallback)"),
+            ("MaybeNullWhenNegated", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static int M(Cell<int> cell,int fallback){if(!cell.Try(out var value))return fallback;return value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 fallback)"),
+            ("MaybeNullWhenCopied", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(true)]out T value){value=default!;return true;}}static int M(Cell<int> cell){cell.Try(out var value);var copy=value;return copy;}", "T1? M<T1>(global::Cases.Cell<T1> cell)"),
+            ("NotNullOutRead", "class Cell<T>{public void Read([System.Diagnostics.CodeAnalysis.NotNull]out T? value)=>value=default!;}static string M(Cell<string> cell){cell.Read(out var value);return value;}", "T1 M<T1>(global::Cases.Cell<T1> cell)"),
+            ("NotNullInputAfterCall", "static void Check<T>([System.Diagnostics.CodeAnalysis.NotNull]T? value){if(value is null)throw new Exception();}static string M(string? value){Check(value);return value;}", "T1 M<T1>(T1? value) where T1 : class"),
+            ("MaybeNullWhenAsync", "class Cell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}static async Task<int> M(Task<Cell<int>> input){var cell=await input;cell.Try(out var value);return value;}", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<global::Cases.Cell<T1>> input)"),
             ("AllowNullArrayArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T[] values)=>Value=values is null?default!:values[0];}static int M(Cell<int> cell,int[]? values){cell.Put(values);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1[]? values)"),
             ("AllowNullNamedArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}static string M(string? value,Cell<string> cell){cell.Put(value:value);return cell.Value;}", "T1 M<T1>(T1? value, global::Cases.Cell<T1> cell) where T1 : class"),
             ("AllowNullValueArgument", "class Cell<T>{public T Value=default!;}static void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value)=>cell.Value=value!;static int M(Cell<int> cell,int value){Put(cell,value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 value)"),
@@ -184,6 +199,8 @@ internal static class QueryChecks
                 [System.Diagnostics.CodeAnalysis.NotNull]public T? Required=>default!;
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>default;
             }
+            public sealed class PostconditionCell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}
+            public delegate bool PostconditionAction<T>(PostconditionCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
             public sealed class InputContractCell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}
             public delegate void InputContractAction<T>(InputContractCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value);
             public static class ReturnContractProvider{
@@ -204,6 +221,9 @@ internal static class QueryChecks
         var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
         (string Name, string Source, string Signature)[] metadataTests =
         [
+            ("MetadataMaybeNullWhen", "static int M(PostconditionCell<int> cell){cell.Try(out var value);return value;}", "T1? M<T1>(global::PostconditionCell<T1> cell)"),
+            ("MetadataMaybeNullWhenSuccess", "static int M(PostconditionCell<int> cell,int fallback)=>cell.Try(out var value)?value:fallback;", "T1 M<T1>(global::PostconditionCell<T1> cell, T1 fallback)"),
+            ("MetadataPostconditionDelegate", "static int M(PostconditionAction<int> action,PostconditionCell<int> cell){action(cell,out var value);return value;}", "T1? M<T1>(global::PostconditionAction<T1> action, global::PostconditionCell<T1> cell)"),
             ("MetadataAllowNullInput", "static string M(InputContractCell<string> cell,string? value){cell.Put(value);return cell.Value;}", "T1 M<T1>(global::InputContractCell<T1> cell, T1? value) where T1 : class"),
             ("MetadataAllowNullDelegate", "static string M(InputContractAction<string> put,InputContractCell<string> cell,string? value){put(cell,value);return cell.Value;}", "T1 M<T1>(global::InputContractAction<T1> put, global::InputContractCell<T1> cell, T1? value) where T1 : class"),
             ("MetadataPropertyMaybeNull", "static int M(ReturnContractCell<int> value,bool tag)=>value.Property;", "T1? M<T1, T2>(global::ReturnContractCell<T1> value, T2 tag)"),

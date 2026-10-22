@@ -25,7 +25,15 @@ public sealed class MemberContractCell<T>{
 public sealed class RequiredMemberCell<T>where T:class{[System.Diagnostics.CodeAnalysis.NotNull]public T? Value=>throw new NotImplementedException();}
 public sealed class InputCell<T>{public T Value=default!;public T Accept([System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback)=>Value=value is null?fallback:value;}
 public delegate T InputAction<T>(InputCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
+public sealed class OutcomeCell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}
+public delegate bool OutcomeAction<T>(OutcomeCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
 public static class QueryConsumer{
+  public static int OutcomeRead(OutcomeCell<int> cell){cell.Try(out var value);return value;}
+  public static int OutcomeSuccess(OutcomeCell<int> cell,int fallback){if(cell.Try(out var value))return value;return fallback;}
+  public static int OutcomeConditional(OutcomeCell<int> cell,int fallback)=>cell.Try(out var value)?value:fallback;
+  public static int OutcomeDelegate(OutcomeAction<int> action,OutcomeCell<int> cell){action(cell,out var value);return value;}
+  public static async Task<int> OutcomeAsync(Task<OutcomeCell<int>> input){var cell=await input;cell.Try(out var value);return value;}
+  public static async ValueTask<int> OutcomeValueAsync(ValueTask<OutcomeCell<int>> input){var cell=await input;cell.Try(out var value);return value;}
   static T AcceptInput<T>(InputCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback)=>cell.Value=value is null?fallback:value;
   public static string InputRead(InputCell<string> cell,string? value,string fallback)=>cell.Accept(value,fallback);
   public static int InputValue(InputCell<int> cell,int value,int fallback)=>AcceptInput(cell,value,fallback);
@@ -172,6 +180,12 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 OutcomeSuccess<T1>(global::OutcomeCell<T1> cell, T1 fallback)' "$log"
+  grep -Fq 'T1 OutcomeConditional<T1>(global::OutcomeCell<T1> cell, T1 fallback)' "$log"
+  if grep -E 'T1 Outcome(Success|Conditional)<T1>\(' "$log" | grep -Fq 'where T1'; then
+    printf 'Successful output reads gained an unnecessary bound (C# %s)\n' "$language"
+    exit 1
+  fi
   grep -Fq 'T1 InputRead<T1>(global::InputCell<T1> cell, T1? value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 InputValue<T1>(global::InputCell<T1> cell, T1 value, T1 fallback)' "$log"
   if grep -F 'T1 InputValue<T1>(' "$log" | grep -Fq 'where T1'; then
@@ -183,6 +197,10 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> InputValueAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1 OutcomeRead<T1>(global::OutcomeCell<T1> cell) where T1 : struct' "$log"
+    grep -Fq 'T1 OutcomeDelegate<T1>(global::OutcomeAction<T1> action, global::OutcomeCell<T1> cell) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> OutcomeAsync<T1>(global::System.Threading.Tasks.Task<global::OutcomeCell<T1>> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> OutcomeValueAsync<T1>(global::System.Threading.Tasks.ValueTask<global::OutcomeCell<T1>> input) where T1 : struct' "$log"
     for member in MemberRead MemberField MemberAccessor MemberIndexer; do
       grep -Fq "T1 $member<T1>(global::MemberContractCell<T1> cell) where T1 : struct" "$log"
     done
@@ -210,6 +228,10 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? OutcomeRead<T1>(global::OutcomeCell<T1> cell)' "$log"
+    grep -Fq 'T1? OutcomeDelegate<T1>(global::OutcomeAction<T1> action, global::OutcomeCell<T1> cell)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> OutcomeAsync<T1>(global::System.Threading.Tasks.Task<global::OutcomeCell<T1>> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> OutcomeValueAsync<T1>(global::System.Threading.Tasks.ValueTask<global::OutcomeCell<T1>> input)' "$log"
     for member in MemberRead MemberField MemberAccessor MemberIndexer; do
       grep -Fq "T1? $member<T1>(global::MemberContractCell<T1> cell)" "$log"
     done

@@ -816,7 +816,7 @@ the condition. Member reads include getter-return attributes, conditional access
 queries and awaited Task/ValueTask receivers. Assignments and ref aliases retain
 the declared storage type. Conditional indexer results follow getter-return
 attributes; property-level `NotNullIfNotNull` does not refine reads in the pinned compiler.
-Stronger wrapper-contract forwarding, parameter postconditions and other member flow
+Stronger wrapper-contract forwarding and other member flow
 contracts still need further work.
 
 Value arguments honor `AllowNull` input contracts on source and metadata methods
@@ -829,6 +829,19 @@ reference arguments keep their invariant storage contract. Applied fixes verify
 stored and returned identity, nullable-value domains, lazy queries, helper counts,
 await suspension, exact faults and cancellation. Generic method type inference
 still follows the compiler's nullable argument rules.
+
+Reads of locals and parameters passed to `MaybeNull`, `MaybeNullWhen`, `NotNull`
+and `NotNullWhen` contracts use the generalized candidate's compiler flow state
+and annotation. This distinguishes an ignored/failure result from a proven-success
+read without treating unconstrained `T` as newly annotated `T?`. Direct ternary
+branches retain the joined compiler annotation. Copies, reassignment, negated
+conditions, delegates, emitted metadata and awaited Task/ValueTask receivers have
+regression coverage. Explicit reference arguments still bind their storage type.
+C# 8 retains representable value bounds when a nullable output requires them;
+compiler facts are rechecked until stable, with cyclic refinements rejected.
+Applied fixes execute original and new reference/nullable-value domains, compare
+helper counts and identities, and check suspension, exact faults and cancellation.
+Member-state contracts and remaining indirect-storage flow still need work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

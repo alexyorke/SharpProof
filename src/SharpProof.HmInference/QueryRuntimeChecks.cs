@@ -27,8 +27,11 @@ internal static class QueryRuntimeChecks
                 public QueryBox<U> Select<U>(Func<T,U> selector){QueryTrace.Value+="select;";return new QueryBox<U>(Values.Select(selector));}
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
+            public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
             public sealed class MemberCell<T>{
                 public T Stored;public T? OptionalStored;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field;public bool Present;public int Reads,Indices,Writes,Refs;
+                public bool TryRead([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){Interlocked.Increment(ref Reads);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=Present?Stored:default!;return Present;}
+                public void ReadOptional([System.Diagnostics.CodeAnalysis.MaybeNull]out T value){Interlocked.Increment(ref Reads);value=Present?Stored:default;}
                 public T StoreInput([System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback){Interlocked.Increment(ref Writes);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;Stored=value is null?fallback:value;return Stored;}
                 public MemberCell(T value,bool present=true){Stored=value;OptionalStored=value;Field=value;Present=present;}
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get{Interlocked.Increment(ref Reads);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return Present?Stored:default;}set{Interlocked.Increment(ref Writes);Stored=value;Present=true;}}
@@ -40,6 +43,18 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static bool TryOutcome<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value)=>cell.TryRead(out value);
+                public static int OutcomeRead(MemberCell<int> cell){cell.TryRead(out var value);return value;}
+                public static int OutcomeSuccess(MemberCell<int> cell,int fallback){if(cell.TryRead(out var value))return value;return fallback;}
+                public static int OutcomeConditional(MemberCell<int> cell,int fallback)=>cell.TryRead(out var value)?value:fallback;
+                public static int OutcomeDelegate(QueryOutcomeAction<int> action,MemberCell<int> cell){action(cell,out var value);return value;}
+                public static int OutcomeOptional(MemberCell<int> cell){cell.ReadOptional(out var value);return value;}
+                public static async Task<int> OutcomeAsync(Task<MemberCell<int>> input){var cell=await input;cell.TryRead(out var value);return value;}
+                public static async ValueTask<int> OutcomeValueAsync(ValueTask<MemberCell<int>> input){var cell=await input;cell.TryRead(out var value);return value;}
+                static void EnsureInput<T>([System.Diagnostics.CodeAnalysis.NotNull]T? value){if(value is null)throw QueryTrace.ContractFailure;}
+                static bool HasInput<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)]T? value)=>value is not null;
+                public static string CheckedInput(string? value){EnsureInput(value);return value;}
+                public static string ConditionalInput(string? value,string fallback)=>HasInput(value)?value:fallback;
                 public static T StoreInput<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback){Interlocked.Increment(ref cell.Writes);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;cell.Stored=value is null?fallback:value;return cell.Stored;}
                 public static string InputMethod(MemberCell<string> cell,string? value,string fallback)=>cell.StoreInput(value,fallback);
                 public static string InputDelegate(QueryInputAction<string> put,MemberCell<string> cell,string? value,string fallback)=>put(cell,value,fallback);
@@ -265,7 +280,29 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> PostconditionContracts(CancellationToken cancellationToken){
+                    var cell=new MemberCell<int>(7);var absent=new MemberCell<int>(7,false);
+                    if(QueryProbe.OutcomeRead(cell)!=7||QueryProbe.OutcomeRead(absent)!=0||QueryProbe.OutcomeSuccess(absent,9)!=9||QueryProbe.OutcomeConditional(cell,9)!=7||QueryProbe.OutcomeDelegate(QueryProbe.TryOutcome,absent)!=0||QueryProbe.OutcomeOptional(absent)!=0||cell.Reads!=2||absent.Reads!=4)return false;
+                    string? missing=null;var text=new string('p',3);if(!ReferenceEquals(QueryProbe.CheckedInput(text),text)||!ReferenceEquals(QueryProbe.ConditionalInput(missing,text),text))return false;
+                    try{_=QueryProbe.CheckedInput(missing);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var failure=new InvalidOperationException("postcondition helper");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        var delayed=new MemberCell<int>(7,false);var gate=new TaskCompletionSource<MemberCell<int>>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.OutcomeAsync(gate.Task);var valueTask=QueryProbe.OutcomeValueAsync(new ValueTask<MemberCell<int>>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||delayed.Reads!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(delayed);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=0)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(delayed.Reads!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> InputContracts(CancellationToken cancellationToken){
+                    if(!await PostconditionContracts(cancellationToken))return false;
                     var text=new string('i',3);var cell=new MemberCell<string>(text);string? missing=null;
                     if(!ReferenceEquals(QueryProbe.InputMethod(cell,missing,text),text)||!ReferenceEquals(cell.Stored,text)||!ReferenceEquals(QueryProbe.InputDelegate(QueryProbe.StoreInput,cell,text,"fallback"),text)||cell.Writes!=2)return false;
                     var numeric=new MemberCell<int?>(7);if(QueryProbe.InputNullableValue(numeric,null,9)!=9||numeric.Stored!=9||numeric.Writes!=1)return false;
@@ -465,7 +502,20 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> PostconditionContracts(string text,CancellationToken cancellationToken){
+                    var cell=new MemberCell<string>(text);var absent=new MemberCell<string>(text,false);
+                    if(!ReferenceEquals(QueryProbe.OutcomeRead(cell),text)||QueryProbe.OutcomeRead(absent)!=null||!ReferenceEquals(QueryProbe.OutcomeSuccess(absent,text),text)||!ReferenceEquals(QueryProbe.OutcomeConditional(cell,text),text)||QueryProbe.OutcomeDelegate(QueryProbe.TryOutcome,absent)!=null||QueryProbe.OutcomeOptional(absent)!=null||cell.Reads!=2||absent.Reads!=4)return false;
+                    if(QueryProbe.OutcomeRead(new MemberCell<decimal?>(23m,false))!=null||QueryProbe.OutcomeOptional(new MemberCell<decimal?>(23m,false))!=null)return false;
+                    var uri=new Uri("https://example.invalid/postconditions");Uri? missing=null;if(!ReferenceEquals(QueryProbe.CheckedInput(uri),uri)||!ReferenceEquals(QueryProbe.ConditionalInput(missing,uri),uri))return false;
+                    try{_=QueryProbe.CheckedInput(missing);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var gate=new TaskCompletionSource<MemberCell<string>>(TaskCreationOptions.RunContinuationsAsynchronously);var delayed=new MemberCell<string>(text,false);
+                    var task=QueryProbe.OutcomeAsync(gate.Task);var valueTask=QueryProbe.OutcomeValueAsync(new ValueTask<MemberCell<string>>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||delayed.Reads!=0)return false;gate.SetResult(delayed);
+                    foreach(var pending in new[]{task,valueTask}){if(await pending.WaitAsync(cancellationToken)!=null)return false;}
+                    return delayed.Reads==2;
+                }
                 static async Task<bool> InputContracts(string text,CancellationToken cancellationToken){
+                    if(!await PostconditionContracts(text,cancellationToken))return false;
                     var uri=new Uri("https://example.invalid/input-contract");var cell=new MemberCell<Uri>(uri);Uri? missing=null;
                     if(!ReferenceEquals(QueryProbe.InputMethod(cell,missing,uri),uri)||!ReferenceEquals(QueryProbe.InputDelegate(QueryProbe.StoreInput,cell,uri,uri),uri)||!ReferenceEquals(cell.Stored,uri)||cell.Writes!=2)return false;
                     var query=QueryProbe.InputQuery(cell,new Uri?[]{null,uri},uri);if(cell.Writes!=2)return false;
