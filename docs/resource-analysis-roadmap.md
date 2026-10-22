@@ -109,6 +109,26 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Source-call argument abstention
+
+Three legal-source controls place an opaque argument before or after array
+arguments and before or after allocations in the caller. Every case must return
+Unknown with no partial numeric bounds; previously accumulated caller or argument
+costs cannot survive an unsupported argument. A fourth, separate editor control
+requires CS0501 for a callee declaration with no body and checks the explicit
+`MissingCalleeBody` result. That case is not executable-source evidence.
+
+All four focused controls passed with zero build warnings or errors
+(`artifacts/resource-call-argument-boundary-probe.log`). The canonical formatter
+copied zero changes. Full quality/API checks passed, including the link audit
+after its built-in transient HTTP retry
+(`artifacts/resource-call-argument-boundary-lint.log`). The complete analyzer
+resource fixture passed all 245 tests with zero build warnings or errors
+(`artifacts/resource-call-argument-boundary-tests.log`). Documentation checks
+passed (`artifacts/resource-call-argument-boundary-docs.log`). No production
+code, model premise or wire identity changes in this checkpoint. The remaining task-runtime byte obligations and
+pending runtime-model choice are unchanged.
+
 ### Replay entry-contract controls
 
 Resource violation search now calls a shared entry-contract check before any

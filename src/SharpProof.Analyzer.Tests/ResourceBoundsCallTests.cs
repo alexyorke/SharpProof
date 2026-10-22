@@ -117,6 +117,38 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds, Is.Null);
     }
 
+    [TestCase("var before=new int[2]; Leaf(System.Math.Abs(n),new int[3]);")]
+    [TestCase("Leaf(System.Math.Abs(n),new int[3]); var after=new int[2];")]
+    [TestCase("var before=new int[2]; Other(new int[3],System.Math.Abs(n));")]
+    public void UnsupportedArgumentCostsDiscardTheWholeSourceCallBound(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var result = AnalyzeSource("public static class C { public static void Root(int n) { " + body +
+            " } static void Leaf(int count,int[] values) {var inside=new int[4];} " +
+            "static void Other(int[] values,int count) {var inside=new int[4];} }");
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.UnknownReason, Is.EqualTo("OpaqueCall"));
+        Assert.That(result.Bounds, Is.Null);
+    }
+
+    [Test]
+    public void AnEditorCalleeWithoutABodyCannotPublishSourceCallBounds()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("public static class C { " +
+            "public static void Root() {var before=new int[2]; Leaf();} static void Leaf(); }", []);
+        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic is null ?
+            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "CS0501"), Is.True);
+        var tree = compilation.SyntaxTrees.Single();
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(static candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identifier.ValueText == "Root");
+        var model = compilation.GetSemanticModel(tree);
+        var result = ResourceBoundsAnalysis.Analyze((IMethodSymbol)model.GetDeclaredSymbol(method)!,
+            model.GetOperation(method.Body!), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.UnknownReason, Is.EqualTo("MissingCalleeBody"));
+        Assert.That(result.Bounds, Is.Null);
+    }
+
     [Test]
     public void RepeatedCallExpansionSharesTheRootBudget()
     {
