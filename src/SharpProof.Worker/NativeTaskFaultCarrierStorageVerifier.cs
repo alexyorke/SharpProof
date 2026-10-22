@@ -1,5 +1,10 @@
 namespace SharpProof.Worker;
 
+internal sealed record NativeTaskSchedulerExceptionInstanceCheck(ResourceExpression? InstanceUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => InstanceUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.SchedulerExceptionInstanceModel;
+}
+
 internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? BookkeepingUpper, string? UnknownReason)
 {
     internal int? TaskTraceCaptureCountUpper { get; init; }
@@ -20,6 +25,32 @@ internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? Bookkeepi
 // separately before any root cumulative byte proof can be published.
 internal static class NativeTaskFaultCarrierStorageVerifier
 {
+    internal const string SchedulerExceptionInstanceModel = "task-join-scheduler-exception-instances-v1";
+    internal const string SchedulerExceptionSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskSchedulerException.cs";
+
+    // Explicit wrapper candidate storage in ScheduleAndStart's queue catch only.
+    // Each admitted Task.Run(Action) calls InternalStartNew once, which calls
+    // ScheduleAndStart(false) once. Its queue catch has one wrapper allocation.
+    // Count every child even if an earlier failure prevents later scheduling.
+    // Messages, inner payloads, traces, initialization and allocator/helper
+    // failures remain separate components. This has no root proof authority.
+    internal static NativeTaskSchedulerExceptionInstanceCheck CheckSchedulerExceptionInstances(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = NativeForkJoinSourceCostVerifier.Check(projection, root, cancellation);
+        if (!source.HasSourceCosts)
+        { return new(null, source.UnknownReason); }
+        var instance = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultNotificationCatalog.ExceptionFields),
+            layout, cancellation);
+        if (instance.Bounds is not { } bytes)
+        { return new(null, instance.UnknownReason); }
+        return new(ResourceExpression.Multiply(bytes.Upper, ResourceExpression.Literal(projection.Children.Length)), null);
+    }
+
     internal const string TraceCopyModel = "task-join-task-dispatch-copy-counts-v1";
     internal const string CombinedTraceCopyModel = "task-join-context-dispatch-copy-counts-v1";
     internal static NativeTaskFaultCarrierCheck Check(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,

@@ -12,6 +12,54 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class NativeForkJoinProjectionTests
 {
+    [TestCase(2, false)]
+    [TestCase(2, true)]
+    [TestCase(16, false)]
+    [TestCase(16, true)]
+    public void SchedulerWrapperInstanceBoundIncludesEveryAdmittedQueueAttempt(int children, bool configured)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(children, 2);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(children, 16);
+        var calls = string.Join(",", Enumerable.Repeat("Task.Run(()=>Child(n))", children));
+        var projection = LowerSource("using System.Threading.Tasks; public static class C {public static " +
+            (configured ? "async " : "") + "Task Root(int n) => " + (configured ? "await " : "") +
+            "Task.WhenAll(" + calls + ")" + (configured ? ".ConfigureAwait(false)" : "") +
+            "; static void Child(int count) {}} ");
+        var check = NativeTaskFaultCarrierStorageVerifier.CheckSchedulerExceptionInstances(projection, Root(projection), Layout(),
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.InstanceUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(136) * children));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(NativeTaskFaultCarrierStorageVerifier.SchedulerExceptionInstanceModel));
+    }
+
+    [TestCase(false, "ForkJoinChildOwnershipInvalid")]
+    [TestCase(true, "IncompatibleResourceRuntimeLayout")]
+    public void SchedulerWrapperInstanceFailuresNeverPublishPartialStorage(bool layoutFailure, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+        var projection = Lower("");
+        if (!layoutFailure)
+        {
+            var child = projection.Children[1];
+            projection = projection with
+            {
+                Children = projection.Children.SetItem(1,
+                child with { Owner = child.Owner with { EffectsCompleteAtEntry = false } })
+            };
+        }
+        var root = Root(projection);
+        var layout = layoutFailure ? new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8) : Layout();
+        var check = NativeTaskFaultCarrierStorageVerifier.CheckSchedulerExceptionInstances(projection, root, layout,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.EqualTo(reason));
+        Assert.That(check.InstanceUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action operation = () => { _ = NativeTaskFaultCarrierStorageVerifier.CheckSchedulerExceptionInstances(projection, root, layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(operation);
+    }
+
     [TestCase("kind")]
     [TestCase("domain")]
     [TestCase("ordinal")]

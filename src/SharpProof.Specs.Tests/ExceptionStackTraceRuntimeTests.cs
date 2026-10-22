@@ -11,6 +11,32 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [Test]
+    public void WarmSchedulerWrapperAllocationsFitTheReviewedInstanceShapeWithoutCopyingTheInnerPayload()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        Assert.That(typeof(TaskSchedulerException).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Empty);
+        var inner = new InvalidOperationException("scheduler-inner-control");
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var instance = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultNotificationCatalog.ExceptionFields), layout,
+            TestContext.CurrentContext.CancellationToken);
+        string? message = null;
+        for (var warmup = 0; warmup < 64; warmup++)
+        { message = new TaskSchedulerException(inner).Message; }
+        for (var iteration = 0; iteration < 128; iteration++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var wrapper = new TaskSchedulerException(inner);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(new BigInteger(allocated), Is.GreaterThan(0).And.LessThanOrEqualTo(instance.Bounds!.Upper.Constant!.Value));
+            Assert.That(ReferenceEquals(wrapper.InnerException, inner), Is.True);
+            Assert.That(ReferenceEquals(wrapper.Message, message), Is.True);
+            GC.KeepAlive(wrapper);
+        }
+    }
+
     [TestCase(0, false)]
     [TestCase(1_000_000, false)]
     [TestCase(0, true)]

@@ -109,6 +109,56 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Scheduler queue-failure wrapper instances
+
+A new private native component bounds explicit `TaskSchedulerException`
+instance candidates in the `ScheduleAndStart` queue-failure catch. Each admitted
+`Task.Run(Action)` reaches `InternalStartNew` at most once, whose body invokes
+`ScheduleAndStart(false)` once. Its queue catch contains one wrapper allocation.
+The component therefore budgets one candidate per projected child, including
+children whose scheduling is never reached after an earlier failure. Empty
+callback bodies do not justify a zero scheduler-wrapper bound.
+
+Pinned [`Task.InternalStartNew`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs#L1144)
+and its scheduling catch establish the count. The pinned
+[`wrapper type`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskSchedulerException.cs)
+adds no fields to Exception, so its candidate storage uses the reviewed
+136-byte upper shape. The model is
+`task-join-scheduler-exception-instances-v1`. The new source was retained with
+verified blob identity, byte count and SHA-256 in the research manifest.
+
+This is candidate-instance storage at that explicit site only, including a
+candidate whose constructor later fails. Default messages and cold resource
+initialization, referenced inner payloads, traces, allocator/helper failures
+and wrappers from other sites remain separate obligations. The component
+requires the closed task-source runtime premise and has no root proof authority.
+Invalid later children and incompatible layouts return Unknown without a
+partial instance bound or model identity; cancellation propagates.
+
+Controls cover two and sixteen children, returned/configured roots, invalid
+ownership, layout failure and cancellation. A separate warmed constructor
+control checks the declared field shape, allocation upper bound and retention
+of the same preexisting inner exception and default-message reference. It does
+not force a default-scheduler queue failure, bound its inner payload, or prove
+cold initialization costs. The root task-byte result remains Unknown.
+
+All 269 Specs cases and all 117 native fork/join projection cases passed,
+with zero build warnings or errors
+(`artifacts/resource-scheduler-wrapper-instances-specs-tests.log` and
+`artifacts/resource-scheduler-wrapper-instances-native-tests.log`). Full
+quality/API checks passed (`artifacts/resource-scheduler-wrapper-instances-lint.log`),
+as did documentation checks (`artifacts/resource-scheduler-wrapper-instances-docs.log`).
+The canonical formatter updated the native test file before the passing run
+(`artifacts/resource-scheduler-wrapper-instances-format.log`).
+
+GitHub's PR head caught up to predecessor `2a1feeea8`. Its automatic CI
+(39836692156), coverage (39836692044) and package consumers (39836692165)
+remain active; security (39836692067) and documentation (39836692054) passed.
+The superseded `d98466d63` CI and coverage workflows were cancelled, not
+passed. The new private component changes no public root verdict, protocol,
+projection encoding or response cache identity. Runtime-byte obligations
+remain open and no predecessor result is attributed to these changes.
+
 ### Portable array-helper entries and OOM identity policy
 
 The private direct-HCall frame model is now
