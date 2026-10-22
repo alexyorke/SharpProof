@@ -1340,7 +1340,8 @@ public static partial class Inference
             {
                 // Let effective compiler diagnostics decide whether the inferred
                 // ref contract needs a value-domain restriction.
-                refReturnDefaultDomains.Add((target, StoreValueLocation(targetSyntax, store)));
+                foreach (var location in StoreValueLocations(targetSyntax, store))
+                { refReturnDefaultDomains.Add((target, location.Value, referenceCall, location.Exact)); }
             }
             if (store is { Right: RefExpressionSyntax }
                 && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)

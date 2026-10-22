@@ -786,6 +786,11 @@ Captured-storage discovery follows each tuple target through nested, conditional
 and switch tuple values, including writes through known ref aliases. Callbacks
 created before those writes retain their lifetime nullability; earlier ordinary
 value copies and explicitly typed defaults retain their separate boundaries.
+Conditional and switch tuple sources preserve each slot's nullability even when
+another branch reads that slot before storing defaults. Ref-return warnings on a
+whole branch constrain the affected destination while independent tuple elements
+keep broader domains. Storage discovery resolves tuple slots through translated
+query scopes, including nested and callback-hosted queries.
 Task and ValueTask checks cover stores after suspension, earlier value copies,
 reference and nullable-value domains, deferred query execution, faults and
 cancellation. C# 8/9/13 CLI and packaged consumers verify these signatures.

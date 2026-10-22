@@ -12,7 +12,7 @@ public static partial class Inference
         private Dictionary<SyntaxNode, HmType>? queryReferences;
         private IMethodSymbol? querySelectorReturn;
 
-        private HmType Query(QueryExpressionSyntax syntax)
+        private HmType Query(QueryExpressionSyntax syntax, bool retainStorageReferences = false)
         {
             if (syntax is null)
             { throw new ArgumentNullException(nameof(syntax)); }
@@ -23,7 +23,7 @@ public static partial class Inference
             try
             { return QueryValue(operation.Operation); }
             finally
-            { queryReferences = previous; }
+            { if (!retainStorageReferences) { queryReferences = previous; } }
         }
 
         private HmType QueryValue(IOperation operation)

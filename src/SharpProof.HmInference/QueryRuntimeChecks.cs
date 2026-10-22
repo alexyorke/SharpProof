@@ -28,6 +28,15 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                static ref T BranchBorrow<T>(ref T value){QueryTrace.Value+="left;";QueryTrace.RefCalls++;return ref value;}
+                static ref T BranchArrayBorrow<T>(T[] value){QueryTrace.Value+="right;";QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                static T BranchKeep<T>(T value){QueryTrace.Value+="keep;";if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return value;}
+                public static IEnumerable<(int left,int right)> ConditionalMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (BranchBorrow(ref pair.first[QueryTrace.Index()]),BranchArrayBorrow(pair.second))=clear?(default,default):(BranchKeep(pair.first[0]),BranchKeep(pair.second[0]));
+                public static IEnumerable<(int left,int right)> SwitchMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (BranchBorrow(ref pair.first[QueryTrace.Index()]),BranchArrayBorrow(pair.second))=clear switch{true=>(default,default),false=>(BranchKeep(pair.first[0]),BranchKeep(pair.second[0]))};
+                public static IEnumerable<(int left,(int mid,bool right) rest)> NestedConditionalMixed(IEnumerable<(int[] first,int[] second,bool[] third)> values,bool clear)=>from pair in values select (BranchBorrow(ref pair.first[QueryTrace.Index()]),(BranchArrayBorrow(pair.second),BranchArrayBorrow(pair.third)))=clear?(default,(default,default)):(BranchKeep(pair.first[0]),(BranchKeep(pair.second[0]),BranchKeep(pair.third[0])));
+                public static async Task<IEnumerable<(int left,int right)>> ConditionalMixedAsync(Task<IEnumerable<(int[] first,int[] second)>> values,bool clear)=>from pair in await values select (BranchBorrow(ref pair.first[QueryTrace.Index()]),BranchArrayBorrow(pair.second))=clear?(default,default):(BranchKeep(pair.first[0]),BranchKeep(pair.second[0]));
+                public static async ValueTask<IEnumerable<(int left,int right)>> ConditionalMixedValueAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values,bool clear)=>from pair in await values select (BranchBorrow(ref pair.first[QueryTrace.Index()]),BranchArrayBorrow(pair.second))=clear?(default,default):(BranchKeep(pair.first[0]),BranchKeep(pair.second[0]));
+                public static (int left,int right) ConditionalArrayStores(int[] first,int[] second,bool clear){(first[0],second[0])=clear?(default,default):(first[0],second[0]);return(first[0],second[0]);}
                 public static Func<int> TupleCapture(int value,bool other){var read=()=>value;(value,other)=(default,default);return read;}
                 public static (Func<int> read,int copy) TupleLocalCopy(int value,bool other){var slot=value;var copy=slot;var read=()=>slot;(slot,other)=(default,default);return(read,copy);}
                 public static (Func<int> read,Action clear) TupleDeferred(int value,bool other){var read=()=>value;Action clear=()=>{(value,other)=(default,default);};return(read,clear);}
@@ -133,7 +142,41 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> BranchStores(CancellationToken cancellationToken){
+                    foreach(var clear in new[]{true,false}){
+                        foreach(var switched in new[]{true,false}){
+                            int[] first={7},second={9};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                            var source=QueryTrace.Source(new[]{(first,second)});var query=switched?QueryProbe.SwitchMixed(source,clear):QueryProbe.ConditionalMixed(source,clear);
+                            if(QueryTrace.Value!=""||QueryTrace.RefCalls!=0||first[0]!=7||second[0]!=9)return false;
+                            var result=query.Take(1).Single();if(result!=(clear?0:7,clear?0:9)||first[0]!=result.left||second[0]!=result.right||QueryTrace.RefCalls!=2||QueryTrace.IndexCalls!=2
+                                ||QueryTrace.Value!=(clear?"open;left;right;dispose;":"open;left;right;keep;keep;dispose;"))return false;
+                        }
+                        int[] left={7},right={9};var stored=QueryProbe.ConditionalArrayStores(left,right,clear);if(stored!=(clear?0:7,clear?0:9)||left[0]!=stored.left||right[0]!=stored.right)return false;
+                    }
+                    int[] failedLeft={7},failedRight={9};var failure=new InvalidOperationException("branch-tuple-rhs");QueryTrace.Failure=failure;QueryTrace.Value="";
+                    try{_=QueryProbe.ConditionalMixed(QueryTrace.Source(new[]{(failedLeft,failedRight)}),false).ToArray();return false;}
+                    catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){}
+                    finally{QueryTrace.Failure=null;}
+                    if(failedLeft[0]!=7||failedRight[0]!=9||QueryTrace.Value!="open;left;right;keep;dispose;")return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        int[] first={7},second={9};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                        var gate=new TaskCompletionSource<IEnumerable<(int[],int[])>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=QueryProbe.ConditionalMixedAsync(gate.Task,true);var valueTask=QueryProbe.ConditionalMixedValueAsync(new ValueTask<IEnumerable<(int[],int[])>>(gate.Task),true).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.Value!=""||QueryTrace.RefCalls!=0)return false;
+                        if(outcome=="Value")gate.SetResult(new[]{(first,second)});else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        var executions=0;foreach(var pending in new[]{task,valueTask}){
+                            try{var query=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||QueryTrace.RefCalls!=executions*2)return false;
+                                if(query.Single()!=(0,0)||first[0]!=0||second[0]!=0||QueryTrace.RefCalls!=++executions*2||QueryTrace.IndexCalls!=executions*2)return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                        if(outcome!="Value"&&(first[0]!=7||second[0]!=9||QueryTrace.RefCalls!=0))return false;
+                    }
+                    return true;
+                }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(!await BranchStores(cancellationToken))return false;
                     if(!await TupleCaptures(cancellationToken))return false;
                     if(QueryProbe.Grouped(7)!=0)return false;
                     using(var cancel=new CancellationTokenSource()){
@@ -229,7 +272,31 @@ internal static class QueryRuntimeChecks
                     if(QueryTrace.CaptureCalls!=2)return false;
                     var optional=await QueryProbe.TupleValueCapture(new ValueTask<decimal?>(23m),tag);return optional()==null;
                 }
+                static async Task<bool> BranchStores(string text,CancellationToken cancellationToken){
+                    foreach(var clear in new[]{true,false}){
+                        foreach(var switched in new[]{true,false}){
+                            decimal[] first={23m};string?[] second={text};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                            var source=QueryTrace.Source(new[]{(first,second)});var query=switched?QueryProbe.SwitchMixed(source,clear):QueryProbe.ConditionalMixed(source,clear);
+                            if(QueryTrace.Value!=""||QueryTrace.RefCalls!=0||first[0]!=23m||!ReferenceEquals(second[0],text))return false;
+                            var result=query.Take(1).Single();if(result.left!=(clear?0m:23m)||first[0]!=result.left||!ReferenceEquals(result.right,clear?null:text)||!ReferenceEquals(second[0],result.right)
+                                ||QueryTrace.RefCalls!=2||QueryTrace.IndexCalls!=2||QueryTrace.Value!=(clear?"open;left;right;dispose;":"open;left;right;keep;keep;dispose;"))return false;
+                        }
+                        var initial=new QueryStoreValue();QueryStoreValue.Calls=0;var firstStore=new[]{initial};string?[] secondStore={text};decimal?[] thirdStore={23m};
+                        var nested=QueryProbe.NestedConditionalMixed(new[]{(firstStore,secondStore,thirdStore)},clear).Single();
+                        if(nested.left.Value!=(clear?0:99)||nested.left.Text!=(clear?null:"ctor")||!ReferenceEquals(nested.rest.mid,clear?null:text)||nested.rest.right!=(clear?null:23m)
+                            ||firstStore[0].Value!=nested.left.Value||!ReferenceEquals(secondStore[0],nested.rest.mid)||thirdStore[0]!=nested.rest.right||QueryStoreValue.Calls!=0)return false;
+                        string?[] ordinaryLeft={text};decimal?[] ordinaryRight={23m};var ordinary=QueryProbe.ConditionalArrayStores(ordinaryLeft,ordinaryRight,clear);
+                        if(!ReferenceEquals(ordinary.left,clear?null:text)||ordinary.right!=(clear?null:23m)||!ReferenceEquals(ordinaryLeft[0],ordinary.left)||ordinaryRight[0]!=ordinary.right)return false;
+                    }
+                    decimal[] asyncLeft={23m};string?[] asyncRight={text};var gate=new TaskCompletionSource<IEnumerable<(decimal[],string?[])>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    QueryTrace.RefCalls=QueryTrace.IndexCalls=0;var task=QueryProbe.ConditionalMixedAsync(gate.Task,true);var valueTask=QueryProbe.ConditionalMixedValueAsync(new ValueTask<IEnumerable<(decimal[],string?[])>>(gate.Task),true).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.RefCalls!=0)return false;gate.SetResult(new[]{(asyncLeft,asyncRight)});
+                    var executed=0;foreach(var pending in new[]{task,valueTask}){var query=await pending.WaitAsync(cancellationToken);if(QueryTrace.RefCalls!=executed*2)return false;
+                        var result=query.Single();if(result.left!=0m||result.right!=null||asyncLeft[0]!=0m||asyncRight[0]!=null||QueryTrace.RefCalls!=++executed*2)return false;}
+                    return true;
+                }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(!await BranchStores(text,cancellationToken))return false;
                     if(!await TupleCaptures(text,cancellationToken))return false;
                     if(QueryProbe.Grouped(text)!=null||QueryProbe.Grouped<decimal?>(23m)!=null)return false;
                     var gateCopy=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var copyTask=QueryProbe.GroupedAsync(gateCopy.Task);

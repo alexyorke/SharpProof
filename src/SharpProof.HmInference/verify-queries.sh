@@ -19,6 +19,10 @@ public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)
 public static class QueryConsumer{
   static ref T Borrow<T>(ref T value)=>ref value;
   static ref T ArrayBorrow<T>(T[] value)=>ref value[0];
+  public static IEnumerable<(int left,int right)> ConditionalMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear?(default,default):(pair.first[0],pair.second[0]);
+  public static IEnumerable<(int left,int right)> SwitchMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear switch{true=>(default,default),false=>(pair.first[0],pair.second[0])};
+  public static async ValueTask<IEnumerable<(int left,int right)>> ConditionalMixedAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values,bool clear)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear?(default,default):(pair.first[0],pair.second[0]);
+  public static (int left,int right) ConditionalArrayStores(int[] first,int[] second,bool clear){(first[0],second[0])=clear?(default,default):(first[0],second[0]);return(first[0],second[0]);}
   static Func<T> Capture<T>(Func<T> read)=>read;
   public static Func<int> TupleCapture(int value,bool other){var read=Capture(()=>value);(value,other)=(default,default);return read;}
   public static (Func<int> read,Action clear) TupleDeferred(int value,bool other){var read=Capture(()=>value);Action clear=()=>{(value,other)=(default,default);};return(read,clear);}
@@ -125,6 +129,10 @@ EOF
     exit 1
   fi
   if [ "$language" = 8 ]; then
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)> ConditionalMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)> values, bool clear) where T1 : struct where T2 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)> SwitchMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)> values, bool clear) where T1 : struct where T2 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2 right)>> ConditionalMixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2[] second)>> values, bool clear) where T1 : struct where T2 : struct' "$log"
+    grep -Fq '(T1 left, T2 right) ConditionalArrayStores<T1, T2>(T1[] first, T2[] second, bool clear) where T1 : struct where T2 : struct' "$log"
     grep -Fq 'global::System.Func<T1> TupleCapture<T1, T2>(T1 value, T2 other) where T1 : struct where T2 : struct' "$log"
     grep -Fq '(global::System.Func<T1> read, global::System.Action clear) TupleDeferred<T1, T2>(T1 value, T2 other) where T1 : struct where T2 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Func<T1>> TupleTaskCapture<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 other) where T1 : struct where T2 : struct' "$log"
@@ -137,6 +145,10 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)> ConditionalMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, bool clear) where T1 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)> SwitchMixed<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)> values, bool clear) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1 left, T2? right)>> ConditionalMixedAsync<T1, T2>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<(T1[] first, T2?[] second)>> values, bool clear) where T1 : struct' "$log"
+    grep -Fq '(T1? left, T2? right) ConditionalArrayStores<T1, T2>(T1?[] first, T2?[] second, bool clear)' "$log"
     grep -Fq 'global::System.Func<T1?> TupleCapture<T1, T2>(T1? value, T2? other)' "$log"
     grep -Fq '(global::System.Func<T1?> read, global::System.Action clear) TupleDeferred<T1, T2>(T1? value, T2? other)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Func<T1?>> TupleTaskCapture<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2? other)' "$log"

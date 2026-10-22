@@ -227,7 +227,7 @@ public static partial class Inference
         private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
         private readonly HashSet<ISymbol> preparedIndirectAliases = new(SymbolEqualityComparer.Default);
         private Dictionary<ISymbol, HmType>? storageLambdaInputs;
-        private readonly List<(HmType Shape, ExpressionSyntax Store)> refReturnDefaultDomains = [];
+        private readonly List<(HmType Shape, ExpressionSyntax Store, InvocationExpressionSyntax Target, bool Exact)> refReturnDefaultDomains = [];
 
         private bool ConstrainRefReturnDefaults(Compilation changed, MethodDeclarationSyntax original, MethodDeclarationSyntax replacement)
         {
@@ -243,6 +243,7 @@ public static partial class Inference
             { return false; }
             var offset = after.SpanStart - before.SpanStart;
             var constrained = new HashSet<HmType>();
+            SemanticModel? rewrittenModel = null;
             foreach (var diagnostic in changed.GetDiagnostics(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -254,7 +255,21 @@ public static partial class Inference
                 {
                     var start = domain.Store.SpanStart + offset;
                     var shape = ConversionCore(domain.Shape);
-                    if (position.Start < start || position.End > start + domain.Store.Span.Length || shape.IsValueType == true || !constrained.Add(shape))
+                    if (position.Start < start || position.End > start + domain.Store.Span.Length || shape.IsValueType == true)
+                    { continue; }
+                    if (domain.Exact)
+                    {
+                        // Tuple conversions report one warning on the enclosing branch.
+                        // Inspect each generated ref destination before restricting its domain.
+                        if (position.Start != start || position.Length != domain.Store.Span.Length)
+                        { continue; }
+                        rewrittenModel ??= changed.GetSemanticModel(replacement.SyntaxTree);
+                        var targetSpan = new Microsoft.CodeAnalysis.Text.TextSpan(domain.Target.SpanStart + offset, domain.Target.Span.Length);
+                        var target = replacement.SyntaxTree.GetRoot(cancellationToken).FindNode(targetSpan, getInnermostNodeForTie: true);
+                        if (rewrittenModel.GetOperation(target, cancellationToken) is not IInvocationOperation { TargetMethod.ReturnType.NullableAnnotation: NullableAnnotation.NotAnnotated })
+                        { continue; }
+                    }
+                    if (!constrained.Add(shape))
                     { continue; }
                     RequireKeyword(shape, "struct");
                 }
@@ -282,11 +297,16 @@ public static partial class Inference
                 if (assignment.Right is RefExpressionSyntax reference && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol is ILocalSymbol alias
                     && ReferenceStorageOwners(alias).Count == 0 && defaultStores is not null && defaultStores.TryGetValue(alias, out var literals))
                 { foreach (var literal in literals) { candidates.Add((reference.Expression, literal, alias.Type, alias)); } }
-                else if (StorageExpression(assignment.Left) is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
+                else
                 {
-                    var type = StorageType(assignment.Left);
-                    foreach (var literal in StoredAlternatives(assignment.Right))
-                    { if (StoredLiteralValue(literal, type) is not null) { candidates.Add((assignment.Left, literal, type, null)); } }
+                    foreach (var component in StorageComponents(assignment.Left, assignment.Right))
+                    {
+                        if (component.Target is not (MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or InvocationExpressionSyntax))
+                        { continue; }
+                        var type = StorageType(component.Target);
+                        foreach (var literal in StoredAlternatives(component.Value))
+                        { if (StoredLiteralValue(literal, type) is not null) { candidates.Add((component.Target, literal, type, null)); } }
+                    }
                 }
             }
             if (candidates.Count == 0 || parameters.Length == 0)
@@ -303,6 +323,7 @@ public static partial class Inference
             { probe.environment.Add(currentMethod.Parameters[i], probeParameters[i]); }
             var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
             var boundDeconstructions = new HashSet<int>();
+            var boundStorageQueries = new HashSet<int>();
             var boundPatterns = new HashSet<int>();
             void BindCallbackParameter(IParameterSymbol parameter)
             {
@@ -477,6 +498,8 @@ public static partial class Inference
                 try
                 {
                     BindLocals(target);
+                    if (target.Ancestors().OfType<QueryExpressionSyntax>().LastOrDefault() is { } query && boundStorageQueries.Add(query.SpanStart))
+                    { BindLocals(query); _ = probe.Query(query, retainStorageReferences: true); }
                     var slot = probe.AssignmentTarget(target);
                     if (slot.FreeVariables().Count == 0)
                     { return; }

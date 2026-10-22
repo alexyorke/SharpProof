@@ -39,29 +39,32 @@ public static partial class Inference
             }
         }
 
-        private static ExpressionSyntax StoreValueLocation(ExpressionSyntax target, AssignmentExpressionSyntax assignment)
+        private static IEnumerable<(ExpressionSyntax Value, bool Exact)> StoreValueLocations(ExpressionSyntax target, AssignmentExpressionSyntax assignment)
         {
             if (target is null)
             { throw new ArgumentNullException(nameof(target)); }
             if (assignment is null)
             { throw new ArgumentNullException(nameof(assignment)); }
-            var path = new Stack<int>();
-            foreach (var node in target.AncestorsAndSelf())
+            target = StorageExpression(target);
+            var found = false;
+            foreach (var component in StorageComponents(assignment.Left, assignment.Right))
             {
-                if (node == assignment.Left)
-                { break; }
-                if (node is ArgumentSyntax argument && argument.Parent is TupleExpressionSyntax tuple)
-                { path.Push(tuple.Arguments.IndexOf(argument)); }
+                if (component.Target.Span != target.Span)
+                { continue; }
+                found = true;
+                yield return (component.Value, false);
+                foreach (var owner in component.Value.Ancestors())
+                {
+                    if (!assignment.Right.Span.Contains(owner.Span))
+                    { break; }
+                    if (owner is ConditionalExpressionSyntax or SwitchExpressionSyntax)
+                    { yield return ((ExpressionSyntax)owner, true); }
+                }
             }
-            var value = assignment.Right;
-            foreach (var index in path)
-            {
-                if (StorageExpression(value) is not TupleExpressionSyntax tuple || index >= tuple.Arguments.Count)
-                { return assignment.Right; }
-                value = tuple.Arguments[index].Expression;
-            }
-            return value;
+            if (!found)
+            { yield return (assignment.Right, true); }
         }
+
         private ITypeSymbol DeconstructionSourceType(AssignmentExpressionSyntax assignment)
         {
             if (assignment is null)
