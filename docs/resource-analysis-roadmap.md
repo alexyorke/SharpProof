@@ -109,6 +109,29 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted qualification of loop and normal-domain controls
+
+Checkpoint `0e15272161c280b082b6a219190f28acfca9608a` passed full canonical CI
+(run 39854917531) and package consumers (39854917689). Coverage run 39854917338
+completed all fifteen shards successfully. Only the aggregate coverage job failed:
+the unchanged required floor is 100 percent. Its complete report measures
+6961/7099 changed trusted lines (98.06 percent), with 138 uncovered lines,
+nine fewer than the preceding 147-gap baseline.
+
+The retained artifact is
+`artifacts/resource-0e15-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `be27efed2665d75603b3d3bcd1d919ce0e92a9d0` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `0e1527216`.
+The production files are unchanged between the compared checkpoints. The five
+loop guards at lines 58, 136, 211, 246 and 310 and the four normal-domain guards
+at lines 80, 158, 251 and 303 are absent from the new uncovered-line list.
+No new uncovered lines were introduced in this comparison.
+
+This hosted evidence qualifies the loop/domain checkpoint. The later constructor
+initializer sweep has separate passing local checks and still requires hosted
+qualification. Cumulative task runtime bytes remain Unknown; the open runtime
+model choice and the remaining roadmap obligations are unchanged.
+
 ### Constructor initializer allowance sweeps
 
 Two source fixtures combine field initializers with a later object-initializer
@@ -141,8 +164,8 @@ quality/API and documentation checks passed
 This strengthens frontend admission and cleanup controls, not a native numeric
 allocation verdict for an incomplete body. The production code, runtime premises,
 projection, protocol and cache identities are unchanged. The latest measured
-coverage baseline remains the complete `99cab41d2` report with 147 gaps; these
-new sweeps and the preceding loop/domain controls have not yet been measured.
+coverage baseline is the complete `0e1527216` report with 138 gaps, described
+below. The new initializer sweeps have not yet been measured by hosted coverage.
 The remaining cumulative runtime-byte obligations and pending runtime-model
 choice are unchanged.
 
