@@ -187,6 +187,67 @@ public sealed class NativeTaskCarrierStorageTests
         return (Stream)Activator.CreateInstance(type!, nonPublic: true)!;
     }
 
+    [TestCase(false, "")]
+    [TestCase(true, "")]
+    [TestCase(false, "for(int i=0;i<n;i++) {var a=new int[4];}")]
+    [TestCase(true, "for(int i=0;i<n;i++) {var a=new int[4];}")]
+    public void DirectSourceFrameComponentRequiresOwnedBodiesAfterTransport(bool configured, string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (compilation, method, projection, root) = Compile(configured, OptimizationLevel.Release, body);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var carriers = collector.Capture(method, "root", cancellation);
+        projection = projection with
+        {
+            Carriers = carriers with
+            {
+                Shapes = carriers.Shapes! with
+                {
+                    SourceBodies = collector.CaptureSourceBodies(method, "root", cancellation),
+                    CallbackActivations = collector.CaptureCallbackActivations(method, "root", cancellation)
+                }
+            }
+        };
+        var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+        var check = NativeTaskCarrierStorageVerifier.CheckDirectSourceFrames(decoded.Carriers!.Shapes!, decoded, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.FramesPerPassUpper, Is.EqualTo(1));
+        Assert.That(check.RequiredCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.SourceBodyModel));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.DirectSourceFrameModel));
+    }
+
+    [TestCase("missing", "TaskSourceBodyEvidenceUnavailable")]
+    [TestCase("foreign", "TaskSourceBodyEvidenceInvalid")]
+    [TestCase("layout", "IncompatibleResourceRuntimeLayout")]
+    public void DirectSourceFrameFailuresPublishNeitherCountNorRequiredModel(string corruption, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        ArgumentNullException.ThrowIfNull(reason);
+        var (compilation, method, projection, root) = Compile(false, OptimizationLevel.Release, "");
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var capture = collector.CaptureSourceBodies(method, "root", cancellation);
+        var carriers = collector.Capture(method, "root", cancellation);
+        var shapes = carriers.Shapes! with
+        {
+            CallbackActivations = collector.CaptureCallbackActivations(method, "root", cancellation),
+            SourceBodies = corruption == "missing" ? null : corruption == "foreign" ?
+                capture with { Inventory = capture.Inventory! with { ModuleSha256 = new string('0', 64) } } : capture
+        };
+        projection = projection with { Carriers = new(shapes, null) };
+        var layout = corruption == "layout" ? new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8) : Layout();
+        var check = NativeTaskCarrierStorageVerifier.CheckDirectSourceFrames(shapes, projection, root, layout, cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo(reason));
+        Assert.That(check.FramesPerPassUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action operation = () => { _ = NativeTaskCarrierStorageVerifier.CheckDirectSourceFrames(shapes, projection, root, layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(operation);
+    }
+
     [TestCase(OptimizationLevel.Debug, false)]
     [TestCase(OptimizationLevel.Release, false)]
     [TestCase(OptimizationLevel.Debug, true)]

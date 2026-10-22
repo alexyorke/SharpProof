@@ -12,6 +12,36 @@ namespace SharpProof.Specs.Test;
 internal sealed class ExceptionStackTraceRuntimeTests
 {
     [TestCase(0)]
+    [TestCase(1_000_000)]
+    public void OneCallFreeSourceInvocationAppearsOnceInTheCapturedTrace(int iterations)
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        Exception? fault = null;
+        try
+        { _ = DirectSourceFrameProbe(iterations, 0); }
+        catch (DivideByZeroException captured)
+        { fault = captured; }
+        Assert.That(fault, Is.Not.Null);
+        var trace = new System.Diagnostics.StackTrace(fault!, false);
+        var count = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
+            frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
+        Assert.That(count, Is.EqualTo(1));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int DirectSourceFrameProbe(
+        int /* SPINT001: all values valid - nonpositive counts skip the loop. */ iterations,
+        int /* SPINT001: all values valid - zero deliberately raises the primitive fault. */ divisor)
+    {
+        var value = 1;
+        for (var index = 0; index < iterations; index++)
+        { value = unchecked((value * 31) ^ index); }
+        return value / divisor;
+    }
+
+    [TestCase(0)]
     [TestCase(1)]
     [TestCase(16)]
     public void DimensionFaultStringsIncludeDiscardedConstructorAndReplacementMessages(int materializations)

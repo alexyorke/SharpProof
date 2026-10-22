@@ -109,6 +109,82 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Direct source-body unwind contribution
+
+A new private native component binds the existing complete, call-free,
+handler-free source-body inventory to a scoped runtime frame model:
+`coreclr8-x64-direct-source-unwind-frame-v1`. Under ordinary execution of the
+exact owned module by the pinned standard JIT/unwind ABI, without rewriting
+or external reentry, one active direct source invocation contributes at most
+one direct source frame in one completed unwind pass. Inlining can remove it.
+The result identifies both required compiler and runtime models. Missing or
+foreign body evidence and incompatible layouts publish neither a count nor
+model identities; cancellation propagates.
+
+This is not a bound on helper/framework frames, failed or repeated passes,
+all attempted trace appends, or total root bytes. Those remain open. The new
+component is private and does not bind its runtime premise to a public root
+claim or change the root task-byte Unknown outcome.
+
+Pinned [`patchpoint.cpp`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/jit/patchpoint.cpp#L10)
+identifies both loop and partial-compilation transition checks. An initial plan to
+add only acyclic-body evidence was rejected as insufficient: absence of IL
+backward branches alone does not exclude the second transition path. No such weaker
+transport fact was added. Importation gates both paths on Tier0 compilation;
+the runtime helpers transfer control to the OSR continuation rather than
+returning to the old body.
+
+The AMD64
+[`OSR prolog`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/jit/codegenxarch.cpp#L9681)
+records inherited Tier0 callee saves and stack space. The
+[`unwind backend`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/jit/unwindamd64.cpp#L223)
+uses the corresponding Windows unwind operations or Unix canonical-frame
+adjustments. CLR virtual unwinding consumes that combined metadata to reach
+the original caller; inherited storage is not a separately entered source
+invocation. The pinned transition, importer, eligibility and unwind sources
+have verified blob identities, byte counts and SHA-256 entries in the ignored
+research manifest. Helper frames and exception-tracker resumption/retry still
+need their own complete bounds before this can feed a root trace budget.
+
+Controls cover configured/returned task roots, source bodies with and without
+loops, codec round trips, missing/foreign evidence, layout rejection and
+cancellation. Separate call-free arithmetic probes capture a primitive fault
+with zero or one million loop iterations and inspect its direct source frame.
+These observations do not assert that OSR occurred and do not replace the
+source-backed unwind model. Their parameters explicitly admit all integer
+values so the probe itself introduces no guard calls.
+
+GitHub's PR head is now synchronized to predecessor `e99c71f8f`. Its automatic
+CI (39829939287), coverage (39829938875) and package consumers (39829938999)
+are running; security (39829938808) and documentation (39829938861) passed.
+The earlier `7d86a8aa1` package run was cancelled, not passed. These hosted
+results predate the new direct-source component.
+
+All 263 Specs cases passed, including both call-free trace controls, and all
+270 carrier cases passed, including the seven new admission/failure controls.
+Both builds had zero warnings or errors
+(`artifacts/resource-direct-source-frame-specs-tests.log` and
+`artifacts/resource-direct-source-frame-carrier-tests.log`). Full quality/API
+checks passed after replacing three uncommon prose terms with plain wording
+(`artifacts/resource-direct-source-frame-lint-fixed.log`). Documentation checks
+passed (`artifacts/resource-direct-source-frame-docs.log`); the canonical
+formatter copied zero changes (`artifacts/resource-direct-source-frame-format-final.log`).
+No transport, protocol, cache identity or public root verdict changed.
+
+The retained report from predecessor `e99c71f8f` coverage run 39829938875
+(commit `353542075ba3f8963adb1bb57dd63b0815c1a966`, 74 input reports) measures
+6895/7046 changed trusted lines, 97.86%, 151 gaps, below the unchanged 100%
+floor. No native-message catalog lines remain uncovered in that report.
+It is retained at
+`artifacts/resource-e99c71-coverage-evidence/coverage/SharpProof.coverage.json`.
+GitHub reports the workflow completed while its corpus-b shard job
+120003097751 still reports running with no steps and no completion time,
+including through the direct jobs API. Fourteen other shards report success.
+The report's measurements are retained, but complete shard qualification is
+not claimed from these inconsistent API states. Canonical CI (39829939287)
+passed for that predecessor; package consumers (39829938999) remain active.
+These results predate the direct-source frame component.
+
 ### Linux array-dimension fault message strings
 
 A new private component composes both managed string candidates in one

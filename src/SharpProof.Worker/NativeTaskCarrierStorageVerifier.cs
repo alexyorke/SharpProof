@@ -5,6 +5,12 @@ internal sealed record NativeTaskCallbackActivationCheck(int? WrapperActivations
     internal string? RequiredCompilerModel => WrapperActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
 }
 
+internal sealed record NativeTaskDirectSourceFrameCheck(int? FramesPerPassUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+    internal string? RequiredRuntimeModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.DirectSourceFrameModel;
+}
+
 internal sealed record NativeTaskSourceBodyCheck(int? DirectSourceActivationsUpper, string? UnknownReason)
 {
     internal string? RequiredCompilerModel => DirectSourceActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
@@ -25,6 +31,29 @@ internal static class NativeTaskCarrierStorageVerifier
     internal const int MaximumCallbacks = 64;
     internal const string CallbackActivationModel = "owned-emitted-callback-forwarders-v1";
     internal const string SourceBodyModel = "owned-emitted-call-free-source-bodies-v1";
+
+    internal const string DirectSourceFrameModel = "coreclr8-x64-direct-source-unwind-frame-v1";
+
+    // Conditional on ordinary execution of the exact emitted module by the
+    // pinned standard JIT/unwind ABI, without rewriting or external reentry.
+    // One active call-free, handler-free source invocation contributes at most
+    // one direct source frame in one completed unwind pass. Inlining can remove
+    // it. OSR's unwind records include the inherited Tier0 saves/stack, so they
+    // unwind the continuation and inherited area to the original caller.
+    // Helper/framework frames, repeated/failed passes and trace allocation are
+    // separate obligations. This result has no root byte-proof authority.
+    internal static NativeTaskDirectSourceFrameCheck CheckDirectSourceFrames(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = CheckSourceBodies(shapes, projection, root, layout, cancellation);
+        return source.DirectSourceActivationsUpper is { } count ? new(count, null) : new(null, source.UnknownReason);
+    }
 
     // One entered source body, with no source callees. Runtime helper frames,
     // initialization, external reentry and unwind behavior are separate premises.
