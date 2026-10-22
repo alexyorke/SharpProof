@@ -4,19 +4,33 @@ output=$(realpath "$1")
 for language in 8 9 13; do
   fixture=$(mktemp -d /tmp/hm-default-values.XXXXXX)
   cp global.json "$fixture/global.json"
+  constants=""
+  if [ "$language" = 13 ]; then constants=MODERN_ALIASES; fi
   package_reference=""
   if [ "$#" -eq 3 ]; then
     package_reference="<ItemGroup><PackageReference Include=\"SharpProof.HmInference\" Version=\"$3\" PrivateAssets=\"all\" /></ItemGroup>"
   fi
   cat > "$fixture/Defaults.csproj" << EOF
 <Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>$language</LangVersion><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
+<PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>$language</LangVersion><DefineConstants>$constants</DefineConstants><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
 $package_reference
 </Project>
 EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Collections.Generic;using System.Threading.Tasks;
 public static class DefaultConsumer{
+    public static int Alias(int value){ref var alias=ref value;alias=default;return value;}
+    public static int AliasLocal(int value){var result=value;ref var alias=ref result;alias=default;return result;}
+    public static int AliasChain(int value){var result=value;ref var first=ref result;ref var second=ref first;second=default;return result;}
+    public static int AliasCopy(int value){var result=value;var copy=result;ref var alias=ref result;alias=default;return copy;}
+    public static int AliasRef(ref int value){value=default;return value;}
+    public static int AliasOut(int value,out int output){output=value;output=default;return output;}
+    public static (int left,int right) AliasConditional(bool flag,int first,int second){var left=first;var right=second;ref var alias=ref(flag?ref left:ref right);alias=default;return(left,right);}
+    public static int AliasConditionalStore(bool flag,int value){ref var alias=ref value;alias=flag?value:default;return value;}
+#if MODERN_ALIASES
+    public static Func<int> AliasCapture(int value){var result=value;var read=()=>result;ref var alias=ref result;alias=default;return read;}
+    public static async Task<int> AliasAsync(Task<int> value){var result=await value;ref var alias=ref result;alias=default;return result;}
+#endif
     public static int Assigned(bool flag,int value){var result=value;if(flag)result=default;return result;}
     public static int Parameter(int value){value=default;return value;}
     public static int Reset(int value){var result=value;void Clear(){result=default;}Clear();return result;}
@@ -72,6 +86,14 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element Alias<T1>($element value)$suffix" \
+    "$element AliasLocal<T1>(T1 value)$suffix" \
+    "$element AliasChain<T1>(T1 value)$suffix" \
+    "T1 AliasCopy<T1>(T1 value)$suffix" \
+    "$element AliasRef<T1>(ref $element value)$suffix" \
+    "$element AliasOut<T1>(T1 value, out $element output)$suffix" \
+    "($element left, $element right) AliasConditional<T1>(bool flag, T1 first, T1 second)$suffix" \
+    "$element AliasConditionalStore<T1>(bool flag, $element value)$suffix" \
     "$element Assigned<T1>(bool flag, T1 value)$suffix" \
     "$element Parameter<T1>($element value)$suffix" \
     "$element Reset<T1>(T1 value)$suffix" \
@@ -95,5 +117,9 @@ EOF
       exit 1
     fi
   done
+  if [ "$language" = 13 ]; then
+    grep -Fq 'global::System.Func<T1?> AliasCapture<T1>(T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> AliasAsync<T1>(global::System.Threading.Tasks.Task<T1> value)' "$log"
+  fi
   if [ "$#" -eq 1 ]; then printf 'PASS CliDefaultValuesCSharp%s\n' "$language"; fi
 done

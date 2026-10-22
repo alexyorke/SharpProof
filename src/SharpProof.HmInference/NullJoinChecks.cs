@@ -9,6 +9,8 @@ internal static class NullJoinChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("StoreNullReferenceAlias", "static object? M(object value,int tag){var result=value;ref var alias=ref result;alias=null;return result;}", "T1? M<T1, T2>(T1 value, T2 tag) where T1 : class"),
+            ("StoreNullValueAlias", "static int? M(int? value,int tag){var result=value;ref var alias=ref result;alias=null;return result;}", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : struct"),
             ("StoreNullReference", "static object? M(bool flag,object value,int tag){var result=value;if(flag)result=null;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag) where T1 : class"),
             ("StoreDefaultReference", "static object? M(bool flag,object value,int tag){var result=value;if(flag)result=default;return result;}", "T1? M<T1, T2>(bool flag, T1 value, T2 tag) where T1 : class"),
             ("StoreNullCopy", "static object M(object value,int tag){var result=value;var copy=result;result=null;return copy;}", "T1 M<T1, T2>(T1 value, T2 tag) where T1 : class"),

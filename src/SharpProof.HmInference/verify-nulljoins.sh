@@ -29,6 +29,8 @@ public readonly struct ConvertedBox<T>{
     public static implicit operator ConvertedBox<T>(T value){Conversions++;return new ConvertedBox<T>(value);}
 }
 public static class NullJoinConsumer{
+public static object? StoreAliasReference(object value){var result=value;ref var alias=ref result;alias=null;return result;}
+public static int? StoreAliasValue(int? value){var result=value;ref var alias=ref result;alias=null;return result;}
 public static object? StoreReference(bool clear,object value){var result=value;if(clear)result=null;return result;}
 public static int? StoreValue(bool clear,int? value){var result=value;if(clear)result=default;return result;}
 public static object? StoreParameter(object? value){value=null;return value;}
@@ -140,6 +142,8 @@ EOF
   fi
   cp "$log" "$destination"
   for expected in \
+    'T1? StoreAliasReference<T1>(T1 value) where T1 : class' \
+    'T1? StoreAliasValue<T1>(T1? value) where T1 : struct' \
     'T1? StoreReference<T1>(bool clear, T1 value) where T1 : class' \
     'T1? StoreValue<T1>(bool clear, T1? value) where T1 : struct' \
     'T1? StoreParameter<T1>(T1? value) where T1 : class' \

@@ -158,8 +158,7 @@ public static partial class Inference
             // must admit default writes before rendering the public signature.
             for (var i = 0; i < parameters.Length; i++)
             {
-                if (symbol.Parameters[i].RefKind == RefKind.None)
-                { parameters[i] = DefaultStoredValue(symbol.Parameters[i], parameters[i]); }
+                parameters[i] = DefaultStoredValue(symbol.Parameters[i], parameters[i]);
             }
             // Seed the declared structure so recursive nullable results do not acquire
             // an extra nullable wrapper while the body is still being inferred.
@@ -188,6 +187,12 @@ public static partial class Inference
                 throw new InferenceException("No method body.");
             }
 
+            // Value flow can add optionality beyond the indexed literal stores.
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                if (defaultAssignedStorages.Contains(symbol.Parameters[i]) && environment.TryGetValue(symbol.Parameters[i], out var stored))
+                { parameters[i] = MergeDefaultValues(parameters[i], stored); }
+            }
             result = iteratorReturn is not null ? WrapIteratorResult() : WrapAsyncResult(result);
             if (symbol.PartialDefinitionPart is { } resultDefinition)
             { ImportPartialContract(result, symbol.ReturnType, resultDefinition.ReturnType, symbol); }
@@ -889,7 +894,8 @@ public static partial class Inference
                 }
                 else if (declaration.Type is RefTypeSyntax referenceType ? referenceType.Type.IsVar : declaration.Type.IsVar)
                 {
-                    environment.Add(symbol, Expression(variable.Initializer.Value));
+                    var initial = Expression(variable.Initializer.Value);
+                    environment.Add(symbol, declaration.Type is RefTypeSyntax && ReferenceStorageOwners(symbol).Count != 0 ? DefaultStoredValue(symbol, initial) : initial);
                 }
                 else
                 {
@@ -1297,11 +1303,21 @@ public static partial class Inference
 
             var target = AssignmentTarget(targetSyntax);
             var targetType = StorageType(targetSyntax);
+            if (targetSyntax.Parent is AssignmentExpressionSyntax { Right: RefExpressionSyntax }
+                && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
+            {
+                HmType.Unify(ConversionCore(target), ConversionCore(value));
+                var rebound = MergeDefaultValues(target, value);
+                environment[alias] = rebound;
+                return rebound;
+            }
             if (targetSyntax is IdentifierNameSyntax && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is { } storage
                 && storage is ILocalSymbol or IParameterSymbol
                 && (HasDefaultValueAnnotation(target) || HasDefaultValueAnnotation(value)))
             {
                 var merged = MergeDefaultValues(target, value);
+                if (WriteReferenceStorage(storage, merged))
+                { return merged; }
                 if (storage is ILocalSymbol { RefKind: not RefKind.None } or IParameterSymbol { RefKind: not RefKind.None })
                 {
                     if (merged.Root.Name == CSharpTypes.NullableParameter)

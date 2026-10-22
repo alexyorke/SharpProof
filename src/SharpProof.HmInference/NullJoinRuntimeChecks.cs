@@ -17,6 +17,8 @@ internal static class NullJoinRuntimeChecks
             using System.Threading;
             using System.Threading.Tasks;
             public static class NullProbe{
+                public static object? StoreAliasReference(object value){var result=value;ref var alias=ref result;alias=null;return result;}
+                public static int? StoreAliasValue(int? value){var result=value;ref var alias=ref result;alias=null;return result;}
                 public static object? StoreReference(bool clear,object value){var result=value;if(clear)result=null;return result;}
                 public static int? StoreValue(bool clear,int? value){var result=value;if(clear)result=default;return result;}
                 public static int? StorePinned(bool clear,int? value,int tag){var result=value;if(clear)result=null;return result;}
@@ -64,6 +66,7 @@ internal static class NullJoinRuntimeChecks
             public static class OriginalRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     object marker=new Uri("https://example.invalid/null-joins");
+                    if(NullProbe.StoreAliasReference(marker)!=null||NullProbe.StoreAliasValue((int?)7)!=null)return false;
                     object? reference=marker;int? number=7;object?[] stored={marker};var storedValues=new List<int?>{7};
                     if(!ReferenceEquals(NullProbe.StoreReference(false,marker),marker)||NullProbe.StoreReference(true,marker)!=null
                         ||NullProbe.StoreValue(false,(int?)7)!=7||NullProbe.StoreValue(true,(int?)7)!=null||NullProbe.StoreValue(false,(int?)null)!=null
@@ -144,6 +147,7 @@ internal static class NullJoinRuntimeChecks
             public static class NewRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     var tag=new Uri("https://example.invalid/new-null-domains");var payload=new string('x',2);
+                    if(NullProbe.StoreAliasReference(payload)!=null||NullProbe.StoreAliasValue((decimal?)23m)!=null)return false;
                     string? reference=payload;decimal? number=23m;string?[] stored={payload};var storedValues=new List<decimal?>{23m};
                     if(!ReferenceEquals(NullProbe.StoreReference(false,payload),payload)||NullProbe.StoreReference(true,payload)!=null
                         ||NullProbe.StoreValue(false,(decimal?)23m)!=23m||NullProbe.StoreValue(true,(decimal?)23m)!=null

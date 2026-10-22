@@ -224,6 +224,121 @@ public static partial class Inference
         private readonly HashSet<HmType> defaultValueAnnotations = [];
         private readonly HashSet<ISymbol> defaultAssignedStorages = new(SymbolEqualityComparer.Default);
         private Dictionary<ISymbol, List<ExpressionSyntax>>? defaultStores;
+        private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
+
+        private static IEnumerable<ExpressionSyntax> StoredAlternatives(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            while (expression is ParenthesizedExpressionSyntax parentheses)
+            { expression = parentheses.Expression; }
+            if (expression is ConditionalExpressionSyntax conditional)
+            {
+                foreach (var value in StoredAlternatives(conditional.WhenTrue))
+                { yield return value; }
+                foreach (var value in StoredAlternatives(conditional.WhenFalse))
+                { yield return value; }
+            }
+            else if (expression is SwitchExpressionSyntax switched)
+            {
+                foreach (var arm in switched.Arms)
+                { foreach (var value in StoredAlternatives(arm.Expression)) { yield return value; } }
+            }
+            else
+            { yield return expression; }
+        }
+
+        private IEnumerable<ISymbol> ReferenceTargets(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            while (expression is ParenthesizedExpressionSyntax or RefExpressionSyntax)
+            { expression = expression is ParenthesizedExpressionSyntax parentheses ? parentheses.Expression : ((RefExpressionSyntax)expression).Expression; }
+            if (expression is ConditionalExpressionSyntax conditional)
+            {
+                foreach (var target in ReferenceTargets(conditional.WhenTrue))
+                { yield return target; }
+                foreach (var target in ReferenceTargets(conditional.WhenFalse))
+                { yield return target; }
+            }
+            else if (model.GetSymbolInfo(expression, cancellationToken).Symbol is ILocalSymbol or IParameterSymbol)
+            { yield return model.GetSymbolInfo(expression, cancellationToken).Symbol!; }
+        }
+
+        private HashSet<ISymbol> ReferenceStorageOwners(ISymbol storage)
+        {
+            if (storage is null)
+            { throw new ArgumentNullException(nameof(storage)); }
+            if (storageAliases is null)
+            {
+                // Rebindings contribute possible owners across the alias lifetime.
+                // Ref invariance separately relates their stored value types.
+                storageAliases = new(SymbolEqualityComparer.Default);
+                void Add(ISymbol alias, ExpressionSyntax reference)
+                {
+                    if (alias is null)
+                    { throw new ArgumentNullException(nameof(alias)); }
+                    if (reference is null)
+                    { throw new ArgumentNullException(nameof(reference)); }
+                    if (!storageAliases.TryGetValue(alias, out var targets))
+                    { targets = new(SymbolEqualityComparer.Default); storageAliases.Add(alias, targets); }
+                    targets.UnionWith(ReferenceTargets(reference));
+                }
+                if (currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is { } declaration)
+                {
+                    foreach (var variable in declaration.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+                    {
+                        if (variable.Initializer?.Value is RefExpressionSyntax reference && model.GetDeclaredSymbol(variable, cancellationToken) is ILocalSymbol alias)
+                        { Add(alias, reference); }
+                    }
+                    foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Right is RefExpressionSyntax reference
+                            && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
+                        { Add(alias, reference); }
+                    }
+                }
+            }
+            var owners = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            var pending = new Stack<ISymbol>();
+            pending.Push(storage);
+            while (pending.Count != 0)
+            {
+                var current = pending.Pop();
+                if (!visited.Add(current))
+                { continue; }
+                if (storageAliases.TryGetValue(current, out var targets))
+                { foreach (var target in targets) { pending.Push(target); } }
+                else if (current is IParameterSymbol or ILocalSymbol { RefKind: RefKind.None })
+                { owners.Add(current); }
+            }
+            return owners;
+        }
+
+        private bool WriteReferenceStorage(ISymbol storage, HmType value)
+        {
+            if (storage is null)
+            { throw new ArgumentNullException(nameof(storage)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            var owners = ReferenceStorageOwners(storage);
+            if (owners.Count == 0)
+            { return false; }
+            var targets = new HashSet<ISymbol>(owners, SymbolEqualityComparer.Default) { storage };
+            foreach (var alias in storageAliases!.Keys)
+            {
+                if (ReferenceStorageOwners(alias).Overlaps(owners))
+                { targets.Add(alias); }
+            }
+            foreach (var target in targets)
+            {
+                // Ordinary value copies sharing a type are not storage aliases.
+                if (environment.TryGetValue(target, out var previous))
+                { environment[target] = MergeDefaultValues(previous, value); defaultAssignedStorages.Add(target); }
+            }
+            return true;
+        }
 
         private HmType CapturedDefaultValue(IdentifierNameSyntax identifier, ISymbol symbol, HmType type)
         {
@@ -256,12 +371,21 @@ public static partial class Inference
                     {
                         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && assignment.Left is IdentifierNameSyntax
                             && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is { } assigned
-                            && assigned is ILocalSymbol or IParameterSymbol
-                            && StoredLiteralValue(assignment.Right, StorageType(assignment.Left)) is not null)
+                            && assigned is ILocalSymbol or IParameterSymbol)
                         {
-                            if (!defaultStores.TryGetValue(assigned, out var stores))
-                            { stores = []; defaultStores.Add(assigned, stores); }
-                            stores.Add(assignment.Right);
+                            foreach (var literal in StoredAlternatives(assignment.Right))
+                            {
+                                if (StoredLiteralValue(literal, StorageType(assignment.Left)) is null)
+                                { continue; }
+                                var targets = ReferenceStorageOwners(assigned);
+                                targets.Add(assigned);
+                                foreach (var target in targets)
+                                {
+                                    if (!defaultStores.TryGetValue(target, out var stores))
+                                    { stores = []; defaultStores.Add(target, stores); }
+                                    stores.Add(literal);
+                                }
+                            }
                         }
                     }
                 }
