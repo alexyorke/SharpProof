@@ -40,6 +40,8 @@ internal static partial class CompilerForkJoinProjectionCodec
             WriteBoundary(writer, shapes.RootExceptionBoundary, cancellation);
             writer.WritePropertyName("activations");
             WriteCallbackActivations(writer, shapes.CallbackActivations, cancellation);
+            writer.WritePropertyName("bodies");
+            WriteSourceBodies(writer, shapes.SourceBodies, cancellation);
             writer.WriteEndObject();
         }
         writer.WriteEndObject();
@@ -78,7 +80,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Carrier Unknown reason is too long.");
             return new(null, reason);
         }
-        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary", "activations"]);
+        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary", "activations", "bodies"]);
         Require(Text(shapes.GetProperty("root")) == owner, "Carrier root is unowned.");
         var module = Text(shapes.GetProperty("module"));
         Require(WorkerProtocolJson.IsSha256(module), "Carrier module hash is invalid.");
@@ -101,11 +103,77 @@ internal static partial class CompilerForkJoinProjectionCodec
         var encodedState = shapes.GetProperty("state");
         Require((encodedState.ValueKind != JsonValueKind.Null) == configured, "Carrier state-machine kind is inconsistent.");
         var state = configured ? ReadCarrierType(encodedState, ref remaining, cancellation) : null;
+        var activations = ReadCallbackActivations(shapes.GetProperty("activations"), owner, module, callbacks, children, cancellation);
         return new(new(owner, module, compiler, callbacks, frames.MoveToImmutable(), state)
         {
             RootExceptionBoundary = ReadBoundary(shapes.GetProperty("boundary"), owner, module, state, cancellation),
-            CallbackActivations = ReadCallbackActivations(shapes.GetProperty("activations"), owner, module, callbacks, children, cancellation)
+            CallbackActivations = activations,
+            SourceBodies = ReadSourceBodies(shapes.GetProperty("bodies"), owner, module, activations?.Activations, cancellation)
         }, null);
+    }
+
+    private static void WriteSourceBodies(Utf8JsonWriter writer, CompilerTaskSourceBodyCapture? capture, CancellationToken cancellation)
+    {
+        writer = ArgumentNullGuard.NotNull(writer, nameof(writer));
+        cancellation.ThrowIfCancellationRequested();
+        if (capture is null)
+        { writer.WriteNullValue(); return; }
+        Require((capture.Inventory is null) != (capture.UnknownReason is null), "Source bodies require an inventory or Unknown.");
+        writer.WriteStartObject();
+        writer.WriteString("unknown", capture.UnknownReason);
+        writer.WritePropertyName("value");
+        if (capture.Inventory is not { } inventory)
+        { writer.WriteNullValue(); }
+        else
+        {
+            Require(!inventory.MethodTokens.IsDefault && inventory.MethodTokens.Length is >= 1 and <= 16, "Source body count is invalid.");
+            writer.WriteStartObject();
+            writer.WriteString("root", inventory.RootCallableId);
+            writer.WriteString("module", inventory.ModuleSha256);
+            writer.WriteStartArray("methods");
+            foreach (var token in inventory.MethodTokens)
+            { cancellation.ThrowIfCancellationRequested(); writer.WriteNumberValue(token); }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+        writer.WriteEndObject();
+    }
+
+    private static CompilerTaskSourceBodyCapture? ReadSourceBodies(JsonElement value, string owner, string module,
+        CompilerTaskCallbackActivation? activations, CancellationToken cancellation)
+    {
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        module = ArgumentNullGuard.NotNull(module, nameof(module));
+        cancellation.ThrowIfCancellationRequested();
+        if (value.ValueKind == JsonValueKind.Null)
+        { return null; }
+        Properties(value, ["unknown", "value"]);
+        var unknown = value.GetProperty("unknown");
+        var encoded = value.GetProperty("value");
+        Require((unknown.ValueKind == JsonValueKind.Null) != (encoded.ValueKind == JsonValueKind.Null), "Source bodies require an inventory or Unknown.");
+        if (encoded.ValueKind == JsonValueKind.Null)
+        {
+            var reason = Text(unknown);
+            Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Source body Unknown reason is invalid.");
+            return new(null, reason);
+        }
+        Properties(encoded, ["root", "module", "methods"]);
+        Require(Text(encoded.GetProperty("root")) == owner && Text(encoded.GetProperty("module")) == module, "Source body identity is unowned.");
+        var list = encoded.GetProperty("methods");
+        Require(list.ValueKind == JsonValueKind.Array && list.GetArrayLength() is >= 1 and <= 16 && activations is not null,
+            "Source body coverage is unavailable.");
+        var methods = ImmutableArray.CreateBuilder<int>(list.GetArrayLength());
+        var unique = new HashSet<int>();
+        foreach (var item in list.EnumerateArray())
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var token = Integer(item);
+            Require(MethodDefinitionToken(token) && unique.Add(token), "Source body token is invalid or duplicated.");
+            methods.Add(token);
+        }
+        Require(unique.SetEquals(activations!.Forwarders.Select(static forwarder =>
+            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)), "Source bodies do not cover the forwarded targets.");
+        return new(new(owner, module, methods.MoveToImmutable()), null);
     }
 
     private static void WriteCallbackActivations(Utf8JsonWriter writer, CompilerTaskCallbackActivationCapture? capture, CancellationToken cancellation)

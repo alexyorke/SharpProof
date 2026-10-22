@@ -19,6 +19,272 @@ public sealed class NativeTaskCarrierStorageTests
     [TestCase(OptimizationLevel.Release, false)]
     [TestCase(OptimizationLevel.Debug, true)]
     [TestCase(OptimizationLevel.Release, true)]
+    public void SourceBodyInventoryBindsEveryDistinctTargetToTheCallbackEmission(OptimizationLevel optimization, bool configured)
+    {
+        var (compilation, method) = CompileSourceProbe(
+            "while(n>0) {var values=new int[n];values[0]=n;int length=values.Length;n--;} n=checked(n*2+1);n=(byte)n;",
+            configured, optimization);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var callbacks = collector.CaptureCallbackActivations(method, "root", cancellation).Activations!;
+        var capture = collector.CaptureSourceBodies(method, "root", cancellation);
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Inventory!.RootCallableId, Is.EqualTo("root"));
+        Assert.That(capture.Inventory.ModuleSha256, Is.EqualTo(callbacks.ModuleSha256));
+        Assert.That(capture.Inventory.MethodTokens.ToArray(), Is.EqualTo(callbacks.Forwarders.Select(forwarder =>
+            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken).Distinct().Order().ToArray()));
+        Assert.That(capture.Inventory.MethodTokens, Has.Length.EqualTo(1));
+        var repeated = collector.CaptureSourceBodies(method, "root", cancellation);
+        Assert.That(repeated.Inventory!.MethodTokens.ToArray(), Is.EqualTo(capture.Inventory.MethodTokens.ToArray()));
+        Assert.That(repeated.Inventory.ModuleSha256, Is.EqualTo(capture.Inventory.ModuleSha256));
+    }
+
+    [TestCase("")]
+    [TestCase("for(int i=0;i<n;i++) {var a=new int[4];}")]
+    public void SourceBodyInventoryCanAccompanyAnAdmittedResourceProjection(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (compilation, method, projection, root) = Compile(false, OptimizationLevel.Release, body);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var capture = collector.CaptureSourceBodies(method, "root", cancellation);
+        Assert.That(projection.Children, Has.Length.EqualTo(2));
+        Assert.That(capture.UnknownReason, Is.Null);
+        Assert.That(capture.Inventory!.MethodTokens, Has.Length.EqualTo(1));
+        var carriers = collector.Capture(method, "root", cancellation);
+        projection = projection with
+        {
+            Carriers = carriers with
+            {
+                Shapes = carriers.Shapes! with
+                { SourceBodies = capture, CallbackActivations = collector.CaptureCallbackActivations(method, "root", cancellation) }
+            }
+        };
+        var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+        var check = NativeTaskCarrierStorageVerifier.CheckSourceBodies(decoded.Carriers!.Shapes!, decoded, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.DirectSourceActivationsUpper, Is.EqualTo(1));
+        Assert.That(check.RequiredCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.SourceBodyModel));
+        Assert.That(decoded.Carriers.Shapes!.SourceBodies!.Inventory!.MethodTokens.ToArray(), Is.EqualTo(capture.Inventory.MethodTokens.ToArray()));
+    }
+
+    [TestCase("owner")]
+    [TestCase("module")]
+    [TestCase("empty")]
+    [TestCase("default")]
+    [TestCase("duplicate")]
+    [TestCase("token")]
+    [TestCase("foreign")]
+    [TestCase("extra")]
+    [TestCase("both")]
+    [TestCase("many")]
+    [TestCase("callbacks")]
+    public void SourceBodyInventoryRejectsUnownedTransportWithoutAnActivationBound(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, root) = Fixture(0);
+        var inventory = new CompilerTaskSourceBodyInventory("root", shapes.ModuleSha256, [0x06000003]);
+        inventory = mutation switch
+        {
+            "owner" => inventory with { RootCallableId = "foreign" },
+            "module" => inventory with { ModuleSha256 = new string('b', 64) },
+            "empty" => inventory with { MethodTokens = [] },
+            "default" => inventory with { MethodTokens = default },
+            "duplicate" => inventory with { MethodTokens = [0x06000003, 0x06000003] },
+            "token" => inventory with { MethodTokens = [0x0a000003] },
+            "foreign" => inventory with { MethodTokens = [0x06000004] },
+            "extra" => inventory with { MethodTokens = [0x06000003, 0x06000004] },
+            "many" => inventory with { MethodTokens = Enumerable.Range(1, 17).Select(value => 0x06000000 | value).ToImmutableArray() },
+            _ => inventory
+        };
+        shapes = shapes with
+        {
+            SourceBodies = new(inventory, mutation == "both" ? "Unsupported" : null),
+            CallbackActivations = mutation == "callbacks" ? null : new(new("root", shapes.ModuleSha256,
+                [new(0x06000001, 0x06000003), new(0x06000002, 0x06000003)]), null)
+        };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo(mutation == "callbacks" ? "TaskCallbackActivationEvidenceUnavailable" : "TaskSourceBodyEvidenceInvalid"));
+        Assert.That(check.DirectSourceActivationsUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        Action encode = () => { _ = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation); };
+        Assert.Throws<InvalidDataException>(encode);
+    }
+
+    [TestCase(null, "TaskSourceBodyEvidenceUnavailable")]
+    [TestCase("UnsupportedSourceBody", "UnsupportedSourceBody")]
+    [TestCase("", "TaskSourceBodyEvidenceInvalid")]
+    public void SourceBodyUnknownNeverPublishesAnActivationModel(string? reason, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var (shapes, projection, root) = Fixture(0);
+        shapes = shapes with
+        {
+            SourceBodies = reason is null ? null : new(null, reason),
+            CallbackActivations = new(new("root", shapes.ModuleSha256, [new(0x06000001, 0x06000003), new(0x06000002, 0x06000003)]), null)
+        };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var check = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, root, Layout(), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo(expected));
+        Assert.That(check.DirectSourceActivationsUpper, Is.Null);
+        Assert.That(check.RequiredCompilerModel, Is.Null);
+        if (reason is null || reason.Length != 0)
+        {
+            var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
+            Assert.That(decoded.Carriers!.Shapes!.SourceBodies?.UnknownReason, Is.EqualTo(reason));
+        }
+        else
+        {
+            Action encode = () => { _ = CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation); };
+            Assert.Throws<InvalidDataException>(encode);
+        }
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action verify = () => { _ = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, root, Layout(), canceled.Token); };
+        Assert.Throws<OperationCanceledException>(verify);
+        var incompatible = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, root, new("CoreCLR", "8.0.32", "arm64", 8), cancellation);
+        Assert.That(incompatible.DirectSourceActivationsUpper, Is.Null);
+        Assert.That(incompatible.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+    }
+
+    [TestCase("missing")]
+    [TestCase("extra")]
+    [TestCase("value-extra")]
+    [TestCase("methods-missing")]
+    [TestCase("kind")]
+    [TestCase("fraction")]
+    [TestCase("both")]
+    [TestCase("neither")]
+    [TestCase("reason")]
+    [TestCase("old")]
+    [TestCase("callbacks")]
+    public void SourceBodyCodecRejectsMalformedAndOldPayloads(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var (shapes, projection, owner) = Fixture(0);
+        shapes = shapes with
+        {
+            SourceBodies = new(new("root", shapes.ModuleSha256, [0x06000003]), null),
+            CallbackActivations = new(new("root", shapes.ModuleSha256, [new(0x06000001, 0x06000003), new(0x06000002, 0x06000003)]), null)
+        };
+        projection = projection with { Carriers = new(shapes, null) };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var root = JsonNode.Parse(CompilerForkJoinProjectionCodec.Encode(projection, owner, cancellation))!.AsObject();
+        var encodedShapes = root["carriers"]!["shapes"]!.AsObject();
+        var capture = encodedShapes["bodies"]!.AsObject();
+        var value = capture["value"]!.AsObject();
+        switch (mutation)
+        {
+            case "missing":
+                encodedShapes.Remove("bodies");
+                break;
+            case "extra":
+                capture["extra"] = 0;
+                break;
+            case "value-extra":
+                value["extra"] = 0;
+                break;
+            case "methods-missing":
+                value.Remove("methods");
+                break;
+            case "kind":
+                encodedShapes["bodies"] = 0;
+                break;
+            case "fraction":
+                value["methods"] = new JsonArray(6.5);
+                break;
+            case "both":
+                capture["unknown"] = "UnsupportedSourceBody";
+                break;
+            case "neither":
+                capture["value"] = null;
+                break;
+            case "reason":
+                capture["value"] = null;
+                capture["unknown"] = new string('x', 513);
+                break;
+            case "callbacks":
+                encodedShapes["activations"] = null;
+                break;
+            default:
+                root["version"] = 5;
+                break;
+        }
+        Action decode = () => { _ = CompilerForkJoinProjectionCodec.Decode(System.Text.Encoding.UTF8.GetBytes(root.ToJsonString()), owner, cancellation); };
+        Assert.Throws<InvalidDataException>(decode);
+    }
+
+    [TestCase("n=System.Math.Abs(n);", "TaskSourceBodyCallUnsupported")]
+    [TestCase("Child(n);", "TaskSourceBodyCallUnsupported")]
+    [TestCase("new object();", "TaskSourceBodyInstructionUnsupported")]
+    [TestCase("var a=new byte[n];", "TaskSourceBodyArrayTypeUnsupported")]
+    [TestCase("var a=new object[n];", "TaskSourceBodyArrayTypeUnsupported")]
+    [TestCase("try {n/=n;} catch(System.Exception) {}", "TaskSourceBodyHandlingUnsupported")]
+    public void SourceBodyInventoryRejectsUnsupportedEmittedOperations(string body, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(expected);
+        var capture = CaptureSourceProbe(body);
+        Assert.That(capture.Inventory, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void SourceBodyInventoryRejectsOversizedBodiesWithoutPartialMethods()
+    {
+        var capture = CaptureSourceProbe(string.Concat(Enumerable.Repeat("n+=1;", 1100)));
+        Assert.That(capture.Inventory, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskSourceBodyInstructionUnsupported"));
+    }
+
+    private static CompilerTaskSourceBodyCapture CaptureSourceProbe(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (compilation, method) = CompileSourceProbe(body, false, OptimizationLevel.Debug);
+        return new CompilerTaskCarrierCollector(compilation).CaptureSourceBodies(method, "root", TestContext.CurrentContext.CancellationToken);
+    }
+
+    private static (CSharpCompilation Compilation, IMethodSymbol Method) CompileSourceProbe(string body, bool configured, OptimizationLevel optimization)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using System.Threading.Tasks; public static class C {public static " + (configured ? "async Task" : "Task") +
+            " Root(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(n)))" +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {" + body + "} }";
+        var initial = TestCompilation.Create("SourceBodyControl", [("Subject.cs", source)]);
+        var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        return (compilation, method);
+    }
+
+    [Test]
+    public void SourceBodyInventoryClearsEarlierMethodsWhenALaterBodyIsUnsupported()
+    {
+        const string source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Good(n)),Task.Run(()=>Bad(n))); static void Good(int n) {} static void Bad(int n) {Bad(n);} }";
+        var compilation = TestCompilation.Create("SourceBodyPartialControl", [("Subject.cs", source)]);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var capture = collector.CaptureSourceBodies(method, "root", cancellation);
+        Assert.That(capture.Inventory, Is.Null);
+        Assert.That(capture.UnknownReason, Is.EqualTo("TaskSourceBodyCallUnsupported"));
+        Assert.That(collector.CaptureCallbackActivations(method, "root", cancellation).Activations, Is.Not.Null,
+            "Source-body rejection does not erase the separate forwarding fact.");
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action check = () => { _ = collector.CaptureSourceBodies(method, "root", canceled.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+        Assert.That(collector.CaptureSourceBodies(method, " ", cancellation).Inventory, Is.Null);
+    }
+
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, true)]
     public void CallbackActivationTransportFeedsNativeSourceComposition(OptimizationLevel optimization, bool configured)
     {
         var (compilation, method, projection, root) = Compile(configured, optimization);
@@ -291,7 +557,26 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(result.UnknownReason, Is.EqualTo("TaskCallbackForwarderBodyUnsupported"));
     }
 
-    private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0, int bodyMutation = 0)
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void SourceBodyValidationClearsMalformedInstructionEvidence(int bodyMutation)
+    {
+        var result = ValidateForwarderProbe("public static void Probe(int n) {var values=new int[n];values[0]=n;n=values.Length;}",
+            bodyMutation: bodyMutation, sourceBody: true);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskSourceBodyInstructionUnsupported"));
+    }
+
+    [Test]
+    public void SourceBodyValidationBindsTheArrayElementFrameworkIdentity()
+    {
+        var result = ValidateForwarderProbe("public static void Probe(int n) {var values=new int[n];}", sourceBody: true, foreignFramework: true);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskSourceBodyArrayTypeUnsupported"));
+    }
+
+    private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0, int bodyMutation = 0,
+        bool sourceBody = false, bool foreignFramework = false)
     {
         ArgumentNullException.ThrowIfNull(declaration);
         var compilation = TestCompilation.Create("ForwarderBodyControl", [("Subject.cs",
@@ -327,8 +612,16 @@ public sealed class NativeTaskCarrierStorageTests
             { bytes[offset + headerBytes + code.Length - 1] = bodyMutation == 1 ? (byte)0xfe : bodyMutation == 4 ? (byte)0x24 : (byte)0x00; }
             using var mutatedStream = new MemoryStream(bytes, false);
             using var mutatedImage = new PEReader(mutatedStream);
-            return CompilerTaskCarrierCollector.ValidateCallbackForwarder(mutatedImage.GetMethodBody(probe.RelativeVirtualAddress), targets,
-                TestContext.CurrentContext.CancellationToken);
+            var mutatedBody = mutatedImage.GetMethodBody(probe.RelativeVirtualAddress);
+            return sourceBody ? (null, CompilerTaskCarrierCollector.ValidateSourceBody(mutatedImage.GetMetadataReader(), mutatedBody,
+                compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity, TestContext.CurrentContext.CancellationToken)) :
+                CompilerTaskCarrierCollector.ValidateCallbackForwarder(mutatedBody, targets, TestContext.CurrentContext.CancellationToken);
+        }
+        if (sourceBody)
+        {
+            return (null, CompilerTaskCarrierCollector.ValidateSourceBody(metadata, image.GetMethodBody(probe.RelativeVirtualAddress),
+            foreignFramework ? new AssemblyIdentity("Foreign") : compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity,
+            TestContext.CurrentContext.CancellationToken));
         }
         return CompilerTaskCarrierCollector.ValidateCallbackForwarder(image.GetMethodBody(probe.RelativeVirtualAddress), targets,
             TestContext.CurrentContext.CancellationToken);

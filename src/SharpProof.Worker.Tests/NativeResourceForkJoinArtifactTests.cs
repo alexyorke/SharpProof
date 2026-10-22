@@ -6,6 +6,36 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CompilerSourceBodiesBindReferencePackArraysWithoutInventingRootBytes(bool mutateArray)
+    {
+        var source = "using SharpProof.Attributes; using System.Threading.Tasks; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,100)] public static Task Target(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int n) {var values=new int[1];" +
+            (mutateArray ? "values[0]=n;" : "") + "} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        if (mutateArray)
+        { Assert.That(target.ForkJoinProjection, Is.Null, target.ResourceUnknownReason); }
+        else
+        {
+            Assert.That(target.ForkJoinProjection, Is.Not.Null, target.ResourceUnknownReason);
+            var projection = target.ForkJoinProjection!;
+            Assert.That(projection.Carriers, Is.Not.Null);
+            var shapes = projection.Carriers!.Shapes!;
+            Assert.That(shapes.SourceBodies!.UnknownReason, Is.Null);
+            Assert.That(shapes.SourceBodies.Inventory!.MethodTokens, Has.Length.EqualTo(1));
+            var check = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, target.TotalEntry!,
+                new("CoreCLR", "8.0.32", "x64", 8), cancellation);
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.DirectSourceActivationsUpper, Is.EqualTo(1));
+        }
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), cancellation)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+    }
+
     [Test]
     public async Task CompilerArtifactCarriesTaskChildrenWithoutInventingRootVerdicts()
     {
@@ -50,6 +80,10 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(capture.Shapes, Is.Not.Null);
             Assert.That(capture.Shapes!.CallbackActivations!.UnknownReason, Is.Null);
             Assert.That(capture.Shapes.CallbackActivations.Activations!.Forwarders, Has.Length.EqualTo(2));
+            Assert.That(capture.Shapes.SourceBodies!.UnknownReason, Is.Null);
+            Assert.That(capture.Shapes.SourceBodies.Inventory!.MethodTokens, Has.Length.EqualTo(1));
+            Assert.That(NativeTaskCarrierStorageVerifier.CheckSourceBodies(capture.Shapes, target.ForkJoinProjection, target.TotalEntry!,
+                new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken).DirectSourceActivationsUpper, Is.EqualTo(1));
             Assert.That(NativeTaskCarrierStorageVerifier.CheckCallbackActivations(capture.Shapes, target.ForkJoinProjection, target.TotalEntry!,
                 new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken).WrapperActivationsUpper, Is.EqualTo(1));
             Assert.That(capture.Shapes!.RootExceptionBoundary, Is.Not.Null);

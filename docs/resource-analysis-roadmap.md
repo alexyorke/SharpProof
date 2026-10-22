@@ -109,6 +109,73 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Emitted source-body inventory for the frame bridge
+
+A private collector now inspects each distinct source-child method from the
+same cached emitted module as the checked callback forwarders. It retains the
+root/module identity and complete sorted method-token inventory only when every
+body is call-free primitive integer/Int32-array IL. Array element references
+must bind to the actual framework assembly identity. Calls, constructors,
+fields, casts/unboxing, handlers, unsupported element types, decoding failures and
+oversized bodies return Unknown without a partial inventory. Rejection of this
+inventory does not erase the independent callback-forwarding fact.
+
+Controls cover Debug/Release and configured/synchronous roots, array loops,
+checked arithmetic, repeated callbacks sharing one source method, cache identity,
+unsupported operations, partial-inventory rejection, cancellation, foreign
+framework identities and malformed bodies. The collector phase passed all 887
+selected worker/parser/artifact/resource-contract cases with zero build warnings
+or errors: `artifacts/resource-source-body-workflows.log`.
+
+This fact inspects a trusted compiler emission rather than independently
+verifying IL stack typing. The shared artifact now transports it in nested
+fork/join projection version 6, with cache version 58 invalidating prior
+responses. Protocol 43, compiler artifact 55 and manifest 6 are unchanged.
+Native checking binds the root/module identity and requires exactly the distinct
+forwarded child-token set, without invalid/duplicate/missing/extra tokens.
+Successful admission establishes one directly entered source body per forwarded
+invocation, excluding helpers, initialization and external reentry. Missing or
+unsupported evidence yields Unknown without a bound or model identity. All 1044
+transport/protocol/cache/parser/artifact/resource-contract cases passed with zero
+build warnings or errors:
+`artifacts/resource-source-body-transport-workflows-verified.log`. Reference-pack
+array allocation checks the actual collector attachment and native admission;
+array stores remain rejected by the existing shared-effects admission rule.
+Both cases preserve Unknown cumulative runtime bytes rather than inventing a
+root bound.
+
+Full quality/API, documentation, container contract and layout checks passed:
+`artifacts/resource-source-body-lint-final.log`,
+`artifacts/resource-source-body-docs-final.log`,
+`artifacts/resource-source-body-contract.log` and
+`artifacts/resource-source-body-layout.log`. Canonical private formatting was
+applied before the passing workflow run; the final pass copied zero changes:
+`artifacts/resource-source-body-format-committable.log`. Exact-head hosted
+qualification of this source-body checkpoint remains required.
+
+The reviewed CLR/helper/unwind bridge remains required. This fact asserts no
+bound on runtime helper frames or trace bytes and changes no root verdict. The
+phase F checklist remains open.
+
+The next helper-frame audit has pinned copies of `frames.h`, `frames.cpp`,
+`fcall.h`, `ecall.cpp` and `jithelpers.cpp` at runtime revision
+`b9a49e4a6d3a444a3685e318c74a7892d01873f7`, with Git blob, byte-count and SHA-256
+checks in `artifacts/resource-runtime-fault-review/sources.json`. `HCall` helpers
+clear their `FCall` identity; the VM's explicit-frame trace path appends only
+frames with a non-null method descriptor. This is source evidence to check
+against every admitted opcode's helper path, not a complete numeric bridge.
+JIT/inlining/`OSR` behavior, first-pass visits and dispatch rethrows still need
+checking before deriving the total attempted-frame budget.
+
+Published `ed7a5ff42` passed complete canonical CI (39740654146), package consumers
+(39740654194), documentation and security. All fifteen coverage shards passed
+in run 39740653952; aggregation measured 6667/6866 changed trusted lines
+(97.10%, 199 uncovered) and failed the unchanged 100% floor. Evidence for merge
+`c490983b97db2099b44c12bb3bafd414d20d2e01`:
+`artifacts/resource-ed7a5-coverage-evidence/coverage/SharpProof.coverage.json`.
+These results supersede the earlier published checkpoint below and do not
+measure the local source-body inventory changes.
+
 ### Latest master integration and complete published evidence
 
 The branch includes master `fe2a05235` after the MR developed conflicts

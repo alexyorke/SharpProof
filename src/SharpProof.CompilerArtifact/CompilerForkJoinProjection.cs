@@ -50,6 +50,7 @@ internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string M
 {
     internal CompilerTaskRootExceptionBoundaryCapture? RootExceptionBoundary { get; init; }
     internal CompilerTaskCallbackActivationCapture? CallbackActivations { get; init; }
+    internal CompilerTaskSourceBodyCapture? SourceBodies { get; init; }
     public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
     public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
     public string CompilerIdentity { get; init; } = RepositoryParameterGuard.NotNull(CompilerIdentity, nameof(CompilerIdentity));
@@ -69,6 +70,18 @@ internal sealed record CompilerTaskCallbackActivation(string RootCallableId, str
     internal int WrapperActivationsUpper => Forwarders.IsEmpty ? 0 : 1;
 }
 internal sealed record CompilerTaskCallbackActivationCapture(CompilerTaskCallbackActivation? Activations, string? UnknownReason);
+
+// Emitted call-free primitive child bodies, not a bound on CLR/helper frames.
+// The owning module is the same cached emission as the callback forwarders.
+internal sealed record CompilerTaskSourceBodyInventory(string RootCallableId, string ModuleSha256,
+    ImmutableArray<int> MethodTokens)
+{
+    public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
+    public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
+    public ImmutableArray<int> MethodTokens { get; init; } = MethodTokens.IsDefault
+        ? throw new ArgumentException("Method tokens must be initialized.", nameof(MethodTokens)) : MethodTokens;
+}
+internal sealed record CompilerTaskSourceBodyCapture(CompilerTaskSourceBodyInventory? Inventory, string? UnknownReason);
 
 // Source-owned emitted boundary evidence only, not a CLR frame or byte bound.
 internal sealed record CompilerTaskRootExceptionBoundary(string RootCallableId, string ModuleSha256,

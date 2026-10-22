@@ -88,7 +88,8 @@ internal sealed class CompilerCallableLowerer
                     Shapes = shapes with
                     {
                         RootExceptionBoundary = _taskCarriers.CaptureExceptionBoundary(target.Method, target.Entry.CallableId, cancellationToken),
-                        CallbackActivations = _taskCarriers.CaptureCallbackActivations(target.Method, target.Entry.CallableId, cancellationToken)
+                        CallbackActivations = _taskCarriers.CaptureCallbackActivations(target.Method, target.Entry.CallableId, cancellationToken),
+                        SourceBodies = _taskCarriers.CaptureSourceBodies(target.Method, target.Entry.CallableId, cancellationToken)
                     }
                 };
             }

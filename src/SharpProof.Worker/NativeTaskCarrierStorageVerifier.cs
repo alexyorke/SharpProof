@@ -5,6 +5,11 @@ internal sealed record NativeTaskCallbackActivationCheck(int? WrapperActivations
     internal string? RequiredCompilerModel => WrapperActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
 }
 
+internal sealed record NativeTaskSourceBodyCheck(int? DirectSourceActivationsUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => DirectSourceActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+}
+
 internal sealed record NativeTaskCarrierStorageCheck(ResourceExpression? DirectUpper,
     ImmutableArray<ResourceStorageKind> AsyncBoxStateFields, string? UnknownReason)
 {
@@ -19,6 +24,40 @@ internal static class NativeTaskCarrierStorageVerifier
     internal const string Model = WorkerResourceModels.TaskCompilerCarrierModel;
     internal const int MaximumCallbacks = 64;
     internal const string CallbackActivationModel = "owned-emitted-callback-forwarders-v1";
+    internal const string SourceBodyModel = "owned-emitted-call-free-source-bodies-v1";
+
+    // One entered source body, with no source callees. Runtime helper frames,
+    // initialization, external reentry and unwind behavior are separate premises.
+    internal static NativeTaskSourceBodyCheck CheckSourceBodies(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var callbacks = CheckCallbackActivations(shapes, projection, root, layout, cancellation);
+        if (callbacks.WrapperActivationsUpper is null)
+        { return new(null, callbacks.UnknownReason); }
+        var capture = shapes.SourceBodies;
+        if (capture is null)
+        { return new(null, "TaskSourceBodyEvidenceUnavailable"); }
+        if (capture.Inventory is not { } inventory)
+        {
+            return new(null, !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskSourceBodyEvidenceInvalid");
+        }
+        if (capture.UnknownReason is not null || inventory.RootCallableId != root.CallableId || inventory.ModuleSha256 != shapes.ModuleSha256 ||
+            inventory.MethodTokens.IsDefault || inventory.MethodTokens.Length is < 1 or > 16)
+        { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        var methods = new HashSet<int>();
+        foreach (var token in inventory.MethodTokens)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (!MethodToken(token) || !methods.Add(token))
+            { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        }
+        if (!methods.SetEquals(shapes.CallbackActivations!.Activations!.Forwarders.Select(static forwarder =>
+            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)))
+        { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        return new(1, null);
+    }
 
     internal static NativeTaskCallbackActivationCheck CheckCallbackActivations(CompilerTaskCarrierShapes shapes,
         CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
