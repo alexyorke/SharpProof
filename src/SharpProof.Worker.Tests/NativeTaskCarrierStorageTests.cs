@@ -215,8 +215,15 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(check.FramesPerPassUpper, Is.EqualTo(1));
         Assert.That(check.RequiredCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.SourceBodyModel));
         Assert.That(check.RequiredRuntimeModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.DirectSourceFrameModel));
+        var owned = NativeTaskCarrierStorageVerifier.CheckOwnedSourceFrames(decoded.Carriers.Shapes!, decoded, root, Layout(), cancellation);
+        Assert.That(owned.UnknownReason, Is.Null);
+        Assert.That(owned.FramesPerPassUpper, Is.EqualTo(2));
+        Assert.That(owned.RequiredSourceCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.SourceBodyModel));
+        Assert.That(owned.RequiredCallbackCompilerModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.CallbackActivationModel));
+        Assert.That(owned.RequiredRuntimeModel, Is.EqualTo(NativeTaskCarrierStorageVerifier.OwnedSourceFrameModel));
     }
 
+    [TestCase("callbacks", "TaskCallbackActivationEvidenceUnavailable")]
     [TestCase("missing", "TaskSourceBodyEvidenceUnavailable")]
     [TestCase("foreign", "TaskSourceBodyEvidenceInvalid")]
     [TestCase("layout", "IncompatibleResourceRuntimeLayout")]
@@ -231,7 +238,7 @@ public sealed class NativeTaskCarrierStorageTests
         var carriers = collector.Capture(method, "root", cancellation);
         var shapes = carriers.Shapes! with
         {
-            CallbackActivations = collector.CaptureCallbackActivations(method, "root", cancellation),
+            CallbackActivations = corruption == "callbacks" ? null : collector.CaptureCallbackActivations(method, "root", cancellation),
             SourceBodies = corruption == "missing" ? null : corruption == "foreign" ?
                 capture with { Inventory = capture.Inventory! with { ModuleSha256 = new string('0', 64) } } : capture
         };
@@ -246,6 +253,14 @@ public sealed class NativeTaskCarrierStorageTests
         canceled.Cancel();
         Action operation = () => { _ = NativeTaskCarrierStorageVerifier.CheckDirectSourceFrames(shapes, projection, root, layout, canceled.Token); };
         Assert.Throws<OperationCanceledException>(operation);
+        var owned = NativeTaskCarrierStorageVerifier.CheckOwnedSourceFrames(shapes, projection, root, layout, cancellation);
+        Assert.That(owned.UnknownReason, Is.EqualTo(reason));
+        Assert.That(owned.FramesPerPassUpper, Is.Null);
+        Assert.That(owned.RequiredSourceCompilerModel, Is.Null);
+        Assert.That(owned.RequiredCallbackCompilerModel, Is.Null);
+        Assert.That(owned.RequiredRuntimeModel, Is.Null);
+        Action ownedOperation = () => { _ = NativeTaskCarrierStorageVerifier.CheckOwnedSourceFrames(shapes, projection, root, layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(ownedOperation);
     }
 
     [TestCase(OptimizationLevel.Debug, false)]

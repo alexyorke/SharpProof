@@ -11,16 +11,18 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
-    [TestCase(0)]
-    [TestCase(1_000_000)]
-    public void OneCallFreeSourceInvocationAppearsOnceInTheCapturedTrace(int iterations)
+    [TestCase(0, false)]
+    [TestCase(1_000_000, false)]
+    [TestCase(0, true)]
+    [TestCase(1_000_000, true)]
+    public void OneCallFreeSourceInvocationAppearsOnceInTheCapturedTrace(int iterations, bool forwarded)
     {
         Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Exception? fault = null;
         try
-        { _ = DirectSourceFrameProbe(iterations, 0); }
+        { _ = forwarded ? DirectSourceForwarderProbe(iterations, 0) : DirectSourceFrameProbe(iterations, 0); }
         catch (DivideByZeroException captured)
         { fault = captured; }
         Assert.That(fault, Is.Not.Null);
@@ -28,6 +30,18 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var count = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
             frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
         Assert.That(count, Is.EqualTo(1));
+        var wrappers = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
+            frame.GetMethod()?.Name == nameof(DirectSourceForwarderProbe));
+        Assert.That(wrappers, Is.LessThanOrEqualTo(forwarded ? 1 : 0));
+        Assert.That(count + wrappers, Is.LessThanOrEqualTo(forwarded ? 2 : 1));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int DirectSourceForwarderProbe(
+        int /* SPINT001: all values valid - forwarded unchanged to the arithmetic probe. */ iterations,
+        int /* SPINT001: all values valid - forwarded unchanged to the arithmetic probe. */ divisor)
+    {
+        return DirectSourceFrameProbe(iterations, divisor);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

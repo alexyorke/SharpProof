@@ -109,6 +109,53 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Owned callback and source unwind composition
+
+A new private component composes the checked direct source-body contribution
+with its compiler-owned callback forwarder. Under the same ordinary pinned
+x64 JIT/unwind premise, one active admitted callback contributes at most two
+owned frames in one completed pass: one source invocation and at most one
+wrapper invocation. The bound is derived from the existing checked counts,
+not a caller-supplied cap. The model is
+`coreclr8-x64-owned-callback-source-unwind-frames-v1` and exposes both required
+compiler models plus the runtime model.
+
+The collector admits a handler-free forwarder with one call to an owned child,
+only forward branches, and a final return. The existing native checks bind its
+complete target map and source-body inventory to the same module and root.
+The ordinary unwind premise therefore applies to its active invocation too;
+inlining or tail calls can remove a frame. Composition first requires the
+complete direct-source proof, so missing callback evidence cannot publish a
+partial source count or any required-model identity. Layout failures and
+cancellation retain their existing behavior.
+
+This is per active callback and completed unwind pass, not a sum across joined
+tasks or a count of helper/framework frames, retries, failed passes or attempted
+trace appends. The root task-byte outcome remains Unknown. The full CLR/helper
+bridge and cold runtime accounting checklist above remain open.
+
+Existing transport/admission and failure controls now check the composed count
+and all required model identities. A missing-callback case also verifies that
+neither component survives without its wrapper proof. Independent arithmetic
+trace controls cover direct and forwarded invocations with zero or one million
+iterations. They allow wrapper removal and do not assert that OSR occurred.
+No protocol, projection encoding or cache identity changed.
+
+All 265 Specs cases passed with zero build warnings or errors, as did all
+271 carrier cases (`artifacts/resource-owned-source-frames-specs-tests.log`
+and `artifacts/resource-owned-source-frames-carrier-tests.log`). The existing
+transport and failure cases were extended rather than duplicated; one new
+missing-callback case and two forwarded trace cases were added. Full quality/API
+checks passed (`artifacts/resource-owned-source-frames-lint.log`), as did
+documentation checks (`artifacts/resource-owned-source-frames-docs.log`). The
+canonical private formatter copied zero source changes
+(`artifacts/resource-owned-source-frames-format.log`).
+
+GitHub's PR head has caught up to `625683062`. The earlier coverage job
+120003097751 still reports running with no completion time through the jobs
+API despite its workflow's terminal state. That inconsistency remains
+unresolved, and no complete shard qualification is inferred from it.
+
 ### Direct source-body unwind contribution
 
 A new private native component binds the existing complete, call-free,

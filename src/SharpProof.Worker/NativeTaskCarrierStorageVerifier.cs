@@ -5,6 +5,13 @@ internal sealed record NativeTaskCallbackActivationCheck(int? WrapperActivations
     internal string? RequiredCompilerModel => WrapperActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
 }
 
+internal sealed record NativeTaskOwnedSourceFrameCheck(int? FramesPerPassUpper, string? UnknownReason)
+{
+    internal string? RequiredSourceCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+    internal string? RequiredCallbackCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
+    internal string? RequiredRuntimeModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.OwnedSourceFrameModel;
+}
+
 internal sealed record NativeTaskDirectSourceFrameCheck(int? FramesPerPassUpper, string? UnknownReason)
 {
     internal string? RequiredCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
@@ -31,6 +38,30 @@ internal static class NativeTaskCarrierStorageVerifier
     internal const int MaximumCallbacks = 64;
     internal const string CallbackActivationModel = "owned-emitted-callback-forwarders-v1";
     internal const string SourceBodyModel = "owned-emitted-call-free-source-bodies-v1";
+
+    internal const string OwnedSourceFrameModel = "coreclr8-x64-owned-callback-source-unwind-frames-v1";
+
+    // Same ordinary-JIT/unwind premise as the direct-source component. The
+    // checked forwarder has no handlers and calls its owned child once, so its
+    // active invocation adds at most one frame; inlining/tail calls can remove
+    // it. This counts only the owned source and wrapper in one completed pass
+    // for one active callback, not other tasks or helper/framework frames.
+    internal static NativeTaskOwnedSourceFrameCheck CheckOwnedSourceFrames(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = CheckDirectSourceFrames(shapes, projection, root, layout, cancellation);
+        if (source.FramesPerPassUpper is not { } count)
+        { return new(null, source.UnknownReason); }
+        // Direct-source admission already checked the complete forwarder map.
+        // Both terms are derived bounded counts, not caller-supplied caps.
+        return new(count + shapes.CallbackActivations!.Activations!.WrapperActivationsUpper, null);
+    }
 
     internal const string DirectSourceFrameModel = "coreclr8-x64-direct-source-unwind-frame-v1";
 
