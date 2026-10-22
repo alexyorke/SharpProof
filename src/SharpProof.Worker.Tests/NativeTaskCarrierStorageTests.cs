@@ -15,6 +15,64 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    [TestCase("array")]
+    [TestCase("byte")]
+    [TestCase("span")]
+    [TestCase("async-array")]
+    [TestCase("async-memory")]
+    public void EveryImageWriteApiEnforcesTheSerializedSizeBudget(string api)
+    {
+        ArgumentNullException.ThrowIfNull(api);
+        using var stream = CreateCarrierImageStream();
+        stream.Position = CompilerTaskCarrierCollector.MaximumImageBytes;
+        var payload = new byte[1];
+        payload[0] = 42;
+        Action write = api switch
+        {
+            "array" => () => stream.Write(payload, 0, payload.Length),
+            "byte" => () => stream.WriteByte(payload[0]),
+            "span" => () => stream.Write(payload.AsSpan()),
+            "async-array" => () => stream.WriteAsync(payload, 0, payload.Length).GetAwaiter().GetResult(),
+            "async-memory" => () => stream.WriteAsync(payload.AsMemory()).AsTask().GetAwaiter().GetResult(),
+            _ => throw new ArgumentOutOfRangeException(nameof(api))
+        };
+        AssertImageBudgetRejection(write);
+        Assert.That(stream.Length, Is.Zero, "Rejected writes must not extend the serialized image.");
+    }
+
+    [Test]
+    public void ImageBudgetAcceptsTheLastByteAndRejectsGrowthWithoutChangingItsPrefix()
+    {
+        using var stream = CreateCarrierImageStream();
+        stream.SetLength(CompilerTaskCarrierCollector.MaximumImageBytes);
+        stream.Position = stream.Length - 1;
+        stream.WriteByte(42);
+        Assert.That(stream.Length, Is.EqualTo(CompilerTaskCarrierCollector.MaximumImageBytes));
+        Assert.That(stream.Position, Is.EqualTo(stream.Length));
+        AssertImageBudgetRejection(() => stream.WriteByte(43));
+        AssertImageBudgetRejection(() => stream.SetLength(CompilerTaskCarrierCollector.MaximumImageBytes + 1L));
+        Assert.That(stream.Length, Is.EqualTo(CompilerTaskCarrierCollector.MaximumImageBytes));
+        stream.Position = stream.Length - 1;
+        var crossing = new byte[2];
+        crossing[0] = 99;
+        crossing[1] = 100;
+        AssertImageBudgetRejection(() => stream.Write(crossing, 0, crossing.Length));
+        Assert.That(stream.ReadByte(), Is.EqualTo(42), "A rejected write must preserve the admitted prefix.");
+        stream.SetLength(0);
+        Assert.That(stream.Length, Is.Zero);
+    }
+    private static void AssertImageBudgetRejection(Action operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        Assert.That(operation, Throws.TypeOf<InvalidDataException>());
+    }
+    private static Stream CreateCarrierImageStream()
+    {
+        var type = typeof(CompilerTaskCarrierCollector).GetNestedType("CarrierImageStream", BindingFlags.NonPublic);
+        Assert.That(type, Is.Not.Null);
+        return (Stream)Activator.CreateInstance(type!, nonPublic: true)!;
+    }
+
     [TestCase(OptimizationLevel.Debug, false)]
     [TestCase(OptimizationLevel.Release, false)]
     [TestCase(OptimizationLevel.Debug, true)]

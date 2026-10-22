@@ -109,6 +109,38 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Compiler image serialization budget controls
+
+New controls invoke the collector's actual private image stream through byte,
+array, span, async-array and async-memory writes. Each API must reject a write
+past the 16 MiB serialized-image cap without extending the image. A separate
+control permits the last byte, rejects length growth and a crossing array
+write without altering the admitted prefix, then permits shrinking to zero.
+
+The suspected bypass through newer overloads was ruled out by pinned source review:
+[`MemoryStream.Write(ReadOnlySpan<byte>)`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/IO/MemoryStream.cs#L636)
+preserves derived-type behavior by delegating through the legacy write path.
+The async-memory overload likewise routes through array or span writes. The
+source identity, byte count and SHA-256 are recorded in the ignored runtime
+research manifest. The production stream implementation remains unchanged.
+
+All 249 carrier cases passed with zero build warnings or errors
+(`artifacts/resource-image-stream-tests-verified.log`), including the six new
+image-budget controls. Full quality/API checks passed
+(`artifacts/resource-image-stream-lint.log`), as did documentation checks
+(`artifacts/resource-image-stream-docs.log`). The final canonical private
+formatter copied zero source changes (`artifacts/resource-image-stream-format-final.log`).
+
+Published `59501c3bc` passed complete canonical CI (39806832622) and package
+consumers (39806832161). All fifteen coverage shards passed in run 39806832032.
+Aggregation measured 6830/7007 changed trusted lines (97.47%, 177 gaps), failing
+the unchanged 100% minimum. Fourteen previous gaps closed in raw object
+initializer admission, field-value lowering and initializer completion. The
+complete report for merge `09cd2c9feb202b8ee89191b8065caa2ebeb23ee3` is retained at
+`artifacts/resource-59501-coverage-evidence/coverage/SharpProof.coverage.json`.
+This report predates the image-budget controls. Cumulative task runtime-byte
+proof obligations remain open.
+
 ### Object initializer lifetime boundaries and measured coverage
 
 Additional native lifetime controls exercise field initialization, constructor
