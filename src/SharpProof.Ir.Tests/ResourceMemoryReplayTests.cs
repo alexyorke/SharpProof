@@ -8,6 +8,35 @@ public sealed class ResourceMemoryReplayTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase("Local")]
+    [TestCase("Static")]
+    [TestCase("Parameter")]
+    [TestCase("Unknown")]
+    public void WritesAfterAnAllocationCannotPublishPartialLifetimeBounds(string regionName)
+    {
+        ArgumentNullException.ThrowIfNull(regionName);
+        var region = Enum.Parse<IrWriteRegion>(regionName);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var target = factory.CreateVariable("array", array);
+        builder.Allocate(entry, factory.CreateOperation(), array, target, factory.Integer(1));
+        builder.Write(entry, factory.CreateOperation(), region);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var check = Replay(builder.Build(), Layout);
+        if (region == IrWriteRegion.Local)
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(32, 32, 0, 0, 32, 32)));
+        }
+        else
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayInstructionUnsupported"));
+        }
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

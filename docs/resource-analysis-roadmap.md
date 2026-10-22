@@ -109,6 +109,24 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Lifetime replay rejects external writes after allocation
+
+Four execution controls allocate and return an owned primitive array, with a
+write between allocation and return. A local write preserves the exact 32-byte
+cumulative and retained bounds, with zero auxiliary bytes because returned
+output is excluded from auxiliary storage. Static, parameter and unknown-region
+writes each return `MemoryReplayInstructionUnsupported` with no partial bounds.
+
+All 55 memory-replay tests passed in the canonical Linux amd64 container, with
+zero build warnings or errors
+(`artifacts/resource-memory-replay-writes-tests-final.log`). The initial test
+signature used an internal enum in a public test method and failed compilation;
+the corrected string-valued test cases passed. No production admission or cost
+model changed in this checkpoint.
+Full quality/API checks passed (`artifacts/resource-memory-replay-writes-lint.log`);
+the canonical private formatter copied zero source changes
+(`artifacts/resource-memory-replay-writes-format.log`).
+
 ### Native isolation and rounded child-cost composition
 
 Three new native controls retain an ordinary first child and replace the later
