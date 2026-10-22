@@ -109,6 +109,25 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted replay-entry contract qualification
+
+Checkpoint `ad478e5b74a2ad3da4d8febf10666743d768a53b` passed package consumers
+(run 39860671443) and full canonical CI (39860671436). Coverage run
+39860671271 completed all fifteen shards successfully;
+aggregate job 120115924708 produced a complete report and failed the unchanged
+100 percent floor. The report measures 6970/7105 changed trusted lines
+(98.10 percent), with 135 gaps, compared with 136 in the preceding report.
+The helper refactor changes the line universe; raw line-number differences
+must not be interpreted as individual guard closures across the edited file.
+
+Evidence is retained in
+`artifacts/resource-ad47-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `202d0689a2bf243ccb8be0dc055609323e9310cb` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `ad478e5b7`.
+The later source-call argument/editor controls have passing local checks but
+are not measured by this report. The task-runtime byte model, exact final-head
+qualification and full-roadmap audit remain open.
+
 ### Source-call argument abstention
 
 Three legal-source controls place an opaque argument before or after array
@@ -126,7 +145,8 @@ after its built-in transient HTTP retry
 resource fixture passed all 245 tests with zero build warnings or errors
 (`artifacts/resource-call-argument-boundary-tests.log`). Documentation checks
 passed (`artifacts/resource-call-argument-boundary-docs.log`). No production
-code, model premise or wire identity changes in this checkpoint. The remaining task-runtime byte obligations and
+code, model premise or wire identity changes in this checkpoint. The remaining
+task-runtime byte obligations and
 pending runtime-model choice are unchanged.
 
 ### Replay entry-contract controls
