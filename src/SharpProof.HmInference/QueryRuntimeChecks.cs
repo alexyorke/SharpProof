@@ -28,6 +28,7 @@ internal static class QueryRuntimeChecks
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+            public static class SlotTrace{public static int Calls,Indices;}
             public sealed class StateBox<T>{public StateCell<T> Nested;public StateBox(StateCell<T> value){Nested=value;}}
             public sealed class StateCell<T>{
                 public T? Field;public int Checks,Gets;public StateCell(T? value){Field=value;}
@@ -50,6 +51,18 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static void WritePossibleSlot<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value){Interlocked.Increment(ref SlotTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=default;}
+                static void WriteKnownSlot<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback){Interlocked.Increment(ref SlotTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(fallback is null)throw QueryTrace.ContractFailure;value=fallback;}
+                static int SlotIndex(){Interlocked.Increment(ref SlotTrace.Indices);return 0;}
+                public static int TupleSlotKnown((int value,bool tag) pair,int fallback){WriteKnownSlot(out pair.Item1,fallback);return pair.value;}
+                public static (int copy,int stored) TupleSlotCopy((int value,bool tag) pair){var copy=pair.value;WritePossibleSlot(out pair.value);return(copy,pair.Item1);}
+                public static int TupleSlotRef(ref (int value,bool tag) pair){WritePossibleSlot(out pair.value);return pair.Item1;}
+                public static int ArraySlotWrite(int[] values){WritePossibleSlot(out values[SlotIndex()]);return values[0];}
+                public static int ArraySlotAlias(int[] values){ref var slot=ref values[SlotIndex()];WritePossibleSlot(out slot);return values[0];}
+                public static int DictionarySlotWrite(Dictionary<int,int> values,int key,int[] output){values.TryGetValue(key,out output[SlotIndex()]);return output[0];}
+                public static async Task<int> TupleSlotAsync(Task<(int value,bool tag)> input){var pair=await input;WritePossibleSlot(out pair.Item1);return pair.value;}
+                public static async ValueTask<int> TupleSlotValueAsync(ValueTask<(int value,bool tag)> input){var pair=await input;WritePossibleSlot(out pair.value);return pair.Item1;}
+                public static async ValueTask<int> TupleSlotKnownAsync(ValueTask<(int value,bool tag)> input,int fallback){var pair=await input;WriteKnownSlot(out pair.value,fallback);return pair.Item1;}
                 public static int StateField(StateCell<int> cell){cell.Ensure();return cell.Field;}
                 public static int StateProperty(StateCell<int> cell){cell.Ensure();return cell.Property;}
                 public static int StateConditional(StateCell<int> cell,int fallback)=>cell.Ready?cell.Field:fallback;
@@ -301,7 +314,32 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> SlotContracts(CancellationToken cancellationToken){
+                    SlotTrace.Calls=SlotTrace.Indices=0;var original=(value:7,tag:true);var copy=QueryProbe.TupleSlotCopy(original);
+                    if(copy.copy!=7||copy.stored!=0||original.value!=7||!original.tag||QueryProbe.TupleSlotKnown(original,9)!=9||SlotTrace.Calls!=2)return false;
+                    if(QueryProbe.TupleSlotRef(ref original)!=0||original.value!=0||!original.tag)return false;
+                    int[] array={7};if(QueryProbe.ArraySlotWrite(array)!=0||array[0]!=0||SlotTrace.Indices!=1)return false;array[0]=11;
+                    if(QueryProbe.ArraySlotAlias(array)!=0||array[0]!=0||SlotTrace.Indices!=2||SlotTrace.Calls!=5)return false;
+                    var dictionary=new Dictionary<int,int>{{3,7}};if(QueryProbe.DictionarySlotWrite(dictionary,3,array)!=7||array[0]!=7||QueryProbe.DictionarySlotWrite(dictionary,4,array)!=0||array[0]!=0||SlotTrace.Indices!=4)return false;
+                    var failure=new InvalidOperationException("slot output");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    QueryTrace.Failure=failure;array[0]=13;try{_=QueryProbe.ArraySlotWrite(array);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){if(array[0]!=13||SlotTrace.Indices!=5||SlotTrace.Calls!=6)return false;}finally{QueryTrace.Failure=null;}
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        SlotTrace.Calls=0;var gate=new TaskCompletionSource<(int value,bool tag)>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.TupleSlotAsync(gate.Task);var valueTask=QueryProbe.TupleSlotValueAsync(new ValueTask<(int value,bool tag)>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||SlotTrace.Calls!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult((7,true));else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=0)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(SlotTrace.Calls!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> MemberStateContracts(CancellationToken cancellationToken){
+                    if(!await SlotContracts(cancellationToken))return false;
                     var cell=new StateCell<int>(7);if(QueryProbe.StateField(cell)!=7||cell.Checks!=1||cell.Gets!=1||QueryProbe.StateProperty(cell)!=7||cell.Checks!=2||cell.Gets!=3)return false;
                     if(QueryProbe.StateConditional(cell,9)!=7||QueryProbe.StateFailure(cell,9)!=9||cell.Checks!=4||cell.Gets!=5)return false;
                     var nested=new StateCell<int>(0);if(QueryProbe.StateNested(new StateBox<int>(nested),new StateCell<int>(7))!=0||nested.Checks!=0||nested.Gets!=0)return false;
@@ -550,7 +588,23 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> SlotContracts(string text,CancellationToken cancellationToken){
+                    SlotTrace.Calls=SlotTrace.Indices=0;var uri=new Uri("https://example.invalid/tuple-slot");(string? value,Uri tag) original=(text,uri);var copy=QueryProbe.TupleSlotCopy(original);
+                    if(!ReferenceEquals(copy.copy,text)||copy.stored!=null||!ReferenceEquals(original.value,text)||!ReferenceEquals(original.tag,uri)||!ReferenceEquals(QueryProbe.TupleSlotKnown(original,text),text)||SlotTrace.Calls!=2)return false;
+                    if(QueryProbe.TupleSlotRef(ref original)!=null||original.value!=null||!ReferenceEquals(original.tag,uri))return false;
+                    string?[] array={text};if(QueryProbe.ArraySlotWrite(array)!=null||array[0]!=null||SlotTrace.Indices!=1)return false;array[0]=text;
+                    if(QueryProbe.ArraySlotAlias(array)!=null||array[0]!=null||SlotTrace.Indices!=2||SlotTrace.Calls!=5)return false;
+                    var key=Guid.NewGuid();var dictionary=new Dictionary<Guid,string>{{key,text}};if(!ReferenceEquals(QueryProbe.DictionarySlotWrite(dictionary,key,array),text)||!ReferenceEquals(array[0],text)||QueryProbe.DictionarySlotWrite(dictionary,Guid.Empty,array)!=null||array[0]!=null||SlotTrace.Indices!=4)return false;
+                    decimal?[] numeric={23m};if(QueryProbe.ArraySlotWrite(numeric)!=null||numeric[0]!=null)return false;
+                    var value=new QueryStoreValue();QueryStoreValue.Calls=0;QueryStoreValue[] structs={value};var zero=QueryProbe.ArraySlotWrite(structs);if(zero.Value!=0||zero.Text!=null||structs[0].Value!=0||structs[0].Text!=null||QueryStoreValue.Calls!=0)return false;
+                    var gate=new TaskCompletionSource<(string? value,Uri tag)>(TaskCreationOptions.RunContinuationsAsynchronously);SlotTrace.Calls=0;
+                    var task=QueryProbe.TupleSlotAsync(gate.Task);var valueTask=QueryProbe.TupleSlotValueAsync(new ValueTask<(string? value,Uri tag)>(gate.Task)).AsTask();var filled=QueryProbe.TupleSlotKnownAsync(new ValueTask<(string? value,Uri tag)>(gate.Task),text).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||filled.IsCompleted||SlotTrace.Calls!=0)return false;gate.SetResult((text,uri));
+                    if(await task.WaitAsync(cancellationToken)!=null||await valueTask.WaitAsync(cancellationToken)!=null||!ReferenceEquals(await filled.WaitAsync(cancellationToken),text)||SlotTrace.Calls!=3)return false;
+                    return true;
+                }
                 static async Task<bool> MemberStateContracts(string text,CancellationToken cancellationToken){
+                    if(!await SlotContracts(text,cancellationToken))return false;
                     var cell=new StateCell<string>(text);var missing=new StateCell<string>(null);
                     if(!ReferenceEquals(QueryProbe.StateField(cell),text)||!ReferenceEquals(QueryProbe.StateProperty(cell),text)||cell.Checks!=2||cell.Gets!=3||!ReferenceEquals(QueryProbe.StateConditional(missing,text),text)||QueryProbe.StateFailure(missing,text)!=null||missing.Checks!=2||missing.Gets!=0)return false;
                     var nested=new StateCell<string>(null);if(QueryProbe.StateNested(new StateBox<string>(nested),new StateCell<decimal?>(23m))!=null||nested.Checks!=0||nested.Gets!=0)return false;

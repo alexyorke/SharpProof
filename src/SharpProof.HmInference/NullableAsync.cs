@@ -91,6 +91,47 @@ public static partial class Inference
             });
         }
 
+        private static bool HasNullableOutput(IParameterSymbol parameter)
+        {
+            if (parameter is null)
+            { throw new ArgumentNullException(nameof(parameter)); }
+            if (parameter.RefKind != RefKind.Out || parameter.OriginalDefinition.Type is ITypeParameterSymbol { HasValueTypeConstraint: true }
+                || parameter.OriginalDefinition.Type is { IsValueType: true } and not ITypeParameterSymbol)
+            { return false; }
+            var maybeNull = false;
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (attribute is null)
+                { throw new InvalidOperationException("Unexpected null output attribute."); }
+                var name = attribute.AttributeClass?.ToDisplayString();
+                maybeNull |= name is "System.Diagnostics.CodeAnalysis.MaybeNullAttribute" or "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute";
+            }
+            return maybeNull;
+        }
+
+        private static HmType OutputStorageType(IParameterSymbol parameter, HmType value)
+        {
+            if (parameter is null)
+            { throw new ArgumentNullException(nameof(parameter)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (!HasNullableOutput(parameter))
+            { return value; }
+            var shape = value.Root;
+            if (shape.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference or CSharpTypes.NullableValue)
+            { return value; }
+            if (shape.IsVariable || shape.CSharpSymbol is ITypeParameterSymbol)
+            { return new HmType(CSharpTypes.NullableParameter, shape); }
+            return parameter.Type.IsReferenceType ? new HmType(CSharpTypes.NullableReference, shape) : value;
+        }
+
+        private static ISymbol NullableReadTarget(ISymbol symbol)
+        {
+            if (symbol is null)
+            { throw new ArgumentNullException(nameof(symbol)); }
+            return symbol is IFieldSymbol { CorrespondingTupleField: { } element } ? element : symbol;
+        }
+
         private MethodResult? RefineNullablePostconditions(Compilation compilation, MethodDeclarationSyntax original,
             MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
         {
@@ -128,7 +169,7 @@ public static partial class Inference
                 else if (operand is IParameterReferenceOperation input)
                 { targets.Add(input.Parameter); }
                 else if (operand is IMemberReferenceOperation member)
-                { targets.Add(member.Member); }
+                { targets.Add(NullableReadTarget(member.Member)); }
             }
             static ExpressionSyntax[] ReadSites(SyntaxNode root)
             {
@@ -162,7 +203,7 @@ public static partial class Inference
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!SyntaxFactory.AreEquivalent(before[i], after[i]))
                 { throw new InferenceException("Cannot correlate nullable postcondition reads."); }
-                if (symbols[i] is not { } symbol || !targets.Contains(symbol) && !(members && symbol is IFieldSymbol or IPropertySymbol))
+                if (symbols[i] is not { } symbol || !targets.Contains(NullableReadTarget(symbol)) && !(members && symbol is IFieldSymbol or IPropertySymbol))
                 { continue; }
                 var info = candidateModel.GetTypeInfo(after[i], cancellationToken);
                 var state = info.Nullability.FlowState;
@@ -608,9 +649,20 @@ public static partial class Inference
                         { continue; }
                         var type = StorageType(component.Target);
                         foreach (var literal in StoredAlternatives(component.Value))
-                        { if (StoredLiteralValue(literal, type) is not null) { candidates.Add((component.Target, literal, type, null)); } }
+                        { if (StoredValueShape(literal, type) is not null) { candidates.Add((component.Target, literal, type, null)); } }
                     }
                 }
+            }
+            foreach (var syntax in declaration.DescendantNodes().OfType<ArgumentSyntax>())
+            {
+                var target = StorageExpression(syntax.Expression);
+                var alias = model.GetSymbolInfo(target, cancellationToken).Symbol as ILocalSymbol;
+                if (target is not (MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or InvocationExpressionSyntax)
+                    && alias is not { RefKind: not RefKind.None }
+                    || model.GetOperation(syntax, cancellationToken) is not IArgumentOperation { Parameter: { } parameter }
+                    || !HasNullableOutput(parameter))
+                { continue; }
+                candidates.Add((target, syntax.Expression, StorageType(target), alias));
             }
             if (candidates.Count == 0 || parameters.Length == 0)
             { return; }
@@ -796,7 +848,7 @@ public static partial class Inference
                 { target = target is ParenthesizedExpressionSyntax parentheses ? parentheses.Expression : ((RefExpressionSyntax)target).Expression; }
                 if (target is ConditionalExpressionSyntax conditional)
                 { Discover(conditional.WhenTrue, literal, type, alias); Discover(conditional.WhenFalse, literal, type, alias); return; }
-                if (probe.StoredLiteralValue(literal, type) is null)
+                if (probe.StoredValueShape(literal, type) is null)
                 { return; }
                 try
                 {
@@ -830,7 +882,7 @@ public static partial class Inference
                 { node = node.WithArguments(arguments); }
                 foreach (var plan in plans)
                 {
-                    if (plan.Parameter == parameter && plan.Path.SequenceEqual(path) && StoredLiteralValue(plan.Literal, plan.Type) is { } literal)
+                    if (plan.Parameter == parameter && plan.Path.SequenceEqual(path) && StoredValueShape(plan.Literal, plan.Type) is { } literal)
                     {
                         node = MergeDefaultValues(node, literal);
                         defaultValueAnnotations.Add(node.Root);
@@ -998,7 +1050,7 @@ public static partial class Inference
                             { continue; }
                             foreach (var literal in StoredAlternatives(component.Value))
                             {
-                                if (StoredLiteralValue(literal, StorageType(component.Target)) is null)
+                                if (StoredValueShape(literal, StorageType(component.Target)) is null)
                                 { continue; }
                                 var targets = ReferenceStorageOwners(assigned);
                                 targets.Add(assigned);
@@ -1019,18 +1071,21 @@ public static partial class Inference
             foreach (var literal in literals)
             {
                 if ((!onlyCapturedWrites || !SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, model.GetEnclosingSymbol(literal.SpanStart, cancellationToken)))
-                    && StoredLiteralValue(literal, storageType) is { } value)
+                    && StoredValueShape(literal, storageType) is { } value)
                 { type = MergeDefaultValues(type, value); }
             }
             return type;
         }
 
-        private HmType? StoredLiteralValue(ExpressionSyntax expression, ITypeSymbol target)
+        private HmType? StoredValueShape(ExpressionSyntax expression, ITypeSymbol target)
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
             if (target is null)
             { throw new ArgumentNullException(nameof(target)); }
+            if (expression.Parent is ArgumentSyntax syntax && model.GetOperation(syntax, cancellationToken) is IArgumentOperation { Parameter: { } parameter }
+                && HasNullableOutput(parameter))
+            { return ApplyMaybeNullContract(target, CSharpTypes.Erase(target)); }
             if (ScalarDefaultValue(expression, target) is { } scalar)
             { return scalar; }
             if (!IsNullLiteralConversion(expression, target))

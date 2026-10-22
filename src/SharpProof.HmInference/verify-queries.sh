@@ -33,6 +33,18 @@ public sealed class StateBox<T>{public StateCell<T> Nested=new StateCell<T>();}
 public sealed class StateCell<T>{public T? Field=default;public T? Property=>Field;[System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Field),nameof(Property))]public void Ensure(){if(Field is null||Property is null)throw new Exception();}[System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Field),nameof(Property))]public bool Ready=>Field is not null&&Property is not null;}
 #endif
 public static class QueryConsumer{
+  static void WriteSlot<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;
+  static bool TrySlot<T>([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}
+  public static int TuplePossibleSlot((int value,bool tag) pair){WriteSlot(out pair.value);return pair.value;}
+  public static int ArrayPossibleSlot(int[] values){WriteSlot(out values[0]);return values[0];}
+  public static int AliasPossibleSlot(int[] values,int fallback){ref var slot=ref values[0];return TrySlot(out slot)?values[0]:fallback;}
+  public static int DictionaryPossibleSlot(Dictionary<int,int> values,int key,int[] output){values.TryGetValue(key,out output[0]);return output[0];}
+  public static string TupleReferenceFill((string? value,int tag) pair,string fallback){FillField(out pair.Item1,fallback);return pair.value;}
+#if ANNOTATED_REF
+  static void FillSlot<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback){if(fallback is null)throw new Exception();value=fallback;}
+  public static int TupleFilledSlot((int value,bool tag) pair,int fallback){FillSlot(out pair.Item1,fallback);return pair.value;}
+  public static async ValueTask<int> TupleFilledAwait(ValueTask<(int value,bool tag)> input,int fallback){var pair=await input;FillSlot(out pair.value,fallback);return pair.Item1;}
+#endif
   static void FillField<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback)where T:class{if(fallback is null)throw new Exception();value=fallback;}
   static void ClearField<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;
   public static string FieldFill(FieldCell<string> cell,string fallback){FillField(out cell.Value,fallback);return cell.Value;}
@@ -201,6 +213,7 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 TupleReferenceFill<T1, T2>((T1? value, T2 tag) pair, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 FieldFill<T1>(global::FieldCell<T1> cell, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1? FieldClear<T1>(global::FieldCell<T1> cell) where T1 : class' "$log"
   if [ "$language" != 8 ]; then
@@ -236,6 +249,10 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> InputValueAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1 TuplePossibleSlot<T1, T2>((T1 value, T2 tag) pair) where T1 : struct' "$log"
+    grep -Fq 'T1 ArrayPossibleSlot<T1>(T1[] values) where T1 : struct' "$log"
+    grep -Fq 'T1 AliasPossibleSlot<T1>(T1[] values, T1 fallback) where T1 : struct' "$log"
+    grep -Fq 'T2 DictionaryPossibleSlot<T1, T2>(global::System.Collections.Generic.Dictionary<T1, T2> values, T1 key, T2[] output) where T1 : notnull where T2 : struct' "$log"
     grep -Fq 'T1 OutcomeRead<T1>(global::OutcomeCell<T1> cell) where T1 : struct' "$log"
     grep -Fq 'T1 OutcomeDelegate<T1>(global::OutcomeAction<T1> action, global::OutcomeCell<T1> cell) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1> OutcomeAsync<T1>(global::System.Threading.Tasks.Task<global::OutcomeCell<T1>> input) where T1 : struct' "$log"
@@ -267,6 +284,12 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? TuplePossibleSlot<T1, T2>((T1? value, T2 tag) pair)' "$log"
+    grep -Fq 'T1? ArrayPossibleSlot<T1>(T1?[] values)' "$log"
+    grep -Fq 'T1? AliasPossibleSlot<T1>(T1?[] values, T1 fallback)' "$log"
+    grep -Fq 'T2? DictionaryPossibleSlot<T1, T2>(global::System.Collections.Generic.Dictionary<T1, T2> values, T1 key, T2?[] output) where T1 : notnull' "$log"
+    grep -Fq 'T1 TupleFilledSlot<T1, T2>((T1? value, T2 tag) pair, T1 fallback)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> TupleFilledAwait<T1, T2>(global::System.Threading.Tasks.ValueTask<(T1? value, T2 tag)> input, T1 fallback)' "$log"
     grep -Fq 'T1? OutcomeRead<T1>(global::OutcomeCell<T1> cell)' "$log"
     grep -Fq 'T1? OutcomeDelegate<T1>(global::OutcomeAction<T1> action, global::OutcomeCell<T1> cell)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> OutcomeAsync<T1>(global::System.Threading.Tasks.Task<global::OutcomeCell<T1>> input)' "$log"

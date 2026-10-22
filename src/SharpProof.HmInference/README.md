@@ -853,6 +853,20 @@ member/getter counts, receiver identity, mutations, lazy query disposal, nullabl
 value/reference domains, suspension, exact faults and cancellation. CLI and package
 consumers cover member-state declarations in C# 9/13 and indirect field outputs in
 C# 8/9/13. The pinned compiler rejects member-state declarations in C# 8 (CS8400).
+Tuple-field reads consume the same compiler facts as ordinary members, with named
+and `ItemN` fields normalized to one storage identity. Nested tuple outputs,
+reference aliases, metadata and Task/ValueTask results have signature controls.
+Storage discovery also accounts for `MaybeNull`/`MaybeNullWhen` out writes into
+tuple and array slots, including parenthesized targets and known ref aliases.
+The output binder admits the annotated storage independently of the read-state
+refinement, preserving dictionary payload relationships and independent tuple
+siblings or fallback inputs. Physical nullable values retain their representation;
+fixed value-type output contracts add no unnecessary optionality. Mixed
+`MaybeNull`/`NotNull` outputs retain the pinned compiler's nullable behavior.
+Applied fixes execute tuple copies and ref mutations, one-time array indices,
+dictionary hits/misses, reference identity, nullable-value domains, struct defaults
+without constructor calls, suspended awaits, exact faults and cancellation.
+CLI/package consumers check representable C# 8 bounds and broader C# 9/13 domains.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

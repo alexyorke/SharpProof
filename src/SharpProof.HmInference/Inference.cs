@@ -1023,7 +1023,7 @@ public static partial class Inference
                         if (assignment.Right is not RefExpressionSyntax && AssignmentTarget(assignment.Left).FreeVariables().Count == 0
                             && StorageType(assignment.Left) is { } fixedTarget)
                         { return FixedContextValue(assignment.Right, fixedTarget); }
-                        return AssignValue(assignment.Left, StoredLiteralValue(assignment.Right, StorageType(assignment.Left)) ?? Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
+                        return AssignValue(assignment.Left, StoredValueShape(assignment.Right, StorageType(assignment.Left)) ?? Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
                             ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 
@@ -1750,7 +1750,7 @@ public static partial class Inference
 
                 var items = tuple.TupleElements.Select(_ => HmType.Variable()).ToArray();
                 HmType.Unify(Expression(member.Expression), new("Tuple", items));
-                return items[index];
+                return ApplyNullableReadFlow(member, tupleField, items[index], forStorage);
             }
 
             if (receiverType is IArrayTypeSymbol array && member.Name.Identifier.ValueText is "Length" or "LongLength" or "Rank")
@@ -1946,7 +1946,7 @@ public static partial class Inference
             }
             // Storage passed by reference is invariant. Omitted readonly arguments
             // continue through ordinary conversion binding, including temporaries.
-            HmType.Unify(expected, BoundExpression(argument.Value, forStorage: true));
+            HmType.Unify(OutputStorageType(parameter, expected), BoundExpression(argument.Value, forStorage: true));
             return true;
         }
         private HmType BoundExpression(IOperation value, bool forStorage = false)

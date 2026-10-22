@@ -88,7 +88,7 @@ public static partial class Inference
                 { values[i] = DeconstructionValue(tuple.Arguments[i].Expression, type.TupleElements[i].Type); }
                 return new("Tuple", values);
             }
-            return StoredLiteralValue(expression, original) ?? Returned(expression, original);
+            return StoredValueShape(expression, original) ?? Returned(expression, original);
         }
 
         private static HmType? ProjectDeconstructionReceiver(ITypeSymbol original, HmType value, INamedTypeSymbol target)
