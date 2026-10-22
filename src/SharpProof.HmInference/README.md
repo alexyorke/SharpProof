@@ -877,6 +877,20 @@ reference/nullable-value inputs, struct defaults without constructors, copied
 identities, ref tuple mutations, one-time indices, faults before writes and
 Task/ValueTask suspension, exact faults and cancellation. CLI/package consumers
 exercise C# 8 class/struct bounds and broader C# 9/13 nullable domains.
+Explicit readonly references honor `AllowNull` input contracts for `in` and
+`ref readonly` parameters. Storage retains its runtime type, and unannotated inputs
+gain no unnecessary nullable wrapper or class/struct bound. Source/metadata,
+array elements, aliases, physical nullable values and awaited inputs have controls.
+Applied fixes verify unchanged inputs, observed identities, one-time indices,
+Task/ValueTask suspension, exact observer/await faults and cancellation.
+Conflicting return annotations follow the pinned compiler: method/delegate
+`MaybeNull` is retained alongside unconditional `NotNull`, while a proven
+`NotNullIfNotNull` still refines the result. Member reads use their own precedence;
+source property annotations override getter-return annotations. Emission forwards
+property attributes to getter returns, so imported getters are checked separately.
+Signature and execution checks cover these distinctions, null results and required
+getter faults. CLI/package consumers exercise C# 8/9/13; `ref readonly` parameter
+declarations are exercised in C# 13.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

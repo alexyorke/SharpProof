@@ -1946,7 +1946,16 @@ public static partial class Inference
             }
             // Storage passed by reference is invariant. Omitted readonly arguments
             // continue through ordinary conversion binding, including temporaries.
-            HmType.Unify(OutputStorageType(parameter, expected), BoundExpression(argument.Value, forStorage: true));
+            var actual = BoundExpression(argument.Value, forStorage: true);
+            var storage = parameter.RefKind is not (RefKind.Ref or RefKind.Out)
+                ? ApplyInputNullability(parameter, expected) : OutputStorageType(parameter, expected);
+            var input = storage.Root;
+            if (parameter.RefKind is not (RefKind.Ref or RefKind.Out)
+                && input.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference
+                && actual.Root.Name is not (CSharpTypes.NullableParameter or CSharpTypes.NullableReference))
+            { HmType.Unify(input.Arguments[0], actual); }
+            else
+            { HmType.Unify(storage, actual); }
             return true;
         }
         private HmType BoundExpression(IOperation value, bool forStorage = false)

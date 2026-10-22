@@ -28,6 +28,19 @@ internal static class QueryRuntimeChecks
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+            public static class ReadonlyTrace{public static int Indices,Returns;}
+            public sealed class ReadonlyCell<T>{
+                public T Value;public T? Observed;public int Calls,ReadonlyCalls;public ReadonlyCell(T value){Value=value;Observed=value;}
+                public void Observe([System.Diagnostics.CodeAnalysis.AllowNull]in T value){Interlocked.Increment(ref Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;Observed=value;}
+                public void ObserveReadonly([System.Diagnostics.CodeAnalysis.AllowNull]ref readonly T value){Interlocked.Increment(ref Calls);Interlocked.Increment(ref ReadonlyCalls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;Observed=value;}
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("value")]public T Echo([System.Diagnostics.CodeAnalysis.AllowNull]in T value){Interlocked.Increment(ref Calls);Observed=value;return value!;}
+            }
+            public sealed class PriorityCell<T>{
+                public T? Data;public int Reads;public PriorityCell(T? value){Data=value;}
+                [System.Diagnostics.CodeAnalysis.MaybeNull]public T Maybe{[return:System.Diagnostics.CodeAnalysis.NotNull]get{Interlocked.Increment(ref Reads);return Data!;}}
+                [System.Diagnostics.CodeAnalysis.NotNull]public T Required{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get{Interlocked.Increment(ref Reads);if(Data is null)throw QueryTrace.ContractFailure;return Data;}}
+            }
+            [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]public delegate T PriorityAction<T>(T value,bool keep);
             public static class RefTrace{public static int Calls,Indices;}
             public delegate void RefSlotAction<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);
             public static class SlotTrace{public static int Calls,Indices;}
@@ -53,6 +66,20 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                static int ReadonlyIndex(){Interlocked.Increment(ref ReadonlyTrace.Indices);return 0;}
+                public static string ReadonlyValue(ReadonlyCell<string> cell,string? value){cell.Observe(in value);return cell.Value;}
+                public static string ReadonlyRefValue(ReadonlyCell<string> cell,string? value){cell.ObserveReadonly(in value);return cell.Value;}
+                public static string ReadonlyArray(ReadonlyCell<string> cell,string?[] values){cell.Observe(in values[ReadonlyIndex()]);return cell.Value;}
+                public static string ReadonlyAlias(ReadonlyCell<string> cell,string?[] values){ref readonly var slot=ref values[ReadonlyIndex()];cell.Observe(in slot);return cell.Value;}
+                public static int ReadonlyScalar(ReadonlyCell<int> cell,int value){cell.Observe(in value);return cell.Value;}
+                public static int[]? ReadonlyEchoArray(ReadonlyCell<int[]> cell,int[]? value)=>cell.Echo(in value);
+                public static async Task<string> ReadonlyTask(ReadonlyCell<string> cell,Task<string?> input){var value=await input;cell.Observe(in value);return cell.Value;}
+                public static async ValueTask<string> ReadonlyValueTask(ReadonlyCell<string> cell,ValueTask<string?> input){var value=await input;cell.Observe(in value);return cell.Value;}
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]public static T MixedReturnValue<T>(T value,bool keep){Interlocked.Increment(ref ReadonlyTrace.Returns);return keep?value!:default!;}
+                public static int MixedReturn(int value,bool keep)=>MixedReturnValue(value,keep);
+                public static int MixedDelegate(PriorityAction<int> action,int value,bool keep)=>action(value,keep);
+                public static int PriorityMaybe(PriorityCell<int> cell)=>cell.Maybe;
+                public static int PriorityRequired(PriorityCell<int> cell)=>cell.Required;
                 public static void ClearRefSlot<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value){Interlocked.Increment(ref RefTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=default;}
                 static void StoreRefSlot<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T target){Interlocked.Increment(ref RefTrace.Calls);target=value;}
                 static bool TryRefSlot<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)][System.Diagnostics.CodeAnalysis.NotNullWhen(true)]ref T target,T value,bool keep){Interlocked.Increment(ref RefTrace.Calls);target=keep?(value is null?throw QueryTrace.ContractFailure:value):default!;return keep;}
@@ -329,7 +356,32 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> ReadonlyContracts(CancellationToken cancellationToken){
+                    ReadonlyTrace.Indices=ReadonlyTrace.Returns=0;var text=new string('r',3);var cell=new ReadonlyCell<string>(text);string? missing=null;string?[] values={null};
+                    if(!ReferenceEquals(QueryProbe.ReadonlyValue(cell,missing),text)||cell.Observed!=null||!ReferenceEquals(QueryProbe.ReadonlyArray(cell,values),text)||values[0]!=null||ReadonlyTrace.Indices!=1)return false;
+                    values[0]=text;if(!ReferenceEquals(QueryProbe.ReadonlyAlias(cell,values),text)||!ReferenceEquals(values[0],text)||!ReferenceEquals(cell.Observed,text)||ReadonlyTrace.Indices!=2||!ReferenceEquals(QueryProbe.ReadonlyRefValue(cell,missing),text)||cell.Observed!=null||cell.Calls!=4||cell.ReadonlyCalls!=1)return false;
+                    var numeric=new ReadonlyCell<int>(7);if(QueryProbe.ReadonlyScalar(numeric,3)!=7||numeric.Value!=7||numeric.Observed!=3||numeric.Calls!=1)return false;
+                    int[] original={7};var arrays=new ReadonlyCell<int[]>(original);int[]? absent=null;if(QueryProbe.ReadonlyEchoArray(arrays,absent)!=null||!ReferenceEquals(QueryProbe.ReadonlyEchoArray(arrays,original),original)||!ReferenceEquals(arrays.Value,original))return false;
+                    if(QueryProbe.MixedReturn(7,false)!=0||QueryProbe.MixedDelegate(QueryProbe.MixedReturnValue,7,false)!=0||ReadonlyTrace.Returns!=2)return false;
+                    var priority=new PriorityCell<int>(7);if(QueryProbe.PriorityMaybe(priority)!=7||QueryProbe.PriorityRequired(priority)!=7||priority.Reads!=2)return false;
+                    var failure=new InvalidOperationException("readonly input");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        var delayed=new ReadonlyCell<string>(text);var gate=new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.ReadonlyTask(delayed,gate.Task);var valueTask=QueryProbe.ReadonlyValueTask(delayed,new ValueTask<string?>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||delayed.Calls!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(null);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||!ReferenceEquals(result,text))return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(delayed.Calls!=(outcome is "Value" or "HelperFault"?2:0)||(outcome=="Value"?delayed.Observed!=null:!ReferenceEquals(delayed.Observed,text)))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> RefSlotContracts(CancellationToken cancellationToken){
+                    if(!await ReadonlyContracts(cancellationToken))return false;
                     RefTrace.Calls=RefTrace.Indices=0;int[] values={7};var pair=QueryProbe.RefSlotCopy(values);if(pair.before!=7||pair.after!=0||values[0]!=0)return false;values[0]=11;
                     if(QueryProbe.RefSlotArray(values)!=0||values[0]!=0)return false;values[0]=13;
                     if(QueryProbe.RefSlotAlias(values)!=0||values[0]!=0||QueryProbe.RefSlotInput(17,values)!=17||values[0]!=17)return false;
@@ -627,7 +679,21 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> ReadonlyContracts(string text,CancellationToken cancellationToken){
+                    ReadonlyTrace.Indices=ReadonlyTrace.Returns=0;var uri=new Uri("https://example.invalid/readonly-input");var cell=new ReadonlyCell<Uri>(uri);Uri? missing=null;Uri?[] values={null};
+                    if(!ReferenceEquals(QueryProbe.ReadonlyValue(cell,missing),uri)||!ReferenceEquals(QueryProbe.ReadonlyArray(cell,values),uri)||values[0]!=null||ReadonlyTrace.Indices!=1)return false;
+                    values[0]=uri;if(!ReferenceEquals(QueryProbe.ReadonlyAlias(cell,values),uri)||!ReferenceEquals(values[0],uri)||!ReferenceEquals(QueryProbe.ReadonlyRefValue(cell,missing),uri)||cell.Observed!=null||cell.Calls!=4||cell.ReadonlyCalls!=1||ReadonlyTrace.Indices!=2)return false;
+                    var numeric=new ReadonlyCell<decimal?>(23m);decimal? absentNumber=null;if(QueryProbe.ReadonlyScalar(numeric,absentNumber)!=23m||numeric.Value!=23m||numeric.Observed!=null)return false;
+                    Uri[] array={uri};var arrays=new ReadonlyCell<Uri[]>(array);Uri[]? absent=null;if(QueryProbe.ReadonlyEchoArray(arrays,absent)!=null||!ReferenceEquals(QueryProbe.ReadonlyEchoArray(arrays,array),array)||!ReferenceEquals(arrays.Value,array))return false;
+                    if(QueryProbe.MixedReturn(text,false)!=null||!ReferenceEquals(QueryProbe.MixedDelegate(QueryProbe.MixedReturnValue,text,true),text)||ReadonlyTrace.Returns!=2||QueryProbe.MixedReturn((decimal?)23m,false)!=null)return false;
+                    var priority=new PriorityCell<string>(null);if(QueryProbe.PriorityMaybe(priority)!=null)return false;try{_=QueryProbe.PriorityRequired(priority);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}if(priority.Reads!=2)return false;
+                    var gate=new TaskCompletionSource<Uri?>(TaskCreationOptions.RunContinuationsAsynchronously);var delayed=new ReadonlyCell<Uri>(uri);
+                    var task=QueryProbe.ReadonlyTask(delayed,gate.Task);var valueTask=QueryProbe.ReadonlyValueTask(delayed,new ValueTask<Uri?>(gate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted||delayed.Calls!=0)return false;gate.SetResult(null);
+                    foreach(var pending in new[]{task,valueTask}){if(!ReferenceEquals(await pending.WaitAsync(cancellationToken),uri))return false;}
+                    return delayed.Calls==2&&delayed.Observed==null;
+                }
                 static async Task<bool> RefSlotContracts(string text,CancellationToken cancellationToken){
+                    if(!await ReadonlyContracts(text,cancellationToken))return false;
                     RefTrace.Calls=RefTrace.Indices=0;string?[] values={text};var pair=QueryProbe.RefSlotCopy(values);if(!ReferenceEquals(pair.before,text)||pair.after!=null||values[0]!=null)return false;values[0]=text;
                     if(QueryProbe.RefSlotArray(values)!=null||values[0]!=null)return false;values[0]=text;
                     if(QueryProbe.RefSlotAlias(values)!=null||values[0]!=null||!ReferenceEquals(QueryProbe.RefSlotInput(text,values),text)||!ReferenceEquals(values[0],text))return false;

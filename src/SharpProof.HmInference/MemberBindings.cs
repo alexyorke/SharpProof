@@ -25,9 +25,15 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(attribute)); }
                 return member is not IPropertySymbol || attribute.AttributeClass?.ToDisplayString() != "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
             });
-            if (member is IPropertySymbol { GetMethod: { } getter })
+            // Source property flow annotations override accessor-return annotations.
+            if (member is IPropertySymbol { GetMethod: { } getter } && !attributes.Any(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return attribute.AttributeClass?.ToDisplayString() is "System.Diagnostics.CodeAnalysis.MaybeNullAttribute" or "System.Diagnostics.CodeAnalysis.NotNullAttribute";
+            }))
             { attributes = attributes.Concat(getter.GetReturnTypeAttributes()); }
-            var result = ApplyNullabilityContract(type, value, attributes, forStorage, arguments, argumentValues);
+            var result = ApplyNullabilityContract(type, value, attributes, forStorage, arguments, argumentValues, preferNotNull: true);
             return syntax is null ? result : ApplyNullableReadFlow(syntax, member, result, forStorage);
         }
 

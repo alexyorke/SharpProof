@@ -20,7 +20,7 @@ public static partial class Inference
         }
 
         private HmType ApplyNullabilityContract(ITypeSymbol returnType, HmType value, IEnumerable<AttributeData> attributes, bool forStorage,
-            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null)
+            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null, bool preferNotNull = false)
         {
             if (returnType is null)
             { throw new ArgumentNullException(nameof(returnType)); }
@@ -33,6 +33,7 @@ public static partial class Inference
             var maybeNull = false;
             var notNull = false;
             var conditional = false;
+            var conditionalNotNull = false;
             foreach (var attribute in attributes)
             {
                 var name = attribute.AttributeClass?.ToDisplayString();
@@ -45,11 +46,11 @@ public static partial class Inference
                     foreach (var argument in arguments ?? [])
                     {
                         if (argument.Parameter?.Name == parameterName && ConditionalReturnGuard(argument, argumentValues))
-                        { notNull = true; }
+                        { conditionalNotNull = true; }
                     }
                 }
             }
-            if (notNull)
+            if (conditionalNotNull || notNull && (preferNotNull || !maybeNull))
             { return ConversionCore(value); }
             if (!maybeNull)
             {

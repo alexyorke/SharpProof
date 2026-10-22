@@ -7,6 +7,7 @@ for language in 8 9 13; do
   package_reference=""
   constants=""
   if [ "$language" != 8 ]; then constants=ANNOTATED_REF; fi
+  if [ "$language" = 13 ]; then constants="$constants;READONLY_REF"; fi
   if [ "$#" -eq 3 ]; then
     package_reference="<ItemGroup><PackageReference Include=\"SharpProof.HmInference\" Version=\"$3\" PrivateAssets=\"all\" /></ItemGroup>"
   fi
@@ -33,7 +34,27 @@ public sealed class StateBox<T>{public StateCell<T> Nested=new StateCell<T>();}
 public sealed class StateCell<T>{public T? Field=default;public T? Property=>Field;[System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Field),nameof(Property))]public void Ensure(){if(Field is null||Property is null)throw new Exception();}[System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Field),nameof(Property))]public bool Ready=>Field is not null&&Property is not null;}
 #endif
 public delegate void RefSlotAction<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);
+public sealed class ReadonlyInputCell<T>{public T Value=default!;public void Observe([System.Diagnostics.CodeAnalysis.AllowNull]in T value){}
+#if READONLY_REF
+public void ObserveRef([System.Diagnostics.CodeAnalysis.AllowNull]ref readonly T value){}
+#endif
+}
+public sealed class PriorityInputCell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Maybe{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}[System.Diagnostics.CodeAnalysis.NotNull]public T Required{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get=>default!;}}
 public static class QueryConsumer{
+  public static string ReadonlyInput(ReadonlyInputCell<string> cell,string? value){cell.Observe(in value);return cell.Value;}
+  public static int ReadonlyValueInput(ReadonlyInputCell<int> cell,int value){cell.Observe(in value);return cell.Value;}
+  public static string ReadonlyArrayInput(ReadonlyInputCell<string> cell,string?[] values){cell.Observe(in values[0]);return cell.Value;}
+  public static async Task<string> ReadonlyAwaitInput(ReadonlyInputCell<string> cell,Task<string?> input){var value=await input;cell.Observe(in value);return cell.Value;}
+  public static async ValueTask<string> ReadonlyValueAwaitInput(ReadonlyInputCell<string> cell,ValueTask<string?> input){var value=await input;cell.Observe(in value);return cell.Value;}
+#if READONLY_REF
+  public static string ReadonlyRefInput(ReadonlyInputCell<string> cell,string? value){cell.ObserveRef(in value);return cell.Value;}
+#endif
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]static T MixedValue<T>(T value)=>value!;
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]public delegate T MixedAction<T>(T value);
+  public static int MixedReturn(int value)=>MixedValue(value);
+  public static int MixedDelegate(MixedAction<int> action,int value)=>action(value);
+  public static int PropertyPriorityMaybe(PriorityInputCell<int> cell)=>cell.Maybe;
+  public static int PropertyPriorityRequired(PriorityInputCell<int> cell)=>cell.Required;
   static void ClearRef<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;
   static void StoreRef<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T target)=>target=value;
   static void EnsureRef<T>([System.Diagnostics.CodeAnalysis.NotNull]ref T? value)where T:class{if(value is null)throw new Exception();}
@@ -225,6 +246,17 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 ReadonlyInput<T1>(global::ReadonlyInputCell<T1> cell, T1? value) where T1 : class' "$log"
+  grep -Fq 'T1 ReadonlyValueInput<T1>(global::ReadonlyInputCell<T1> cell, T1 value)' "$log"
+  if grep -F ' ReadonlyValueInput<T1>(' "$log" | grep -Fq 'where T1'; then
+    printf 'Readonly input acquired an unnecessary bound (C# %s)\n' "$language"
+    exit 1
+  fi
+  grep -Fq 'T1 ReadonlyArrayInput<T1>(global::ReadonlyInputCell<T1> cell, T1?[] values) where T1 : class' "$log"
+  grep -Fq 'global::System.Threading.Tasks.Task<T1> ReadonlyAwaitInput<T1>(global::ReadonlyInputCell<T1> cell, global::System.Threading.Tasks.Task<T1?> input) where T1 : class' "$log"
+  grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> ReadonlyValueAwaitInput<T1>(global::ReadonlyInputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> input) where T1 : class' "$log"
+  if [ "$language" = 13 ]; then grep -Fq 'T1 ReadonlyRefInput<T1>(global::ReadonlyInputCell<T1> cell, T1? value) where T1 : class' "$log"; fi
+  grep -Fq 'T1 PropertyPriorityRequired<T1>(global::PriorityInputCell<T1> cell)' "$log"
   grep -Fq 'T1 CheckedRefTuple<T1, T2>((T1? value, T2 tag) pair) where T1 : class' "$log"
   grep -Fq 'T1 TupleReferenceFill<T1, T2>((T1? value, T2 tag) pair, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 FieldFill<T1>(global::FieldCell<T1> cell, T1 fallback) where T1 : class' "$log"
@@ -262,6 +294,9 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> InputValueAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1 MixedReturn<T1>(T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 MixedDelegate<T1>(global::QueryConsumer.MixedAction<T1> action, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 PropertyPriorityMaybe<T1>(global::PriorityInputCell<T1> cell) where T1 : struct' "$log"
     for method in ArrayRefSlot AliasRefSlot; do
       grep -Fq "T1 $method<T1>(T1[] values) where T1 : struct" "$log"
     done
@@ -305,6 +340,9 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? MixedReturn<T1>(T1 value)' "$log"
+    grep -Fq 'T1? MixedDelegate<T1>(global::QueryConsumer.MixedAction<T1> action, T1 value)' "$log"
+    grep -Fq 'T1? PropertyPriorityMaybe<T1>(global::PriorityInputCell<T1> cell)' "$log"
     for method in ArrayRefSlot AliasRefSlot; do
       grep -Fq "T1? $method<T1>(T1?[] values)" "$log"
     done
