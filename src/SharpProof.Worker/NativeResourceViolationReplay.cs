@@ -66,14 +66,9 @@ internal static class NativeResourceViolationReplay
         {
             if (!EntryModelIsOwned(owner, inputs, cancellation))
             { return null; }
-            var factory = owner.Program.Factory;
-            if (!CallableReplayValidator.EntryConstraintsHold(factory, candidate.EntryConstraints, inputs, cancellation))
+            if (!EntryContractsHold(candidate, inputs, cancellation))
             { return null; }
-            foreach (var clause in candidate.Requires)
-            {
-                if (!CallableReplayValidator.EntryConstraintsHold(factory, [clause.Safe, clause.Value], inputs, cancellation))
-                { return null; }
-            }
+            var factory = owner.Program.Factory;
             var evaluatedLimit = limit.Evaluate(input =>
             {
                 ArgumentNullException.ThrowIfNull(input);
@@ -232,6 +227,24 @@ internal static class NativeResourceViolationReplay
             { return false; }
         }
         return !owner.HasReceiver || inputs[owner.Parameters[owner.Parameters.Length - 1].Entry].Kind != IrValueKind.Null;
+    }
+
+    // Search models remain candidates until both owned entry facts and each
+    // precondition's safety and value have been independently checked.
+    internal static bool EntryContractsHold(PassiveCallableCandidate candidate,
+        ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellation)
+    {
+        candidate = ArgumentNullGuard.NotNull(candidate, nameof(candidate));
+        inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
+        cancellation.ThrowIfCancellationRequested();
+        if (!CallableReplayValidator.EntryConstraintsHold(candidate.Factory, candidate.EntryConstraints, inputs, cancellation))
+        { return false; }
+        foreach (var clause in candidate.Requires)
+        {
+            if (!CallableReplayValidator.EntryConstraintsHold(candidate.Factory, [clause.Safe, clause.Value], inputs, cancellation))
+            { return false; }
+        }
+        return true;
     }
 
     private static BigInteger? ExactArrayBytes(IrFactory factory, IrAllocationInstruction instruction, int elements,

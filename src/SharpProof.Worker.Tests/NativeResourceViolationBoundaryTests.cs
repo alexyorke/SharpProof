@@ -253,6 +253,65 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(await FindBoundaryViolation(target, limit), Is.Null);
     }
 
+    [TestCase(false, false, true)]
+    [TestCase(true, false, false)]
+    [TestCase(true, true, true)]
+    public void ResourceReplayChecksNominalEntryDisjointness(bool alias, bool nullInputs, bool admitted)
+    {
+        var target = Read(CreateArtifact("using SharpProof.Attributes; public sealed class A {} public sealed class B {} " +
+            "public static class C { [ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] " +
+            "public static void Target(A left,B right) {var value=new int[1];} }"));
+        var owner = target.Total!;
+        var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
+        Assert.That(candidate.EntryConstraints, Is.Not.Empty);
+        var identity = new object();
+        var inputs = owner.Parameters.Select((parameter, ordinal) =>
+        {
+            if (parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault)
+            { throw new ArgumentException("Value must be initialized.", nameof(parameter)); }
+            var type = owner.Program.Factory.GetVariableInfo(parameter.Entry).Type;
+            var value = nullInputs ? owner.Program.Factory.CreateNullValue(type) :
+                owner.Program.Factory.CreateReferenceValue(type, alias || ordinal == 0 ? identity : new object());
+            return (parameter.Entry, Value: value);
+        }).ToImmutableDictionary(pair => pair.Entry, pair => pair.Value);
+        Assert.That(NativeResourceViolationReplay.EntryModelIsOwned(owner, inputs,
+            TestContext.CurrentContext.CancellationToken), Is.True);
+        Assert.That(NativeResourceViolationReplay.EntryContractsHold(candidate, inputs,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(admitted));
+    }
+
+    [TestCase(true, true)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(false, false)]
+    public void ResourceReplayRequiresBothPreconditionSafetyAndTruth(bool safe, bool value)
+    {
+        var target = Read(CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] public static void Target() {var value=new int[1];} }"));
+        var original = PassiveCallableArtifactAdapter.Enroll(target)!;
+        var factory = original.Factory;
+        var candidate = new PassiveCallableCandidate(original.CallableId, original.Program, original.Parameters,
+            original.Result, [new PassiveContractClause(factory.Boolean(value), factory.Boolean(safe), factory.CreateOperation())], []);
+        Assert.That(NativeResourceViolationReplay.EntryContractsHold(candidate, ImmutableDictionary<IrVarId, IrValue>.Empty,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(safe && value));
+    }
+
+    [Test]
+    public void ResourceEntryContractsHonorCancellationEvenWithoutClauses()
+    {
+        var target = Read(CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] public static void Target() {var value=new int[1];} }"));
+        var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () =>
+        {
+            _ = NativeResourceViolationReplay.EntryContractsHold(candidate,
+                ImmutableDictionary<IrVarId, IrValue>.Empty, cancellation.Token);
+        };
+        Assert.That(check, Throws.TypeOf<OperationCanceledException>());
+    }
+
     private static Task<WorkerClaimResult?> FindBoundaryViolation(CompilerCallablePreparation target, ResourceExpression limit,
         WorkerBudgets? budgets = null)
     {

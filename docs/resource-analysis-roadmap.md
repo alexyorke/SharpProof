@@ -109,6 +109,48 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Replay entry-contract controls
+
+Resource violation search now calls a shared entry-contract check before any
+cost observation. This retains the existing entry-disjointness and precondition
+safety/value checks, independently of model shape/type validation. The helper
+also honors cancellation before an empty contract set. No cost model, resource
+verdict or successful cache identity is changed.
+
+Eight targeted controls cover distinct nominal reference identities, deliberately
+aliased identities of incompatible nominal types, null identities, all four
+precondition safety/truth combinations, and cancellation without clauses. The
+aliased identity is an adversarial solver model, not an executable C# input.
+A shape-valid model must still pass the separate semantic entry checks. All eight
+focused controls passed with zero build warnings or errors
+(`artifacts/resource-replay-entry-contract-corrected-probe.log`). The initial
+probe caught a missing explicit test-lambda parameter guard; its failure is
+retained in `artifacts/resource-replay-entry-contract-probe.log`. The corrected
+canonical formatter copied zero changes. Quality/API and documentation checks
+passed. All 773 selected native tests passed, covering the complete native
+resource-contract fixture, aliasing boundaries and compiler entry-constraint
+replay (`artifacts/resource-replay-entry-contract-tests.log`); the build reported
+zero warnings and errors. This checkpoint does not close the runtime-byte
+roadmap obligations. Protocol, cache, projection and cost-model identities are
+unchanged: accepted semantic entry contracts and successful verdicts retain
+their previous behavior.
+
+Hosted coverage for predecessor `be7e59570` completed all fifteen shards, but
+aggregate job 120106277400 in run 39857769947 failed before merging reports:
+the pinned Ubuntu xz package download hit a TLS handshake timeout. Only that
+failed job was rerun. Attempt 2, aggregate job 120107160378, produced a complete
+report and failed the unchanged 100 percent floor: 6963/7099 changed trusted
+lines (98.08 percent), with 136 gaps. Evidence is retained in
+`artifacts/resource-be7e-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `9759d97a9350c66cc1e02fc089d7278b3cd46dac` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and branch checkpoint
+`be7e595703132b8bb4d066f2f5112e521834794a`.
+
+Compared with `0e1527216`, the unchanged constructor-call production file now
+covers the allowance rejection guards at lines 213 and 220: two gaps closed,
+with no new gaps. This measures the initializer sweeps, not the newer replay
+entry-contract controls. The latter still require hosted qualification.
+
 ### Hosted qualification of loop and normal-domain controls
 
 Checkpoint `0e15272161c280b082b6a219190f28acfca9608a` passed full canonical CI
