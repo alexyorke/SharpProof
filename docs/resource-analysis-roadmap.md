@@ -109,6 +109,50 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Portable array-helper entries and OOM identity policy
+
+The private direct-HCall frame model is now
+`coreclr8-direct-primitive-hcall-trace-frames-v2`, with seven reviewed entries.
+The added value-array and reference-array portable fast paths install no
+explicit managed helper frame before returning or falling back through
+`HCCALL2` to the already reviewed `JIT_NewArr1` worker. That worker's explicit
+frame has a null FCall method identity, as established by the existing model.
+The result remains zero direct trace frames for each reviewed entry.
+
+Pinned [`JIT_NewArr1VC_MP_FastPortable`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/jithelpers.cpp#L2642)
+and the adjacent reference-array helper were reviewed through their complete
+fast/fallback bodies. Supported-entry tests cover both additions; an adjacent
+enum value outside the reviewed set still returns Unknown without a count or model identity.
+This does not establish which implementation an opcode selects, cover assembly
+fast paths, bound managed calls made by a helper, or count unwind passes.
+Those obligations and the root byte result remain open.
+
+The OOM trace-allocation policy was checked directly in
+[`ExceptionTracker::CanAllocateMemory`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/exceptionhandling.h#L406).
+It compares object identity with the preallocated OOM and stack-overflow
+objects. It does not suppress trace allocation merely because an exception
+has the OOM type. The existing dimension-fault allocation control already
+requires a fresh OOM trace buffer and would reject that incorrect shortcut.
+No zero-trace conclusion was added for arbitrary OOM instances.
+
+Predecessor `d98466d63` has automatic CI (39834486380), coverage (39834486121)
+and package consumers (39834486545) running/pending. Security (39834486120)
+and documentation (39834486134) passed. The earlier `625683062` coverage
+workflow was cancelled, not passed. Current helper changes have not yet
+received hosted qualification. No protocol, projection encoding, response
+cache identity or public root verdict changed.
+
+All 268 Specs cases passed with zero build warnings or errors
+(`artifacts/resource-portable-array-hcalls-tests.log`). Full quality/API
+checks passed after one prose spelling correction
+(`artifacts/resource-portable-array-hcalls-lint-fixed.log`), as did
+documentation checks (`artifacts/resource-portable-array-hcalls-docs.log`).
+The canonical private formatter copied zero source changes
+(`artifacts/resource-portable-array-hcalls-format.log`). The new tests exercise
+only the declared entry summaries; no claim is made that a runtime probe
+forced either portable helper to be selected. The source review establishes
+the entry-local result, and opcode/helper dispatch remains a separate proof.
+
 ### Owned callback and source unwind composition
 
 A new private component composes the checked direct source-body contribution

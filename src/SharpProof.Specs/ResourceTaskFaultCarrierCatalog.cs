@@ -4,7 +4,7 @@ using SharpProof.Ir;
 
 namespace SharpProof.Specs;
 
-internal enum ResourcePrimitiveHCallKind { DivideByZero, Overflow, NullReference, RangeCheck, NewArrayWorker }
+internal enum ResourcePrimitiveHCallKind { DivideByZero, Overflow, NullReference, RangeCheck, NewArrayWorker, NewArrayValueFastPortable, NewArrayReferenceFastPortable }
 
 internal sealed record ResourcePrimitiveHCallFrameCheck(int? DirectFramesUpper, string? UnknownReason)
 {
@@ -48,13 +48,14 @@ internal static class ResourceTaskFaultCarrierCatalog
     internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
     internal const string ResolverTraceBufferModel = "closed-exception-resolver-buffers-v1";
     internal const string TraceBufferModel = "closed-exception-trace-buffer-composition-v1";
-    internal const string PrimitiveHCallFrameModel = "coreclr8-direct-primitive-hcall-trace-frames-v1";
+    internal const string PrimitiveHCallFrameModel = "coreclr8-direct-primitive-hcall-trace-frames-v2";
     internal const string HCallIdentitySource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/fcall.h";
     internal const string HCallMappingSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/ecall.cpp";
     internal const string HCallFrameSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/frames.cpp";
     internal const string PrimitiveHelperSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/jithelpers.cpp";
 
-    // The direct explicit frame of the reviewed HCIMPL entry only. HCIMPL
+    // The direct explicit frame of the reviewed HCIMPL entry only. Where an
+    // entry installs such a frame, HCIMPL
     // clears __me; HelperMethodFrame receives that null FCall identity, and
     // MapTargetBackToMethod(null) returns null. ProcessExplicitFrame appends
     // only non-null MethodDesc frames. This does not bound managed calls made
@@ -65,7 +66,8 @@ internal static class ResourceTaskFaultCarrierCatalog
         layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
         cancellation.ThrowIfCancellationRequested();
         if (helper is not (ResourcePrimitiveHCallKind.DivideByZero or ResourcePrimitiveHCallKind.Overflow or
-            ResourcePrimitiveHCallKind.NullReference or ResourcePrimitiveHCallKind.RangeCheck or ResourcePrimitiveHCallKind.NewArrayWorker))
+            ResourcePrimitiveHCallKind.NullReference or ResourcePrimitiveHCallKind.RangeCheck or ResourcePrimitiveHCallKind.NewArrayWorker or
+            ResourcePrimitiveHCallKind.NewArrayValueFastPortable or ResourcePrimitiveHCallKind.NewArrayReferenceFastPortable))
         { return new(null, "UnsupportedPrimitiveHCallEntry"); }
         var compatible = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Byte,
             ResourceExpression.Zero), layout, cancellation);
@@ -73,6 +75,8 @@ internal static class ResourceTaskFaultCarrierCatalog
         { return new(null, compatible.UnknownReason); }
         // JIT_ThrowDivZero, JIT_Overflow, JIT_ThrowNullRef, JIT_RngChkFail,
         // and the JIT_NewArr1 worker are HCIMPL entries in the pinned source.
+        // The portable VC/OBJ array fast entries install no explicit helper
+        // frame before falling back through HCCALL2 to that same worker.
         return new(0, null);
     }
     internal const string NativeDimensionMessageModel = "coreclr8-linux-array-dimension-fault-strings-v1";

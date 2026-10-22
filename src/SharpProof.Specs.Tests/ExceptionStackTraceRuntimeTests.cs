@@ -311,6 +311,8 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(ResourcePrimitiveHCallKind.NullReference)]
     [TestCase(ResourcePrimitiveHCallKind.RangeCheck)]
     [TestCase(ResourcePrimitiveHCallKind.NewArrayWorker)]
+    [TestCase(ResourcePrimitiveHCallKind.NewArrayValueFastPortable)]
+    [TestCase(ResourcePrimitiveHCallKind.NewArrayReferenceFastPortable)]
     public void ReviewedPrimitiveHCallsHaveNoDirectTraceFrame(ResourcePrimitiveHCallKind helper)
     {
         var result = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(helper,
@@ -321,6 +323,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     }
 
     [TestCase(-1)]
+    [TestCase(7)]
     [TestCase(int.MaxValue)]
     public void UnreviewedHelperEntriesNeverPublishAFrameBound(int helper)
     {
