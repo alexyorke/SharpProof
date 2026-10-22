@@ -22,6 +22,14 @@ public sealed class IndirectConsumerCell<T>{public T Value;public IndirectConsum
 public sealed class OwnerConsumerPair<T,U>{public T Row;public U Flag;public OwnerConsumerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){row=Row;flag=Flag;}}
 public delegate void OutConsumerCopier<T>(T value,out T result);
 public static class DefaultConsumer{
+    static void VisitCallbacks<T>(IEnumerable<T> values,Action<T> action){foreach(var value in values)action(value);}
+    static U SelectCallback<T,U>(T value,U tag,Func<T,U,U> action)=>action(value,tag);
+    static Task ApplyCallback<T>(T value,Func<T,Task> action)=>action(value);
+    static ValueTask ApplyValueCallback<T>(T value,Func<T,ValueTask> action)=>action(value);
+    public static void CallbackRows(IEnumerable<int[]> values){VisitCallbacks(values,row=>{row[0]=default;});}
+    public static void CallbackNested(IEnumerable<IEnumerable<int[]>> values){VisitCallbacks(values,rows=>VisitCallbacks(rows,row=>{ref var alias=ref row[0];alias=default;}));}
+    public static void CallbackDelegate(Action<Action<int[]>> visit){visit(row=>{ref var alias=ref row[0];alias=default;});}
+    public static int CallbackSibling(int[] value,int tag)=>SelectCallback(value,tag,(row,other)=>{ref var alias=ref row[0];alias=default;return other;});
     static bool CopyOut<T>(T value,out T result){result=value;return true;}
     public static int OutCall(int[] value){CopyOut(value,out var row);ref var alias=ref row[0];alias=default;return alias;}
     public static int OutCondition(int[] value){if(CopyOut(value,out var row)){row[0]=default;return row[0];}return default;}
@@ -63,6 +71,8 @@ public static class DefaultConsumer{
     public static (int left,int right) AliasConditional(bool flag,int first,int second){var left=first;var right=second;ref var alias=ref(flag?ref left:ref right);alias=default;return(left,right);}
     public static int AliasConditionalStore(bool flag,int value){ref var alias=ref value;alias=flag?value:default;return value;}
 #if MODERN_ALIASES
+    public static Task CallbackAsync(int[] value,Task gate)=>ApplyCallback(value,async row=>{await gate;ref var alias=ref row[0];alias=default;});
+    public static ValueTask CallbackValueAsync(int[] value,Task gate)=>ApplyValueCallback(value,async row=>{await gate;ref var alias=ref row[0];alias=default;});
     public static async Task<int> OutAwait(Task<int[]> value){CopyOut(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
     public static async ValueTask<int> OutValueAwait(ValueTask<int[]> value){CopyOut(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
     public static int PatternList(int[][] value){if(value is [var row,..]){ref var alias=ref row[0];alias=default;return alias;}return default;}
@@ -130,6 +140,10 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "void CallbackRows<T1>(global::System.Collections.Generic.IEnumerable<${element}[]> values)$suffix" \
+    "void CallbackNested<T1>(global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.IEnumerable<${element}[]>> values)$suffix" \
+    "void CallbackDelegate<T1>(global::System.Action<global::System.Action<${element}[]>> visit)$suffix" \
+    "T2 CallbackSibling<T1, T2>(${element}[] value, T2 tag)$suffix" \
     "$element OutCall<T1>(${element}[] value)$suffix" \
     "$element OutCondition<T1>(${element}[] value)$suffix" \
     "$element OutTuple<T1, T2>((${element}[] row, T2 tag) value)$suffix" \
@@ -191,6 +205,8 @@ EOF
     fi
   done
   if [ "$language" = 13 ]; then
+    grep -Fq 'global::System.Threading.Tasks.Task CallbackAsync<T1>(T1?[] value, global::System.Threading.Tasks.Task gate)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask CallbackValueAsync<T1>(T1?[] value, global::System.Threading.Tasks.Task gate)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> OutAwait<T1>(global::System.Threading.Tasks.Task<T1?[]> value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> OutValueAwait<T1>(global::System.Threading.Tasks.ValueTask<T1?[]> value)' "$log"
     grep -Fq 'T1? PatternList<T1>(T1?[][] value)' "$log"

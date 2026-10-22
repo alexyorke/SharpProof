@@ -322,7 +322,10 @@ public static partial class Inference
                         var parameter = parameters[i];
                         if (parameter.Type is not null)
                         { HmType.Unify(signature.Inputs[i], CSharpTypes.Rigid(model.GetTypeInfo(parameter.Type, cancellationToken).Type!)); }
-                        environment.Add(model.GetDeclaredSymbol(parameter, cancellationToken)!, signature.Inputs[i]);
+                        var symbol = model.GetDeclaredSymbol(parameter, cancellationToken)!;
+                        environment.Add(symbol, signature.Inputs[i]);
+                        if (storageLambdaInputs is not null)
+                        { storageLambdaInputs[symbol] = signature.Inputs[i]; }
                     }
                     var hasVoidBody = operation.Symbol.ReturnsVoid || asyncReturn is { Arity: 0 };
                     HmType result;

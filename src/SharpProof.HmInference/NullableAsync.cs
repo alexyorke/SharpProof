@@ -226,6 +226,7 @@ public static partial class Inference
         private Dictionary<ISymbol, List<ExpressionSyntax>>? defaultStores;
         private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
         private readonly HashSet<ISymbol> preparedIndirectAliases = new(SymbolEqualityComparer.Default);
+        private Dictionary<ISymbol, HmType>? storageLambdaInputs;
 
         private void PrepareIndirectStorage(HmType[] parameters)
         {
@@ -258,7 +259,7 @@ public static partial class Inference
             { return; }
             var template = HmType.Function(parameters, new("void"));
             var fresh = new HmScheme(template, template.FreeVariables()).Instantiate();
-            var probe = new Session(model, cancellationToken) { currentMethod = currentMethod };
+            var probe = new Session(model, cancellationToken) { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
             probe.SetIteratorReturn(declaration, currentMethod);
             if (probe.iteratorReturn is null)
             { probe.SetAsyncReturn(currentMethod); }
@@ -269,6 +270,45 @@ public static partial class Inference
             var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
             var boundDeconstructions = new HashSet<int>();
             var boundPatterns = new HashSet<int>();
+            void BindCallbackParameter(IParameterSymbol parameter)
+            {
+                if (parameter is null)
+                { throw new ArgumentNullException(nameof(parameter)); }
+                if (!probe.storageLambdaInputs.TryGetValue(parameter, out var shape))
+                {
+                    if (!resolving.Add(parameter))
+                    { throw new InferenceException("Cyclic callback storage context."); }
+                    var site = parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+                    var lambda = site?.AncestorsAndSelf().OfType<AnonymousFunctionExpressionSyntax>().FirstOrDefault();
+                    var context = lambda?.Ancestors().OfType<ExpressionSyntax>().FirstOrDefault(expression =>
+                    { if (expression is null) { throw new ArgumentNullException(nameof(expression)); } return expression is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax; })
+                        ?? throw new InferenceException("Callback storage has no call context.");
+                    foreach (var identifier in context.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+                    {
+                        var dependency = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
+                        if (dependency is not (ILocalSymbol or IParameterSymbol))
+                        { continue; }
+                        var declared = dependency.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+                        if (declared?.SyntaxTree == context.SyntaxTree && context.Span.Contains(declared.Span))
+                        { continue; }
+                        BindLocals(identifier);
+                    }
+                    if (!probe.storageLambdaInputs.TryGetValue(parameter, out shape))
+                    {
+                        foreach (var owned in probe.environment.Keys.ToArray())
+                        {
+                            var declared = owned.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+                            if (declared?.SyntaxTree == context.SyntaxTree && context.Span.Contains(declared.Span))
+                            { probe.environment.Remove(owned); }
+                        }
+                        _ = probe.Expression(context);
+                    }
+                    if (!probe.storageLambdaInputs.TryGetValue(parameter, out shape))
+                    { throw new InferenceException("Unresolved callback storage parameter."); }
+                    resolving.Remove(parameter);
+                }
+                probe.environment[parameter] = shape;
+            }
             bool BindPatternOwner(SyntaxNode site)
             {
                 if (site is null)
@@ -308,7 +348,12 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(syntax)); }
                 foreach (var identifier in syntax.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
                 {
-                    if (model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local || probe.environment.ContainsKey(local))
+                    var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
+                    if (symbol is not null && probe.environment.ContainsKey(symbol))
+                    { continue; }
+                    if (symbol is IParameterSymbol { ContainingSymbol: IMethodSymbol { MethodKind: MethodKind.AnonymousFunction } } callback)
+                    { BindCallbackParameter(callback); continue; }
+                    if (symbol is not ILocalSymbol local)
                     { continue; }
                     if (!resolving.Add(local))
                     { throw new InferenceException("Cyclic storage initializer."); }

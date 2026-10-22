@@ -45,6 +45,17 @@ internal static class DefaultValueRuntimeChecks
                 public async ValueTask DisposeAsync(){Disposals++;Disposing.SetResult(true);await DisposeGate.Task;Row[0]=Restore;if(DisposeError!=null)throw DisposeError;}
             }
             public static class DefaultProbe{
+                public static int CallbackCalls;
+                static void VisitRows<T>(IEnumerable<T> values,Action<T> action){foreach(var value in values){Interlocked.Increment(ref CallbackCalls);action(value);}}
+                static U SelectRow<T,U>(T value,U tag,Func<T,U,U> action)=>action(value,tag);
+                static Task ApplyRow<T>(T value,Func<T,Task> action)=>action(value);
+                static ValueTask ApplyValueRow<T>(T value,Func<T,ValueTask> action)=>action(value);
+                public static void CallbackRows(IEnumerable<int[]> values){VisitRows(values,row=>{row[0]=default;});}
+                public static void CallbackNested(IEnumerable<IEnumerable<int[]>> values){VisitRows(values,rows=>VisitRows(rows,row=>{var copy=row;ref var alias=ref copy[0];alias=default;}));}
+                public static void CallbackDelegate(Action<Action<int[]>> visit){visit(row=>{ref var alias=ref row[0];alias=default;});}
+                public static int CallbackSibling(int[] value,int tag)=>SelectRow(value,tag,(row,other)=>{ref var alias=ref row[0];alias=default;return other;});
+                public static Task CallbackAsync(int[] value,Task gate)=>ApplyRow(value,async row=>{await gate;ref var alias=ref row[0];alias=default;});
+                public static ValueTask CallbackValueAsync(int[] value,Task gate)=>ApplyValueRow(value,async row=>{await gate;ref var alias=ref row[0];alias=default;});
                 public static int OutCalls;
                 static bool Transfer<T>(T value,out T result){Interlocked.Increment(ref OutCalls);result=value;return true;}
                 static void TransferPair<T,U>(T value,U tag,out T row,out U other){Interlocked.Increment(ref OutCalls);row=value;other=tag;}
@@ -135,6 +146,7 @@ internal static class DefaultValueRuntimeChecks
                     if(!await Owners(cancellationToken))return false;
                     if(!await Patterns(cancellationToken))return false;
                     if(!await Outputs(cancellationToken))return false;
+                    if(!await Callbacks(cancellationToken))return false;
                     foreach(bool flag in new[]{false,true}){
                         int expected=flag?7:0;
                         if(DefaultProbe.Assigned(!flag,7)!=expected||await DefaultProbe.AssignedAsync(!flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected)return false;
@@ -200,6 +212,29 @@ internal static class DefaultValueRuntimeChecks
                         ||DefaultProbe.IndirectProperty(property)!=0||property.Value!=0||property.Reads!=1
                         ||DefaultProbe.IndirectIndexer(indexer)!=0||indexer.Value!=0||indexer.Reads!=1||DefaultProbe.IndirectTuple((7,9))!=0)return false;
                     int[] first={7},second={9};return DefaultProbe.IndirectRebind(first,second)==0&&first[0]==7&&second[0]==0;
+                }
+                static async Task<bool> Callbacks(CancellationToken cancellationToken){
+                    int[] first={7},second={9};DefaultProbe.CallbackCalls=0;DefaultProbe.CallbackRows(new[]{first,second});
+                    if(first[0]!=0||second[0]!=0||DefaultProbe.CallbackCalls!=2)return false;
+                    first[0]=7;second[0]=9;DefaultProbe.CallbackCalls=0;DefaultProbe.CallbackNested(new[]{new[]{first,second}});
+                    if(first[0]!=0||second[0]!=0||DefaultProbe.CallbackCalls!=3)return false;
+                    int calls=0;Action<int[]>? saved=null;Action<Action<int[]>> visit=action=>{calls++;saved=action;};
+                    first[0]=7;DefaultProbe.CallbackDelegate(visit);if(first[0]!=7||calls!=1||saved==null)return false;saved(first);if(first[0]!=0)return false;
+                    first[0]=7;if(DefaultProbe.CallbackSibling(first,9)!=9||first[0]!=0)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        var row=new[]{7};var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=DefaultProbe.CallbackAsync(row,gate.Task);var valueTask=DefaultProbe.CallbackValueAsync(row,gate.Task).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||row[0]!=7)return false;var failure=new InvalidOperationException("callback-await");
+                        if(outcome=="Value")gate.SetResult(true);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        foreach(var pending in new[]{task,valueTask}){
+                            try{await pending.WaitAsync(cancellationToken);if(outcome!="Value")return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                        if(row[0]!=(outcome=="Value"?0:7))return false;
+                    }
+                    return true;
                 }
                 static async Task<bool> Outputs(CancellationToken cancellationToken){
                     DefaultProbe.OutCalls=0;int[] first={7},conditional={7},tuple={7},stored={7},delegated={7},captured={7};
@@ -297,6 +332,7 @@ internal static class DefaultValueRuntimeChecks
                     if(!await Owners(text,cancellationToken))return false;
                     if(!await Patterns(text,cancellationToken))return false;
                     if(!await Outputs(text,cancellationToken))return false;
+                    if(!await Callbacks(text,cancellationToken))return false;
                     string other=new string('y',2);string? slot=text;decimal? number=23m;
                     if(DefaultProbe.Alias(text)!=null||DefaultProbe.AliasLocal(text)!=null||DefaultProbe.AliasChain(text)!=null||DefaultProbe.AliasReset(text)!=null
                         ||!ReferenceEquals(DefaultProbe.AliasCopy(text),text)||DefaultProbe.AliasCopy(text).Length!=text.Length||DefaultProbe.AliasCapture(text)()!=null||DefaultProbe.AliasRef(ref slot)!=null||slot!=null
@@ -348,6 +384,20 @@ internal static class DefaultValueRuntimeChecks
                     numbers[0]=23m;if(DefaultProbe.IndirectLift(numbers,23m)!=null||numbers[0]!=null)return false;
                     var numberCell=new IndirectCell<decimal?>(23m);if(DefaultProbe.IndirectProperty(numberCell)!=null||numberCell.Value!=null)return false;
                     string?[] first={text},second={text};return DefaultProbe.IndirectRebind(first,second)==null&&ReferenceEquals(first[0],text)&&second[0]==null;
+                }
+                static async Task<bool> Callbacks(string text,CancellationToken cancellationToken){
+                    string?[] first={text},second={text};DefaultProbe.CallbackCalls=0;DefaultProbe.CallbackRows(new[]{first,second});
+                    if(first[0]!=null||second[0]!=null||DefaultProbe.CallbackCalls!=2)return false;
+                    first[0]=text;second[0]=text;DefaultProbe.CallbackCalls=0;DefaultProbe.CallbackNested(new[]{new[]{first,second}});
+                    if(first[0]!=null||second[0]!=null||DefaultProbe.CallbackCalls!=3)return false;
+                    int calls=0;Action<string?[]>? saved=null;Action<Action<string?[]>> visit=action=>{calls++;saved=action;};
+                    first[0]=text;DefaultProbe.CallbackDelegate(visit);if(!ReferenceEquals(first[0],text)||calls!=1||saved==null)return false;saved(first);if(first[0]!=null)return false;
+                    var tag=new Uri("https://example.invalid/callback");first[0]=text;if(!ReferenceEquals(DefaultProbe.CallbackSibling(first,tag),tag)||first[0]!=null)return false;
+                    var row=new[]{(string?)text};var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var task=DefaultProbe.CallbackAsync(row,gate.Task);var valueTask=DefaultProbe.CallbackValueAsync(row,gate.Task).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||!ReferenceEquals(row[0],text))return false;
+                    gate.SetResult(true);await Task.WhenAll(task,valueTask).WaitAsync(cancellationToken);if(row[0]!=null)return false;
+                    decimal?[] number={23m};DefaultProbe.CallbackRows(new[]{number});return number[0]==null;
                 }
                 static async Task<bool> Outputs(string text,CancellationToken cancellationToken){
                     DefaultProbe.OutCalls=0;string?[] first={text},conditional={text},tuple={text},stored={text},delegated={text},captured={text};
