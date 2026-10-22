@@ -867,6 +867,16 @@ Applied fixes execute tuple copies and ref mutations, one-time array indices,
 dictionary hits/misses, reference identity, nullable-value domains, struct defaults
 without constructor calls, suspended awaits, exact faults and cancellation.
 CLI/package consumers check representable C# 8 bounds and broader C# 9/13 domains.
+Nullable write discovery also handles `ref` parameters with `MaybeNull` or
+`MaybeNullWhen` output contracts. Source/metadata methods and delegates preserve
+array/tuple storage, aliases, copied values and relationships with other inputs.
+`AllowNull` inputs and conditional `NotNullWhen`/`NotNull` guarantees participate
+through the same compiler-checked storage and read paths. Fixed value-type and
+struct-constrained references keep their original domains. Applied fixes verify
+reference/nullable-value inputs, struct defaults without constructors, copied
+identities, ref tuple mutations, one-time indices, faults before writes and
+Task/ValueTask suspension, exact faults and cancellation. CLI/package consumers
+exercise C# 8 class/struct bounds and broader C# 9/13 nullable domains.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

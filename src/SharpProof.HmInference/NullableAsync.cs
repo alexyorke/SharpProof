@@ -95,7 +95,7 @@ public static partial class Inference
         {
             if (parameter is null)
             { throw new ArgumentNullException(nameof(parameter)); }
-            if (parameter.RefKind != RefKind.Out || parameter.OriginalDefinition.Type is ITypeParameterSymbol { HasValueTypeConstraint: true }
+            if (parameter.RefKind is not (RefKind.Ref or RefKind.Out) || parameter.OriginalDefinition.Type is ITypeParameterSymbol { HasValueTypeConstraint: true }
                 || parameter.OriginalDefinition.Type is { IsValueType: true } and not ITypeParameterSymbol)
             { return false; }
             var maybeNull = false;

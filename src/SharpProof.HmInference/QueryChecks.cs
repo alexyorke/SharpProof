@@ -10,6 +10,17 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("ArrayMaybeNullRefOnly", "static void Clear<T>([System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;static int M(int[] values){Clear(ref values[0]);return values[0];}", "T1? M<T1>(T1?[] values)"),
+            ("TupleConditionalRef", "static bool Store<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)][System.Diagnostics.CodeAnalysis.NotNullWhen(true)]ref T target,T value,bool keep){target=keep?(value is null?throw new Exception():value):default!;return keep;}static int M((int value,bool tag) pair,int value,bool keep){if(Store(ref pair.value,value,keep))return pair.Item1;return value;}", "T1 M<T1, T2>((T1? value, T2 tag) pair, T1 value, bool keep)"),
+            ("RefNotNullStorage", "static void Check<T>([System.Diagnostics.CodeAnalysis.NotNull]ref T? value){if(value is null)throw new Exception();}static int M((int value,bool tag) pair){Check(ref pair.value);return pair.Item1;}", "T1 M<T1, T2>((T1? value, T2 tag) pair)"),
+            ("RefFixedValueStorage", "static void Clear([System.Diagnostics.CodeAnalysis.MaybeNull]ref int value)=>value=0;static bool M((int value,bool tag) pair){Clear(ref pair.value);return pair.tag;}", "T1 M<T1>((int value, T1 tag) pair)"),
+            ("RefConstrainedValueStorage", "static void Clear<T>([System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)where T:struct=>value=default;static int M((int value,bool tag) pair){Clear(ref pair.value);return pair.value;}", "T1 M<T1, T2>((T1 value, T2 tag) pair) where T1 : struct"),
+            ("RefDelegateStorage", "delegate void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);static int M(Clear<int> clear,int[] values){clear(ref values[0]);return values[0];}", "T1? M<T1>(global::Cases.Clear<T1> clear, T1?[] values)"),
+            ("RefAsyncStorage", "static void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;static async Task<int> M(Task<int[]> input){var values=await input;Clear(ref values[0]);return values[0];}", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<T1?[]> input)"),
+            ("ArrayNullableRefStore", "static void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;static int M(int[] values){Clear(ref values[0]);return values[0];}", "T1? M<T1>(T1?[] values)"),
+            ("TupleNullableRefStore", "static void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;static int M((int value,bool tag) pair){Clear(ref pair.value);return pair.Item1;}", "T1? M<T1, T2>((T1? value, T2 tag) pair)"),
+            ("ArrayNullableRefCopy", "static void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;static (int before,int after) M(int[] values){var copy=values[0];Clear(ref values[0]);return(copy,values[0]);}", "(T1? before, T1? after) M<T1>(T1?[] values)"),
+            ("ArrayNullableRefInput", "static void Store<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T target)=>target=value;static int M(int value,int[] target){Store(value,ref target[0]);return target[0];}", "T1? M<T1>(T1 value, T1?[] target)"),
             ("FixedValueOutputStorage", "static void Read([System.Diagnostics.CodeAnalysis.MaybeNull]out int value)=>value=0;static bool M((int value,bool tag) pair){Read(out pair.value);return pair.tag;}", "T1 M<T1>((int value, T1 tag) pair)"),
             ("ConstrainedValueOutputStorage", "static void Read<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)where T:struct=>value=default;static int M((int value,bool tag) pair){Read(out pair.value);return pair.value;}", "T1 M<T1, T2>((T1 value, T2 tag) pair) where T1 : struct"),
             ("ArrayAliasNullableOutput", "static bool Read<T>([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}static int M(int[] values,int fallback){ref var slot=ref values[0];return Read(out slot)?values[0]:fallback;}", "T1? M<T1>(T1?[] values, T1 fallback)"),
@@ -241,6 +252,8 @@ internal static class QueryChecks
                 [System.Diagnostics.CodeAnalysis.NotNull]public T? Required=>default!;
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>default;
             }
+            public delegate void RefContractAction<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);
+            public static class RefContractProvider{public static void Clear<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;}
             public static class SlotContractProvider{public static void Fill<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback){if(fallback is null)throw new System.Exception();value=fallback;}public static void Clear<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;}
             public sealed class StateContractCell<T>{public T? Value;[System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Value))]public void Ensure(){if(Value is null)throw new System.Exception();}[System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Value))]public bool Ready=>Value is not null;}
             public sealed class PostconditionCell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}
@@ -265,6 +278,8 @@ internal static class QueryChecks
         var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
         (string Name, string Source, string Signature)[] metadataTests =
         [
+            ("MetadataNullableRefStorage", "static int M(int[] values){RefContractProvider.Clear(ref values[0]);return values[0];}", "T1? M<T1>(T1?[] values)"),
+            ("MetadataNullableRefDelegate", "static int M(RefContractAction<int> clear,int[] values){clear(ref values[0]);return values[0];}", "T1? M<T1>(global::RefContractAction<T1> clear, T1?[] values)"),
             ("MetadataTupleNotNullOutput", "static int M((int value,bool tag) pair,int fallback){SlotContractProvider.Fill(out pair.Item1,fallback);return pair.value;}", "T1 M<T1, T2>((T1? value, T2 tag) pair, T1 fallback)"),
             ("MetadataTupleNullableOutput", "static int M((int value,bool tag) pair){SlotContractProvider.Clear(out pair.value);return pair.value;}", "T1? M<T1, T2>((T1? value, T2 tag) pair)"),
             ("MetadataArrayNullableOutput", "static int M(int[] values){SlotContractProvider.Clear(out values[0]);return values[0];}", "T1? M<T1>(T1?[] values)"),

@@ -32,7 +32,19 @@ public sealed class FieldCell<T>where T:class{public T? Value=default;}
 public sealed class StateBox<T>{public StateCell<T> Nested=new StateCell<T>();}
 public sealed class StateCell<T>{public T? Field=default;public T? Property=>Field;[System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Field),nameof(Property))]public void Ensure(){if(Field is null||Property is null)throw new Exception();}[System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Field),nameof(Property))]public bool Ready=>Field is not null&&Property is not null;}
 #endif
+public delegate void RefSlotAction<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);
 public static class QueryConsumer{
+  static void ClearRef<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value)=>value=default;
+  static void StoreRef<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T target)=>target=value;
+  static void EnsureRef<T>([System.Diagnostics.CodeAnalysis.NotNull]ref T? value)where T:class{if(value is null)throw new Exception();}
+  public static int ArrayRefSlot(int[] values){ClearRef(ref values[0]);return values[0];}
+  public static int TupleRefSlot((int value,bool tag) pair){ClearRef(ref pair.value);return pair.Item1;}
+  public static int AliasRefSlot(int[] values){ref var slot=ref values[0];ClearRef(ref slot);return values[0];}
+  public static int InputRefSlot(int value,int[] target){StoreRef(value,ref target[0]);return target[0];}
+  public static int DelegateRefSlot(RefSlotAction<int> clear,int[] values){clear(ref values[0]);return values[0];}
+  public static string CheckedRefTuple((string? value,bool tag) pair){EnsureRef(ref pair.Item1);return pair.value;}
+  public static async Task<int> AwaitRefSlot(Task<int[]> input){var values=await input;ClearRef(ref values[0]);return values[0];}
+  public static async ValueTask<int> ValueAwaitRefSlot(ValueTask<int[]> input){var values=await input;ClearRef(ref values[0]);return values[0];}
   static void WriteSlot<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;
   static bool TrySlot<T>([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}
   public static int TuplePossibleSlot((int value,bool tag) pair){WriteSlot(out pair.value);return pair.value;}
@@ -213,6 +225,7 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 CheckedRefTuple<T1, T2>((T1? value, T2 tag) pair) where T1 : class' "$log"
   grep -Fq 'T1 TupleReferenceFill<T1, T2>((T1? value, T2 tag) pair, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 FieldFill<T1>(global::FieldCell<T1> cell, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1? FieldClear<T1>(global::FieldCell<T1> cell) where T1 : class' "$log"
@@ -249,6 +262,14 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> InputValueAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    for method in ArrayRefSlot AliasRefSlot; do
+      grep -Fq "T1 $method<T1>(T1[] values) where T1 : struct" "$log"
+    done
+    grep -Fq 'T1 TupleRefSlot<T1, T2>((T1 value, T2 tag) pair) where T1 : struct' "$log"
+    grep -Fq 'T1 InputRefSlot<T1>(T1 value, T1[] target) where T1 : struct' "$log"
+    grep -Fq 'T1 DelegateRefSlot<T1>(global::RefSlotAction<T1> clear, T1[] values) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> AwaitRefSlot<T1>(global::System.Threading.Tasks.Task<T1[]> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> ValueAwaitRefSlot<T1>(global::System.Threading.Tasks.ValueTask<T1[]> input) where T1 : struct' "$log"
     grep -Fq 'T1 TuplePossibleSlot<T1, T2>((T1 value, T2 tag) pair) where T1 : struct' "$log"
     grep -Fq 'T1 ArrayPossibleSlot<T1>(T1[] values) where T1 : struct' "$log"
     grep -Fq 'T1 AliasPossibleSlot<T1>(T1[] values, T1 fallback) where T1 : struct' "$log"
@@ -284,6 +305,14 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    for method in ArrayRefSlot AliasRefSlot; do
+      grep -Fq "T1? $method<T1>(T1?[] values)" "$log"
+    done
+    grep -Fq 'T1? TupleRefSlot<T1, T2>((T1? value, T2 tag) pair)' "$log"
+    grep -Fq 'T1? InputRefSlot<T1>(T1 value, T1?[] target)' "$log"
+    grep -Fq 'T1? DelegateRefSlot<T1>(global::RefSlotAction<T1> clear, T1?[] values)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> AwaitRefSlot<T1>(global::System.Threading.Tasks.Task<T1?[]> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> ValueAwaitRefSlot<T1>(global::System.Threading.Tasks.ValueTask<T1?[]> input)' "$log"
     grep -Fq 'T1? TuplePossibleSlot<T1, T2>((T1? value, T2 tag) pair)' "$log"
     grep -Fq 'T1? ArrayPossibleSlot<T1>(T1?[] values)' "$log"
     grep -Fq 'T1? AliasPossibleSlot<T1>(T1?[] values, T1 fallback)' "$log"

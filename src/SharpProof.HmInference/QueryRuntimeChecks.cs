@@ -28,6 +28,8 @@ internal static class QueryRuntimeChecks
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+            public static class RefTrace{public static int Calls,Indices;}
+            public delegate void RefSlotAction<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value);
             public static class SlotTrace{public static int Calls,Indices;}
             public sealed class StateBox<T>{public StateCell<T> Nested;public StateBox(StateCell<T> value){Nested=value;}}
             public sealed class StateCell<T>{
@@ -51,6 +53,19 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static void ClearRefSlot<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T value){Interlocked.Increment(ref RefTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=default;}
+                static void StoreRefSlot<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNull]ref T target){Interlocked.Increment(ref RefTrace.Calls);target=value;}
+                static bool TryRefSlot<T>([System.Diagnostics.CodeAnalysis.AllowNull][System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)][System.Diagnostics.CodeAnalysis.NotNullWhen(true)]ref T target,T value,bool keep){Interlocked.Increment(ref RefTrace.Calls);target=keep?(value is null?throw QueryTrace.ContractFailure:value):default!;return keep;}
+                static int RefSlotIndex(){Interlocked.Increment(ref RefTrace.Indices);return 0;}
+                public static (int before,int after) RefSlotCopy(int[] values){var copy=values[0];ClearRefSlot(ref values[RefSlotIndex()]);return(copy,values[0]);}
+                public static int RefSlotArray(int[] values){ClearRefSlot(ref values[RefSlotIndex()]);return values[0];}
+                public static int RefSlotAlias(int[] values){ref var slot=ref values[RefSlotIndex()];ClearRefSlot(ref slot);return values[0];}
+                public static int RefSlotInput(int value,int[] target){StoreRefSlot(value,ref target[RefSlotIndex()]);return target[0];}
+                public static int RefSlotTuple(ref (int value,bool tag) pair){ClearRefSlot(ref pair.value);return pair.Item1;}
+                public static int RefSlotConditional((int value,bool tag) pair,int value,bool keep){if(TryRefSlot(ref pair.value,value,keep))return pair.Item1;return value;}
+                public static int RefSlotDelegate(RefSlotAction<int> clear,int[] values){clear(ref values[RefSlotIndex()]);return values[0];}
+                public static async Task<int> RefSlotTask(Task<int[]> input){var values=await input;ClearRefSlot(ref values[RefSlotIndex()]);return values[0];}
+                public static async ValueTask<int> RefSlotValueTask(ValueTask<int[]> input){var values=await input;ClearRefSlot(ref values[RefSlotIndex()]);return values[0];}
                 public static void WritePossibleSlot<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value){Interlocked.Increment(ref SlotTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=default;}
                 static void WriteKnownSlot<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback){Interlocked.Increment(ref SlotTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(fallback is null)throw QueryTrace.ContractFailure;value=fallback;}
                 static int SlotIndex(){Interlocked.Increment(ref SlotTrace.Indices);return 0;}
@@ -314,7 +329,31 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> RefSlotContracts(CancellationToken cancellationToken){
+                    RefTrace.Calls=RefTrace.Indices=0;int[] values={7};var pair=QueryProbe.RefSlotCopy(values);if(pair.before!=7||pair.after!=0||values[0]!=0)return false;values[0]=11;
+                    if(QueryProbe.RefSlotArray(values)!=0||values[0]!=0)return false;values[0]=13;
+                    if(QueryProbe.RefSlotAlias(values)!=0||values[0]!=0||QueryProbe.RefSlotInput(17,values)!=17||values[0]!=17)return false;
+                    var tuple=(value:19,tag:true);if(QueryProbe.RefSlotTuple(ref tuple)!=0||tuple.value!=0||!tuple.tag)return false;
+                    if(QueryProbe.RefSlotConditional((23,true),29,true)!=29||QueryProbe.RefSlotConditional((23,true),29,false)!=29||QueryProbe.RefSlotDelegate(QueryProbe.ClearRefSlot,values)!=0||values[0]!=0||RefTrace.Calls!=8||RefTrace.Indices!=5)return false;
+                    var failure=new InvalidOperationException("ref slot");using var canceled=new CancellationTokenSource();canceled.Cancel();QueryTrace.Failure=failure;values[0]=31;
+                    try{_=QueryProbe.RefSlotArray(values);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,failure)){if(values[0]!=31||RefTrace.Calls!=9||RefTrace.Indices!=6)return false;}finally{QueryTrace.Failure=null;}
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        RefTrace.Calls=RefTrace.Indices=0;int[] delayed={7};var gate=new TaskCompletionSource<int[]>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.RefSlotTask(gate.Task);var valueTask=QueryProbe.RefSlotValueTask(new ValueTask<int[]>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||RefTrace.Calls!=0||RefTrace.Indices!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(delayed);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=0)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            var expected=outcome is "Value" or "HelperFault"?2:0;if(RefTrace.Calls!=expected||RefTrace.Indices!=expected||delayed[0]!=(outcome=="Value"?0:7))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> SlotContracts(CancellationToken cancellationToken){
+                    if(!await RefSlotContracts(cancellationToken))return false;
                     SlotTrace.Calls=SlotTrace.Indices=0;var original=(value:7,tag:true);var copy=QueryProbe.TupleSlotCopy(original);
                     if(copy.copy!=7||copy.stored!=0||original.value!=7||!original.tag||QueryProbe.TupleSlotKnown(original,9)!=9||SlotTrace.Calls!=2)return false;
                     if(QueryProbe.TupleSlotRef(ref original)!=0||original.value!=0||!original.tag)return false;
@@ -588,7 +627,22 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> RefSlotContracts(string text,CancellationToken cancellationToken){
+                    RefTrace.Calls=RefTrace.Indices=0;string?[] values={text};var pair=QueryProbe.RefSlotCopy(values);if(!ReferenceEquals(pair.before,text)||pair.after!=null||values[0]!=null)return false;values[0]=text;
+                    if(QueryProbe.RefSlotArray(values)!=null||values[0]!=null)return false;values[0]=text;
+                    if(QueryProbe.RefSlotAlias(values)!=null||values[0]!=null||!ReferenceEquals(QueryProbe.RefSlotInput(text,values),text)||!ReferenceEquals(values[0],text))return false;
+                    var uri=new Uri("https://example.invalid/ref-slot");(string? value,Uri tag) tuple=(text,uri);if(QueryProbe.RefSlotTuple(ref tuple)!=null||tuple.value!=null||!ReferenceEquals(tuple.tag,uri))return false;
+                    if(!ReferenceEquals(QueryProbe.RefSlotConditional(tuple,text,true),text)||!ReferenceEquals(QueryProbe.RefSlotConditional(tuple,text,false),text)||QueryProbe.RefSlotDelegate(QueryProbe.ClearRefSlot,values)!=null||values[0]!=null||RefTrace.Calls!=8||RefTrace.Indices!=5)return false;
+                    decimal?[] numeric={23m};if(QueryProbe.RefSlotArray(numeric)!=null||numeric[0]!=null)return false;
+                    var original=new QueryStoreValue();QueryStoreValue.Calls=0;QueryStoreValue[] structs={original};var zero=QueryProbe.RefSlotArray(structs);if(zero.Value!=0||zero.Text!=null||structs[0].Value!=0||structs[0].Text!=null||QueryStoreValue.Calls!=0)return false;
+                    var gate=new TaskCompletionSource<string?[]>(TaskCreationOptions.RunContinuationsAsynchronously);string?[] delayed={text};RefTrace.Calls=RefTrace.Indices=0;
+                    var task=QueryProbe.RefSlotTask(gate.Task);var valueTask=QueryProbe.RefSlotValueTask(new ValueTask<string?[]>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||RefTrace.Calls!=0)return false;gate.SetResult(delayed);
+                    foreach(var pending in new[]{task,valueTask}){if(await pending.WaitAsync(cancellationToken)!=null)return false;}
+                    return delayed[0]==null&&RefTrace.Calls==2&&RefTrace.Indices==2;
+                }
                 static async Task<bool> SlotContracts(string text,CancellationToken cancellationToken){
+                    if(!await RefSlotContracts(text,cancellationToken))return false;
                     SlotTrace.Calls=SlotTrace.Indices=0;var uri=new Uri("https://example.invalid/tuple-slot");(string? value,Uri tag) original=(text,uri);var copy=QueryProbe.TupleSlotCopy(original);
                     if(!ReferenceEquals(copy.copy,text)||copy.stored!=null||!ReferenceEquals(original.value,text)||!ReferenceEquals(original.tag,uri)||!ReferenceEquals(QueryProbe.TupleSlotKnown(original,text),text)||SlotTrace.Calls!=2)return false;
                     if(QueryProbe.TupleSlotRef(ref original)!=null||original.value!=null||!ReferenceEquals(original.tag,uri))return false;
