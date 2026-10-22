@@ -11,6 +11,93 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 internal sealed class ExceptionStackTraceRuntimeTests
 {
+    [TestCase(ResourcePrimitiveHCallKind.DivideByZero)]
+    [TestCase(ResourcePrimitiveHCallKind.Overflow)]
+    [TestCase(ResourcePrimitiveHCallKind.NullReference)]
+    [TestCase(ResourcePrimitiveHCallKind.RangeCheck)]
+    [TestCase(ResourcePrimitiveHCallKind.NewArrayWorker)]
+    public void ReviewedPrimitiveHCallsHaveNoDirectTraceFrame(ResourcePrimitiveHCallKind helper)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(helper,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.DirectFramesUpper, Is.Zero);
+        Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.PrimitiveHCallFrameModel));
+    }
+
+    [TestCase(-1)]
+    [TestCase(int.MaxValue)]
+    public void UnreviewedHelperEntriesNeverPublishAFrameBound(int helper)
+    {
+        var result = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames((ResourcePrimitiveHCallKind)helper,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.EqualTo("UnsupportedPrimitiveHCallEntry"));
+        Assert.That(result.DirectFramesUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+    }
+
+    [Test]
+    public void PrimitiveHelperFramesRequirePinnedLayoutAndPropagateCancellation()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "arm64", 8);
+        var result = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(ResourcePrimitiveHCallKind.Overflow,
+            layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        Assert.That(result.DirectFramesUpper, Is.Null);
+        Assert.That(result.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action check = () => { _ = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(ResourcePrimitiveHCallKind.Overflow, layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(check);
+    }
+
+    [TestCase(ResourcePrimitiveHCallKind.DivideByZero, 0, typeof(DivideByZeroException))]
+    [TestCase(ResourcePrimitiveHCallKind.Overflow, int.MaxValue, typeof(OverflowException))]
+    [TestCase(ResourcePrimitiveHCallKind.NullReference, 0, typeof(NullReferenceException))]
+    [TestCase(ResourcePrimitiveHCallKind.RangeCheck, 1, typeof(IndexOutOfRangeException))]
+    [TestCase(ResourcePrimitiveHCallKind.NewArrayWorker, -1, typeof(OverflowException))]
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    public void PrimitiveFaultRawTracesFitTheIndependentSourceAndCatchFrames(ResourcePrimitiveHCallKind helper, int input, Type expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        Exception? fault = null;
+        try
+        { _ = PrimitiveFault(helper, input); }
+        catch (Exception exception) when (exception is DivideByZeroException or OverflowException or NullReferenceException or IndexOutOfRangeException)
+        { fault = exception; }
+        Assert.That(fault, Is.TypeOf(expected));
+        var trace = (byte[])typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fault)!;
+        // Inspect the raw VM trace, including hidden frames, rather than the
+        // formatted StackTrace API. Only the source and this catch are active.
+        var frames = BitConverter.ToUInt64(trace, 0);
+        Assert.That(frames, Is.InRange(1UL, 2UL));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static int PrimitiveFault(ResourcePrimitiveHCallKind helper,
+        /* SPINT001: all values valid - Invalid operands intentionally exercise primitive fault paths. */ int input)
+    {
+        switch (helper)
+        {
+            case ResourcePrimitiveHCallKind.DivideByZero:
+                return 17 / input;
+            case ResourcePrimitiveHCallKind.Overflow:
+                return checked(input + 1);
+            case ResourcePrimitiveHCallKind.NullReference:
+                int[]? missing = null;
+                return missing!.Length;
+            case ResourcePrimitiveHCallKind.RangeCheck:
+                return (new int[1])[input];
+            case ResourcePrimitiveHCallKind.NewArrayWorker:
+                return new int[input].Length;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(helper));
+        }
+    }
+
     [TestCase(0, 0, 0, 0)]
     [TestCase(1, 0, 2, 30)]
     [TestCase(10, 4, 1, 1024)]

@@ -109,6 +109,52 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Direct primitive helper-frame contribution
+
+The private model `coreclr8-direct-primitive-hcall-trace-frames-v1` now admits
+only the reviewed divide-by-zero, overflow, null-reference, range-check and
+`JIT_NewArr1` worker entries. Their direct explicit helper frames contribute
+zero trace elements: `HCIMPL` clears the `FCall` identity, the helper frame's
+method-descriptor lookup maps null to null, and the VM explicit-frame trace
+path appends only frames with a non-null descriptor. The implementation records
+the immutable source links for that chain. Entries without review and incompatible
+runtime layouts return Unknown without a frame bound or model; cancellation
+propagates.
+
+Tests cover the closed entry set, unknown kinds, layout/cancellation, and raw VM
+traces from actual primitive faults in the pinned runtime. The independent
+runtime controls disable inlining/optimization and allow only the source and
+catch frames; they do not rely on formatted stack traces hiding helper frames.
+All 234 Specs cases passed with zero build warnings or errors, including all
+five primitive-fault raw-trace controls:
+`artifacts/resource-hcall-frames-specs-final.log`. Full quality/API and
+documentation checks passed: `artifacts/resource-hcall-frames-lint-final.log`
+and `artifacts/resource-hcall-frames-docs.log`. The final canonical private
+formatter copied zero changes:
+`artifacts/resource-hcall-frames-format-verified.log`. Exact-head hosted
+qualification of this direct-helper checkpoint remains required.
+
+This component does not count transitive managed calls, all possible JIT
+implementations of an opcode, tiered/inlining/`OSR` frames or unwind/rethrow
+visits. Those obligations remain open before any attempted-frame budget or
+root byte bound can be derived. No protocol/cache change or root verdict change.
+
+Pinned helper selection is in `src/coreclr/inc/jithelpers.h` and
+`src/coreclr/vm/jitinterface.cpp`. `OSR` frame review starts in
+`src/coreclr/jit/codegencommon.cpp`; `src/coreclr/jit/osr.cpp` is absent at this
+revision and its failed-fetch payload is not registered as a source. Successful
+downloads are byte-count/hash checked in
+`artifacts/resource-runtime-fault-review/sources.json`.
+
+Published `4456993d7` passed complete canonical CI (39787702379), package consumers
+(39787702403), documentation and security. All fifteen coverage shards passed
+in run 39787702098; aggregation measured 6794/6995 changed trusted lines
+(97.13%, 201 uncovered), failing the unchanged 100% floor. The new source-body
+codec and native checker have no uncovered changed lines. Complete evidence for
+merge `cae2639348cf4e295ba268fd0163e79cd68579bc`:
+`artifacts/resource-445699-coverage-evidence/coverage/SharpProof.coverage.json`.
+This report does not measure the local direct-helper component.
+
 ### Emitted source-body inventory for the frame bridge
 
 A private collector now inspects each distinct source-child method from the
