@@ -8,6 +8,63 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class SourceInitializerNaturalBudgetCoverageTests
 {
+    [TestCase("public sealed class Box { public int First=2, Second=3; }")]
+    [TestCase("public sealed class Box { public int First=2; public int Second=3; }")]
+    public void ConstructorAndObjectInitializersCompleteAtomicallyAcrossWorkAllowances(string declaration)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        using var subject = TypedProgramSubject.Create(
+            "int Target() { var item=new Box { Second=7 }; return item.First+item.Second; }", declaration);
+        Assert.That(subject.Invoke([]), Is.EqualTo(9));
+        var type = subject.Compilation.GetTypeByMetadataName("Box")!;
+        var constructor = type.InstanceConstructors.Single();
+        int? firstExact = null;
+        var limitSeen = false;
+        for (var available = 0; available <= 256; available++)
+        {
+            var exact = CheckAllowance(available);
+            if (exact)
+            { firstExact ??= available; }
+            else
+            {
+                Assert.That(firstExact, Is.Null, "A larger allowance must not invalidate an exact constructor import.");
+                limitSeen = true;
+            }
+        }
+        Assert.That(limitSeen, Is.True);
+        var exactAllowance = firstExact ?? throw new AssertionException("No exact constructor import within the tested allowance range.");
+        Assert.That(exactAllowance, Is.LessThan(256));
+        TestContext.WriteLine("First exact constructor import: " + exactAllowance);
+
+        bool CheckAllowance(int available)
+        {
+            if (available is < 0 or > 256)
+            { throw new ArgumentOutOfRangeException(nameof(available)); }
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var context = new TotalLoweringContext(factory, subject.Context.Target);
+            var session = new TotalSourceCallSession(subject.Compilation, static _ => true, null,
+                TestContext.CurrentContext.CancellationToken);
+            Assert.That(session.Spend(RoslynTotalProgramLowerer.MaximumRegionSteps - available), Is.True);
+            var lowered = new RoslynTotalProgramLowerer(context, TestContext.CurrentContext.CancellationToken, session).Lower(subject.Graph);
+            Assert.That(session.IsActive(subject.Context.Target), Is.False);
+            Assert.That(session.IsActive(constructor), Is.False);
+            Assert.That(lowered.ConstructionLimitExceeded, Is.EqualTo(session.ConstructionLimitExceeded));
+            if (lowered.ConstructionLimitExceeded)
+            {
+                Assert.That(lowered.IsExact, Is.False);
+                return false;
+            }
+            Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+            var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
+                ImmutableDictionary<IrVarId, IrValue>.Empty, 1000,
+                new IrProgramReplayOptions(static _ => null), TestContext.CurrentContext.CancellationToken);
+            Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(replay.ConsumedApproximation, Is.False);
+            Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(9)));
+            return true;
+        }
+    }
+
     [Test]
     public void ActualStaticFieldDeclarationsConsumeTheDefaultSessionBudget()
     {

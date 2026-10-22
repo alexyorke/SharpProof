@@ -109,6 +109,43 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Constructor initializer allowance sweeps
+
+Two source fixtures combine field initializers with a later object-initializer
+override, using one declaration with two variables or two separate declarations.
+Both compiled executions return nine. A representative probe first verified the
+exhausted-to-exact transition, the next allowance and allowance 256; both cases
+passed before expanding the sweep.
+
+The final sweep checks every allowance from 0 through 256 for both declaration
+shapes: 514 states. Each uses a fresh owned factory/context and the normal shared
+source-call session, with the existing work-allowance API. Every exhausted result
+must be incomplete; every exact result must replay to nine without consuming an
+approximation. A larger allowance cannot invalidate an already exact import.
+Caller and constructor activity must be cleared after every attempt, including
+exhausted attempts. The first exact allowance must occur before the upper end of
+the tested range. No manual private-field changes or new budget mechanism are
+introduced.
+
+All 110 related frontend cases passed, covering the complete sweeps, source-call
+lowering and event-initializer admission. The build reported zero warnings or
+errors (`artifacts/resource-constructor-initializer-budget-tests.log`). The
+representative probe is retained in
+`artifacts/resource-constructor-initializer-budget-probe.log`. The canonical
+formatter copied zero source changes
+(`artifacts/resource-constructor-initializer-budget-format.log`). Full
+quality/API and documentation checks passed
+(`artifacts/resource-constructor-initializer-budget-lint.log` and
+`artifacts/resource-constructor-initializer-budget-docs.log`).
+
+This strengthens frontend admission and cleanup controls, not a native numeric
+allocation verdict for an incomplete body. The production code, runtime premises,
+projection, protocol and cache identities are unchanged. The latest measured
+coverage baseline remains the complete `99cab41d2` report with 147 gaps; these
+new sweeps and the preceding loop/domain controls have not yet been measured.
+The remaining cumulative runtime-byte obligations and pending runtime-model
+choice are unchanged.
+
 ### Loop admission and normal-domain guard controls
 
 The analyzer control batch distinguishes legal promoted integral strides and
