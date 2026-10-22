@@ -6,6 +6,76 @@ namespace SharpProof.Ir.Test;
 public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
+    [TestCase(false)]
+    [TestCase(true)]
+    public void NonFieldMembersAreRejectedByBothTheBuilderAndMemoryExtraction(bool isStatic)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        var allocation = builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            IrFieldSites.Prefix + "invalid", factory.ObjectType, isStatic, isStatic ? [] : [factory.IntegerType]);
+        Action store = () =>
+        {
+            _ = builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field,
+            factory.Variable(root), member, factory.Null(factory.ObjectType));
+        };
+        Assert.That(store, Throws.ArgumentException);
+        var seed = builder.Write(entry, factory.CreateOperation(), IrWriteRegion.Local);
+        var returned = builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
+        var prefix = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(prefix.Bounds, Is.EqualTo(new ResourceMemoryBounds(24, 24, 0, 0, 24, 24)));
+
+        // The typed builder rejects this metadata. Exercise extraction's own
+        // guard with a deliberately malformed instruction using owned IDs.
+        var malformed = new IrWriteInstruction(seed.Id, seed.Operation, IrWriteRegion.Field,
+            factory.Variable(root), member, factory.Null(factory.ObjectType));
+        var check = ExtractMemory(factory, [allocation, malformed, returned]);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MemoryFieldStoreUnsupported"));
+    }
+    [TestCase(false, "MemoryControlFlowUnsupported")]
+    [TestCase(true, "MemoryInstructionUnsupported")]
+    public void ExtractionRejectsIncompleteOrUnsupportedTailsAfterOwnedAllocation(bool unsupported, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        List<IrInstruction> instructions = [builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root)];
+        if (unsupported)
+        { instructions.Add(builder.Write(entry, factory.CreateOperation(), IrWriteRegion.Static)); }
+        var check = ExtractMemory(factory, instructions);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(reason));
+    }
+
+    [Test]
+    public void ExtractionEnforcesItsEventBudgetIndependentlyOfThePathCollector()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", factory.ObjectType);
+        var instructions = new List<IrInstruction>();
+        for (var index = 0; index <= ResourceMemoryTrace.MaximumEvents; index++)
+        { instructions.Add(builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, root)); }
+        var check = ExtractMemory(factory, instructions);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MemoryProgramBudgetExceeded"));
+    }
+
+    private static ResourceMemoryCheck ExtractMemory(IrFactory factory, List<IrInstruction> instructions)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(instructions);
+        var method = typeof(ResourceMemoryProgram).GetMethod("Extract", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        return (ResourceMemoryCheck)method!.Invoke(null, [factory, instructions, Layout, TestContext.CurrentContext.CancellationToken])!;
+    }
 
     [TestCase(false)]
     [TestCase(true)]

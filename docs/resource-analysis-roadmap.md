@@ -109,6 +109,35 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Independent memory extraction guards
+
+Five additional memory-program controls cover incomplete/unsupported tails,
+malformed field-member metadata and extraction's own event budget. Static and
+method-shaped field stores are first rejected by the typed builder, leaving
+its admitted allocation prefix intact. Deliberately malformed instructions
+using owned IDs then verify extraction's separate rejection. Incomplete,
+unsupported and over-budget extraction inputs return Unknown without partial
+memory bounds even when valid allocations precede the rejection.
+
+Published `64125e57e` passed complete canonical CI (39812478216) and package
+consumers (39812478160). The retained coverage report still fails the unchanged
+100% floor; these passes do not qualify the newer local commits.
+
+All 108 memory-program cases passed on the formatted final source with zero
+build warnings or errors
+(`artifacts/resource-memory-program-boundaries-tests-verified.log`). The first
+probe expected evaluation to receive invalid stores; it instead confirmed the
+builder's earlier validation. The corrected controls exercise both layers.
+The canonical formatter updated the new action block before the passing run
+(`artifacts/resource-memory-program-boundaries-format.log`). No production
+admission rule or cost model changed. Task runtime-byte obligations remain open.
+
+Full quality/API checks passed
+(`artifacts/resource-memory-program-boundaries-lint.log`), as did documentation
+checks (`artifacts/resource-memory-program-boundaries-docs.log`). The final
+canonical private formatter copied zero source changes
+(`artifacts/resource-memory-program-boundaries-format-verified.log`).
+
 ### Carrier shape admission and throwable-construction audit
 
 Additional collector controls cover primitive field widths in generated class
