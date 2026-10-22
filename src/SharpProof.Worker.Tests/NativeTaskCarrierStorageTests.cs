@@ -974,6 +974,96 @@ public sealed class NativeTaskCarrierStorageTests
         }
     }
 
+    [TestCase("var observed=value.Number;", "Ldfld")]
+    [TestCase("value.Number=7;", "Stfld")]
+    [TestCase("ref int observed=ref value.Number;", "Ldflda")]
+    public void ForeignReceiverFieldsRequireTheProtectedSourceRegion(string statement, string rawCode)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(rawCode);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            var declaration = "public sealed class Cell {public int Number;} public static void Probe(Cell value) { " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? statement : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
+                (location == "after" ? statement : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
+                Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundarySourceEscape"), location);
+        }
+    }
+
+    [TestCase(OptimizationLevel.Debug)]
+    [TestCase(OptimizationLevel.Release)]
+    public void OwnedBoundaryFieldSequencesRetainCompilerEvidence(OptimizationLevel optimization)
+    {
+        var (compilation, _, _, _) = Compile(true, optimization);
+        using var emitted = new MemoryStream();
+        Assert.That(compilation.Emit(emitted, cancellationToken: TestContext.CurrentContext.CancellationToken).Success, Is.True);
+        using var image = new PEReader(new MemoryStream(emitted.ToArray(), false));
+        var metadata = image.GetMetadataReader();
+        var method = metadata.MethodDefinitions.Single(handle =>
+            metadata.GetString(metadata.GetMethodDefinition(handle).Name) == "MoveNext");
+        var body = image.GetMethodBody(metadata.GetMethodDefinition(method).RelativeVirtualAddress);
+        var region = body.ExceptionRegions.Single();
+        var code = body.GetILBytes()!;
+        var cursor = 0;
+        var outside = new List<string>();
+        while (cursor < code.Length)
+        {
+            Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction), Is.True);
+            if (instruction.Offset < region.TryOffset || instruction.Offset >= region.TryOffset + region.TryLength)
+            { outside.Add(instruction.Offset + ":" + instruction.RawCode + ":" + instruction.Operand); }
+        }
+        Assert.That(outside.Any(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Contains(":Ldfld:", StringComparison.Ordinal)), Is.True);
+        Assert.That(CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method,
+            compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity, 2,
+            TestContext.CurrentContext.CancellationToken), Is.Null, string.Join(", ", outside));
+    }
+
+    [TestCase(false, "var observed=this.Number;", true)]
+    [TestCase(false, "this.Number=7;", true)]
+    [TestCase(false, "ref int observed=ref this.Number;", true)]
+    [TestCase(false, "this.Next=null;", true)]
+    [TestCase(false, "this.Number=local=7;", true)]
+    [TestCase(false, "if(argument==0) {this.Number=7;}", true)]
+    [TestCase(false, "var observed=other.Number;", false)]
+    [TestCase(false, "other.Number=7;", false)]
+    [TestCase(false, "ref int observed=ref other.Number;", false)]
+    [TestCase(false, "var observed=this.Next.Number;", false)]
+    [TestCase(false, "this.Number=argument;", false)]
+    [TestCase(true, "var observed=other.Number;", false)]
+    [TestCase(true, "other.Number=7;", false)]
+    public void BoundaryFieldsRequireAnOwnedReceiverAndReviewedValuePrefix(bool staticProbe, string statement, bool admitted)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            var declaration = "public int Number; public C Next; public " + (staticProbe ? "static " : "") +
+                "void Probe(C other,int argument) {int local=0; " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? statement : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
+                (location == "after" ? statement : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false),
+                Is.EqualTo(location == "try" || admitted ? null : "TaskRootExceptionBoundarySourceEscape"), location);
+        }
+    }
+
+    [Test]
+    public void IncomingBranchesCannotBypassTheOwnedReceiverPrefix()
+    {
+        const string declaration = "public int Number; public void Probe(bool flag) {if(flag) Number=7; " +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) {builder.SetException(e);} builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Stfld"), Is.Null);
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Stfld", corruptFieldBranch: true),
+            Is.EqualTo("TaskRootExceptionBoundarySourceEscape"));
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
@@ -1019,10 +1109,10 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.Throws<OperationCanceledException>(check);
     }
 
-    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false, string? requiredRawCode = null)
+    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false, string? requiredRawCode = null, bool corruptFieldBranch = false)
     {
         ArgumentNullException.ThrowIfNull(declaration);
-        var source = "using System; using System.Threading.Tasks; public static class C {" + declaration +
+        var source = "using System; using System.Threading.Tasks; public class C {" + declaration +
             " static void Helper() {} } public sealed class CustomException : Exception {}";
         var initial = TestCompilation.Create("BoundaryBodyControl", [("Subject.cs", source)], allowUnsafe: true);
         var compilation = initial.WithOptions(initial.Options.WithAllowUnsafe(true).WithOptimizationLevel(OptimizationLevel.Debug));
@@ -1033,12 +1123,14 @@ public sealed class NativeTaskCarrierStorageTests
         var bytes = emitted.ToArray();
         if (corruptCall)
         { CorruptProbeCall(bytes); }
+        if (corruptFieldBranch)
+        { CorruptProbeFieldBranch(bytes); }
         using var stream = new MemoryStream(bytes, false);
         using var image = new PEReader(stream);
         var metadata = image.GetMetadataReader();
-        var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
-            .Single(value => metadata.GetString(value.Name) == (asyncBody ? "MoveNext" : "Probe"));
-        var body = image.GetMethodBody(method.RelativeVirtualAddress);
+        var method = metadata.MethodDefinitions.Single(handle =>
+            metadata.GetString(metadata.GetMethodDefinition(handle).Name) == (asyncBody ? "MoveNext" : "Probe"));
+        var body = image.GetMethodBody(metadata.GetMethodDefinition(method).RelativeVirtualAddress);
         if (requiredRawCode is not null)
         {
             var code = body.GetILBytes()!;
@@ -1051,9 +1143,41 @@ public sealed class NativeTaskCarrierStorageTests
         using var cancellation = new CancellationTokenSource();
         if (cancel)
         { cancellation.Cancel(); }
-        return CompilerTaskCarrierCollector.ValidateExceptionBoundary(metadata, body,
+        return CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method,
             compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity, children,
             cancel ? cancellation.Token : TestContext.CurrentContext.CancellationToken);
+    }
+
+    private static void CorruptProbeFieldBranch(byte[] bytes)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        using var image = new PEReader(new MemoryStream(bytes, false));
+        var metadata = image.GetMetadataReader();
+        var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
+            .Single(value => metadata.GetString(value.Name) == "Probe");
+        var section = image.PEHeaders.SectionHeaders.Single(value => method.RelativeVirtualAddress >= value.VirtualAddress &&
+            method.RelativeVirtualAddress < value.VirtualAddress + value.SizeOfRawData);
+        var offset = section.PointerToRawData + method.RelativeVirtualAddress - section.VirtualAddress;
+        Assert.That(bytes[offset] & 3, Is.EqualTo(3));
+        var headerBytes = (bytes[offset + 1] >> 4) * 4;
+        var body = image.GetMethodBody(method.RelativeVirtualAddress);
+        var code = body.GetILBytes()!;
+        var cursor = 0;
+        var branch = -1;
+        var field = -1;
+        while (cursor < body.ExceptionRegions[0].TryOffset)
+        {
+            Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction), Is.True);
+            if (instruction.RawCode is "Brfalse_s" or "Brtrue_s")
+            { branch = instruction.Offset; }
+            if (instruction.RawCode == "Stfld")
+            { field = instruction.Offset; break; }
+        }
+        Assert.That(branch, Is.GreaterThanOrEqualTo(0));
+        Assert.That(field, Is.GreaterThan(branch));
+        var delta = field - branch - 2;
+        Assert.That(delta, Is.InRange((int)sbyte.MinValue, (int)sbyte.MaxValue));
+        bytes[offset + headerBytes + branch + 1] = unchecked((byte)(sbyte)delta);
     }
 
     private static void CorruptProbeCall(byte[] bytes)

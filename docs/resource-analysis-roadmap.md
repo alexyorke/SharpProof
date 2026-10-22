@@ -109,6 +109,66 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Instance-field boundary ownership
+
+Three arbitrary-receiver controls reproduced escaping field load, store and
+address admission in the handler. Two separate diagnostic inventory probes
+recorded actual Debug/Release instructions; their intentional assertions are
+not counted as production failures or passing regressions. Evidence is retained
+in `artifacts/resource-boundary-instance-fields-probe.log`.
+
+Debug emission also clears an owned reference field to null outside the catch.
+The validator now resolves the method body from the same PE image and method
+handle. An outside instance-field access must belong to that instance method's
+own declaring type and use a direct owned receiver. Reviewed state stores admit
+Int32 constants, typed null clears and the compiler's local-assignment/duplicate
+sequence. Incoming branch targets cannot enter the middle of the receiver/value
+prefix. Other receiver or value patterns remain Unknown. No field-name match
+or separately supplied body establishes ownership.
+
+The initial fixed run checks the three rejection controls and converts the two
+inventories into positive generated Debug/Release regressions. An expanded
+source matrix covers owned access, same-type parameter receivers, nested field
+loads, null clears, local assignment and supported branch entry. A separate
+adversarial emitted-body mutation redirects a branch to bypass the receiver
+prefix; it is not an executable-source claim. The first fixed build caught CA1859 on an unnecessary collection interface;
+the private helper now accepts its concrete list type. That failed build is
+retained in `artifacts/resource-boundary-instance-fields-green.log`. The expanded
+focused run passed all nineteen controls with zero build warnings or errors
+(`artifacts/resource-boundary-instance-fields-expanded-tests.log`). The broader
+carrier/projection/protocol/native-resource selection passed all 1286 tests
+with zero build warnings or errors
+(`artifacts/resource-boundary-instance-fields-tests.log`). The expanded full
+quality/API run also passed
+(`artifacts/resource-boundary-instance-fields-expanded-lint.log`). Documentation
+checks passed (`artifacts/resource-boundary-instance-fields-docs.log`).
+The canonical formatter copied zero changes.
+
+Nested projection 10 and response cache 62 invalidate older field evidence;
+acceptance constants, defaults tests and current documentation are coordinated.
+Protocol 43, manifest 6 and artifact schema 55 are unchanged. No caller/frame cap
+or numeric runtime-byte premise is added. Other emitted instruction families,
+builder failures, CLR/helper frames, cold initialization and root composition
+remain open, with the runtime-model choice pending.
+
+### Hosted endpoint-repair and boundary coverage
+
+Checkpoint `09ca319cfe3a95d7bbe5bd50914727086cd2f94f` completed all fifteen
+coverage shards successfully in run 39869157626. The prior script-tool endpoint
+failure no longer prevents this workflow from running its tests. Aggregate job
+120143888913 produced a complete report and failed the unchanged 100 percent
+floor: 6982/7115 changed trusted lines (98.13 percent), with 133 gaps. The line
+universe grew by ten compared with `143c2f1cf`; the gap count is unchanged.
+No individual line closure is inferred across the edited collector file.
+
+Evidence is retained in
+`artifacts/resource-09ca-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `9b4ccbe3b529ca20d8d33a9d427639f8cebbb150` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `09ca319cf`.
+Full canonical CI (39869157692) and package consumers (39869157998) passed for
+that exact checkpoint. The newer instance-field ownership changes are not
+measured by this report and still require their own qualification.
+
 ### Pinned script-tool endpoint repair
 
 Hosted checkpoint `8af9e8066` cannot qualify yet. Package job 120129938139 in

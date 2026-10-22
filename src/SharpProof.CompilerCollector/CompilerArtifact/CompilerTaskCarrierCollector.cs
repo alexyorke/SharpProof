@@ -373,7 +373,7 @@ internal sealed class CompilerTaskCarrierCollector
             if (framework is null)
             { return new(null, "TaskRootExceptionBoundaryCatchUnsupported"); }
             var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
-            if (ValidateExceptionBoundary(metadata, body, framework, plan.Children.Length, cancellation) is { } failure)
+            if (ValidateExceptionBoundary(pe, (MethodDefinitionHandle)handle, framework, plan.Children.Length, cancellation) is { } failure)
             { return new(null, failure); }
             var region = body.ExceptionRegions[0];
             return new(new(callableId, shapes.ModuleSha256, machine.MetadataName, entries[0].MetadataToken, region.TryOffset, region.TryLength), null);
@@ -382,19 +382,103 @@ internal sealed class CompilerTaskCarrierCollector
         { return new(null, "TaskRootExceptionBoundaryEmissionInvalid"); }
     }
 
-    // Body facts only. The caller separately binds the emitted module, owning
-    // state-machine method and callable before constructing a boundary record.
-    internal static string? ValidateExceptionBoundary(MetadataReader metadata, MethodBodyBlock body,
-        AssemblyIdentity framework, int children, CancellationToken cancellation)
+    // Recognize only a direct owned receiver and simple emitted bookkeeping.
+    // Incoming branches cannot bypass any part of the receiver/value prefix.
+    private static bool OwnedBoundaryField(MetadataReader metadata, MethodDefinitionHandle method,
+        List<CompilerIlToken> instructions, int index, HashSet<int> entries, CancellationToken cancellation)
     {
         metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
-        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        instructions = ArgumentNullGuard.NotNull(instructions, nameof(instructions));
+        entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
+        if (index < 0 || index >= instructions.Count)
+        { throw new ArgumentOutOfRangeException(nameof(index)); }
+        cancellation.ThrowIfCancellationRequested();
+        if (method.IsNil)
+        { return false; }
+        var definition = metadata.GetMethodDefinition(method);
+        if ((definition.Attributes & MethodAttributes.Static) != 0)
+        { return false; }
+        var instruction = instructions[index];
+        var fieldHandle = MetadataTokens.EntityHandle(checked((int)instruction.Operand));
+        if (fieldHandle.Kind != HandleKind.FieldDefinition || fieldHandle.IsNil ||
+            !metadata.GetTypeDefinition(definition.GetDeclaringType()).GetFields().Contains((FieldDefinitionHandle)fieldHandle))
+        { return false; }
+        var field = metadata.GetFieldDefinition((FieldDefinitionHandle)fieldHandle);
+        if ((field.Attributes & FieldAttributes.Static) != 0)
+        { return false; }
+        var start = index - 1;
+        var store = instruction.RawCode == "Stfld";
+        if (store)
+        {
+            while (start >= 0 && instructions[start].RawCode != "Ldarg_0")
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var raw = instructions[start].RawCode;
+                if (raw is not ("Nop" or "Dup" or "Ldnull") &&
+                    !raw.StartsWith("Ldc_i4", StringComparison.Ordinal) && !raw.StartsWith("Stloc", StringComparison.Ordinal))
+                { return false; }
+                start--;
+            }
+        }
+        else
+        {
+            while (start >= 0 && instructions[start].RawCode == "Nop")
+            { cancellation.ThrowIfCancellationRequested(); start--; }
+        }
+        if (start < 0 || instructions[start].RawCode != "Ldarg_0")
+        { return false; }
+        for (var position = start + 1; position <= index; position++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (entries.Contains(instructions[position].Offset))
+            { return false; }
+        }
+        if (!store)
+        { return true; }
+        if ((field.Attributes & FieldAttributes.InitOnly) != 0)
+        { return false; }
+        var values = new List<bool>();
+        for (var position = start + 1; position < index; position++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var raw = instructions[position].RawCode;
+            if (raw == "Nop")
+            { continue; }
+            if (raw == "Ldnull" || raw.StartsWith("Ldc_i4", StringComparison.Ordinal))
+            { values.Add(raw == "Ldnull"); }
+            else if (raw == "Dup" && values.Count > 0)
+            { values.Add(values[values.Count - 1]); }
+            else if (raw.StartsWith("Stloc", StringComparison.Ordinal) && values.Count > 0)
+            { values.RemoveAt(values.Count - 1); }
+            else
+            { return false; }
+        }
+        if (values.Count != 1)
+        { return false; }
+        var signature = metadata.GetBlobReader(field.Signature);
+        if (signature.ReadSignatureHeader().Kind != SignatureKind.Field)
+        { return false; }
+        var type = signature.ReadByte();
+        var reference = type is 0x0e or 0x12 or 0x14 or 0x1c or 0x1d || type == 0x15 && signature.ReadByte() == 0x12;
+        return values[0] ? reference : type == 0x08;
+    }
+
+    // Body facts only. The caller separately binds the emitted module, owning
+    // state-machine method and callable before constructing a boundary record.
+    internal static string? ValidateExceptionBoundary(PEReader image, MethodDefinitionHandle method,
+        AssemblyIdentity framework, int children, CancellationToken cancellation)
+    {
+        image = ArgumentNullGuard.NotNull(image, nameof(image));
         framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
         cancellation.ThrowIfCancellationRequested();
         if (children is < 2 or > 16)
         { return "TaskRootExceptionBoundaryCallsIncomplete"; }
         try
         {
+            if (method.IsNil)
+            { return "TaskRootExceptionBoundaryMethodUnavailable"; }
+            var metadata = image.GetMetadataReader();
+            var body = image.GetMethodBody(metadata.GetMethodDefinition(method).RelativeVirtualAddress);
             if (body.ExceptionRegions.Length != 1 || body.ExceptionRegions[0].Kind != ExceptionRegionKind.Catch)
             { return "TaskRootExceptionBoundaryHandlerUnsupported"; }
             var region = body.ExceptionRegions[0];
@@ -403,17 +487,30 @@ internal sealed class CompilerTaskCarrierCollector
             var code = body.GetILBytes();
             if (code is null || code.Length > 4096)
             { return "TaskRootExceptionBoundaryBodyUnsupported"; }
+            var instructions = new List<CompilerIlToken>();
+            var entries = new HashSet<int> { region.TryOffset, region.HandlerOffset };
             var cursor = 0;
+            while (cursor < code.Length)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var decoded))
+                { return "TaskRootExceptionBoundaryBodyUnsupported"; }
+                instructions.Add(decoded);
+                if (decoded.TargetByteOffset >= 0)
+                { entries.Add(decoded.TargetByteOffset); }
+            }
             var runs = 0;
             var joins = 0;
             var awaits = 0;
             var records = 0;
-            while (cursor < code.Length)
+            for (var index = 0; index < instructions.Count; index++)
             {
                 cancellation.ThrowIfCancellationRequested();
-                if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
-                { return "TaskRootExceptionBoundaryBodyUnsupported"; }
+                var instruction = instructions[index];
                 var inside = instruction.Offset >= region.TryOffset && instruction.Offset < region.TryOffset + region.TryLength;
+                if (!inside && (instruction.RawCode is "Ldfld" or "Ldflda" or "Stfld") &&
+                    !OwnedBoundaryField(metadata, method, instructions, index, entries, cancellation))
+                { return "TaskRootExceptionBoundarySourceEscape"; }
                 if (instruction.RawCode == "Calli")
                 { return "TaskRootExceptionBoundaryCallUnsupported"; }
                 if (instruction.RawCode is "Newobj" or "Newarr" or "Throw" or "Rethrow" && !inside)
