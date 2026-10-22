@@ -327,12 +327,15 @@ public static partial class Inference
                         { throw new ArgumentNullException(nameof(candidate)); }
                         return candidate.Left is DeclarationExpressionSyntax or TupleExpressionSyntax && candidate.Left.Span.Contains(site.Span);
                     });
+                    var output = site.AncestorsAndSelf().OfType<DeclarationExpressionSyntax>().FirstOrDefault();
                     if (loop is not null)
                     { BindLocals(loop.Expression); probe.BindIteration(loop); }
                     else if (deconstruction is not null)
                     { BindDeconstructed(deconstruction); }
                     else if (BindPatternOwner(site))
                     { /* Pattern binding supplies each declared receiver's structural shape. */ }
+                    else if (output?.Parent is ArgumentSyntax { RefKindKeyword.RawKind: (int)SyntaxKind.OutKeyword, Parent.Parent: ExpressionSyntax call })
+                    { BindLocals(call); _ = probe.Expression(call); }
                     else if (site is VariableDeclaratorSyntax { Initializer: not null, Parent: VariableDeclarationSyntax localDeclaration } variable)
                     {
                         BindLocals(variable.Initializer.Value);

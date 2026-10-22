@@ -21,6 +21,7 @@ internal static class DefaultValueRuntimeChecks
             public sealed class IndirectPair<T,U>{public T Left;public U Right;public IndirectPair(T left,U right){Left=left;Right=right;}}
             public sealed class OwnerPair<T,U>{public T Row;public U Flag;public int Calls;public OwnerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){Calls++;row=Row;flag=Flag;}}
             public sealed class PatternCell<T>{public T Value;public int Reads;public PatternCell(T value){Value=value;}public T Row{get{Reads++;return Value;}}}
+            public delegate void OutCopier<T>(T value,out T result);
             public sealed class OwnerRows<T>:IEnumerable<T[]>,IEnumerator<T[]>{
                 public T[] Row;public T Restore;public bool RestoreOnDispose;public bool HasRow=true;public Exception? MoveError,DisposeError;
                 public int Gets,Moves,Disposals;bool moved;
@@ -44,6 +45,18 @@ internal static class DefaultValueRuntimeChecks
                 public async ValueTask DisposeAsync(){Disposals++;Disposing.SetResult(true);await DisposeGate.Task;Row[0]=Restore;if(DisposeError!=null)throw DisposeError;}
             }
             public static class DefaultProbe{
+                public static int OutCalls;
+                static bool Transfer<T>(T value,out T result){Interlocked.Increment(ref OutCalls);result=value;return true;}
+                static void TransferPair<T,U>(T value,U tag,out T row,out U other){Interlocked.Increment(ref OutCalls);row=value;other=tag;}
+                public static (int tag,int value) OutMultiple(int[] value,int tag){TransferPair(value,tag,out var row,out var other);ref var alias=ref row[0];alias=default;return(other,alias);}
+                public static int OutCall(int[] value){Transfer(value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+                public static int OutCondition(int[] value){if(Transfer(value,out var row)){row[0]=default;return row[0];}return default;}
+                public static int OutTuple((int[] row,int tag) value){Transfer(value,out var pair);var(row,_)=pair;ref var alias=ref row[0];alias=default;return alias;}
+                public static int OutDictionary(Dictionary<int,int[]> value,int key){if(value.TryGetValue(key,out var row)){ref var alias=ref row[0];alias=default;return alias;}return default;}
+                public static int OutDelegate(OutCopier<int[]> copy,int[] value){copy(value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+                public static Func<int> OutCapture(int[] value)=>()=>{Transfer(value,out var row);ref var alias=ref row[0];alias=default;return alias;};
+                public static async Task<int> OutAwait(Task<int[]> value){Transfer(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+                public static async ValueTask<int> OutValueAwait(ValueTask<int[]> value){Transfer(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
                 public static int PatternVar(int[] value){if(value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
                 public static int PatternProperty(PatternCell<int[]> value){if(value is {Row:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
                 public static int PatternTuple((int[] row,int flag) value){if(value is {row:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
@@ -121,6 +134,7 @@ internal static class DefaultValueRuntimeChecks
                     if(!Indirect())return false;
                     if(!await Owners(cancellationToken))return false;
                     if(!await Patterns(cancellationToken))return false;
+                    if(!await Outputs(cancellationToken))return false;
                     foreach(bool flag in new[]{false,true}){
                         int expected=flag?7:0;
                         if(DefaultProbe.Assigned(!flag,7)!=expected||await DefaultProbe.AssignedAsync(!flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected)return false;
@@ -186,6 +200,32 @@ internal static class DefaultValueRuntimeChecks
                         ||DefaultProbe.IndirectProperty(property)!=0||property.Value!=0||property.Reads!=1
                         ||DefaultProbe.IndirectIndexer(indexer)!=0||indexer.Value!=0||indexer.Reads!=1||DefaultProbe.IndirectTuple((7,9))!=0)return false;
                     int[] first={7},second={9};return DefaultProbe.IndirectRebind(first,second)==0&&first[0]==7&&second[0]==0;
+                }
+                static async Task<bool> Outputs(CancellationToken cancellationToken){
+                    DefaultProbe.OutCalls=0;int[] first={7},conditional={7},tuple={7},stored={7},delegated={7},captured={7};
+                    var dictionary=new Dictionary<int,int[]>{{1,stored}};
+                    if(DefaultProbe.OutCall(first)!=0||first[0]!=0||DefaultProbe.OutCondition(conditional)!=0||conditional[0]!=0
+                        ||DefaultProbe.OutTuple((tuple,9))!=0||tuple[0]!=0||DefaultProbe.OutDictionary(dictionary,1)!=0||stored[0]!=0
+                        ||DefaultProbe.OutDictionary(dictionary,2)!=0||dictionary.Count!=1||DefaultProbe.OutCalls!=3)return false;
+                    var callback=DefaultProbe.OutCapture(captured);if(captured[0]!=7||DefaultProbe.OutCalls!=3||callback()!=0||captured[0]!=0||DefaultProbe.OutCalls!=4)return false;
+                    int calls=0;OutCopier<int[]> copy=(int[] input,out int[] output)=>{calls++;output=input;};
+                    if(DefaultProbe.OutDelegate(copy,delegated)!=0||delegated[0]!=0||calls!=1)return false;
+                    var multiple=new[]{7};if(DefaultProbe.OutMultiple(multiple,9)!=(9,0)||multiple[0]!=0||DefaultProbe.OutCalls!=5)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        DefaultProbe.OutCalls=0;var row=new[]{7};var gate=new TaskCompletionSource<int[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=DefaultProbe.OutAwait(gate.Task);var valueTask=DefaultProbe.OutValueAwait(new ValueTask<int[]>(gate.Task)).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||row[0]!=7||DefaultProbe.OutCalls!=0)return false;
+                        var failure=new InvalidOperationException("out-await");
+                        if(outcome=="Value")gate.SetResult(row);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        foreach(var pending in new[]{task,valueTask}){
+                            try{if(await pending.WaitAsync(cancellationToken)!=0||outcome!="Value")return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                        if(row[0]!=(outcome=="Value"?0:7)||DefaultProbe.OutCalls!=(outcome=="Value"?2:0))return false;
+                    }
+                    return true;
                 }
                 static async Task<bool> Patterns(CancellationToken cancellationToken){
                     var cell=new PatternCell<int[]>(new[]{7});var pair=new OwnerPair<int[],int>(new[]{7},9);
@@ -256,6 +296,7 @@ internal static class DefaultValueRuntimeChecks
                     if(!Indirect(text))return false;
                     if(!await Owners(text,cancellationToken))return false;
                     if(!await Patterns(text,cancellationToken))return false;
+                    if(!await Outputs(text,cancellationToken))return false;
                     string other=new string('y',2);string? slot=text;decimal? number=23m;
                     if(DefaultProbe.Alias(text)!=null||DefaultProbe.AliasLocal(text)!=null||DefaultProbe.AliasChain(text)!=null||DefaultProbe.AliasReset(text)!=null
                         ||!ReferenceEquals(DefaultProbe.AliasCopy(text),text)||DefaultProbe.AliasCopy(text).Length!=text.Length||DefaultProbe.AliasCapture(text)()!=null||DefaultProbe.AliasRef(ref slot)!=null||slot!=null
@@ -307,6 +348,23 @@ internal static class DefaultValueRuntimeChecks
                     numbers[0]=23m;if(DefaultProbe.IndirectLift(numbers,23m)!=null||numbers[0]!=null)return false;
                     var numberCell=new IndirectCell<decimal?>(23m);if(DefaultProbe.IndirectProperty(numberCell)!=null||numberCell.Value!=null)return false;
                     string?[] first={text},second={text};return DefaultProbe.IndirectRebind(first,second)==null&&ReferenceEquals(first[0],text)&&second[0]==null;
+                }
+                static async Task<bool> Outputs(string text,CancellationToken cancellationToken){
+                    DefaultProbe.OutCalls=0;string?[] first={text},conditional={text},tuple={text},stored={text},delegated={text},captured={text};
+                    var dictionary=new Dictionary<string,string?[]>{{text,stored}};
+                    if(DefaultProbe.OutCall(first)!=null||first[0]!=null||DefaultProbe.OutCondition(conditional)!=null||conditional[0]!=null
+                        ||DefaultProbe.OutTuple((tuple,23m))!=null||tuple[0]!=null||DefaultProbe.OutDictionary(dictionary,text)!=null||stored[0]!=null
+                        ||DefaultProbe.OutDictionary(dictionary,"missing")!=null||dictionary.Count!=1||DefaultProbe.OutCalls!=3)return false;
+                    var callback=DefaultProbe.OutCapture(captured);if(!ReferenceEquals(captured[0],text)||DefaultProbe.OutCalls!=3||callback()!=null||captured[0]!=null||DefaultProbe.OutCalls!=4)return false;
+                    int calls=0;OutCopier<string?[]> copy=(string?[] input,out string?[] output)=>{calls++;output=input;};
+                    if(DefaultProbe.OutDelegate(copy,delegated)!=null||delegated[0]!=null||calls!=1)return false;
+                    var row=new[]{(string?)text};var gate=new TaskCompletionSource<string?[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var task=DefaultProbe.OutAwait(gate.Task);var valueTask=DefaultProbe.OutValueAwait(new ValueTask<string?[]>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||!ReferenceEquals(row[0],text)||DefaultProbe.OutCalls!=4)return false;
+                    gate.SetResult(row);if(await task.WaitAsync(cancellationToken)!=null||await valueTask.WaitAsync(cancellationToken)!=null||row[0]!=null||DefaultProbe.OutCalls!=6)return false;
+                    var multiple=new[]{(string?)text};var tag=new Uri("https://example.invalid/out");var result=DefaultProbe.OutMultiple(multiple,tag);
+                    if(!ReferenceEquals(result.tag,tag)||result.value!=null||multiple[0]!=null||DefaultProbe.OutCalls!=7)return false;
+                    decimal?[] number={23m};return DefaultProbe.OutCall(number)==null&&number[0]==null;
                 }
                 static async Task<bool> Patterns(string text,CancellationToken cancellationToken){
                     var cell=new PatternCell<string?[]>(new[]{(string?)text});var pair=new OwnerPair<string?[],Uri>(new[]{(string?)text},new Uri("https://example.invalid/pattern"));

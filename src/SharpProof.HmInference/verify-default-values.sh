@@ -20,7 +20,15 @@ EOF
 using System;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class IndirectConsumerCell<T>{public T Value;public IndirectConsumerCell(T value){Value=value;}public ref T Slot=>ref Value;public ref T this[int index]=>ref Value;}
 public sealed class OwnerConsumerPair<T,U>{public T Row;public U Flag;public OwnerConsumerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){row=Row;flag=Flag;}}
+public delegate void OutConsumerCopier<T>(T value,out T result);
 public static class DefaultConsumer{
+    static bool CopyOut<T>(T value,out T result){result=value;return true;}
+    public static int OutCall(int[] value){CopyOut(value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+    public static int OutCondition(int[] value){if(CopyOut(value,out var row)){row[0]=default;return row[0];}return default;}
+    public static int OutDictionary(Dictionary<int,int[]> value,int key){if(value.TryGetValue(key,out var row)){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int OutTuple((int[] row,bool tag) value){CopyOut(value,out var pair);var(row,_)=pair;ref var alias=ref row[0];alias=default;return alias;}
+    public static int OutDelegate(OutConsumerCopier<int[]> copy,int[] value){copy(value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+    public static Func<int> OutCapture(int[] value)=>()=>{CopyOut(value,out var row);ref var alias=ref row[0];alias=default;return alias;};
     public static int PatternVar(int[] value){if(value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int PatternProperty(IndirectConsumerCell<int[]> value){if(value is {Value:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int PatternTuple((int[] row,bool flag) value){if(value is {row:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
@@ -55,6 +63,8 @@ public static class DefaultConsumer{
     public static (int left,int right) AliasConditional(bool flag,int first,int second){var left=first;var right=second;ref var alias=ref(flag?ref left:ref right);alias=default;return(left,right);}
     public static int AliasConditionalStore(bool flag,int value){ref var alias=ref value;alias=flag?value:default;return value;}
 #if MODERN_ALIASES
+    public static async Task<int> OutAwait(Task<int[]> value){CopyOut(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
+    public static async ValueTask<int> OutValueAwait(ValueTask<int[]> value){CopyOut(await value,out var row);ref var alias=ref row[0];alias=default;return alias;}
     public static int PatternList(int[][] value){if(value is [var row,..]){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int PatternSlice(int[] value){if(value is [..var row]){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static async Task<int> PatternAsync(Task<int[]> value){if(await value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
@@ -120,6 +130,11 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element OutCall<T1>(${element}[] value)$suffix" \
+    "$element OutCondition<T1>(${element}[] value)$suffix" \
+    "$element OutTuple<T1, T2>((${element}[] row, T2 tag) value)$suffix" \
+    "$element OutDelegate<T1>(global::OutConsumerCopier<${element}[]> copy, ${element}[] value)$suffix" \
+    "global::System.Func<$element> OutCapture<T1>(${element}[] value)$suffix" \
     "$element PatternVar<T1>(${element}[] value)$suffix" \
     "$element PatternProperty<T1>(global::IndirectConsumerCell<${element}[]> value)$suffix" \
     "$element PatternTuple<T1, T2>((${element}[] row, T2 flag) value)$suffix" \
@@ -176,6 +191,8 @@ EOF
     fi
   done
   if [ "$language" = 13 ]; then
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> OutAwait<T1>(global::System.Threading.Tasks.Task<T1?[]> value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> OutValueAwait<T1>(global::System.Threading.Tasks.ValueTask<T1?[]> value)' "$log"
     grep -Fq 'T1? PatternList<T1>(T1?[][] value)' "$log"
     grep -Fq 'T1? PatternSlice<T1>(T1?[] value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> PatternAsync<T1>(global::System.Threading.Tasks.Task<T1?[]> value)' "$log"
@@ -185,6 +202,11 @@ EOF
     grep -Fq 'T1? OwnerMixed<T1>(T1?[] first, T1?[] second)' "$log"
     grep -Fq 'global::System.Func<T1?> AliasCapture<T1>(T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> AliasAsync<T1>(global::System.Threading.Tasks.Task<T1> value)' "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'T2 OutDictionary<T1, T2>(global::System.Collections.Generic.Dictionary<T1, T2[]> value, T1 key) where T1 : notnull where T2 : struct' "$log"
+  else
+    grep -Fq 'T2? OutDictionary<T1, T2>(global::System.Collections.Generic.Dictionary<T1, T2?[]> value, T1 key) where T1 : notnull' "$log"
   fi
   if [ "$#" -eq 1 ]; then printf 'PASS CliDefaultValuesCSharp%s\n' "$language"; fi
 done
