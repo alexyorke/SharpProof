@@ -109,6 +109,70 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Pinned script-tool endpoint repair
+
+Hosted checkpoint `8af9e8066` cannot qualify yet. Package job 120129938139 in
+run 39866511248 failed while building the tooling image: the script-tool
+installer received HTTP 404 before tests ran. Several canonical and coverage
+jobs also failed during this checkpoint. All nine failed coverage shard logs
+were inspected and each reports the same HTTP 404 during image preparation;
+canonical job causes are not inferred solely from those other logs.
+
+A canonical Linux container probe reproduced HTTP 404 from the pinned
+PSScriptAnalyzer Gallery API endpoint. ShellCheck and shfmt returned HTTP 200.
+The publisher's Gallery CDN served the same PSScriptAnalyzer 1.25.0 package,
+matching pinned SHA256
+`14e634c828eb98efb9f40b2918ba90f139ed5eccdf663a2a747736d996995d60`.
+Only its URL in `eng/container/toolchain.json` changes; versions, checksums and
+installer verification remain unchanged.
+
+The actual `Install-ScriptTools.ps1` successfully installed all three tools into
+a fresh temporary destination using the corrected catalog, including checksum
+validation and module import (`artifacts/resource-script-tool-install.log`).
+The endpoint/hash probe is retained in `artifacts/resource-script-tool-probe.log`.
+The cold tooling image rebuilt successfully with the corrected catalog, including
+native payload validation. The first quality run then identified one spelling
+issue in the new prose; it was reworded without a dictionary exception. The
+corrected full quality/API run passed
+(`artifacts/resource-boundary-storage-lint.log`), as did documentation checks
+(`artifacts/resource-boundary-storage-docs.log`). No hosted pass or new coverage
+measurement is claimed for the failing predecessor. The newer boundary fix and
+endpoint repair still require exact-head hosted qualification.
+
+### Other faulting emitted operations
+
+The original validator admitted cast/unbox, boxing, string loading, array
+length/load/store/address operations, static-field access and indirect
+loads/stores in the handler. All fifteen emitted controls reproduced the gap
+(`artifacts/resource-boundary-storage-red.log`). Each first admitted its
+protected placement, then failed the expected handler rejection. Every fixture
+requires its expected opcode to be present.
+
+The validator now rejects these operation families outside the protected source
+region. All fifteen fixed controls passed with zero build warnings or errors
+(`artifacts/resource-boundary-storage-green.log`). The controls check protected,
+handler and continuation placement: 45 states. Pointer fixtures test emitted
+placement facts only; they do not enroll pointer parameters into the supported
+task-root source model or establish that every hardware fault can be caught.
+Instance-field and other remaining emitted instruction families still require
+their own ownership/placement audit; no complete exception-containment result is
+claimed here.
+
+All 1267 selected carrier/projection/protocol/native-resource tests passed,
+including the fifteen new controls, normal generated task shapes, previous
+projection-version rejection and acceptance/defaults alignment. The broader
+build reported zero warnings or errors
+(`artifacts/resource-boundary-storage-tests.log`). The canonical formatter copied
+zero changes (`artifacts/resource-boundary-storage-format.log`). Quality/API and
+documentation checks passed as recorded above.
+
+Nested projection 9 and response cache 61 invalidate older evidence; acceptance
+constants, defaults tests and current version documentation are updated together.
+Protocol 43, manifest 6 and artifact schema 55 remain unchanged. The original
+arithmetic fix remains independently verified. CLR/helper frames, cold
+initialization and root runtime-byte composition remain open, and the
+runtime-model choice remains pending.
+
 ### Faulting arithmetic outside the protected region
 
 The corrected emitted-body controls reproduced an admission gap: division,

@@ -423,6 +423,16 @@ internal sealed class CompilerTaskCarrierCollector
                 if (!inside && (instruction.RawCode is "Div" or "Div_un" or "Rem" or "Rem_un" ||
                     instruction.RawCode.IndexOf("_ovf", StringComparison.Ordinal) >= 0))
                 { return "TaskRootExceptionBoundarySourceEscape"; }
+                // These storage/type operations can fault or materialize managed
+                // storage without a call instruction. Static access can also run
+                // a type initializer. Placement does not prove fault containment.
+                if (!inside && (instruction.RawCode is "Castclass" or "Unbox" or "Unbox_any" or "Box" or
+                    "Ldstr" or "Ldlen" or "Ldsfld" or "Ldsflda" or "Stsfld" ||
+                    instruction.RawCode.StartsWith("Ldelem", StringComparison.Ordinal) ||
+                    instruction.RawCode.StartsWith("Stelem", StringComparison.Ordinal) ||
+                    instruction.RawCode.StartsWith("Ldind", StringComparison.Ordinal) ||
+                    instruction.RawCode.StartsWith("Stind", StringComparison.Ordinal)))
+                { return "TaskRootExceptionBoundarySourceEscape"; }
                 if (instruction.RawCode is not ("Call" or "Callvirt"))
                 { continue; }
                 var called = MetadataTokens.EntityHandle(checked((int)instruction.Operand));

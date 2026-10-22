@@ -941,6 +941,39 @@ public sealed class NativeTaskCarrierStorageTests
         }
     }
 
+    [TestCase("var observed=(string)value;", "Castclass")]
+    [TestCase("var observed=(int)value;", "Unbox_any")]
+    [TestCase("object observed=number;", "Box")]
+    [TestCase("var observed=integers.Length;", "Ldlen")]
+    [TestCase("var observed=integers[index];", "Ldelem_i4")]
+    [TestCase("integers[index]=number;", "Stelem_i4")]
+    [TestCase("var observed=references[index];", "Ldelem_ref")]
+    [TestCase("references[index]=value;", "Stelem_ref")]
+    [TestCase("ref int observed=ref integers[index];", "Ldelema")]
+    [TestCase("var observed=\"literal\";", "Ldstr")]
+    [TestCase("var observed=Shared;", "Ldsfld")]
+    [TestCase("Shared=number;", "Stsfld")]
+    [TestCase("ref int observed=ref Shared;", "Ldsflda")]
+    [TestCase("var observed=*pointer;", "Ldind_i4")]
+    [TestCase("*pointer=number;", "Stind_i4")]
+    public void FaultingStorageRequiresTheProtectedSourceRegion(string statement, string rawCode)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(rawCode);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            var declaration = "public static int Shared; public static unsafe void Probe(object value,int[] integers," +
+                "object[] references,int index,int number,int* pointer) { " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? statement : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
+                (location == "after" ? statement : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
+                Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundarySourceEscape"), location);
+        }
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]

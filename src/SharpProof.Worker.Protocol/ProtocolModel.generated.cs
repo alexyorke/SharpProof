@@ -16,7 +16,7 @@ internal static class WorkerProtocolVersions
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 60;
+    public const int Current = 61;
 }
 
 internal static class WorkerManifestVersions

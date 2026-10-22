@@ -26,7 +26,7 @@
   "scriptTools": {
     "psscriptAnalyzer": {
       "version": "1.25.0",
-      "url": "https://www.powershellgallery.com/api/v2/package/PSScriptAnalyzer/1.25.0",
+      "url": "https://cdn.powershellgallery.com/packages/psscriptanalyzer.1.25.0.nupkg",
       "sha256": "14e634c828eb98efb9f40b2918ba90f139ed5eccdf663a2a747736d996995d60"
     },
     "shellcheck": {
