@@ -15,6 +15,120 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTaskCarrierStorageTests
 {
+    private static readonly ResourceStorageKind[] PrimitiveCarrierFields =
+    [
+        ResourceStorageKind.Byte, ResourceStorageKind.Byte, ResourceStorageKind.Byte,
+        ResourceStorageKind.Word16, ResourceStorageKind.Word16, ResourceStorageKind.Word16,
+        ResourceStorageKind.Word32, ResourceStorageKind.Word32, ResourceStorageKind.Word32,
+        ResourceStorageKind.Word64, ResourceStorageKind.Word64, ResourceStorageKind.Word64,
+        ResourceStorageKind.Reference, ResourceStorageKind.Reference
+    ];
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void GeneratedCarrierShapesPreservePrimitiveWidthsAndIgnoreStaticStorage(bool valueType)
+    {
+        var (compilation, type) = CompileCarrierShape("namespace Frames { [CompilerGenerated] public " +
+            (valueType ? "struct" : "class") + " Frame {public bool A;public byte B;public sbyte C;" +
+            "public char D;public short E;public ushort F;public int G;public uint H;public float I;" +
+            "public long J;public ulong K;public double L;public object M;public string N;public static decimal Ignored;} }",
+            "Frames.Frame");
+        var shape = InspectCarrierShape(type, compilation, TestContext.CurrentContext.CancellationToken);
+        Assert.That(shape, Is.Not.Null);
+        Assert.That(shape!.MetadataName, Is.EqualTo("Frames.Frame"));
+        Assert.That(shape.IsValueType, Is.EqualTo(valueType));
+        Assert.That(shape.Fields, Is.EqualTo(PrimitiveCarrierFields));
+    }
+
+    [TestCase("public class Frame {}", "Frame")]
+    [TestCase("[CompilerGenerated] public class Frame<T> {}", "Frame`1")]
+    [TestCase("public class Parent {} [CompilerGenerated] public class Frame:Parent {}", "Frame")]
+    [TestCase("[CompilerGenerated,System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public class Frame {}", "Frame")]
+    [TestCase("[CompilerGenerated] public class Frame {public decimal Unsupported;}", "Frame")]
+    [TestCase("public sealed class CompilerGeneratedAttribute:Attribute {} [CompilerGenerated] public class Frame {}", "Frame")]
+    [TestCase("namespace System.Runtime.CompilerServices {public sealed class CompilerGeneratedAttribute:Attribute {}} [CompilerGenerated] public class Frame {}", "Frame")]
+    public void CarrierShapeAdmissionRejectsUnsupportedTypesAndAttributeShadows(string declaration, string metadataName)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(metadataName);
+        var (compilation, type) = CompileCarrierShape(declaration, metadataName);
+        Assert.That(InspectCarrierShape(type, compilation, TestContext.CurrentContext.CancellationToken), Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CarrierFieldBudgetRejectsTheFirstExcessSlotWithoutPartialShape(bool excess)
+    {
+        var count = ResourceAllocationShape.MaximumFields + (excess ? 1 : 0);
+        var fields = string.Concat(Enumerable.Range(0, count).Select(static index => "public byte Field" + index + ";"));
+        var (compilation, type) = CompileCarrierShape("[CompilerGenerated] public class Frame {" + fields + "}", "Frame");
+        var shape = InspectCarrierShape(type, compilation, TestContext.CurrentContext.CancellationToken);
+        if (excess)
+        { Assert.That(shape, Is.Null); }
+        else
+        {
+            Assert.That(shape, Is.Not.Null);
+            Assert.That(shape!.Fields, Has.Length.EqualTo(count));
+            Assert.That(shape.Fields.All(static field => field == ResourceStorageKind.Byte), Is.True);
+        }
+    }
+
+    [Test]
+    public void GeneratedCarrierMetadataNamesHaveAnIndependentLengthBudget()
+    {
+        var names = Enumerable.Range(0, 17).Select(index => new string('N', 250) + index).ToArray();
+        var declarations = string.Concat(names.Select(static name => name is null ? throw new ArgumentNullException(nameof(name)) : "public class " + name + "{"));
+        var metadataName = string.Join("+", names) + "+Frame";
+        Assert.That(metadataName.Length, Is.GreaterThan(4096));
+        var (compilation, type) = CompileCarrierShape(declarations + "[CompilerGenerated] public class Frame {}" +
+            new string('}', names.Length), metadataName);
+        Assert.That(InspectCarrierShape(type, compilation, TestContext.CurrentContext.CancellationToken), Is.Null);
+    }
+
+    [Test]
+    public void CarrierOwnershipUsesContainingSymbolsRatherThanMatchingOwnerNames()
+    {
+        var (compilation, type) = CompileCarrierShape("namespace A {public class Owner {[CompilerGenerated] public class Frame {}}}" +
+            "namespace B {public class Owner {}}", "A.Owner+Frame");
+        var method = typeof(CompilerTaskCarrierCollector).GetMethod("Inside", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        Assert.That(method!.Invoke(null, [type, compilation.GetTypeByMetadataName("A.Owner")!]), Is.True);
+        Assert.That(method.Invoke(null, [type, compilation.GetTypeByMetadataName("B.Owner")!]), Is.False);
+    }
+
+    [Test]
+    public void CarrierShapeCancellationDoesNotReturnAPartialFieldInventory()
+    {
+        var (compilation, type) = CompileCarrierShape("[CompilerGenerated] public class Frame {public bool Value;}", "Frame");
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action inspect = () => { _ = InspectCarrierShape(type, compilation, canceled.Token); };
+        var exception = Assert.Throws<TargetInvocationException>(inspect)!;
+        Assert.That(exception.InnerException, Is.TypeOf<OperationCanceledException>());
+    }
+
+    private static (CSharpCompilation Compilation, INamedTypeSymbol Type) CompileCarrierShape(string declarations, string metadataName)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        ArgumentNullException.ThrowIfNull(metadataName);
+        var compilation = TestCompilation.Create("CarrierShapeControl", [("Frame.cs",
+            "#pragma warning disable CS0436\nusing System;using System.Runtime.CompilerServices;" + declarations)]);
+        TestCompilation.AssertNoErrors(compilation);
+        var type = compilation.GetTypeByMetadataName(metadataName);
+        Assert.That(type, Is.Not.Null);
+        return (compilation, type!);
+    }
+
+    private static CompilerTaskCarrierType? InspectCarrierShape(INamedTypeSymbol type, CSharpCompilation compilation, CancellationToken cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(compilation);
+        var framework = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString();
+        var method = typeof(CompilerTaskCarrierCollector).GetMethod("Shape", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        return (CompilerTaskCarrierType?)method!.Invoke(null, [type, framework, cancellation]);
+    }
+
     [TestCase("array")]
     [TestCase("byte")]
     [TestCase("span")]

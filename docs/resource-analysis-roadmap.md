@@ -109,6 +109,45 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Carrier shape admission and throwable-construction audit
+
+Additional collector controls cover primitive field widths in generated class
+and struct carriers, ignored static storage, unsupported generic/inherited/layout
+shapes, shadow generated attributes, the exact field-count boundary, long
+nested metadata names, enclosing-symbol ownership and cancellation without a
+partial field inventory. These probes use real Roslyn symbols and the actual
+collector helpers; production admission rules remain unchanged.
+
+All 263 carrier tests passed on the final source, with zero build warnings or
+errors (`artifacts/resource-carrier-shape-tests-final.log`), including fourteen
+new shape controls. Full quality/API checks passed
+(`artifacts/resource-carrier-shape-lint.log`), as did documentation checks
+(`artifacts/resource-carrier-shape-docs.log`). The canonical private formatter
+copied zero source changes (`artifacts/resource-carrier-shape-format-final.log`).
+
+Pinned source review reached the throwable-construction guard in
+[`CLRException::GetThrowable`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp#L90).
+For `EEException`,
+[`IsSameInstanceType`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.h#L217)
+compares native exception type and managed exception kind. Failed construction
+can delegate to `GetThrowableFromException`; the guard is not an explicit
+numeric limit on all helper/constructor attempts. Constructor and resource
+paths still require separate accounting before root task-byte composition.
+The exception headers have verified blob identities, byte counts and SHA-256
+hashes in the ignored research manifest.
+
+The automatic report for published `64125e57e` measures 6837/7007 changed trusted
+lines (97.57%, 170 gaps), failing the unchanged 100% minimum. Seven previous
+image-write and length-budget guard lines are now covered. The complete report
+for merge `b3570a3c4356eb956dd05480de191839ff58a8a5` is retained at
+`artifacts/resource-64125-coverage-evidence/coverage/SharpProof.coverage.json`
+(run 39812477832). This report predates the current carrier-shape controls.
+
+Initial GitHub listings returned no latest-head runs; later reads exposed the
+automatic PR runs. Four duplicate manual test/security dispatches were cancelled
+and the completed manual docs run was left terminal. The automatic PR runs are
+the qualification evidence; cancelled duplicates are not passes.
+
 ### Compiler image serialization budget controls
 
 New controls invoke the collector's actual private image stream through byte,
