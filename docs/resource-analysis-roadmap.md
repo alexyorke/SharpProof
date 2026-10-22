@@ -109,6 +109,29 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Mathematical integer widths and arithmetic guard rejection
+
+Three additional memory-program controls check the separation between legacy
+mathematical integers and fixed-width Total storage, and between arithmetic
+values and Boolean branch proofs. The builder rejects a legacy array length;
+extraction independently returns `MemoryAllocationUnsupported` for a malformed
+allocation using owned IDs. Public legacy evaluation returns
+`MemoryProgramRequiresTotalSemantics`. Neither rejection publishes partial bounds.
+Addition and multiplication with known integer operands cannot become Boolean
+guard proofs through the private condition evaluator.
+
+All 111 memory-program cases passed with zero build warnings or errors
+(`artifacts/resource-memory-width-guards-tests-fixed.log`). The initial legacy
+probe reached the builder's earlier length validation; the corrected control
+checks both rejection layers. The canonical private formatter copied zero
+source changes (`artifacts/resource-memory-width-guards-format-fixed.log`).
+No production admission rule or cost model changed. Runtime-byte obligations
+and the unchanged 100% changed-trusted-code coverage requirement remain open.
+
+Full quality/API checks passed after correcting heading spacing
+(`artifacts/resource-memory-width-guards-lint-fixed.log`); documentation checks
+also passed (`artifacts/resource-memory-width-guards-docs.log`).
+
 ### Independent memory extraction guards
 
 Five additional memory-program controls cover incomplete/unsupported tails,

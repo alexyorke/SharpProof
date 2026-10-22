@@ -68,6 +68,52 @@ public sealed class ResourceMemoryProgramTests
         Assert.That(check.UnknownReason, Is.EqualTo("MemoryProgramBudgetExceeded"));
     }
 
+    [Test]
+    public void MathematicalIntegerArraysNeverAcquireAPrimitiveByteWidth()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Legacy);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var root = factory.CreateVariable("root", type);
+        Action allocate = () =>
+        {
+            _ = builder.Allocate(entry, factory.CreateOperation(), type, root, factory.Integer(1));
+        };
+        Assert.That(allocate, Throws.ArgumentException);
+        var seed = builder.Write(entry, factory.CreateOperation(), IrWriteRegion.Local);
+        var allocation = new IrAllocationInstruction(seed.Id, seed.Operation, type, root, factory.Integer(1));
+        var returned = builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
+        var publicCheck = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(publicCheck.Bounds, Is.Null);
+        Assert.That(publicCheck.UnknownReason, Is.EqualTo("MemoryProgramRequiresTotalSemantics"));
+        var extraction = ExtractMemory(factory, [allocation, returned]);
+        Assert.That(extraction.Bounds, Is.Null);
+        Assert.That(extraction.UnknownReason, Is.EqualTo("MemoryAllocationUnsupported"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ConstantArithmeticDoesNotBecomeABooleanGuardProof(bool multiply)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var left = factory.CreateVariable("left", factory.IntegerType);
+        var right = factory.CreateVariable("right", factory.IntegerType);
+        var condition = factory.Binary(multiply ? IrBinaryOperator.Multiply : IrBinaryOperator.Add,
+            factory.Variable(left), factory.Variable(right));
+        var constants = new Dictionary<IrVarId, IrTerm> { [left] = factory.Integer(1), [right] = factory.Integer(2) };
+        var method = typeof(ResourceMemoryProgram).GetMethod("TryConstantCondition",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        object?[] arguments =
+        [
+            condition, constants, factory, new Dictionary<IrVarId, int>(),
+            new Dictionary<(int Receiver, IrMemberId Field), int>(),
+            new Dictionary<(int Receiver, IrMemberId Field), IrTerm>(), false, 0
+        ];
+        Assert.That(method!.Invoke(null, arguments), Is.False);
+        Assert.That(arguments[6], Is.False);
+    }
     private static ResourceMemoryCheck ExtractMemory(IrFactory factory, List<IrInstruction> instructions)
     {
         ArgumentNullException.ThrowIfNull(factory);
