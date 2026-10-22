@@ -109,6 +109,64 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Linux native OOM constructor message storage
+
+A new private component bounds the returned managed string from the CoreCLR
+OOM constructor's native message QCall. Under the pinned Linux CoreCLR 8.0.32
+x64 model, at most 61 UTF-16 characters require at most 144 aligned bytes per
+independently bounded constructor attempt. The model is
+`coreclr8-linux-native-oom-message-storage-v1`. Other operating systems,
+incompatible layouts and expression-budget exhaustion return Unknown without
+a partial bound or model identity; cancellation propagates.
+
+Pinned [`ExceptionNative_GetMessageFromNativeResources`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/comutilnative.cpp#L448)
+selects exactly one QCall string setter. The OOM native resource and fallback
+both have 61 characters, verified independently from the retained source.
+The initial manual count was 59 and was corrected before tests; both extents
+align to the same 144-byte bound. The Linux
+[`resource target`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/dlls/mscorrc/CMakeLists.txt)
+builds its table from `include.rc`, which includes `mscorrc.rc`. The Unix loader
+uses this compiled table; QCall's setter attempts one returned managed string.
+
+This is returned-string storage only. It does not bound constructor attempts,
+resource/culture callbacks, native buffers, initialization, helper failures,
+trace buffers or the separate dimension-error message. The caller must bind
+Linux and the exact runtime/table model before composition. Runtime layout
+compatibility alone does not establish this platform premise. The root task
+cumulative-byte result remains Unknown.
+
+Controls cover constant and symbolic counts, platform/layout/budget rejection,
+cancellation and independent warmed constructor allocations. The warmed
+measurements compare an instance plus its native message against their
+separate components; they do not establish a cold constructor or root bound.
+The first build rejected explicit reserved-exception construction under
+CA2201; its suppression is scoped to this allocation-control test only. Native
+resource, QCall, table and build sources have verified blob identities, byte
+counts and SHA-256 entries in the ignored research manifest.
+
+All 254 Specs cases passed on the formatted final source, with zero build
+warnings or errors (`artifacts/resource-native-oom-message-tests-fixed.log`).
+The canonical formatter copied zero source changes
+(`artifacts/resource-native-oom-message-format-fixed.log`). Documentation
+checks passed (`artifacts/resource-native-oom-message-docs.log`). A filename
+spelling finding was corrected by marking the actual resource filenames as
+code identifiers; no dictionary exception was added.
+
+Published `7d86a8aa1` coverage run 39825959374 attempt 1 failed before report
+aggregation: package shard 0's container setup received a blocked tool-download
+response after the existing retries. Its failed log is retained at
+`artifacts/resource-7d86-coverage-failed.log`. Only failed jobs were retried on
+the same commit. There is no complete coverage report for that attempt, so the
+latest complete measurement remains the earlier 155-gap report. Dependency
+pins, download hashes and the 100% coverage floor were preserved.
+
+Final quality/API checks passed
+(`artifacts/resource-native-oom-message-lint-fixed.log`). The failed-job
+coverage retry is live as attempt 2 on the same `7d86a8aa1` commit; no result
+is inferred from that pending run. This private component does not change
+protocol schemas, cache identities or the root task-byte verdict. The open
+runtime-byte checklist above remains authoritative.
+
 ### Best-effort OOM materialization instance storage
 
 A new private component bounds fixed instance storage for an independently

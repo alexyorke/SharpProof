@@ -11,6 +11,11 @@ internal sealed record ResourcePrimitiveHCallFrameCheck(int? DirectFramesUpper, 
     internal string? RequiredRuntimeModel => DirectFramesUpper is null ? null : ResourceTaskFaultCarrierCatalog.PrimitiveHCallFrameModel;
 }
 
+internal sealed record ResourceNativeOomMessageCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.NativeOomMessageModel;
+}
+
 internal sealed record ResourceBestOomInstanceCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
 {
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.BestOomInstanceModel;
@@ -65,6 +70,33 @@ internal static class ResourceTaskFaultCarrierCatalog
         // and the JIT_NewArr1 worker are HCIMPL entries in the pinned source.
         return new(0, null);
     }
+    internal const string NativeOomMessageModel = "coreclr8-linux-native-oom-message-storage-v1";
+    internal const string NativeOomMessageSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/comutilnative.cpp";
+
+    // Returned managed-string storage only. The pinned Unix resource table and
+    // native fallback both contain at most 61 UTF-16 characters for this ID.
+    // Exactly one QCall setter is selected; it attempts one managed string.
+    // Lookup/culture callbacks, native buffers, helper failures, initialization
+    // and other exception messages remain separate costs. The caller must bind
+    // Linux and independently bound all constructor attempts before composition.
+    internal static ResourceNativeOomMessageCheck BoundNativeOomConstructorMessages(ResourceExpression constructorAttempts,
+        string operatingSystem, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        constructorAttempts = ArgumentNullGuard.NotNull(constructorAttempts, nameof(constructorAttempts));
+        operatingSystem = ArgumentNullGuard.NotNull(operatingSystem, nameof(operatingSystem));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        if (operatingSystem != "Linux")
+        { return new(null, "UnsupportedNativeOomMessagePlatform"); }
+        var message = ResourceRuntimeLayout.Bound(ResourceAllocationShape.String(ResourceExpression.Literal(61)), layout, cancellation);
+        if (message.Bounds is not { } bytes)
+        { return new(null, message.UnknownReason); }
+        try
+        { return new(ResourceExpression.Multiply(bytes.Upper, constructorAttempts), null); }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "NativeOomMessageBudgetExceeded"); }
+    }
+
     internal const string BestOomInstanceModel = "coreclr8-best-oom-instance-storage-v1";
     internal const string BestOomInstanceSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp";
 

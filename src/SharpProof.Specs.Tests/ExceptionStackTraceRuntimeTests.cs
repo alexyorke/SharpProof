@@ -14,6 +14,87 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(16)]
+    public void NativeOomMessageStorageBoundsOneReturnedStringPerConstructor(int attempts)
+    {
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.Literal(attempts), "Linux",
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.CumulativeUpper!.Constant, Is.EqualTo(new BigInteger(144) * attempts));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.NativeOomMessageModel));
+    }
+
+    [TestCase("Windows")]
+    [TestCase("macOS")]
+    public void NativeOomMessagesCannotBorrowTheUnixTableForOtherPlatforms(string operatingSystem)
+    {
+        ArgumentNullException.ThrowIfNull(operatingSystem);
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.Zero, operatingSystem,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.EqualTo("UnsupportedNativeOomMessagePlatform"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+    }
+
+    [Test]
+    public void NativeOomMessageCompositionPreservesSymbolicCountsAndRejectsBudgetOrLayoutFailure()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var attempts = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "attempts", int.MaxValue));
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(attempts, "Linux", layout, cancellation);
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 3,
+            cancellation), Is.EqualTo(new BigInteger(432)));
+        for (var depth = attempts.Depth; depth < ResourceExpression.MaximumDepth; depth++)
+        { attempts = ResourceExpression.Add(attempts, ResourceExpression.One); }
+        check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(attempts, "Linux", layout, cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("NativeOomMessageBudgetExceeded"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.Zero, "Linux",
+            new("CoreCLR", "8.0.32", "arm64", 8), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action operation = () => { _ = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.One, "Linux", layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(operation);
+    }
+
+#pragma warning disable CA2201 // Measure the native constructor message allocation without throwing the exception.
+    [Test]
+    public void WarmOomConstructorsFitTheIndependentInstanceAndNativeMessageComponents()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(OperatingSystem.IsLinux(), Is.True);
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var instance = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultNotificationCatalog.ExceptionFields), layout, cancellation);
+        var message = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.One, "Linux", layout, cancellation);
+        var bound = instance.Bounds!.Upper.Constant!.Value + message.CumulativeUpper!.Constant!.Value;
+        for (var warmup = 0; warmup < 64; warmup++)
+        { GC.KeepAlive(new OutOfMemoryException()); }
+        string? previous = null;
+        for (var iteration = 0; iteration < 128; iteration++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var exception = new OutOfMemoryException();
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(new BigInteger(allocated), Is.GreaterThan(0).And.LessThanOrEqualTo(bound));
+            Assert.That(exception.Message.Length, Is.LessThanOrEqualTo(61));
+            Assert.That(ReferenceEquals(previous, exception.Message), Is.False);
+            previous = exception.Message;
+            GC.KeepAlive(exception);
+        }
+    }
+
+#pragma warning restore CA2201
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(16)]
     public void BestOomMaterializationBoundsOneInstancePerConversion(int conversions)
     {
         var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(ResourceExpression.Literal(conversions),
