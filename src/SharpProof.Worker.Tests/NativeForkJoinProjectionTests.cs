@@ -12,6 +12,48 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class NativeForkJoinProjectionTests
 {
+    [TestCase("kind")]
+    [TestCase("domain")]
+    [TestCase("ordinal")]
+    public void SubstitutionIndependentlyRejectsInputsOutsideTheOwnedScalarMap(string corruption)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        var input = new ResourceInput(corruption == "ordinal" ? 1 : 0,
+            corruption == "kind" ? ResourceInputKind.ArrayLength : ResourceInputKind.NonNegativeScalar,
+            "value", corruption == "domain" ? long.MaxValue : int.MaxValue);
+        var expression = ResourceExpression.InputSize(input);
+        var method = typeof(NativeForkJoinSourceCostVerifier).GetMethod("Substitute",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        object?[] arguments = [expression, new ResourceExpression[] { ResourceExpression.One },
+            ResourceExpression.MaximumNodes, TestContext.CurrentContext.CancellationToken];
+        Action substitute = () => { _ = method!.Invoke(null, arguments); };
+        var exception = Assert.Throws<System.Reflection.TargetInvocationException>(substitute);
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public void SubstitutionConsumesOneSharedBudgetAcrossExpressions()
+    {
+        var input = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "value", int.MaxValue));
+        var expression = ResourceExpression.Add(input, ResourceExpression.One);
+        var replacement = ResourceExpression.Literal(7);
+        var method = typeof(NativeForkJoinSourceCostVerifier).GetMethod("Substitute",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        object?[] arguments = [expression, new ResourceExpression[] { replacement }, expression.NodeCount,
+            TestContext.CurrentContext.CancellationToken];
+        var first = (ResourceExpression)method!.Invoke(null, arguments)!;
+        Assert.That(first.Constant, Is.EqualTo(new System.Numerics.BigInteger(8)));
+        Assert.That(arguments[2], Is.EqualTo(0));
+
+        // Reuse the ref budget across a later expression, just as composition
+        // does across the child metrics. A valid prefix cannot reset it.
+        arguments[0] = ResourceExpression.One;
+        Action exhausted = () => { _ = method.Invoke(null, arguments); };
+        var exception = Assert.Throws<System.Reflection.TargetInvocationException>(exhausted);
+        Assert.That(exception!.InnerException, Is.TypeOf<ResourceExpressionLimitException>());
+    }
     [TestCase(false, 1)]
     [TestCase(true, 3)]
     public void SourceActivationBoundsComeFromOwnedCallPrograms(bool nested, int expected)

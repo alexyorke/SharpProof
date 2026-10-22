@@ -109,6 +109,32 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Independent source-cost substitution guards
+
+Four additional native fork/join controls exercise substitution's own scalar
+input-map checks and shared node budget. Array-length inputs, a mismatched
+scalar maximum and an out-of-range formal ordinal must be rejected even when
+the helper is invoked independently of the caller's admission checks. An
+exactly sufficient budget permits one complete expression, leaves zero nodes,
+and rejects a later expression that reuses that budget. These controls do not
+supply a CLR frame bound or a root task allocation proof.
+
+Published `d74b98de9` passed exact-head security (39822545623) and documentation
+(39822545566) checks. Its canonical CI (39822545996), coverage (39822545703) and
+package-consumer (39822546154) workflows remain pending/running. The earlier
+`8b6be36f1` canonical CI (39819949377) and package-consumer (39819958128) runs
+both completed successfully. Its coverage report still fails the unchanged
+100% floor. These predecessor passes do not qualify the current head.
+
+All 111 native fork/join projection cases passed with zero build warnings or
+errors (`artifacts/resource-forkjoin-substitution-guards-tests.log`). Full
+quality/API checks passed (`artifacts/resource-forkjoin-substitution-guards-lint.log`),
+as did documentation checks (`artifacts/resource-forkjoin-substitution-guards-docs.log`).
+The canonical private formatter copied zero source changes
+(`artifacts/resource-forkjoin-substitution-guards-format.log`). No production
+admission rule, runtime model or cache identity changed. Coverage of these new
+controls remains unverified until the next exact-head report.
+
 ### Native task declaration boundaries and fault escape review
 
 The task-root controls now include empty, malformed JSON, oversized and
