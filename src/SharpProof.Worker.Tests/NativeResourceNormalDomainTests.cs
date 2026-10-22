@@ -8,6 +8,105 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class NativeResourceNormalDomainTests
 {
+    [TestCase(10)]
+    [TestCase(11)]
+    public void BranchSnapshotFoldingCannotFollowEdgesAfterTheSharedBudgetIsExhausted(int reserve)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        builder.Assign(entry, factory.CreateOperation(), condition, factory.Boolean(true));
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(condition), yes, no);
+        builder.Return(yes, factory.CreateOperation());
+        builder.Return(no, factory.CreateOperation());
+        var clause = new CompilerTotalClause(CompilerContractKind.Requires, factory.Boolean(true), factory.Boolean(true),
+            factory.CreateOperation(), null, null);
+        var owner = new CompilerTotalCallablePreparation("owner", builder.Build(), [], null,
+            Enumerable.Repeat(clause, ResourceExpression.MaximumNodes - reserve).ToImmutableArray());
+        Assert.That(NativeResourceNormalDomain.Check(ResourceProgram.Zero, owner,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo("ResourceNormalDomainBudgetExceeded"));
+    }
+
+    [TestCase(16, true)]
+    [TestCase(96, false)]
+    public void DeepArrayExtentSnapshotsRemainUnknownWithoutInventingNormalCompletion(int aliases, bool admitted)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var current = factory.CreateVariable("extent", factory.IntegerType);
+        builder.Assign(entry, factory.CreateOperation(), current, factory.Integer(0));
+        for (var index = 0; index < aliases; index++)
+        {
+            var next = factory.CreateVariable("snapshot", factory.IntegerType);
+            builder.Assign(entry, factory.CreateOperation(), next, factory.Variable(current));
+            current = next;
+        }
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var target = factory.CreateVariable("array", type);
+        var allocation = builder.Allocate(entry, factory.CreateOperation(), type, target, factory.Variable(current));
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(7));
+        var program = builder.Build();
+        Assert.That(Check(program), admitted ? Is.Null : Is.EqualTo("ResourceNormalDomainInstructionUnsupported:" + allocation.Kind));
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000,
+            new IrProgramReplayOptions(static _ => null), TestContext.CurrentContext.CancellationToken);
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(7));
+    }
+
+    [TestCase(IrBinaryOperator.Add)]
+    [TestCase(IrBinaryOperator.Subtract)]
+    [TestCase(IrBinaryOperator.Multiply)]
+    [TestCase(IrBinaryOperator.Divide)]
+    public void NumericSnapshotExpressionsCannotBecomeBooleanFacts(IrBinaryOperator operation)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var left = factory.CreateVariable("left", factory.IntegerType);
+        var right = factory.CreateVariable("right", factory.IntegerType);
+        var definitions = new Dictionary<IrVarId, IrTerm>
+        { [left] = factory.Integer(2), [right] = factory.Integer(3) };
+        var term = factory.Binary(operation, factory.Variable(left), factory.Variable(right));
+        var method = typeof(NativeResourceNormalDomain).GetMethod("Boolean",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        object?[] arguments = [term, factory, definitions, new HashSet<IrVarId>(), ResourceExpression.MaximumNodes,
+            TestContext.CurrentContext.CancellationToken, 0];
+        Assert.That(method!.Invoke(null, arguments), Is.Null);
+    }
+
+    [TestCase(1, false)]
+    [TestCase(4, true)]
+    public void AllocationSuccessRecognitionCannotBorrowBudgetFromItsContinuation(int budget, bool admitted)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var failure = builder.CreateBlock();
+        var success = builder.CreateBlock();
+        var failureExit = builder.CreateBlock();
+        var choice = factory.CreateVariable("choice", factory.BooleanType);
+        builder.Havoc(entry, factory.CreateOperation(IrOpaqueCallSite.Describe(IrOpaqueCallEffects.Throws,
+            "array:beyond-maximum-length")), IrHavocKind.Variables, IrHavocOrigin.Approximation, choice);
+        var site = factory.CreateOperation("array-site");
+        builder.Branch(entry, site, factory.Variable(choice), failure, success);
+        builder.Throw(failure, site, IrExceptionKind.Unknown, failureExit);
+        builder.Return(failureExit, factory.CreateOperation());
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        builder.Allocate(success, site, type, factory.CreateVariable("array", type), factory.Integer(1));
+        builder.Return(success, factory.CreateOperation());
+        var program = builder.Build();
+        var method = typeof(NativeResourceNormalDomain).GetMethod("AllocationSuccessContinuation",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        object?[] arguments = [program, program.GetBlock(entry), budget, TestContext.CurrentContext.CancellationToken];
+        var continuation = method!.Invoke(null, arguments);
+        Assert.That(continuation, admitted ? Is.EqualTo(success) : Is.Null);
+        if (!admitted)
+        { Assert.That(arguments[2], Is.LessThan(0)); }
+    }
+
     [TestCase(IrBinaryOperator.Equal, false)]
     [TestCase(IrBinaryOperator.NotEqual, true)]
     [TestCase(IrBinaryOperator.LessThan, true)]

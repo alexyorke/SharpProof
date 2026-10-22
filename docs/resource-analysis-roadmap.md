@@ -109,6 +109,59 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Loop admission and normal-domain guard controls
+
+The analyzer control batch distinguishes legal promoted integral strides and
+explicit truncating conversions from loops that do not make progress and other
+unsupported forms.
+It checks multiple/missing initializers, unsigned counters, wrapped signed
+constants, zero-valued converted steps, and both positions of an opaque counter
+phase. An opaque second phase must discard an otherwise valid first phase's
+partial allocation and loop bounds. Explicit casts of 1.5 to an integer must use
+the converted stride of one, not a rounded stride of two.
+
+Seven separate editor controls deliberately retain CS0266 compilation errors
+from illegal compound assignments. They require analysis to abstain with no
+numeric bounds; they do not represent executable C#. The initial fixture run
+identified these language errors before analysis, and the corrected legal-source
+and broken-editor batches are tested separately within the resource fixture.
+The initial log is retained as
+`artifacts/resource-loop-boundary-controls-initial-tests.log`.
+
+Ten native normal-domain controls check shared-budget exhaustion during branch
+snapshot folding and allocation-success recognition, bounded integer-alias
+reasoning, and rejection of numeric arithmetic as Boolean facts. The short and
+deep alias programs are independently interpreted to completion; an analysis
+limit must yield Unknown rather than a false normal-completion fact. These
+controls introduce no production, cost-model, protocol or cache changes.
+
+All 753 selected native tests passed, including the ten new normal-domain
+controls and the complete native resource-contract fixture
+(`artifacts/resource-normal-domain-guard-controls-tests.log`). All 241 analyzer
+resource tests also passed (`artifacts/resource-loop-boundary-controls-tests.log`).
+Both builds reported zero warnings or errors. Full quality/API checks and
+documentation checks passed (`artifacts/resource-loop-normal-domain-controls-lint.log`
+and `artifacts/resource-loop-normal-domain-controls-docs.log`). The canonical
+formatter copied zero source changes after the corrected fixtures
+(`artifacts/resource-loop-boundary-controls-format.log`).
+
+Predecessor `99cab41d2` passed full canonical CI (39850739303) and the package
+consumer workflow (39850739355). These qualify that exact predecessor, not the
+uncommitted test controls.
+
+The latest retained coverage baseline is now `99cab41d2`, run 39850739285:
+all fifteen shards passed, while aggregate job 120082538282 failed the unchanged
+100 percent floor. Its 74 input reports measure 6952/7099 changed trusted lines
+(97.93 percent), with 147 gaps. Evidence is retained in
+`artifacts/resource-99ca-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge commit `c75d5e731abc0cbcc5afa33201f027ad0da318de` has verified parents
+master `fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and branch head
+`99cab41d2fb051d88adb0a832ae11eb6976687c1`. The entry-model helper's new lines
+are covered, but the overall gap count is unchanged; the separated entry
+constraint rejection remains uncovered. The new loop/domain controls are not
+yet measured by this report. Runtime-byte modeling and the other full-roadmap
+obligations remain open, with the runtime-model choice still pending user input.
+
 ### Replay entry-model validation
 
 The native replay entry-shape check is now a directly testable helper used by
