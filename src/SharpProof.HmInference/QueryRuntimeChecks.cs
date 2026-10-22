@@ -28,6 +28,9 @@ internal static class QueryRuntimeChecks
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+            public static class RequiredTrace{public static int Calls;}
+            public delegate T RequiredAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
+            public static partial class PartialInputProbe{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryProbe.RequireInput(value);}
             public static class ReadonlyTrace{public static int Indices,Returns;}
             public sealed class ReadonlyCell<T>{
                 public T Value;public T? Observed;public int Calls,ReadonlyCalls;public ReadonlyCell(T value){Value=value;Observed=value;}
@@ -66,6 +69,14 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static T RequireInput<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value){Interlocked.Increment(ref RequiredTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(value is null)throw QueryTrace.ContractFailure;return value;}
+                static void RequireReadonly<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value){Interlocked.Increment(ref RequiredTrace.Calls);if(value is null)throw QueryTrace.ContractFailure;}
+                public static int RequiredValue(int value)=>RequireInput(value);
+                public static int RequiredNamed(int value)=>RequireInput(value:value);
+                public static int RequiredDelegate(RequiredAction<int> require,int value)=>require(value);
+                public static int RequiredReadonly(in int value){RequireReadonly(in value);return value;}
+                public static async Task<int> RequiredTask(int value,Task gate){await gate;return RequireInput(value);}
+                public static async ValueTask<int> RequiredValueTask(int value,Task gate){await gate;return RequireInput(value);}
                 static int ReadonlyIndex(){Interlocked.Increment(ref ReadonlyTrace.Indices);return 0;}
                 public static string ReadonlyValue(ReadonlyCell<string> cell,string? value){cell.Observe(in value);return cell.Value;}
                 public static string ReadonlyRefValue(ReadonlyCell<string> cell,string? value){cell.ObserveReadonly(in value);return cell.Value;}
@@ -356,7 +367,25 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> RequiredContracts(CancellationToken cancellationToken){
+                    RequiredTrace.Calls=0;var value=17;if(QueryProbe.RequiredValue(7)!=7||QueryProbe.RequiredNamed(11)!=11||QueryProbe.RequiredDelegate(QueryProbe.RequireInput,13)!=13||QueryProbe.RequiredReadonly(in value)!=17||value!=17||PartialInputProbe.RequiredPartial(19)!=19||RequiredTrace.Calls!=5)return false;
+                    var failure=new InvalidOperationException("required input");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        RequiredTrace.Calls=0;var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.RequiredTask(7,gate.Task);var valueTask=QueryProbe.RequiredValueTask(7,gate.Task).AsTask();if(task.IsCompleted||valueTask.IsCompleted||RequiredTrace.Calls!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(true);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=7)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(RequiredTrace.Calls!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> ReadonlyContracts(CancellationToken cancellationToken){
+                    if(!await RequiredContracts(cancellationToken))return false;
                     ReadonlyTrace.Indices=ReadonlyTrace.Returns=0;var text=new string('r',3);var cell=new ReadonlyCell<string>(text);string? missing=null;string?[] values={null};
                     if(!ReferenceEquals(QueryProbe.ReadonlyValue(cell,missing),text)||cell.Observed!=null||!ReferenceEquals(QueryProbe.ReadonlyArray(cell,values),text)||values[0]!=null||ReadonlyTrace.Indices!=1)return false;
                     values[0]=text;if(!ReferenceEquals(QueryProbe.ReadonlyAlias(cell,values),text)||!ReferenceEquals(values[0],text)||!ReferenceEquals(cell.Observed,text)||ReadonlyTrace.Indices!=2||!ReferenceEquals(QueryProbe.ReadonlyRefValue(cell,missing),text)||cell.Observed!=null||cell.Calls!=4||cell.ReadonlyCalls!=1)return false;
@@ -679,7 +708,20 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> RequiredContracts(string text,CancellationToken cancellationToken){
+                    RequiredTrace.Calls=0;var uri=new Uri("https://example.invalid/required-input");decimal? number=23m;
+                    if(!ReferenceEquals(QueryProbe.RequiredValue(text),text)||QueryProbe.RequiredNamed(number)!=23m||!ReferenceEquals(QueryProbe.RequiredDelegate(QueryProbe.RequireInput,uri),uri)||QueryProbe.RequiredReadonly(in number)!=23m||number!=23m||PartialInputProbe.RequiredPartial(number)!=23m||RequiredTrace.Calls!=5)return false;
+                    try{_=QueryProbe.RequiredValue<string>(null!);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    try{_=PartialInputProbe.RequiredPartial<decimal?>(null!);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var parameter=typeof(QueryProbe).GetMethod(nameof(QueryProbe.RequiredValue))!.GetParameters()[0];if(parameter.GetCustomAttributes(typeof(System.Diagnostics.CodeAnalysis.DisallowNullAttribute),false).Length!=1)return false;
+                    var partialParameter=typeof(PartialInputProbe).GetMethod(nameof(PartialInputProbe.RequiredPartial))!.GetParameters()[0];if(partialParameter.GetCustomAttributes(typeof(System.Diagnostics.CodeAnalysis.DisallowNullAttribute),false).Length!=1)return false;
+                    var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);RequiredTrace.Calls=0;
+                    var task=QueryProbe.RequiredTask(number,gate.Task);var valueTask=QueryProbe.RequiredValueTask(number,gate.Task).AsTask();if(task.IsCompleted||valueTask.IsCompleted||RequiredTrace.Calls!=0)return false;gate.SetResult(true);
+                    foreach(var pending in new[]{task,valueTask}){if(await pending.WaitAsync(cancellationToken)!=23m)return false;}
+                    return RequiredTrace.Calls==2;
+                }
                 static async Task<bool> ReadonlyContracts(string text,CancellationToken cancellationToken){
+                    if(!await RequiredContracts(text,cancellationToken))return false;
                     ReadonlyTrace.Indices=ReadonlyTrace.Returns=0;var uri=new Uri("https://example.invalid/readonly-input");var cell=new ReadonlyCell<Uri>(uri);Uri? missing=null;Uri?[] values={null};
                     if(!ReferenceEquals(QueryProbe.ReadonlyValue(cell,missing),uri)||!ReferenceEquals(QueryProbe.ReadonlyArray(cell,values),uri)||values[0]!=null||ReadonlyTrace.Indices!=1)return false;
                     values[0]=uri;if(!ReferenceEquals(QueryProbe.ReadonlyAlias(cell,values),uri)||!ReferenceEquals(values[0],uri)||!ReferenceEquals(QueryProbe.ReadonlyRefValue(cell,missing),uri)||cell.Observed!=null||cell.Calls!=4||cell.ReadonlyCalls!=1||ReadonlyTrace.Indices!=2)return false;

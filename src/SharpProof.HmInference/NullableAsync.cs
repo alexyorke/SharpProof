@@ -92,6 +92,61 @@ public static partial class Inference
             });
         }
 
+        private readonly HashSet<int> forwardedDisallowNull = [];
+
+        private bool ForwardDisallowNullInputs(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            var diagnostics = compilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
+            {
+                if (diagnostic is null)
+                { throw new ArgumentNullException(nameof(diagnostic)); }
+                return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
+                    && diagnostic.Id is "CS8604" or "CS8607" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+            }).ToArray();
+            if (diagnostics.Length == 0)
+            { return false; }
+            var before = original.DescendantNodes().OfType<ArgumentSyntax>().ToArray();
+            var after = candidate.DescendantNodes().OfType<ArgumentSyntax>().ToArray();
+            if (before.Length != after.Length)
+            { return false; }
+            var changed = false;
+            for (var i = 0; i < before.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!diagnostics.Any(diagnostic =>
+                {
+                    if (diagnostic is null)
+                    { throw new ArgumentNullException(nameof(diagnostic)); }
+                    return after[i].Span.Contains(diagnostic.Location.SourceSpan);
+                }) || model.GetOperation(before[i], cancellationToken) is not IArgumentOperation { Parameter: { } target }
+                    || target.RefKind == RefKind.Out || !HasDisallowNull(target)
+                    || StorageExpression(before[i].Expression) is not IdentifierNameSyntax identifier
+                    || model.GetSymbolInfo(identifier, cancellationToken).Symbol is not IParameterSymbol source
+                    || !SymbolEqualityComparer.Default.Equals(source.ContainingSymbol, currentMethod) || HasDisallowNull(source))
+                { continue; }
+                changed |= forwardedDisallowNull.Add(source.Ordinal);
+            }
+            return changed;
+        }
+
+        private static bool HasDisallowNull(IParameterSymbol parameter)
+        {
+            if (parameter is null)
+            { throw new ArgumentNullException(nameof(parameter)); }
+            return parameter.GetAttributes().Any(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.DisallowNullAttribute";
+            });
+        }
+
         private static bool HasNullableOutput(IParameterSymbol parameter)
         {
             if (parameter is null)

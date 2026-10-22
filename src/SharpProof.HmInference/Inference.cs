@@ -323,7 +323,9 @@ public static partial class Inference
                     { throw new ArgumentNullException(nameof(parameter)); }
                     if (index < 0)
                     { throw new ArgumentOutOfRangeException(nameof(index)); }
-                    return parameter.WithType(SyntaxFactory.ParseTypeName(parameterNames[index]).WithTriviaFrom(parameter.Type!));
+                    var rendered = parameter.WithType(SyntaxFactory.ParseTypeName(parameterNames[index]).WithTriviaFrom(parameter.Type!));
+                    return !forwardedDisallowNull.Contains(index) ? rendered : rendered.AddAttributeLists(
+                        SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Attribute(SyntaxFactory.ParseName("global::System.Diagnostics.CodeAnalysis.DisallowNull")))));
                 })));
             }
             var candidate = method.WithReturnType(RenderReturnSyntax()).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(RenderParameters());
@@ -373,6 +375,13 @@ public static partial class Inference
                 candidate = candidate.WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter)))))
                     .WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints))
                     .WithReturnType(RenderReturnSyntax()).WithParameterList(RenderParameters());
+                changed = CandidateTree();
+                changedCompilation = ReplaceCandidate(changed);
+            }
+            while (ForwardDisallowNullInputs(changedCompilation, method,
+                changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single()))
+            {
+                candidate = candidate.WithParameterList(RenderParameters());
                 changed = CandidateTree();
                 changedCompilation = ReplaceCandidate(changed);
             }
@@ -611,7 +620,7 @@ public static partial class Inference
 
                 return p.Identifier.Text;
             }) ?? Enumerable.Empty<string>()).Concat(variables.Values);
-            var renderedParameters = method.Parameters().Select((p, i) =>
+            var renderedParameters = candidate.Parameters().Select((p, i) =>
             {
                 if (p is null)
                 {

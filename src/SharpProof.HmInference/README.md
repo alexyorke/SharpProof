@@ -891,6 +891,19 @@ property attributes to getter returns, so imported getters are checked separatel
 Signature and execution checks cover these distinctions, null results and required
 getter faults. CLI/package consumers exercise C# 8/9/13; `ref readonly` parameter
 declarations are exercised in C# 13.
+Direct wrapper parameters forward `DisallowNull` when generalized-candidate
+compiler diagnostics show that the callee requires it. The candidate, displayed
+signature, IDE fix and emitted parameter metadata retain the inferred contract.
+This avoids replacing a value precondition with a blanket `notnull` type bound:
+non-null nullable-value inputs remain usable. Guards, existing attributes and
+suppressed warnings prevent unnecessary forwarding; user attribute syntax stays
+intact. Named calls, delegates, source/metadata helpers, readonly parameters and
+Task/ValueTask wrappers have regression coverage. Partial implementations emit the
+contract once while both declarations retain matching generic types. Applied fixes
+verify reference identity, nullable-value inputs, exact helper faults, suspension,
+cancellation and reflected metadata. CLI/package consumers cover C# 8/9/13 and
+C# 9/13 non-void partial declarations. Projected input contracts and stronger
+relational wrapper forwarding still need work.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

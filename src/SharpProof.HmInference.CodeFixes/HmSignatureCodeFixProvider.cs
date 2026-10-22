@@ -123,7 +123,9 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                 throw new global::System.ArgumentOutOfRangeException(nameof(index));
             }
 
-            return parameter.WithType(shape.ParameterList.Parameters[index].Type!.WithTriviaFrom(parameter.Type!));
+            // Preserve user syntax and append only attributes inferred for this parameter.
+            return parameter.WithType(shape.ParameterList.Parameters[index].Type!.WithTriviaFrom(parameter.Type!))
+                .AddAttributeLists(shape.ParameterList.Parameters[index].AttributeLists.Skip(parameter.AttributeLists.Count).ToArray());
         }), method.ParameterList.Parameters.GetSeparators()))).WithAdditionalAnnotations(Formatter.Annotation);
         var roots = Inference.RewriteMethodParts(method, replacement, model, cancellationToken);
         var solution = document.Project.Solution;

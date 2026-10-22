@@ -18,6 +18,18 @@ internal static class QueryChecks
             ("CombinedNullableMethodReturn", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]static T Both<T>(T value)=>value!;static int M(int value)=>Both(value);", "T1? M<T1>(T1 value)"),
             ("CombinedNullableDelegateReturn", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]delegate T Both<T>(T value);static int M(Both<int> both,int value)=>both(value);", "T1? M<T1>(global::Cases.Both<T1> both, T1 value)"),
             ("CombinedNullablePropertyReturn", "class Cell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull][System.Diagnostics.CodeAnalysis.NotNull]public T Value=>default!;}static int M(Cell<int> cell)=>cell.Value;", "T1 M<T1>(global::Cases.Cell<T1> cell)"),
+            ("DisallowNullNamedInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static int M(int value)=>Require(value:value);", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullPreservesAttribute", "class Mark:System.Attribute{}static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static int M([Mark]int value)=>Require(value);", "T1 M<T1>([Mark] [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullInWrapper", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value)=>value;static int M(in int value)=>Require(in value);", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] in T1 value)"),
+            ("DisallowNullAsyncWrapper", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static async Task<int> M(int value,Task gate){await gate;return Require(value);}", "global::System.Threading.Tasks.Task<T1> M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value, global::System.Threading.Tasks.Task gate)"),
+            ("DisallowNullSuppressedInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;\n#pragma warning disable CS8607\nstatic int M(int value)=>Require(value);", "T1 M<T1>(T1 value)"),
+            ("DisallowNullGuardedInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static string M(string? value){if(value is null)throw new Exception();return Require(value);}", "T1 M<T1>(T1? value) where T1 : class"),
+            ("DisallowNullExistingInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static int M([System.Diagnostics.CodeAnalysis.DisallowNull]int value)=>Require(value);", "T1 M<T1>([System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullPartialInput", "partial class Holder{static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;private static partial int M(int value);private static partial int M(int value)=>Require(value);}", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullGenericInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;static int M(int value)=>Require(value);", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullAnnotatedInput", "static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T? value)=>value;static int M(int value)=>Require(value);", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullDelegateInput", "delegate T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);static int M(Require<int> require,int value)=>require(value);", "T1 M<T1>(global::Cases.Require<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("DisallowNullReadonlyInput", "class Cell<T>{public T Value=default!;public void Observe([System.Diagnostics.CodeAnalysis.DisallowNull]in T value){}}static int M(Cell<int> cell,int value){cell.Observe(in value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
             ("ReadonlyPhysicalNullableInput", "class Cell<T>{public T Value=default!;public void Observe([System.Diagnostics.CodeAnalysis.AllowNull]in T value){}}static int? M(Cell<int?> cell,int? value){cell.Observe(in value);return cell.Value;}", "T1? M<T1>(global::Cases.Cell<T1?> cell, T1? value) where T1 : struct"),
             ("ReadonlyAllowNullValue", "class Cell<T>{public T Value=default!;public void Observe([System.Diagnostics.CodeAnalysis.AllowNull]in T value){}}static int M(Cell<int> cell,int value){cell.Observe(in value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 value)"),
             ("ReadonlyAllowNullConditionalArray", "class Cell<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]public T Echo([System.Diagnostics.CodeAnalysis.AllowNull]in T value)=>value!;}static int[]? M(Cell<int[]> cell,int[]? value,bool tag)=>cell.Echo(in value);", "T1[]? M<T1, T2>(global::Cases.Cell<T1[]> cell, T1[]? value, T2 tag)"),
@@ -250,8 +262,9 @@ internal static class QueryChecks
             { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; }).ToArray();
             if (errors.Length != 0)
             { throw new InvalidOperationException(test.Name + " fixture: " + errors[0]); }
-            var result = Program.Results(compilation, cancellationToken).Single(candidate =>
-            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == "M"; });
+            var testMethod = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Identifier.ValueText == "M" && (candidate.Body is not null || candidate.ExpressionBody is not null); });
+            var result = Inference.Analyze(testMethod, compilation.GetSemanticModel(tree), cancellationToken);
             if (result.Status != "Suggestion" || result.Signature != test.Signature)
             { failures.Add(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); continue; }
             Program.Log.Info("PASS " + test.Name);
@@ -267,6 +280,8 @@ internal static class QueryChecks
                 [System.Diagnostics.CodeAnalysis.NotNull]public T? Required=>default!;
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>default;
             }
+            public delegate T RequiredInputAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
+            public static class RequiredInputProvider{public static T Require<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;}
             public static class CombinedContractProvider{[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNull]public static T Both<T>(T value)=>value!;}
             public sealed class CombinedContractCell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}}
             public sealed class ReadonlyContractCell<T>{public T Value=default!;public void Observe([System.Diagnostics.CodeAnalysis.AllowNull]in T value){}}
@@ -296,6 +311,8 @@ internal static class QueryChecks
         var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
         (string Name, string Source, string Signature)[] metadataTests =
         [
+            ("MetadataDisallowNullForward", "static int M(int value)=>RequiredInputProvider.Require(value);", "T1 M<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
+            ("MetadataDisallowNullDelegateForward", "static int M(RequiredInputAction<int> require,int value)=>require(value);", "T1 M<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)"),
             ("MetadataCombinedMethodReturn", "static int M(int value)=>CombinedContractProvider.Both(value);", "T1? M<T1>(T1 value)"),
             ("MetadataGetterCombinedPrecedence", "static int M(CombinedContractCell<int> cell)=>cell.Value;", "T1 M<T1>(global::CombinedContractCell<T1> cell)"),
             ("MetadataReadonlyInput", "static string M(ReadonlyContractCell<string> cell,string? value){cell.Observe(in value);return cell.Value;}", "T1 M<T1>(global::ReadonlyContractCell<T1> cell, T1? value) where T1 : class"),

@@ -40,7 +40,19 @@ public void ObserveRef([System.Diagnostics.CodeAnalysis.AllowNull]ref readonly T
 #endif
 }
 public sealed class PriorityInputCell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Maybe{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}[System.Diagnostics.CodeAnalysis.NotNull]public T Required{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get=>default!;}}
+public delegate T RequiredInputAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
+#if ANNOTATED_REF
+public static partial class ForwardInputPartial{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryConsumer.RequiredForwardHelper(value);}
+#endif
 public static class QueryConsumer{
+  public static T RequiredForwardHelper<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;
+  static T RequiredReadonlyHelper<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value)=>value;
+  public static int RequiredForward(int value)=>RequiredForwardHelper(value);
+  public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
+  public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
+  public static int RequiredReadonlyForward(in int value)=>RequiredReadonlyHelper(in value);
+  public static async Task<int> RequiredAwaitForward(int value,Task gate){await gate;return RequiredForwardHelper(value);}
+  public static async ValueTask<int> RequiredValueAwaitForward(int value,Task gate){await gate;return RequiredForwardHelper(value);}
   public static string ReadonlyInput(ReadonlyInputCell<string> cell,string? value){cell.Observe(in value);return cell.Value;}
   public static int ReadonlyValueInput(ReadonlyInputCell<int> cell,int value){cell.Observe(in value);return cell.Value;}
   public static string ReadonlyArrayInput(ReadonlyInputCell<string> cell,string?[] values){cell.Observe(in values[0]);return cell.Value;}
@@ -246,6 +258,17 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
+  grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
+  grep -Fq 'T1 RequiredDelegateForward<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
+  grep -Fq 'T1 RequiredReadonlyForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] in T1 value)' "$log"
+  grep -Fq 'global::System.Threading.Tasks.Task<T1> RequiredAwaitForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value, global::System.Threading.Tasks.Task gate)' "$log"
+  grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequiredValueAwaitForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value, global::System.Threading.Tasks.Task gate)' "$log"
+  if [ "$language" != 8 ]; then grep -Fq 'T1 RequiredPartial<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"; fi
+  if grep -E ' Required(Forward|NamedForward|DelegateForward|ReadonlyForward|AwaitForward|ValueAwaitForward|Partial)<T1>\(' "$log" | grep -Fq 'where T1'; then
+    printf 'Forwarded input contract acquired a type bound (C# %s)\n' "$language"
+    exit 1
+  fi
   grep -Fq 'T1 ReadonlyInput<T1>(global::ReadonlyInputCell<T1> cell, T1? value) where T1 : class' "$log"
   grep -Fq 'T1 ReadonlyValueInput<T1>(global::ReadonlyInputCell<T1> cell, T1 value)' "$log"
   if grep -F ' ReadonlyValueInput<T1>(' "$log" | grep -Fq 'where T1'; then
