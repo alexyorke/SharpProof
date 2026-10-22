@@ -304,6 +304,8 @@ internal sealed class NativeForkJoinProjectionTests
     }
 
     [TestCase("for(int i=2;i<count;i++){}", 5, 4)]
+    [TestCase("for(long i=0;i<count;i+=3){}", 8, 4)]
+    [TestCase("for(long i=1;i<count;i*=2){}", 8, 5)]
     [TestCase("int remaining=count; while(remaining>0){remaining/=2;}", 8, 6)]
     [TestCase("if(count>0){for(int i=0;i<count;i++){}}else{for(int i=0;i<2;i++){}}", 4, 7)]
     public void SubstitutionPreservesDifferenceGeometricAndMaximumExpressions(string body, int inputValue, int expected)
@@ -474,6 +476,35 @@ internal sealed class NativeForkJoinProjectionTests
             Children = projection.Children.SetItem(1, child with { Owner = child.Owner with { Program = builder.Build() } })
         };
         AssertNoPartialCosts(projection, root, "ForkJoinSourceCostBudgetExceeded");
+    }
+
+    [TestCase(IrWriteRegion.Static)]
+    [TestCase(IrWriteRegion.Parameter)]
+    [TestCase(IrWriteRegion.Unknown)]
+    public void LaterChildExternalWritesDiscardAllSourceAndStorageBounds(IrWriteRegion region)
+    {
+        var projection = Lower("var a=new int[count];");
+        var root = Root(projection);
+        var child = projection.Children[1];
+        var factory = child.Owner.Program.Factory;
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Write(entry, factory.CreateOperation("external-write"), region);
+        builder.Return(entry, factory.CreateOperation());
+        projection = projection with
+        {
+            Children = projection.Children.SetItem(1, child with { Owner = child.Owner with { Program = builder.Build() } })
+        };
+        AssertNoPartialCosts(projection, root, "ForkJoinChildIsolationUnproved");
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var activations = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, root, cancellation);
+        Assert.That(activations.Upper, Is.Null);
+        Assert.That(activations.RequiredSourceModel, Is.Null);
+        Assert.That(activations.UnknownReason, Is.EqualTo("ForkJoinChildIsolationUnproved"));
+        var callbacks = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, root, Layout(), cancellation);
+        Assert.That(callbacks.Upper, Is.Null);
+        Assert.That(callbacks.RequiredSourceModel, Is.Null);
+        Assert.That(callbacks.UnknownReason, Is.EqualTo("ForkJoinChildIsolationUnproved"));
     }
 
     private static void AssertNoPartialCosts(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root, string reason)

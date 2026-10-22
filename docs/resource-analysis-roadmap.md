@@ -109,6 +109,37 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Native isolation and rounded child-cost composition
+
+Three new native controls retain an ordinary first child and replace the later
+child with a static, parameter or unknown-region write. Every source-work,
+storage, source-activation and callback/source-activation result must discard
+partial bounds and return `ForkJoinChildIsolationUnproved`, without publishing
+an activation model. These controls exercise native admission independently of
+the compiler's rejection of shared writes. Two additional source-loop cases
+check ceiling-division and ceiling-log substitution across parameter and
+constant child arguments.
+
+All 107 native fork/join tests passed with zero build warnings or errors in the
+canonical Linux amd64 container (`artifacts/resource-child-isolation-tests.log`).
+The canonical private formatter copied zero changes
+(`artifacts/resource-child-isolation-format.log`).
+Full quality/API checks passed (`artifacts/resource-child-isolation-lint.log`).
+
+The complete coverage artifact for published `2ddc058d8` is retained at
+`artifacts/resource-2ddc-coverage-evidence/coverage/SharpProof.coverage.json`.
+All fifteen shards passed in run 39792642948. The report measures merge
+`bbdb4f593150f387bc3b16db526013d77bad7a48`: 6806/7007 changed trusted lines,
+97.13%, with 201 uncovered lines against the unchanged 100% minimum. The
+direct primitive helper-frame component has no uncovered changed lines. This
+report predates the local array-token and isolation test checkpoints; it does
+not establish their resulting coverage or complete the coverage requirement.
+
+Package run 39792643381 failed before consumer execution on a TLS handshake
+timeout downloading the checksum-pinned Ubuntu `xz-utils` package. The failed
+log is retained in `artifacts/resource-2ddc-package-failed.log`; only failed
+jobs were rerun. This infrastructure failure does not count as a consumer pass.
+
 ### Array metadata rejection and unwind/delegate source audit
 
 Additional emitted-PE controls replace the `newarr` element token with an
