@@ -816,8 +816,19 @@ the condition. Member reads include getter-return attributes, conditional access
 queries and awaited Task/ValueTask receivers. Assignments and ref aliases retain
 the declared storage type. Conditional indexer results follow getter-return
 attributes; property-level `NotNullIfNotNull` does not refine reads in the pinned compiler.
-Stronger wrapper-contract forwarding, parameter and other member flow
+Stronger wrapper-contract forwarding, parameter postconditions and other member flow
 contracts still need further work.
+
+Value arguments honor `AllowNull` input contracts on source and metadata methods
+and delegates. Nullable inputs retain their relationship to the receiver or other
+arguments without widening the declared result or stored payload. Named calls,
+arrays, nullable values, queries and awaited Task/ValueTask arguments are covered.
+Expanded params and collection expressions retain their non-null container shape;
+ordinary generic inputs gain no unnecessary C# 8 class/struct bounds. Explicit
+reference arguments keep their invariant storage contract. Applied fixes verify
+stored and returned identity, nullable-value domains, lazy queries, helper counts,
+await suspension, exact faults and cancellation. Generic method type inference
+still follows the compiler's nullable argument rules.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

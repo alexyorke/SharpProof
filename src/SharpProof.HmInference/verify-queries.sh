@@ -23,7 +23,15 @@ public sealed class MemberContractCell<T>{
   [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>Field!;
 }
 public sealed class RequiredMemberCell<T>where T:class{[System.Diagnostics.CodeAnalysis.NotNull]public T? Value=>throw new NotImplementedException();}
+public sealed class InputCell<T>{public T Value=default!;public T Accept([System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback)=>Value=value is null?fallback:value;}
+public delegate T InputAction<T>(InputCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
 public static class QueryConsumer{
+  static T AcceptInput<T>(InputCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback)=>cell.Value=value is null?fallback:value;
+  public static string InputRead(InputCell<string> cell,string? value,string fallback)=>cell.Accept(value,fallback);
+  public static int InputValue(InputCell<int> cell,int value,int fallback)=>AcceptInput(cell,value,fallback);
+  public static string InputDelegate(InputAction<string> put,InputCell<string> cell,string? value,string fallback)=>put(cell,value,fallback);
+  public static async Task<string> InputAsync(InputCell<string> cell,Task<string?> value,string fallback)=>cell.Accept(await value,fallback);
+  public static async ValueTask<string> InputValueAsync(InputCell<string> cell,ValueTask<string?> value,string fallback)=>cell.Accept(await value,fallback);
   public static int MemberRead(MemberContractCell<int> cell)=>cell.Value;
   public static int MemberField(MemberContractCell<int> cell)=>cell.Field;
   public static int MemberAccessor(MemberContractCell<int> cell)=>cell.Accessor;
@@ -164,6 +172,15 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 InputRead<T1>(global::InputCell<T1> cell, T1? value, T1 fallback) where T1 : class' "$log"
+  grep -Fq 'T1 InputValue<T1>(global::InputCell<T1> cell, T1 value, T1 fallback)' "$log"
+  if grep -F 'T1 InputValue<T1>(' "$log" | grep -Fq 'where T1'; then
+    printf 'AllowNull unnecessarily constrained an ordinary input (C# %s)\n' "$language"
+    exit 1
+  fi
+  grep -Fq 'T1 InputDelegate<T1>(global::InputAction<T1> put, global::InputCell<T1> cell, T1? value, T1 fallback) where T1 : class' "$log"
+  grep -Fq 'global::System.Threading.Tasks.Task<T1> InputAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.Task<T1?> value, T1 fallback) where T1 : class' "$log"
+  grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> InputValueAsync<T1>(global::InputCell<T1> cell, global::System.Threading.Tasks.ValueTask<T1?> value, T1 fallback) where T1 : class' "$log"
   grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
     for member in MemberRead MemberField MemberAccessor MemberIndexer; do

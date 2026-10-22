@@ -26,8 +26,10 @@ internal static class QueryRuntimeChecks
                 public IEnumerable<T> Values;public QueryBox(IEnumerable<T> values){Values=values;}
                 public QueryBox<U> Select<U>(Func<T,U> selector){QueryTrace.Value+="select;";return new QueryBox<U>(Values.Select(selector));}
             }
+            public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public sealed class MemberCell<T>{
                 public T Stored;public T? OptionalStored;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field;public bool Present;public int Reads,Indices,Writes,Refs;
+                public T StoreInput([System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback){Interlocked.Increment(ref Writes);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;Stored=value is null?fallback:value;return Stored;}
                 public MemberCell(T value,bool present=true){Stored=value;OptionalStored=value;Field=value;Present=present;}
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get{Interlocked.Increment(ref Reads);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return Present?Stored:default;}set{Interlocked.Increment(ref Writes);Stored=value;Present=true;}}
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]{get{Interlocked.Increment(ref Indices);return Value;}set{Interlocked.Increment(ref Writes);Stored=value;Present=true;}}
@@ -38,6 +40,13 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static T StoreInput<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback){Interlocked.Increment(ref cell.Writes);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;cell.Stored=value is null?fallback:value;return cell.Stored;}
+                public static string InputMethod(MemberCell<string> cell,string? value,string fallback)=>cell.StoreInput(value,fallback);
+                public static string InputDelegate(QueryInputAction<string> put,MemberCell<string> cell,string? value,string fallback)=>put(cell,value,fallback);
+                public static int? InputNullableValue(MemberCell<int?> cell,int? value,int? fallback)=>StoreInput(cell,value,fallback);
+                public static IEnumerable<string> InputQuery(MemberCell<string> cell,IEnumerable<string?> values,string fallback)=>from value in values select cell.StoreInput(value,fallback);
+                public static async Task<string> InputAsync(MemberCell<string> cell,Task<string?> value,string fallback)=>cell.StoreInput(await value,fallback);
+                public static async ValueTask<string> InputValueAsync(MemberCell<string> cell,ValueTask<string?> value,string fallback)=>cell.StoreInput(await value,fallback);
                 public static int MemberProperty(MemberCell<int> cell)=>cell.Value;
                 public static int MemberField(MemberCell<int> cell)=>cell.Field;
                 public static int MemberIndexer(MemberCell<int> cell,int index)=>cell[index];
@@ -256,7 +265,30 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> InputContracts(CancellationToken cancellationToken){
+                    var text=new string('i',3);var cell=new MemberCell<string>(text);string? missing=null;
+                    if(!ReferenceEquals(QueryProbe.InputMethod(cell,missing,text),text)||!ReferenceEquals(cell.Stored,text)||!ReferenceEquals(QueryProbe.InputDelegate(QueryProbe.StoreInput,cell,text,"fallback"),text)||cell.Writes!=2)return false;
+                    var numeric=new MemberCell<int?>(7);if(QueryProbe.InputNullableValue(numeric,null,9)!=9||numeric.Stored!=9||numeric.Writes!=1)return false;
+                    var query=QueryProbe.InputQuery(cell,new string?[]{null,text},text);if(cell.Writes!=2)return false;
+                    using(var iterator=query.GetEnumerator()){if(!iterator.MoveNext()||!ReferenceEquals(iterator.Current,text)||cell.Writes!=3)return false;}
+                    var failure=new InvalidOperationException("input contract");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        var delayed=new MemberCell<string>(text);var gate=new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.InputAsync(delayed,gate.Task,text);var valueTask=QueryProbe.InputValueAsync(delayed,new ValueTask<string?>(gate.Task),text).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||delayed.Writes!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(null);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||!ReferenceEquals(result,text))return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(delayed.Writes!=(outcome is "Value" or "HelperFault"?2:0)||!ReferenceEquals(delayed.Stored,text))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> MemberContracts(CancellationToken cancellationToken){
+                    if(!await InputContracts(cancellationToken))return false;
                     var cell=new MemberCell<int>(7);if(QueryProbe.MemberProperty(cell)!=7||cell.Reads!=1||QueryProbe.MemberField(cell)!=7||QueryProbe.MemberIndexer(cell,0)!=7||cell.Reads!=2||cell.Indices!=1)return false;
                     var pair=QueryProbe.MemberStore(cell,9);if(pair!=(9,9)||cell.Stored!=9||cell.Writes!=1||cell.Reads!=3)return false;
                     if(QueryProbe.MemberFieldStore(cell,11)!=11||cell.Field!=11||QueryProbe.MemberRefStore(cell,13)!=13||cell.OptionalStored!=13||cell.Refs!=2)return false;
@@ -433,7 +465,20 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> InputContracts(string text,CancellationToken cancellationToken){
+                    var uri=new Uri("https://example.invalid/input-contract");var cell=new MemberCell<Uri>(uri);Uri? missing=null;
+                    if(!ReferenceEquals(QueryProbe.InputMethod(cell,missing,uri),uri)||!ReferenceEquals(QueryProbe.InputDelegate(QueryProbe.StoreInput,cell,uri,uri),uri)||!ReferenceEquals(cell.Stored,uri)||cell.Writes!=2)return false;
+                    var query=QueryProbe.InputQuery(cell,new Uri?[]{null,uri},uri);if(cell.Writes!=2)return false;
+                    using(var iterator=query.GetEnumerator()){if(!iterator.MoveNext()||!ReferenceEquals(iterator.Current,uri)||cell.Writes!=3)return false;}
+                    var numeric=new MemberCell<decimal?>(7m);if(QueryProbe.InputNullableValue(numeric,null,9m)!=9m||numeric.Stored!=9m||numeric.Writes!=1)return false;
+                    var gate=new TaskCompletionSource<Uri?>(TaskCreationOptions.RunContinuationsAsynchronously);var delayed=new MemberCell<Uri>(uri);
+                    var task=QueryProbe.InputAsync(delayed,gate.Task,uri);var valueTask=QueryProbe.InputValueAsync(delayed,new ValueTask<Uri?>(gate.Task),uri).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||delayed.Writes!=0)return false;gate.SetResult(null);
+                    foreach(var pending in new[]{task,valueTask}){if(!ReferenceEquals(await pending.WaitAsync(cancellationToken),uri))return false;}
+                    return delayed.Writes==2&&ReferenceEquals(delayed.Stored,uri);
+                }
                 static async Task<bool> MemberContracts(string text,CancellationToken cancellationToken){
+                    if(!await InputContracts(text,cancellationToken))return false;
                     var cell=new MemberCell<string>(text);if(!ReferenceEquals(QueryProbe.MemberProperty(cell),text)||!ReferenceEquals(QueryProbe.MemberField(cell),text)||!ReferenceEquals(QueryProbe.MemberIndexer(cell,0),text)||cell.Reads!=2||cell.Indices!=1)return false;
                     var next=new string('y',3);var pair=QueryProbe.MemberStore(cell,next);if(!ReferenceEquals(pair.copy,next)||!ReferenceEquals(pair.stored,next)||!ReferenceEquals(cell.Stored,next)||cell.Writes!=1)return false;
                     if(!ReferenceEquals(QueryProbe.MemberFieldStore(cell,text),text)||!ReferenceEquals(cell.Field,text)||!ReferenceEquals(QueryProbe.MemberRefStore(cell,text),text)||!ReferenceEquals(cell.OptionalStored,text)||cell.Refs!=2)return false;

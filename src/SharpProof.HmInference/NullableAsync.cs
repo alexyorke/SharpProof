@@ -56,6 +56,38 @@ public static partial class Inference
                 { defaultValueAnnotations.Add(value.Root); }
                 return value;
             }
+            return ApplyMaybeNullContract(returnType, value);
+        }
+
+        private static HmType ApplyInputNullability(IParameterSymbol parameter, HmType value)
+        {
+            if (parameter is null)
+            { throw new ArgumentNullException(nameof(parameter)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (!parameter.GetAttributes().Any(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute";
+            }))
+            { return value; }
+            var shape = value.Root;
+            if (shape.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference or CSharpTypes.NullableValue)
+            { return value; }
+            // This annotation describes argument acceptance, not a nullable result
+            // to emit. It must not constrain an ordinary C# 8 input to struct/class.
+            if (shape.IsVariable || shape.CSharpSymbol is ITypeParameterSymbol)
+            { return new HmType(CSharpTypes.NullableParameter, shape); }
+            return parameter.Type.IsReferenceType ? new HmType(CSharpTypes.NullableReference, shape) : value;
+        }
+
+        private HmType ApplyMaybeNullContract(ITypeSymbol returnType, HmType value)
+        {
+            if (returnType is null)
+            { throw new ArgumentNullException(nameof(returnType)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
             value = value.Root;
             if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && returnType.IsValueType && returnType is not ITypeParameterSymbol)
             { return value; }

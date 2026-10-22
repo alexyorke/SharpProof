@@ -10,6 +10,15 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("AllowNullArrayArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T[] values)=>Value=values is null?default!:values[0];}static int M(Cell<int> cell,int[]? values){cell.Put(values);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1[]? values)"),
+            ("AllowNullNamedArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}static string M(string? value,Cell<string> cell){cell.Put(value:value);return cell.Value;}", "T1 M<T1>(T1? value, global::Cases.Cell<T1> cell) where T1 : class"),
+            ("AllowNullValueArgument", "class Cell<T>{public T Value=default!;}static void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value)=>cell.Value=value!;static int M(Cell<int> cell,int value){Put(cell,value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 value)"),
+            ("AllowNullNullableValueArgument", "class Cell<T>{public T Value=default!;}static void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value)=>cell.Value=value!;static int? M(Cell<int?> cell,int? value){Put(cell,value);return cell.Value;}", "T1? M<T1>(global::Cases.Cell<T1?> cell, T1? value) where T1 : struct"),
+            ("AllowNullParamsArgument", "class Cell<T>{public T Value=default!;}static void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]params T[] values)=>cell.Value=values![0];static int M(Cell<int> cell,int value){Put(cell,value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 value)"),
+            ("AllowNullCollectionArgument", "class Cell<T>{public T Value=default!;}static void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T[] values)=>cell.Value=values![0];static int M(Cell<int> cell,int value){Put(cell,[value]);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1 value)"),
+            ("AllowNullMethodArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}static string M(Cell<string> cell,string? value){cell.Put(value);return cell.Value;}", "T1 M<T1>(global::Cases.Cell<T1> cell, T1? value) where T1 : class"),
+            ("AllowNullDelegateArgument", "class Cell<T>{public T Value=default!;}delegate void Put<T>(Cell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value);static string M(Put<string> put,Cell<string> cell,string? value){put(cell,value);return cell.Value;}", "T1 M<T1>(global::Cases.Put<T1> put, global::Cases.Cell<T1> cell, T1? value) where T1 : class"),
+            ("AllowNullAsyncArgument", "class Cell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}static async Task<string> M(Cell<string> cell,Task<string?> value){cell.Put(await value);return cell.Value;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::Cases.Cell<T1> cell, global::System.Threading.Tasks.Task<T1?> value) where T1 : class"),
             ("ConditionalGetterIndexerRead", "class Cell<T>{public T this[object? key]{[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"key\")]get=>key is null?default:default!;}}static int M(Cell<int> value,bool tag)=>value[\"ready\"];", "T1 M<T1, T2>(global::Cases.Cell<T1> value, T2 tag)"),
             ("ConditionalIndexerRead", "class Cell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull][System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"key\")]public T this[object? key]=>key is null?default:default!;}static int M(Cell<int> value,bool tag)=>value[\"ready\"];", "T1? M<T1, T2>(global::Cases.Cell<T1> value, T2 tag)"),
             ("ConditionalIndexerUnknown", "class Cell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull][System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"key\")]public T this[object? key]=>key is null?default:default!;}static int M(Cell<int> value,object? key,bool tag)=>value[key];", "T1? M<T1, T2, T3>(global::Cases.Cell<T1> value, T2? key, T3 tag) where T2 : class"),
@@ -175,6 +184,8 @@ internal static class QueryChecks
                 [System.Diagnostics.CodeAnalysis.NotNull]public T? Required=>default!;
                 [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>default;
             }
+            public sealed class InputContractCell<T>{public T Value=default!;public void Put([System.Diagnostics.CodeAnalysis.AllowNull]T value)=>Value=value!;}
+            public delegate void InputContractAction<T>(InputContractCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value);
             public static class ReturnContractProvider{
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public static T Guarded<T>(T value,object? guard)=>guard is null?default:value!;
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T Maybe<T>(T value)=>value;
@@ -193,6 +204,8 @@ internal static class QueryChecks
         var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
         (string Name, string Source, string Signature)[] metadataTests =
         [
+            ("MetadataAllowNullInput", "static string M(InputContractCell<string> cell,string? value){cell.Put(value);return cell.Value;}", "T1 M<T1>(global::InputContractCell<T1> cell, T1? value) where T1 : class"),
+            ("MetadataAllowNullDelegate", "static string M(InputContractAction<string> put,InputContractCell<string> cell,string? value){put(cell,value);return cell.Value;}", "T1 M<T1>(global::InputContractAction<T1> put, global::InputContractCell<T1> cell, T1? value) where T1 : class"),
             ("MetadataPropertyMaybeNull", "static int M(ReturnContractCell<int> value,bool tag)=>value.Property;", "T1? M<T1, T2>(global::ReturnContractCell<T1> value, T2 tag)"),
             ("MetadataFieldMaybeNull", "static int M(ReturnContractCell<int> value,bool tag)=>value.Field;", "T1? M<T1, T2>(global::ReturnContractCell<T1> value, T2 tag)"),
             ("MetadataGetterMaybeNull", "static int M(ReturnContractCell<int> value,bool tag)=>value.Accessor;", "T1? M<T1, T2>(global::ReturnContractCell<T1> value, T2 tag)"),

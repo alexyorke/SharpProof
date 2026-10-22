@@ -1909,7 +1909,7 @@ public static partial class Inference
                 }
                 else
                 {
-                    var actual = BindNullableArgument(argument.Value, expected);
+                    var actual = BindNullableArgument(argument.Value, ApplyInputNullability(parameter, expected));
                     if (argumentValues is not null)
                     { argumentValues[parameter.Ordinal] = actual; }
                 }
