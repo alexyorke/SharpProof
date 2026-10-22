@@ -664,13 +664,15 @@ public static partial class Inference
                 {
                     foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
                     {
-                        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) && StorageExpression(assignment.Left) is IdentifierNameSyntax
-                            && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol is { } assigned
-                            && assigned is ILocalSymbol or IParameterSymbol)
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                        { continue; }
+                        foreach (var component in StorageComponents(assignment.Left, assignment.Right))
                         {
-                            foreach (var literal in StoredAlternatives(assignment.Right))
+                            if (component.Target is not IdentifierNameSyntax || model.GetSymbolInfo(component.Target, cancellationToken).Symbol is not { } assigned || assigned is not (ILocalSymbol or IParameterSymbol))
+                            { continue; }
+                            foreach (var literal in StoredAlternatives(component.Value))
                             {
-                                if (StoredLiteralValue(literal, StorageType(assignment.Left)) is null)
+                                if (StoredLiteralValue(literal, StorageType(component.Target)) is null)
                                 { continue; }
                                 var targets = ReferenceStorageOwners(assigned);
                                 targets.Add(assigned);

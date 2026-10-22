@@ -18,6 +18,27 @@ public static partial class Inference
             return expression;
         }
 
+        private static IEnumerable<(ExpressionSyntax Target, ExpressionSyntax Value)> StorageComponents(ExpressionSyntax target, ExpressionSyntax value)
+        {
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            target = StorageExpression(target);
+            if (target is not TupleExpressionSyntax targets)
+            { yield return (target, value); yield break; }
+            foreach (var alternative in StoredAlternatives(value))
+            {
+                if (StorageExpression(alternative) is not TupleExpressionSyntax values || values.Arguments.Count != targets.Arguments.Count)
+                { continue; }
+                for (var i = 0; i < targets.Arguments.Count; i++)
+                {
+                    foreach (var component in StorageComponents(targets.Arguments[i].Expression, values.Arguments[i].Expression))
+                    { yield return component; }
+                }
+            }
+        }
+
         private static ExpressionSyntax StoreValueLocation(ExpressionSyntax target, AssignmentExpressionSyntax assignment)
         {
             if (target is null)

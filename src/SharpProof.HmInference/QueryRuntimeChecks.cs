@@ -14,7 +14,7 @@ internal static class QueryRuntimeChecks
             #nullable enable
             using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
             public static class QueryTrace{
-                public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls;
+                public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls,CaptureCalls;
                 public static int Index(){IndexCalls++;return 0;}
                 public static bool Accept<T>(T value){Value+="where;";return true;}
                 public static T Touch<T>(T value){Value+="touch;";if(Failure!=null)throw Failure;return value;}
@@ -28,6 +28,11 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static Func<int> TupleCapture(int value,bool other){var read=()=>value;(value,other)=(default,default);return read;}
+                public static (Func<int> read,int copy) TupleLocalCopy(int value,bool other){var slot=value;var copy=slot;var read=()=>slot;(slot,other)=(default,default);return(read,copy);}
+                public static (Func<int> read,Action clear) TupleDeferred(int value,bool other){var read=()=>value;Action clear=()=>{(value,other)=(default,default);};return(read,clear);}
+                public static async Task<Func<int>> TupleTaskCapture(Task<int> value,bool other){var slot=await value;Interlocked.Increment(ref QueryTrace.CaptureCalls);var read=()=>slot;(slot,other)=(default,default);return read;}
+                public static async ValueTask<Func<int>> TupleValueCapture(ValueTask<int> value,bool other){var slot=await value;Interlocked.Increment(ref QueryTrace.CaptureCalls);var read=()=>slot;(slot,other)=(default,default);return read;}
                 public static int Grouped(int value){(value)=default;return value;}
                 public static async Task<(int copy,int stored)> GroupedAsync(Task<int> value){var result=await value;var copy=result;((result))=default;return(copy,result);}
                 public static async Task<(int left,int right)> TupleAsync(Task<int[]> first,int[] second){var result=await first;(Borrow(ref result[QueryTrace.Index()]),ArrayBorrow(second))=(default,default);return(result[0],second[0]);}
@@ -109,7 +114,27 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> TupleCaptures(CancellationToken cancellationToken){
+                    if(QueryProbe.TupleCapture(7,true)()!=0)return false;
+                    var copied=QueryProbe.TupleLocalCopy(7,true);if(copied.copy!=7||copied.read()!=0)return false;
+                    var deferred=QueryProbe.TupleDeferred(7,true);if(deferred.read()!=7)return false;deferred.clear();if(deferred.read()!=0)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();var failure=new InvalidOperationException("tuple-capture");
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        QueryTrace.Value="";QueryTrace.CaptureCalls=0;var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=QueryProbe.TupleTaskCapture(gate.Task,true);var valueTask=QueryProbe.TupleValueCapture(new ValueTask<int>(gate.Task),true).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.CaptureCalls!=0)return false;
+                        if(outcome=="Value")gate.SetResult(7);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        foreach(var pending in new[]{task,valueTask}){
+                            try{var read=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||read()!=0)return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                        if(QueryTrace.CaptureCalls!=(outcome=="Value"?2:0))return false;
+                    }
+                    return true;
+                }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(!await TupleCaptures(cancellationToken))return false;
                     if(QueryProbe.Grouped(7)!=0)return false;
                     using(var cancel=new CancellationTokenSource()){
                         cancel.Cancel();var failure=new InvalidOperationException("tuple-await");
@@ -190,7 +215,22 @@ internal static class QueryRuntimeChecks
                     foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(QueryTrace.Value!=""||!result.SequenceEqual(new string?[]{text,null})||QueryTrace.Value!="touch;touch;")return false;QueryTrace.Value="";}
                     return true;
                 }
+                static async Task<bool> TupleCaptures(string text,CancellationToken cancellationToken){
+                    var tag=new Uri("https://example.invalid/captured-tuple");
+                    if(QueryProbe.TupleCapture(text,tag)()!=null||QueryProbe.TupleCapture((decimal?)23m,tag)()!=null)return false;
+                    var copied=QueryProbe.TupleLocalCopy(text,tag);if(!ReferenceEquals(copied.copy,text)||copied.read()!=null)return false;
+                    var deferred=QueryProbe.TupleDeferred(text,tag);if(!ReferenceEquals(deferred.read(),text))return false;deferred.clear();if(deferred.read()!=null)return false;
+                    var initial=new QueryStoreValue();QueryStoreValue.Calls=0;var stored=QueryProbe.TupleCapture(initial,tag)();
+                    if(stored.Value!=0||stored.Text!=null||QueryStoreValue.Calls!=0)return false;
+                    var gate=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Value="";QueryTrace.CaptureCalls=0;
+                    var task=QueryProbe.TupleTaskCapture(gate.Task,tag);var valueTask=QueryProbe.TupleValueCapture(new ValueTask<string>(gate.Task),tag).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.CaptureCalls!=0)return false;gate.SetResult(text);
+                    foreach(var pending in new[]{task,valueTask}){var read=await pending.WaitAsync(cancellationToken);if(read()!=null)return false;}
+                    if(QueryTrace.CaptureCalls!=2)return false;
+                    var optional=await QueryProbe.TupleValueCapture(new ValueTask<decimal?>(23m),tag);return optional()==null;
+                }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(!await TupleCaptures(text,cancellationToken))return false;
                     if(QueryProbe.Grouped(text)!=null||QueryProbe.Grouped<decimal?>(23m)!=null)return false;
                     var gateCopy=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var copyTask=QueryProbe.GroupedAsync(gateCopy.Task);
                     if(copyTask.IsCompleted)return false;gateCopy.SetResult(text);var grouped=await copyTask.WaitAsync(cancellationToken);

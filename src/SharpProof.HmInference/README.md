@@ -782,6 +782,10 @@ siblings, generic caller wrappers and async suspension, faults and cancellation.
 Parenthesized assignment targets and tuple deconstruction stores preserve nullable
 storage paths, including ref-return targets and contextually typed `default`
 elements. Compiler warnings refine the affected tuple element independently.
+Captured-storage discovery follows each tuple target through nested, conditional
+and switch tuple values, including writes through known ref aliases. Callbacks
+created before those writes retain their lifetime nullability; earlier ordinary
+value copies and explicitly typed defaults retain their separate boundaries.
 Task and ValueTask checks cover stores after suspension, earlier value copies,
 reference and nullable-value domains, deferred query execution, faults and
 cancellation. C# 8/9/13 CLI and packaged consumers verify these signatures.
