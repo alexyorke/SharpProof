@@ -575,8 +575,22 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(result.UnknownReason, Is.EqualTo("TaskSourceBodyArrayTypeUnsupported"));
     }
 
+    [TestCase(0x7f000001, "TaskSourceBodyInstructionUnsupported")]
+    [TestCase(0x0100ffff, "TaskSourceBodyInstructionUnsupported")]
+    [TestCase(0x01000000, "TaskSourceBodyInstructionUnsupported")]
+    [TestCase(0x06000001, "TaskSourceBodyArrayTypeUnsupported")]
+    [TestCase(0x23000001, "TaskSourceBodyArrayTypeUnsupported")]
+    public void SourceBodyValidationRejectsInvalidArrayTypeTokens(int token, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var result = ValidateForwarderProbe("public static void Probe(int n) {var values=new int[n];}",
+            sourceBody: true, arrayTypeToken: token);
+        Assert.That(result.Target, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo(expected));
+    }
+
     private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0, int bodyMutation = 0,
-        bool sourceBody = false, bool foreignFramework = false)
+        bool sourceBody = false, bool foreignFramework = false, int? arrayTypeToken = null)
     {
         ArgumentNullException.ThrowIfNull(declaration);
         var compilation = TestCompilation.Create("ForwarderBodyControl", [("Subject.cs",
@@ -590,7 +604,7 @@ public sealed class NativeTaskCarrierStorageTests
         var child = metadata.MethodDefinitions.Single(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name) == "Child");
         var targets = targetMutation == 1 ? ImmutableHashSet<int>.Empty :
             ImmutableHashSet.Create(targetMutation == 2 ? 0x0a000001 : System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(child));
-        if (bodyMutation != 0)
+        if (bodyMutation != 0 || arrayTypeToken is not null)
         {
             // Keep a real emitted PE/header. A malformed final opcode or missing
             // return must discard a preceding owned call. A branch operand can
@@ -602,7 +616,13 @@ public sealed class NativeTaskCarrierStorageTests
             var headerBytes = (bytes[offset] & 3) == 2 ? 1 : (bytes[offset + 1] >> 4) * 4;
             var code = image.GetMethodBody(probe.RelativeVirtualAddress).GetILBytes()!;
             Assert.That(code[^1], Is.EqualTo(0x2a), "The fixture must end in ret.");
-            if (bodyMutation == 3)
+            if (arrayTypeToken is { } token)
+            {
+                var newArray = Array.IndexOf(code, (byte)0x8d);
+                Assert.That(newArray, Is.GreaterThanOrEqualTo(0), "The fixture must allocate an array.");
+                System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(offset + headerBytes + newArray + 1, 4), token);
+            }
+            else if (bodyMutation == 3)
             {
                 Assert.That(code.Length, Is.GreaterThanOrEqualTo(5));
                 bytes[offset + headerBytes] = 0x38;

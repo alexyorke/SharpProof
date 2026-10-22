@@ -109,6 +109,48 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Array metadata rejection and unwind/delegate source audit
+
+Additional emitted-PE controls replace the `newarr` element token with an
+invalid token kind, an absent or nil type-reference row, a method-definition
+token, and an assembly-reference token. These inputs must discard the source
+body evidence and return an explicit Unknown reason. They exercise the parser
+and metadata exception boundary as well as the element-type admission rule;
+none supplies a physical-frame or root allocation bound.
+
+All 243 task-carrier tests passed in the canonical Linux amd64 container,
+including the five new token controls, with zero build warnings or errors:
+`artifacts/resource-array-token-tests.log`. Documentation checks passed:
+`artifacts/resource-array-token-docs.log`. Full quality/API checks passed:
+`artifacts/resource-array-token-lint.log`; the canonical private formatter
+copied zero source changes (`artifacts/resource-array-token-format.log`).
+Hosted qualification of this
+checkpoint and the unchanged 100% changed-TCB coverage floor remain required.
+
+The pinned runtime audit also established the following narrower facts:
+
+- [`LowerDelegateInvoke`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/jit/lower.cpp#L4909)
+  loads the delegate instance and first target for the indirect call.
+- The reviewed open-delegate constructor selects a shuffle thunk; the reviewed
+  closed-instance path stores the target pointer directly in
+  [`comdelegate.cpp`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/comdelegate.cpp#L1656).
+  The AMD64 shuffle emitter finishes with a jump to the target in
+  [`stublinkerx86.cpp`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/i386/stublinkerx86.cpp#L3513),
+  included by the AMD64 source. This does not admit multicast, virtual,
+  wrapper, collectible or arbitrary externally supplied delegates.
+- [`genOSRRecordTier0CalleeSavedRegistersAndFrame`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/jit/codegenxarch.cpp#L9681)
+  emits unwind records accounting for inherited Tier0 storage and the fake
+  call slot. The non-x86
+  [`UnwindStackFrame`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/eetwain.cpp#L4367)
+  delegates to `Thread::VirtualUnwindCallFrame`. These facts alone do not
+  establish a bound on repeated first-pass trace appends.
+
+All seven newly inspected source files have immutable blob identities,
+matching downloaded byte counts and SHA-256 hashes in the ignored research
+manifest `artifacts/resource-runtime-fault-review/sources.json`. The complete
+CLR/helper bridge, escape/rethrow accounting and root byte composition remain
+unchecked above. No new runtime model or root verdict is published here.
+
 ### Direct primitive helper-frame contribution
 
 The private model `coreclr8-direct-primitive-hcall-trace-frames-v1` now admits
