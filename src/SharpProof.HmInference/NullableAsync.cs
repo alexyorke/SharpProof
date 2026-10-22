@@ -9,26 +9,42 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
-        private HmType ApplyReturnNullability(IMethodSymbol called, HmType value, bool forStorage)
+        private HmType ApplyReturnNullability(IInvocationOperation operation, HmType value, bool forStorage, IReadOnlyDictionary<int, HmType>? argumentValues)
         {
-            if (called is null)
-            { throw new ArgumentNullException(nameof(called)); }
+            if (operation is null)
+            { throw new ArgumentNullException(nameof(operation)); }
+            var called = operation.TargetMethod;
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
             if (forStorage || called.ReturnsVoid)
             { return value; }
             var maybeNull = false;
             var notNull = false;
+            var conditional = false;
             foreach (var attribute in called.GetReturnTypeAttributes())
             {
                 var name = attribute.AttributeClass?.ToDisplayString();
                 maybeNull |= name == "System.Diagnostics.CodeAnalysis.MaybeNullAttribute";
                 notNull |= name == "System.Diagnostics.CodeAnalysis.NotNullAttribute";
+                if (name == "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" && attribute.ConstructorArguments.Length == 1
+                    && attribute.ConstructorArguments[0].Value is string parameterName)
+                {
+                    conditional = true;
+                    foreach (var argument in operation.Arguments)
+                    {
+                        if (argument.Parameter?.Name == parameterName && ConditionalReturnGuard(argument, argumentValues))
+                        { notNull = true; }
+                    }
+                }
             }
             if (notNull)
             { return ConversionCore(value); }
             if (!maybeNull)
-            { return value; }
+            {
+                if (conditional && value.Root.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter)
+                { defaultValueAnnotations.Add(value.Root); }
+                return value;
+            }
             value = value.Root;
             if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && called.ReturnType.IsValueType && called.ReturnType is not ITypeParameterSymbol)
             { return value; }
@@ -59,6 +75,42 @@ public static partial class Inference
                 return nullable;
             }
             return value;
+        }
+
+        private static bool ConditionalReturnGuard(IArgumentOperation argument, IReadOnlyDictionary<int, HmType>? argumentValues)
+        {
+            if (argument is null)
+            { throw new ArgumentNullException(nameof(argument)); }
+            if (argument.ArgumentKind is ArgumentKind.ParamArray or ArgumentKind.ParamCollection)
+            { return false; }
+            if (argument.Parameter is not { RefKind: not RefKind.Out } parameter)
+            { return false; }
+            if (argument.ArgumentKind == ArgumentKind.DefaultValue
+                || argument.Value.Syntax is ExpressionSyntax defaultSyntax && StorageExpression(defaultSyntax).IsKind(SyntaxKind.DefaultLiteralExpression))
+            {
+                var declared = parameter.OriginalDefinition.Type;
+                if (declared is ITypeParameterSymbol)
+                { return false; }
+                return argument.Value.ConstantValue.HasValue ? argument.Value.ConstantValue.Value is not null
+                    : declared.IsValueType && declared is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+            }
+            if (argument.Value.Syntax is ExpressionSyntax syntax && StorageExpression(syntax) is PostfixUnaryExpressionSyntax suppression
+                && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+            { return true; }
+            if (argument.Value.ConstantValue.HasValue)
+            { return argument.Value.ConstantValue.Value is not null; }
+            if (argumentValues is null || !argumentValues.TryGetValue(parameter.Ordinal, out var value))
+            { return false; }
+            value = value.Root;
+            if (value.Name is CSharpTypes.NullableReference or CSharpTypes.NullableParameter or CSharpTypes.NullableValue
+                || value.CSharpSymbol is IDynamicTypeSymbol)
+            { return false; }
+            if (value.CSharpSymbol is ITypeParameterSymbol existing)
+            {
+                return existing.HasValueTypeConstraint || existing.HasUnmanagedTypeConstraint || existing.HasNotNullConstraint
+                    || existing.HasReferenceTypeConstraint && existing.ReferenceTypeConstraintNullableAnnotation != NullableAnnotation.Annotated;
+            }
+            return !value.IsVariable || value.IsValueType == true;
         }
 
         private INamedTypeSymbol? asyncReturn;
@@ -1272,22 +1324,30 @@ public static partial class Inference
             }
             return CSharpTypes.Rigid(definition.ReturnType, mapping);
         }
-        private void BindNullableArgument(IOperation value, HmType expected)
+        private HmType BindNullableArgument(IOperation value, HmType expected)
         {
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
             if (expected is null)
             { throw new ArgumentNullException(nameof(expected)); }
             if (value.Syntax is ExpressionSyntax interpolation && IsTargetedInterpolation(interpolation))
-            { Interpolation(interpolation, expected); return; }
+            { return Interpolation(interpolation, expected); }
+            if (value.Syntax is ExpressionSyntax literal)
+            {
+                literal = StorageExpression(literal);
+                while (literal is PostfixUnaryExpressionSyntax suppression && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                { literal = StorageExpression(suppression.Operand); }
+                if (literal.IsKind(SyntaxKind.DefaultLiteralExpression))
+                { return expected; }
+            }
             if (TryBindFixedArgument(value, expected))
-            { return; }
+            { return value.Type is { } fixedType ? CSharpTypes.Rigid(fixedType) : expected; }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
             if (TryBindDynamicArgument(value, expected, inferred))
-            { return; }
+            { return inferred; }
             if (TryBindArgumentConversion(value, expected, inferred))
-            { return; }
+            { return inferred; }
             if (expected.Name == CSharpTypes.NullableParameter)
             {
                 // A T? formal accepts an unannotated actual without making that
@@ -1312,6 +1372,7 @@ public static partial class Inference
             {
                 HmType.Unify(inferred, expected);
             }
+            return inferred;
         }
 
         private HmType Coalesced(BinaryExpressionSyntax expression)

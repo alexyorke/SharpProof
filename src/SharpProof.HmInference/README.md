@@ -804,7 +804,15 @@ and writes retain the storage type. Applied fixes verify default/null results,
 identity, explicit struct constructors, suspension, faults and cancellation.
 C# 8 uses representable class/struct bounds for newly inferred nullable results;
 existing unconstrained generic return types retain their declared form there.
-Conditional, parameter and member flow contracts still need further work.
+`NotNullIfNotNull` refines results when the named argument is demonstrably
+non-null. Named arguments, multiple guards, extension calls, constants, existing
+constraints, source/metadata delegates and explicit arrays/collections are covered.
+Unconstrained or nullable inputs retain nullable results, preserving their wider
+domains. Omitted generic defaults are distinguished from fixed non-null constants;
+contextual default arguments no longer pin generic calls to their original types.
+Implicit params packs retain nullable results where compiler flow cannot prove
+the condition. Stronger wrapper-contract forwarding, parameter and member flow
+contracts still need further work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

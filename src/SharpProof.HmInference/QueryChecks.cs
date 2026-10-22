@@ -10,6 +10,26 @@ internal static class QueryChecks
     {
         (string Name, string Source, string Signature)[] tests =
         [
+            ("ConditionalReturnExplicitParams", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guards\")]static T Echo<T>(T value,params object[] guards)=>value!;static int M(int value,bool tag)=>Echo(value,new object[0]);", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnCollection", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guards\")]static T Echo<T>(T value,object[]? guards)=>value!;static int M(int value,bool tag)=>Echo(value,[]);", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnMultiple", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"first\")][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"second\")]static T Echo<T>(T value,object? first,object? second)=>value!;static int M(int value,object? first,bool tag)=>Echo(second:\"ready\",value:value,first:first);", "T1 M<T1, T2, T3>(T1 value, T2? first, T3 tag) where T2 : class"),
+            ("ConditionalReturnExtension", "static int M(int value,bool tag)=>value.Echo();}static class Extensions{[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]public static T Echo<T>(this T value,string? guard=\"ready\")=>value!;}class Tail{", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnKnownArray", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static U Echo<T,U>(T[]? guard,U value)=>value!;static bool M(int[] guard,bool value,string tag)=>Echo(guard,value);", "T2 M<T1, T2, T3>(T1[] guard, T2 value, T3 tag)"),
+            ("ConditionalReturnNullableArray", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static U Echo<T,U>(T[]? guard,U value)=>guard is null?default:value!;static bool M(int[]? guard,bool value,string tag)=>Echo(guard,value);", "T2? M<T1, T2, T3>(T1[]? guard, T2 value, T3 tag)"),
+            ("ConditionalReturnUnrelatedUnknown", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static U Echo<T,U>(T guard,U value)=>guard is null?default:value!;static bool M(int guard,bool value,string tag)=>Echo(guard,value);", "T2? M<T1, T2, T3>(T1 guard, T2 value, T3 tag)"),
+            ("ConditionalReturnKnownConstant", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static T Echo<T>(T value,string? guard)=>value!;static int M(int value,bool tag)=>Echo(guard:\"ready\",value:value);", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnOmittedConstant", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static T Echo<T>(T value,string? guard=\"ready\")=>value!;static int M(int value,bool tag)=>Echo(value);", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnParams", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guards\")]static T Echo<T>(T value,params object[] guards)=>value!;static int M(int value,bool tag)=>Echo(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnSuppressedGuard", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static T Echo<T>(T value,object? guard)=>value!;static int M(int value,object? guard,bool tag)=>Echo(value,guard!);", "T1 M<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T2 : class"),
+            ("ConditionalReturnExistingNotNull", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static U Echo<T,U>(T guard,U value)=>value!;static bool M<T>(T guard,bool value,string tag)where T:notnull=>Echo(guard,value);", "T1 M<T, T1, T2>(T guard, T1 value, T2 tag) where T : notnull"),
+            ("ConditionalReturnIdentity", "[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]static T? Echo<T>(T? value)=>value;static int M(int value,bool tag)=>Echo(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnMaybeNullOverride", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]static T Echo<T>(T value)=>value;static int M(int value,bool tag)=>Echo(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnNullableInput", "[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]static T? Echo<T>(T? value)=>value;static string? M(string? value,bool tag)=>Echo(value);", "T1? M<T1, T2>(T1? value, T2 tag) where T1 : class"),
+            ("ConditionalReturnDelegate", "[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]delegate T? Echo<T>(T? value);static int M(Echo<int> action,int value,bool tag)=>action(value);", "T1? M<T1, T2>(global::Cases.Echo<T1> action, T1 value, T2 tag)"),
+            ("ConditionalReturnAsync", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]static T Echo<T>(T value)=>value;static async Task<int> M(Task<int> value,bool tag)=>Echo(await value);", "global::System.Threading.Tasks.Task<T1?> M<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)"),
+            ("ConditionalReturnNamedFallback", "[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"first\")][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"second\")]static T? Echo<T>(T? first,T? second)=>first is null?second:first;static int M(int value,bool tag)=>Echo(second:value,first:default);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnOmittedDefault", "[return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"guard\")]static T Echo<T>(T value,T guard=default)=>guard is null?default:value;static int M(int value,bool tag)=>Echo(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
+            ("ConditionalReturnArrayGuard", "[return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"value\")]static string? Echo<T>(T[]? value)=>value is null?null:\"ready\";static string M(int[] value,bool tag)=>Echo(value);", "string M<T1, T2>(T1[] value, T2 tag)"),
             ("ImportedMaybeNullExistingGeneric", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)=>Maybe(value);", "T? M<T, T1>(T value, T1 tag)"),
             ("ImportedMaybeNullExistingReference", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)where T:class=>Maybe(value);", "T? M<T, T1>(T value, T1 tag) where T : class"),
             ("ImportedMaybeNullExistingStruct", "[return:System.Diagnostics.CodeAnalysis.MaybeNull]static U Maybe<U>(U value)=>value;static T M<T>(T value,int tag)where T:struct=>Maybe(value);", "T M<T, T1>(T value, T1 tag) where T : struct"),
@@ -132,13 +152,15 @@ internal static class QueryChecks
         var providerTree = CSharpSyntaxTree.ParseText("""
             #nullable enable
             public static class ReturnContractProvider{
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public static T Guarded<T>(T value,object? guard)=>guard is null?default:value!;
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T Maybe<T>(T value)=>value;
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T[] ArrayMaybe<T>(T[] value)=>value;
                 [return:System.Diagnostics.CodeAnalysis.NotNull]public static T? Require<T>(T? value)=>value!;
             }
+            [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public delegate T GuardedContract<T>(T value,object? guard);
             [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T MaybeContract<T>(T value);
             public sealed class ReturnContractBox<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read()=>default;}
-            namespace Other{[System.AttributeUsage(System.AttributeTargets.ReturnValue)]public sealed class MaybeNullAttribute:System.Attribute{}}
+            namespace Other{[System.AttributeUsage(System.AttributeTargets.ReturnValue)]public sealed class MaybeNullAttribute:System.Attribute{}[System.AttributeUsage(System.AttributeTargets.ReturnValue)]public sealed class NotNullIfNotNullAttribute:System.Attribute{public NotNullIfNotNullAttribute(string name){}}}
             """, cancellationToken: cancellationToken);
         using var providerImage = new MemoryStream();
         var emittedProvider = Program.Compile([providerTree]).WithAssemblyName("ReturnContractMetadata").Emit(providerImage, cancellationToken: cancellationToken);
@@ -147,6 +169,10 @@ internal static class QueryChecks
         var providerReference = MetadataReference.CreateFromImage(providerImage.ToArray());
         (string Name, string Source, string Signature)[] metadataTests =
         [
+            ("MetadataConditionalKnown", "static int M(int value,bool tag)=>ReturnContractProvider.Guarded(value,\"ready\");", "T1 M<T1, T2>(T1 value, T2 tag)"),
+            ("MetadataConditionalUnknown", "static int M(int value,object? guard,bool tag)=>ReturnContractProvider.Guarded(value,guard);", "T1? M<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T2 : class"),
+            ("MetadataConditionalDelegate", "static int M(GuardedContract<int> action,int value,bool tag)=>action(value,\"ready\");", "T1 M<T1, T2>(global::GuardedContract<T1> action, T1 value, T2 tag)"),
+            ("MetadataUnrelatedConditional", "[return:Other.NotNullIfNotNull(\"guard\")][return:System.Diagnostics.CodeAnalysis.MaybeNull]static T Echo<T>(T value,string guard)=>value;static int M(int value,bool tag)=>Echo(value,\"ready\");", "T1? M<T1, T2>(T1 value, T2 tag)"),
             ("MetadataMaybeNull", "static int M(int value,bool tag)=>ReturnContractProvider.Maybe(value);", "T1? M<T1, T2>(T1 value, T2 tag)"),
             ("MetadataMaybeNullArray", "static int[] M(int[] value,bool tag)=>ReturnContractProvider.ArrayMaybe(value);", "T1[]? M<T1, T2>(T1[] value, T2 tag)"),
             ("MetadataNotNull", "static string M(string? value,bool tag)=>ReturnContractProvider.Require(value);", "T1 M<T1, T2>(T1? value, T2 tag) where T1 : class"),

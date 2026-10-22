@@ -1782,20 +1782,22 @@ public static partial class Inference
             }
             var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation ?? throw new InferenceException("Unresolved or dynamic invocation.");
             var called = operation.TargetMethod;
+            Dictionary<int, HmType>? argumentValues = !forStorage && called.GetReturnTypeAttributes().Any(attribute =>
+            { if (attribute is null) { throw new ArgumentNullException(nameof(attribute)); } return attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"; }) ? [] : null;
             if (called.MethodKind == MethodKind.DelegateInvoke)
             {
                 var receiver = invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Invoke" } member
                     ? member.Expression : invocation.Expression;
                 var receiverValue = operation.Instance is IConditionalAccessInstanceOperation ? ConditionalReceiver().Value : Expression(receiver);
                 var signature = DelegateSignature(called.ContainingType, receiverValue);
-                BindArguments(operation, signature.Inputs);
-                return ApplyReturnNullability(called, signature.Output, forStorage);
+                BindArguments(operation, signature.Inputs, argumentValues);
+                return ApplyReturnNullability(operation, signature.Output, forStorage, argumentValues);
             }
             if (SameMethodDefinition(called, currentMethod) && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod!.ContainingType)
                 && Enumerable.SequenceEqual<ITypeSymbol>(called.TypeArguments, currentMethod.TypeParameters, SymbolEqualityComparer.Default))
             {
-                BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray());
-                return ApplyReturnNullability(called, currentFunction.Arguments[currentFunction.Arguments.Length - 1], forStorage);
+                BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray(), argumentValues);
+                return ApplyReturnNullability(operation, currentFunction.Arguments[currentFunction.Arguments.Length - 1], forStorage, argumentValues);
             }
 
             ExpressionSyntax? instanceReceiver = null;
@@ -1825,13 +1827,13 @@ public static partial class Inference
                 }
 
                 return CSharpTypes.Rigid(p.Type, variables);
-            }).ToArray());
+            }).ToArray(), argumentValues);
             foreach (var parameter in definition.TypeParameters)
             { ImportConstraints(parameter, variables[parameter], variables, called.TypeArguments[parameter.Ordinal]); }
-            return ApplyReturnNullability(called, CSharpTypes.Rigid(definition.ReturnType, variables), forStorage);
+            return ApplyReturnNullability(operation, CSharpTypes.Rigid(definition.ReturnType, variables), forStorage, argumentValues);
         }
 
-        private void BindArguments(IInvocationOperation operation, HmType[] parameters)
+        private void BindArguments(IInvocationOperation operation, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null)
         {
             if (operation is null)
             {
@@ -1843,10 +1845,10 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(parameters));
             }
 
-            BindArguments(operation.Arguments, parameters);
+            BindArguments(operation.Arguments, parameters, argumentValues);
         }
 
-        private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters)
+        private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null)
         {
             if (arguments is null)
             {
@@ -1872,10 +1874,19 @@ public static partial class Inference
                 }
 
                 if (BindReferenceArgument(argument, expected))
-                { continue; }
+                {
+                    if (argumentValues is not null && parameter.RefKind != RefKind.Out)
+                    { argumentValues[parameter.Ordinal] = expected; }
+                    continue;
+                }
 
                 if (argument.Value is ICollectionExpressionOperation collection)
-                { CollectionExpression(collection, expected); continue; }
+                {
+                    var constructed = CollectionExpression(collection, expected);
+                    if (argumentValues is not null)
+                    { argumentValues[parameter.Ordinal] = ConversionCore(constructed); }
+                    continue;
+                }
 
                 if (argument.ArgumentKind == ArgumentKind.ParamArray)
                 {
@@ -1885,7 +1896,10 @@ public static partial class Inference
                     }
 
                     var element = HmType.Variable();
-                    HmType.Unify(expected, new("[]", element));
+                    var packed = new HmType("[]", element);
+                    HmType.Unify(expected, packed);
+                    if (argumentValues is not null)
+                    { argumentValues[parameter.Ordinal] = packed; }
                     foreach (var value in array.Initializer.ElementValues)
                     {
                         BindNullableArgument(value, element);
@@ -1893,7 +1907,9 @@ public static partial class Inference
                 }
                 else
                 {
-                    BindNullableArgument(argument.Value, expected);
+                    var actual = BindNullableArgument(argument.Value, expected);
+                    if (argumentValues is not null)
+                    { argumentValues[parameter.Ordinal] = actual; }
                 }
             }
         }

@@ -13,6 +13,7 @@ internal static class QueryRuntimeChecks
         const string source = """
             #nullable enable
             using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+            [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public delegate T QueryGuardedAction<T>(T value,object? guard);
             [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T QueryMaybeAction<T>(T value,bool keep);
             public static class QueryTrace{
                 public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls,CaptureCalls,ContractCalls;public static Exception ContractFailure=new InvalidOperationException("contract-null");
@@ -29,6 +30,12 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public static T ConditionalContract<T>(T value,object? guard){Interlocked.Increment(ref QueryTrace.ContractCalls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(guard is null)return default;if(value is null)throw QueryTrace.ContractFailure;return value;}
+                public static int ConditionalKnown(int value)=>ConditionalContract(QueryTrace.Touch(value),"ready");
+                public static int ConditionalUnknown(int value,object? guard)=>ConditionalContract(value,guard);
+                public static int ConditionalDelegate(QueryGuardedAction<int> action,int value)=>action(value,"ready");
+                public static async Task<int> ConditionalAsync(Task<int> value)=>ConditionalContract(await value,"ready");
+                public static async ValueTask<int> ConditionalValueAsync(ValueTask<int> value,object? guard)=>ConditionalContract(await value,guard);
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public static T ContractMaybe<T>(T value,bool keep){Interlocked.Increment(ref QueryTrace.ContractCalls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return keep?value:default;}
                 [return:System.Diagnostics.CodeAnalysis.NotNull]static T? ContractRequired<T>(T? value){Interlocked.Increment(ref QueryTrace.ContractCalls);if(value is null)throw QueryTrace.ContractFailure;return value;}
                 public static int ContractValue(int value,bool keep)=>ContractMaybe(value,keep);
@@ -209,7 +216,30 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> ConditionalContracts(CancellationToken cancellationToken){
+                    QueryTrace.Value="";QueryTrace.ContractCalls=0;QueryGuardedAction<int> action=QueryProbe.ConditionalContract;
+                    if(QueryProbe.ConditionalKnown(7)!=7||QueryTrace.Value!="touch;"||QueryTrace.ContractCalls!=1||QueryProbe.ConditionalDelegate(action,7)!=7
+                        ||QueryProbe.ConditionalUnknown(7,null)!=0||QueryProbe.ConditionalUnknown(7,"ready")!=7)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();var failure=new InvalidOperationException("conditional-contract");
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        QueryTrace.ContractCalls=0;QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{
+                            var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);var task=QueryProbe.ConditionalAsync(gate.Task);
+                            var optional=QueryProbe.ConditionalValueAsync(new ValueTask<int>(gate.Task),null).AsTask();
+                            if(task.IsCompleted||optional.IsCompleted||QueryTrace.ContractCalls!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(7);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            var index=0;foreach(var pending in new[]{task,optional}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=(index++==0?7:0))return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(QueryTrace.ContractCalls!=(outcome is "Value" or "HelperFault"?2:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(!await ConditionalContracts(cancellationToken))return false;
                     if(!await ReturnContracts(cancellationToken))return false;
                     if(!await BranchStores(cancellationToken))return false;
                     if(!await TupleCaptures(cancellationToken))return false;
@@ -346,7 +376,21 @@ internal static class QueryRuntimeChecks
                     foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(result!=null)return false;}
                     return QueryTrace.ContractCalls==2;
                 }
+                static async Task<bool> ConditionalContracts(string text,CancellationToken cancellationToken){
+                    var uri=new Uri("https://example.invalid/conditional-contract");QueryGuardedAction<string> action=QueryProbe.ConditionalContract;
+                    QueryTrace.Value="";QueryTrace.ContractCalls=0;if(!ReferenceEquals(QueryProbe.ConditionalKnown(text),text)||QueryTrace.Value!="touch;"||QueryTrace.ContractCalls!=1
+                        ||!ReferenceEquals(QueryProbe.ConditionalDelegate(action,text),text)||QueryProbe.ConditionalUnknown(text,(object?)null)!=null
+                        ||!ReferenceEquals(QueryProbe.ConditionalUnknown(text,uri),text)||QueryProbe.ConditionalUnknown((decimal?)23m,(object?)null)!=null)return false;
+                    var initial=new QueryStoreValue();QueryStoreValue.Calls=0;var zero=QueryProbe.ConditionalUnknown(initial,(object?)null);if(zero.Value!=0||zero.Text!=null||QueryStoreValue.Calls!=0)return false;
+                    try{_=QueryProbe.ConditionalKnown<string?>(null);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var gate=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.ContractCalls=0;
+                    var task=QueryProbe.ConditionalAsync(gate.Task);var optional=QueryProbe.ConditionalValueAsync(new ValueTask<string>(gate.Task),(object?)null).AsTask();
+                    if(task.IsCompleted||optional.IsCompleted||QueryTrace.ContractCalls!=0)return false;gate.SetResult(text);
+                    if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
+                    return true;
+                }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(!await ConditionalContracts(text,cancellationToken))return false;
                     if(!await ReturnContracts(text,cancellationToken))return false;
                     if(!await BranchStores(text,cancellationToken))return false;
                     if(!await TupleCaptures(text,cancellationToken))return false;

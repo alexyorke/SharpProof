@@ -23,6 +23,14 @@ public static class QueryConsumer{
   public static IEnumerable<(int left,int right)> SwitchMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear switch{true=>(default,default),false=>(pair.first[0],pair.second[0])};
   public static async ValueTask<IEnumerable<(int left,int right)>> ConditionalMixedAsync(ValueTask<IEnumerable<(int[] first,int[] second)>> values,bool clear)=>from pair in await values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear?(default,default):(pair.first[0],pair.second[0]);
   public static (int left,int right) ConditionalArrayStores(int[] first,int[] second,bool clear){(first[0],second[0])=clear?(default,default):(first[0],second[0]);return(first[0],second[0]);}
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]static T Conditional<T>(T value,object? guard)=>guard is null?default:(value is null?throw new ArgumentNullException(nameof(value)):value);
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]static T ConditionalDefault<T>(T value,[System.Diagnostics.CodeAnalysis.AllowNull]T guard=default)=>guard is null?default:(value is null?throw new ArgumentNullException(nameof(value)):value);
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public delegate T ConditionalAction<T>(T value,object? guard);
+  public static int ConditionalKnown(int value,bool tag)=>Conditional(value,"ready");
+  public static int ConditionalUnknown(int value,object? guard,bool tag)=>Conditional(value,guard);
+  public static int ConditionalDefaultValue(int value,bool tag)=>ConditionalDefault(value);
+  public static int ConditionalDelegate(ConditionalAction<int> action,int value,bool tag)=>action(value,"ready");
+  public static async Task<int> ConditionalAsync(Task<int> value,bool tag)=>Conditional(await value,"ready");
   [return:System.Diagnostics.CodeAnalysis.MaybeNull]static T ContractMaybe<T>(T value)=>value;
   [return:System.Diagnostics.CodeAnalysis.NotNull]static T? ContractRequired<T>(T? value)where T:class=>value!;
   [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T ContractAction<T>(T value);
@@ -137,9 +145,14 @@ EOF
     printf 'Query operator rebinding was suggested (C# %s)\n' "$language"
     exit 1
   fi
+  grep -Fq 'T1 ConditionalKnown<T1, T2>(T1 value, T2 tag)' "$log"
+  grep -Fq 'T1 ConditionalDelegate<T1, T2>(global::QueryConsumer.ConditionalAction<T1> action, T1 value, T2 tag)' "$log"
+  grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1 ConditionalUnknown<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T1 : struct where T2 : class' "$log"
+    grep -Fq 'T1 ConditionalDefaultValue<T1, T2>(T1 value, T2 tag) where T1 : struct' "$log"
     grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag) where T1 : class' "$log"
     grep -Fq 'T1 ContractValue<T1, T2>(T1 value, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1> ContractAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag) where T1 : struct' "$log"
@@ -160,6 +173,8 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? ConditionalUnknown<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T2 : class' "$log"
+    grep -Fq 'T1? ConditionalDefaultValue<T1, T2>(T1 value, T2 tag)' "$log"
     grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag)' "$log"
     grep -Fq 'T1? ContractValue<T1, T2>(T1 value, T2 tag)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> ContractAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
