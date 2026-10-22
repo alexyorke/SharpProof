@@ -143,6 +143,15 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(original)); }
             if (symbol is null)
             { throw new InferenceException("Unresolved pattern member."); }
+            if (original is INamedTypeSymbol { IsTupleType: true } tuple && symbol is IFieldSymbol tupleField)
+            {
+                var index = TuplePatternFieldIndex(tuple, tupleField);
+                if (index < 0)
+                { throw new InferenceException("Unresolved tuple pattern field."); }
+                var elements = tuple.TupleElements.Select(_ => HmType.Variable()).ToArray();
+                UnifyDeconstructionReceiver(new("Tuple", elements), input);
+                return elements[index];
+            }
             if (symbol is IPropertySymbol { ContainingType.IsAnonymousType: true } anonymousProperty)
             {
                 var shape = ConversionCore(input);
@@ -240,6 +249,22 @@ public static partial class Inference
             return true;
         }
 
+        private static int TuplePatternFieldIndex(INamedTypeSymbol tuple, IFieldSymbol field)
+        {
+            if (tuple is null)
+            { throw new ArgumentNullException(nameof(tuple)); }
+            if (field is null)
+            { throw new ArgumentNullException(nameof(field)); }
+            for (var i = 0; i < tuple.TupleElements.Length; i++)
+            {
+                var element = tuple.TupleElements[i];
+                if (SymbolEqualityComparer.Default.Equals(element, field)
+                    || (element.CorrespondingTupleField?.Name ?? element.Name) == (field.CorrespondingTupleField?.Name ?? field.Name))
+                { return i; }
+            }
+            return -1;
+        }
+
         private bool SamePatternMember(ISymbol? before, ISymbol? after, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)
         {
             if (changedMethod is null)
@@ -257,6 +282,12 @@ public static partial class Inference
             { return SameCallSignature(original, candidate); }
             if (before is IPropertySymbol { ContainingType.IsAnonymousType: true } left && after is IPropertySymbol { ContainingType.IsAnonymousType: true } right)
             { return MemberSymbol(left) == MemberSymbol(right); }
+            if (before is IFieldSymbol { ContainingType.IsTupleType: true } leftField && after is IFieldSymbol { ContainingType.IsTupleType: true } rightField)
+            {
+                var index = TuplePatternFieldIndex(leftField.ContainingType, leftField);
+                return index >= 0 && index == TuplePatternFieldIndex(rightField.ContainingType, rightField)
+                    && leftField.ContainingType.TupleElements.Length == rightField.ContainingType.TupleElements.Length;
+            }
             return ProtocolMember(before) == ProtocolMember(after);
         }
 

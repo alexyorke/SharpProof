@@ -21,6 +21,12 @@ using System;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class IndirectConsumerCell<T>{public T Value;public IndirectConsumerCell(T value){Value=value;}public ref T Slot=>ref Value;public ref T this[int index]=>ref Value;}
 public sealed class OwnerConsumerPair<T,U>{public T Row;public U Flag;public OwnerConsumerPair(T row,U flag){Row=row;Flag=flag;}public void Deconstruct(out T row,out U flag){row=Row;flag=Flag;}}
 public static class DefaultConsumer{
+    public static int PatternVar(int[] value){if(value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int PatternProperty(IndirectConsumerCell<int[]> value){if(value is {Value:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int PatternTuple((int[] row,bool flag) value){if(value is {row:var row}){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int PatternPositional(OwnerConsumerPair<int[],bool> value){if(value is (var row,_)){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int PatternSwitch((int[] row,bool flag) value){switch(value){case(var row,_):ref var alias=ref row[0];alias=default;return alias;}}
+    public static int PatternExpression(int[] value)=>value switch{var row=>row[0]=default};
     public static int OwnerArray(int[][] value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int OwnerEnumerable(IEnumerable<int[]> value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int OwnerList(List<int[]> value){foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
@@ -49,6 +55,10 @@ public static class DefaultConsumer{
     public static (int left,int right) AliasConditional(bool flag,int first,int second){var left=first;var right=second;ref var alias=ref(flag?ref left:ref right);alias=default;return(left,right);}
     public static int AliasConditionalStore(bool flag,int value){ref var alias=ref value;alias=flag?value:default;return value;}
 #if MODERN_ALIASES
+    public static int PatternList(int[][] value){if(value is [var row,..]){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static int PatternSlice(int[] value){if(value is [..var row]){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static async Task<int> PatternAsync(Task<int[]> value){if(await value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
+    public static async ValueTask<int> PatternValueAsync(ValueTask<int[]> value){if(await value is var row){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static async Task<int> OwnerAsync(IAsyncEnumerable<int[]> value){await foreach(var row in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static async Task<int> OwnerAwaitTuple(IAsyncEnumerable<(int[] row,bool flag)> value){await foreach(var(row,_)in value){ref var alias=ref row[0];alias=default;return alias;}return default;}
     public static int OwnerMixed(int[] first,int[] second){var row=first;(row,var other)=(second,first);ref var alias=ref other[0];alias=default;return row[0];}
@@ -110,6 +120,12 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element PatternVar<T1>(${element}[] value)$suffix" \
+    "$element PatternProperty<T1>(global::IndirectConsumerCell<${element}[]> value)$suffix" \
+    "$element PatternTuple<T1, T2>((${element}[] row, T2 flag) value)$suffix" \
+    "$element PatternPositional<T1, T2>(global::OwnerConsumerPair<${element}[], T2> value)$suffix" \
+    "$element PatternSwitch<T1, T2>((${element}[] row, T2 flag) value)$suffix" \
+    "$element PatternExpression<T1>(${element}[] value)$suffix" \
     "$element OwnerArray<T1>(${element}[][] value)$suffix" \
     "$element OwnerEnumerable<T1>(global::System.Collections.Generic.IEnumerable<${element}[]> value)$suffix" \
     "$element OwnerList<T1>(global::System.Collections.Generic.List<${element}[]> value)$suffix" \
@@ -160,6 +176,10 @@ EOF
     fi
   done
   if [ "$language" = 13 ]; then
+    grep -Fq 'T1? PatternList<T1>(T1?[][] value)' "$log"
+    grep -Fq 'T1? PatternSlice<T1>(T1?[] value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> PatternAsync<T1>(global::System.Threading.Tasks.Task<T1?[]> value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> PatternValueAsync<T1>(global::System.Threading.Tasks.ValueTask<T1?[]> value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> OwnerAsync<T1>(global::System.Collections.Generic.IAsyncEnumerable<T1?[]> value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> OwnerAwaitTuple<T1, T2>(global::System.Collections.Generic.IAsyncEnumerable<(T1?[] row, T2 flag)> value)' "$log"
     grep -Fq 'T1? OwnerMixed<T1>(T1?[] first, T1?[] second)' "$log"

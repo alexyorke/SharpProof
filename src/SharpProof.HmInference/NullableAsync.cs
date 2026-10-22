@@ -268,6 +268,28 @@ public static partial class Inference
             { probe.environment.Add(currentMethod.Parameters[i], probeParameters[i]); }
             var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
             var boundDeconstructions = new HashSet<int>();
+            var boundPatterns = new HashSet<int>();
+            bool BindPatternOwner(SyntaxNode site)
+            {
+                if (site is null)
+                { throw new ArgumentNullException(nameof(site)); }
+                foreach (var ancestor in site.AncestorsAndSelf())
+                {
+                    var binding = ancestor switch
+                    {
+                        IsPatternExpressionSyntax test => (test.Pattern, test.Expression),
+                        SwitchExpressionArmSyntax { Parent: SwitchExpressionSyntax selection } arm => (arm.Pattern, selection.GoverningExpression),
+                        CasePatternSwitchLabelSyntax { Parent.Parent: SwitchStatementSyntax selection } label => (label.Pattern, selection.Expression),
+                        _ => ((PatternSyntax?)null, (ExpressionSyntax?)null)
+                    };
+                    if (binding.Item1 is not { } pattern || binding.Item2 is not { } input || !pattern.Span.Contains(site.Span))
+                    { continue; }
+                    if (boundPatterns.Add(pattern.SpanStart))
+                    { BindLocals(input); probe.Pattern(pattern, probe.Expression(input)); }
+                    return true;
+                }
+                return false;
+            }
             void BindDeconstructed(AssignmentExpressionSyntax assignment)
             {
                 if (assignment is null)
@@ -309,6 +331,8 @@ public static partial class Inference
                     { BindLocals(loop.Expression); probe.BindIteration(loop); }
                     else if (deconstruction is not null)
                     { BindDeconstructed(deconstruction); }
+                    else if (BindPatternOwner(site))
+                    { /* Pattern binding supplies each declared receiver's structural shape. */ }
                     else if (site is VariableDeclaratorSyntax { Initializer: not null, Parent: VariableDeclarationSyntax localDeclaration } variable)
                     {
                         BindLocals(variable.Initializer.Value);
