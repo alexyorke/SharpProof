@@ -18,7 +18,19 @@ $package_reference
 EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Collections.Generic;using System.Threading.Tasks;
+public sealed class IndirectConsumerCell<T>{public T Value;public IndirectConsumerCell(T value){Value=value;}public ref T Slot=>ref Value;public ref T this[int index]=>ref Value;}
 public static class DefaultConsumer{
+    static ref T Borrow<T>(ref T value)=>ref value;
+    public static int IndirectArray(int[] value){ref var alias=ref value[0];alias=default;return alias;}
+    public static int IndirectMatrix(int[,] value){ref var alias=ref value[0,0];alias=default;return alias;}
+    public static int IndirectJagged(int[][] value){ref var alias=ref value[0][0];alias=default;return alias;}
+    public static int IndirectSpan(Span<int> value){ref var alias=ref value[0];alias=default;return alias;}
+    public static int IndirectField(IndirectConsumerCell<int> cell){ref var alias=ref cell.Value;alias=default;return alias;}
+    public static int IndirectProperty(IndirectConsumerCell<int> cell){ref var alias=ref cell.Slot;alias=default;return alias;}
+    public static int IndirectIndexer(IndirectConsumerCell<int> cell){ref var alias=ref cell[0];alias=default;return alias;}
+    public static int IndirectReturn(int[] value){ref var alias=ref Borrow(ref value[0]);alias=default;return alias;}
+    public static int IndirectFill(int[] value,int fill){value[0]=fill;ref var alias=ref value[0];alias=default;return fill;}
+    public static int IndirectRebind(int[] first,int[] second){ref var alias=ref first[0];alias=ref second[0];alias=default;return alias;}
     public static int Alias(int value){ref var alias=ref value;alias=default;return value;}
     public static int AliasLocal(int value){var result=value;ref var alias=ref result;alias=default;return result;}
     public static int AliasChain(int value){var result=value;ref var first=ref result;ref var second=ref first;second=default;return result;}
@@ -86,6 +98,16 @@ EOF
     suffix=' where T1 : struct'
   fi
   for expected in \
+    "$element IndirectArray<T1>(${element}[] value)$suffix" \
+    "$element IndirectMatrix<T1>(${element}[,] value)$suffix" \
+    "$element IndirectJagged<T1>(${element}[][] value)$suffix" \
+    "$element IndirectSpan<T1>(global::System.Span<$element> value)$suffix" \
+    "$element IndirectField<T1>(global::IndirectConsumerCell<$element> cell)$suffix" \
+    "$element IndirectProperty<T1>(global::IndirectConsumerCell<$element> cell)$suffix" \
+    "$element IndirectIndexer<T1>(global::IndirectConsumerCell<$element> cell)$suffix" \
+    "$element IndirectReturn<T1>(${element}[] value)$suffix" \
+    "T1 IndirectFill<T1>(${element}[] value, T1 fill)$suffix" \
+    "$element IndirectRebind<T1>(${element}[] first, ${element}[] second)$suffix" \
     "$element Alias<T1>($element value)$suffix" \
     "$element AliasLocal<T1>(T1 value)$suffix" \
     "$element AliasChain<T1>(T1 value)$suffix" \

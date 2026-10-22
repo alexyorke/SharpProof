@@ -225,6 +225,159 @@ public static partial class Inference
         private readonly HashSet<ISymbol> defaultAssignedStorages = new(SymbolEqualityComparer.Default);
         private Dictionary<ISymbol, List<ExpressionSyntax>>? defaultStores;
         private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
+        private readonly HashSet<ISymbol> preparedIndirectAliases = new(SymbolEqualityComparer.Default);
+
+        private void PrepareIndirectStorage(HmType[] parameters)
+        {
+            if (parameters is null)
+            { throw new ArgumentNullException(nameof(parameters)); }
+            if (currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration)
+            { return; }
+            var candidates = new List<(ExpressionSyntax Target, ExpressionSyntax Literal, ITypeSymbol Type, ISymbol? Alias)>();
+            foreach (var variable in declaration.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (variable.Initializer?.Value is RefExpressionSyntax reference && model.GetDeclaredSymbol(variable, cancellationToken) is ILocalSymbol alias
+                    && ReferenceStorageOwners(alias).Count == 0 && defaultStores is not null && defaultStores.TryGetValue(alias, out var literals))
+                { foreach (var literal in literals) { candidates.Add((reference.Expression, literal, alias.Type, alias)); } }
+            }
+            foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                { continue; }
+                if (assignment.Right is RefExpressionSyntax reference && model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol alias
+                    && ReferenceStorageOwners(alias).Count == 0 && defaultStores is not null && defaultStores.TryGetValue(alias, out var literals))
+                { foreach (var literal in literals) { candidates.Add((reference.Expression, literal, alias.Type, alias)); } }
+                else if (assignment.Left is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
+                {
+                    var type = StorageType(assignment.Left);
+                    foreach (var literal in StoredAlternatives(assignment.Right))
+                    { if (StoredLiteralValue(literal, type) is not null) { candidates.Add((assignment.Left, literal, type, null)); } }
+                }
+            }
+            if (candidates.Count == 0 || parameters.Length == 0)
+            { return; }
+            var template = HmType.Function(parameters, new("void"));
+            var fresh = new HmScheme(template, template.FreeVariables()).Instantiate();
+            var probe = new Session(model, cancellationToken) { currentMethod = currentMethod };
+            probe.SetIteratorReturn(declaration, currentMethod);
+            if (probe.iteratorReturn is null)
+            { probe.SetAsyncReturn(currentMethod); }
+            var probeParameters = fresh.Arguments.Take(parameters.Length).ToArray();
+            probe.currentFunction = HmType.Function(probeParameters, CSharpTypes.Erase(currentMethod.ReturnType));
+            for (var i = 0; i < parameters.Length; i++)
+            { probe.environment.Add(currentMethod.Parameters[i], probeParameters[i]); }
+            var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            void BindLocals(SyntaxNode syntax)
+            {
+                if (syntax is null)
+                { throw new ArgumentNullException(nameof(syntax)); }
+                foreach (var identifier in syntax.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+                {
+                    if (model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local || probe.environment.ContainsKey(local))
+                    { continue; }
+                    if (!resolving.Add(local))
+                    { throw new InferenceException("Cyclic storage initializer."); }
+                    var variable = local.DeclaringSyntaxReferences.Select(reference =>
+                        { if (reference is null) { throw new ArgumentNullException(nameof(reference)); } return reference.GetSyntax(cancellationToken); }).OfType<VariableDeclaratorSyntax>().FirstOrDefault();
+                    if (variable?.Initializer is null || variable.Parent is not VariableDeclarationSyntax localDeclaration)
+                    { throw new InferenceException("Storage owner has no initializer."); }
+                    BindLocals(variable.Initializer.Value);
+                    var inferred = localDeclaration.Type is RefTypeSyntax referenceType ? referenceType.Type.IsVar : localDeclaration.Type.IsVar;
+                    probe.environment.Add(local, inferred ? probe.Expression(variable.Initializer.Value) : CSharpTypes.Rigid(local.Type));
+                    resolving.Remove(local);
+                    // Receiver copies can be reassigned to another input container.
+                    foreach (var assignment in declaration.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) || assignment.Right is RefExpressionSyntax
+                            || !SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol, local)
+                            || model.GetTypeInfo(assignment.Right, cancellationToken).Type is not { IsReferenceType: true })
+                        { continue; }
+                        BindLocals(assignment.Right);
+                        probe.AssignValue(assignment.Left, probe.Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
+                    }
+                }
+            }
+            var plans = new List<(int Parameter, int[] Path, ExpressionSyntax Literal, ITypeSymbol Type, ISymbol? Alias)>();
+            void Find(HmType node, HmType slot, int parameter, List<int> path, ExpressionSyntax literal, ITypeSymbol type, ISymbol? alias)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (slot is null)
+                { throw new ArgumentNullException(nameof(slot)); }
+                if (parameter < 0)
+                { throw new ArgumentOutOfRangeException(nameof(parameter)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                if (literal is null)
+                { throw new ArgumentNullException(nameof(literal)); }
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                node = node.Root;
+                if (ReferenceEquals(node, slot.Root))
+                { plans.Add((parameter, path.ToArray(), literal, type, alias)); return; }
+                for (var i = 0; i < node.Arguments.Length; i++)
+                { path.Add(i); Find(node.Arguments[i], slot, parameter, path, literal, type, alias); path.RemoveAt(path.Count - 1); }
+            }
+            void Discover(ExpressionSyntax target, ExpressionSyntax literal, ITypeSymbol type, ISymbol? alias)
+            {
+                if (target is null)
+                { throw new ArgumentNullException(nameof(target)); }
+                if (literal is null)
+                { throw new ArgumentNullException(nameof(literal)); }
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                while (target is ParenthesizedExpressionSyntax or RefExpressionSyntax)
+                { target = target is ParenthesizedExpressionSyntax parentheses ? parentheses.Expression : ((RefExpressionSyntax)target).Expression; }
+                if (target is ConditionalExpressionSyntax conditional)
+                { Discover(conditional.WhenTrue, literal, type, alias); Discover(conditional.WhenFalse, literal, type, alias); return; }
+                if (probe.StoredLiteralValue(literal, type) is null)
+                { return; }
+                try
+                {
+                    BindLocals(target);
+                    var slot = probe.AssignmentTarget(target);
+                    if (slot.FreeVariables().Count == 0)
+                    { return; }
+                    for (var i = 0; i < parameters.Length; i++)
+                    { Find(probeParameters[i], slot, i, [], literal, type, alias); }
+                }
+                catch (InferenceException)
+                { /* An unresolved owner retains the normal fixed/ref constraints. */ }
+            }
+            foreach (var candidate in candidates)
+            { Discover(candidate.Target, candidate.Literal, candidate.Type, candidate.Alias); }
+            HmType Rewrite(HmType node, int parameter, List<int> path)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (parameter < 0)
+                { throw new ArgumentOutOfRangeException(nameof(parameter)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                node = node.Root;
+                var arguments = node.Arguments.ToArray();
+                for (var i = 0; i < arguments.Length; i++)
+                { path.Add(i); arguments[i] = Rewrite(arguments[i], parameter, path); path.RemoveAt(path.Count - 1); }
+                if (arguments.Length != 0)
+                { node = node.WithArguments(arguments); }
+                foreach (var plan in plans)
+                {
+                    if (plan.Parameter == parameter && plan.Path.SequenceEqual(path) && StoredLiteralValue(plan.Literal, plan.Type) is { } literal)
+                    {
+                        node = MergeDefaultValues(node, literal);
+                        defaultValueAnnotations.Add(node.Root);
+                        if (plan.Alias is not null)
+                        { preparedIndirectAliases.Add(plan.Alias); }
+                    }
+                }
+                return node;
+            }
+            if (plans.Count == 0)
+            { return; }
+            // Apply children before parent annotations so paths do not shift.
+            for (var i = 0; i < parameters.Length; i++)
+            { parameters[i] = Rewrite(parameters[i], i, []); environment[currentMethod.Parameters[i]] = parameters[i]; }
+        }
 
         private static IEnumerable<ExpressionSyntax> StoredAlternatives(ExpressionSyntax expression)
         {

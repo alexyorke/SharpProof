@@ -13,7 +13,32 @@ internal static class DefaultValueRuntimeChecks
         const string source = """
             #nullable enable
             using System;using System.Collections.Generic;using System.Linq;using System.Threading;using System.Threading.Tasks;
+            public sealed class IndirectCell<T>{
+                public T Value;public int Reads;public IndirectCell(T value){Value=value;}
+                public ref T Slot{get{Reads++;return ref Value;}}
+                public ref T this[int index]{get{Reads++;return ref Value;}}
+            }
+            public sealed class IndirectPair<T,U>{public T Left;public U Right;public IndirectPair(T left,U right){Left=left;Right=right;}}
             public static class DefaultProbe{
+                public static int IndirectSibling(IndirectPair<int,int> pair){ref var alias=ref pair.Left;alias=default;return pair.Right;}
+                public static long IndirectWidening(long[] value,int fill){value[0]=fill;var copy=value[0];ref var alias=ref value[0];alias=default;return copy;}
+                public static int? IndirectLift(int?[] value,int fill){value[0]=fill;ref var alias=ref value[0];alias=default;return alias;}
+                public static int IndirectIndexCalls;
+                static int IndirectIndex(){IndirectIndexCalls++;return 0;}
+                static ref T IndirectBorrow<T>(ref T value)=>ref value;
+                public static int IndirectArray(int[] value){ref var alias=ref value[IndirectIndex()];alias=default;return alias;}
+                public static int IndirectMatrix(int[,] value){ref var alias=ref value[0,0];alias=default;return alias;}
+                public static int IndirectJagged(int[][] value){ref var alias=ref value[0][0];alias=default;return alias;}
+                public static int IndirectSpan(Span<int> value){ref var alias=ref value[0];alias=default;return alias;}
+                public static int IndirectField(IndirectCell<int> cell){ref var alias=ref cell.Value;alias=default;return alias;}
+                public static int IndirectProperty(IndirectCell<int> cell){ref var alias=ref cell.Slot;alias=default;return alias;}
+                public static int IndirectIndexer(IndirectCell<int> cell){ref var alias=ref cell[0];alias=default;return alias;}
+                public static int IndirectTuple((int left,int right) value){ref var alias=ref value.left;alias=default;return alias;}
+                public static int IndirectReturn(int[] value){ref var alias=ref IndirectBorrow(ref value[0]);alias=default;return alias;}
+                public static int IndirectCopy(int[] value){var copy=value[0];ref var alias=ref value[0];alias=default;return copy;}
+                public static Func<int> IndirectCapture(int[] value){var read=()=>value[0];ref var alias=ref value[0];alias=default;return read;}
+                public static int IndirectFill(int[] value,int fill){value[0]=fill;ref var alias=ref value[0];alias=default;return fill;}
+                public static int IndirectRebind(int[] first,int[] second){ref var alias=ref first[0];alias=ref second[0];alias=default;return alias;}
                 public static int Assigned(bool flag,int value){var result=value;if(flag)result=default;return result;}
                 public static int Parameter(int value){value=default;return value;}
                 public static int Reset(int value){var result=value;void Clear(){result=default;}Clear();return result;}
@@ -51,6 +76,7 @@ internal static class DefaultValueRuntimeChecks
             }
             public static class OriginalDefaultRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
+                    if(!Indirect())return false;
                     foreach(bool flag in new[]{false,true}){
                         int expected=flag?7:0;
                         if(DefaultProbe.Assigned(!flag,7)!=expected||await DefaultProbe.AssignedAsync(!flag,Task.FromResult(7)).WaitAsync(cancellationToken)!=expected)return false;
@@ -97,6 +123,26 @@ internal static class DefaultValueRuntimeChecks
                     }
                     return true;
                 }
+                static bool Indirect(){
+                    int[] values={7};int[,] matrix={{7}};int[][] jagged={new[]{7}};
+                    long[] widened={7};int?[] optional={7};
+                    if(DefaultProbe.IndirectWidening(widened,int.MinValue)!=(long)int.MinValue||widened[0]!=0
+                        ||DefaultProbe.IndirectLift(optional,7)!=null||optional[0]!=null)return false;
+                    DefaultProbe.IndirectIndexCalls=0;
+                    if(DefaultProbe.IndirectArray(values)!=0||values[0]!=0||DefaultProbe.IndirectIndexCalls!=1
+                        ||DefaultProbe.IndirectMatrix(matrix)!=0||matrix[0,0]!=0||DefaultProbe.IndirectJagged(jagged)!=0||jagged[0][0]!=0)return false;
+                    values[0]=7;if(DefaultProbe.IndirectSpan(values.AsSpan())!=0||values[0]!=0)return false;
+                    values[0]=7;if(DefaultProbe.IndirectReturn(values)!=0||values[0]!=0)return false;
+                    values[0]=7;if(DefaultProbe.IndirectCopy(values)!=7||values[0]!=0)return false;
+                    values[0]=7;if(DefaultProbe.IndirectCapture(values)()!=0||values[0]!=0)return false;
+                    values[0]=7;if(DefaultProbe.IndirectFill(values,9)!=9||values[0]!=0)return false;
+                    var field=new IndirectCell<int>(7);var property=new IndirectCell<int>(7);var indexer=new IndirectCell<int>(7);
+                    var pair=new IndirectPair<int,int>(7,9);if(DefaultProbe.IndirectSibling(pair)!=9||pair.Left!=0||pair.Right!=9)return false;
+                    if(DefaultProbe.IndirectField(field)!=0||field.Value!=0||field.Reads!=0
+                        ||DefaultProbe.IndirectProperty(property)!=0||property.Value!=0||property.Reads!=1
+                        ||DefaultProbe.IndirectIndexer(indexer)!=0||indexer.Value!=0||indexer.Reads!=1||DefaultProbe.IndirectTuple((7,9))!=0)return false;
+                    int[] first={7},second={9};return DefaultProbe.IndirectRebind(first,second)==0&&first[0]==7&&second[0]==0;
+                }
             }
             """;
         const string newSource = """
@@ -106,6 +152,7 @@ internal static class DefaultValueRuntimeChecks
             public static class NewDefaultRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     string text=new string('x',2);
+                    if(!Indirect(text))return false;
                     string other=new string('y',2);string? slot=text;decimal? number=23m;
                     if(DefaultProbe.Alias(text)!=null||DefaultProbe.AliasLocal(text)!=null||DefaultProbe.AliasChain(text)!=null||DefaultProbe.AliasReset(text)!=null
                         ||!ReferenceEquals(DefaultProbe.AliasCopy(text),text)||DefaultProbe.AliasCopy(text).Length!=text.Length||DefaultProbe.AliasCapture(text)()!=null||DefaultProbe.AliasRef(ref slot)!=null||slot!=null
@@ -125,7 +172,7 @@ internal static class DefaultValueRuntimeChecks
                     if(DefaultProbe.Choose(false,23m)!=0m||DefaultProbe.Choose(true,23m)!=23m
                         ||DefaultProbe.Choose(false,(decimal?)23m)!=null||DefaultProbe.Choose(true,(decimal?)23m)!=23m)return false;
                     var original=new ConstructorProbe();ConstructorProbe.Calls=0;
-                    if(DefaultProbe.Choose(false,original).Value!=0||DefaultProbe.Assigned(true,original).Value!=0||DefaultProbe.Alias(original).Value!=0||DefaultProbe.AliasLocal(original).Value!=0||ConstructorProbe.Calls!=0)return false;
+                    if(DefaultProbe.Choose(false,original).Value!=0||DefaultProbe.Assigned(true,original).Value!=0||DefaultProbe.Alias(original).Value!=0||DefaultProbe.AliasLocal(original).Value!=0||DefaultProbe.IndirectArray(new[]{original}).Value!=0||ConstructorProbe.Calls!=0)return false;
                     if(DefaultProbe.Tuple(false,(text,23m))!=(null,0m)||DefaultProbe.Tuple(true,(text,23m))!=(text,23m))return false;
                     if(DefaultProbe.Coalesce((decimal?)null)!=0m||DefaultProbe.Assign((decimal?)null) is not { } zero||zero!=0m
                         ||DefaultProbe.Box(false,23m) is not decimal boxed||boxed!=0m)return false;
@@ -135,6 +182,28 @@ internal static class DefaultValueRuntimeChecks
                         ||await DefaultProbe.Async(false,Task.FromResult((decimal?)23m)).WaitAsync(cancellationToken)!=null)return false;
                     var items=new List<string?>();await foreach(var item in DefaultProbe.AsyncIterator(text).WithCancellation(cancellationToken))items.Add(item);
                     return items.SequenceEqual(new string?[]{text,null});
+                }
+                static bool Indirect(string text){
+                    string?[] values={text};string?[,] matrix={{text}};string?[][] jagged={new[]{(string?)text}};
+                    DefaultProbe.IndirectIndexCalls=0;
+                    if(DefaultProbe.IndirectArray(values)!=null||values[0]!=null||DefaultProbe.IndirectIndexCalls!=1
+                        ||DefaultProbe.IndirectMatrix(matrix)!=null||matrix[0,0]!=null||DefaultProbe.IndirectJagged(jagged)!=null||jagged[0][0]!=null)return false;
+                    values[0]=text;if(DefaultProbe.IndirectSpan(values.AsSpan())!=null||values[0]!=null)return false;
+                    values[0]=text;if(DefaultProbe.IndirectReturn(values)!=null||values[0]!=null)return false;
+                    values[0]=text;if(!ReferenceEquals(DefaultProbe.IndirectCopy(values),text)||values[0]!=null)return false;
+                    values[0]=text;if(DefaultProbe.IndirectCapture(values)()!=null||values[0]!=null)return false;
+                    if(DefaultProbe.IndirectFill<string>(values,text).Length!=text.Length||values[0]!=null)return false;
+                    var field=new IndirectCell<string?>(text);var property=new IndirectCell<string?>(text);var indexer=new IndirectCell<string?>(text);
+                    var pair=new IndirectPair<string?,string>(text,text);
+                    if(DefaultProbe.IndirectSibling<string,string>(pair).Length!=text.Length||pair.Left!=null||!ReferenceEquals(pair.Right,text))return false;
+                    if(DefaultProbe.IndirectField(field)!=null||field.Value!=null||field.Reads!=0
+                        ||DefaultProbe.IndirectProperty(property)!=null||property.Value!=null||property.Reads!=1
+                        ||DefaultProbe.IndirectIndexer(indexer)!=null||indexer.Value!=null||indexer.Reads!=1
+                        ||DefaultProbe.IndirectTuple(((string?)text,23m))!=null)return false;
+                    decimal?[] numbers={23m};if(DefaultProbe.IndirectArray(numbers)!=null||numbers[0]!=null)return false;
+                    numbers[0]=23m;if(DefaultProbe.IndirectLift(numbers,23m)!=null||numbers[0]!=null)return false;
+                    var numberCell=new IndirectCell<decimal?>(23m);if(DefaultProbe.IndirectProperty(numberCell)!=null||numberCell.Value!=null)return false;
+                    string?[] first={text},second={text};return DefaultProbe.IndirectRebind(first,second)==null&&ReferenceEquals(first[0],text)&&second[0]==null;
                 }
             }
             """;

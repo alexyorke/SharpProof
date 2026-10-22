@@ -168,6 +168,8 @@ public static partial class Inference
             {
                 environment.Add(symbol.Parameters[i], parameters[i]);
             }
+            PrepareIndirectStorage(parameters);
+            currentFunction = HmType.Function(parameters, recursiveReturn);
 
             HmType result;
             if (method.ExpressionBody is not null)
@@ -1318,6 +1320,8 @@ public static partial class Inference
                 var merged = MergeDefaultValues(target, value);
                 if (WriteReferenceStorage(storage, merged))
                 { return merged; }
+                if (preparedIndirectAliases.Contains(storage))
+                { HmType.Unify(target, merged); environment[storage] = merged; return merged; }
                 if (storage is ILocalSymbol { RefKind: not RefKind.None } or IParameterSymbol { RefKind: not RefKind.None })
                 {
                     if (merged.Root.Name == CSharpTypes.NullableParameter)
@@ -1329,6 +1333,14 @@ public static partial class Inference
                 environment[storage] = merged;
                 defaultAssignedStorages.Add(storage);
                 return merged;
+            }
+            if (HasDefaultValueAnnotation(target) && targetSyntax is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax)
+            {
+                if (sourceType is null || SymbolEqualityComparer.Default.Equals(targetType, sourceType)
+                    && sourceType is not IDynamicTypeSymbol && targetType is not IDynamicTypeSymbol && !IsDynamicIdentityBoundary(sourceType, targetType))
+                { return MergeDefaultValues(target, value); }
+                BindConvertedArgument(sourceType, targetType, value, target);
+                return target;
             }
             if (sourceType is not null && SymbolEqualityComparer.Default.Equals(targetType, sourceType)
                 && sourceType is not IDynamicTypeSymbol && targetType is not IDynamicTypeSymbol
