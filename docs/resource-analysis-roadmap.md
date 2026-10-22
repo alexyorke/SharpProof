@@ -109,6 +109,58 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Receiver, allocation-shape and direct task-call controls
+
+New replay controls use an ordinary instance-method compiler fixture to require
+a non-null receiver in any returned violation model. The admitted body allocates
+one array against a zero-array contract. A missing or null receiver cannot
+establish a valid method-entry witness merely because its body would allocate.
+This checks candidate replay rather than adding a new public proof model.
+
+Four focused controls exercise the exact-array-byte helper with a valid
+`int[1]` candidate (32 bytes), a negative extent, a valid object allocation,
+and an incompatible runtime layout. Invalid candidates must return no numeric
+byte result. These controls use the existing IR builder and helper boundary;
+they do not corrupt factory internals to invent unsupported integer widths.
+No production, transport, cache or runtime-premise changes are introduced.
+
+A separate emitted-body control passes an existing task array directly to
+`Task.WhenAll` outside the protected region. It reaches the task-call escape
+check without an earlier `Array.Empty` call masking that guard. The previous
+nested-call control is preserved. This is a source-placement rejection control,
+not a claim that the runtime builder or task methods are exception-free.
+
+All 696 native resource-contract tests and all 276 carrier tests passed, with
+zero build warnings or errors (`artifacts/resource-replay-receiver-shape-guards-tests.log`
+and `artifacts/resource-replay-receiver-shape-guards-carrier-tests.log`). Full
+quality/API checks and documentation checks passed
+(`artifacts/resource-replay-receiver-shape-guards-lint.log` and
+`artifacts/resource-replay-receiver-shape-guards-docs.log`). The canonical
+formatter copied zero source changes (`artifacts/resource-replay-receiver-shape-guards-format.log`).
+
+The working coverage baseline advances to predecessor `16d7ec58d`, run
+39845085555: all fifteen shards passed; aggregate job 120061409178 failed the
+unchanged 100 percent floor. Its 74 input reports measure 6940 of 7090 changed
+trusted lines (97.88 percent), with 150 gaps. The report is retained in
+`artifacts/resource-16d7-coverage-evidence/coverage/SharpProof.coverage.json`.
+Its merge commit `c05a2940d0b7c5d6093e34c21f166029c69738e7` has verified parents
+master `fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and branch head
+`16d7ec58d4318626817268ae02af5300c0156138`. Compared with the previous audited
+report against the same master base and unchanged replay source, replay lines
+133 and 146 are now covered. Collector line 433 remains uncovered in that
+report; the new direct task-call control targets it. This report does not
+measure the new receiver, shape or direct-call controls.
+
+Predecessor `16d7ec58d` documentation (39845085460) and security (39845085461)
+passed. The previously failing semantic-projects coverage shard succeeded
+(job 120056134593), independently confirming the acceptance-cache repair.
+Canonical projects job 120056545845 also succeeded. Overall canonical CI
+(39845085805) and package consumers (39845085623) remain active at the last
+observation.
+These results do not qualify this uncommitted change.
+The runtime-model choice remains pending; cumulative task-runtime bytes stay
+Unknown and the remaining full-roadmap obligations are unchanged.
+
 ### Byte-prefix controls, cache acceptance repair and coverage evidence
 
 New native consumer controls check that later array, string and object

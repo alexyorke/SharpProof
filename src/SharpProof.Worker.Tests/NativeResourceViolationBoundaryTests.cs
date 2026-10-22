@@ -8,6 +8,46 @@ namespace SharpProof.Worker.Test;
 internal sealed partial class NativeResourceContractTests
 {
     [Test]
+    public async Task InstanceViolationSearchRequiresANonNullReceiverModel()
+    {
+        var target = Read(CreateArtifact("using SharpProof.Attributes; public sealed class C { " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] public void Target() {var value=new int[1];} }"));
+        Assert.That(target.Total, Is.Not.Null);
+        Assert.That(target.Total!.HasReceiver, Is.True);
+        var result = await FindBoundaryViolation(target, ResourceExpression.Zero);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("1"));
+        var receiver = result.Model.Single(static value => value is null ? throw new ArgumentNullException(nameof(value)) :
+            value.Variable == "this");
+        Assert.That(receiver.Kind, Is.Not.EqualTo("null"));
+        Assert.That(receiver.Value, Is.Not.EqualTo("null"));
+    }
+
+    [TestCase(true, 1, false, 32)]
+    [TestCase(true, -1, false, null)]
+    [TestCase(false, 1, false, null)]
+    [TestCase(true, 1, true, null)]
+    public void ExactArrayByteCandidatesRequireANonnegativeExtentArrayShapeAndCompatibleLayout(
+        bool array, int elements, bool incompatible, int? expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) :
+            factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Object");
+        var target = factory.CreateVariable("value", type);
+        var instruction = builder.Allocate(entry, factory.CreateOperation(), type, target, array ? factory.Integer(1) : null);
+        var layout = incompatible ? new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x86", 4) :
+            new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var method = typeof(NativeResourceViolationReplay).GetMethod("ExactArrayBytes",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        var bytes = method!.Invoke(null, [factory, instruction, elements, layout, TestContext.CurrentContext.CancellationToken]);
+        Assert.That(bytes, expected is { } amount ? Is.EqualTo(new System.Numerics.BigInteger(amount)) : Is.Null);
+    }
+
+    [Test]
     public async Task UnsupportedViolationMetricsCannotCreateARefutation()
     {
         var target = Read(CreateArtifact("using SharpProof.Attributes; public static class C { " +
