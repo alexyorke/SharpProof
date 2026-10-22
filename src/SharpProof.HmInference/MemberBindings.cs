@@ -8,6 +8,28 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private HmType ApplyMemberNullability(ISymbol member, HmType value, bool forStorage = false,
+            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null)
+        {
+            if (member is null)
+            { throw new ArgumentNullException(nameof(member)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            var type = member switch { IFieldSymbol field => field.Type, IPropertySymbol property => property.Type, _ => null };
+            if (type is null)
+            { return value; }
+            // The pinned compiler reads conditional property contracts from getter return attributes.
+            var attributes = member.GetAttributes().Where(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return member is not IPropertySymbol || attribute.AttributeClass?.ToDisplayString() != "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
+            });
+            if (member is IPropertySymbol { GetMethod: { } getter })
+            { attributes = attributes.Concat(getter.GetReturnTypeAttributes()); }
+            return ApplyNullabilityContract(type, value, attributes, forStorage, arguments, argumentValues);
+        }
+
         private HmType WithExpression(WithExpressionSyntax syntax)
         {
             if (syntax is null)
@@ -34,7 +56,7 @@ public static partial class Inference
             }
             return receiver;
         }
-        private HmType IndexedProperty(ElementAccessExpressionSyntax syntax, IPropertyReferenceOperation indexer)
+        private HmType IndexedProperty(ElementAccessExpressionSyntax syntax, IPropertyReferenceOperation indexer, bool forStorage = false)
         {
             if (syntax is null)
             { throw new ArgumentNullException(nameof(syntax)); }
@@ -43,12 +65,13 @@ public static partial class Inference
             var original = model.GetTypeInfo(syntax.Expression, cancellationToken).Type ?? throw new InferenceException("Unresolved indexer receiver.");
             var mapping = PatternOwnerMapping(indexer.Property.ContainingType, Expression(syntax.Expression), original);
             var definition = indexer.Property.OriginalDefinition;
+            Dictionary<int, HmType>? argumentValues = forStorage ? null : [];
             BindArguments(indexer.Arguments, definition.Parameters.Select(parameter =>
-            { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray());
-            return CSharpTypes.Rigid(definition.Type, mapping);
+            { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray(), argumentValues);
+            return ApplyMemberNullability(indexer.Property, CSharpTypes.Rigid(definition.Type, mapping), forStorage, indexer.Arguments, argumentValues);
         }
 
-        private HmType IndexedImplicitly(ElementAccessExpressionSyntax syntax, IImplicitIndexerReferenceOperation indexer)
+        private HmType IndexedImplicitly(ElementAccessExpressionSyntax syntax, IImplicitIndexerReferenceOperation indexer, bool forStorage = false)
         {
             if (syntax is null)
             { throw new ArgumentNullException(nameof(syntax)); }
@@ -57,7 +80,7 @@ public static partial class Inference
             foreach (var argument in syntax.ArgumentList.Arguments)
             { Anchor(argument.Expression); }
             var original = model.GetTypeInfo(syntax.Expression, cancellationToken).Type ?? throw new InferenceException("Unresolved implicit indexer receiver.");
-            return PatternSymbolType(indexer.IndexerSymbol, Expression(syntax.Expression), original);
+            return ApplyMemberNullability(indexer.IndexerSymbol, PatternSymbolType(indexer.IndexerSymbol, Expression(syntax.Expression), original), forStorage);
         }
 
         private static string? MemberSymbol(ISymbol symbol)

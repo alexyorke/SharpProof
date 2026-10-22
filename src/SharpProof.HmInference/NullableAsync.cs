@@ -13,15 +13,26 @@ public static partial class Inference
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
-            var called = operation.TargetMethod;
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
-            if (forStorage || called.ReturnsVoid)
+            return ApplyNullabilityContract(operation.TargetMethod.ReturnType, value, operation.TargetMethod.GetReturnTypeAttributes(), forStorage, operation.Arguments, argumentValues);
+        }
+
+        private HmType ApplyNullabilityContract(ITypeSymbol returnType, HmType value, IEnumerable<AttributeData> attributes, bool forStorage,
+            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null)
+        {
+            if (returnType is null)
+            { throw new ArgumentNullException(nameof(returnType)); }
+            if (attributes is null)
+            { throw new ArgumentNullException(nameof(attributes)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (forStorage || returnType.SpecialType == SpecialType.System_Void)
             { return value; }
             var maybeNull = false;
             var notNull = false;
             var conditional = false;
-            foreach (var attribute in called.GetReturnTypeAttributes())
+            foreach (var attribute in attributes)
             {
                 var name = attribute.AttributeClass?.ToDisplayString();
                 maybeNull |= name == "System.Diagnostics.CodeAnalysis.MaybeNullAttribute";
@@ -30,7 +41,7 @@ public static partial class Inference
                     && attribute.ConstructorArguments[0].Value is string parameterName)
                 {
                     conditional = true;
-                    foreach (var argument in operation.Arguments)
+                    foreach (var argument in arguments ?? [])
                     {
                         if (argument.Parameter?.Name == parameterName && ConditionalReturnGuard(argument, argumentValues))
                         { notNull = true; }
@@ -46,7 +57,7 @@ public static partial class Inference
                 return value;
             }
             value = value.Root;
-            if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && called.ReturnType.IsValueType && called.ReturnType is not ITypeParameterSymbol)
+            if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && returnType.IsValueType && returnType is not ITypeParameterSymbol)
             { return value; }
             if (value.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
             { defaultValueAnnotations.Add(value); return value; }
@@ -64,11 +75,11 @@ public static partial class Inference
                     defaultValueAnnotations.Add(annotated);
                     return annotated;
                 }
-                if (legacy && called.ReturnType.IsReferenceType)
+                if (legacy && returnType.IsReferenceType)
                 { RequireKeyword(value, "class"); }
-                return DefaultValueAnnotation(value, legacy && !called.ReturnType.IsReferenceType);
+                return DefaultValueAnnotation(value, legacy && !returnType.IsReferenceType);
             }
-            if (called.ReturnType.IsReferenceType)
+            if (returnType.IsReferenceType)
             {
                 var nullable = new HmType(CSharpTypes.NullableReference, value);
                 defaultValueAnnotations.Add(nullable);
@@ -153,9 +164,10 @@ public static partial class Inference
                     return CSharpTypes.Rigid(property.Type!);
                 }
                 var mapping = PatternOwnerMapping(property.Property.ContainingType, receiver.Value, receiver.Type);
+                Dictionary<int, HmType> argumentValues = [];
                 BindArguments(property.Arguments, property.Property.OriginalDefinition.Parameters.Select(parameter =>
-                { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray());
-                return CSharpTypes.Rigid(property.Property.OriginalDefinition.Type, mapping);
+                { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray(), argumentValues);
+                return ApplyMemberNullability(property.Property, CSharpTypes.Rigid(property.Property.OriginalDefinition.Type, mapping), arguments: property.Arguments, argumentValues: argumentValues);
             }
             if (operation is IFieldReferenceOperation field)
             {
@@ -164,7 +176,7 @@ public static partial class Inference
                     for (var i = 0; i < tuple.TupleElements.Length; i++)
                     { if (tuple.TupleElements[i].Name == field.Field.Name) { return receiver.Value.Root.Arguments[i]; } }
                 }
-                return PatternSymbolType(field.Field, receiver.Value, receiver.Type);
+                return ApplyMemberNullability(field.Field, PatternSymbolType(field.Field, receiver.Value, receiver.Type));
             }
             throw new InferenceException("Unresolved conditional member binding.");
         }

@@ -944,10 +944,11 @@ public static partial class Inference
             return Scoped(() => statement is BlockSyntax block ? Statements(block.Statements.ToArray()) : Statements([statement]));
         }
 
-        private HmType Expression(ExpressionSyntax expression)
+        private HmType Expression(ExpressionSyntax expression, bool forStorage = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (queryReferences is not null && queryReferences.TryGetValue(expression, out var queryReference))
+            if (queryReferences is not null && queryReferences.TryGetValue(expression, out var queryReference)
+                && (!forStorage || model.GetSymbolInfo(expression, cancellationToken).Symbol is not (IFieldSymbol or IPropertySymbol)))
             { return queryReference; }
             if (expression is IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax
                 && model.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol group
@@ -971,7 +972,7 @@ public static partial class Inference
                     if (StorageExpression(reference.Expression) is InvocationExpressionSyntax referenceCall
                         && model.GetOperation(referenceCall, cancellationToken) is IInvocationOperation { TargetMethod.RefKind: not RefKind.None })
                     { return MethodCall(referenceCall, forStorage: true); }
-                    return Expression(reference.Expression);
+                    return Expression(reference.Expression, forStorage: true);
                 case RangeExpressionSyntax range:
                     if (range.LeftOperand is not null)
                     { Anchor(range.LeftOperand); }
@@ -996,7 +997,7 @@ public static partial class Inference
                 case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.NullLiteralExpression) || literal.IsKind(SyntaxKind.DefaultLiteralExpression):
                     return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped null/default literal."));
                 case ParenthesizedExpressionSyntax parentheses:
-                    return Expression(parentheses.Expression);
+                    return Expression(parentheses.Expression, forStorage);
                 case ThrowExpressionSyntax thrown:
                     Anchor(thrown.Expression);
                     return HmType.Variable();
@@ -1060,12 +1061,12 @@ public static partial class Inference
                     { return CSharpTypes.Rigid(captured.Type); }
                     if (symbol is IFieldSymbol field)
                     {
-                        return CSharpTypes.Rigid(field.Type);
+                        return ApplyMemberNullability(field, CSharpTypes.Rigid(field.Type), forStorage);
                     }
 
                     if (symbol is IPropertySymbol property)
                     {
-                        return CSharpTypes.Rigid(property.Type);
+                        return ApplyMemberNullability(property, CSharpTypes.Rigid(property.Type), forStorage);
                     }
 
                     throw new InferenceException("Only local and parameter references are supported.");
@@ -1149,10 +1150,10 @@ public static partial class Inference
                     }
                     if (model.GetOperation(element, cancellationToken) is IPropertyReferenceOperation indexer)
                     {
-                        return IndexedProperty(element, indexer);
+                        return IndexedProperty(element, indexer, forStorage);
                     }
                     if (model.GetOperation(element, cancellationToken) is IImplicitIndexerReferenceOperation implicitIndex)
-                    { return IndexedImplicitly(element, implicitIndex); }
+                    { return IndexedImplicitly(element, implicitIndex, forStorage); }
                     var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array indexing is supported.");
                     var elementType = HmType.Variable();
                     HmType.Unify(Expression(element.Expression), new("[" + new string(',', array.Rank - 1) + "]", elementType));
@@ -1175,7 +1176,7 @@ public static partial class Inference
 
                     return elementType;
                 case MemberAccessExpressionSyntax member:
-                    return Member(member);
+                    return Member(member, forStorage);
                 case CastExpressionSyntax cast:
                     if (IsUntypedNull(cast.Expression) && model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: null, Conversion.Exists: true }
                         && model.GetTypeInfo(cast.Type, cancellationToken).Type is { } nullCastType)
@@ -1311,13 +1312,13 @@ public static partial class Inference
             if (target is InvocationExpressionSyntax invocation && model.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true })
             { return MethodCall(invocation, forStorage: true); }
             if (target is PrefixUnaryExpressionSyntax pointerTarget && pointerTarget.IsKind(SyntaxKind.PointerIndirectionExpression))
-            { return Expression(target); }
+            { return Expression(target, forStorage: true); }
             if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax and not MemberAccessExpressionSyntax)
             {
                 throw new InferenceException("Unsupported assignment target.");
             }
 
-            return Expression(target);
+            return Expression(target, forStorage: true);
         }
 
         private HmType AssignValue(ExpressionSyntax targetSyntax, HmType value, ITypeSymbol? sourceType)
@@ -1709,7 +1710,7 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(binary, cancellationToken).Type!);
         }
 
-        private HmType Member(MemberAccessExpressionSyntax member)
+        private HmType Member(MemberAccessExpressionSyntax member, bool forStorage = false)
         {
             var receiverType = model.GetTypeInfo(member.Expression, cancellationToken).Type;
             if (receiverType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } && member.Name.Identifier.ValueText is "Value" or "HasValue")
@@ -1758,12 +1759,13 @@ public static partial class Inference
 
             if (selected is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false })
             {
-                return receiverType is IPointerTypeSymbol pointer
+                var shape = receiverType is IPointerTypeSymbol pointer
                     ? PatternSymbolType(selected, PointerElement(member.Expression), pointer.PointedAtType)
                     : PatternSymbolType(selected, Expression(member.Expression), receiverType ?? throw new InferenceException("Unresolved member receiver."));
+                return ApplyMemberNullability(selected, shape, forStorage);
             }
 
-            return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);
+            return ApplyMemberNullability(selected, CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!), forStorage);
         }
 
         private HmType MethodCall(InvocationExpressionSyntax invocation, bool forStorage = false)

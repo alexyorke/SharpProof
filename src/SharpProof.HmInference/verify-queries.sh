@@ -16,7 +16,21 @@ EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Linq;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
+public sealed class MemberContractCell<T>{
+  [System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;
+  [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get=>Field!;set=>Field=value!;}
+  public T Accessor{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get=>Field!;}
+  [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]=>Field!;
+}
+public sealed class RequiredMemberCell<T>where T:class{[System.Diagnostics.CodeAnalysis.NotNull]public T? Value=>throw new NotImplementedException();}
 public static class QueryConsumer{
+  public static int MemberRead(MemberContractCell<int> cell)=>cell.Value;
+  public static int MemberField(MemberContractCell<int> cell)=>cell.Field;
+  public static int MemberAccessor(MemberContractCell<int> cell)=>cell.Accessor;
+  public static int MemberIndexer(MemberContractCell<int> cell)=>cell[0];
+  public static async Task<int> MemberAsync(Task<MemberContractCell<int>> cell)=>(await cell).Value;
+  public static async ValueTask<int> MemberValueAsync(ValueTask<MemberContractCell<int>> cell)=>(await cell)[0];
+  public static string MemberRequired(RequiredMemberCell<string> cell)=>cell.Value;
   static ref T Borrow<T>(ref T value)=>ref value;
   static ref T ArrayBorrow<T>(T[] value)=>ref value[0];
   public static IEnumerable<(int left,int right)> ConditionalMixed(IEnumerable<(int[] first,int[] second)> values,bool clear)=>from pair in values select (Borrow(ref pair.first[0]),ArrayBorrow(pair.second))=clear?(default,default):(pair.first[0],pair.second[0]);
@@ -150,7 +164,13 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 MemberRequired<T1>(global::RequiredMemberCell<T1> cell) where T1 : class' "$log"
   if [ "$language" = 8 ]; then
+    for member in MemberRead MemberField MemberAccessor MemberIndexer; do
+      grep -Fq "T1 $member<T1>(global::MemberContractCell<T1> cell) where T1 : struct" "$log"
+    done
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> MemberAsync<T1>(global::System.Threading.Tasks.Task<global::MemberContractCell<T1>> cell) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> MemberValueAsync<T1>(global::System.Threading.Tasks.ValueTask<global::MemberContractCell<T1>> cell) where T1 : struct' "$log"
     grep -Fq 'T1 ConditionalUnknown<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T1 : struct where T2 : class' "$log"
     grep -Fq 'T1 ConditionalDefaultValue<T1, T2>(T1 value, T2 tag) where T1 : struct' "$log"
     grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag) where T1 : class' "$log"
@@ -173,6 +193,11 @@ EOF
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    for member in MemberRead MemberField MemberAccessor MemberIndexer; do
+      grep -Fq "T1? $member<T1>(global::MemberContractCell<T1> cell)" "$log"
+    done
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> MemberAsync<T1>(global::System.Threading.Tasks.Task<global::MemberContractCell<T1>> cell)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> MemberValueAsync<T1>(global::System.Threading.Tasks.ValueTask<global::MemberContractCell<T1>> cell)' "$log"
     grep -Fq 'T1? ConditionalUnknown<T1, T2, T3>(T1 value, T2? guard, T3 tag) where T2 : class' "$log"
     grep -Fq 'T1? ConditionalDefaultValue<T1, T2>(T1 value, T2 tag)' "$log"
     grep -Fq 'T1? ContractReference<T1, T2>(T1 value, T2 tag)' "$log"

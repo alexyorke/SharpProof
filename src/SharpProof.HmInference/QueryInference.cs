@@ -42,9 +42,9 @@ public static partial class Inference
                 case IParameterReferenceOperation:
                     throw new InferenceException("Unbound query parameter.");
                 case IPropertyReferenceOperation { Instance: not null, Arguments.Length: 0 } property:
-                    return PatternSymbolType(property.Property, QueryValue(property.Instance!), property.Instance!.Type!);
+                    return ApplyMemberNullability(property.Property, PatternSymbolType(property.Property, QueryValue(property.Instance!), property.Instance!.Type!));
                 case IFieldReferenceOperation { Instance: not null } field:
-                    return PatternSymbolType(field.Field, QueryValue(field.Instance!), field.Instance!.Type!);
+                    return ApplyMemberNullability(field.Field, PatternSymbolType(field.Field, QueryValue(field.Instance!), field.Instance!.Type!));
                 case IInvocationOperation { IsImplicit: true } call:
                     return QueryCall(call);
                 case IConversionOperation { IsImplicit: true, Type: not null } conversion:

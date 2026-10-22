@@ -795,7 +795,8 @@ Task and ValueTask checks cover stores after suspension, earlier value copies,
 reference and nullable-value domains, deferred query execution, faults and
 cancellation. C# 8/9/13 CLI and packaged consumers verify these signatures.
 
-Calls and delegate invocations honor `MaybeNull` and `NotNull` return contracts,
+Calls, delegate invocations, and field/property/indexer reads honor `MaybeNull` and
+`NotNull` contracts,
 including contracts imported from emitted metadata. Nullable results preserve
 independent inputs and tuple siblings; arrays, existing generic parameters and
 Task/ValueTask results retain their structural relationships. Physical nullable
@@ -811,7 +812,11 @@ Unconstrained or nullable inputs retain nullable results, preserving their wider
 domains. Omitted generic defaults are distinguished from fixed non-null constants;
 contextual default arguments no longer pin generic calls to their original types.
 Implicit params packs retain nullable results where compiler flow cannot prove
-the condition. Stronger wrapper-contract forwarding, parameter and member flow
+the condition. Member reads include getter-return attributes, conditional access,
+queries and awaited Task/ValueTask receivers. Assignments and ref aliases retain
+the declared storage type. Conditional indexer results follow getter-return
+attributes; property-level `NotNullIfNotNull` does not refine reads in the pinned compiler.
+Stronger wrapper-contract forwarding, parameter and other member flow
 contracts still need further work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

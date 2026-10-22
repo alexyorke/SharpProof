@@ -26,10 +26,28 @@ internal static class QueryRuntimeChecks
                 public IEnumerable<T> Values;public QueryBox(IEnumerable<T> values){Values=values;}
                 public QueryBox<U> Select<U>(Func<T,U> selector){QueryTrace.Value+="select;";return new QueryBox<U>(Values.Select(selector));}
             }
+            public sealed class MemberCell<T>{
+                public T Stored;public T? OptionalStored;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field;public bool Present;public int Reads,Indices,Writes,Refs;
+                public MemberCell(T value,bool present=true){Stored=value;OptionalStored=value;Field=value;Present=present;}
+                [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get{Interlocked.Increment(ref Reads);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return Present?Stored:default;}set{Interlocked.Increment(ref Writes);Stored=value;Present=true;}}
+                [System.Diagnostics.CodeAnalysis.MaybeNull]public T this[int index]{get{Interlocked.Increment(ref Indices);return Value;}set{Interlocked.Increment(ref Writes);Stored=value;Present=true;}}
+                [System.Diagnostics.CodeAnalysis.MaybeNull]public ref T? RefSlot{get{Interlocked.Increment(ref Refs);return ref OptionalStored;}}
+                [System.Diagnostics.CodeAnalysis.NotNull]public T? Required{get{Interlocked.Increment(ref Reads);if(Stored is null)throw QueryTrace.ContractFailure;return Stored;}}
+            }
             public static class QueryProbe{
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static int MemberProperty(MemberCell<int> cell)=>cell.Value;
+                public static int MemberField(MemberCell<int> cell)=>cell.Field;
+                public static int MemberIndexer(MemberCell<int> cell,int index)=>cell[index];
+                public static (int copy,int stored) MemberStore(MemberCell<int> cell,int fill){var copy=fill;cell.Value=fill;return(copy,cell.Value);}
+                public static int MemberFieldStore(MemberCell<int> cell,int fill){cell.Field=fill;return cell.Field;}
+                public static int MemberRefStore(MemberCell<int> cell,int fill){ref var slot=ref cell.RefSlot;slot=fill;return cell.RefSlot;}
+                public static string MemberRequired(MemberCell<string?> cell)=>cell.Required;
+                public static IEnumerable<int> MemberQuery(IEnumerable<MemberCell<int>> cells)=>from cell in cells select cell.Value;
+                public static async Task<int> MemberAsync(Task<MemberCell<int>> cell)=>(await cell).Value;
+                public static async ValueTask<int> MemberValueAsync(ValueTask<MemberCell<int>> cell)=>(await cell)[0];
                 [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("guard")]public static T ConditionalContract<T>(T value,object? guard){Interlocked.Increment(ref QueryTrace.ContractCalls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(guard is null)return default;if(value is null)throw QueryTrace.ContractFailure;return value;}
                 public static int ConditionalKnown(int value)=>ConditionalContract(QueryTrace.Touch(value),"ready");
                 public static int ConditionalUnknown(int value,object? guard)=>ConditionalContract(value,guard);
@@ -238,7 +256,33 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> MemberContracts(CancellationToken cancellationToken){
+                    var cell=new MemberCell<int>(7);if(QueryProbe.MemberProperty(cell)!=7||cell.Reads!=1||QueryProbe.MemberField(cell)!=7||QueryProbe.MemberIndexer(cell,0)!=7||cell.Reads!=2||cell.Indices!=1)return false;
+                    var pair=QueryProbe.MemberStore(cell,9);if(pair!=(9,9)||cell.Stored!=9||cell.Writes!=1||cell.Reads!=3)return false;
+                    if(QueryProbe.MemberFieldStore(cell,11)!=11||cell.Field!=11||QueryProbe.MemberRefStore(cell,13)!=13||cell.OptionalStored!=13||cell.Refs!=2)return false;
+                    var missing=new MemberCell<int>(7,false);if(QueryProbe.MemberProperty(missing)!=0)return false;
+                    QueryTrace.Value="";missing.Reads=0;var query=QueryProbe.MemberQuery(QueryTrace.Source(new[]{missing}));if(QueryTrace.Value!=""||missing.Reads!=0||query.Take(1).Single()!=0||missing.Reads!=1||QueryTrace.Value!="open;dispose;")return false;
+                    if(QueryProbe.MemberRequired(new MemberCell<string?>("value"))!="value")return false;
+                    try{_=QueryProbe.MemberRequired(new MemberCell<string?>(null));return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();var failure=new InvalidOperationException("member-contract");
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","GetterFault"}){
+                        var delayed=new MemberCell<int>(7);var gate=new TaskCompletionSource<MemberCell<int>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        QueryTrace.Failure=outcome=="GetterFault"?failure:null;
+                        try{var task=QueryProbe.MemberAsync(gate.Task);var valueTask=QueryProbe.MemberValueAsync(new ValueTask<MemberCell<int>>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||delayed.Reads!=0)return false;
+                            if(outcome is "Value" or "GetterFault")gate.SetResult(delayed);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=7)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "GetterFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(delayed.Reads!=(outcome is "Value" or "GetterFault"?2:0)||delayed.Indices!=(outcome is "Value" or "GetterFault"?1:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> Stores(CancellationToken cancellationToken){
+                    if(!await MemberContracts(cancellationToken))return false;
                     if(!await ConditionalContracts(cancellationToken))return false;
                     if(!await ReturnContracts(cancellationToken))return false;
                     if(!await BranchStores(cancellationToken))return false;
@@ -389,7 +433,23 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> MemberContracts(string text,CancellationToken cancellationToken){
+                    var cell=new MemberCell<string>(text);if(!ReferenceEquals(QueryProbe.MemberProperty(cell),text)||!ReferenceEquals(QueryProbe.MemberField(cell),text)||!ReferenceEquals(QueryProbe.MemberIndexer(cell,0),text)||cell.Reads!=2||cell.Indices!=1)return false;
+                    var next=new string('y',3);var pair=QueryProbe.MemberStore(cell,next);if(!ReferenceEquals(pair.copy,next)||!ReferenceEquals(pair.stored,next)||!ReferenceEquals(cell.Stored,next)||cell.Writes!=1)return false;
+                    if(!ReferenceEquals(QueryProbe.MemberFieldStore(cell,text),text)||!ReferenceEquals(cell.Field,text)||!ReferenceEquals(QueryProbe.MemberRefStore(cell,text),text)||!ReferenceEquals(cell.OptionalStored,text)||cell.Refs!=2)return false;
+                    var missing=new MemberCell<string>(text,false);if(QueryProbe.MemberProperty(missing)!=null||QueryProbe.MemberQuery(new[]{missing}).Single()!=null)return false;
+                    if(QueryProbe.MemberProperty(new MemberCell<decimal?>(23m,false))!=null)return false;
+                    var original=new QueryStoreValue();QueryStoreValue.Calls=0;var zero=QueryProbe.MemberProperty(new MemberCell<QueryStoreValue>(original,false));if(zero.Value!=0||zero.Text!=null||QueryStoreValue.Calls!=0)return false;
+                    var uri=new Uri("https://example.invalid/member-required");if(!ReferenceEquals(QueryProbe.MemberRequired(new MemberCell<Uri?>(uri)),uri))return false;
+                    try{_=QueryProbe.MemberRequired(new MemberCell<Uri?>(null));return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var gate=new TaskCompletionSource<MemberCell<string>>(TaskCreationOptions.RunContinuationsAsynchronously);var delayed=new MemberCell<string>(text,false);
+                    var task=QueryProbe.MemberAsync(gate.Task);var valueTask=QueryProbe.MemberValueAsync(new ValueTask<MemberCell<string>>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||delayed.Reads!=0)return false;gate.SetResult(delayed);
+                    foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(result!=null)return false;}
+                    return delayed.Reads==2&&delayed.Indices==1;
+                }
                 static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    if(!await MemberContracts(text,cancellationToken))return false;
                     if(!await ConditionalContracts(text,cancellationToken))return false;
                     if(!await ReturnContracts(text,cancellationToken))return false;
                     if(!await BranchStores(text,cancellationToken))return false;
