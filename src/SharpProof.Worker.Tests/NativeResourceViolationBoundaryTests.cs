@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -7,6 +8,103 @@ namespace SharpProof.Worker.Test;
 
 internal sealed partial class NativeResourceContractTests
 {
+    [TestCase("valid", true)]
+    [TestCase("extra", true)]
+    [TestCase("missing-first", false)]
+    [TestCase("missing-later", false)]
+    [TestCase("wrong-type", false)]
+    [TestCase("foreign-value", false)]
+    [TestCase("null-value", false)]
+    public void ReplayEntryModelsMustBindEveryDeclaredParameter(string mutation, bool admitted)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var owner = Prepare(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)]", "var value=new int[1];")).Total!;
+        var factory = owner.Program.Factory;
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        foreach (var parameter in owner.Parameters)
+        {
+            var type = factory.GetVariableInfo(parameter.Entry).Type;
+            inputs = inputs.Add(parameter.Entry, factory.GetTypeInfo(type).CreateDefaultValue(factory));
+        }
+        var first = owner.Parameters[0].Entry;
+        switch (mutation)
+        {
+            case "valid":
+                break;
+            case "extra":
+                inputs = inputs.Add(factory.CreateVariable("extra", factory.BooleanType), factory.CreateBooleanValue(false));
+                break;
+            case "missing-first":
+                inputs = inputs.Remove(first);
+                break;
+            case "missing-later":
+                inputs = inputs.Remove(owner.Parameters[1].Entry);
+                break;
+            case "wrong-type":
+                inputs = inputs.SetItem(first, factory.CreateBooleanValue(false));
+                break;
+            case "foreign-value":
+                inputs = inputs.SetItem(first, new IrFactory(IrExecutionSemantics.Total).CreateIntegerValue(0));
+                break;
+            case "null-value":
+                inputs = inputs.SetItem(first, null!);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        Assert.That(NativeResourceViolationReplay.EntryModelIsOwned(owner, inputs,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(admitted));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ReplayEntryModelShapeRequiresANonNullReceiver(bool nonnull)
+    {
+        var owner = Read(CreateArtifact("using SharpProof.Attributes; public sealed class C { " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] public void Target() {} }")).Total!;
+        var factory = owner.Program.Factory;
+        var entry = owner.Parameters[owner.Parameters.Length - 1].Entry;
+        var type = factory.GetVariableInfo(entry).Type;
+        var value = nonnull ? factory.CreateReferenceValue(type, new object()) : factory.CreateNullValue(type);
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty.Add(entry, value);
+        Assert.That(NativeResourceViolationReplay.EntryModelIsOwned(owner, inputs,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(nonnull));
+    }
+
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public void EmptyReplayEntriesCannotPretendToHaveAReceiver(bool receiver, bool admitted)
+    {
+        var owner = Read(CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)] public static void Target() {} }")).Total! with
+        { HasReceiver = receiver };
+        Assert.That(NativeResourceViolationReplay.EntryModelIsOwned(owner, ImmutableDictionary<IrVarId, IrValue>.Empty,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(admitted));
+    }
+
+    [Test]
+    public void DefaultReplayParameterListsCannotBecomeEmptyEntryProofs()
+    {
+        var owner = Prepare(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)]", "")).Total! with
+        { Parameters = default };
+        Assert.That(NativeResourceViolationReplay.EntryModelIsOwned(owner, ImmutableDictionary<IrVarId, IrValue>.Empty,
+            TestContext.CurrentContext.CancellationToken), Is.False);
+    }
+
+    [Test]
+    public void ReplayEntryShapeValidationPropagatesCancellationBeforeRejectingAModel()
+    {
+        var owner = Prepare(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations,0)]", "")).Total!;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action check = () =>
+        {
+            _ = NativeResourceViolationReplay.EntryModelIsOwned(owner,
+            ImmutableDictionary<IrVarId, IrValue>.Empty, cancellation.Token);
+        };
+        Assert.That(check, Throws.TypeOf<OperationCanceledException>());
+    }
+
     [Test]
     public async Task InstanceViolationSearchRequiresANonNullReceiverModel()
     {

@@ -109,6 +109,56 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Replay entry-model validation
+
+The native replay entry-shape check is now a directly testable helper used by
+every sampled and solver-supplied candidate. It retains the existing requirement
+that every declared entry parameter has a value of its exact owned IR type,
+including the factory scope, and that an instance receiver is non-null. Extra
+solver entries remain allowed. Entry constraints and safe/value preconditions
+are still checked independently before any resource prefix is observed.
+
+The helper also rejects null model values, default parameter lists, and an
+impossible receiver entry with no receiver parameter. Previously those malformed
+shapes could throw while accessing a value or parameter list. Cancellation
+propagates before rejection and during parameter traversal. This adds no new
+cost model or runtime assumptions. Successful cached verdicts remain compatible:
+the new rejections cover shapes that previously failed before a verdict, while
+key/type/receiver validation for completed candidates is unchanged. Cache 59,
+projection 7, protocol 43 and artifact schema 55 are unchanged.
+
+Thirteen focused controls cover valid inputs and harmless extra entries,
+missing first/later parameters, wrong and foreign-scoped types, null values,
+null/non-null receivers, empty static/receiver entries, a default parameter list,
+and cancellation. All 715 selected tests passed: 709 native resource-contract
+cases and six actual worker cache/SARIF consumer cases, with zero build warnings
+or errors (`artifacts/resource-replay-entry-model-guards-tests.log`). Full
+quality/API checks and documentation checks passed
+(`artifacts/resource-replay-entry-model-guards-lint.log` and
+`artifacts/resource-replay-entry-model-guards-docs.log`). The canonical formatter
+updated the test file before verification
+(`artifacts/resource-replay-entry-model-guards-format.log`).
+
+Predecessor `16d7ec58d` passed full canonical CI (39845085805); its package
+consumer run (39845085623) was cancelled, not passed. Current committed
+`cc9d9d1ed` has active CI and package qualification; its completed coverage
+run failed the aggregate floor as recorded below. These hosted results do not
+qualify the uncommitted entry-model helper.
+
+The working measured coverage baseline advances to `cc9d9d1ed`, run
+39848470551: all fifteen shards passed; aggregate job 120072498473 failed the
+unchanged 100 percent floor. Its 74 input reports measure 6943/7090 changed
+trusted lines (97.93 percent), with 147 gaps. The report is retained in
+`artifacts/resource-cc9d-coverage-evidence/coverage/SharpProof.coverage.json`.
+Its merge commit `faf115be2748423448d910104eed9edbb48be099` has verified parents
+master `fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and branch head
+`cc9d9d1ed97e2903d0f852618e6d8f6b6f178dbd`. Against unchanged production files
+and the same master base, replay lines 76 and 229 and collector line 433 are now
+covered, confirming the prior receiver, shape and direct-call controls. The new
+entry-model helper and its thirteen controls have not yet been measured by
+hosted coverage. Cumulative task-runtime bytes remain Unknown; the runtime-model
+choice and other full-roadmap obligations are unchanged.
+
 ### Receiver, allocation-shape and direct task-call controls
 
 New replay controls use an ordinary instance-method compiler fixture to require

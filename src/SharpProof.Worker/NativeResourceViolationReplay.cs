@@ -64,15 +64,10 @@ internal static class NativeResourceViolationReplay
 
         WorkerClaimResult? Replay(ImmutableDictionary<IrVarId, IrValue> inputs)
         {
-            ArgumentNullException.ThrowIfNull(inputs);
+            if (!EntryModelIsOwned(owner, inputs, cancellation))
+            { return null; }
             var factory = owner.Program.Factory;
-            foreach (var parameter in owner.Parameters)
-            {
-                if (!inputs.TryGetValue(parameter.Entry, out var value) || value.Type != factory.GetVariableInfo(parameter.Entry).Type)
-                { return null; }
-            }
-            if (owner.HasReceiver && inputs[owner.Parameters[owner.Parameters.Length - 1].Entry].Kind == IrValueKind.Null ||
-                !CallableReplayValidator.EntryConstraintsHold(factory, candidate.EntryConstraints, inputs, cancellation))
+            if (!CallableReplayValidator.EntryConstraintsHold(factory, candidate.EntryConstraints, inputs, cancellation))
             { return null; }
             foreach (var clause in candidate.Requires)
             {
@@ -216,6 +211,27 @@ internal static class NativeResourceViolationReplay
             }).OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable, StringComparer.Ordinal)];
             return result;
         }
+    }
+
+    // Shape validation for a solver/sample model against an already owned entry.
+    // Preconditions and entry constraints remain independently checked by Replay.
+    internal static bool EntryModelIsOwned(CompilerTotalCallablePreparation owner,
+        ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellation)
+    {
+        owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
+        cancellation.ThrowIfCancellationRequested();
+        if (owner.Parameters.IsDefault || owner.HasReceiver && owner.Parameters.IsEmpty)
+        { return false; }
+        var factory = owner.Program.Factory;
+        foreach (var parameter in owner.Parameters)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (!inputs.TryGetValue(parameter.Entry, out var value) || value is null ||
+                value.Type != factory.GetVariableInfo(parameter.Entry).Type)
+            { return false; }
+        }
+        return !owner.HasReceiver || inputs[owner.Parameters[owner.Parameters.Length - 1].Entry].Kind != IrValueKind.Null;
     }
 
     private static BigInteger? ExactArrayBytes(IrFactory factory, IrAllocationInstruction instruction, int elements,
