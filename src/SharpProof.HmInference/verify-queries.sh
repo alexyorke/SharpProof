@@ -51,6 +51,10 @@ public static class QueryConsumer{
   public static int RequiredArrayProjection(int[] values)=>RequiredForwardHelper(values[0]);
   public static async Task<int> RequiredTaskProjection(Task<(int value,bool tag)> input){var pair=await input;return RequiredForwardHelper(pair.value);}
   public static async ValueTask<int> RequiredValueTaskProjection(ValueTask<int[]> input){var values=await input;return RequiredForwardHelper(values[0]);}
+  public static int RequiredLocalForward(int value){var local=value;return RequiredForwardHelper(local);}
+  public static int RequiredChoiceForward(int left,int right,bool choose){var local=choose?left:right;return RequiredForwardHelper(local);}
+  public static int RequiredDefaultProjection(int[] values){values[0]=default;return RequiredForwardHelper(values[0]);}
+  public static async ValueTask<int> RequiredDefaultAwaitProjection(ValueTask<int[]> input){var values=await input;values[0]=default;return RequiredForwardHelper(values[0]);}
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -266,6 +270,10 @@ EOF
   grep -Fq 'T1 RequiredArrayProjection<T1>(T1[] values) where T1 : notnull' "$log"
   grep -Fq 'global::System.Threading.Tasks.Task<T1> RequiredTaskProjection<T1, T2>(global::System.Threading.Tasks.Task<(T1 value, T2 tag)> input) where T1 : notnull' "$log"
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequiredValueTaskProjection<T1>(global::System.Threading.Tasks.ValueTask<T1[]> input) where T1 : notnull' "$log"
+  grep -Fq 'T1 RequiredLocalForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
+  grep -Fq 'T1 RequiredChoiceForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 left, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 right, bool choose)' "$log"
+  grep -Fq 'T1 RequiredDefaultProjection<T1>(T1[] values) where T1 : struct' "$log"
+  grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequiredDefaultAwaitProjection<T1>(global::System.Threading.Tasks.ValueTask<T1[]> input) where T1 : struct' "$log"
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredDelegateForward<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

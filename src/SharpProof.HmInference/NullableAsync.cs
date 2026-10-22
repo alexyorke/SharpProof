@@ -94,7 +94,7 @@ public static partial class Inference
 
         private readonly HashSet<int> forwardedDisallowNull = [];
         private readonly Dictionary<TextSpan, HmType> disallowNullArguments = [];
-        private readonly HashSet<HmType> constrainedDisallowNull = [];
+        private readonly HashSet<(HmType Shape, string Keyword)> constrainedDisallowNull = [];
 
         private void RecordDisallowNullArgument(IArgumentOperation argument, HmType value)
         {
@@ -146,14 +146,99 @@ public static partial class Inference
                     if (!HasDisallowNull(source))
                     { changed |= forwardedDisallowNull.Add(source.Ordinal); }
                 }
-                else if (disallowNullArguments.TryGetValue(before[i].Span, out var actual)
-                    && actual.Root.IsVariable && constrainedDisallowNull.Add(actual.Root))
+                else if (disallowNullArguments.TryGetValue(before[i].Span, out var actual))
                 {
-                    RequireKeyword(actual.Root, "notnull");
-                    changed = true;
+                    if (ForwardAliasedDisallowNull(compilation, candidate, i, actual))
+                    { return true; }
+                    var required = actual.Root;
+                    var keyword = "notnull";
+                    if (required.Name == CSharpTypes.NullableParameter && HasDefaultValueAnnotation(required)
+                        && model.GetOperation(before[i], cancellationToken) is IArgumentOperation { Value.Type: { IsValueType: true } originalType }
+                        && originalType is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+                    {
+                        required = required.Arguments[0].Root;
+                        keyword = "struct";
+                    }
+                    if (required.IsVariable && constrainedDisallowNull.Add((required, keyword)))
+                    {
+                        RequireKeyword(required, keyword);
+                        changed = true;
+                    }
                 }
+                if (changed)
+                { break; }
             }
             return changed;
+        }
+
+        private bool ForwardAliasedDisallowNull(Compilation compilation, MethodDeclarationSyntax candidate, int argumentIndex, HmType actual)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            if (actual is null)
+            { throw new ArgumentNullException(nameof(actual)); }
+            if (argumentIndex < 0)
+            { throw new ArgumentOutOfRangeException(nameof(argumentIndex)); }
+            if (!actual.Root.IsVariable || currentMethod is null)
+            { return false; }
+            var inputs = new HashSet<int>(currentMethod.Parameters.Where(parameter =>
+            {
+                if (parameter is null)
+                { throw new ArgumentNullException(nameof(parameter)); }
+                return parameter.RefKind != RefKind.Out && !HasDisallowNull(parameter)
+                    && !forwardedDisallowNull.Contains(parameter.Ordinal)
+                    && environment.TryGetValue(parameter, out var shape) && shape.Root == actual.Root;
+            }).Select(parameter =>
+            {
+                if (parameter is null)
+                { throw new ArgumentNullException(nameof(parameter)); }
+                return parameter.Ordinal;
+            }));
+            if (inputs.Count == 0 || !Accepts(inputs))
+            { return false; }
+            // Compiler flow, rather than type equality alone, must establish which
+            // input contracts actually reach this argument. Remove redundant inputs.
+            foreach (var input in inputs.ToArray())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                inputs.Remove(input);
+                if (!Accepts(inputs))
+                { inputs.Add(input); }
+            }
+            forwardedDisallowNull.UnionWith(inputs);
+            return inputs.Count != 0;
+
+            bool Accepts(HashSet<int> contracts)
+            {
+                if (contracts is null)
+                { throw new ArgumentNullException(nameof(contracts)); }
+                var marker = new SyntaxAnnotation("HM.InputTrial");
+                var trial = candidate.WithParameterList(candidate.ParameterList.WithParameters(SyntaxFactory.SeparatedList(candidate.Parameters().Select((parameter, index) =>
+                {
+                    if (parameter is null)
+                    { throw new ArgumentNullException(nameof(parameter)); }
+                    if (index < 0)
+                    { throw new ArgumentOutOfRangeException(nameof(index)); }
+                    return !contracts.Contains(index) ? parameter : parameter.AddAttributeLists(
+                        SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Attribute(SyntaxFactory.ParseName("global::System.Diagnostics.CodeAnalysis.DisallowNull")))));
+                })))).WithAdditionalAnnotations(marker);
+                var tree = candidate.SyntaxTree;
+                var replacement = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(candidate, trial), tree.Options);
+                var rewritten = compilation.ReplaceSyntaxTree(tree, replacement);
+                if (rewritten.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
+                { rewritten = rewritten.WithOptions(rewritten.Options.WithSyntaxTreeOptionsProvider(new CandidateTreeOptions(sourceOptions, tree, replacement))); }
+                var argument = replacement.GetRoot(cancellationToken).GetAnnotatedNodes(marker).Single().DescendantNodes().OfType<ArgumentSyntax>().ElementAt(argumentIndex);
+                return !rewritten.GetDiagnostics(cancellationToken).Any(diagnostic =>
+                {
+                    if (diagnostic is null)
+                    { throw new ArgumentNullException(nameof(diagnostic)); }
+                    return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
+                        && diagnostic.Id is "CS8604" or "CS8607" && diagnostic.Location.SourceTree == replacement
+                        && argument.Span.Contains(diagnostic.Location.SourceSpan);
+                });
+            }
         }
 
         private static bool HasDisallowNull(IParameterSymbol parameter)

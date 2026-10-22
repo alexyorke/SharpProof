@@ -907,8 +907,15 @@ member reads, delegate/readonly arguments and Task/ValueTask payloads infer
 `notnull` only on the component that needs it. Unrelated tuple components stay
 unconstrained. Effective compiler diagnostics drive these bounds; guarded and
 suppressed calls avoid unnecessary restrictions. Source/metadata helpers, applied
-IDE fixes and C# 8/9/13 CLI/package consumers cover these cases. Stronger
-relational wrapper forwarding and optional projected storage still need work.
+IDE fixes and C# 8/9/13 CLI/package consumers cover these cases. Local aliases
+and conditional choices now forward value preconditions to the necessary source
+parameters. Compiler-flow trials remove redundant contracts, retaining unrelated
+nullable inputs and non-null nullable-value callers. Default-backed projected
+storage instead requires a non-nullable value domain when the original value type
+proves that domain applies. These candidates rerender both parameters and results
+after constraint normalization. Applied fixes verify zero-initialized structs
+without invoking constructors, mutation, identity, suspension, exact faults and
+cancellation. Remaining relational and optional-storage contracts still need work.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

@@ -383,7 +383,7 @@ public static partial class Inference
             {
                 NormalizeConstraints();
                 nullableConstraints = BuildConstraints(variables, nullableAnnotations);
-                candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints)).WithParameterList(RenderParameters());
+                candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints)).WithReturnType(RenderReturnSyntax()).WithParameterList(RenderParameters());
                 changed = CandidateTree();
                 changedCompilation = ReplaceCandidate(changed);
             }

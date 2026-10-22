@@ -71,6 +71,15 @@ internal static class QueryRuntimeChecks
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
                 public static T RequireInput<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value){Interlocked.Increment(ref RequiredTrace.Calls);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(value is null)throw QueryTrace.ContractFailure;return value;}
                 static void RequireReadonly<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value){Interlocked.Increment(ref RequiredTrace.Calls);if(value is null)throw QueryTrace.ContractFailure;}
+                public static int RequiredLocal(int value){var local=value;return RequireInput(local);}
+                public static int RequiredChoice(int left,int right,bool choose){var local=choose?left:right;return RequireInput(local);}
+                public static int[] RequiredUnrelated(int value,int other){var local=value;return new[]{RequireInput(local),other};}
+                public static async Task<int> RequiredLocalTask(int value,Task gate){var local=value;await gate;return RequireInput(local);}
+                public static async ValueTask<int> RequiredLocalValueTask(int value,Task gate){var local=value;await gate;return RequireInput(local);}
+                public static int RequiredDefaultArray(int[] values){values[0]=default;return RequireInput(values[0]);}
+                public static int RequiredDefaultTuple((int value,bool tag) pair){pair.value=default;return RequireInput(pair.value);}
+                public static async Task<int> RequiredDefaultTask(Task<int[]> input){var values=await input;values[0]=default;return RequireInput(values[0]);}
+                public static async ValueTask<int> RequiredDefaultValueTask(ValueTask<int[]> input){var values=await input;values[0]=default;return RequireInput(values[0]);}
                 public static int RequiredPair((int value,bool tag) pair)=>RequireInput(pair.value);
                 public static int RequiredArray(int[] values)=>RequireInput(values[0]);
                 public static int RequiredMember(ReadonlyCell<int> cell)=>RequireInput(cell.Value);
@@ -372,7 +381,25 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> RelationalContracts(CancellationToken cancellationToken){
+                    RequiredTrace.Calls=0;var values=new[]{7};if(QueryProbe.RequiredLocal(7)!=7||QueryProbe.RequiredChoice(7,11,true)!=7||QueryProbe.RequiredChoice(7,11,false)!=11||QueryProbe.RequiredUnrelated(7,11)[1]!=11||QueryProbe.RequiredDefaultArray(values)!=0||values[0]!=0||QueryProbe.RequiredDefaultTuple((7,true))!=0||RequiredTrace.Calls!=6)return false;
+                    var failure=new InvalidOperationException("relational input");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        RequiredTrace.Calls=0;var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);var arrayGate=new TaskCompletionSource<int[]>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;var array=new[]{7};
+                        try{var task=QueryProbe.RequiredLocalTask(7,gate.Task);var valueTask=QueryProbe.RequiredLocalValueTask(7,gate.Task).AsTask();var stored=QueryProbe.RequiredDefaultTask(arrayGate.Task);var storedValue=QueryProbe.RequiredDefaultValueTask(new ValueTask<int[]>(arrayGate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted||stored.IsCompleted||storedValue.IsCompleted||RequiredTrace.Calls!=0||array[0]!=7)return false;
+                            if(outcome is "Value" or "HelperFault"){gate.SetResult(true);arrayGate.SetResult(array);}else if(outcome=="Fault"){gate.SetException(failure);arrayGate.SetException(failure);}else{gate.SetCanceled(canceled.Token);arrayGate.SetCanceled(canceled.Token);}
+                            foreach(var pending in new[]{task,valueTask,stored,storedValue}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=(ReferenceEquals(pending,task)||ReferenceEquals(pending,valueTask)?7:0))return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(RequiredTrace.Calls!=(outcome is "Value" or "HelperFault"?4:0)||array[0]!=(outcome is "Value" or "HelperFault"?0:7))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> ProjectedContracts(CancellationToken cancellationToken){
+                    if(!await RelationalContracts(cancellationToken))return false;
                     RequiredTrace.Calls=0;if(QueryProbe.RequiredPair((7,true))!=7||QueryProbe.RequiredArray(new[]{7})!=7||QueryProbe.RequiredMember(new ReadonlyCell<int>(7))!=7||RequiredTrace.Calls!=3)return false;
                     var failure=new InvalidOperationException("projected input");using var canceled=new CancellationTokenSource();canceled.Cancel();
                     foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
@@ -731,7 +758,16 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> RelationalContracts(string text,CancellationToken cancellationToken){
+                    decimal? number=23m;RequiredTrace.Calls=0;if(QueryProbe.RequiredLocal(number)!=23m||QueryProbe.RequiredChoice(number,number,false)!=23m)return false;
+                    var mixed=QueryProbe.RequiredUnrelated<string?>(text,null);if(!ReferenceEquals(mixed[0],text)||mixed[1]!=null)return false;
+                    var gate=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);var task=QueryProbe.RequiredLocalTask(number,gate.Task);var valueTask=QueryProbe.RequiredLocalValueTask(number,gate.Task).AsTask();if(task.IsCompleted||valueTask.IsCompleted)return false;gate.SetResult(true);if(await task.WaitAsync(cancellationToken)!=23m||await valueTask.WaitAsync(cancellationToken)!=23m)return false;
+                    QueryStoreValue.Calls=0;var values=new[]{default(QueryStoreValue)};if(QueryProbe.RequiredDefaultArray(values).Value!=0||QueryProbe.RequiredDefaultTuple((default(QueryStoreValue),(Uri?)null)).Text!=null||values[0].Value!=0||QueryStoreValue.Calls!=0)return false;
+                    var arrayGate=new TaskCompletionSource<QueryStoreValue[]>(TaskCreationOptions.RunContinuationsAsynchronously);var stored=QueryProbe.RequiredDefaultTask(arrayGate.Task);var storedValue=QueryProbe.RequiredDefaultValueTask(new ValueTask<QueryStoreValue[]>(arrayGate.Task)).AsTask();if(stored.IsCompleted||storedValue.IsCompleted)return false;arrayGate.SetResult(values);if((await stored.WaitAsync(cancellationToken)).Text!=null||(await storedValue.WaitAsync(cancellationToken)).Value!=0||QueryStoreValue.Calls!=0)return false;
+                    return true;
+                }
                 static async Task<bool> ProjectedContracts(string text,CancellationToken cancellationToken){
+                    if(!await RelationalContracts(text,cancellationToken))return false;
                     RequiredTrace.Calls=0;Uri? unrelated=null;var values=new[]{text};var cell=new ReadonlyCell<string>(text);
                     if(!ReferenceEquals(QueryProbe.RequiredPair((text,unrelated)),text)||!ReferenceEquals(QueryProbe.RequiredArray(values),text)||!ReferenceEquals(QueryProbe.RequiredMember(cell),text)||RequiredTrace.Calls!=3||!ReferenceEquals(values[0],text)||!ReferenceEquals(cell.Value,text))return false;
                     var gate=new TaskCompletionSource<(string value,Uri? tag)>(TaskCreationOptions.RunContinuationsAsynchronously);var arrayGate=new TaskCompletionSource<string[]>(TaskCreationOptions.RunContinuationsAsynchronously);RequiredTrace.Calls=0;
