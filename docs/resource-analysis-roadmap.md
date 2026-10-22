@@ -109,6 +109,43 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Default exception messages and resource initialization
+
+The pinned runtime controls now exercise all seven reviewed ordinary exception
+families with both explicit preexisting messages and parameterless constructors.
+The default-constructor controls warm the message lookup before measurement,
+check that repeated instances share the message reference, then count actual
+managed allocation for 128 constructions. All seven fit the existing fixed
+instance bounds after warmup. Constructors are measured without throwing;
+stack traces and native helper message replacement remain separate costs.
+
+All 241 Specs cases passed in the canonical Linux amd64 container on
+.NET 8.0.32 x64, with zero build warnings or errors
+(`artifacts/resource-default-exception-messages-tests-final.log`). The intentional
+parameterless argument-exception cases have a two-expression `CA2208`
+suppression because those exact overloads supply the default messages under
+measurement. The canonical private formatter copied zero source changes
+(`artifacts/resource-default-exception-messages-format.log`).
+
+Source review of the pinned
+[CoreLib resource helper](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/SR.cs#L15)
+found a static lock object and a loading list. A cold lookup explicitly runs
+class constructors for `ResourceManager`, `ResourceReader`, `RuntimeResourceSet`
+and `BinaryReader`, then retrieves the resource. The
+[shared helper](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/Common/src/System/SR.cs#L28)
+can bypass lookup with the resource-key switch, but that does not remove the
+CoreLib static initialization obligation. Both files have verified immutable
+blob identities, downloaded byte counts and SHA-256 hashes in the ignored
+research manifest (`CoreLibSR.cs` and `CommonSR.cs` distinguish their local names).
+
+These observations establish warmed constructor controls. Cold lookup,
+initialization, specialized replacement strings and failure/retry paths still
+need a declared upper bound before cumulative task bytes can be proved. The
+runtime-byte roadmap item remains open, and its root results remain Unknown.
+
+Full quality/API checks passed (`artifacts/resource-default-exception-messages-lint.log`),
+and documentation checks passed (`artifacts/resource-default-exception-messages-docs.log`).
+
 ### Boolean case meaning and metadata provenance
 
 Additional compiler-to-native controls exercise Boolean negation, explicit

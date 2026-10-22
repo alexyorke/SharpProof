@@ -642,14 +642,21 @@ internal sealed class ExceptionStackTraceRuntimeTests
         GC.KeepAlive(ambientDepth);
     }
 
-    [TestCase(0, 136)]
-    [TestCase(1, 136)]
-    [TestCase(2, 136)]
-    [TestCase(3, 136)]
-    [TestCase(4, 136)]
-    [TestCase(5, 144)]
-    [TestCase(6, 152)]
-    public void OrdinarySourceExceptionInstancesFitReviewedInheritedStorage(int family, int upper)
+    [TestCase(0, 136, false)]
+    [TestCase(1, 136, false)]
+    [TestCase(2, 136, false)]
+    [TestCase(3, 136, false)]
+    [TestCase(4, 136, false)]
+    [TestCase(5, 144, false)]
+    [TestCase(6, 152, false)]
+    [TestCase(0, 136, true)]
+    [TestCase(1, 136, true)]
+    [TestCase(2, 136, true)]
+    [TestCase(3, 136, true)]
+    [TestCase(4, 136, true)]
+    [TestCase(5, 144, true)]
+    [TestCase(6, 152, true)]
+    public void OrdinarySourceExceptionInstancesFitReviewedInheritedStorage(int family, int upper, bool defaultMessage)
     {
         if (family is < 0 or > 6)
         { throw new ArgumentOutOfRangeException(nameof(family)); }
@@ -657,16 +664,39 @@ internal sealed class ExceptionStackTraceRuntimeTests
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         for (var index = 0; index < 64; index++)
-        { GC.KeepAlive(Create(family)); }
+        { GC.KeepAlive(Create(family, defaultMessage)); }
+        if (defaultMessage)
+        {
+            Assert.That(ReferenceEquals(Create(family, true).Message, Create(family, true).Message), Is.True,
+                "These measurements require warmed shared default messages.");
+        }
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < 128; index++)
-        { GC.KeepAlive(Create(family)); }
+        { GC.KeepAlive(Create(family, defaultMessage)); }
         var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
         Assert.That(bytes, Is.GreaterThan(0));
         Assert.That(bytes, Is.LessThanOrEqualTo(128L * upper));
 
-        static Exception Create(int kind)
+        static Exception Create(int kind, bool useDefaultMessage)
         {
+            if (useDefaultMessage)
+            {
+                return kind switch
+                {
+                    0 => new DivideByZeroException(),
+                    1 => new OverflowException(),
+#pragma warning disable CA2201 // Measure these runtime-reserved instance layouts without throwing them.
+                    2 => new NullReferenceException(),
+                    3 => new IndexOutOfRangeException(),
+#pragma warning restore CA2201
+                    4 => new InvalidCastException(),
+#pragma warning disable CA2208 // Parameterless constructors are the default-message paths under measurement.
+                    5 => new ArgumentException(),
+                    6 => new ArgumentOutOfRangeException(),
+#pragma warning restore CA2208
+                    _ => throw new ArgumentOutOfRangeException(nameof(kind))
+                };
+            }
             return kind switch
             {
                 0 => new DivideByZeroException("preexisting-message"),
